@@ -1,0 +1,42 @@
+# ───────────────────────────────────────────────────────────────
+# pybers .gitignore
+# Based on standard Python packaging conventions.
+# ───────────────────────────────────────────────────────────────
+
+# ── macOS ──────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# ── Python ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Local config / secrets ─────────────────────────────────────
+.env
+.env.local
+
+# ── Claude Code / harness ──────────────────────────────────────
+# NOTE: CLAUDE.md is COMMITTED on purpose — it is the shared agent
+# constitution. Only local, machine-specific settings are ignored.
+.claude/settings.local.json
+.mcp.json
+
+# ── workarea: ephemeral scratch, never committed ───────────────
+# The whole folder is ignored EXCEPT its README, which documents the
+# convention in-repo. See workarea/README.md.
+workarea/*
+!workarea/README.md
