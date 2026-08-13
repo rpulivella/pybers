@@ -25,8 +25,8 @@ fallback — a missing token is a loud failure, never a guess:
 Usage:
     python3 scripts/ticket.py create --label feat --title "Add a thing" --body-file draft.md
     python3 scripts/ticket.py show 14
-    python3 scripts/ticket.py show 14 --title-only
-    python3 scripts/ticket.py show 14 --body-only
+    python3 scripts/ticket.py export-as-source 14 --title
+    python3 scripts/ticket.py export-as-source 14 --body
     python3 scripts/ticket.py start 14
     python3 scripts/ticket.py edit 14 --body-file revised.md
     python3 scripts/ticket.py status 14 --set "Code Review"
@@ -40,6 +40,11 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-13  Split `export-as-source` out of `show`. Displaying and round-tripping are separate
+            actions: `show` renders through rich and may reformat freely, `export-as-source`
+            emits bytes and must never transform any. Named for what each returns,
+            not for the verb, because both of them read. /ticket-edit was reading the
+            rendered view and writing part of it back, silently reflowing bodies.
 2026-08-13  Removed the system-keyring fallback from resolveToken. `gh` can hold
             several accounts at once, so the keyring was a silent path to the
             wrong identity. A missing token now fails loudly.
@@ -496,6 +501,34 @@ def assignTicket(token: str, number: int, assignee: str) -> None:
     requestJson(url, token, method="POST", payload={"assignees": [assignee]})
 
 
+def printBodyAsRawString(summary: TicketSummary) -> None:
+    """Write a ticket body to stdout byte for byte, so it can be edited and sent back.
+
+    Anything that passes through rich is unusable for that. rich hard-wraps to the
+    terminal width, expands tabs to spaces, substitutes emoji shortcodes (`:warning:`
+    becomes a glyph), and reads square brackets as style markup — a body containing
+    `[bold]`, `[red]` or `[hotfix]` loses those words SILENTLY, with no error.
+    Measured 2026-08-13: "use [bold] tags and [red] markers, plus [88] and [hotfix]"
+    renders as "use  tags and  markers, plus [88] and ". Passing markup=False,
+    highlight=False and soft_wrap=True narrows this but never eliminates it; tab
+    expansion and emoji substitution survive every flag.
+
+    Without this, the only way to fetch an editable body is to curl the API directly,
+    which is forbidden. If a future operation is not covered here, add a subcommand
+    rather than reaching around the tool.
+    """
+    sys.stdout.write(summary["body"])
+
+
+def printTitleAsRawString(summary: TicketSummary) -> None:
+    """Write a ticket title to stdout with nothing added but its own newline.
+
+    Deliberately bare: /changelog-add copies this verbatim into CHANGELOG.md, so
+    any decoration would end up committed.
+    """
+    print(summary["title"])
+
+
 def showTicket(summary: TicketSummary) -> None:
     """Print a ticket for a human reader.
 
@@ -520,6 +553,12 @@ def showTicket(summary: TicketSummary) -> None:
             console.print(f"{label}: [{tint}]{escape(listed)}[/]")
     if summary["body"]:
         console.print()
+        # markup=False because rich reads square brackets as style tags, and a body
+        # carrying [bold], [red] or [hotfix] would lose those words silently.
+        # highlight=False stops it recoloring numbers and URLs inside prose it does
+        # not own. Wrapping stays ON: this is the human-reading path and
+        # terminal-width wrapping is wanted here. It is also why this cannot
+        # round-trip — for that use printBodyAsRawString(), which touches nothing.
         console.print(summary["body"], markup=False, highlight=False)
 
 
@@ -560,20 +599,31 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
 
 
 def cmdShow(arguments: argparse.Namespace) -> int:
-    """Print one ticket, or only its title or body when a skill needs just that."""
-    token = resolveToken()
-    summary = readTicket(token, arguments.number)
-    if arguments.titleOnly:
-        # Deliberately bare: /changelog-add copies this verbatim into CHANGELOG.md.
-        print(summary["title"])
-        return 0
-    if arguments.bodyOnly:
-        # Deliberately unrendered — /ticket-edit reads the exact source back before
-        # writing part of it out again. No trailing newline: the body already
-        # carries its own.
-        print(summary["body"], end="")
-        return 0
+    """Print one ticket for a human reader.
+
+    `show` renders; `export-as-source` does not. That is the whole distinction, and the names
+    are meant to carry it without anyone having to read this file. This one is free
+    to change its formatting at any time, which is exactly why its output must never
+    be sent back — use `export-as-source` for that.
+    """
+    summary = readTicket(resolveToken(), arguments.number)
     showTicket(summary)
+    return 0
+
+
+def cmdExportAsSource(arguments: argparse.Namespace) -> int:
+    """Emit one field of a ticket verbatim, for a skill that will send it back.
+
+    Separate from `show` because displaying and round-tripping are different actions
+    with incompatible contracts: `show` may reformat freely, `export-as-source` must never
+    transform a single byte. Both of them "read" a ticket, which is why neither is
+    called that — the name has to say what comes out.
+    """
+    summary = readTicket(resolveToken(), arguments.number)
+    if arguments.body:
+        printBodyAsRawString(summary)
+    else:
+        printTitleAsRawString(summary)
     return 0
 
 
@@ -839,16 +889,29 @@ def buildParser() -> argparse.ArgumentParser:
     createParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     createParser.set_defaults(handler=cmdCreate)
 
-    showParser = subparsers.add_parser("show", help="print one ticket")
-    showParser.add_argument("number", type=int)
-    showParser.add_argument("--title-only", dest="titleOnly", action="store_true")
-    showParser.add_argument(
-        "--body-only",
-        dest="bodyOnly",
-        action="store_true",
-        help="print the raw body unrendered, for feeding back into edit --body-file",
+    showParser = subparsers.add_parser(
+        "show",
+        help="RENDERED for reading: colored, wrapped to your terminal. Never copy from it.",
     )
+    showParser.add_argument("number", type=int)
     showParser.set_defaults(handler=cmdShow)
+
+    exportParser = subparsers.add_parser(
+        "export-as-source",
+        help="The SOURCE, byte for byte, nothing rendered: the form to edit and send "
+        "back to `edit`. Contrast `show`, which renders.",
+    )
+    exportParser.add_argument("number", type=int)
+    # Mutually exclusive and required, because these never compose: each is a whole
+    # output, not a modifier on a shared one.
+    fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
+    fieldGroup.add_argument(
+        "--body", action="store_true", help="the body, byte for byte, nothing rendered"
+    )
+    fieldGroup.add_argument(
+        "--title", action="store_true", help="the title, with nothing added"
+    )
+    exportParser.set_defaults(handler=cmdExportAsSource)
 
     startParser = subparsers.add_parser("start", help="assign and move to In Progress")
     startParser.add_argument("number", type=int)

@@ -18,7 +18,12 @@ means fetching the current body, changing part of it, and writing the whole thin
 ## Steps
 
 1. Get the issue number from `$ARGUMENTS`. If missing, ask.
-2. Fetch the current state: `python3 scripts/ticket.py show <N>`.
+2. Fetch the current state. Two different reads, for two different purposes:
+   - `python3 scripts/ticket.py show <N>` to *read* it yourself.
+   - `python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"` to get the
+     body you will edit. **Never edit from `show`'s output** — it renders through rich,
+     which reflows long lines, expands tabs, and substitutes emoji shortcodes, so writing
+     it back silently reformats the whole ticket.
 3. Draft the revision. Preserve everything not being changed, **verbatim** — a revision
    that silently reflows the SPEC or drops a section is a regression, not an edit.
 4. **Show the user what changes and wait for explicit approval.** This is the same

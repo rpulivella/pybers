@@ -11,7 +11,7 @@ Add an entry to the `CHANGELOG.md` Unreleased list for the current ticket.
 
 1. Get the ticket number from `$ARGUMENTS` or the branch name (`<label>/<N>-...`).
 2. **If there is a ticket number**, fetch the **issue title only**:
-   `python3 scripts/ticket.py show <N> --title-only`. **If there is none**, see
+   `python3 scripts/ticket.py export-as-source <N> --title`. **If there is none**, see
    [Entries with no ticket](#entries-with-no-ticket) below and write the summary
    yourself.
 3. Read `CHANGELOG.md`, find the `## Unreleased` header, and insert **at the top of its

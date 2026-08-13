@@ -20,7 +20,9 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
    line for this work, run `/changelog-add` and commit it. Then push (`git push`). The
    entry is `- [#<N>] <title>` for ticketed work; `/changelog-add` also handles the
    ticketless case with `[init]` or `[hotfix]`, and a bare bullet is never correct.
-4. Fetch the issue for its title and ACs: `python3 scripts/ticket.py show <N>`.
+4. Fetch the issue. The title is used **verbatim** in step 5, so read it verbatim:
+   - `python3 scripts/ticket.py export-as-source <N> --title` for the title.
+   - `python3 scripts/ticket.py show <N>` for the ACs, which you are reading, not copying.
 5. **Read `.github/pull_request_template.md`** and fill it, writing the result to
    `$TMPDIR/pybers-pr-body-<N>.md` — the OS temp directory, which is per-user and cleaned
    by the system. **Never write a PR body inside the repository**, not even into
