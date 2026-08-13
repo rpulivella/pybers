@@ -14,11 +14,23 @@ documents — built in deep respect for Apple Numbers itself.
 
 ## Why
 
-Editing a `.numbers` file programmatically should be as reliable as editing one by hand
-in Numbers. This library replaces an inherited fork of `numbers-parser` that accumulated
-real correctness bugs — style loss on write, a shared mutable `Style` object corrupting
-an unrelated cell, a row-insert regex that shifted the wrong end of a formula range — that
-ad hoc patching wasn't fixing at the root. Full story in `CLAUDE.md`.
+`pybers` would not exist without [`numbers-parser`](https://github.com/masaccio/numbers-parser)
+by [masaccio](https://github.com/masaccio). Reverse-engineering Apple's entirely
+undocumented `.numbers` archive format — the protobuf schemas, the compression, the
+formula AST — from nothing is a remarkable piece of software archaeology, and it is the
+foundation this project builds on; genuine thanks are owed for it being open source at
+all.
+
+This project grew out of real, hands-on use of a fork of that project extended to add
+formula-writing support, on real files, for a real budget. That extension work surfaced a
+handful of correctness bugs along the way — style loss on write, a shared mutable `Style`
+object corrupting an unrelated cell, a row-insert regex that shifted the wrong end of a
+formula range — ordinary friction from pushing a young feature branch further, not a
+reflection on the project as a whole. `pybers` exists because this developer wanted a
+different foundation for those specific bugs and a few other things she'd been wanting
+regardless — dataclasses, a library-and-CLI/TUI split, first-class named styles — not
+because `numbers-parser` did anything wrong. Full story, including the specific bugs, is
+in `CLAUDE.md`. The original is vendored at `reference/numbers-parser/` for study.
 
 ## Repository map
 

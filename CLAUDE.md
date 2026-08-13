@@ -6,10 +6,21 @@ documents. Built in deep respect for Apple Numbers itself — the goal is for ed
 
 ## Why this exists
 
-The a renovation-budget project used a patched fork of `numbers-parser`
+`pybers` stands on the shoulders of
+[`numbers-parser`](https://github.com/masaccio/numbers-parser) by
+[masaccio](https://github.com/masaccio) — an open-source project that reverse-engineered
+Apple's entirely undocumented `.numbers` archive format (the protobuf schemas, the
+compression, the formula AST) from nothing. That is a rare, substantial piece of software
+archaeology, and it is the actual foundation everything here depends on. Real thanks are
+owed for it existing and being open source at all; nothing below should read as a
+complaint about that project.
+
+The a renovation-budget project used a fork of `numbers-parser` extended with
+formula-writing support, to edit real `.numbers` files directly. Pushing that young
+feature branch further, on real files, surfaced some real correctness bugs — ordinary
+friction from extending a young branch, not a reflection on the project as a whole
 (vendored here at `reference/numbers-parser/`, with the rationale for each fix in
-`reference/patches/`) to edit real `.numbers` files directly. Over that project we hit
-four real correctness bugs in that fork:
+`reference/patches/`):
 
 1. `Table.write()` silently dropped a cell's `Style` (alignment, fill, font) unless a
    `preserve_format=True` flag was passed, and even then only worked after a deeper fix.
@@ -22,18 +33,23 @@ four real correctness bugs in that fork:
 4. A number-format decoder crashed (`TypeError`) on certain `None`-valued fields instead
    of defaulting them.
 
-Plus known, never-fixed gaps: fragile merged-cell handling (a phantom merge-anchor could
-throw `ValueError: Value out of range` at save time), and no way to relocate a block of
-cells as a unit. Patching an inherited, abandoned branch adhoc, bug by bug, is what
-produced the trust problem this library exists to fix. This is a clean break, not a
-continuation.
+Plus a couple of known, unaddressed gaps hit along the way: fragile merged-cell handling
+(a phantom merge-anchor could throw `ValueError: Value out of range` at save time), and no
+way to relocate a block of cells as a unit. Two of the four bugs above were actually
+diagnosed, fixed, and committed back into that fork (see `reference/numbers-parser/`'s own
+git history before it was vendored, and `reference/patches/` for the rest) — the intent
+was always to leave things better, not just extract value.
 
-**New project, not a fork — decided.** A GitHub-style fork carries git lineage and
-implies staying API-compatible with upstream `numbers-parser`; neither is true of the
-approach here (dataclasses, camelCase, a dual-consumer library/CLI split, named styles).
-`reference/numbers-parser/` is vendored source to study, copied in with its `.git`
-history stripped (like `another project`'s `reference/ola/`), not a dependency
-this project extends.
+`pybers` exists for reasons independent of any of that: this developer wanted dataclasses
+instead of the existing object model, a library-and-CLI/TUI split, and first-class named
+styles from the start — things worth a clean design rather than retrofitting onto
+someone else's architecture. **New project, not a fork — decided.** A GitHub-style fork
+carries git lineage and implies staying API-compatible with upstream; neither fits an
+approach this different (dataclasses, camelCase, a dual-consumer library/CLI split, named
+styles). `reference/numbers-parser/` is vendored source to study, copied in with its
+`.git` history stripped (like `another project`'s `reference/ola/`), not a
+dependency this project extends — and some of the fixes documented above may be worth
+proposing back upstream at some point, separate from this project's own direction.
 
 **Python, not Rust — decided.** The reverse-engineered iWork archive protobuf schemas
 already exist in Python; rebuilding that reverse-engineering in Rust would re-derive the
@@ -98,14 +114,36 @@ front end while doing so.
 
 ## Open architectural decisions (not yet made)
 
-1. **Protobuf schema reuse.** Whether to vendor/reuse the already-reverse-engineered
-   low-level iWork archive protobuf schemas from `reference/numbers-parser/` (the
-   `.proto`-derived classes for `TSTArchives`/`TSWPArchives`/etc.) as the substrate,
-   versus rebuilding archive parsing from zero. Recommendation: reuse the schemas (years
-   of real reverse-engineering work, unrelated to the four bugs above), but write an
-   entirely new, tested Python API layer on top — none of those bugs lived in the
-   protobuf schema itself, they lived in the higher-level read/write/style/formula logic.
-   Confirm before starting `pybers.archive`.
+1. ~~**Protobuf schema reuse.**~~ **DECIDED 2026-08-13: extract our own from Numbers.app.**
+   The question was framed as reuse-the-vendored-schemas versus rebuild-from-zero, and both
+   framings were wrong, because `reference/numbers-parser/`'s `.proto` files are not authored
+   work to reuse or re-derive. Its `Makefile` extracts them from `/Applications/Numbers.app`
+   — `protodump.py` dumps the protobuf descriptors Apple compiles into the binary,
+   `rename_proto_files.py` normalizes them, `protoc --python_out` generates the `_pb2.py`,
+   and `src/protos/` is a git-tracked copy of that dump. Both layers are machine output over
+   Apple's own binary. Extraction is not the hard part; discovering that the descriptors are
+   embedded, and writing the dumper, was.
+
+   So `pybers` runs **its own** extraction, from the same source of truth Apple ships. Three
+   reasons beyond ownership: the schemas then match the Numbers version this project actually
+   round-trips against, rather than whatever was installed when someone else last
+   bootstrapped; the step is re-runnable when Apple ships a new Numbers, instead of waiting
+   on an upstream refresh or hand-patching; and it keeps the lineage honest — the technique
+   is learned from that `Makefile` (credit it in the bootstrap script's docstring) without
+   copying its output. `reference/numbers-parser/src/protos/` becomes a **differential
+   check**: a matching dump corroborates both, and a difference is a finding worth
+   understanding rather than a silent divergence.
+
+   Two practical constraints this imposes. Their bootstrap unsigns the app
+   (`/tmp/Numbers.unsigned.app`, entitlements stripped) to read the binary, and the
+   `mapping.json` step *executes* that unsigned copy — the proto dump is the benign half and
+   the mapping extraction needs understanding before it is run. And because the bootstrap
+   depends on a local `Numbers.app`, its **generated output must be committed** so that
+   `pip install pybers` works on a machine without Numbers present.
+
+   (Licensing was never the constraint: `reference/numbers-parser/` is MIT, Jon Connell 2021,
+   so copying with attribution would have been permitted. The bar here is ownership of the
+   foundation and respect for someone else's craft, which is higher than the license.)
 2. **Named styles.** Bold/italic alone are insufficient — Numbers supports real named,
    reusable styles (a "Heading 1"-type named style referenced by many cells/runs, so
    editing the named style updates every place that uses it), not just inline formatting.
