@@ -28,6 +28,13 @@ htmlcov/
 # ── Local config / secrets ─────────────────────────────────────
 .env
 .env.local
+.env.*.local
+# CLAUDE.md/scripts/ticket.py name .dev.vars as the sanctioned home for the GitHub
+# token. Never let this line be removed — see the author's other tooling own .gitignore for why
+# this comment exists: it was named as git-ignored there once and was not.
+.dev.vars
+.dev.vars.*
+.secrets
 
 # ── Claude Code / harness ──────────────────────────────────────
 # NOTE: CLAUDE.md is COMMITTED on purpose — it is the shared agent
