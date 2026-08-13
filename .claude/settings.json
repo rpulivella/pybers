@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch",
+      "WebSearch",
+
+      "Bash(pytest:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(.venv/bin/python -m pytest:*)",
+
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch --show-current:*)",
+      "Bash(git rev-parse:*)",
+
+      "Bash(python3 scripts/ticket.py list:*)",
+      "Bash(python3 scripts/ticket.py show:*)",
+      "Bash(python3 scripts/pr.py find:*)"
+    ]
+  }
+}
