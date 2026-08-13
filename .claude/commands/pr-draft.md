@@ -21,7 +21,10 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
    entry is `- [#<N>] <title>` for ticketed work; `/changelog-add` also handles the
    ticketless case with `[init]` or `[hotfix]`, and a bare bullet is never correct.
 4. Fetch the issue for its title and ACs: `python3 scripts/ticket.py show <N>`.
-5. **Read `.github/pull_request_template.md`** and fill it. Rules:
+5. **Read `.github/pull_request_template.md`** and fill it, writing the result to
+   `$TMPDIR/pybers-pr-body-<N>.md` — the OS temp directory, which is per-user and cleaned
+   by the system. **Never write a PR body inside the repository**, not even into
+   `workarea/`; it is transient tool input, not scratch worth keeping. Rules:
    - **Title**: `[#<N>] <issue title verbatim>` — do not paraphrase.
    - **Ticket**: the `Link:` line carries the issue URL, and `Closes #<N>` stays on its
      own line — that keyword is what closes the issue on merge.
@@ -29,8 +32,14 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
    - **Detail your changes**: keep only the checkboxes that apply; remove the rest.
    - **Breaking Changes**: `None` after each heading, or a short list.
    - **Checklist**: check what is genuinely true.
-6. Create the PR as **draft**: `gh pr create --draft --base develop`.
-7. Output the PR URL.
+6. Create the PR as **draft**:
+   ```
+   python3 scripts/pr.py create --title "[#<N>] <title>" --body-file "$TMPDIR/pybers-pr-body-<N>.md"
+   ```
+   Head is the checked-out branch and base is `develop`, both by default. `--dry-run`
+   first prints the body without opening anything. Pass the body as a **file** — never
+   through a shell heredoc, which would mangle the backticks in every code span.
+7. Output the PR URL, which `pr.py` prints.
 
 ## Hard rules
 

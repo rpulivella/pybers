@@ -17,8 +17,11 @@ rather than TypedDict for data, and is documented in `CLAUDE.md`.
 ```
 ticket.py    file and move tickets on GitHub Issues and the pybers Project board,
              the single sanctioned path — never hand-run the GitHub API around it
-             (see the command map below). INERT until a GitHub remote and Project
-             board exist — see CLAUDE.md / the handoff doc.
+             (see the command map below). INERT until a Project board exists and
+             projectNumber is set — see CLAUDE.md / the handoff doc.
+pr.py        open, inspect, promote and merge pull requests. Exists so that no
+             skill needs `gh`, whose identity is an ambient keyring holding
+             several accounts at once. Live now.
 ```
 
 `pr-preflight-check.py` (the deterministic half of `/pr-review-code`) does not exist yet
@@ -53,20 +56,36 @@ reach, follow the `test-<topic>.py` / synthetic-data / glob-discovered conventio
 | `close` | `/ticket-startwork` — `--reason completed` on delivery, `--reason not-planned` on abandonment |
 | `list` | `/release-tag` — reconciling shipped tickets against `CHANGELOG.md`. Also the everyday manual command for reading the board. |
 
-Opening the pull request itself is **not** here: `/pr-draft` shells out to `gh pr create
---draft`, and merging is `gh pr merge`. Pull requests are deliberately outside this tool,
-which owns Issues and the Project board only.
+Pull requests are **not** here: `ticket.py` owns Issues and the Project board only.
+They live in `pr.py`, which shares this tool's auth rather than duplicating it.
+
+## pr.py commands, and the skill that calls each
+
+| Command | Called by |
+|---|---|
+| `create` | `/pr-draft` — always opens a draft; there is no flag to open otherwise |
+| `find` | `/pr-review-code` (`--number-only`) — resolve the PR for the current branch |
+| `ready` | `/pr-review-code` — the only sanctioned promotion out of draft |
+| `merge` | `/pr-review-code` — `--subject` required; `merge` by default, `squash` by exception |
+
+`--base` defaults to `develop`. A web-facing repository whose deploy tracks another branch
+passes `--base` instead of editing the default.
+
+**Never use `gh` for any of this.** `gh` authenticates from an OAuth token in the system
+keyring, which can hold several accounts at once, so the account it acts as is ambient
+state no repository can pin. `pr.py` uses the explicit PAT below, which keeps every GitHub
+interaction here on exactly two channels: a PAT for the API, and SSH for git itself.
 
 ## ticket.py authentication
 
-Same pattern as every other repo of this developer's, `another repository` included. Resolved in
-order: `GITHUB_TOKEN` or `GH_TOKEN` in the environment, then a `GITHUB_TOKEN=` line in the
-git-ignored `.dev.vars` at the repository root, then the token `gh` holds in the system
-keyring.
+`pr.py` reuses this, so there is exactly one auth story here. Resolved in order:
+`GITHUB_TOKEN` or `GH_TOKEN` in the environment, then a `GITHUB_TOKEN=` line in the
+git-ignored `.dev.vars` at the repository root. **There is deliberately no third
+fallback** — a missing token raises rather than guessing.
 
-**Prefer `.dev.vars`.** The keyring entry belongs to `gh`, and macOS grants Keychain
-access per binary, so reading it from Python prompts for a password on every single run.
-Either earlier source avoids that entirely.
+**The system keyring is never consulted.** It holds `gh`'s own token, `gh` can be signed
+into several accounts at once, and a fallback cascade is precisely how the wrong identity
+gets used in silence.
 
 The token must be a **classic** personal access token carrying both `repo` and `project`.
 Fine-grained tokens cannot reach user-owned Project boards at all — that permission is not
@@ -80,9 +99,11 @@ These hold for every script here.
 1. **Never shell out to the OS when a Python library can do the work. Not ever.**
    Introducing a maintained dependency beats calling a console app. HTTP goes through
    `urllib.request` (typed exceptions), JSON through `json`, YAML through `PyYAML` —
-   never `curl`, never `jq`. The one sanctioned exception is a genuinely external
-   toolchain with no Python equivalent (`git`, `gh`) — those stay `subprocess`, isolated
-   behind one helper, with explicit return-code handling and a comment saying why.
+   never `curl`, never `jq`, **never `gh`**. The one sanctioned exception is a genuinely
+   external toolchain with no Python equivalent (`git`) — that stays `subprocess`,
+   isolated behind one helper, with explicit return-code handling and a comment saying
+   why. `gh` was removed from that list on 2026-08-13: it is not merely a shell-out, it
+   is a second identity system, and `pr.py` covers what it was used for.
 2. **camelCase** for functions, variables, and module-level config alike.
 3. **Full type annotations on everything** — parameters, returns, and module data, even
    when the type is obvious. Dataclasses for structured config, not TypedDict.
@@ -109,7 +130,12 @@ relying on captured stdout — `workarea/logs/<script>-<timestamp>.log`.
 ## Setup
 
 ```
-/usr/bin/env python3 -m pip install --upgrade rich rich_argparse keyring
+/usr/bin/env python3 -m pip install --upgrade rich rich_argparse
 ```
+
+**Run these scripts with the system interpreter, not the project venv.** `rich` is
+installed for system Python; `.venv` carries only the library's own test dependencies, so
+`source .venv/bin/activate && python3 scripts/pr.py` fails on the `rich` import. `pytest`
+is the reverse — it runs under `.venv`.
 
 See each script's docstring for its specific prerequisites.

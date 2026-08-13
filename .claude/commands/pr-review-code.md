@@ -19,7 +19,7 @@ handoff doc.
 ## Steps
 
 1. Get the PR number from `$ARGUMENTS`, or from the current branch
-   (`gh pr view --json number --jq .number`). If there is no PR, stop and say so.
+   (`python3 scripts/pr.py find --number-only`). If there is no PR, stop and say so.
 2. **Run the preflight and stop if it fails:**
    ```
    python3 scripts/pr-preflight-check.py --pr <N>
@@ -56,7 +56,8 @@ handoff doc.
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
 5. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
-6. **Only on a green preflight with no unresolved finding**, promote it: `gh pr ready <N>`.
+6. **Only on a green preflight with no unresolved finding**, promote it:
+   `python3 scripts/pr.py ready <N>`.
 
 ## Waiving a stage
 
@@ -85,13 +86,20 @@ more than the one stage in question.
 One command, watched, needing no ceremony. After a clean review:
 
 ```
-gh pr merge <N> --merge --delete-branch --subject "[<N>] <prefix>: <summary>"
+python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
 ```
 
-**Never `--squash`.** A branch carries genuinely separate concerns and each earned its
-own commit on purpose; squashing destroys which change was which.
+**A real merge is the default and the norm.** A branch usually carries genuinely separate
+concerns and each commit earned its place; squashing would destroy which change was which.
+The branch is deleted on merge unless `--keep-branch` is passed.
 
-Pass `--subject` so the merge commit follows the house format rather than GitHub's
-default. `Closes #<N>` in the body closes the issue.
+**`--method squash` is the exception, not a preference.** Reach for it only when the branch
+is one logical change whose history is fixup churn rather than separable steps — and say in
+the review why.
+
+`--subject` is required, so the merge commit follows the house format rather than GitHub's
+generated default. `Closes #<N>` in the body closes the issue.
+
+`pr.py` refuses to merge a PR that is still a draft, so step 6 cannot be skipped.
 
 $ARGUMENTS

@@ -17,10 +17,10 @@ board is created, and everything here starts working unchanged.
 Talks to GitHub over urllib: REST for issues, GraphQL for the Project board.
 Never shells out to `gh` or `jq`, per the house rules in scripts/README.md.
 
-Authentication resolves in this order:
+Authentication resolves in this order, and there is deliberately no third
+fallback — a missing token is a loud failure, never a guess:
     1. GITHUB_TOKEN or GH_TOKEN in the environment
     2. a GITHUB_TOKEN= line in the git-ignored .dev.vars at the repository root
-    3. the token `gh` already stored in the system keyring
 
 Usage:
     python3 scripts/ticket.py create --label feat --title "Add a thing" --body-file draft.md
@@ -36,10 +36,13 @@ Usage:
     python3 scripts/ticket.py block 25 --unblock 17
     python3 scripts/ticket.py list --status Todo
 
-Requires rich and keyring:
-    /usr/bin/env python3 -m pip install --upgrade rich keyring
+Requires rich:
+    /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-13  Removed the system-keyring fallback from resolveToken. `gh` can hold
+            several accounts at once, so the keyring was a silent path to the
+            wrong identity. A missing token now fails loudly.
 2026-08-12  Ported from another repository. projectNumber is a placeholder until the
             pybers GitHub repo and Project board exist.
 """
@@ -53,7 +56,6 @@ __date__ = "2026/08/12"
 __usage__ = "python3 scripts/ticket.py <command> [options]"
 
 import argparse
-import base64
 import json
 import os
 import sys
@@ -78,8 +80,6 @@ graphqlRoot: str = "https://api.github.com/graphql"
 # Issue dependencies arrived after the unversioned endpoints and require this explicitly.
 dependencyApiVersion: str = "2026-03-10"
 
-keyringService: str = "gh:github.com"
-keyringPrefix: str = "go-keyring-base64:"
 
 validLabels: tuple[str, ...] = (
     "feat",
@@ -128,15 +128,15 @@ class BoardCoordinates(TypedDict):
 def readTokenFromSecretsFile() -> str | None:
     """Return a token from the repository's git-ignored .dev.vars, if one is there.
 
-    Reading it here is what keeps this tool from touching the system keyring at
-    all: the keyring entry belongs to `gh`, and macOS challenges every other
-    binary that reads it, which means a password prompt on every single run.
+    This file is the sanctioned home for the token. It is git-ignored, scoped to
+    this repository, and read explicitly, so the identity in use is never
+    inherited from ambient machine state.
     """
     secretsPath = Path(__file__).resolve().parent.parent / ".dev.vars"
     if not secretsPath.is_file():
         return None
 
-    for line in secretsPath.read_text().splitlines():
+    for line in secretsPath.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue
@@ -147,11 +147,12 @@ def readTokenFromSecretsFile() -> str | None:
 
 
 def resolveToken() -> str:
-    """Return a GitHub token from the environment, the secrets file, or the keyring.
+    """Return a GitHub token from the environment or the git-ignored secrets file.
 
-    The keyring is deliberately last. It holds `gh`'s own token, and macOS grants
-    Keychain access per binary, so reading it from Python prompts for a password
-    every time. Either of the earlier sources avoids that entirely.
+    There is deliberately no third fallback. The system keyring holds `gh`'s own
+    token, and `gh` can be signed into several accounts at once, so reading it
+    would silently pick an identity this tool never chose. An explicit token or a
+    loud failure is the only safe pair of outcomes.
     """
     for variableName in ("GITHUB_TOKEN", "GH_TOKEN"):
         fromEnvironment = os.environ.get(variableName)
@@ -162,24 +163,12 @@ def resolveToken() -> str:
     if fromFile:
         return fromFile
 
-    try:
-        import keyring
-    except ImportError as exc:
-        raise RuntimeError(
-            "No GITHUB_TOKEN in the environment and the keyring module is not installed. "
-            "Run: /usr/bin/env python3 -m pip install --upgrade keyring"
-        ) from exc
-
-    stored = keyring.get_password(keyringService, repositoryOwner)
-    if not stored:
-        raise RuntimeError(
-            f"No token found in the keyring under {keyringService!r}. "
-            "Authenticate with `gh auth login`, or export GITHUB_TOKEN."
-        )
-
-    if stored.startswith(keyringPrefix):
-        return base64.b64decode(stored[len(keyringPrefix):]).decode().strip()
-    return stored.strip()
+    raise RuntimeError(
+        "No GitHub token found. Set GITHUB_TOKEN in the environment, or add a "
+        "GITHUB_TOKEN= line to the git-ignored .dev.vars at the repository root. "
+        "The system keyring is never consulted: it belongs to `gh`, which may hold "
+        "several accounts, and guessing one is how the wrong identity gets used."
+    )
 
 
 def requestJson(
@@ -545,7 +534,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {bodyPath}")
         return 1
-    body = bodyPath.read_text()
+    body = bodyPath.read_text(encoding="utf-8")
 
     if arguments.dryRun:
         console.print("[yellow]Dry run — nothing was filed.[/]")
@@ -627,7 +616,7 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {bodyPath}")
             return 1
-        body = bodyPath.read_text()
+        body = bodyPath.read_text(encoding="utf-8")
 
     if arguments.dryRun:
         console.print("[yellow]Dry run — nothing was changed.[/]")
