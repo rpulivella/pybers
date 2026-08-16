@@ -227,9 +227,17 @@ This IS now its own real repo (`git init -b develop`, under `~/code/
 git-local/`, same as every other repo of this developer's) — no longer living inside the
 a renovation-budget project folder. `.venv`/`__pycache__`/`.pytest_cache` are
 already covered by pre-existing global sync-ignore bare-name rules; no setup needed
-there. `dist`/`build`/`*.egg-info` are NOT yet ignored (none exist yet) — add a
-path-scoped sync-ignore rule the moment `python -m build` (or similar) is first run,
-per the standing global-CLAUDE.md rule about action-triggered ignore setup.
+there. `dist`/`build` are now path-scoped in `the sync ignore rules`, added before the
+first build per the action-triggered rule; `*.egg-info` is covered globally.
+
+**Hatchling, not setuptools — decided 2026-08-15.** `src/pybers/` holds 34 non-Python
+files (33 `.proto` schemas plus their provenance README) that must ship in the wheel.
+Hatchling includes everything under the package directory by default; setuptools omits
+non-Python files unless `package-data` or a `MANIFEST.in` says otherwise, and fails
+silently when it does — the wheel builds clean and arrives incomplete. Hatchling also
+writes PEP 376 `.dist-info` into site-packages rather than scattering setuptools'
+legacy `.egg-info` through the source tree. No C extensions here, so setuptools' real
+strengths do not apply; its only advantage is familiarity.
 
 ### GitHub setup — do this when ready to make the ticket workflow real
 

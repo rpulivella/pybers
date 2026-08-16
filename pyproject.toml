@@ -11,7 +11,14 @@ requires-python = ">=3.11"
 authors = [
     { name = "Richard P Ulivella", email = "rpulivella@icloud.com" },
 ]
-dependencies = []
+dependencies = [
+    # Required at import time, not merely to build: every module in pybers/_generated
+    # imports google.protobuf and calls ValidateProtobufRuntimeVersion, which raises
+    # VersionError when the runtime is older than the gencode. The floor is the gencode
+    # version stamped into those modules (6.32.1, from protoc 32.1); re-running
+    # scripts/protos-extract.py with a newer protoc raises it and this must follow.
+    "protobuf>=6.32.1",
+]
 
 # License is intentionally undecided — see CLAUDE.md. Not set here until chosen.
 
@@ -23,3 +30,15 @@ testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pybers"]
+
+# ── Generated code is excluded from every quality tool ─────────────────────────
+# src/pybers/_generated/ is protoc output and src/pybers/protos/ is the schema dump
+# it came from. Neither is authored here, neither may be hand-edited (a correction
+# would be destroyed by the next extraction), and both would otherwise drown any
+# real finding in thousands of machine-written lines. Configured ahead of the tools
+# themselves so that adding a linter later cannot accidentally adopt them.
+[tool.ruff]
+extend-exclude = ["src/pybers/_generated", "src/pybers/protos"]
+
+[tool.mypy]
+exclude = ["^src/pybers/_generated/", "^src/pybers/protos/"]
