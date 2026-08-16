@@ -44,6 +44,10 @@ Requires rich. protodump additionally requires protobuf and tqdm, and generating
 Python from the dumped schemas requires protoc on PATH.
 
 UPDATES
+2026-08-16  Pinned encoding on both subprocess calls. text=True alone decodes with the
+            ambient locale, so a context without LANG mangled the toolchain's own
+            diagnostics — which are the text quoted into the RuntimeError, making the
+            one explanation of a failure the thing that got corrupted.
 2026-08-13  Written. Replaces the abandoned "reuse the vendored _pb2 classes" plan;
             see CLAUDE.md decision 1 for why extracting our own is the correct call.
 """
@@ -231,7 +235,13 @@ def runProtodump(
     completed = subprocess.run(
         [sys.executable, str(protodumpPath), str(application.bundlePath), str(outputDirectory)],
         capture_output=True,
+        # text=True alone decodes with the ambient locale, so the same run under a
+        # cron or launchd context with no LANG turns an em-dash in protodump's own
+        # output into mojibake — silently, without raising. That matters here because
+        # this output IS the error message raised below.
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if completed.returncode != 0:
@@ -323,7 +333,12 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
             *[str(path) for path in schemas],
         ],
         capture_output=True,
+        # Pinned for the same reason as the protodump call above: protoc's diagnostics
+        # are quoted verbatim into the RuntimeError below, so a locale-dependent decode
+        # would corrupt the one thing that explains the failure.
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if completed.returncode != 0:

@@ -40,6 +40,11 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-16  Added GitHubHttpError so requestJson carries the HTTP status as a number.
+            pr.py's unpushed-branch guard was recovering it by searching the message
+            for "404", which reported an expired token as an unpushed branch: a
+            private repository answers 404, not 403, to a credential that cannot see
+            it. A RuntimeError subclass, so every existing handler keeps working.
 2026-08-13  Split `export-as-source` out of `show`. Displaying and round-tripping are separate
             actions: `show` renders through rich and may reformat freely, `export-as-source`
             emits bytes and must never transform any. Named for what each returns,
@@ -130,6 +135,27 @@ class BoardCoordinates(TypedDict):
     statusOptionIds: dict[str, str]
 
 
+class GitHubHttpError(RuntimeError):
+    """A refusal from GitHub, carrying its status code as a number.
+
+    A `RuntimeError` subclass on purpose: every existing `except RuntimeError`
+    keeps catching it unchanged, so this adds a capability without moving any
+    caller onto a new failure path.
+
+    The status has to survive as an integer because the alternative — recovering
+    it from the formatted message — silently conflates causes. A private
+    repository answers **404** to a token that has expired or lost `repo` scope,
+    exactly as it does to a branch that is genuinely absent, so a guard matching
+    on the string "404" reported a dead credential as an unpushed branch and sent
+    the user off to run a `git push` that could not possibly help. A message is
+    prose and will be reworded; a status code is a value, so carry the value.
+    """
+
+    def __init__(self, statusCode: int, message: str) -> None:
+        super().__init__(message)
+        self.statusCode = statusCode
+
+
 def readTokenFromSecretsFile() -> str | None:
     """Return a token from the repository's git-ignored .dev.vars, if one is there.
 
@@ -185,8 +211,13 @@ def requestJson(
 ) -> Any:
     """Perform one authenticated JSON request and return the decoded body.
 
-    Raises RuntimeError carrying GitHub's own message, because the API explains
-    its refusals far better than a status code does.
+    Raises ``GitHubHttpError`` carrying GitHub's own message, because the API
+    explains its refusals far better than a status code does — and carrying the
+    status *as a number* alongside it, because a caller that needs to branch on
+    one must not go looking for it in the prose. A guard that recovered the status
+    by searching the message for "404" told a user to push an already-pushed
+    branch whenever a token expired, since a private repository answers 404 rather
+    than 403 for a credential that cannot see it.
     """
     body = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(url, data=body, method=method)
@@ -205,7 +236,9 @@ def requestJson(
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")
-        raise RuntimeError(f"GitHub returned HTTP {exc.code}: {detail}") from exc
+        raise GitHubHttpError(
+            exc.code, f"GitHub returned HTTP {exc.code}: {detail}"
+        ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Could not reach GitHub: {exc.reason}") from exc
 

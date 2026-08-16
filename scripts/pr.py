@@ -37,6 +37,13 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-16  Fixed the four defects a code review found on 2026-08-14, all of them in
+            the half of this file that had never executed. A failed branch delete no
+            longer reports the completed merge as a failure; `find` says which of
+            three things happened instead of signalling "none" with silence; the
+            unpushed-branch guard reads a status code rather than searching the error
+            text for "404"; and `find` filters on base, refusing to choose when more
+            than one pull request still matches.
 2026-08-13  Written to take pull requests off `gh`. See the module docstring for
             why: `gh` acts as whichever account is active in its keyring, which
             no repository can pin.
@@ -76,6 +83,27 @@ validMergeMethods: tuple[str, ...] = (
     "merge",
     "squash",
 )
+
+# Exit codes are distinguished because a skill reads them and acts. Collapsing
+# "there is no pull request" into "something went wrong" made a missing token
+# report as a missing pull request: /pr-review-code asks `find --number-only`
+# whether a PR exists, and a 401 answered "no" just as convincingly as an empty
+# list did. "I could not determine X" and "X is not there" are different claims,
+# and only one of them is a fact this tool holds.
+notFoundExitCode: int = 1
+errorExitCode: int = 2
+
+# The merge landed and only the cleanup did not. Distinct from both of the above
+# because the recovery is neither "retry" nor "investigate" — it is "finish the
+# last step by hand, and on no account run merge again".
+partialSuccessExitCode: int = 3
+
+# What `find --number-only` prints when there is genuinely no pull request. A word
+# rather than an empty line, because the caller is an agent reading stdout: it can
+# tell this apart from a number and from an error message, whereas it cannot tell
+# an empty stdout apart from a command that died before printing. Deliberately not
+# a number and not a valid PR reference, so it can never be mistaken for one.
+noOpenPullRequestMarker: str = "no-open-pull-request"
 
 
 class PullRequestSummary(TypedDict):
@@ -153,6 +181,13 @@ def assertBranchIsPushed(ticket: ModuleType, token: str, branch: str) -> None:
     GitHub refuses to open a pull request from an unpushed branch with a message
     about an invalid field, which reads as a bug in this tool rather than as the
     missing `git push` it actually is.
+
+    The status is read from the exception's own `statusCode`, never by searching
+    its message. Matching the string "404" conflated two very different causes:
+    a **private** repository — which this one will be — answers 404 rather than
+    403 to a token that has expired or lost `repo` scope, so an expired credential
+    was reported as an unpushed branch and sent the user to run a `git push` that
+    could not possibly help.
     """
     url = (
         f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
@@ -160,11 +195,13 @@ def assertBranchIsPushed(ticket: ModuleType, token: str, branch: str) -> None:
     )
     try:
         ticket.requestJson(url, token)
-    except RuntimeError as exc:
-        if "404" in str(exc):
+    except ticket.GitHubHttpError as exc:
+        if exc.statusCode == 404:
             raise RuntimeError(
-                f"Branch {branch!r} does not exist on the remote. Push it first: "
-                f"git push -u origin {branch}"
+                f"Branch {branch!r} was not found on the remote. Usually that means it "
+                f"is unpushed — push it first:\n  git push -u origin {branch}\n"
+                f"On a private repository a 404 can also mean the token cannot see the "
+                f"repository at all, so check the credential if the branch is pushed."
             ) from exc
         raise
 
@@ -194,11 +231,23 @@ def createDraftPullRequest(
 
 
 def findOpenPullRequest(
-    ticket: ModuleType, token: str, head: str
+    ticket: ModuleType, token: str, head: str, base: str
 ) -> PullRequestSummary | None:
-    """Return the open pull request for a branch, or None when there is none."""
+    """Return the open pull request for a branch and base, or None when there is none.
+
+    Filtered by base as well as head, and it must be. GitHub permits several open
+    pull requests from one head branch to different bases, and returns them newest
+    first — so taking the first of an unfiltered list picks whichever was opened
+    most recently rather than the one being asked about. `/pr-review-code` feeds
+    that number straight into `ready` and `merge`, so guessing here would promote
+    and merge the wrong pull request.
+
+    More than one match after filtering is refused rather than resolved. There is
+    no correct guess available, and choosing silently is how the wrong one gets
+    merged.
+    """
     query = urllib.parse.urlencode(
-        {"head": f"{ticket.repositoryOwner}:{head}", "state": "open"}
+        {"head": f"{ticket.repositoryOwner}:{head}", "base": base, "state": "open"}
     )
     url = (
         f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
@@ -207,6 +256,13 @@ def findOpenPullRequest(
     matches = ticket.requestJson(url, token)
     if not matches:
         return None
+    if len(matches) > 1:
+        numbers = ", ".join(f"#{match['number']}" for match in matches)
+        raise RuntimeError(
+            f"{len(matches)} open pull requests from {head!r} into {base!r}: {numbers}. "
+            "Refusing to choose one. Close the ones that do not belong, or name the "
+            "number explicitly."
+        )
     return summarizePullRequest(matches[0])
 
 
@@ -284,7 +340,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     bodyPath = Path(arguments.bodyFile)
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {bodyPath}")
-        return 1
+        return errorExitCode
     body = bodyPath.read_text(encoding="utf-8")
 
     head = arguments.head or readCurrentBranch()
@@ -292,7 +348,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
         console.print(
             f"[red]Refusing to open a pull request from {head!r} into itself.[/]"
         )
-        return 1
+        return errorExitCode
 
     if arguments.dryRun:
         console.print("[yellow]Dry run — no pull request was opened.[/]")
@@ -306,11 +362,14 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     ticket = loadTicketModule()
     token = ticket.resolveToken()
 
-    existing = findOpenPullRequest(ticket, token, head)
+    existing = findOpenPullRequest(ticket, token, head, arguments.base)
     if existing is not None:
-        console.print(f"[yellow]An open pull request already exists for {head!r}.[/]")
+        console.print(
+            f"[yellow]An open pull request already exists for {head!r} "
+            f"into {arguments.base!r}.[/]"
+        )
         showPullRequest(existing)
-        return 1
+        return errorExitCode
 
     assertBranchIsPushed(ticket, token, head)
     summary = createDraftPullRequest(
@@ -322,16 +381,33 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
 
 
 def cmdFind(arguments: argparse.Namespace) -> int:
-    """Print the open pull request for a branch, if there is one."""
+    """Print the open pull request for a branch, if there is one.
+
+    Three outcomes, and each one says which it is in what it prints: a number, the
+    `no-open-pull-request` marker, or an error. The exit codes carry the same three
+    for anything scripting this, but the printed output is the contract, because
+    the consumer is an agent reading stdout rather than a shell reading `$?`.
+    """
     head = arguments.head or readCurrentBranch()
     ticket = loadTicketModule()
-    summary = findOpenPullRequest(ticket, ticket.resolveToken(), head)
+    summary = findOpenPullRequest(
+        ticket, ticket.resolveToken(), head, arguments.base
+    )
 
     if summary is None:
+        # Said out loud, never signalled by silence. An empty stdout is
+        # indistinguishable from a command that failed before it printed anything,
+        # which is how "your token expired" came to be reported as "there is no
+        # pull request". The exit code below carries the same fact for scripts;
+        # neither is load-bearing on its own.
         if arguments.numberOnly:
-            return 1
-        console.print(f"[yellow]No open pull request for {head!r}.[/]")
-        return 1
+            console.print(noOpenPullRequestMarker)
+        else:
+            console.print(
+                f"[yellow]No open pull request for {head!r} "
+                f"into {arguments.base!r}.[/]"
+            )
+        return notFoundExitCode
 
     if arguments.numberOnly:
         console.print(summary["number"])
@@ -367,7 +443,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
     if arguments.method not in validMergeMethods:
         console.print(f"[red]Unknown merge method {arguments.method!r}.[/]")
         console.print(f"Choose one of: {', '.join(validMergeMethods)}")
-        return 1
+        return errorExitCode
 
     ticket = loadTicketModule()
     token = ticket.resolveToken()
@@ -378,7 +454,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
             f"[red]#{summary['number']} is still a draft.[/] "
             "Run /pr-review-code, which owns the promotion out of draft."
         )
-        return 1
+        return errorExitCode
 
     if arguments.dryRun:
         console.print("[yellow]Dry run — nothing was merged.[/]")
@@ -397,9 +473,26 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         f"by [cyan]{arguments.method}[/] as [dim]{sha[:12]}[/]"
     )
 
-    if not arguments.keepBranch:
+    if arguments.keepBranch:
+        return 0
+
+    # The merge is irreversible and the delete is a second call, so a failure here
+    # must never read as a failure of the whole command. Left to propagate, it
+    # printed a red error and returned non-zero *after* the merge had landed — and
+    # the obvious response to that, re-running `merge`, sails past the draft guard
+    # (the pull request is closed now, so isDraft is false), gets an opaque
+    # "405 not mergeable" from GitHub, and reads as though nothing ever worked.
+    try:
         deleteBranch(ticket, token, summary["head"])
-        console.print(f"[green]Deleted branch[/] {escape(summary['head'])}")
+    except RuntimeError as exc:
+        console.print("[yellow]The merge succeeded. Only the branch delete failed.[/]")
+        console.print(f"  [dim]{escape(str(exc))}[/]")
+        console.print(
+            f"[bold]Do not re-run merge[/] — #{summary['number']} is already merged. "
+            f"Finish by hand:\n  git push origin --delete {summary['head']}"
+        )
+        return partialSuccessExitCode
+    console.print(f"[green]Deleted branch[/] {escape(summary['head'])}")
     return 0
 
 
@@ -428,6 +521,11 @@ def buildParser() -> argparse.ArgumentParser:
     findParser = subparsers.add_parser("find", help="print the open pull request for a branch")
     findParser.add_argument(
         "--head", default=None, help="source branch (default: the checked-out branch)"
+    )
+    findParser.add_argument(
+        "--base",
+        default=defaultBaseBranch,
+        help=f"target branch to match on (default: {defaultBaseBranch})",
     )
     findParser.add_argument(
         "--number-only",
@@ -468,13 +566,17 @@ def buildParser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    """Parse the command line and dispatch, reporting failures without a traceback."""
+    """Parse the command line and dispatch, reporting failures without a traceback.
+
+    Returns ``errorExitCode`` rather than 1, so that "the question could not be
+    asked" stays distinguishable from a command's own considered negative answer.
+    """
     arguments = buildParser().parse_args()
     try:
         return int(arguments.handler(arguments))
     except RuntimeError as exc:
-        console.print(f"[red]{exc}[/]")
-        return 1
+        console.print(f"[red]{escape(str(exc))}[/]")
+        return errorExitCode
 
 
 if __name__ == "__main__":

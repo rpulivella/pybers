@@ -19,7 +19,17 @@ handoff doc.
 ## Steps
 
 1. Get the PR number from `$ARGUMENTS`, or from the current branch
-   (`python3 scripts/pr.py find --number-only`). If there is no PR, stop and say so.
+   (`python3 scripts/pr.py find --number-only`). **Read what it printed.** One of three
+   things:
+   - a bare number — that is the PR;
+   - `no-open-pull-request` — there genuinely is none for this branch and base; stop and
+     say so;
+   - anything else — the question could not be asked at all (no credential, a 401, GitHub
+     unreachable). Report *that*. It is a different claim from "there is no pull request",
+     and reporting it as one states a fact you do not have.
+
+   Exit codes carry the same three cases (`0`, `1`, `2`) for anything scripting this, but
+   the printed output is the contract here — do not depend on `$?`.
 2. **Run the preflight and stop if it fails:**
    ```
    python3 scripts/pr-preflight-check.py --pr <N>

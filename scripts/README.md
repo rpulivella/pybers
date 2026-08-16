@@ -50,7 +50,8 @@ reach, follow the `test-<topic>.py` / synthetic-data / glob-discovered conventio
 |---|---|
 | `create` | `/ticket-create` |
 | `edit` | `/ticket-edit` |
-| `show` | `/ticket-startwork`, `/changelog-add` (`--title-only`), `/pr-draft` |
+| `show` | `/ticket-startwork`, `/pr-draft`, `/ticket-edit` — **rendered, for reading only** |
+| `export-as-source` | `/ticket-edit` (`--body` and `--title`), `/changelog-add` and `/pr-draft` (`--title`) — **byte-exact, for round-tripping** |
 | `start` | `/ticket-startwork` |
 | `status` | `/ticket-startwork` — the move to `Code Review`, and the move back to `Concept` when a spec proves inadequate |
 | `close` | `/ticket-startwork` — `--reason completed` on delivery, `--reason not-planned` on abandonment |

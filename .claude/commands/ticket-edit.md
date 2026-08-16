@@ -18,12 +18,21 @@ means fetching the current body, changing part of it, and writing the whole thin
 ## Steps
 
 1. Get the issue number from `$ARGUMENTS`. If missing, ask.
-2. Fetch the current state. Two different reads, for two different purposes:
-   - `python3 scripts/ticket.py show <N>` to *read* it yourself.
-   - `python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"` to get the
-     body you will edit. **Never edit from `show`'s output** — it renders through rich,
-     which reflows long lines, expands tabs, and substitutes emoji shortcodes, so writing
-     it back silently reformats the whole ticket.
+2. Fetch the current state. Three different reads, and using the wrong one is a silent
+   corruption rather than an error:
+   - `python3 scripts/ticket.py show <N>` — to **read** it yourself. Rendered, wrapped,
+     prefixed.
+   - `python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"`
+     — to **edit**. The body byte for byte, which is what gets revised and written back.
+   - `python3 scripts/ticket.py export-as-source <N> --title` — whenever the revision
+     keeps any part of the existing title. `show` prints it as `#<N> <title>` and wraps
+     at eighty columns, so a long title taken from there comes back with the number glued
+     on and split across lines.
+
+   **Never draft the revision from `show`.** It renders through rich, which reflows long
+   lines, expands tabs, substitutes emoji shortcodes, and eats `[bracketed]` words as
+   style markup with no error — so writing it back silently reformats the whole ticket
+   and can drop text outright.
 3. Draft the revision. Preserve everything not being changed, **verbatim** — a revision
    that silently reflows the SPEC or drops a section is a regression, not an edit.
 4. **Show the user what changes and wait for explicit approval.** This is the same
