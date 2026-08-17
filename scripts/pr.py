@@ -30,13 +30,23 @@ Usage:
     python3 scripts/pr.py find --number-only
     python3 scripts/pr.py ready 8
     python3 scripts/pr.py merge 8 --subject "[14] feat: add a thing"
-    python3 scripts/pr.py merge 8 --subject "..." --method squash
     python3 scripts/pr.py merge 8 --subject "..." --keep-branch
 
 Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-17  Round two of the same review. The merge PUT is now guarded as well as the
+            branch delete: urllib lets a read-phase TimeoutError through as an OSError
+            and a proxy error page makes json.loads raise ValueError, neither of which is
+            a RuntimeError, so both escaped to exit 1 — the code meaning "no pull
+            request" — after a merge that may have landed. main() is broadened for the
+            same reason. A delete answering 404 or 422 is now success, because the ref is
+            already gone whenever the repository deletes head branches automatically, and
+            an alarm that fires on success stops being read. `squash` stays available:
+            the tool serves repositories that permit it, and the prohibition belongs in
+            /pr-review-code — but the usage example teaching it is gone, since permitting
+            and advertising are different acts.
 2026-08-16  Fixed the four defects a code review found on 2026-08-14, all of them in
             the half of this file that had never executed. A failed branch delete no
             longer reports the completed merge as a failure; `find` says which of
@@ -467,7 +477,30 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         )
         return 0
 
-    sha = mergePullRequest(ticket, token, arguments.number, arguments.method, arguments.subject)
+    # `except Exception`, not `except RuntimeError`, and deliberately so. urllib does
+    # not wrap every failure: a read-phase TimeoutError is an OSError it lets through
+    # untouched, and a proxy's HTML error page makes json.loads raise ValueError.
+    # Neither is a RuntimeError, so both escaped main()'s handler to a bare traceback
+    # and exit 1 — which is notFoundExitCode. A merge that may well have landed then
+    # reported as "there is no pull request", and the warning below never printed.
+    # The merge is the irreversible step, so an unknown outcome here must say so.
+    try:
+        sha = mergePullRequest(
+            ticket, token, arguments.number, arguments.method, arguments.subject
+        )
+    except Exception as exc:
+        console.print(
+            f"[red]The merge request for #{summary['number']} did not complete "
+            "cleanly, and whether it landed is unknown.[/]"
+        )
+        console.print(f"  [dim]{escape(str(exc))}[/]")
+        console.print(
+            "[bold]Check the pull request on GitHub before doing anything else.[/] "
+            "Do not re-run merge until you know: if it did land, a second attempt "
+            "returns an opaque 405 that reads as though nothing ever worked."
+        )
+        return partialSuccessExitCode
+
     console.print(
         f"[green]Merged[/] [bold cyan]#{summary['number']}[/] "
         f"by [cyan]{arguments.method}[/] as [dim]{sha[:12]}[/]"
@@ -482,9 +515,24 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
     # the obvious response to that, re-running `merge`, sails past the draft guard
     # (the pull request is closed now, so isDraft is false), gets an opaque
     # "405 not mergeable" from GitHub, and reads as though nothing ever worked.
+    # One handler on purpose. GitHubHttpError is a RuntimeError subclass, so catching it
+    # separately and re-raising would escape this function entirely rather than fall
+    # through to the sibling clause — which would regress the whole point of this block.
     try:
         deleteBranch(ticket, token, summary["head"])
     except RuntimeError as exc:
+        # 404 or 422 means the ref is already gone, which is the NORMAL outcome when the
+        # repository has "automatically delete head branches" enabled. Reporting that as
+        # a failed cleanup printed a bold "Do not re-run merge", exited non-zero, and
+        # sent the user to run a `git push --delete` that also fails. An alarm that
+        # fires on success is an alarm that stops being read.
+        alreadyGone = getattr(exc, "statusCode", None) in (404, 422)
+        if alreadyGone:
+            console.print(
+                f"[green]Branch[/] {escape(summary['head'])} "
+                "[green]was already deleted.[/]"
+            )
+            return 0
         console.print("[yellow]The merge succeeded. Only the branch delete failed.[/]")
         console.print(f"  [dim]{escape(str(exc))}[/]")
         console.print(
@@ -574,7 +622,12 @@ def main() -> int:
     arguments = buildParser().parse_args()
     try:
         return int(arguments.handler(arguments))
-    except RuntimeError as exc:
+    except Exception as exc:
+        # Broader than RuntimeError deliberately. urllib lets a read-phase TimeoutError
+        # through as a bare OSError, and a proxy error page makes json.loads raise
+        # ValueError. Anything escaping to Python's own handler would exit 1, and 1 is
+        # notFoundExitCode — so an unhandled crash would announce itself as "there is no
+        # pull request". No path may reach exit 1 except a considered negative answer.
         console.print(f"[red]{escape(str(exc))}[/]")
         return errorExitCode
 

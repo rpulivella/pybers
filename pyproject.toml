@@ -23,7 +23,18 @@ dependencies = [
 # License is intentionally undecided — see CLAUDE.md. Not set here until chosen.
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3.0"]
+# rich and rich_argparse are for scripts/, not for the library — pybers itself must
+# never import them, which the library-purity check enforces. Declared here so that
+# one `pip install -e ".[dev]"` equips the venv for both the test suite and the repo
+# tooling, rather than the tooling depending on whatever the system interpreter
+# happens to carry. Both are also installed system-wide on this developer's machine
+# and the scripts run fine there; this makes the venv self-sufficient as well, so a
+# fresh clone needs one command and neither environment has to be reasoned about.
+dev = [
+    "pytest>=8.3.0",
+    "rich>=13.7.0",
+    "rich_argparse>=1.4.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -18,8 +18,16 @@ means fetching the current body, changing part of it, and writing the whole thin
 ## Steps
 
 1. Get the issue number from `$ARGUMENTS`. If missing, ask.
-2. Fetch the current state. Three different reads, and using the wrong one is a silent
-   corruption rather than an error:
+2. **Pull the ticket fresh, immediately before drafting — every time, no exceptions.**
+   `edit` replaces the WHOLE body and GitHub offers no conflict detection, so a revision
+   drafted against a copy fetched earlier silently discards anything that changed in
+   between. There is no error and no conflict marker; the other edit is simply gone. Never
+   reuse an export from earlier in the session, and never work from a file you did not
+   fetch in this step. "Pull first" as a habit is not enough — the window is small, and a
+   rule that depends on a small window eventually loses.
+
+   Three different reads, and using the wrong one is a silent corruption rather than an
+   error:
    - `python3 scripts/ticket.py show <N>` — to **read** it yourself. Rendered, wrapped,
      prefixed.
    - `python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"`
@@ -29,10 +37,15 @@ means fetching the current body, changing part of it, and writing the whole thin
      at eighty columns, so a long title taken from there comes back with the number glued
      on and split across lines.
 
-   **Never draft the revision from `show`.** It renders through rich, which reflows long
-   lines, expands tabs, substitutes emoji shortcodes, and eats `[bracketed]` words as
-   style markup with no error — so writing it back silently reformats the whole ticket
-   and can drop text outright.
+   **Never draft the revision from `show`.** It hard-wraps to the terminal width, expands
+   tabs, and substitutes emoji shortcodes (`:warning:` becomes a glyph), so writing its
+   output back silently reformats the whole ticket. No flag turns those off, which is why
+   `export-as-source` exists as a separate command rather than a flag on this one.
+
+   It does **not** eat `[bracketed]` words — `showTicket` escapes the title and prints the
+   body with `markup=False`, so brackets survive. That fault was real once and was fixed;
+   the warning about it outlived it. Corrected here so nobody re-derives a bug that is
+   already gone.
 3. Draft the revision. Preserve everything not being changed, **verbatim** — a revision
    that silently reflows the SPEC or drops a section is a regression, not an edit.
 4. **Show the user what changes and wait for explicit approval.** This is the same
@@ -43,18 +56,34 @@ means fetching the current body, changing part of it, and writing the whole thin
    python3 scripts/ticket.py edit <N> --title "<new title>"
    python3 scripts/ticket.py edit <N> --label <label>
    ```
-   Flags combine, and `--dry-run` previews any of them.
-6. Report what changed.
+   Flags combine, and `--dry-run` previews any of them. `edit` reads the ticket back and
+   verifies what landed against what was sent, so a write that lost a concurrent change
+   fails loudly instead of passing silently.
+6. **Delete the local copy as soon as the edit reports the write verified.** A ticket's
+   contents live in the Project, never on disk. The lingering export is the actual hazard —
+   it is a second source of truth that goes stale in minutes and is exactly what a later
+   revision gets drafted against. Draft in `$TMPDIR`, never in the repository and not even
+   under `workarea/`, and remove it once the verification line appears. Once step 5
+   confirms the write landed, the local copy is provably redundant.
+7. Report what changed.
 
 ## What a revision can break
 
-- **The number is the address; the text is not.** ACs are referenced from conversation,
-  commits, and PR bodies ("AC 3 fails because…"), and that reference has to keep landing
-  on the same requirement. So **rewriting an AC in place is fine** — sharpening it,
-  correcting it, folding a decision into it — as long as its number does not move and it
-  still concerns the same thing. What is forbidden is **renumbering or reordering**,
-  which silently redirects every reference that already exists. New ACs append at the
-  end, even when the ordering comes out unnatural.
+- **Whether numbering is frozen depends on the ticket's Status, and nothing else.**
+  Check the Status first; it decides which of these two applies.
+  - **Concept or Todo — work has not begun.** Renumber, reorder, rewrite, split and
+    delete freely. Nothing references these ACs yet, so the only goal is the clearest
+    possible spec, and fixing a bad structure now beats carrying it forever.
+  - **In Progress or later.** The number is the address. ACs are referenced from
+    conversation, commits, and PR bodies ("AC 3 fails because…"), and that reference has
+    to keep landing on the same requirement. **Rewriting an AC in place stays fine** —
+    sharpening it, correcting it, folding a decision into it — as long as its number does
+    not move and it still concerns the same thing. **Renumbering and reordering are
+    forbidden**, because they silently redirect every reference that already exists. New
+    ACs append at the end, even when the ordering comes out unnatural.
+- **Inserting an AC mid-list renumbers everything after it**, which surprises people:
+  markdown numbers an ordered list sequentially regardless of the literal digits written.
+  Harmless before work starts. After it starts, that *is* the renumbering forbidden above.
 - **A dropped AC is struck through, never deleted.** Wrap it in `~~` and leave it where
   it is: `4. ~~The old requirement.~~` A deleted AC leaves every existing reference
   pointing at nothing, or worse, at whatever slid into its place.
@@ -69,10 +98,12 @@ means fetching the current body, changing part of it, and writing the whole thin
 ## Hard rules
 
 - Never `edit` to move a ticket between statuses; that is `status` and `close`.
-- Never renumber or reorder existing acceptance criteria. Rewriting one in place is
-  allowed.
-- Never delete an acceptance criterion — strike it through and leave the number in
-  place.
+- Never draft from an export fetched before this invocation, and never keep one on disk
+  after the edit verifies.
+- **Once a ticket is `In Progress` or later:** never renumber or reorder existing
+  acceptance criteria, and never delete one — strike it through and leave the number in
+  place. Rewriting one in place is always allowed. Before work begins, none of this
+  applies; see the Status gate above.
 - Never use `[ ]` checkbox syntax in the ACs — numbered lists only.
 - One label per issue.
 - Never hand-run the GitHub API outside `scripts/ticket.py`.

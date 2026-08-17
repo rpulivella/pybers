@@ -40,6 +40,19 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-17  Fixed two credential bugs. readTokenFromSecretsFile returned the first line
+            matching GITHUB_TOKEN *or* GH_TOKEN, so a stale GH_TOKEN above the real one
+            silently decided the identity; GITHUB_TOKEN now wins by name, and two
+            different values refuse rather than picking. resolveToken tested the
+            environment variable for truth before stripping it, so a whitespace-only
+            value sent `Authorization: Bearer ` — it now strips first and raises on
+            set-but-empty rather than falling through to another source.
+2026-08-17  `edit` now reads the ticket back and compares body, title and label against
+            what was sent. `edit` replaces the WHOLE body and GitHub has no conflict
+            detection, so a revision drafted against a copy exported minutes earlier
+            silently discarded whatever changed in between. This cannot prevent a lost
+            update; it makes one visible immediately, and it is what makes deleting the
+            local draft safe.
 2026-08-16  Added GitHubHttpError so requestJson carries the HTTP status as a number.
             pr.py's unpushed-branch guard was recovering it by searching the message
             for "404", which reported an expired token as an unpushed branch: a
@@ -162,19 +175,42 @@ def readTokenFromSecretsFile() -> str | None:
     This file is the sanctioned home for the token. It is git-ignored, scoped to
     this repository, and read explicitly, so the identity in use is never
     inherited from ambient machine state.
+
+    `GITHUB_TOKEN` wins over `GH_TOKEN` **by name, not by position**. Returning the
+    first line matching either name let a stale `GH_TOKEN=` sitting above the real
+    one silently decide the identity — and on a machine with two GitHub accounts
+    that means every issue filed and every commit authored as the wrong person,
+    with nothing to show for it but the wrong name in the history.
+
+    Two different values for the two names is a misconfiguration rather than a
+    preference, so it raises instead of picking. Whichever this function chose,
+    roughly half the time it would be the one the user did not mean.
     """
     secretsPath = Path(__file__).resolve().parent.parent / ".dev.vars"
     if not secretsPath.is_file():
         return None
 
+    found: dict[str, str] = {}
     for line in secretsPath.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue
         name, _, value = stripped.partition("=")
-        if name.strip() in ("GITHUB_TOKEN", "GH_TOKEN"):
-            return value.strip().strip('"').strip("'")
-    return None
+        name = name.strip()
+        if name in ("GITHUB_TOKEN", "GH_TOKEN"):
+            # Last occurrence of a given name wins, matching how a shell would
+            # source the file. Only the cross-name conflict is an error.
+            found[name] = value.strip().strip('"').strip("'")
+
+    primary = found.get("GITHUB_TOKEN")
+    secondary = found.get("GH_TOKEN")
+    if primary and secondary and primary != secondary:
+        raise RuntimeError(
+            f"{secretsPath} sets GITHUB_TOKEN and GH_TOKEN to different values. "
+            "Refusing to guess which account you meant — delete whichever is stale. "
+            "Picking one silently is how work gets filed under the wrong identity."
+        )
+    return primary or secondary or None
 
 
 def resolveToken() -> str:
@@ -184,11 +220,26 @@ def resolveToken() -> str:
     token, and `gh` can be signed into several accounts at once, so reading it
     would silently pick an identity this tool never chose. An explicit token or a
     loud failure is the only safe pair of outcomes.
+
+    A variable that is **set but empty or whitespace** raises rather than falling
+    through to the next source. Testing the raw value for truth before stripping it
+    sent `Authorization: Bearer ` to GitHub, whose refusal explains nothing; and
+    falling through would be worse still, because it would quietly authenticate as
+    whatever `.dev.vars` holds while the user believed the environment was in
+    charge. Someone who exported the variable meant to use it.
     """
     for variableName in ("GITHUB_TOKEN", "GH_TOKEN"):
         fromEnvironment = os.environ.get(variableName)
-        if fromEnvironment:
-            return fromEnvironment.strip()
+        if fromEnvironment is None:
+            continue
+        cleaned = fromEnvironment.strip()
+        if not cleaned:
+            raise RuntimeError(
+                f"{variableName} is set but empty. That is a misconfiguration, not a "
+                "request to look elsewhere — unset it to fall back to .dev.vars, or "
+                "give it a real value."
+            )
+        return cleaned
 
     fromFile = readTokenFromSecretsFile()
     if fromFile:
@@ -713,8 +764,43 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         return 0
 
     token = resolveToken()
-    summary = editTicket(token, arguments.number, arguments.title, body, arguments.label)
-    console.print(f"[green]Edited[/] [bold cyan]#{summary['number']}[/] {summary['title']}")
+    editTicket(token, arguments.number, arguments.title, body, arguments.label)
+
+    # Read the ticket back and confirm what landed. `edit` replaces the WHOLE body
+    # and GitHub offers no conflict detection, so a revision drafted against a copy
+    # exported even minutes earlier silently discards whatever changed in between —
+    # no error, no conflict marker, the other edit simply gone. Verifying cannot
+    # prevent that, but it makes it visible immediately to whoever caused it, which
+    # is the difference between losing data and failing a command. It is also what
+    # makes deleting the local draft safe: once this passes, the copy is provably
+    # redundant, and a lingering export is the thing a later revision gets drafted
+    # against by mistake.
+    summary = readTicket(token, arguments.number)
+    mismatches: list[str] = []
+    if body is not None and summary["body"] != body:
+        mismatches.append("body")
+    if arguments.title is not None and summary["title"] != arguments.title:
+        mismatches.append("title")
+    if arguments.label is not None and arguments.label not in summary["labels"]:
+        mismatches.append("label")
+
+    if mismatches:
+        console.print(
+            f"[red]Edit did not land cleanly:[/] {', '.join(mismatches)} differs from "
+            "what was sent."
+        )
+        console.print(
+            "The ticket may have changed between your export and this write. Re-export "
+            "it, re-apply your revision, and check that nothing was lost."
+        )
+        console.print(summary["url"])
+        return 1
+
+    console.print(
+        f"[green]Edited[/] [bold cyan]#{summary['number']}[/] "
+        f"{escape(summary['title'])}"
+    )
+    console.print("[dim]verified against the filed ticket[/]")
     console.print(summary["url"])
     return 0
 
