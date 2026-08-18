@@ -26,6 +26,14 @@ __email__ = "rpulivella@icloud.com"
 __status__ = "Development"
 __date__ = "2026/08/16"
 
+from .cells import (
+    CellDecodeError,
+    CellRecord,
+    decodeCellValue,
+    decodeDecimal128,
+    decodeRecord,
+    decodeRow,
+)
 from .compression import SnappyError, decompressRaw, readVarint
 from .container import (
     ContainerError,
@@ -52,6 +60,8 @@ from .iwa import (
 __all__ = [
     "Archive",
     "ArchiveMessage",
+    "CellDecodeError",
+    "CellRecord",
     "ContainerError",
     "IWAError",
     "IWAFile",
@@ -59,6 +69,10 @@ __all__ = [
     "NumbersPackage",
     "SnappyError",
     "StoredMember",
+    "decodeCellValue",
+    "decodeDecimal128",
+    "decodeRecord",
+    "decodeRow",
     "decompressPayload",
     "decompressRaw",
     "isDocumentMember",
