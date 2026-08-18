@@ -47,57 +47,52 @@ established is in [FINDINGS.md](FINDINGS.md) — read that before making more, b
 fixtures turned out to carry more than they were asked for and the list below has been
 adjusted accordingly.
 
-`10-text-ligatures` answered its own open question once its text was rewritten to say that
-the paragraph is None *and* specific letters are overridden to Default. That layered case is
-the most valuable thing in the set so far, and it exposed the next real gap: proving which
-characters a style applies to needs the style **run table**
-(`StorageArchive.table_char_style`), which pybers does not parse yet. Until then, findings can
-say what styles exist and what they contain, but not which text they cover.
+**The style run table is solved.** `StorageArchive.table_char_style` is a sparse list of
+`(character_index, style reference)` entries, each run ending where the next begins. Verified
+against `02-text-rich`, which resolves to exactly the four runs it was built from: `He` bold,
+`l` italic, `l` in the alternate font with OpenType features, `o` underlined and colored. So
+findings can now state which characters a style covers, not just that the style exists.
+
+**Text properties are done.** The remaining entries at 37-40 are low priority. What the set
+still lacks is everything that is not text: no fixture contains a numeric, date or boolean
+value, a formula, a merge, a named style, or a floating object.
 
 ---
 
-## To make
+## Made — 00 through 10, all text and formatting
 
-Each line is one Save As from `00-baseline`, one change, save. Nothing else touched.
-
-### Text and formatting
+All read, all mapped. What each established is in [FINDINGS.md](FINDINGS.md); the notes
+here are only what is worth knowing about the *fixture*.
 
 ```
-04-text-monospace       One cell in a monospaced font, no other formatting
-05-opentype             One cell using OpenType features only (onum, pnum, liga)
-                        with no bold/italic/color, so the feature bits are alone
-06-strikethrough        One cell struck through
-07-text-superscript     Superscript and subscript done with the OpenType features
-                        (sups, subs) and an ordinal with ordn — NOT the app's
-                        synthetic raise-and-shrink. If Numbers offers both, put
-                        the real feature version in this file. Add one synthetic
-                        one too, in a separate cell, purely so the two are
-                        distinguishable in the archive.
-08-text-para-backgrounds  DONE, and it corrected a wrong expectation. The UI calls
-                        this "Text Background" and offers it in the character
-                        panel, but it writes to TWO DIFFERENT FIELDS by scope:
-                        paragraph scope -> ParagraphStylePropertiesArchive.fill,
-                        character scope -> CharacterStylePropertiesArchive
-                        .background_color. This fixture carries one of each and
-                        says which is which in its own text, which is what made
-                        the difference findable. See FINDINGS.md.
-09-text-capitalization  All caps via the real feature, plus a small-caps run if
-                        the font has true small caps (smcp). Never the fake kind
-                        — scaled-down capitals are not small caps.
-                        LEARNED WHILE MAKING THIS: Numbers' own all-caps setting
-                        alone renders badly. It needs both OpenType capital
-                        features enabled alongside it — case-sensitive forms and
-                        capital spacing — because capitals set with lowercase
-                        sidebearings and lowercase-height punctuation look wrong.
-                        So all caps is TWO settings in two different places, and
-                        pybers must carry both or it will produce ugly output
-                        while believing it matched.
-10-text-ligatures       DONE, and it also corrected an expectation: ligatures are
-                        NOT stored as AAT feature pairs at all. Numbers uses its
-                        own LigaturesType enum, and "Use Default" writes nothing.
-                        See FINDINGS.md. The screenshot of "More Text Options" is
-                        what identified the other unexplored controls now listed
-                        as 36-39 below.
+00-baseline             The subtraction reference. Everything else is this plus one change.
+01-text-plain           A plain string. Establishes that plain text creates NO archives.
+02-text-rich            Four differently formatted runs in one cell. The single most useful
+                        fixture: proved one CharacterStyleArchive per run, and later proved
+                        the run table maps them to exact character ranges.
+03-text-multiline       Two paragraphs. Proved one ParagraphStyleArchive per paragraph.
+04-text-monospace       A font change over a whole cell. Proved that UNIFORM formatting
+                        needs no rich-text payload.
+05-opentype             Ten distinct character styles carrying OpenType features. Proved
+                        features are stored as AAT integer pairs, not tag strings.
+06-strikethrough        Same shape as 04. Confirmed the uniform-formatting tier.
+07-text-superscript     Carries BOTH the synthetic superscript enum and the real OpenType
+                        features, side by side. That contrast is what makes the
+                        never-write-the-fake-one rule testable rather than asserted.
+08-text-para-backgrounds  Corrected a wrong expectation. The UI calls this "Text
+                        Background" and offers it in the character panel, but it writes to
+                        TWO DIFFERENT FIELDS by scope — paragraph to
+                        ParagraphStylePropertiesArchive.fill, character to
+                        CharacterStylePropertiesArchive.background_color. Carries one of
+                        each and names them in its own text, which is what made the
+                        difference findable.
+09-text-capitalization  All caps. Established that it is TWO settings in two places:
+                        capitalization=kAllCaps plus the two OpenType capital features,
+                        because the enum alone renders badly.
+10-text-ligatures       A LAYERED case — None on the paragraph, Default overridden onto
+                        specific letters. The only fixture with paragraph-value-plus-
+                        character-override, which is the structure named styles will need.
+                        Also proved ligatures are their own enum, not an OpenType feature.
 ```
 
 **Typographic rules these fixtures exist to protect.** Real OpenType features are always
@@ -111,14 +106,46 @@ and `pybers` should support it too.
 So its presence is a baseline condition rather than a signal — a feature record appearing
 does not by itself mean the fixture's feature was applied.
 
-### Numbers and formats
+**Nothing further is needed for text properties.** 37-40 below are the remaining controls
+from the "More Text Options" panel, and they are low priority — the structural lessons are
+already learned.
+
+---
+
+## To make
+
+Each line is one Save As from `00-baseline`, one change, save. Nothing else touched.
+
+### Values
 
 ```
-11-number-currency      One cell = 1234.5 as currency
-12-number-percent       One cell = 0.25 as percent
-13-number-date          One cell holding a date
-14-number-scientific    One cell in scientific notation
-15-number-custom        One cell using a custom format you define
+11-value-types-noformats  DONE, and the highest-yield fixture in the whole set. It
+                        broke open the cell-value encoding, which is the one part of
+                        the format the protobuf schemas do not describe at all — the
+                        values live in an opaque binary buffer.
+
+                        It worked because its second row labels every cell in text.
+                        With known contents, nine unknown byte records became nine
+                        verifiable ones. Any future fixture over an opaque encoding
+                        should be built the same way: put the answer key in the file.
+
+                        It also carried more than was asked — a star rating, slider,
+                        stepper and popup menu — which established that interactive
+                        controls are ordinary values plus a presentation reference,
+                        not new value types. See FINDINGS.md.
+```
+
+### Number formats — after 11
+
+These layer a display format over a value, which is a separate concern from the value
+itself. `11` must come first or there is nothing to compare them against.
+
+```
+12-number-currency      One cell = 1234.5 as currency
+13-number-percent       One cell = 0.25 as percent
+14-number-date          One cell holding a date, formatted
+15-number-scientific    One cell in scientific notation
+16-number-custom        One cell using a custom format you define
 ```
 
 Note these are *number formats*, not typography — but `onum` versus `lnum` (oldstyle
@@ -128,50 +155,72 @@ different places. Keep them in separate fixtures so that stays visible.
 ### Formulas
 
 ```
-16-formula-sum          A1:A3 = 1,2,3 and A4 = =SUM(A1:A3)
-17-formula-sumifs       A SUMIFS with a range argument
-18-formula-crosssheet   A formula referencing a cell on a second sheet
-19-formula-error        A formula that deliberately errors (=1/0)
+17-formula-sum          A1:A3 = 1,2,3 and A4 = =SUM(A1:A3)
+18-formula-sumifs       A SUMIFS with a range argument
+19-formula-crosssheet   A formula referencing a cell on a second sheet
+20-formula-error        A formula that deliberately errors (=1/0)
 ```
 
 ### Structure
 
 ```
-20-merge-2x2            Merge A1:B2. Nothing else.
-21-row-inserted         One row inserted
-22-column-inserted      One column inserted
-23-two-tables           A second table on the same sheet
-24-two-sheets           A second sheet added
-25-big-table            ~2000 rows of any values — enough to push one .iwa past
+21-merge-2x2            Merge A1:B2. Nothing else.
+22-row-inserted         One row inserted
+23-column-inserted      One column inserted
+24-two-tables           A second table on the same sheet
+25-two-sheets           A second sheet added
+26-big-table            ~2000 rows of any values — enough to push one .iwa past
                         64 KB and force multi-frame chunking
 ```
 
 ### Cell styling
 
 ```
-26-style-fill           One cell with a background fill color. This is
+27-style-fill           One cell with a background fill color. This is
                         TST.CellStylePropertiesArchive.cell_fill — a THIRD thing,
                         distinct from both backgrounds in 08. See FINDINGS.md.
-27-style-border         One cell with a border on one edge only
-28-style-align          One cell set to centered
-29-style-inset-2pt      One cell with the text inset reduced from the 4 pt default
+28-style-border         One cell with a border on one edge only
+29-style-align          One cell set to centered
+30-style-inset-2pt      One cell with the text inset reduced from the 4 pt default
                         to your usual 2 pt
-30-style-inset-uneven   One cell with FOUR DIFFERENT insets if the UI allows it —
+31-style-inset-uneven   One cell with FOUR DIFFERENT insets if the UI allows it —
                         the archive stores left/top/right/bottom as independent
                         floats (TSWP.PaddingArchive), so this checks whether the
                         single-value UI control is a real constraint or just a
                         convenience. If Numbers will not let you, say so and skip.
-31-named-style          One cell using a built-in NAMED style rather than manual
+32-named-style          One cell using a built-in NAMED style rather than manual
                         formatting — drives the named-styles decision in CLAUDE.md
 ```
 
 ### Floating objects
 
 ```
-32-textbox              One floating text box with a word in it
-33-shape                One drawn shape, a rectangle is fine
-34-image                One small embedded image
-35-image-and-shape      Both, to check they are independent
+33-textbox              One floating text box with a word in it
+34-shape                One drawn shape, a rectangle is fine
+35-image                One small embedded image
+36-image-and-shape      Both, to check they are independent
+```
+
+### Table bands and panes
+
+Numbered from 41 to avoid renumbering the list again. Grouping is by section, not by
+adjacent numbers.
+
+```
+41-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
+                        all in one file. These are plain scalars on the table model
+                        (number_of_header_rows / _header_columns / _footer_rows), so
+                        one fixture covers all three.
+42-table-frozen         Freeze the header row AND the header column. Note that
+                        freezing (header_rows_frozen) is a SEPARATE field from
+                        repeating-on-print (repeating_header_rows_enabled) — set only
+                        freezing here so the two stay distinguishable.
+43-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
+                        a different fill, in the same file. The schema says a band has
+                        a real style reference (header_row_style) while a body row has
+                        none — so this should show one reference change for the header
+                        and N per-cell styles for the body row. Confirms whether
+                        "format a row" is a real operation or only sugar.
 ```
 
 ### Still unexplored from the "More Text Options" panel
@@ -179,10 +228,10 @@ different places. Keep them in separate fixtures so that stays visible.
 That panel holds several controls no fixture covers yet, and each is a separate field:
 
 ```
-36-text-charspacing     Character Spacing set to something other than 0%
-37-text-baselineshift   Baseline Shift set to something other than 0 pt
-38-text-outline         The Outline checkbox
-39-text-shadow          The Shadow checkbox
+37-text-charspacing     Character Spacing set to something other than 0%
+38-text-baselineshift   Baseline Shift set to something other than 0 pt
+39-text-outline         The Outline checkbox
+40-text-shadow          The Shadow checkbox
 ```
 
 Baseline Shift is worth having precisely because it is the manual way to fake a
@@ -197,9 +246,9 @@ fields.
 If you want to stop early, these cover every distinct *kind* of thing, and the rest only
 sharpen the mapping:
 
-**`16-formula-sum`, `20-merge-2x2`, `31-named-style`, `32-textbox`, `25-big-table`.**
+**`17-formula-sum`, `21-merge-2x2`, `32-named-style`, `33-textbox`, `26-big-table`.**
 
-`25-big-table` is the odd one out — it tests the container rather than the model, and it is
+`26-big-table` is the odd one out — it tests the container rather than the model, and it is
 the only fixture that exercises the multi-frame path with real user data.
 
 ---

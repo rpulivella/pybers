@@ -203,6 +203,112 @@ mean the fixture's feature was applied.
 
 ---
 
+## Cell values: the one place the schemas stop helping
+
+`TST.Tile` holds rows as `TileRowInfo`, and the values are **not protobuf**. They live in an
+opaque `cell_storage_buffer`, indexed by a `cell_offsets` array. Everything below was
+reverse-engineered against `11-value-types-noformats`, whose second row labels every cell in
+text — which is the only reason the decode is verifiable rather than plausible.
+
+```
+cell_offsets           fixed 255 entries, uint16 (uint32 when has_wide_offsets)
+                       0xFFFF means NO CELL — an empty cell has no record at all
+cell_storage_buffer    records laid end to end; a record runs to the next live offset
+```
+
+Record layout, as far as it is needed to read a value:
+
+```
+byte  0      storage version (5 in every file seen)
+byte  1      value TYPE (below)
+bytes 4-7    flags bitmask — NOT decoded
+bytes 8-11   purpose unknown — NOT decoded
+bytes 12+    the value
+```
+
+| type | meaning | encoding at byte 12 |
+|---|---|---|
+| 2 | number | IEEE-754 **decimal128**, little-endian, 16 bytes |
+| 3 | string | uint32 key into the `STRING` `TableDataList` |
+| 5 | date | float64 seconds since **2001-01-01 UTC** (Apple epoch) |
+| 6 | boolean | float64, zero is false |
+| 7 | duration | float64 seconds |
+
+Verified end to end: the fixture decodes to `1234.5`, `42`, `2027-06-15`, `0:20:00`, `True`,
+`3`, `50`, `1`, `'Item 1'` — matching all nine of its own labels, with the tenth cell empty
+and carrying no record.
+
+### Numbers are decimal128, and this matters more than anything else here
+
+Not float64. `1234.5` is stored exactly, as mantissa `12345` with exponent `-1`. A spreadsheet
+library that round-trips values through Python's `float` **will corrupt them**: reading `0.1`
+and writing it back would introduce binary-representation error into a document that never had
+any. `decimal.Decimal` is the correct type for `Cell.value`, and this decides that part of the
+model rather than leaving it to taste.
+
+### Interactive controls are ordinary values plus a presentation reference
+
+A checkbox, star rating, slider, stepper and popup menu all store a **normal value** — bool,
+number, or string — and reference a `CONTROL_CELL_SPEC` separately. The control is how the
+value is edited, not what it is. So they need no new value type, only a reference to carry.
+
+### Two storage strategies by type
+
+Strings are **pooled and deduplicated** into a `TableDataList` and referenced by key; numbers,
+dates, booleans and durations are stored **inline** in the record. There is no `NUMBER` list
+type. Any writer has to maintain the string pool, not just the cell.
+
+### Do not trust `numCells`, `maxColumn` or `maxRow`
+
+All three read **0** in a tile holding 19 real cells across two rows. They are not maintained.
+The row count comes from `rowInfos`, and the populated columns come from the offsets array.
+This cost a debugging cycle: a filter skipping tiles where `numCells == 0` skipped everything.
+
+## Styles exist per BAND, not per row or column
+
+`TST.TableModelArchive` carries a style reference for each band, and nothing else:
+
+```
+table_style          the whole table
+body_cell_style      the default for every body cell
+body_text_style      the default text for every body cell
+header_row_style     the header-rows band     (+ header_row_text_style)
+header_column_style  the header-columns band  (+ header_column_text_style)
+footer_row_style     the footer-rows band     (+ footer_row_text_style)
+```
+
+There is **no per-row or per-column style reference for body rows.** Formatting body row 7
+therefore writes a style onto each cell in it, and the fact that a whole row was selected is
+not recorded anywhere — afterwards it is N cells that happen to match.
+
+**Design consequence.** `setHeaderRowStyle(style)` is a genuine single-property operation
+that round-trips as intent. A `setRowStyle(7, style)` would be sugar over N cell writes and
+could never be read back as "row 7 is styled". The API should not make the two look alike.
+
+Unverified: fixture `43-style-band-vs-row` exists in the list to confirm this by measurement
+rather than leaving it as a reading of the schema.
+
+## Headers, footers and frozen panes are plain scalars
+
+Also on `TST.TableModelArchive`, and simple enough to need no modeling beyond the values:
+
+```
+number_of_header_rows = 9      header_rows_frozen = 12
+number_of_header_columns = 10  header_columns_frozen = 13
+number_of_footer_rows = 11
+repeating_header_rows_enabled = 29
+repeating_header_columns_enabled = 32
+```
+
+**Freezing and repeating-on-print are different fields.** They are easy to conflate because
+the Numbers UI presents both near each other, and conflating them would silently change print
+behavior while appearing to set a view preference.
+
+The presence of `HeaderStorageBucket-*.iwa` members in every fixture confirms header bands
+have their own storage, not merely a count.
+
+---
+
 ## Method notes, learned the hard way
 
 - **Diff archive *contents* by identifier, not just presence.** An archive modified in place
