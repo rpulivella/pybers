@@ -655,24 +655,32 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
 
     bodyPath = Path(arguments.bodyFile)
     if not bodyPath.is_file():
-        console.print(f"[red]Body file not found:[/] {bodyPath}")
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
     body = bodyPath.read_text(encoding="utf-8")
 
     if arguments.dryRun:
         console.print("[yellow]Dry run — nothing was filed.[/]")
         console.print(f"label:  [magenta]{arguments.label}[/]")
-        console.print(f"title:  [bold]{arguments.title}[/]")
+        console.print(f"title:  [bold]{escape(arguments.title)}[/]")
         console.print(f"status: [cyan]{arguments.status}[/]")
         console.print()
-        console.print(body)
+        # markup=False because this is a PREVIEW of bytes about to be written:
+        # rich reads square brackets as style tags, so a body carrying [hotfix]
+        # or a path like /work/[slug] would display with those words missing.
+        # A dry run whose whole purpose is showing what will be written must not
+        # be the one place the text is altered.
+        console.print(body, markup=False, highlight=False)
         return 0
 
     token = resolveToken()
     coordinates = readBoardCoordinates(token)
 
     summary = createTicket(token, arguments.label, arguments.title, body)
-    console.print(f"[green]Filed[/] [bold cyan]#{summary['number']}[/] {summary['title']}")
+    console.print(
+        f"[green]Filed[/] [bold cyan]#{summary['number']}[/] "
+        f"{escape(summary['title'])}"
+    )
 
     nodeId = readIssueNodeId(token, summary["number"])
     itemId = placeOnBoard(token, coordinates, nodeId)
@@ -748,19 +756,24 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
     if arguments.bodyFile is not None:
         bodyPath = Path(arguments.bodyFile)
         if not bodyPath.is_file():
-            console.print(f"[red]Body file not found:[/] {bodyPath}")
+            console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return 1
         body = bodyPath.read_text(encoding="utf-8")
 
     if arguments.dryRun:
         console.print("[yellow]Dry run — nothing was changed.[/]")
         if arguments.title:
-            console.print(f"would set title: [bold]{arguments.title}[/]")
+            console.print(f"would set title: [bold]{escape(arguments.title)}[/]")
         if arguments.label:
             console.print(f"would set label: [magenta]{arguments.label}[/]")
         if body is not None:
             console.print("would replace the body with:")
-            console.print(body)
+            # markup=False because this is a PREVIEW of bytes about to be written:
+        # rich reads square brackets as style tags, so a body carrying [hotfix]
+        # or a path like /work/[slug] would display with those words missing.
+        # A dry run whose whole purpose is showing what will be written must not
+        # be the one place the text is altered.
+        console.print(body, markup=False, highlight=False)
         return 0
 
     token = resolveToken()
@@ -841,7 +854,10 @@ def cmdClose(arguments: argparse.Namespace) -> int:
         console.print("[yellow]Ticket was not on the board; only the issue was closed.[/]")
 
     verb = "Completed" if reason == "completed" else "Abandoned"
-    console.print(f"[green]{verb}[/] [bold cyan]#{summary['number']}[/] {summary['title']}")
+    console.print(
+        f"[green]{verb}[/] [bold cyan]#{summary['number']}[/] "
+        f"{escape(summary['title'])}"
+    )
     return 0
 
 
@@ -1100,7 +1116,7 @@ def main() -> int:
     try:
         return int(arguments.handler(arguments))
     except RuntimeError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         return 1
 
 

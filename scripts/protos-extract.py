@@ -70,6 +70,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 
 console = Console()
 
@@ -369,7 +370,7 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
 def showApplication(application: NumbersApplication) -> None:
     """Print the located Numbers install."""
     console.print(f"[bold]Numbers {application.version}[/] [dim](build {application.build})[/]")
-    console.print(f"  bundle     [cyan]{application.bundlePath}[/]")
+    console.print(f"  bundle     [cyan]{escape(str(application.bundlePath))}[/]")
     console.print(f"  identifier [dim]{application.bundleIdentifier}[/]")
 
 
@@ -400,7 +401,7 @@ def cmdExtract(arguments: argparse.Namespace) -> int:
         Path(arguments.protodump) if arguments.protodump else None
     )
     showApplication(application)
-    console.print(f"  protodump  [dim]{protodumpPath}[/]")
+    console.print(f"  protodump  [dim]{escape(str(protodumpPath))}[/]")
     console.print()
 
     with tempfile.TemporaryDirectory(prefix="pybers-protos-") as temporaryName:
@@ -430,7 +431,10 @@ def cmdExtract(arguments: argparse.Namespace) -> int:
         dumped = sorted(extractedDirectory.glob("*.proto"))
         if arguments.dryRun:
             console.print("[yellow]Dry run — nothing was written.[/]")
-            console.print(f"would write [bold]{len(dumped)}[/] schemas to {schemaDirectory}")
+            console.print(
+                f"would write [bold]{len(dumped)}[/] schemas to "
+                f"{escape(str(schemaDirectory))}"
+            )
             console.print(f"would generate Python into {generatedDirectory}")
             return 0
 
@@ -439,11 +443,16 @@ def cmdExtract(arguments: argparse.Namespace) -> int:
             (schemaDirectory / path.name).write_text(
                 path.read_text(encoding="utf-8", errors="replace"), encoding="utf-8"
             )
-        console.print(f"[green]Wrote[/] {len(dumped)} schemas to {schemaDirectory}")
+        console.print(
+            f"[green]Wrote[/] {len(dumped)} schemas to {escape(str(schemaDirectory))}"
+        )
 
         with console.status("compiling schemas to Python with protoc"):
             moduleCount = generatePythonModules(schemaDirectory, generatedDirectory)
-        console.print(f"[green]Generated[/] {moduleCount} modules in {generatedDirectory}")
+        console.print(
+            f"[green]Generated[/] {moduleCount} modules in "
+            f"{escape(str(generatedDirectory))}"
+        )
 
     return 0
 
@@ -483,7 +492,7 @@ def main() -> int:
     try:
         return int(arguments.handler(arguments))
     except RuntimeError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         return 1
 
 

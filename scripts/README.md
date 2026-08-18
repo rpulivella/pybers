@@ -111,6 +111,22 @@ These hold for every script here.
 4. **Docstrings on every function and class.** No exceptions.
 5. **`argparse` for every CLI**, with `cmd`-prefixed handler functions mapping 1:1 onto
    subcommands.
+6a. **Never interpolate arbitrary text into a markup-enabled `console.print`.** rich reads
+   square brackets as style tags and silently consumes any that look like one. Measured
+   2026-08-18: `[hotfix]`, `[build]` and `/work/[slug]` vanish while `[90]` and `[ERROR]`
+   survive, so the corruption is *inconsistent* — a reader cannot learn to distrust it
+   selectively. Two cases and nothing between them:
+
+   ```python
+   console.print(body, markup=False, highlight=False)   # whole line is arbitrary
+   console.print(f"title: [bold]{escape(title)}[/]")    # styled label + arbitrary value
+   ```
+
+   Treat all of these as arbitrary: issue titles and bodies, commit subjects, file and
+   route paths, subprocess output, and exception messages. **The bytes were never wrong** —
+   only the display — which is why this hid for so long, and why it mattered most in
+   `--dry-run` previews, whose entire purpose is showing exactly what will be written.
+
 6. **`rich` for all output — color-coded, never bordered.** Bordered tables/panels
    collapse to "+N lines" in the agent console. Use `console.print` with color markup;
    `Table(box=None)` if a table is genuinely needed. Show every row, never truncate.

@@ -349,7 +349,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     """Open a draft pull request for the current branch."""
     bodyPath = Path(arguments.bodyFile)
     if not bodyPath.is_file():
-        console.print(f"[red]Body file not found:[/] {bodyPath}")
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
     body = bodyPath.read_text(encoding="utf-8")
 
