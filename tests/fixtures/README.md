@@ -198,11 +198,61 @@ different places. Keep them in separate fixtures so that stays visible.
 ### Formulas
 
 ```
-18-formula-sum          A1:A3 = 1,2,3 and A4 = =SUM(A1:A3)
-19-formula-sumifs       A SUMIFS with a range argument
-20-formula-crosssheet   A formula referencing a cell on a second sheet
-21-formula-error        A formula that deliberately errors (=1/0)
+18-formula-literals     THE BASELINE, and deliberately reference-free. Several
+                        formulas that compute from literals only, so the formula
+                        machinery is visible without any reference machinery mixed
+                        into it. Whatever appears in 19 that is not here IS a
+                        reference.
+                          =1+1
+                          =2*3
+                          =SUM(1,2,3)          one function, several arguments
+                          =ROUND(2.5,0)        ROUND needs value AND digits
+                          =IF(1>0,1,2)         nesting plus a comparison operator
+                          ="a"&"b"             string concatenation
+                        Substitute freely if Numbers rejects any of these — the point
+                        is a spread of shapes (operator, function, nesting, string),
+                        not these exact calls.
+                        Include one plain number cell as well, so a formula cell
+                        and a value cell can be compared side by side.
+
+19-formula-dragged      THE DECISIVE ONE — do not retype anything, DRAG it.
+                          - D1 = =SUM(A1:A3), with A1:A3 = 1,2,3
+                          - drag D1 down to D2 and D3
+                          - E1 = =SUM($A$1:$A$3), both ends locked
+                          - drag E1 down to E2 and E3
+                          - F1 = =A1+B1 with a mixed lock, =$A1+B$1
+                          - drag F1 down to F2
+                        Three questions answered at once. If D1/D2/D3 hold
+                        IDENTICAL stored bytes then references are relative offsets
+                        and movement is structural — the good case, and the reason
+                        Numbers needs no $ kludge. If they differ, references are
+                        resolved addresses and pybers must do the shifting itself,
+                        which is exactly where the range-shift bug in CLAUDE.md
+                        lived. The E and F columns show how anchoring is encoded
+                        differently — a flag on a reference, or a separate node.
+
+20-formula-shapes       Variety in one file, once 18 and 19 have established the
+                        basics. One cell each:
+                          - a range argument:      =SUM(A1:A10)
+                          - a multi-range SUMIFS   (the shape of the CLAUDE.md bug)
+                          - a cross-sheet ref      =Sheet2::TableName::A1
+                          - a whole-column ref     =SUM(A)
+                          - a nested call          =IF(SUM(A1:A3)>0,"y","n")
+                          - a reference to a cell that itself holds a formula
+
+21-formula-errors       Formulas that fail, in one file:
+                          - =1/0                       a division error
+                          - a reference to a deleted cell, for the #REF shape
+                          - =UNKNOWNFUNC(1)            an unresolvable name
+                          - a circular reference, if Numbers will save one
+                        Errors are their own cell type (formulaErrorCellType = 8),
+                        so this establishes what a failed formula stores as opposed
+                        to what it displays.
 ```
+
+**Read 18 and 19 before making 20 and 21.** If 19 shows references are relative offsets,
+the later fixtures answer different questions than if they are resolved addresses, and the
+list above may want revising rather than following.
 
 ### Structure
 
@@ -286,10 +336,16 @@ adjacent numbers.
 
 ## Highest value first
 
-If you want to stop early, these cover every distinct *kind* of thing, and the rest only
-sharpen the mapping:
+**`18-formula-literals` and `19-formula-dragged` come before everything else**, and not
+because formulas are the biggest feature. They are the only fixtures that can still change
+the *object model*. Whether a formula is a string, a token list, or a tree carrying
+relative references decides what `Cell` looks like, what "move a range" means, and whether
+relocating cells is a walk over structure or a rewrite of text. Everything else on this list
+refines knowledge that is already settled; these two can invalidate a design.
 
-**`18-formula-sum`, `22-merge-2x2`, `33-named-style`, `34-textbox`, `27-big-table`.**
+After those, and in this order:
+
+**`22-merge-2x2`, `33-named-style`, `34-textbox`, `27-big-table`.**
 
 `27-big-table` is the odd one out — it tests the container rather than the model, and it is
 the only fixture that exercises the multi-frame path with real user data.

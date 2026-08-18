@@ -406,6 +406,67 @@ All three read **0** in a tile holding 19 real cells across two rows. They are n
 The row count comes from `rowInfos`, and the populated columns come from the offsets array.
 This cost a debugging cycle: a filter skipping tiles where `numCells == 0` skipped everything.
 
+## Formulas are a postfix AST, not text — and this decides the object model
+
+From `18-formula-literals`. A formula is stored in a `FORMULA` `TableDataList` as a
+`TSCE.FormulaArchive`, whose whole content is a flat array of nodes in **postfix order** —
+a stack machine, with no text anywhere:
+
+```
+=1+1         [NUMBER(1), NUMBER(1), ADDITION_NODE]
+=2*3         [NUMBER(2), NUMBER(3), MULTIPLICATION_NODE]
+=SUM(1,2,3)  [NUMBER(1), NUMBER(2), NUMBER(3), FUNCTION_NODE(index=168, numArgs=3)]
+```
+
+Operators are nodes with implied arity; functions carry a numeric `index` and an explicit
+`numArgs`. Numeric literals are **decimal128** in `decimal_low`/`decimal_high`, the same
+encoding as cell values, alongside a float64 convenience copy.
+
+**`Cell.formula: str | None` is therefore wrong** and must become a structured type. A string
+would mean emitting a language Numbers then has to re-parse — a lossy conversion in each
+direction around a format that is already a tree.
+
+### A formula cell stores its computed RESULT, typed by that result
+
+`formulaCellType = 4` never appears. `=1+1` is an ordinary **type 2** cell holding `2`;
+`="a"&"b"` is **type 3** holding `'ab'`. The formula is reached by a key in the cell's tail,
+and the value slot caches what it evaluated to.
+
+Two consequences. Reading a value never requires evaluating anything, because the answer is
+already stored. And **writing a formula means writing a plausible cached result too** — a
+stale or missing one would display the wrong number until Numbers recalculated.
+
+A failing formula is different: `18` includes `=ROUND(2.5)`, invalid because ROUND needs two
+arguments, and that cell is **type 8** (`formulaErrorCellType`) carrying its formula key in
+the value slot rather than the tail.
+
+### Reference locking is a per-axis flag, not a syntax
+
+```
+ASTLocalCellReferenceNodeArchive {
+  row_handle
+  column_handle
+  row_is_sticky        the $ on the row
+  column_is_sticky     the $ on the column
+}
+```
+
+**`$` is not an escape hatch in this format — it is two booleans on a reference.** `$A1`,
+`A$1` and `$A$1` are three combinations of the same two flags, which is why mixed locking
+behaves correctly in Numbers and why dragging never needs a textual workaround. Anchoring is
+a genuine property of a reference, and pybers should model it as one rather than as
+punctuation inside a string.
+
+A separate `AST_cross_table_cell_reference_node_reference` exists, so local and cross-table
+references are distinct node kinds rather than one kind with an optional table.
+
+**Still unknown, and the reason `19-formula-dragged` exists:** whether `row_handle` and
+`column_handle` are relative offsets from the containing cell or resolved absolute
+coordinates. "Handle" rather than "index" hints at indirection. If dragging a formula leaves
+the stored bytes identical they are relative, and moving cells is structural; if they change,
+pybers must do the shifting itself — which is exactly where the range-shift bug in CLAUDE.md
+came from, and why that fix has to be an AST walk rather than a regex.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:

@@ -10,6 +10,7 @@ Maintained by `/changelog-add` — one verbatim ticket-title bullet per line und
 
 ## Unreleased
 
+- [init] Establish that formulas are a postfix AST with per-axis reference locking
 - [init] Escape arbitrary text in all rich console output
 - [init] Type cell values and pin numbers to Decimal for exact round-tripping
 - [init] Add real Numbers fixtures and record the archive format findings
