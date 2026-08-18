@@ -216,12 +216,22 @@ different places. Keep them in separate fixtures so that stays visible.
                         and a value cell can be compared side by side.
 
 19-formula-dragged      THE DECISIVE ONE — do not retype anything, DRAG it.
-                          - D1 = =SUM(A1:A3), with A1:A3 = 1,2,3
-                          - drag D1 down to D2 and D3
-                          - E1 = =SUM($A$1:$A$3), both ends locked
-                          - drag E1 down to E2 and E3
-                          - F1 = =A1+B1 with a mixed lock, =$A1+B$1
-                          - drag F1 down to F2
+                        Values run ACROSS a row, matching the label-row pattern the
+                        other fixtures use:
+                          A1, B1, C1 = 1, 2, 3
+                          A2, B2, C2 = 4, 5, 6      so dragged copies land on real
+                                                    data rather than empty cells
+                        Then three formulas in row 1, each dragged DOWN one row:
+                          D1 = =SUM(A1:C1)          relative at both ends
+                          E1 = =SUM($A$1:$C$1)      both ends fully locked
+                          F1 = =$A1+B$1             ONE formula, mixed locking:
+                                                    column locked on the first term,
+                                                    row locked on the second
+                          drag D1 -> D2, E1 -> E2, F1 -> F2
+                        F1 is the sharpest test. Dragged down it should become
+                        $A2 + B$1 — the $A holds the column while the row moves, the
+                        $1 holds the row while the column does not. One formula
+                        exercising both flags in opposite directions.
                         Three questions answered at once. If D1/D2/D3 hold
                         IDENTICAL stored bytes then references are relative offsets
                         and movement is structural — the good case, and the reason

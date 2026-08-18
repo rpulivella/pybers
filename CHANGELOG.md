@@ -10,6 +10,8 @@ Maintained by `/changelog-add` — one verbatim ticket-title bullet per line und
 
 ## Unreleased
 
+- [init] Establish that formula references are relative offsets, shared by refcount
+- [init] Add cell value decoding for numbers, text, dates, booleans and durations
 - [init] Establish that formulas are a postfix AST with per-axis reference locking
 - [init] Escape arbitrary text in all rich console output
 - [init] Type cell values and pin numbers to Decimal for exact round-tripping

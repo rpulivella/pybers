@@ -460,12 +460,62 @@ punctuation inside a string.
 A separate `AST_cross_table_cell_reference_node_reference` exists, so local and cross-table
 references are distinct node kinds rather than one kind with an optional table.
 
-**Still unknown, and the reason `19-formula-dragged` exists:** whether `row_handle` and
-`column_handle` are relative offsets from the containing cell or resolved absolute
-coordinates. "Handle" rather than "index" hints at indirection. If dragging a formula leaves
-the stored bytes identical they are relative, and moving cells is structural; if they change,
-pybers must do the shifting itself — which is exactly where the range-shift bug in CLAUDE.md
-came from, and why that fix has to be an AST walk rather than a regex.
+### ANSWERED: references are relative offsets, and one formula is shared by many cells
+
+`19-formula-dragged` settles it. Every formula there has **`refcount = 2`** — a single
+stored archive shared by the original cell and its dragged copy, producing *different*
+results in each. That is only possible if references resolve against the containing cell.
+
+`SUM(B1:D3)`, unlocked, one archive serving both rows:
+
+```
+relative_column { range_begin: -3, range_end: -1 }
+relative_row    { range_begin: -1 }
+```
+
+Signed offsets from the cell holding the formula. In row 1 it sums the numbers and gives 6;
+the same archive in row 2 resolves one row lower, lands on the text row, and gives 0.
+
+**Absolute is a different field, not merely a flag.** The locked version carries
+`absolute_column` and `absolute_row` where the relative one carries `relative_column` and
+`relative_row`, with plain coordinates instead of offsets:
+
+```
+absolute_column { range_begin: 1, range_end: 3 }
+absolute_row    { range_begin: 0 }
+```
+
+`ASTStickyBits` records the same fact alongside — all four false for the relative form, all
+four true for the locked one — so anchoring is expressed twice, in the field variant and in
+the bits.
+
+**Mixed locking is per axis on one reference.** `$B1+C$1` decodes to two coordinate nodes
+and an addition:
+
+```
+column={column: 1,  absolute: true }   row={row: -1, absolute: false}    ->  $B1
+column={column: -4, absolute: false}   row={row: 0,  absolute: true }    ->  C$1
+```
+
+An absolute column beside a relative row, then the reverse, on the same formula.
+
+### What this decides
+
+**Moving a cell requires no reference rewriting.** A relative reference is already relative
+to wherever the cell sits, so a moved or copied formula is correct by construction — which
+is why Numbers never needs `$` as a workaround, and why a user can drag freely without
+anything breaking. Locking is then free to mean what it should: *this one stays put*.
+
+For pybers this removes an entire class of work. There is no formula text to parse, no
+reference rewriting on move, and no regex — the defect in CLAUDE.md's bug list came from
+treating as text something the format never stored as text. What remains is a walk over
+nodes, and unrecognized node types should be carried through untouched rather than
+interpreted, since a formula is shared state that other cells depend on.
+
+Node types seen so far: `67` a range tract, `36` a cell coordinate, `16` a function call
+(`index` plus `numArgs`), `1` addition, `32` unidentified and appearing after the locked
+range. The vocabulary is large — the node message has 45 fields — so exhaustive modelling is
+neither necessary nor wise.
 
 ## Styles exist per BAND, not per row or column
 
