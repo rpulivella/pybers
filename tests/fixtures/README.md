@@ -63,9 +63,20 @@ against `02-text-rich`, which resolves to exactly the four runs it was built fro
 `l` italic, `l` in the alternate font with OpenType features, `o` underlined and colored. So
 findings can now state which characters a style covers, not just that the style exists.
 
-**Made so far: 00 through 14.** Text and formatting are done, and the cell-value encoding is
-broken open for numbers, currency, percent and dates. What the set still lacks: durations
-with formats, formulas, merges, named styles and floating objects.
+**Made so far: 00 through 14, and 18 through 21.** Text and formatting are done. The
+cell-value encoding is broken open for numbers, currency, percent and dates. Formulas are
+fully mapped: a postfix AST, relative offsets, per-axis locking, cross-table references by
+UUID, and the error shapes.
+
+**Still missing, in the order worth doing them:**
+
+1. `15`, `16`, `17` — durations with formats, scientific, custom. These finish the value and
+   format arc while the decoder is fresh, and are quick.
+2. `22` through `27` — structure: merges, inserted rows and columns, several tables, several
+   sheets. A different subsystem.
+3. `45`, `46`, `47` — table geometry, dimensions and titles. Nothing covers these yet, and a
+   round trip that loses a column width has damaged the document.
+4. `28` through `37` — cell styling and floating objects.
 
 ---
 
@@ -241,23 +252,65 @@ different places. Keep them in separate fixtures so that stays visible.
                         lived. The E and F columns show how anchoring is encoded
                         differently — a flag on a reference, or a separate node.
 
-20-formula-shapes       Variety in one file, once 18 and 19 have established the
-                        basics. One cell each:
-                          - a range argument:      =SUM(A1:A10)
-                          - a multi-range SUMIFS   (the shape of the CLAUDE.md bug)
-                          - a cross-sheet ref      =Sheet2::TableName::A1
-                          - a whole-column ref     =SUM(A)
-                          - a nested call          =IF(SUM(A1:A3)>0,"y","n")
-                          - a reference to a cell that itself holds a formula
+20-formula-shapes       DONE. Established that cross-table references are relative
+                        offsets plus a table UUID, that multi-range functions carry
+                        each range as an independent node, and that a whole-column
+                        reference is a coordinate with no row. See FINDINGS.md. The
+                        original request is kept below for the record:
 
-21-formula-errors       Formulas that fail, in one file:
-                          - =1/0                       a division error
-                          - a reference to a deleted cell, for the #REF shape
-                          - =UNKNOWNFUNC(1)            an unresolvable name
-                          - a circular reference, if Numbers will save one
-                        Errors are their own cell type (formulaErrorCellType = 8),
-                        so this establishes what a failed formula stores as opposed
-                        to what it displays.
+                        Put these across row 11 beside the existing SUM, then a
+                        LABEL ROW in row 12 under each one saying what it is — the
+                        labels are what make a decode checkable rather than assumed.
+
+                          B11 = =SUM(A1:A10)+1
+                                a range feeding an operator, to see how a tract and
+                                an arithmetic node combine
+
+                          C11 = =SUMIFS(A1:A10,A1:A10,">5")
+                                TWO ranges plus a criteria string in one call. This
+                                is the exact shape of the range-shift bug in
+                                CLAUDE.md, so it is the most important single cell
+                                in the file.
+
+                          D11 = =IF(SUM(A1:A5)>10,"big","small")
+                                a call nested inside a call, with a comparison and
+                                two string literals — shows how nesting appears in
+                                postfix order
+
+                          E11 = =A11*2
+                                a reference to a cell that ITSELF holds a formula,
+                                which is a dependency rather than a value
+
+                          F11 = =SUM(A)
+                                a whole-column reference, made by clicking the
+                                column header rather than typing. If Numbers writes
+                                something different, that is the finding — an
+                                unbounded range has to encode differently from
+                                A1:A10. Skip it if the UI will not produce one.
+
+                        THEN two structural references, which need company in the
+                        document. Both are worth more than everything above:
+
+                          G11 = a reference to a cell in a SECOND TABLE on the same
+                                sheet. Add a small table, put a number in its first
+                                cell, and point G11 at it by clicking rather than
+                                typing so Numbers writes its own syntax.
+
+                          H11 = a reference to a cell on a SECOND SHEET, same way.
+
+                        G11 and H11 are the priority. Every reference seen so far is
+                        an ASTLocalCellReferenceNodeArchive, and the schema also has
+                        ASTCrossTableCellReferenceNodeArchive carrying a table UUID.
+                        Nothing has ever populated it, so how a reference survives
+                        leaving its own table is completely unknown — and it is the
+                        mechanism that decides whether moving a table breaks the
+                        formulas pointing into it.
+
+21-formula-errors       DONE, and richer than asked. Established that a broken
+                        reference is node type 46 with sentinel coordinates, that an
+                        unknown function keeps its spelling, that circularity is not
+                        recorded at all, and that the FORMULA_ERROR list is empty —
+                        the KIND of error is not stored. See FINDINGS.md.
 ```
 
 **Read 18 and 19 before making 20 and 21.** If 19 shows references are relative offsets,
@@ -319,6 +372,36 @@ Baseline Shift is worth having precisely because it is the manual way to fake a
 superscript, so it needs to be distinguishable from both the synthetic `superscript`
 enum and the real OpenType feature. Three routes to a similar look, three different
 fields.
+
+### Table geometry and placement — NOTHING covers this yet
+
+Every fixture so far describes what is *in* a table. None describes the table as an object
+on a canvas: where it sits, how big it is, or how wide its columns are. A round trip that
+loses any of that has damaged the document just as surely as losing a value.
+
+```
+45-table-geometry       One table moved somewhere deliberate on the canvas, with
+                        several column widths and row heights set BY HAND to
+                        distinctly different values — not dragged approximately,
+                        typed if the UI allows, so the numbers are recognizable in
+                        the archive.
+46-table-dimensions     Three tables on one sheet with clearly different row and
+                        column COUNTS: one tall and narrow, one short and wide, one
+                        single-cell. Dimensions are separate from placement and
+                        should be confirmed separately.
+47-table-titles         The table title and header settings that every other fixture
+                        has had switched OFF. One table with its title shown, one
+                        with header rows, header columns and a footer row all
+                        present. This is the DEFAULT Numbers state, so it is what
+                        most real documents look like — the fixtures so far are the
+                        unusual ones.
+```
+
+**Note for every fixture already made:** table titles were unchecked and header rows,
+header columns and footers were all set to zero, which is *not* the Numbers default. That
+was the right call for isolating cell behavior, and it means these fixtures are
+deliberately atypical. `47-table-titles` exists so the default shape is covered too, and
+nothing assumes the stripped-down form is normal.
 
 ### Table bands and panes
 

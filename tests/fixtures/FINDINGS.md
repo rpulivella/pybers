@@ -512,10 +512,91 @@ treating as text something the format never stored as text. What remains is a wa
 nodes, and unrecognized node types should be carried through untouched rather than
 interpreted, since a formula is shared state that other cells depend on.
 
-Node types seen so far: `67` a range tract, `36` a cell coordinate, `16` a function call
-(`index` plus `numArgs`), `1` addition, `32` unidentified and appearing after the locked
-range. The vocabulary is large — the node message has 45 fields — so exhaustive modelling is
-neither necessary nor wise.
+### Cross-table references are relative offsets plus a table UUID
+
+From `20-formula-shapes`, which points one cell at a second table on the same sheet and
+another at a table on a second sheet. Both produce the **same** node type as an ordinary
+reference — `36` — with one extra field:
+
+```
+column: -6, absolute: false          an ordinary relative offset
+row:   -10, absolute: false
+cross_table_reference_extra_info { table_id: <128-bit UUID> }
+```
+
+**The table is named by identity, never by name or position.** Renaming a table, moving it,
+or reordering sheets cannot break a formula pointing into it. Same principle as relative
+offsets: address by identity, not by location.
+
+Note that `ASTCrossTableCellReferenceNodeArchive` exists in the schema and is **not** used.
+Numbers writes the compact form instead. A reader must handle what is written, not what the
+schema permits.
+
+### Multi-range functions carry each range as a separate node
+
+`SUMIFS(A1:A10,A1:A10,">5")` decodes to two independent range tracts, each with its own
+`sticky_bits`, then the criteria string, then the call:
+
+```
+67 (range, relative)   67 (range, relative)   19 (string ">5")   16 FUNCTION 231 numArgs=3
+```
+
+This is the exact shape of the range-shift bug in CLAUDE.md. Because each range is its own
+node with its own anchoring, adjusting one cannot disturb the other — the structure makes
+the correct behavior the default, which is precisely what a regex over formula text could
+not do.
+
+### A whole-column reference is a coordinate with no row
+
+`SUM(A)` gives `column: -5, absolute: false` and **no row component at all**. Unboundedness
+is expressed by absence rather than by a sentinel or a flag.
+
+### Broken references, unknown functions, and what errors do NOT store
+
+From `21-formula-errors`.
+
+A **deleted reference** becomes node type `46` — not the usual `36` — carrying sentinel
+coordinates:
+
+```
+column = 32767      (0x7FFF, maximum int16)
+row    = 2147483647 (0x7FFFFFFF, maximum int32)
+```
+
+So `#REF` is a coordinate deliberately pointing nowhere, and is recognizable structurally.
+
+An **unknown function keeps its spelling**: node type `31` carries
+`unknown_function_node_string = "UNKNOWNFUNC"` with its argument count. Numbers preserves
+the text of a function it cannot resolve, so an unrecognized formula still round-trips —
+the same instinct pybers applies to unknown cell types.
+
+**A circular reference is not marked at all.** Two cells referring to each other hold
+ordinary relative coordinates; circularity is a property the calculation engine detects, not
+one the file records.
+
+**The kind of error is not stored.** The `FORMULA_ERROR` data list is empty; an error cell is
+simply type 8 pointing at an ordinary formula. Division by zero is indistinguishable in the
+file from any other failure. Only `#REF` is visible, through those sentinels. So pybers can
+report *that* a cell errored and, for broken references, *why* — but reproducing Numbers'
+error text for anything else would mean evaluating the formula.
+
+### Node types identified so far
+
+```
+ 1  addition            17  number literal      36  cell coordinate
+ 4  division            19  string literal      46  broken reference (sentinels)
+ 7  comparison          31  unknown function    67  range tract
+16  function call       32  unidentified, follows a call in several files
+34/35  a bracketing pair around each argument of a nested call
+```
+
+Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS**. These are numeric, so a name map is
+eventually needed and must be derived rather than borrowed, per the schema-ownership
+decision.
+
+The node message has 45 fields, so exhaustive modelling is neither necessary nor wise.
+Unrecognized nodes should be carried through untouched — a formula is shared state that
+other cells depend on.
 
 ## Styles exist per BAND, not per row or column
 

@@ -10,6 +10,7 @@ Maintained by `/changelog-add` — one verbatim ticket-title bullet per line und
 
 ## Unreleased
 
+- [init] Map cross-table references, multi-range functions and formula error shapes
 - [init] Establish that formula references are relative offsets, shared by refcount
 - [init] Add cell value decoding for numbers, text, dates, booleans and durations
 - [init] Establish that formulas are a postfix AST with per-axis reference locking
