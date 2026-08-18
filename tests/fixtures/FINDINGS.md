@@ -226,13 +226,155 @@ bytes 8-11   purpose unknown — NOT decoded
 bytes 12+    the value
 ```
 
-| type | meaning | encoding at byte 12 |
+### Byte 1 is NOT simply `TST.CellType`
+
+It coincides with `TST.CellType` for every type in `11-value-types-noformats`, which made
+that look settled. `12-number-currency` disproved it: **every currency cell carries type
+`10`, and 10 is outside the `CellType` enum entirely** — that enum stops at 9, and
+`CellValueType` puts currency at 9, not 10.
+
+So the storage byte is its own numbering that happens to agree with `CellType` over the
+common types. Treat the enum as a useful guide and **not** as an exhaustive list, and expect
+further values that neither enum names. Anything reading this byte must handle an unknown
+value by preserving it rather than rejecting the cell.
+
+The table below is what has been *measured*, with the enum names attached where they match:
+
+| value | name | status |
 |---|---|---|
-| 2 | number | IEEE-754 **decimal128**, little-endian, 16 bytes |
-| 3 | string | uint32 key into the `STRING` `TableDataList` |
-| 5 | date | float64 seconds since **2001-01-01 UTC** (Apple epoch) |
-| 6 | boolean | float64, zero is false |
-| 7 | duration | float64 seconds |
+| 0 | `genericCellType` | not seen |
+| 1 | `spanCellType` | not seen — this is how the cells *covered by a merge* are marked |
+| 2 | `numberCellType` | **decoded** — IEEE-754 decimal128, little-endian, 16 bytes |
+| 3 | `textCellType` | **decoded** — uint32 key into the `STRING` `TableDataList` |
+| 4 | `formulaCellType` | not seen |
+| 5 | `dateCellType` | **decoded** — float64 seconds since 2001-01-01 UTC |
+| 6 | `boolCellType` | **decoded** — float64, zero is false |
+| 7 | `durationCellType` | **decoded** — float64 seconds |
+| 8 | `formulaErrorCellType` | not seen |
+| 9 | `automaticCellType` | not seen |
+| 10 | *(named by neither enum)* | **decoded — currency.** Value is decimal128 at bytes 12-27, identical to a plain number |
+
+## Currency is a distinct cell type, but not a distinct value encoding
+
+Measured across `12-number-currency`, which carries nine currency variants beside a plain
+`1234.5` for comparison. All nine are **type 10**; the plain number is type 2. Yet the value
+sits at the same offset in the same decimal128 encoding in both, signs included — the three
+negative variants decode to `-1234.5` correctly from decimal128's sign bit.
+
+So currency is a **type marker plus a format reference over an ordinary number**. It needs no
+new value type in the model: `Decimal` already covers it. What it needs is somewhere to carry
+the currency code and the presentation, because those are not in the value.
+
+Every one of these is type 10 with the same value, differing only in trailing references:
+basic currency, thousands separator, accounting style, zero decimal digits, negatives as
+`(-100)`, negatives in red, negatives combined with accounting style, and Euros rather than
+dollars. **The currency code itself is part of the format, not the value** — `1234.5` in
+Euros and `1234.5` in dollars are the same cell value.
+
+## Percent is NOT a distinct type, and the asymmetry with currency is the point
+
+Every cell in `13-number-percent` is **type 2**, an ordinary number, with `flags 0x0003` plus
+format references. Currency gets its own type byte; percent does not.
+
+The distinction is meaningful rather than arbitrary. **Currency carries semantic data the
+value cannot hold** — the currency code. `1234.5` in Euros is different information from
+`1234.5` in dollars, and no amount of formatting recovers which was meant. Percent carries
+none: the value is a fraction and the format multiplies by 100 to display it.
+
+The stored value is always the fraction, never the displayed number:
+
+```
+displays  0.25     stores  25 x 10^-2  =  0.25
+displays  25%      stores  25 x 10^-2  =  0.25
+displays  1,000%   stores  1000 x 10^-2 = 10.0
+displays  -0.25%   stores  25 x 10^-4, sign set = -0.0025
+```
+
+**Anything reading a percent cell must not report the displayed number**, and anything
+writing one must not hand over a display value. It is a factor-of-100 error that looks
+entirely reasonable in isolation.
+
+### A caution about authoring fixtures, not about the library
+
+In this fixture the positive cells hold `0.25` while the negative ones hold `-0.0025`,
+despite the same described action. Numbers decided differently for the two, and the exact
+mechanism was not pinned down — order of operations and a sign-dependent parse are both
+consistent with what is on disk.
+
+This does **not** affect pybers, which stores and returns the underlying value and does not
+emulate how Numbers interprets typing. It affects *fixtures*: when a file is built by typing
+into Numbers, what ends up stored may not be what was typed. So a fixture label should record
+**what is displayed**, which is checkable against a screenshot, rather than what was entered,
+which is not recoverable from the file.
+
+## Dates: the time is in the value, and the tail offset is not fixed
+
+From `14-number-date`. Every cell is **type 5** whatever format is applied, so dates behave
+like percent and unlike currency — formatting never changes the type.
+
+**A date-time is a single number, not a date plus a time field.** `11:00` is stored inside
+the same float64 as `11:00:00` past midnight; cells with no time hold exactly `00:00:00`.
+There is nowhere else for a time to live.
+
+Flags record which format layers exist:
+
+```
+0x0000   no format applied
+0x0008   a date format
+0x000b   a date format and a time format
+```
+
+### The trailing references do NOT start at a fixed offset
+
+They begin immediately after the value, and the value's width depends on the type:
+
+```
+decimal128 (types 2, 10)   16 bytes   tail starts at 28
+float64    (types 5, 6, 7)  8 bytes   tail starts at 20
+string key (type 3)         4 bytes   tail starts at 16
+```
+
+Reading the tail at a constant 28 silently skipped two fields on every date, boolean and
+duration cell while looking perfectly plausible, because the remaining fields still parsed as
+integers. Nothing raised. This is the failure mode to expect throughout this format: a wrong
+offset yields wrong numbers rather than an error, so every layout claim needs a fixture whose
+expected content is known independently.
+
+### Format is carried by reference, gated by a bitmask
+
+Bytes 6-7 are a flags bitmask that decides which trailing `uint32` references are present:
+
+```
+type  2, flags 0x0000 -> tail [1, 1]
+type 10, flags 0x0802 -> tail [2, K]        the common currency case
+type 10, flags 0x0803 -> tail [2, 1, K]     bit 0 adds one field
+type 10, flags 0x0882 -> tail [2, 11, 5]    bit 7 adds a different one
+```
+
+The last element varies with the format variant, so it reads as a key into the `FORMAT`
+`TableDataList`. **The individual flag bits are not decoded** — which bit implies which
+field is unknown, and guessing would be worse than saying so. A writer must not synthesize
+this bitmask until each bit is understood; round-tripping the original bytes is safe, and
+inventing them is not.
+
+### There are TWO cell type enums and they do not agree
+
+`TST.CellType` is the one in the storage byte. `TST.CellValueType` is a **different** enum
+used elsewhere, and its numbering is offset:
+
+```
+CellValueType  0 empty  1 number  2 string  3 provided  4 date
+               5 bool   6 duration  7 error  8 richText  9 currency
+```
+
+`date` is **5** in `CellType` and **4** in `CellValueType`. Confusing the two shifts every
+type by one and would misread whole columns silently. Always name which enum is meant.
+
+`CellValueType` also carries two entries `CellType` does not: `richTextCellType`, consistent
+with the separate rich-text payload, and **`currencyCellValueType`** — so **currency appears
+to be a value type in its own right rather than a display format over a number.** That is
+worth confirming with a fixture rather than assuming either way, and it makes
+`12-number-currency` a real unknown rather than a variation on `11`.
 
 Verified end to end: the fixture decodes to `1234.5`, `42`, `2027-06-15`, `0:20:00`, `True`,
 `3`, `50`, `1`, `'Item 1'` — matching all nine of its own labels, with the tenth cell empty

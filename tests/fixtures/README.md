@@ -27,6 +27,16 @@ Whatever formatting the default new document carries is fine — **do not try to
 truly empty.** The baseline is a subtraction reference, not a minimal document; anything it
 carries cancels out in the diff as long as every file starts from the same one.
 
+### Label what is DISPLAYED, not what you typed
+
+The label row is the answer key that makes a decode verifiable, so it has to describe
+something checkable. What a cell displays can be confirmed against a screenshot. What was
+typed cannot be recovered from the file at all — and `13-number-percent` showed the two can
+differ, where typing `0.25` and `-0.25` into percent cells did not store symmetric values.
+
+Describing the formatting applied is useful too. Just do not assume the stored value equals
+the keystrokes.
+
 ### Things that do not matter, so do not spend effort on them
 
 - **File size.** It is dominated by the preview JPEGs Numbers regenerates on every save
@@ -53,9 +63,9 @@ against `02-text-rich`, which resolves to exactly the four runs it was built fro
 `l` italic, `l` in the alternate font with OpenType features, `o` underlined and colored. So
 findings can now state which characters a style covers, not just that the style exists.
 
-**Text properties are done.** The remaining entries at 37-40 are low priority. What the set
-still lacks is everything that is not text: no fixture contains a numeric, date or boolean
-value, a formula, a merge, a named style, or a floating object.
+**Made so far: 00 through 14.** Text and formatting are done, and the cell-value encoding is
+broken open for numbers, currency, percent and dates. What the set still lacks: durations
+with formats, formulas, merges, named styles and floating objects.
 
 ---
 
@@ -106,7 +116,7 @@ and `pybers` should support it too.
 So its presence is a baseline condition rather than a signal — a feature record appearing
 does not by itself mean the fixture's feature was applied.
 
-**Nothing further is needed for text properties.** 37-40 below are the remaining controls
+**Nothing further is needed for text properties.** 38-41 below are the remaining controls
 from the "More Text Options" panel, and they are low priority — the structural lessons are
 already learned.
 
@@ -141,11 +151,44 @@ These layer a display format over a value, which is a separate concern from the 
 itself. `11` must come first or there is nothing to compare them against.
 
 ```
-12-number-currency      One cell = 1234.5 as currency
-13-number-percent       One cell = 0.25 as percent
-14-number-date          One cell holding a date, formatted
-15-number-scientific    One cell in scientific notation
-16-number-custom        One cell using a custom format you define
+12-number-currency      DONE, and it settled the question both ways. Currency IS a
+                        distinct cell type (10) but is NOT a distinct value
+                        encoding — the decimal128 sits at the same offset as a
+                        plain number. It also disproved the assumption that the
+                        storage type byte is TST.CellType: 10 is in neither enum.
+                        Nine variants in one file, with a plain number beside them
+                        for comparison, is what made both conclusions provable.
+                        See FINDINGS.md.
+13-number-percent       DONE. Percent is NOT its own cell type — it is an ordinary
+                        number plus a format, which is the opposite of currency and
+                        makes the pair worth reading together. Confirmed the stored
+                        value is always the fraction, never the displayed figure.
+                        See FINDINGS.md.
+14-number-date          DONE. Established that a date-time is ONE float64 — the time
+                        lives in the value, not in a separate field — and that dates
+                        keep type 5 whatever format is applied. Also exposed that the
+                        trailing references start after the value, whose width varies
+                        by type, so there is no fixed tail offset. See FINDINGS.md.
+                        NOTE: col 4's label mentions 11:00 but the cell stores
+                        00:00:00, unlike its neighbours 5 and 6. Worth a glance.
+15-duration-formats     Durations are the one type whose FORMAT carries more
+                        information than any other, because Numbers lets you choose
+                        which units appear and in what style. One duration cell per
+                        presentation, in the same file:
+                          - a plain unformatted duration, for comparison
+                          - hours and minutes only
+                          - a range including milliseconds
+                          - the compact style, e.g. 2h 30m
+                          - the long style, e.g. 2 hours 30 minutes
+                          - the colon style, e.g. 2:30
+                        Two open questions this settles: whether the stored value
+                        stays a plain seconds float64 across all of them (expected,
+                        by analogy with percent and date), and whether duration cells
+                        keep type 7 throughout or gain a distinct type the way
+                        currency did. Currency is the only type so far that changed
+                        its type byte for a format, so either answer is a finding.
+16-number-scientific    One cell in scientific notation
+17-number-custom        One cell using a custom format you define
 ```
 
 Note these are *number formats*, not typography — but `onum` versus `lnum` (oldstyle
@@ -155,72 +198,50 @@ different places. Keep them in separate fixtures so that stays visible.
 ### Formulas
 
 ```
-17-formula-sum          A1:A3 = 1,2,3 and A4 = =SUM(A1:A3)
-18-formula-sumifs       A SUMIFS with a range argument
-19-formula-crosssheet   A formula referencing a cell on a second sheet
-20-formula-error        A formula that deliberately errors (=1/0)
+18-formula-sum          A1:A3 = 1,2,3 and A4 = =SUM(A1:A3)
+19-formula-sumifs       A SUMIFS with a range argument
+20-formula-crosssheet   A formula referencing a cell on a second sheet
+21-formula-error        A formula that deliberately errors (=1/0)
 ```
 
 ### Structure
 
 ```
-21-merge-2x2            Merge A1:B2. Nothing else.
-22-row-inserted         One row inserted
-23-column-inserted      One column inserted
-24-two-tables           A second table on the same sheet
-25-two-sheets           A second sheet added
-26-big-table            ~2000 rows of any values — enough to push one .iwa past
+22-merge-2x2            Merge A1:B2. Nothing else.
+23-row-inserted         One row inserted
+24-column-inserted      One column inserted
+25-two-tables           A second table on the same sheet
+26-two-sheets           A second sheet added
+27-big-table            ~2000 rows of any values — enough to push one .iwa past
                         64 KB and force multi-frame chunking
 ```
 
 ### Cell styling
 
 ```
-27-style-fill           One cell with a background fill color. This is
+28-style-fill           One cell with a background fill color. This is
                         TST.CellStylePropertiesArchive.cell_fill — a THIRD thing,
                         distinct from both backgrounds in 08. See FINDINGS.md.
-28-style-border         One cell with a border on one edge only
-29-style-align          One cell set to centered
-30-style-inset-2pt      One cell with the text inset reduced from the 4 pt default
+29-style-border         One cell with a border on one edge only
+30-style-align          One cell set to centered
+31-style-inset-2pt      One cell with the text inset reduced from the 4 pt default
                         to your usual 2 pt
-31-style-inset-uneven   One cell with FOUR DIFFERENT insets if the UI allows it —
+32-style-inset-uneven   One cell with FOUR DIFFERENT insets if the UI allows it —
                         the archive stores left/top/right/bottom as independent
                         floats (TSWP.PaddingArchive), so this checks whether the
                         single-value UI control is a real constraint or just a
                         convenience. If Numbers will not let you, say so and skip.
-32-named-style          One cell using a built-in NAMED style rather than manual
+33-named-style          One cell using a built-in NAMED style rather than manual
                         formatting — drives the named-styles decision in CLAUDE.md
 ```
 
 ### Floating objects
 
 ```
-33-textbox              One floating text box with a word in it
-34-shape                One drawn shape, a rectangle is fine
-35-image                One small embedded image
-36-image-and-shape      Both, to check they are independent
-```
-
-### Table bands and panes
-
-Numbered from 41 to avoid renumbering the list again. Grouping is by section, not by
-adjacent numbers.
-
-```
-41-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
-                        all in one file. These are plain scalars on the table model
-                        (number_of_header_rows / _header_columns / _footer_rows), so
-                        one fixture covers all three.
-42-table-frozen         Freeze the header row AND the header column. Note that
-                        freezing (header_rows_frozen) is a SEPARATE field from
-                        repeating-on-print (repeating_header_rows_enabled) — set only
-                        freezing here so the two stay distinguishable.
-43-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
-                        a different fill, in the same file. The schema says a band has
-                        a real style reference (header_row_style) while a body row has
-                        none — so this should show one reference change for the header
-                        and N per-cell styles for the body row. Confirms whether
-                        "format a row" is a real operation or only sugar.
+34-textbox              One floating text box with a word in it
+35-shape                One drawn shape, a rectangle is fine
+36-image                One small embedded image
+37-image-and-shape      Both, to check they are independent
 ```
 
 ### Still unexplored from the "More Text Options" panel
@@ -228,16 +249,38 @@ adjacent numbers.
 That panel holds several controls no fixture covers yet, and each is a separate field:
 
 ```
-37-text-charspacing     Character Spacing set to something other than 0%
-38-text-baselineshift   Baseline Shift set to something other than 0 pt
-39-text-outline         The Outline checkbox
-40-text-shadow          The Shadow checkbox
+38-text-charspacing     Character Spacing set to something other than 0%
+39-text-baselineshift   Baseline Shift set to something other than 0 pt
+40-text-outline         The Outline checkbox
+41-text-shadow          The Shadow checkbox
 ```
 
 Baseline Shift is worth having precisely because it is the manual way to fake a
 superscript, so it needs to be distinguishable from both the synthetic `superscript`
 enum and the real OpenType feature. Three routes to a similar look, three different
 fields.
+
+### Table bands and panes
+
+Numbered from 41 to avoid renumbering the list again. Grouping is by section, not by
+adjacent numbers.
+
+```
+42-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
+                        all in one file. These are plain scalars on the table model
+                        (number_of_header_rows / _header_columns / _footer_rows), so
+                        one fixture covers all three.
+43-table-frozen         Freeze the header row AND the header column. Note that
+                        freezing (header_rows_frozen) is a SEPARATE field from
+                        repeating-on-print (repeating_header_rows_enabled) — set only
+                        freezing here so the two stay distinguishable.
+44-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
+                        a different fill, in the same file. The schema says a band has
+                        a real style reference (header_row_style) while a body row has
+                        none — so this should show one reference change for the header
+                        and N per-cell styles for the body row. Confirms whether
+                        "format a row" is a real operation or only sugar.
+```
 
 ---
 
@@ -246,9 +289,9 @@ fields.
 If you want to stop early, these cover every distinct *kind* of thing, and the rest only
 sharpen the mapping:
 
-**`17-formula-sum`, `21-merge-2x2`, `32-named-style`, `33-textbox`, `26-big-table`.**
+**`18-formula-sum`, `22-merge-2x2`, `33-named-style`, `34-textbox`, `27-big-table`.**
 
-`26-big-table` is the odd one out — it tests the container rather than the model, and it is
+`27-big-table` is the odd one out — it tests the container rather than the model, and it is
 the only fixture that exercises the multi-frame path with real user data.
 
 ---
