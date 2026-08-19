@@ -6,6 +6,72 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 
 ---
 
+## Borders: THREE separate mechanisms, and none is built on the others
+
+`29-style-border` carries five tables, each using a different border feature. The result
+contradicts the reasonable guess that the table-level controls are convenience wrappers that
+write ordinary cell borders. They are not.
+
+```
+Table 1              per-cell borders     8 strokes in the sidecar
+Table 1-1            table outline 2pt    0 strokes
+Table 1-1-1          gridlines on         0 strokes
+Table 1-1-1-1        gridlines off        0 strokes
+Table 1-1-1-1-1      alternating rows     0 strokes
+```
+
+| mechanism | stored in |
+|---|---|
+| per-cell borders | `TableModelArchive.stroke_sidecar` |
+| gridlines and outline | `TableStyleArchive.table_properties.{v,h}_strokes_visible`, `table_border_visible` |
+| row and column banding | `TableStyleArchive.table_properties.banded_rows`, `banded_fill` |
+
+**Cell styles carry no strokes at all.** `CellStylePropertiesArchive` defines `top_stroke`,
+`right_stroke`, `bottom_stroke` and `left_stroke`, and not one cell style in this fixture sets
+any of them. Borders do not travel with a cell's style.
+
+### The stroke sidecar is run-length layers per side
+
+```
+left_column_stroke_layers    one layer per COLUMN, runs indexed by row
+right_column_stroke_layers   one layer per COLUMN, runs indexed by row
+top_row_stroke_layers        one layer per ROW,    runs indexed by column
+bottom_row_stroke_layers     one layer per ROW,    runs indexed by column
+```
+
+Each run carries an origin, a length, and a stroke with width, color and a dash pattern. A
+width of `0` is how "no border" is expressed, so the layers are dense rather than sparse —
+every position has a run, most of them empty.
+
+Verified against the fixture: a 3pt top border on B1 is `top_row` layer 0 at column 1; a 0.5pt
+blue right border on C1 is `right_column` layer 2; a dashed bottom on D1 carries
+`dash[1, 1]`; a dotted left on E1 carries `dash[0, 2]`.
+
+### One line between two cells is stored TWICE
+
+This is the part worth knowing before writing anything.
+
+The border between F1 and G1 appears as **both** F1's right stroke and G1's left stroke. The
+border between H1 and H2 appears as **both** H1's bottom and H2's top. A single visual line is
+two independent stored strokes on the facing edges.
+
+So **setting a border between two cells means writing both sides.** Writing one leaves the
+pair disagreeing, and which one Numbers renders is not something this fixture establishes.
+Reading has the mirror problem: a border reported from one cell's perspective may or may not
+be matched by its neighbour, and those are different document states.
+
+### The table style has more than sixty stroke slots
+
+Beyond the visibility flags, `table_properties` carries header row, header column, footer,
+body horizontal and vertical strokes, five levels of category strokes, and a set of pivot
+variants. The border vocabulary is large and almost all of it is **band-level** rather than
+cell-level — consistent with the earlier finding that styles exist per band and not per row
+or column.
+
+Tables that only change a table-level setting show it as an override list on a variation
+style — `Table 1-1-1-1` sets exactly `v_strokes_visible`, `h_strokes_visible` and
+`table_border_visible` — the same parent-plus-override pattern seen in sheet tab colors.
+
 ## A fill is a three-way union
 
 From `28-style-fills`, which carries ten variants in one row. A cell's style reaches

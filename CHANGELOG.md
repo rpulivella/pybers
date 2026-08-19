@@ -10,6 +10,7 @@ Maintained by `/changelog-add` — one verbatim ticket-title bullet per line und
 
 ## Unreleased
 
+- [init] Map the three border mechanisms and the stroke sidecar
 - [init] Map cell fills, gradients, color spaces and embedded images
 - [init] Resolve tiles through the tile list rather than archive order
 - [init] Map merges, structural edits, sheets and table geometry
