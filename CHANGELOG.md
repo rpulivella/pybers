@@ -10,6 +10,9 @@ Maintained by `/changelog-add` — one verbatim ticket-title bullet per line und
 
 ## Unreleased
 
+- [init] Resolve tiles through the tile list rather than archive order
+- [init] Map merges, structural edits, sheets and table geometry
+- [init] Add duration, scientific and custom number format fixtures
 - [init] Map cross-table references, multi-range functions and formula error shapes
 - [init] Establish that formula references are relative offsets, shared by refcount
 - [init] Add cell value decoding for numbers, text, dates, booleans and durations

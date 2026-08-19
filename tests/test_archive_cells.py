@@ -37,9 +37,10 @@ from pybers.archive.cells import (
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
-# TST.Tile. Named here rather than imported because the type identifier is ours, read
-# from the archive, and does not come from a generated constant.
+# TST.Tile and TST.TableModelArchive. Named here rather than imported because these
+# identifiers are ours, read from the archive, and do not come from a generated constant.
 tileTypeId: int = 6002
+tableModelTypeId: int = 6001
 
 
 def fixturePath(name: str) -> Path:
@@ -51,31 +52,56 @@ def fixturePath(name: str) -> Path:
 
 
 def valueRow(name: str) -> dict[int, object]:
-    """Decode row 0 of a fixture, returning column to value.
+    """Decode document row 0 of a fixture, returning column to value.
 
-    Row 0 is the values in every fixture built for this purpose; the labels sit in a
+    Row 0 holds the values in every fixture built for this purpose; the labels sit in a
     later row and are read by eye, not by the tests.
+
+    **Resolved through the tile list, not by scanning tile archives.** `27-big-table`
+    established two things that make the obvious approach wrong: `tile_row_index` is
+    local to its tile and restarts at zero in each one, so a 2001-row table has eight
+    different rows numbered zero; and tile archive identifiers are not in row order, so
+    iterating archives as they appear scrambles the table. `TileStorage.tiles` carries
+    the authoritative order and the `tileid` that maps a tile to its row range.
     """
     from pybers._generated import TSTArchives_pb2 as tst
 
     package = readPackage(fixturePath(name))
+    tiles = {
+        archive.identifier: message.data
+        for iwaFile in package.iwaFiles
+        for archive in iwaFile.archives
+        for message in archive.messages
+        if message.typeId == tileTypeId
+    }
+
     for iwaFile in package.iwaFiles:
         for archive in iwaFile.archives:
             for message in archive.messages:
-                if message.typeId != tileTypeId:
+                if message.typeId != tableModelTypeId:
                     continue
-                tile = tst.Tile()
-                tile.ParseFromString(message.data)
-                for info in tile.rowInfos:
-                    if info.tile_row_index != 0:
+                model = tst.TableModelArchive()
+                model.ParseFromString(message.data)
+                storage = model.base_data_store.tiles
+                for entry in storage.tiles:
+                    # Only the tile holding document row 0 is wanted here.
+                    if entry.tileid * (storage.tile_size or 256) != 0:
                         continue
-                    records = decodeRow(
-                        info.cell_offsets,
-                        info.cell_storage_buffer,
-                        info.has_wide_offsets,
-                    )
-                    if records:
-                        return {record.column: record.value for record in records}
+                    raw = tiles.get(entry.tile.identifier)
+                    if raw is None:
+                        continue
+                    tile = tst.Tile()
+                    tile.ParseFromString(raw)
+                    for info in tile.rowInfos:
+                        if info.tile_row_index != 0:
+                            continue
+                        records = decodeRow(
+                            info.cell_offsets,
+                            info.cell_storage_buffer,
+                            info.has_wide_offsets,
+                        )
+                        if records:
+                            return {r.column: r.value for r in records}
     raise AssertionError(f"No populated row 0 found in {name}.")
 
 
