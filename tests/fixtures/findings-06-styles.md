@@ -1,10 +1,65 @@
-# Fills, gradients and color
+# Cell styling: borders, fills and alignment
 
-How a cell gets its background, and why color is not three floats.
+How a cell gets its borders, its background and its alignment — three subsystems that turn
+out to share almost nothing.
 
 Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 
 ---
+
+## Alignment is split across TWO style types, and the STYLE list is heterogeneous
+
+From `30-style-align`. The `STYLE` data list does not hold one kind of thing:
+
+```
+key 1  TSWP.ParagraphStyleArchive     key 2  TST.CellStyleArchive
+key 3  TSWP.ParagraphStyleArchive     key 6  TST.CellStyleArchive
+```
+
+**Horizontal alignment is a paragraph property. Vertical alignment and text wrap are cell
+properties.** A cell needing both references both, which is why cell records carry a variable
+number of style references:
+
+```
+refs=(5,1)        all defaults, no style of its own
+refs=(1,5,1)      one paragraph style      h: left
+refs=(6,1,5,1)    a cell style AND a paragraph style    h: left, v: middle
+```
+
+This is what the flags bitmask on a cell record gates — not one style slot, but several, of
+different kinds. That resolves the variable-length tail that had been unexplained since the
+value fixtures.
+
+### The alignment enum has NO usable names, so the fixture is the authority
+
+Apple's compiled descriptor carries placeholders:
+
+```
+enum TextAlignmentType { TATvalue0 = 0; TATvalue1 = 1; TATvalue2 = 2; TATvalue3 = 3; TATvalue4 = 4; }
+```
+
+Established by measurement instead, from a fixture that labels each cell with what it shows:
+
+```
+alignment 0 = left      alignment 2 = center
+alignment 1 = right     alignment 3 = justify
+```
+
+Note that **1 is right and 2 is center**, which is not the order anyone would guess. `TATvalue4`
+is not exercised by this fixture and remains unknown.
+
+**Horizontal "auto" is the ABSENCE of a paragraph style**, not a value — the auto cells carry
+no paragraph reference at all. Same for vertical top and wrap-on: they are defaults expressed
+by omission.
+
+Vertical alignment on the cell style:
+
+```
+0 = top (default, never written)    1 = middle    2 = bottom
+```
+
+**Where a schema gives placeholder names, only a labelled fixture can supply meaning.** That
+makes fixtures the source of truth for parts of this format, not merely a check on it.
 
 ## Borders: THREE separate mechanisms, and none is built on the others
 
@@ -187,3 +242,40 @@ That state is worth remembering even now that supplied images are understood: **
 tolerate an image reference that does not resolve**, because it is a legitimate document state
 rather than corruption. A document using only Numbers' own default imagery carries no `Data/`
 member at all.
+
+## Only SOME style kinds can be named — and cell styles never are
+
+Counted across `30-style-align`, `02-text-rich` and `10-text-ligatures`. `TSS.StyleArchive`,
+the shared base of every style, carries `name`, `style_identifier`, `parent` and
+`is_variation` — but only some kinds ever populate `name`.
+
+| kind | named | anonymous |
+|---|---|---|
+| `TSWP.ParagraphStyleArchive` | 21 — Body, Title, Heading, Caption, Table Style 1-7 | 667 |
+| `TSWP.CharacterStyleArchive` | 8 — Emphasis, Italic, Link, Underline, Strikethrough | 5 |
+| `TSWP.ListStyleArchive` | 5 — Bullet, Numbered, Lettered, Image, None | 0 |
+| `TST.CellStyleArchive` | **0** | **309** |
+| `TST.TableStyleArchive` | **0** | 18 |
+| `TN.SheetStyleArchive` | **0** | 3 |
+
+**Cell styles are never named**, in 309 instances. Nor are table or sheet styles. They exist
+only as anonymous archives deduplicated by value and reached through a table's `STYLE` list.
+
+Two details worth keeping. A **user-created** character style appears in the same registry as
+Apple's own — `'smallcap'`, made while building `09-text-capitalization` — so named styles are
+not a fixed built-in set. And `Table Style 1` through `Table Style 7` are **paragraph** styles
+despite the name, so the table styling vocabulary is expressed through named paragraph styles
+rather than through named table styles.
+
+### What this decides for the named-style question in CLAUDE.md
+
+The layering machinery is real and already observed: a style may carry a `parent`, be marked
+`is_variation`, and record an `override_count` — seen directly in the sheet tab colors of
+`26-multi-sheets` and in the table-level border settings of `29-style-border`.
+
+But it applies to **paragraph, character and list** styles only. A `NamedStyle` registry that
+covers those maps onto something Numbers really has. Extending it to cell styles would be
+inventing a concept the format does not carry, and any such feature has to be labelled a
+pybers concept rather than presented as a mapping — otherwise a round trip would promise a
+persistence it cannot deliver.
+

@@ -400,7 +400,13 @@ list above may want revising rather than following.
                         style, not convenience over cell borders. And a single line
                         between two cells is stored TWICE, once on each facing edge.
                         See findings-06-styles.md.
-30-style-align          One cell set to centered
+30-style-align          DONE, and it resolved the variable-length style tail. The
+                        STYLE list is HETEROGENEOUS — horizontal alignment is a
+                        paragraph style, vertical alignment and wrap are cell styles,
+                        and a cell referencing both carries two style keys. Also
+                        established the alignment enum by measurement, because the
+                        schema ships it with placeholder names (TATvalue0..4). See
+                        findings-06-styles.md.
 31-style-inset-2pt      One cell with the text inset reduced from the 4 pt default
                         to your usual 2 pt
 32-style-inset-uneven   One cell with FOUR DIFFERENT insets if the UI allows it —
