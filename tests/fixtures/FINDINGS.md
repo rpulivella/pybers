@@ -12,13 +12,14 @@ Split by topic — this file is the index.
 | [findings-02-formulas.md](findings-02-formulas.md) | The postfix AST, why references survive being moved, cross-table links, and what a failed formula stores. |
 | [findings-03-structure.md](findings-03-structure.md) | Merges, what structural edits do to them, tiles, and how tables and sheets sit on a document. |
 | [findings-04-text.md](findings-04-text.md) | Text storage, style runs, OpenType features, and the typography traps. |
+| [findings-06-styles.md](findings-06-styles.md) | Fills, gradients, and why a color is not three floats. |
 | [findings-05-method.md](findings-05-method.md) | How these findings were produced, and the mistakes that produced them slowly. |
 
 ---
 
-## The five that matter most
+## The six that matter most
 
-If nothing else here is read, these five change what the library has to be.
+If nothing else here is read, these six change what the library has to be.
 
 **Numbers are IEEE-754 decimal128, not float64.** `1234.5` is stored exactly. Routing a value
 through a Python `float` would introduce binary rounding error into a document that never had
@@ -39,6 +40,10 @@ integer or float, so misreading one still parses. This is why every layout claim
 fixture whose contents are known independently, and why the fixtures carry their own answer
 key. — [method](findings-05-method.md)
 
+**Color carries a color space, and it varies within a single gradient.** Storing `(r, g, b, a)`
+floats would silently shift colors, because 0.5 red in sRGB is not 0.5 red in Display P3.
+— [styles](findings-06-styles.md)
+
 **Real OpenType features sit right beside Apple's synthetic imitations.** `superscript` and
 `capitalization = kSmallCaps` fake the effect on the existing glyph; the honest route is a
 font feature. pybers must be able to tell them apart and must never write the fake form.
@@ -57,6 +62,9 @@ font feature. pybers must be able to tell them apart and must never write the fa
   has to be derived rather than borrowed, per the schema-ownership decision in `CLAUDE.md`.
 - **Header rows, header columns and footers** are switched off in every fixture here, so the
   default Numbers table shape is untested. `42-table-bands` covers it and is worth promoting.
+- **Where a supplied image is stored.** `28` exercises image fills, but only with the default
+  image Numbers provides, whose data is not in the document at all. A fixture with a real
+  image dragged in would settle it.
 
 ---
 
