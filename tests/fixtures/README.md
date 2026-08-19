@@ -63,20 +63,24 @@ against `02-text-rich`, which resolves to exactly the four runs it was built fro
 `l` italic, `l` in the alternate font with OpenType features, `o` underlined and colored. So
 findings can now state which characters a style covers, not just that the style exists.
 
-**Made so far: 00 through 14, and 18 through 21.** Text and formatting are done. The
-cell-value encoding is broken open for numbers, currency, percent and dates. Formulas are
-fully mapped: a postfix AST, relative offsets, per-axis locking, cross-table references by
-UUID, and the error shapes.
+**Made so far: 00 through 22, plus 22b.** Text and formatting are done. The cell-value
+encoding is broken open for every type. Formulas are fully mapped: a postfix AST, relative
+offsets, per-axis locking, cross-table references by UUID, and the error shapes. Merges are
+located and understood.
 
 **Still missing, in the order worth doing them:**
 
-1. `15`, `16`, `17` — durations with formats, scientific, custom. These finish the value and
-   format arc while the decoder is fresh, and are quick.
-2. `22` through `27` — structure: merges, inserted rows and columns, several tables, several
-   sheets. A different subsystem.
+1. `23` and `24` — a row and a column inserted **into a file that has merges**. These are the
+   last fixtures that can still change the object model, because merge ranges are stored
+   absolute and it is unknown whether Numbers rewrites them on a structural edit.
+2. `25`, `26`, `27` — more tables, more sheets, a big table. Expected to be routine now that
+   cross-table references are understood.
 3. `45`, `46`, `47` — table geometry, dimensions and titles. Nothing covers these yet, and a
    round trip that loses a column width has damaged the document.
 4. `28` through `37` — cell styling and floating objects.
+
+After `23` and `24` the model has no remaining unknowns, and the next step is the
+architecture conversation rather than more fixtures.
 
 ---
 
@@ -182,24 +186,22 @@ itself. `11` must come first or there is nothing to compare them against.
                         by type, so there is no fixed tail offset. See FINDINGS.md.
                         NOTE: col 4's label mentions 11:00 but the cell stores
                         00:00:00, unlike its neighbours 5 and 6. Worth a glance.
-15-duration-formats     Durations are the one type whose FORMAT carries more
-                        information than any other, because Numbers lets you choose
-                        which units appear and in what style. One duration cell per
-                        presentation, in the same file:
-                          - a plain unformatted duration, for comparison
-                          - hours and minutes only
-                          - a range including milliseconds
-                          - the compact style, e.g. 2h 30m
-                          - the long style, e.g. 2 hours 30 minutes
-                          - the colon style, e.g. 2:30
-                        Two open questions this settles: whether the stored value
-                        stays a plain seconds float64 across all of them (expected,
-                        by analogy with percent and date), and whether duration cells
-                        keep type 7 throughout or gain a distinct type the way
-                        currency did. Currency is the only type so far that changed
-                        its type byte for a format, so either answer is a finding.
-16-number-scientific    One cell in scientific notation
-17-number-custom        One cell using a custom format you define
+15-number-duration-formats  DONE, and the most informative of the three. Proved
+                        durations keep type 7 across EVERY format, so currency stays
+                        the only type that changes its type byte for a format. Also
+                        gave the controlled experiment identifying the format key as
+                        the LAST trailing reference — one value, five presentations,
+                        one slot moving. Plus three behaviors nobody asked for: a
+                        leading apostrophe is an input directive and is not stored,
+                        duration arithmetic coerces to HOURS, and feeding one value
+                        into two DURATION() slots pins its argument order. See
+                        FINDINGS.md.
+16-number-scientific-numeralsystems  DONE, with a surprise: Numbers has NUMERAL SYSTEMS, base 2,
+                        10 and 16 with configurable places and two's complement for
+                        negatives. All display only — the value never changes.
+17-number-custom        DONE. Established that ONE custom format archive holds its
+                        positive, negative and zero presentations together, rather
+                        than three formats chosen by sign.
 ```
 
 Note these are *number formats*, not typography — but `onum` versus `lnum` (oldstyle
@@ -320,19 +322,60 @@ list above may want revising rather than following.
 ### Structure
 
 ```
-22-merge-2x2            Merge A1:B2. Nothing else.
-23-row-inserted         One row inserted
-24-column-inserted      One column inserted
-25-two-tables           A second table on the same sheet
-26-two-sheets           A second sheet added
-27-big-table            ~2000 rows of any values — enough to push one .iwa past
-                        64 KB and force multi-frame chunking
+22-merge-2x2            DONE, and it carries far more than the name suggests: five
+                        merges across row 0, two of them merging cells that already
+                        held content, plus formulas reading both a merge anchor and a
+                        covered cell. That range is what made the findings possible.
+22b-merge-2x2-unmerged  The SAME file with every merge removed and nothing else
+                        touched. This pair is what located merge storage — a presence
+                        check had already failed, because the field exists in both and
+                        only its CONTENT differs. Established that merges live in
+                        TableModelArchive.merge_owner.formula_store as full formula
+                        archives, that merging is destructive and unmerging does not
+                        undo it, and that a reference to a covered cell errors and
+                        recovers. See FINDINGS.md.
+
+                        THE PATTERN WORTH REUSING: when a feature cannot be located,
+                        make the same file with and without it. Two files differing in
+                        one property beat any amount of searching by field name.
+23-row-inserted         DONE, and it explained an existing bug. Numbers DOES rewrite
+                        merge ranges on a structural edit — the originals moved from
+                        row 0 to row 1. Inserted rows also INHERIT the merge pattern
+                        of their neighbour, so 5 merges became 15, and a merge can
+                        cover entirely empty cells. See FINDINGS.md.
+
+24-column-inserted      DONE, and it proved rows and columns differ. Merges shifted
+                        to their new columns correctly, but NO new merges were
+                        created — where a row insert created ten. Testing only one
+                        axis would have produced the wrong rule for both.
+
+25-multi-tables         DONE, and it answered more than asked. Sheets hold an ORDERED
+                        list of drawable_infos and a table is simply a drawable.
+                        TableInfoArchive.super carries geometry — position, size,
+                        angle, locked — so tables can be ROTATED. This largely covers
+                        what 45 and 47 were meant to discover.
+
+26-multi-sheets         DONE. Three sheets, one with a tab color and one with a
+                        background color. Both live in SheetStyleArchive
+                        .sheet_properties (tab_color and fill), NOT as sheet fields —
+                        and the styled sheets carry parent + is_variation + an
+                        override_count, which is the named-style layering from
+                        CLAUDE.md decision 2 visible in the wild.
+
+27-big-table            DONE, and it was discovery rather than confirmation. A table
+                        over 256 rows SPLITS INTO TILES — 2001 rows became 8. Two
+                        traps followed: tile_row_index restarts at 0 in every tile, so
+                        a document row is tileid * tile_size + tile_row_index; and
+                        tile archive identifiers are NOT in row order, so
+                        TileStorage.tiles is the authoritative sequence. Built by
+                        importing a generated CSV, which breaks Save-As lineage — fine
+                        here, because this fixture is not compared against a baseline.
 ```
 
 ### Cell styling
 
 ```
-28-style-fill           One cell with a background fill color. This is
+28-style-fills          One cell with a background fill color. This is
                         TST.CellStylePropertiesArchive.cell_fill — a THIRD thing,
                         distinct from both backgrounds in 08. See FINDINGS.md.
 29-style-border         One cell with a border on one edge only
