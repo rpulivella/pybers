@@ -61,6 +61,36 @@ Vertical alignment on the cell style:
 **Where a schema gives placeholder names, only a labelled fixture can supply meaning.** That
 makes fixtures the source of truth for parts of this format, not merely a check on it.
 
+## The cell owns its box, the paragraph owns its text
+
+`31-style-inset-2pt` adds insets and the indent controls sitting beside them in the UI, and the
+split matches what `30` found for alignment:
+
+```
+key 2  CELL       padding  L2 T2 R2 B2
+key 3  CELL       padding  L0 T0 R0 B0
+key 4  PARAGRAPH  first_line_indent 18.0
+key 1  PARAGRAPH  first_line_indent 18.0, left_indent 18.0
+key 5  PARAGRAPH  first_line_indent 18.0, left_indent 18.0, right_indent 18.0
+```
+
+The rule that now covers every styling fixture:
+
+| the CELL owns | the PARAGRAPH owns |
+|---|---|
+| `padding` (the inset) | `alignment` |
+| `vertical_alignment` | `first_line_indent`, `left_indent`, `right_indent` |
+| `text_wrap` | `fill` (the paragraph background) |
+| `cell_fill` | |
+
+**Everything is points.** An indent entered as `0.25in` stores as `18.0`, which is 0.25 x 72.
+Inches, and any other unit the UI offers, are a display convenience with no presence in the
+file.
+
+**A 4pt inset is the default and writes no style at all** — the 4pt cell carries no cell style
+key, where the 2pt and 0pt cells do. Consistent with defaults elsewhere: absence is how the
+common case is expressed, so a reader must supply the default rather than report "unset".
+
 ## Borders: THREE separate mechanisms, and none is built on the others
 
 `29-style-border` carries five tables, each using a different border feature. The result

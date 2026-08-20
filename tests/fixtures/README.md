@@ -407,8 +407,12 @@ list above may want revising rather than following.
                         established the alignment enum by measurement, because the
                         schema ships it with placeholder names (TATvalue0..4). See
                         findings-06-styles.md.
-31-style-inset-2pt      One cell with the text inset reduced from the 4 pt default
-                        to your usual 2 pt
+31-style-inset-2pt          DONE, and extended with the indent controls that sit beside
+                        inset in the UI. Established that insets are CELL padding
+                        while indents are PARAGRAPH properties — the cell owns its
+                        box, the paragraph owns its text. Also confirmed everything
+                        is stored in points (0.25in -> 18.0) and that the 4pt default
+                        writes no style at all. See findings-06-styles.md.
 32-style-inset-uneven   One cell with FOUR DIFFERENT insets if the UI allows it —
                         the archive stores left/top/right/bottom as independent
                         floats (TSWP.PaddingArchive), so this checks whether the

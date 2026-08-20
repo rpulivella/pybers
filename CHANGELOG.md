@@ -10,6 +10,7 @@ Maintained by `/changelog-add` — one verbatim ticket-title bullet per line und
 
 ## Unreleased
 
+- [init] Map cell insets and paragraph indents
 - [init] Establish which style kinds can be named, and that cell styles cannot
 - [init] Map alignment styles and resolve the cell style reference tail
 - [init] Map the three border mechanisms and the stroke sidecar
