@@ -87,9 +87,19 @@ The rule that now covers every styling fixture:
 Inches, and any other unit the UI offers, are a display convenience with no presence in the
 file.
 
-**A 4pt inset is the default and writes no style at all** — the 4pt cell carries no cell style
-key, where the 2pt and 0pt cells do. Consistent with defaults elsewhere: absence is how the
-common case is expressed, so a reader must supply the default rather than report "unset".
+**A 4pt inset is the default and needs no per-cell style** — the 4pt cell carries no cell
+style key of its own, where the 2pt and 0pt cells do. The value is not absent from the
+document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 times. So the
+default lives in the inherited style and the cell simply declines to override it.
+
+**Padding is always uniform in practice.** Across every fixture here, 3,368 cell styles carry
+padding and **not one is uneven** — only `4/4/4/4`, `2/2/2/2` and `0/0/0/0` appear. The UI
+offers a single value and Numbers never writes anything else.
+
+That leaves an open **write** question rather than a read one. `PaddingArchive` has four
+independent floats, so pybers is able to emit `L2 T0 R4 B8`; whether Numbers honours it,
+normalizes it, or rejects the file cannot be known until such a file exists. It is recorded
+here so the capability is not assumed in either direction.
 
 ## Borders: THREE separate mechanisms, and none is built on the others
 

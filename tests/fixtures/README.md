@@ -413,22 +413,44 @@ list above may want revising rather than following.
                         box, the paragraph owns its text. Also confirmed everything
                         is stored in points (0.25in -> 18.0) and that the 4pt default
                         writes no style at all. See findings-06-styles.md.
-32-style-inset-uneven   One cell with FOUR DIFFERENT insets if the UI allows it —
-                        the archive stores left/top/right/bottom as independent
-                        floats (TSWP.PaddingArchive), so this checks whether the
-                        single-value UI control is a real constraint or just a
-                        convenience. If Numbers will not let you, say so and skip.
-33-named-style          One cell using a built-in NAMED style rather than manual
-                        formatting — drives the named-styles decision in CLAUDE.md
+32-named-styles         THE ONE THAT DRIVES CLAUDE.md DECISION 2. Numbers has named
+                        PARAGRAPH styles, named CHARACTER styles and named LIST
+                        styles — cell, table and sheet styles are never nameable
+                        (measured: 0 named out of 309 cell styles). So this fixture
+                        must cover both kinds, and the layering on top of them.
+
+                        One cell each, labelled as usual:
+                          - a built-in named PARAGRAPH style, e.g. Heading or Title
+                          - a DIFFERENT built-in paragraph style, so two are present
+                          - a built-in named CHARACTER style applied to PART of the
+                            text in a cell, e.g. Emphasis on two words
+                          - a paragraph style YOU create and name yourself
+                          - a character style YOU create and name yourself
+                          - a named paragraph style WITH A LOCAL OVERRIDE on top,
+                            e.g. apply Heading then change its color in that cell only
+                          - the same visual result achieved MANUALLY, with no named
+                            style at all — the control that makes the rest readable
+
+                        WHAT IT ANSWERS. Does applying a named style write a REFERENCE
+                        to the shared style, or copy its properties into a new
+                        anonymous one? Does a local override create a variation with
+                        parent + is_variation + override_count, the way sheet tab
+                        colors and table border settings do? And can a character
+                        style and a paragraph style apply to the same text at once?
+
+                        A user-created character style has already been seen in the
+                        wild — 'smallcap', made while building 09 — so user styles
+                        land in the same registry as Apple's rather than somewhere
+                        separate.
 ```
 
 ### Floating objects
 
 ```
-34-textbox              One floating text box with a word in it
-35-shape                One drawn shape, a rectangle is fine
-36-image                One small embedded image
-37-image-and-shape      Both, to check they are independent
+33-textbox              One floating text box with a word in it
+34-shape                One drawn shape, a rectangle is fine
+35-image                One small embedded image
+36-image-and-shape      Both, to check they are independent
 ```
 
 ### Still unexplored from the "More Text Options" panel
@@ -436,16 +458,38 @@ list above may want revising rather than following.
 That panel holds several controls no fixture covers yet, and each is a separate field:
 
 ```
-38-text-charspacing     Character Spacing set to something other than 0%
-39-text-baselineshift   Baseline Shift set to something other than 0 pt
-40-text-outline         The Outline checkbox
-41-text-shadow          The Shadow checkbox
+37-text-charspacing     Character Spacing set to something other than 0%
+38-text-baselineshift   Baseline Shift set to something other than 0 pt
+39-text-outline         The Outline checkbox
+40-text-shadow          The Shadow checkbox
 ```
 
 Baseline Shift is worth having precisely because it is the manual way to fake a
 superscript, so it needs to be distinguishable from both the synthetic `superscript`
 enum and the real OpenType feature. Three routes to a similar look, three different
 fields.
+
+### Table bands and panes
+
+Numbered from 41 to avoid renumbering the list again. Grouping is by section, not by
+adjacent numbers.
+
+```
+41-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
+                        all in one file. These are plain scalars on the table model
+                        (number_of_header_rows / _header_columns / _footer_rows), so
+                        one fixture covers all three.
+42-table-frozen         Freeze the header row AND the header column. Note that
+                        freezing (header_rows_frozen) is a SEPARATE field from
+                        repeating-on-print (repeating_header_rows_enabled) — set only
+                        freezing here so the two stay distinguishable.
+43-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
+                        a different fill, in the same file. The schema says a band has
+                        a real style reference (header_row_style) while a body row has
+                        none — so this should show one reference change for the header
+                        and N per-cell styles for the body row. Confirms whether
+                        "format a row" is a real operation or only sugar.
+```
 
 ### Table geometry and placement — NOTHING covers this yet
 
@@ -454,16 +498,16 @@ on a canvas: where it sits, how big it is, or how wide its columns are. A round 
 loses any of that has damaged the document just as surely as losing a value.
 
 ```
-45-table-geometry       One table moved somewhere deliberate on the canvas, with
+44-table-geometry       One table moved somewhere deliberate on the canvas, with
                         several column widths and row heights set BY HAND to
                         distinctly different values — not dragged approximately,
                         typed if the UI allows, so the numbers are recognizable in
                         the archive.
-46-table-dimensions     Three tables on one sheet with clearly different row and
+45-table-dimensions     Three tables on one sheet with clearly different row and
                         column COUNTS: one tall and narrow, one short and wide, one
                         single-cell. Dimensions are separate from placement and
                         should be confirmed separately.
-47-table-titles         The table title and header settings that every other fixture
+46-table-titles         The table title and header settings that every other fixture
                         has had switched OFF. One table with its title shown, one
                         with header rows, header columns and a footer row all
                         present. This is the DEFAULT Numbers state, so it is what
@@ -474,48 +518,29 @@ loses any of that has damaged the document just as surely as losing a value.
 **Note for every fixture already made:** table titles were unchecked and header rows,
 header columns and footers were all set to zero, which is *not* the Numbers default. That
 was the right call for isolating cell behavior, and it means these fixtures are
-deliberately atypical. `47-table-titles` exists so the default shape is covered too, and
+deliberately atypical. `46-table-titles` exists so the default shape is covered too, and
 nothing assumes the stripped-down form is normal.
-
-### Table bands and panes
-
-Numbered from 41 to avoid renumbering the list again. Grouping is by section, not by
-adjacent numbers.
-
-```
-42-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
-                        all in one file. These are plain scalars on the table model
-                        (number_of_header_rows / _header_columns / _footer_rows), so
-                        one fixture covers all three.
-43-table-frozen         Freeze the header row AND the header column. Note that
-                        freezing (header_rows_frozen) is a SEPARATE field from
-                        repeating-on-print (repeating_header_rows_enabled) — set only
-                        freezing here so the two stay distinguishable.
-44-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
-                        a different fill, in the same file. The schema says a band has
-                        a real style reference (header_row_style) while a body row has
-                        none — so this should show one reference change for the header
-                        and N per-cell styles for the body row. Confirms whether
-                        "format a row" is a real operation or only sugar.
-```
 
 ---
 
 ## Highest value first
 
-**`18-formula-literals` and `19-formula-dragged` come before everything else**, and not
-because formulas are the biggest feature. They are the only fixtures that can still change
-the *object model*. Whether a formula is a string, a token list, or a tree carrying
-relative references decides what `Cell` looks like, what "move a range" means, and whether
-relocating cells is a walk over structure or a rewrite of text. Everything else on this list
-refines knowledge that is already settled; these two can invalidate a design.
+The object model has no remaining unknowns — every fixture that could reshape it is made and
+read. What follows adds coverage, with one exception.
 
-After those, and in this order:
+**`32-named-styles` is the exception, and should be next.** It is the last fixture that can
+still influence a design decision: CLAUDE.md's open question about named styles and how a
+local override layers on top of one. Everything needed to answer it is now known except how
+Numbers itself represents the relationship.
 
-**`22-merge-2x2`, `33-named-style`, `34-textbox`, `27-big-table`.**
+**`41-table-bands` should be promoted well above its number.** Every fixture in this
+directory has header rows, header columns, footers and titles switched OFF, which is *not*
+the Numbers default. The most common table shape in the world is therefore the one shape
+never tested here, and `HeaderStorageBucket-*.iwa` members appear in every file without ever
+having been opened.
 
-`27-big-table` is the odd one out — it tests the container rather than the model, and it is
-the only fixture that exercises the multi-frame path with real user data.
+After those two, in rough order of value: the floating objects (`33`-`36`), the remaining
+table settings (`42`-`46`), and the last text controls (`37`-`40`), which are lowest.
 
 ---
 
