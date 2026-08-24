@@ -34,3 +34,18 @@ This produced no error, only wrong words — the same failure mode as a wrong by
 worth the same suspicion. A decode that looks plausible across a multi-table document should
 be checked against a fixture where the tables hold visibly different text.
 
+## A value present in a fixture is not a value someone set
+
+`tracking = -0.01` appears in every fixture in this directory, `00-baseline` included. It was
+briefly recorded as a deliberate character-spacing setting. It is a built-in template style's
+default, and the baseline proves it: nothing had been done to that file.
+
+**Check the baseline before attributing any value to a fixture's author.** The corpus is a
+star around `00-baseline`, so anything the baseline also carries is Apple's, not ours. The
+same reasoning already retired the selection archives as noise; this is the general form of
+it.
+
+The genuine setting in that case was `0.02`, in a different fixture entirely from the one
+where it was expected — so a value's *absence* where predicted is worth checking too, rather
+than assuming the prediction located it.
+

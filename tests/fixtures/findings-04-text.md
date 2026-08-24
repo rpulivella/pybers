@@ -198,3 +198,173 @@ internally rather than making every caller learn this enum.
 mean the fixture's feature was applied.
 
 ---
+
+## Character spacing is `tracking`, and it is a FRACTION
+
+The Character Spacing control in "More Text Options" writes
+`CharacterStylePropertiesArchive.tracking`, **stored as a fraction rather than points**. A
+setting of +2% is `0.02`, so a reader must not report the stored number as a point value.
+
+Measured across every fixture in this directory, there are exactly two non-zero values:
+
+```
+tracking = -0.01    in ALL 38 fixtures, including 00-baseline
+tracking =  0.02    in 32-named-styles only, once
+```
+
+**Only the second one was set by anyone.** The `-0.01` is a built-in template style's
+default and is present in the untouched baseline, which is precisely why a value appearing
+in a fixture is not evidence that the fixture's author put it there. It was briefly reported
+here as a deliberate setting; it is not.
+
+The `0.02` sits on the custom named paragraph style in `32`, not on any text box — so
+character spacing is a *paragraph-reachable character property* like the rest, with nothing
+text-box-specific about it.
+
+`kerning` is a **separate field** on the same message, zero throughout. Tracking and kerning
+are distinct properties rather than one control under two names, even though the UI exposes
+only one.
+
+`baseline_shift` is likewise on every character style and always `0.0` so far — identified
+but never exercised.
+
+## Rich text: a StorageArchive with SIX parallel run tables
+
+This is the layer that several earlier findings missed by only reading a table's own
+`styleTable`. A rich-text cell references a `TST.RichTextPayloadArchive`, which references a
+`TSWP.StorageArchive`, and that carries the text plus **six** run tables indexed the same way:
+
+```
+table_char_style    character styles      table_para_starts   paragraph boundaries
+table_para_style    paragraph styles      table_language      language runs
+table_list_style    list styles           table_para_bidi     bidirectional runs
+```
+
+`table_language` and `table_para_bidi` mean **language and text direction are RUN properties**,
+not document or paragraph settings — relevant to the unresolved Unicode questions.
+
+### A run with no object inherits from the paragraph
+
+The character run table alternates styled and unstyled spans. An entry whose `object` field is
+**absent** — `HasField("object")` is false, not an identifier of zero — carries no character
+style, and the text there takes the paragraph's formatting:
+
+```
+character_index=0     hasObject=False        the paragraph's own formatting
+character_index=380   hasObject=True   -> a named character style
+character_index=390   hasObject=False        back to the paragraph
+```
+
+So the table is a sequence of overrides over a paragraph baseline, and a reader must treat a
+missing object as "inherit" rather than skipping the entry or treating it as an error.
+
+### Character styles live HERE, not in the table's style list
+
+A table's `styleTable` holds paragraph and cell styles. **Character styles appear only inside
+rich-text storages**, reached through the run table. Any survey of "the styles in a table" that
+reads `styleTable` alone will not see a single character style — which is what caused two
+wrong attributions recorded and corrected earlier in this file.
+
+This matches the behavior the fixture documents in its own text: a character style cannot be
+applied by selecting a cell, only by selecting text. It is available to text anywhere — cells,
+text boxes, shapes — but always to a *range*, never to a container.
+
+### Named character styles carry real properties, including tracking
+
+From `32-named-styles`, user-created styles alongside Apple's built-ins:
+
+```
+'tabular numbers (lining + monospaced)'   font_features [(6, 0)]
+'smallcaps'                                font_features [(33, 2)]
+'smallcaps +2%'                            font_features [(33, 2)] + tracking 0.02
+'Emphasis'   built-in                      bold = True
+'Italic'     built-in                      italic = True
+```
+
+And anonymous character **variations**, exactly as paragraph styles do:
+
+```
+font_color + tsd_fill        override_count = 1     a color change
+font_name SkolarSansLatn-El  override_count = 1     a weight change
+font_name + italic           override_count = 2
+```
+
+So the reference-plus-variation model established for paragraph styles applies unchanged to
+character styles. A color change again writes both `font_color` and `tsd_fill` and counts as
+one override.
+
+### Two more AAT feature pairs identified
+
+```
+(33, 2)   small caps           the 'smallcaps' style sets exactly this
+(6,  0)   tabular / lining figures
+```
+
+`(33, 2)` retroactively explains `09-text-capitalization`, where `(33, 2)` and `(33, 0)` appear
+together with `capitalization = kAllCaps` — feature type 33 is the letter-case family, and its
+selectors are what the earlier finding described only as "the two capital features".
+
+`(6, 0)` is the counterpart of the `(6, 1)` that appears as a default throughout, so feature
+type 6 is the number-spacing family.
+
+## Typeface variants live in the font NAME, and bold/italic can fake them
+
+A third place where Numbers offers a synthetic alternative beside the real thing. Every
+distinct combination in `32-named-styles`:
+
+```
+HelveticaNeue         bold=False  italic=False
+HelveticaNeue         bold=True   italic=False     SYNTHETIC bold on a regular face
+HelveticaNeue-Bold    bold=False  italic=False     the real bold face, flag off
+HelveticaNeue-Bold    bold=True   italic=False     the real bold face AND the flag
+HelveticaNeue-Light   bold=False  italic=False
+HelveticaNeue-Medium  bold=False  italic=False
+SkolarSansLatn-El     bold=(unset) italic=(unset)  extralight
+SkolarSansLatn-ElIt   bold=(unset) italic=True     the italic face AND the flag
+SkolarSansLatn-Rg     bold=False  italic=False
+```
+
+**Weight and slant are part of `font_name`** — the PostScript name — and `bold` / `italic` are
+independent booleans layered on top. So:
+
+- `bold=True` on a regular face is **faux bold**, the same class of defect as the synthetic
+  superscript and scaled small caps recorded above.
+- `bold=True` on a face that is already bold is redundant at best.
+- A style may set neither flag, which is what a chosen variant like extralight looks like.
+
+**pybers must not treat `bold` as "make this bold".** Choosing a real face is a change of
+`font_name`; setting the flag asks the renderer to synthesize. A caller wanting genuine
+weight needs the family's actual face, and the library should be able to tell the two apart
+when reading and prefer the real face when writing.
+
+## Lists are nine-level arrays
+
+Every list property is an array with one entry per nesting level, nine of them, whether or
+not the text nests:
+
+```
+label_types    0 = none,  2 = bullet from `strings`,  3 = number
+strings        the glyph per level, e.g. ['■','•','•','•','•','•','•','•','•']
+indents        per level in points, e.g. [0, 11, 22, 33, 44, 55, 66, 77, 88]
+text_indents   per level
+geometries     scale, baseline_offset, scale_with_text
+number_types   for numbered lists
+tiered_numbers whether a level shows its ancestors' numbers
+```
+
+A bullet's size is `geometries[level].scale` and its vertical nudge is
+`geometries[level].baseline_offset` in points. Measured across `32`, and unambiguous:
+
+```
+200%              scale = 2.0     baseline_offset =  0.0
+100%, -2pt        scale = 1.0     baseline_offset = -2.0
+100%, +10pt       scale = 1.0     baseline_offset = 10.0
+'Named Bullet'    scale = 1.35    baseline_offset =  1.0
+```
+
+`scale` is a multiplier where 1.0 is 100%, so the UI percentage divided by a hundred.
+
+List styles follow the same reference-and-variation model as everything else: named ones —
+`'None'`, `'Bullet'`, `'Numbered'`, and a user-created `'Named Bullet'` — plus anonymous
+variations carrying only what differs, such as a single overridden `strings` array to change
+one glyph.
