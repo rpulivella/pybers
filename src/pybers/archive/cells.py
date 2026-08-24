@@ -150,6 +150,14 @@ def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
         # A key into the table's STRING data list. Strings are pooled and shared
         # across cells; only the key lives in the record.
         return int.from_bytes(body[:4], "little"), 4
+    if typeByte == 9:
+        # Rich text: a key into the table's RICH_TEXT_PAYLOAD list rather than the
+        # string list. Same four-byte shape as a plain string, and that similarity is
+        # exactly the trap — before this branch existed the width defaulted to zero,
+        # so the payload key was mistaken for the first trailing reference and every
+        # reference on a rich-text cell was read one slot early. It produced plausible
+        # style keys pointing at the wrong styles, with nothing raising.
+        return int.from_bytes(body[:4], "little"), 4
     if typeByte == 5:
         seconds = struct.unpack("<d", body[:8])[0]
         return appleEpoch + datetime.timedelta(seconds=seconds), 8

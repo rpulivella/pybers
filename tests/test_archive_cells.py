@@ -228,3 +228,28 @@ def testUnknownTypeIsPreservedRatherThanRejected() -> None:
     assert decoded.typeByte == 99
     assert decoded.value is None
     assert decoded.raw == record
+
+
+def testRichTextCellConsumesItsPayloadKey() -> None:
+    """A rich-text cell's payload key is its VALUE, not its first style reference.
+
+    Type 9 carries a four-byte key into the table's RICH_TEXT_PAYLOAD list, the same
+    shape as a plain string's key into the STRING list. Before that was known the width
+    defaulted to zero, so the payload key was mistaken for the first trailing reference
+    and every reference on a rich-text cell was read one slot early — yielding plausible
+    style keys that pointed at the wrong styles, with nothing raising.
+
+    Built by hand so it tests the decoder rather than a fixture.
+    """
+    from pybers.archive.cells import decodeRecord
+
+    record = (
+        bytes([5, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        + (7).to_bytes(4, "little")      # the rich-text payload key
+        + (4).to_bytes(4, "little")      # the style reference that follows it
+        + (1).to_bytes(4, "little")
+    )
+    decoded = decodeRecord(0, record)
+    assert decoded.typeByte == 9
+    assert decoded.value == 7, "the payload key is the value"
+    assert decoded.references == (4, 1), "references start AFTER the payload key"
