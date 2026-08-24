@@ -413,35 +413,23 @@ list above may want revising rather than following.
                         box, the paragraph owns its text. Also confirmed everything
                         is stored in points (0.25in -> 18.0) and that the 4pt default
                         writes no style at all. See findings-06-styles.md.
-32-named-styles         THE ONE THAT DRIVES CLAUDE.md DECISION 2. Numbers has named
-                        PARAGRAPH styles, named CHARACTER styles and named LIST
-                        styles — cell, table and sheet styles are never nameable
-                        (measured: 0 named out of 309 cell styles). So this fixture
-                        must cover both kinds, and the layering on top of them.
+32-named-styles         DONE, and it ANSWERED CLAUDE.md decision 2. Applying a named
+                        style writes a REFERENCE to the shared style; formatting on top
+                        of one creates an anonymous VARIATION carrying parent,
+                        is_variation and override_count, storing only the overridden
+                        properties. The design CLAUDE.md proposed — a style reference
+                        plus an optional local override — is what Numbers does.
 
-                        One cell each, labelled as usual:
-                          - a built-in named PARAGRAPH style, e.g. Heading or Title
-                          - a DIFFERENT built-in paragraph style, so two are present
-                          - a built-in named CHARACTER style applied to PART of the
-                            text in a cell, e.g. Emphasis on two words
-                          - a paragraph style YOU create and name yourself
-                          - a character style YOU create and name yourself
-                          - a named paragraph style WITH A LOCAL OVERRIDE on top,
-                            e.g. apply Heading then change its color in that cell only
-                          - the same visual result achieved MANUALLY, with no named
-                            style at all — the control that makes the rest readable
+                        Two things nobody predicted. override_count counts LOGICAL
+                        properties, not fields: a color change stores font_color and
+                        tsd_fill but counts as 1. And there is NO unparented text
+                        style — the cell labelled "manually styled" is still a
+                        variation of Body, so manual formatting is an anonymous
+                        variation of a named style rather than the absence of one.
 
-                        WHAT IT ANSWERS. Does applying a named style write a REFERENCE
-                        to the shared style, or copy its properties into a new
-                        anonymous one? Does a local override create a variation with
-                        parent + is_variation + override_count, the way sheet tab
-                        colors and table border settings do? And can a character
-                        style and a paragraph style apply to the same text at once?
-
-                        A user-created character style has already been seen in the
-                        wild — 'smallcap', made while building 09 — so user styles
-                        land in the same registry as Apple's rather than somewhere
-                        separate.
+                        Also recorded in the fixture's own text: character styles
+                        cannot be applied to a cell at all, only to selected text.
+                        See findings-06-styles.md.
 ```
 
 ### Floating objects
@@ -452,6 +440,37 @@ list above may want revising rather than following.
 35-image                One small embedded image
 36-image-and-shape      Both, to check they are independent
 ```
+
+### Unicode — NOT COVERED, and one hazard is live
+
+The corpus contains four non-ASCII characters in total, all smart quotes Numbers inserted
+by autocorrect, all in the Basic Multilingual Plane. **Zero astral-plane characters.** So
+nothing here tests Unicode deliberately.
+
+```
+47-unicode-text         ONE cell per case, labelled as usual:
+                          - accented Latin: naive, cafe with an acute, Straße
+                          - CJK: a few Chinese and Japanese characters
+                          - EMOJI, and more than one — this is the important case
+                          - an emoji with a skin-tone modifier, and a family emoji
+                            (those are multi-codepoint sequences)
+                          - Hebrew or Arabic, for right-to-left
+                          - a combining sequence: e + combining acute, typed so it
+                            stays decomposed if Numbers allows it
+                          - a cell mixing ASCII and emoji with DIFFERENT FORMATTING
+                            on each side of the emoji
+
+                        THE LAST ONE IS THE POINT. StorageArchive.table_char_style
+                        indexes style runs by `character_index`, and Apple's text
+                        stack is NSString, which counts UTF-16 code units. Python
+                        counts scalars. For BMP text the two agree exactly, which is
+                        why 02-text-rich validated perfectly and proved nothing. One
+                        emoji makes a Python character two UTF-16 units, and every run
+                        boundary after it drifts — silently, producing plausible wrong
+                        runs rather than an error.
+
+                        pybers currently ASSUMES the indices are Python offsets. That
+                        assumption is untested and probably wrong.
 
 ### Still unexplored from the "More Text Options" panel
 

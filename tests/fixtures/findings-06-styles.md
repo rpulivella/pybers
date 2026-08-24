@@ -319,3 +319,58 @@ inventing a concept the format does not carry, and any such feature has to be la
 pybers concept rather than presented as a mapping — otherwise a round trip would promise a
 persistence it cannot deliver.
 
+
+## Named styles: applying one writes a REFERENCE, overriding one writes a VARIATION
+
+`32-named-styles` answers the open question in `CLAUDE.md` about how named styles and local
+formatting relate. The design that document proposed — a style reference plus an optional
+local override layered on top — is what Numbers actually does.
+
+Applying a named style to a cell stores a **direct reference** to the shared style:
+
+```
+key 2  'Heading'   is_variation=False
+key 3  'Title'     is_variation=False
+key 4  'Body'      is_variation=False
+key 5  'Text'      is_variation=False     a user-created named style
+```
+
+Formatting a cell that already carries a named style creates an **anonymous variation**:
+
+```
+key 6  variation of 'Heading'          override_count=1   char: font_color, tsd_fill
+key 8  variation of 'Body'             override_count=3   char: bold, font_name, font_size
+key 1  variation of 'Table Style 2'    override_count=1   para: alignment
+```
+
+The variation stores **only the overridden properties**. Everything else resolves through
+`parent`. So the chain is `cell -> variation -> named style`, and reading a cell's effective
+formatting means walking it.
+
+### `override_count` counts logical properties, not fields
+
+Key 6 changed one thing — the color — and stores **two** fields, `font_color` and `tsd_fill`,
+which are the legacy and modern spellings of the same property. `override_count` is 1. Key 8
+changed three genuinely different things and reports 3.
+
+So the count cannot be derived by counting set fields, and should be preserved rather than
+recomputed.
+
+### There is no unparented text style
+
+The cell in `32` labelled as manually styled — the fixture's own note says it was hard to
+"remove all styling" — is **still a variation of `Body`**. Nothing in the document carries text
+formatting without a named parent.
+
+**Manual formatting is not the absence of a named style; it is an anonymous variation of one.**
+For the model this means a text style reference is never genuinely absent, and a design with
+`styleRef: str | None` should treat `None` as "not yet resolved" rather than "has no style".
+
+### Character styles cannot be applied to a cell
+
+Recorded in the fixture's own text: a character style can only be applied to **selected text**,
+never to a whole cell by clicking it. Paragraph styles can be applied either way.
+
+That matches the earlier finding that the cell owns its box and the paragraph owns its text —
+and it means a per-cell API for character styling would be offering something the application
+cannot express.

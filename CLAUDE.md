@@ -144,18 +144,32 @@ front end while doing so.
    (Licensing was never the constraint: `reference/numbers-parser/` is MIT, Jon Connell 2021,
    so copying with attribution would have been permitted. The bar here is ownership of the
    foundation and respect for someone else's craft, which is higher than the license.)
-2. **Named styles.** Bold/italic alone are insufficient — Numbers supports real named,
-   reusable styles (a "Heading 1"-type named style referenced by many cells/runs, so
-   editing the named style updates every place that uses it), not just inline formatting.
-   The likely shape: a `NamedStyle` (a `Style` plus a `name`/id) held in a registry at the
-   `Workbook` level; `Cell`/`TextRun`/`Paragraph` would then optionally hold a
-   `styleRef: str | None` (the named style) plus an optional local override layered on
-   top — mirroring how Numbers itself layers a named style under direct formatting. Not
-   yet built — the user is preparing real examples from actual `.numbers` files to
-   inspect before this gets encoded into dataclass shapes, since that shape is costly to
-   redo carelessly. Also open: what text-run properties beyond bold/italic actually need
-   modeling (underline, strikethrough, super/subscript, letter spacing, highlight color,
-   etc.) — again, pending real examples rather than guessing the property list.
+2. ~~**Named styles.**~~ **DECIDED 2026-08-24 by measurement, not by design.** The shape
+   proposed here — a named style plus an optional local override layered on top — is
+   exactly what Numbers does, confirmed against `tests/fixtures/32-named-styles.numbers`.
+   Applying a named style writes a **reference** to the shared style; formatting on top of
+   it writes an anonymous **variation** carrying `parent`, `is_variation` and
+   `override_count`, storing only the properties that changed. Reading a cell's effective
+   formatting is a walk up that chain.
+
+   Three things the fixtures corrected, none of which was guessable:
+
+   - **Only some style kinds can be named.** Paragraph, character and list styles carry
+     names; **cell, table and sheet styles never do** — zero named out of 309 cell styles
+     measured. A `NamedStyle` registry maps onto something real for text, and would be a
+     pybers invention for cells. If it is offered there anyway, it must be labelled as a
+     pybers concept, because a round trip cannot persist it.
+   - **There is no unparented text style.** A cell formatted entirely by hand is still a
+     *variation* of a named style. So `styleRef: str | None` should read `None` as "not
+     yet resolved", never as "has no style".
+   - **`override_count` counts logical properties, not fields** — a color change stores
+     both `font_color` and `tsd_fill` and counts as one. Preserve it rather than
+     recomputing it.
+
+   The property-list question is likewise settled by fixtures rather than guesswork: see
+   `tests/fixtures/findings-04-text.md` for what a text run actually carries, including
+   the rule that Apple's synthetic superscript and small-caps must never be written when
+   a real OpenType feature exists.
 
 ## House style
 
@@ -213,13 +227,30 @@ requirements rather than a real alternate convention.
 
 ## Status
 
-Early scaffold only. `pybers.model` (the dataclass object model, split by feature area)
-exists and is tested — `pytest` is green (`python3 -m venv .venv && source .venv/bin/
-activate && pip install -e ".[dev]" && pytest`, confirmed working with the system Python
-framework interpreter, not a pyenv/conda shim). `pybers.archive` (real `.numbers` file
-read/write) does not exist yet — that's the next real piece of work, gated on the
-protobuf-schema-reuse decision above. `pybers.cli`/`pybers.tui` do not exist yet either —
-see "Two consumers" above.
+`pybers.model` (the dataclass object model, split by feature area) and `pybers.archive`
+(the `.numbers` container and cell reader) both exist and are tested. Run the suite as
+**`.venv/bin/python3 -m pytest`** — that exact spelling, because `.claude/settings.json`
+matches permission strings as text and a grant that never fires reads as coverage.
+
+`pybers.archive` reads a `.numbers` file end to end: zip, IWA frames, a pure-Python
+Snappy decoder with no C dependency, length-prefixed protobuf archives, and cell values
+including numbers, text, dates, booleans, durations and currency. It writes a package back
+with one bounded, documented difference in the zip envelope, confirmed to open cleanly in
+Numbers. `pybers.cli`/`pybers.tui` do not exist yet — see "Two consumers" above.
+
+**The format is mapped; the model binding is not.** Roughly 33 real `.numbers` fixtures
+live under `tests/fixtures/`, each labelling its own contents so a decode is verifiable
+rather than plausible. What they established is in `tests/fixtures/FINDINGS.md`, split by
+topic. **Read that before designing anything** — several findings invalidate the obvious
+approach, and the format's characteristic failure is that a wrong offset yields wrong
+numbers rather than an error.
+
+The five that change what the library must be: numbers are **decimal128** and never
+`float`; formulas are a **postfix AST with relative references**, so there is no formula
+text to parse and `$` is a per-axis boolean; **merges are stored as formulas** and a
+structural edit that ignores the merge store is what caused the phantom-merge-anchor
+defect listed above; **color carries a color space**; and a **named style plus variation**
+is how all text formatting works.
 
 License: undecided, not yet set in `pyproject.toml`.
 
