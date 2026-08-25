@@ -63,24 +63,32 @@ against `02-text-rich`, which resolves to exactly the four runs it was built fro
 `l` italic, `l` in the alternate font with OpenType features, `o` underlined and colored. So
 findings can now state which characters a style covers, not just that the style exists.
 
-**Made so far: 00 through 28, plus 22b.** Text and formatting are done. The cell-value
+**Made so far: 00 through 35, plus 22b.** Text and formatting are done. The cell-value
 encoding is broken open for every type. Formulas are fully mapped. Merges, structural edits,
-tiles, sheets, table geometry and the fill subsystem are all understood.
+tiles, sheets, table geometry, the fill subsystem and the floating objects — text boxes,
+shapes and images — are all understood.
 
-**The object model has no remaining unknowns.** Every fixture that could still change its
-shape has been made and read. What remains adds coverage, not architecture.
+**The object model has ONE remaining unknown, and it is `36-unicode-text`.** Everything else
+still to make adds coverage rather than architecture. Unicode does not: `33` established that
+a `StorageArchive` carries **twenty-one parallel run tables**, nineteen of them keyed by
+`character_index`, and a structural edit has to reindex every one of them consistently. If
+that index counts UTF-16 code units while pybers counts Python scalars, all nineteen drift
+after the first astral character. That is a precondition for the text model, not a coverage
+item, which is why it moved from `45` to `36`.
 
 **Still to make, in the order worth doing them:**
 
-1. `29` through `37` — borders, alignment, insets, named styles, and floating objects. The
-   named-style fixture (`33`) is the most interesting: `26` already showed the layering
-   mechanism at sheet level, with a parent style plus an override count.
-2. `42`, `43` — header rows, header columns, footers and frozen panes. Every fixture here has
-   these switched OFF, which is NOT the Numbers default, so the common table shape is untested.
-   Worth promoting above its number.
-3. `45`, `46`, `47` — table geometry and titles. Largely covered already by `25`, so these are
-   about varying the values rather than discovering them.
-4. `38` through `41` — the remaining "More Text Options" controls. Lowest value.
+1. `36-unicode-text` — the last fixture that can still change a design decision. See above.
+2. `40-table-bands` and `45-table-titles` — header rows, header columns, footers and titles.
+   Every fixture here has these switched OFF, which is NOT the Numbers default, so the most
+   common table shape in the world is the one shape never tested. Worth promoting well above
+   their numbers.
+3. `41-table-frozen`, `42-style-band-vs-row`, `43-table-geometry`, `44-table-dimensions` —
+   the remaining table settings. Largely covered already by `25`, so these are about varying
+   the values rather than discovering them.
+4. `46-stroke-dashes` and `47-line-ends` — two gaps `34` left open in the drawable styles.
+   Both fields exist in the schema and nothing in the corpus sets them.
+5. `37` through `39` — the remaining "More Text Options" controls. Lowest value.
 
 ---
 
@@ -131,9 +139,10 @@ and `pybers` should support it too.
 So its presence is a baseline condition rather than a signal — a feature record appearing
 does not by itself mean the fixture's feature was applied.
 
-**Nothing further is needed for text properties.** 38-41 below are the remaining controls
+**Nothing further is needed for text properties.** 37-39 below are the remaining controls
 from the "More Text Options" panel, and they are low priority — the structural lessons are
-already learned.
+already learned. The one text fixture that is NOT low priority is `36-unicode-text`, which
+is about how character indices are counted rather than about a formatting control.
 
 ---
 
@@ -435,10 +444,57 @@ list above may want revising rather than following.
 ### Floating objects
 
 ```
-33-textbox              One floating text box with a word in it
-34-shape                One drawn shape, a rectangle is fine
-35-image                One small embedded image
-36-image-and-shape      Both, to check they are independent
+33-textbox              DONE, and far richer than the name. Settled the UNITS question
+                        for the whole format with an arrow-key nudge ladder, and
+                        proved a vertical flip is a horizontal flip plus a 180-degree
+                        rotation rather than a bit of its own.
+34-shape                DONE, and it carries the single most important structural
+                        fact in the drawable layer: Numbers SHARES style archives by
+                        reference between shapes. Also z-ordering, three separate
+                        encodings of "off", and nine different shape kinds.
+35-image                DONE. Thirteen placements covering scaling, rotation,
+                        flipping, locking, deliberate distortion and four crops.
+```
+
+### Drawable gaps `34` left open
+
+Both of these are fields that exist in the schema and that **nothing in the corpus sets**,
+so their layout is currently inferred rather than measured.
+
+```
+46-stroke-dashes        Every stroke in the corpus is either TSDEmptyPattern (no
+                        border) or TSDSolidPattern. The dash array is therefore
+                        completely untested: `pattern.count` is 0 everywhere and
+                        `pattern.pattern` is a FIXED SIX-ELEMENT array of zeros, with
+                        a `phase` for the dash offset.
+
+                        Draw several lines or rectangle borders, one per stroke style
+                        Numbers offers in the Border menu — solid, dashed, dotted, and
+                        whichever other presets exist — and label each with the name
+                        the UI gives it. Vary the WIDTH on at least two of them, since
+                        a dash array may or may not scale with stroke width, and that
+                        is the thing a writer would get wrong.
+
+                        What this answers: how many of the six slots each preset uses,
+                        whether the numbers are absolute points or multiples of the
+                        width, and what `phase` does.
+
+47-line-ends            head_line_end and tail_line_end are EMPTY on every style in
+                        the corpus, including on the plain line and on the connector,
+                        so arrowheads are entirely unmapped.
+
+                        Several straight lines: one with an arrowhead at the START
+                        only, one at the END only, one at BOTH, and two more using
+                        DIFFERENT arrowhead shapes from the menu. Label which end and
+                        which shape each carries — the labels matter here because
+                        head-versus-tail is exactly the kind of thing that is easy to
+                        get backwards and impossible to check afterwards.
+
+                        ALSO, and separately valuable: draw a connector and actually
+                        ATTACH it to two shapes. The connector in `34` holds no
+                        reference to anything it connects, so either it was
+                        unattached or attachment is recorded somewhere not yet found.
+                        A genuinely connected one settles which.
 ```
 
 ### Unicode — NOT COVERED, and one hazard is live
@@ -448,7 +504,7 @@ by autocorrect, all in the Basic Multilingual Plane. **Zero astral-plane charact
 nothing here tests Unicode deliberately.
 
 ```
-47-unicode-text         ONE cell per case, labelled as usual:
+36-unicode-text         ONE cell per case, labelled as usual:
                           - accented Latin: naive, cafe with an acute, Straße
                           - CJK: a few Chinese and Japanese characters
                           - EMOJI, and more than one — this is the important case
@@ -477,10 +533,16 @@ nothing here tests Unicode deliberately.
 That panel holds several controls no fixture covers yet, and each is a separate field:
 
 ```
-37-text-charspacing     Character Spacing set to something other than 0%
-38-text-baselineshift   Baseline Shift set to something other than 0 pt
-39-text-outline         The Outline checkbox
-40-text-shadow          The Shadow checkbox
+37-text-baselineshift   Baseline Shift set to something other than 0 pt. The field is
+                        already IDENTIFIED — baseline_shift on
+                        CharacterStylePropertiesArchive, present on every style and
+                        always 0.0 so far. What this still adds is the third route to
+                        a raised character: the synthetic superscript enum, the real
+                        OpenType feature, and a manual baseline shift are three
+                        different fields producing a similar look, and pybers must
+                        tell them apart.
+38-text-outline         The Outline checkbox
+39-text-shadow          The Shadow checkbox
 ```
 
 Baseline Shift is worth having precisely because it is the manual way to fake a
@@ -490,19 +552,20 @@ fields.
 
 ### Table bands and panes
 
-Numbered from 41 to avoid renumbering the list again. Grouping is by section, not by
-adjacent numbers.
+Grouping is by section, not by adjacent numbers. The list was renumbered once, when
+`unicode-text` was promoted from `45` to `36` — it is a correctness precondition rather
+than coverage — so anything referring to the old numbers is stale.
 
 ```
-41-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
+40-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
                         all in one file. These are plain scalars on the table model
                         (number_of_header_rows / _header_columns / _footer_rows), so
                         one fixture covers all three.
-42-table-frozen         Freeze the header row AND the header column. Note that
+41-table-frozen         Freeze the header row AND the header column. Note that
                         freezing (header_rows_frozen) is a SEPARATE field from
                         repeating-on-print (repeating_header_rows_enabled) — set only
                         freezing here so the two stay distinguishable.
-43-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
+42-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
                         a different fill, in the same file. The schema says a band has
                         a real style reference (header_row_style) while a body row has
                         none — so this should show one reference change for the header
@@ -517,16 +580,16 @@ on a canvas: where it sits, how big it is, or how wide its columns are. A round 
 loses any of that has damaged the document just as surely as losing a value.
 
 ```
-44-table-geometry       One table moved somewhere deliberate on the canvas, with
+43-table-geometry       One table moved somewhere deliberate on the canvas, with
                         several column widths and row heights set BY HAND to
                         distinctly different values — not dragged approximately,
                         typed if the UI allows, so the numbers are recognizable in
                         the archive.
-45-table-dimensions     Three tables on one sheet with clearly different row and
+44-table-dimensions     Three tables on one sheet with clearly different row and
                         column COUNTS: one tall and narrow, one short and wide, one
                         single-cell. Dimensions are separate from placement and
                         should be confirmed separately.
-46-table-titles         The table title and header settings that every other fixture
+45-table-titles         The table title and header settings that every other fixture
                         has had switched OFF. One table with its title shown, one
                         with header rows, header columns and a footer row all
                         present. This is the DEFAULT Numbers state, so it is what
@@ -537,29 +600,29 @@ loses any of that has damaged the document just as surely as losing a value.
 **Note for every fixture already made:** table titles were unchecked and header rows,
 header columns and footers were all set to zero, which is *not* the Numbers default. That
 was the right call for isolating cell behavior, and it means these fixtures are
-deliberately atypical. `46-table-titles` exists so the default shape is covered too, and
+deliberately atypical. `45-table-titles` exists so the default shape is covered too, and
 nothing assumes the stripped-down form is normal.
 
 ---
 
 ## Highest value first
 
-The object model has no remaining unknowns — every fixture that could reshape it is made and
-read. What follows adds coverage, with one exception.
+Every fixture that could reshape the object model is made and read, with one exception.
+What else follows adds coverage.
 
-**`32-named-styles` is the exception, and should be next.** It is the last fixture that can
-still influence a design decision: CLAUDE.md's open question about named styles and how a
-local override layers on top of one. Everything needed to answer it is now known except how
-Numbers itself represents the relationship.
+**`36-unicode-text` is the exception, and should be next.** It is the last fixture that can
+still change a design decision. `32-named-styles` answered CLAUDE.md decision 2 and is done;
+this one decides how `character_index` is counted, which nineteen run tables depend on.
 
-**`41-table-bands` should be promoted well above its number.** Every fixture in this
+**`40-table-bands` should be promoted well above its number.** Every fixture in this
 directory has header rows, header columns, footers and titles switched OFF, which is *not*
 the Numbers default. The most common table shape in the world is therefore the one shape
 never tested here, and `HeaderStorageBucket-*.iwa` members appear in every file without ever
 having been opened.
 
-After those two, in rough order of value: the floating objects (`33`-`36`), the remaining
-table settings (`42`-`46`), and the last text controls (`37`-`40`), which are lowest.
+The floating objects `33`-`35` are done. After the two above, in rough order of value: the
+remaining table settings (`41`-`44`), the two drawable gaps (`46`-`47`), and the last text
+controls (`37`-`39`), which are lowest.
 
 ---
 
