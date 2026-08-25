@@ -228,20 +228,107 @@ only one.
 `baseline_shift` is likewise on every character style and always `0.0` so far — identified
 but never exercised.
 
-## Rich text: a StorageArchive with SIX parallel run tables
+## Rich text: a StorageArchive with TWENTY-ONE parallel run tables
 
 This is the layer that several earlier findings missed by only reading a table's own
 `styleTable`. A rich-text cell references a `TST.RichTextPayloadArchive`, which references a
-`TSWP.StorageArchive`, and that carries the text plus **six** run tables indexed the same way:
+`TSWP.StorageArchive`, and that carries the text plus a set of run tables indexed the same way.
+
+Six of them appear in the cell fixtures, which is what this section originally recorded. The
+schema defines **twenty-one**, and a text box in `33` sets three more that no cell does:
 
 ```
-table_char_style    character styles      table_para_starts   paragraph boundaries
-table_para_style    paragraph styles      table_language      language runs
-table_list_style    list styles           table_para_bidi     bidirectional runs
+table_char_style    table_para_style    table_list_style    table_para_data
+table_para_starts   table_language      table_para_bidi     table_drop_cap_style
+table_dictation     table_attachment    table_smartfield    table_layout_style
+table_bookmark      table_footnote      table_section       table_rubyfield
+table_insertion     table_deletion      table_highlight     table_tatechuyoko
+table_overlapping_highlight             table_pencil_annotation
 ```
 
 `table_language` and `table_para_bidi` mean **language and text direction are RUN properties**,
 not document or paragraph settings — relevant to the unresolved Unicode questions.
+`table_insertion` and `table_deletion` are tracked changes; `table_tatechuyoko` is Japanese
+horizontal-in-vertical text; `table_pencil_annotation` is Apple Pencil markup.
+
+### The tables come in four shapes, and one of them can OVERLAP
+
+```protobuf
+ObjectAttributeTable             character_index + optional Reference
+StringAttributeTable             character_index + optional string
+ParaDataAttributeTable           character_index + required first, second   (both uint32)
+OverlappingFieldAttributeTable   a TSP.Range + a Reference
+```
+
+Nineteen of the twenty-one key on a single `character_index`, so each is a **strict
+non-overlapping partition** of the text: a run ends where the next begins. But
+`table_overlapping_highlight` and `table_pencil_annotation` use a `TSP.Range` instead,
+**because highlights can overlap each other and character styles cannot**.
+
+A model that represents every run as one ordered list of boundaries is therefore correct for
+nineteen tables and wrong for those two, which need real intervals.
+
+### `StorageArchive.kind` defaults to TEXTBOX, so a cell must set it explicitly
+
+```protobuf
+optional KindType kind = 1 [default = TEXTBOX];
+// BODY, HEADER, FOOTNOTE, TEXTBOX, NOTE, CELL, UNCLASSIFIED, TABLEOFCONTENTS, UNDEFINED
+```
+
+None of the text boxes in `33` sets `kind` at all, because protobuf omits a field equal to its
+default. So **an absent `kind` means text box**, and a writer producing a cell's storage has
+to set `CELL` explicitly or it silently becomes something else.
+
+### `table_dictation` carries a UUID per dictated word
+
+`33`'s text boxes expose a run table no cell fixture has. Two of them carry:
+
+```
+entries { character_index: 0 }
+entries { character_index: 16  object: "9640819A-4879-4687-9E93-F31D6DF1F40A" }
+entries { character_index: 20 }
+```
+
+Characters 16 to 20 of that text are the word **"with"**. So macOS tags dictated or
+autocorrected text with a per-word UUID, and it persists in the saved document.
+
+Two consequences. It is **user-provenance metadata that travels with any shared file**, which
+is worth knowing before a library silently preserves or strips it. And because it is keyed by
+character index, **any insertion or deletion must shift it exactly like a style run** — a
+structural edit that reindexes only the style tables leaves the UUID pointing at the wrong
+word.
+
+### Absence is asserted POSITIVELY, not by omission
+
+A text box with no list still carries a `table_list_style` entry pointing at a
+`ListStyleArchive` **named `'None'`**. Likewise `table_drop_cap_style` is present on all
+fifteen with an entry that has a `character_index` and no `object`.
+
+So "no list" and "no drop cap" are things Numbers writes down rather than leaves out, and a
+writer that omits the table is not producing the same document. This matches the
+`StandinCaptionArchive` pattern in
+[findings-07-drawables.md](findings-07-drawables.md), where an empty message is written purely
+to say the slot exists.
+
+### A text box's paragraph style is a NAMED reference with no variation
+
+Every text box in `33` points its `table_para_style` at a theme style — `'Body'` on fourteen
+of them, `'Heading'` on the one labelled "this paragraph is a heading". Neither is a variation
+and **neither has a parent**, so theme base styles are roots.
+
+The two differ in exactly three properties:
+
+```
+                Body      Heading
+char.bold       False     True
+char.font_size  11.0      18.0
+para.outline_style  1     2
+```
+
+And **`table_char_style` is absent entirely** from every text box, because none has
+character-level formatting. This is consistent with character styles applying to selected text
+rather than to a container: with nothing selected and restyled, the table is simply not
+written.
 
 ### A run with no object inherits from the paragraph
 

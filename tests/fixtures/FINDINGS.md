@@ -13,6 +13,7 @@ Split by topic — this file is the index.
 | [findings-03-structure.md](findings-03-structure.md) | Merges, what structural edits do to them, tiles, and how tables and sheets sit on a document. |
 | [findings-04-text.md](findings-04-text.md) | Text storage, style runs, OpenType features, and the typography traps. |
 | [findings-06-styles.md](findings-06-styles.md) | Fills, gradients, and why a color is not three floats. |
+| [findings-07-drawables.md](findings-07-drawables.md) | Text boxes, shapes and images — everything floating on a sheet rather than inside a table. |
 | [findings-05-method.md](findings-05-method.md) | How these findings were produced, and the mistakes that produced them slowly. |
 
 ---
@@ -61,11 +62,11 @@ font feature. pybers must be able to tell them apart and must never write the fa
 - **Function indices are numeric** — 168 is SUM, 62 is IF, 231 is SUMIFS — and a full name map
   has to be derived rather than borrowed, per the schema-ownership decision in `CLAUDE.md`.
 - **Header rows, header columns and footers** are switched off in every fixture here, so the
-  default Numbers table shape is untested. `41-table-bands` covers it and is worth promoting.
+  default Numbers table shape is untested. `39-table-bands` covers it and is worth promoting.
 - **Whether `character_index` counts UTF-16 code units or Unicode scalars.** Apple's text stack
   is NSString, which is UTF-16, so it is very likely code units — but the corpus contains no
   astral-plane character, so the two are indistinguishable in every fixture read so far. Style
-  run boundaries after an emoji would drift silently. `47-unicode-text` exists to settle it.
+  run boundaries after an emoji would drift silently. `45-unicode-text` exists to settle it.
 - **Where a supplied image is stored.** `28` exercises image fills, but only with the default
   image Numbers provides, whose data is not in the document at all. A fixture with a real
   image dragged in would settle it.
