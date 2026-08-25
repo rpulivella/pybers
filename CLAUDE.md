@@ -238,19 +238,39 @@ including numbers, text, dates, booleans, durations and currency. It writes a pa
 with one bounded, documented difference in the zip envelope, confirmed to open cleanly in
 Numbers. `pybers.cli`/`pybers.tui` do not exist yet — see "Two consumers" above.
 
-**The format is mapped; the model binding is not.** Roughly 33 real `.numbers` fixtures
+**The format is mapped; the model binding is not.** Roughly 36 real `.numbers` fixtures
 live under `tests/fixtures/`, each labelling its own contents so a decode is verifiable
 rather than plausible. What they established is in `tests/fixtures/FINDINGS.md`, split by
 topic. **Read that before designing anything** — several findings invalidate the obvious
 approach, and the format's characteristic failure is that a wrong offset yields wrong
 numbers rather than an error.
 
-The five that change what the library must be: numbers are **decimal128** and never
+The seven that change what the library must be: numbers are **decimal128** and never
 `float`; formulas are a **postfix AST with relative references**, so there is no formula
 text to parse and `$` is a per-axis boolean; **merges are stored as formulas** and a
 structural edit that ignores the merge store is what caused the phantom-merge-anchor
 defect listed above; **color carries a color space**; and a **named style plus variation**
 is how all text formatting works.
+
+The remaining two came from the fixtures for floating objects and Unicode:
+
+**Text run indices count UTF-16 code units, not Python characters** (`36-unicode-text`). A
+`StorageArchive` carries twenty-one parallel run tables, nineteen of them keyed by
+`character_index`, covering character and paragraph styles, language, bidi, drop caps and
+dictated-word provenance. Every one of those indices is an NSString offset. For BMP text the
+two counts agree exactly, which is why the earlier rich-text fixtures validated perfectly and
+proved nothing. One astral character shifts every later boundary by one, silently, producing
+plausible runs with the wrong text in them. The conversion belongs at the boundary where a
+run table is read or written; plain string cells need no special handling.
+
+**Numbers shares style archives by reference between objects** (`34-shape`). Twenty-one
+shapes resolve to twelve styles, one of which backs seven drawables directly and another
+backs eight — two directly and six more as the `parent` their variations inherit from. So the
+aliasing defect listed above is not an upstream implementation slip but a hazard the format
+creates: a decoder that hands the same mutable object to every user of an archive lets one
+edit silently restyle seven unrelated shapes. The frozen-`Style` contract has to hold on the
+**read** path, not only when writing. Numbers itself never mutates a shared archive — it
+writes a new variation and repoints the one object that changed.
 
 License: undecided, not yet set in `pyproject.toml`.
 

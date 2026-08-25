@@ -68,27 +68,36 @@ encoding is broken open for every type. Formulas are fully mapped. Merges, struc
 tiles, sheets, table geometry, the fill subsystem and the floating objects — text boxes,
 shapes and images — are all understood.
 
-**The object model has ONE remaining unknown, and it is `36-unicode-text`.** Everything else
-still to make adds coverage rather than architecture. Unicode does not: `33` established that
-a `StorageArchive` carries **twenty-one parallel run tables**, nineteen of them keyed by
-`character_index`, and a structural edit has to reindex every one of them consistently. If
-that index counts UTF-16 code units while pybers counts Python scalars, all nineteen drift
-after the first astral character. That is a precondition for the text model, not a coverage
-item, which is why it moved from `45` to `36`.
+**The object model has NO remaining unknowns.** `36-unicode-text` settled the last one:
+`character_index` counts **UTF-16 code units**, not Python characters, across all nineteen
+run tables that use it. Everything still to make adds coverage rather than architecture.
+
+**`39` was freed and REUSED.** It was planned as `39-text-shadow`, but
+`38-text-outline-shadow` covers both checkboxes in one file. The number now holds
+`39-text-tabs-indents`, so the sequence stays gapless.
 
 **Still to make, in the order worth doing them:**
 
-1. `36-unicode-text` — the last fixture that can still change a design decision. See above.
-2. `40-table-bands` and `45-table-titles` — header rows, header columns, footers and titles.
+1. `40-table-bands` and `45-table-titles` — header rows, header columns, footers and titles.
    Every fixture here has these switched OFF, which is NOT the Numbers default, so the most
    common table shape in the world is the one shape never tested. Worth promoting well above
-   their numbers.
-3. `41-table-frozen`, `42-style-band-vs-row`, `43-table-geometry`, `44-table-dimensions` —
+   their numbers, and they are now the highest-value fixtures remaining.
+2. `41-table-frozen`, `42-style-band-vs-row`, `43-table-geometry`, `44-table-dimensions` —
    the remaining table settings. Largely covered already by `25`, so these are about varying
    the values rather than discovering them.
-4. `46-stroke-dashes` and `47-line-ends` — two gaps `34` left open in the drawable styles.
-   Both fields exist in the schema and nothing in the corpus sets them.
-5. `37` through `39` — the remaining "More Text Options" controls. Lowest value.
+3. `39-text-tabs-indents` — tab stops are entirely unexercised and are common in real
+   documents. `TabArchive` carries a position, four alignments including decimal, and a
+   leader string, none of it observed anywhere.
+4. `47-line-ends` — MOSTLY DONE. The expanded `34-shape` mapped `TSD.LineEndArchive`
+   completely. What remains is only the connector question: a connector actually attached to
+   two shapes, since the one in `34` holds no reference to anything it connects.
+5. `46-stroke-dashes` — now a single question, whether dash lengths are points or multiples
+   of stroke width. Lowest value.
+
+**Two smaller gaps, each needing one cell rather than a fixture:** an RTL cell with MIXED
+formatting, to populate `table_para_bidi`, which is still `(0,0)` everywhere because every
+RTL cell in `36` is a plain string; and a ZWJ emoji sequence such as a family or profession
+emoji, which `36`'s skin-tone coverage does not include.
 
 ---
 
@@ -456,57 +465,46 @@ list above may want revising rather than following.
                         flipping, locking, deliberate distortion and four crops.
 ```
 
-### Drawable gaps `34` left open
-
-Both of these are fields that exist in the schema and that **nothing in the corpus sets**,
-so their layout is currently inferred rather than measured.
-
-```
-46-stroke-dashes        Every stroke in the corpus is either TSDEmptyPattern (no
-                        border) or TSDSolidPattern. The dash array is therefore
-                        completely untested: `pattern.count` is 0 everywhere and
-                        `pattern.pattern` is a FIXED SIX-ELEMENT array of zeros, with
-                        a `phase` for the dash offset.
-
-                        Draw several lines or rectangle borders, one per stroke style
-                        Numbers offers in the Border menu — solid, dashed, dotted, and
-                        whichever other presets exist — and label each with the name
-                        the UI gives it. Vary the WIDTH on at least two of them, since
-                        a dash array may or may not scale with stroke width, and that
-                        is the thing a writer would get wrong.
-
-                        What this answers: how many of the six slots each preset uses,
-                        whether the numbers are absolute points or multiples of the
-                        width, and what `phase` does.
-
-47-line-ends            head_line_end and tail_line_end are EMPTY on every style in
-                        the corpus, including on the plain line and on the connector,
-                        so arrowheads are entirely unmapped.
-
-                        Several straight lines: one with an arrowhead at the START
-                        only, one at the END only, one at BOTH, and two more using
-                        DIFFERENT arrowhead shapes from the menu. Label which end and
-                        which shape each carries — the labels matter here because
-                        head-versus-tail is exactly the kind of thing that is easy to
-                        get backwards and impossible to check afterwards.
-
-                        ALSO, and separately valuable: draw a connector and actually
-                        ATTACH it to two shapes. The connector in `34` holds no
-                        reference to anything it connects, so either it was
-                        unattached or attachment is recorded somewhere not yet found.
-                        A genuinely connected one settles which.
-```
-
 ### Unicode — NOT COVERED, and one hazard is live
 
 The corpus contains four non-ASCII characters in total, all smart quotes Numbers inserted
 by autocorrect, all in the Basic Multilingual Plane. **Zero astral-plane characters.** So
 nothing here tests Unicode deliberately.
 
+**DONE, and it ANSWERED the question it was promoted for.** `character_index` counts
+**UTF-16 code units**, not Python characters. The decisive cell is `AB𠮟CD` with `AB` bold and
+`CD` in a small-caps character style: the third run begins at index **4**, where Python
+indexing would put it at 3. Only the UTF-16 reading reconstructs `AB` / `𠮟` / `CD`; the scalar
+reading yields `AB` / `𠮟C` / `D` — plausible, wrong, and silent. pybers assumed Python offsets
+and that assumption is now known to be wrong. Full detail in
+[findings-04-text.md](findings-04-text.md).
+
+It also established, none of which was asked for: Arabic-Indic digits typed into a NUMBER cell
+are parsed and stored as decimal `123` with the digits gone entirely; Numbers normalizes to
+**precomposed** form on entry, so a long-pressed `é` stores as one character; and a
+skin-toned emoji is a **base plus a separate modifier code point**, where neither half is
+reliably astral.
+
+**Two things `36` could NOT answer, needing one more fixture each:**
+
+```
+RTL run tables      All four RTL cells are PLAIN STRINGS, which have no
+                    StorageArchive and therefore no run tables at all. So
+                    table_para_bidi is still (0,0) and its two uint32 fields
+                    remain unmapped, as does table_language beyond "en".
+                    NEEDS: an RTL cell with MIXED FORMATTING, which is what
+                    forces a rich-text payload to exist.
+
+ZWJ sequences       The emoji cell covers skin-tone modifiers and variation
+                    selectors but contains no zero-width-joiner sequence.
+                    NEEDS: a family emoji or a profession emoji, which are
+                    several code points joined by U+200D.
+```
+
 ```
 36-unicode-text         ONE cell per case, labelled as usual:
-                          - accented Latin: naive, cafe with an acute, Straße
-                          - CJK: a few Chinese and Japanese characters
+                          - accented Latin: naive, cafe with an acute, Straße   [DONE]
+                          - CJK: see the paste-ready block below
                           - EMOJI, and more than one — this is the important case
                           - an emoji with a skin-tone modifier, and a family emoji
                             (those are multi-codepoint sequences)
@@ -528,27 +526,187 @@ nothing here tests Unicode deliberately.
                         pybers currently ASSUMES the indices are Python offsets. That
                         assumption is untested and probably wrong.
 
-### Still unexplored from the "More Text Options" panel
+                        It is not only the char style table. `33-textbox` showed a
+                        StorageArchive carries TWENTY-ONE parallel run tables,
+                        NINETEEN of them keyed by character_index — styles, language,
+                        bidi, drop cap, dictation, tracked changes. All nineteen drift
+                        together, and a structural edit has to reindex every one.
+```
 
-That panel holds several controls no fixture covers yet, and each is a separate field:
+#### CJK — paste-ready, one cell each
+
+The first five are BMP and prove nothing about indexing; they cover encoding, script mixing
+and normalization. **The last four are the ones that matter**, because a Python scalar count
+and a UTF-16 count disagree on every one of them.
 
 ```
-37-text-baselineshift   Baseline Shift set to something other than 0 pt. The field is
-                        already IDENTIFIED — baseline_shift on
-                        CharacterStylePropertiesArchive, present on every style and
-                        always 0.0 so far. What this still adds is the third route to
-                        a raised character: the synthetic superscript enum, the real
-                        OpenType feature, and a manual baseline shift are three
-                        different fields producing a similar look, and pybers must
-                        tell them apart.
-38-text-outline         The Outline checkbox
-39-text-shadow          The Shadow checkbox
+你好世界                          py  4   utf16  4   Han, Simplified
+漢字測試                          py  4   utf16  4   Han, Traditional
+日本語のテスト、カタカナ混じり    py 15   utf16 15   kanji + hiragana + katakana
+한국어                            py  3   utf16  3   Hangul, PRECOMPOSED
+ＡＢＣ１２３                      py  6   utf16  6   full-width forms
+𠀋𠮟𡈽                            py  3   utf16  6   CJK Extension B, astral
+𪚲                                py  1   utf16  2   near the end of Ext B
+AB𠮟CD                            py  5   utf16  6   THE DECISIVE CELL
+```
+
+Plus one that **cannot be written into this file**, for a reason that is itself the finding:
+
+```
+U+2F804    a CJK COMPATIBILITY ideograph, astral, py 1 / utf16 2
+           renders identically to U+4F60, the first character of 你好世界
+           produce it with:  python3 -c 'print("\U0002F804")'
+```
+
+Three of these are deliberately sly:
+
+- **U+2F804 looks exactly like U+4F60 and is twice the length.** It is a compatibility
+  ideograph with a canonical decomposition, so **any NFC normalization anywhere in the path
+  silently replaces it with the ordinary BMP character** — which is what happened on the
+  first attempt to write it into this README, turning a 2-unit astral character into a
+  1-unit BMP one with nothing to show for it. Generate it at the terminal with the command
+  above rather than copying it from anywhere, and check the cell afterwards. Visually
+  indistinguishable, different length in the file: exactly the shape of error this format
+  specializes in producing without complaint.
+- **`한국어` tests whether Numbers NORMALIZES on entry.** Precomposed it is 3 characters;
+  decomposed into jamo (`U+1112 U+1161 U+11AB U+1100 U+116E U+11A8 U+110B U+1165`) it is 8,
+  and both display identically. If a decomposed paste comes back as 3, Numbers applied NFC,
+  and a round trip must not silently reapply or undo that. The Japanese line has the same
+  property in miniature — `じ` is one character in NFC and two in NFD.
+- **`AB𠮟CD` is the whole experiment.** Format `AB` one way and `CD` another, leaving the
+  astral character between them untouched. The second run's `character_index` will be **4**
+  if Numbers counts UTF-16 code units and **3** if it counts Python scalars. Label which
+  formatting is on which side — that label is the answer key, and without it the result is
+  a number with nothing to check it against.
+
+One cell, an unambiguous answer, and it decides how nineteen run tables are indexed.
+
+#### Hebrew and Arabic — paste-ready, one cell each
+
+Every one of these is BMP, so a Python count and a UTF-16 count agree and **none of them
+tests the indexing question**. They are here for a different unknown: `table_para_bidi` is a
+`ParaDataAttributeTable` carrying two `uint32` fields, `first` and `second`, and both are
+`0, 0` in every fixture made so far. Mixed-direction text is the only thing that can populate
+it.
+
+```
+שלום עולם            py  9  utf16  9  bidi R,WS      plain Hebrew
+שָׁלוֹם                 py  7  utf16  7  bidi R,NSM     Hebrew WITH NIQQUD
+مرحبا بالعالم        py 13  utf16 13  bidi AL,WS     plain Arabic
+مَرْحَبًا                py  9  utf16  9  bidi AL,NSM    Arabic WITH HARAKAT
+abc שלום def         py 12  utf16 12  bidi L,WS,R    direction changes TWICE
+שלום 123 עולם        py 13  utf16 13  bidi R,WS,EN   European digits inside RTL
+١٢٣                  py  3  utf16  3  bidi AN        Arabic-Indic digits
+אב𠮟גד               py  5  utf16  6  bidi R,L       RTL *and* astral
+```
+
+What each is actually for:
+
+- **`abc שלום def` and `שלום 123 עולם` should be the first cells in the corpus to make
+  `table_para_bidi` non-zero.** Until something does, the meaning of `first` and `second`
+  cannot be established at all.
+- **The niqqud and harakat cells test what "one character" means.** `שָׁלוֹם` is 4 visible
+  letters, 7 code points and 7 UTF-16 units, with 3 combining marks; the Arabic one carries
+  4. If `character_index` should turn out to count grapheme clusters rather than code units,
+  these are the only cells that can reveal it — Latin and CJK samples have no combining
+  marks and would agree either way.
+- **`١٢٣` is bidi class `AN`, not `EN`.** Arabic-Indic digits are a different directional
+  class from the European digits one line above, so the two cells together separate "there
+  are digits" from "there are digits of a particular class".
+
+Arabic letters join contextually when rendered but are **stored as isolated code points**, so
+a decode that shows unjoined forms is correct rather than broken. Do not chase it.
+
+### The "More Text Options" panel — mostly covered now
+
+`37` and `38` are done and both carried far more than their names suggested. What is left of
+this panel is tabs and indents, specced below as `39`.
+
+```
+37-text-baselineshift   DONE, and it went well beyond the ask. Established that
+                        baseline_shift is SIGNED POINTS and is the third route to a
+                        raised character, alongside the synthetic superscript enum
+                        and the real OpenType feature. Also: a uniform shift over a
+                        whole cell stays a PLAIN STRING and puts the character
+                        property on a ParagraphStyleArchive; a saved NAMED character
+                        style is a root with no parent while an ad-hoc one is an
+                        anonymous variation of the character style named 'None'; and
+                        line_spacing has four modes (kExactLineSpacing,
+                        kMinimumLineSpacing, kSpaceBetweenLineSpacing, unset) carried
+                        as a mode-plus-amount sub-message rather than a bare number.
+
+38-text-outline-shadow  DONE, and it covers BOTH checkboxes in one file plus two
+                        findings neither was asked for.
+
+                        It DECODED THE DASH ARRAY that 34-shape left unexercised:
+                        text outline is a tsd_stroke, the same stroke message a
+                        shape border uses, and the fixture carries solid, dotted,
+                        dashed, wide-dashed and circular-dotted. count says how many
+                        of the six slots are live (2 for a dash/gap pair), a solid
+                        stroke uses its own TSDSolidPattern and leaves the array
+                        empty, and circular dots are a ZERO-LENGTH dash with a round
+                        cap rather than a distinct pattern kind.
+
+                        It also settled what the *_null booleans mean. shadow_null =
+                        True is an override to EXPLICITLY NOTHING, not "unspecified"
+                        — it counts toward override_count exactly as setting a value
+                        does. And its own label caught, and correctly diagnosed, that
+                        text shadow is specified at BOTH the cell level and the
+                        character-run level, so resolving one means walking both.
+
+                        EXPANDED with the five brush strokes, which turn out to be
+                        named rather than described: StrokeArchive.smart_stroke holds
+                        a stroke_name string ('Chalk2', 'Feathered Brush',
+                        'Calligraphy', 'Dry Brush', 'Pen') plus a random_seed. Their
+                        `pattern` is an ordinary TSDSolidPattern, so a reader checking
+                        only the pattern would call a chalk stroke solid.
 ```
 
 Baseline Shift is worth having precisely because it is the manual way to fake a
 superscript, so it needs to be distinguishable from both the synthetic `superscript`
 enum and the real OpenType feature. Three routes to a similar look, three different
 fields.
+
+### Tabs, indents and paragraph borders
+
+The "More Text Options" panel also offers indents, tab stops and paragraph borders. Indents
+are partly covered by `31-style-inset-2pt`, which picked up the controls sitting beside the
+inset, but tabs are not covered at all and they are common in real documents.
+
+```
+39-text-tabs-indents    TABS are the point. TabsArchive holds a repeated TabArchive,
+                        each with a `position` float, an `alignment` of
+                        left / center / right / DECIMAL, and a `leader` STRING.
+                        None of that is exercised anywhere in the corpus.
+
+                          - one cell using only the default tab stops, to see what
+                            `default_tab_stops` (a float, 36.0 in the theme) means
+                            when no explicit stop exists
+                          - one cell with several EXPLICIT stops at different
+                            positions, one of each alignment
+                          - at least one stop with a LEADER, the dotted run-in used
+                            in a table of contents. It is a string field, so what
+                            actually goes in it is worth knowing.
+                          - a DECIMAL tab with numbers that have differing digit
+                            counts, since `decimal_tab` is a separate string field
+                            holding "." in the theme and presumably follows the
+                            locale
+
+                        INDENTS: first_line_indent, left_indent and right_indent are
+                        three separate floats. Set all three to DIFFERENT values in
+                        one cell so they cannot be confused, and make one cell a
+                        HANGING indent (first line further left than the body),
+                        which should show as a negative first_line_indent.
+
+                        PARAGRAPH BORDERS are rare — this developer has never used
+                        one, nor seen one in a shared document — so they are the
+                        lowest priority here and one cell is enough. They are worth
+                        a single sample only because pybers must not damage what it
+                        does not understand: `border_positions` (an int32 bitmask),
+                        `stroke` plus `stroke_null`, and `rule_width` all sit on
+                        every paragraph style already, reading 0 or unset. One cell
+                        with a border proves whether carrying them through unchanged
+                        is sufficient.
 
 ### Table bands and panes
 
@@ -602,6 +760,45 @@ header columns and footers were all set to zero, which is *not* the Numbers defa
 was the right call for isolating cell behavior, and it means these fixtures are
 deliberately atypical. `45-table-titles` exists so the default shape is covered too, and
 nothing assumes the stripped-down form is normal.
+
+### Drawable gaps — one closed, one narrowed
+
+`47-line-ends` was closed by expanding `34-shape` itself; what is left of it is the connector
+question. `46-stroke-dashes` was answered from an unexpected direction, by text outlines in
+`38`, and is now down to a single measurement.
+
+```
+46-stroke-dashes        NARROWED TWICE, now a single question. 38-text-outline-shadow
+                        decoded the dash array from text outlines, and 29-style-border
+                        confirmed CELL BORDERS USE THE IDENTICAL ENCODING — one stroke
+                        message serves shapes, cells and text, and only the menus
+                        differ.
+
+                        Every dashed stroke in the corpus has width 1.0, so whether
+                        the dash numbers are POINTS or MULTIPLES OF THE STROKE WIDTH
+                        cannot be told apart. One line or cell border with a DASHED
+                        stroke at two clearly different widths — say 1pt and 4pt —
+                        settles it. Nothing else is needed.
+
+47-line-ends            MOSTLY DONE. 34-shape was expanded with ten lines carrying
+                        arrowheads, which mapped TSD.LineEndArchive completely: an
+                        `identifier` name, the FULL path, `is_filled`, and an
+                        `end_point` that MAY BE NEGATIVE so the line stops short of
+                        the marker. Ten presets observed — simple / filled / inverted
+                        / open arrow, filled / open circle, filled / open square,
+                        filled diamond, and line — every one authored in a 6x6 box.
+
+                        Unlike smart_stroke, which gives only a name, a line end
+                        carries its geometry, so pybers can render one without
+                        Apple's engine. head and tail are independently settable; the
+                        fixture holds head fixed and varies only the tail, which is
+                        what proves which field is which.
+
+                        WHAT REMAINS is only the connector question: draw a connector
+                        and actually ATTACH it to two shapes. The connector in 34
+                        holds no reference to anything it connects, so either it was
+                        unattached or attachment is recorded somewhere not yet found.
+```
 
 ---
 
