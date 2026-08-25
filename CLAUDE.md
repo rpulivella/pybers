@@ -290,35 +290,44 @@ writes PEP 376 `.dist-info` into site-packages rather than scattering setuptools
 legacy `.egg-info` through the source tree. No C extensions here, so setuptools' real
 strengths do not apply; its only advantage is familiarity.
 
-### GitHub setup — do this when ready to make the ticket workflow real
+### GitHub setup — DONE except the Project board
 
-The full ticket/PR skill set (`/ticket-create`, `/ticket-startwork`, `/ticket-edit`,
-`/release-tag`, `/pr-draft`, `/pr-review-code`, `scripts/ticket.py`) is already ported
-from `another repository` and adapted for `pybers`, but is **inert** until a real GitHub repo
-and Project board exist. The user will stand this up herself when told it is time; when
-that moment comes, tell her to:
+**The repo and remote exist and are pushed.** `origin` is
+`git@github.com-personal:rpulivella/pybers.git` — note the **host alias**, not
+`github.com`, which is how `~/.ssh/config` and the `includeIf` blocks in `~/.gitconfig`
+route this repo onto the personal key and identity. `develop` tracks `origin/develop`.
+Do not "correct" that hostname; it is the mechanism.
 
-1. Create the GitHub repo `rpulivella/pybers` (private is fine to start).
-2. `git remote add origin git@github.com:rpulivella/pybers.git`, push `develop`.
-3. Create a user-owned GitHub Project (v2) board for it, with a `Status` single-select
-   field carrying exactly these options in order: `Concept`, `Todo`, `In Progress`,
+The `.dev.vars` token is in place and **works** — `scripts/ticket.py` reaches the GitHub
+GraphQL API and fails only on the project lookup, which is an API-level error rather than
+an auth one.
+
+What is left is one thing, and it blocks the whole ticket workflow:
+
+1. Create a user-owned GitHub Project (v2) board, with a `Status` single-select field
+   carrying exactly these options in order: `Concept`, `Todo`, `In Progress`,
    `Code Review`, `Done`. Note its **Project number** (visible in its URL).
-4. Update `scripts/ticket.py`'s `projectNumber` constant from the placeholder `0` to that
-   real number.
-5. Generate a **classic** GitHub personal access token with both `repo` and `project`
-   scopes (fine-grained tokens cannot reach user-owned Project boards at all). Same
-   pattern as every other repo of hers, `another repository` included.
-6. Put it in a git-ignored `.dev.vars` at the repo root as `GITHUB_TOKEN=<token>`
-   (already covered by `.gitignore`) — this is preferred over the system keyring, which
-   prompts for a password on every run since the keyring entry belongs to `gh`, not this
-   tool. `scripts/ticket.py` resolves `GITHUB_TOKEN`/`GH_TOKEN` env vars first, then
-   `.dev.vars`, then the keyring, in that order.
-7. Also create `.github/labels` matching `validLabels` in `scripts/ticket.py` (`feat`
-   `fix` `perf` `refactor` `style` `docs` `chore`) via `gh label create` or the repo
-   settings UI — the tool assumes these already exist on the repo.
-8. Sanity check: `python3 scripts/ticket.py list` should return "No tickets match."
-   rather than erroring, once all of the above is in place.
+2. Set `scripts/ticket.py`'s `projectNumber` constant — still the placeholder `0` at
+   line 99 — to that real number.
 
-Once this is done, `[init]`-prefixed commits give way to real `[<N>]`-ticket-numbered
-ones per `CONTRIBUTING.md`, and the full skill set goes live with no further code
-changes needed.
+Until then `.venv/bin/python3 scripts/ticket.py list` returns
+`GraphQL error: Could not resolve to a ProjectV2 with the number 0.`, which is the
+expected symptom rather than a fault. Once the number is set it should return
+"No tickets match."
+
+Also unverified: `.github/labels` matching `validLabels` in `scripts/ticket.py` (`feat`
+`fix` `perf` `refactor` `style` `docs` `chore`). The tool assumes they already exist on
+the repo. Create them through the repo settings UI — **not** `gh`, per the standing rule
+against using it as a credential source.
+
+Reference, since it explains the token choice: the PAT must be **classic**, with both
+`repo` and `project` scopes, because fine-grained tokens cannot reach user-owned Project
+boards at all. It lives in a git-ignored `.dev.vars` as `GITHUB_TOKEN=<token>`, which is
+preferred over the system keyring — the keyring entry belongs to `gh`, so it prompts for
+a password on every run. `scripts/ticket.py` resolves `GITHUB_TOKEN`/`GH_TOKEN` env vars
+first, then `.dev.vars`, then the keyring.
+
+Once the Project number is set, `[init]`-prefixed commits give way to real
+`[<N>]`-ticket-numbered ones per `CONTRIBUTING.md`, and the full skill set
+(`/ticket-create`, `/ticket-startwork`, `/ticket-edit`, `/release-tag`, `/pr-draft`,
+`/pr-review-code`) goes live with no further code changes needed.
