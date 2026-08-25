@@ -228,6 +228,337 @@ only one.
 `baseline_shift` is likewise on every character style and always `0.0` so far — identified
 but never exercised.
 
+## `*_null` booleans mean "explicitly NONE", not "unspecified"
+
+**Settled by `38-text-outline-shadow`, and it changes how the whole style chain resolves.**
+`CharacterStylePropertiesArchive` is littered with paired fields — `shadow` / `shadow_null`,
+`background_color` / `background_color_null`, `font_features` / `font_features_null` and
+many more. The pair is a tri-state that protobuf cannot express on its own.
+
+Two character runs in the same cell, both variations of the style named `'None'`, both with
+`override_count = 1`:
+
+```
+#981307   set fields: ['shadow_null']   shadow_null = True    an override to NOTHING
+#982958   set fields: ['shadow']        shadow = <blue>       an override to a VALUE
+```
+
+Both **count as one override**, which is the proof: `shadow_null = True` is not "I say
+nothing about shadow", it is "I define shadow, and it is none". A property genuinely left
+alone sets neither field and contributes nothing to `override_count`.
+
+```
+neither field set    inherit from the parent chain
+value field set      use this value
+*_null set True      explicitly NO value, cancelling anything inherited
+```
+
+A reader that treats `shadow_null` as noise will inherit a shadow onto text that Numbers
+shows without one. A writer that omits it cannot express "remove the inherited shadow" at
+all.
+
+## Text shadow and outline exist at BOTH the cell and the character level
+
+`38` demonstrates this by accident, and the fixture labels the accident, which is what makes
+it usable. One cell was copied from another; the copy kept the source's **cell-level** style
+archive — `c7` and `c8` share style key 4, carrying a black shadow — and then had a blue
+shadow applied to part of its text:
+
+```
+cell style (shared with c7)          shadow: black, angle 46.98, offset 0, radius 3
+  run [0:17]  'weak blue shadow '    shadow_null = True        -> no shadow
+  run [17:41] 'only on these...'     shadow: blue              -> blue shadow
+```
+
+So resolving a character's effective shadow means walking the cell's style **and** the
+character run, in that order, applying the `*_null` rule above at each step. The same is true
+of the outline. Text typed into the cell that is not yet part of a run picks up the
+cell-level value, which is exactly the black shadow the fixture's own label reports as
+suspicious.
+
+## Text outline is `tsd_stroke`, and it DECODES THE DASH ARRAY
+
+The Outline checkbox writes a full `tsd_stroke` on the character properties — the same stroke
+message shapes use for borders. `38` carries five outline styles and so resolves the dash
+array that `34-shape` left completely unexercised:
+
+```
+                 pattern.type       count   pattern[0..1]      cap / join
+solid            TSDSolidPattern      0     0, 0               ButtCap  MiterJoin
+dotted           TSDPattern           2     1.0, 1.0           ButtCap  MiterJoin
+dashed           TSDPattern           2     2.0, 2.0           ButtCap  MiterJoin
+wide dashed      TSDPattern           2     6.0, 6.0           ButtCap  MiterJoin
+circular dotted  TSDPattern           2     0.001, 2.0         RoundCap RoundJoin
+```
+
+Four things this settles. A solid stroke has its **own pattern type** and leaves the array
+empty rather than filling it. `count` says how many of the six slots are live, and dashes use
+**two** — dash length then gap length. **Circular dots are a zero-length dash with a round
+cap**, the classic construction, not a distinct pattern kind: `0.001` is as close to zero as
+Numbers writes. And `cap` and `join` change with the preset, so they are part of the style
+rather than constants.
+
+Still open: every outline in `38` has `width: 1.0`, so whether the dash numbers are **points
+or multiples of the stroke width** cannot be told apart here. That is now the only thing
+`46-stroke-dashes` still needs to answer.
+
+### Cell borders use the SAME encoding, from a different menu
+
+Checked against `29-style-border` rather than assumed. A cell border lives in
+`TST.StrokeLayerArchive.stroke_runs`, each run carrying `origin`, `length` and a `stroke`
+whose `pattern` is the identical `{ type, phase, count, pattern[6] }` message:
+
+```
+solid border    pattern { type: TSDSolidPattern }   cap ButtCap   join MiterJoin
+dotted border   pattern { type: TSDPattern }        cap RoundCap  join RoundJoin
+no border       pattern { type: TSDEmptyPattern }   width 0
+```
+
+So one stroke encoding serves shape borders, cell borders and text outlines. **The menus
+differ, not the format**: the cell Border Styles menu offers only solid, dashed, dotted and
+No Border, while the text-outline menu offers about ten, including five brush strokes.
+
+### Brush strokes are named, not described
+
+The text-outline menu's five artistic strokes are **not** a dash array and not a raster
+asset. `TSD.StrokeArchive` has a `smart_stroke` sub-message, and the brush is identified by a
+plain string:
+
+```protobuf
+message SmartStrokeArchive {
+  optional string stroke_name = 2;
+  optional uint32 random_seed = 3;
+  optional .TSP.ReferenceDictionary parameterValues = 4;
+  optional double pattern_offset_distance = 5;
+}
+```
+
+```
+width 3.0  RoundCap  stroke_name 'Chalk2'
+width 8.0  RoundCap  stroke_name 'Feathered Brush'
+width 3.0  ButtCap   stroke_name 'Calligraphy'
+width 8.0  RoundCap  stroke_name 'Dry Brush'
+width 8.0  RoundCap  stroke_name 'Pen'
+```
+
+Four consequences. The `pattern` on these is an ordinary `TSDSolidPattern` with `count: 0`,
+so **a reader checking only the pattern would call a chalk stroke solid** — `smart_stroke`
+has to be checked before the pattern is believed. `stroke_name` is an internal identifier,
+not a localized label: `'Chalk2'` carries a digit no menu shows. `cap` varies with the brush
+(`Calligraphy` uses `ButtCap` where the others use `RoundCap`), so it is part of the preset
+rather than a constant. And `random_seed` exists because these strokes are randomized —
+preserving it is what keeps a document rendering identically, so it must be carried through
+rather than regenerated.
+
+`parameterValues` is a `ReferenceDictionary` and is unset on all five, so per-brush tuning is
+possible but unexercised. Brush strokes default to **8pt**; the fixture includes 3pt versions
+of two of them to show the width is independent of the preset.
+
+pybers can round-trip all of this faithfully without being able to render any of it, which is
+the correct outcome — the geometry lives in Apple's renderer, keyed by that name.
+
+## Baseline shift is the THIRD route to a raised character
+
+`37-text-baselineshift` completes the set. Three different fields produce a similar look and
+a reader must tell them apart, because only one of them is typographically real:
+
+```
+superscript      an enum on CharacterStylePropertiesArchive   SYNTHETIC, never write it
+font_features    AAT sups / subs / ordn                       the real OpenType feature
+baseline_shift   a float, SIGNED POINTS                       a manual nudge, no semantics
+```
+
+`baseline_shift` is plain signed points — `-1.0`, `3.0`, `-3.0`, `5.0`, `10.0` across the
+fixture. It carries no meaning about what the text *is*, unlike a real superscript feature,
+so it must never be used to represent one and must never be mistaken for one on read.
+
+### Uniform baseline shift puts a CHARACTER property on a PARAGRAPH style
+
+The cells that shift the whole cell are **plain strings with no rich-text payload**. Their
+value goes into the cell's own style reference, which resolves to a `ParagraphStyleArchive`
+variation carrying `char_properties.baseline_shift`:
+
+```
+"Baseline shift -1pt of all text in this cell"   plain string
+   -> ParagraphStyleArchive #964645 VARIATION ov=2   char.baseline_shift = -1.0
+```
+
+This is the uniform-formatting tier again, and it confirms that a paragraph style is where
+character properties live when the whole cell shares them. Only a cell with *mixed* baseline
+shift produces a rich-text payload and a `table_char_style` run.
+
+### A saved named character style is NOT a variation
+
+`37` has both routes side by side and they are structurally different:
+
+```
+applied to selected text     #969015  name=''              is_variation=True   ov=1
+                                      parent -> character style named 'None'
+                             #969799  name=''              is_variation=True   ov=1
+
+applied as a saved style     #974338  name='+5pt baseline' is_variation=False  ov=1
+                                      no parent
+```
+
+So an ad-hoc formatting change is an **anonymous variation of the character style named
+`'None'`**, while a style the user saved and named is a **root** with no parent. This is the
+third confirmation that there is no unparented text style: "no character style" is itself a
+named style called `'None'`, exactly as "no list" is a list style called `'None'` in `33`.
+
+`#969799` is shared by **three** cells, so text styles are shared by reference across cells
+just as shape styles are across drawables. See the aliasing warning in
+[findings-07-drawables.md](findings-07-drawables.md); it applies here too.
+
+### Line spacing has four modes, and the labels identify three of them
+
+```
+kExactLineSpacing           amount 15.5     the UI's "Exactly" / fixed line height
+kMinimumLineSpacing         amount 15.5     the UI's "At Least"
+kSpaceBetweenLineSpacing    amount 15.5     the UI's "Between"
+(field unset)                               the theme default
+```
+
+`37` labels these in its second row, which is what makes the mapping checkable: the cells
+describing themselves as "fixed", "minimum" and "between" carry exactly
+`kExactLineSpacing`, `kMinimumLineSpacing` and `kSpaceBetweenLineSpacing`, and the row-1
+labels name the two ambiguous ones as the UI's `"at least"` and `"between"`.
+
+Line spacing sits in `para_properties` and is a sub-message with a `mode` and an `amount`,
+not a bare number, so a model storing line height as a float loses which mode it is.
+
+**Read line spacing from the payload's paragraph style, not the cell's style reference.**
+For a rich-text cell the two can disagree: `37`'s character-style cell has `kExactLineSpacing`
+on its paragraph style inside the payload while its own cell-level style sets no
+`line_spacing` at all. The paragraph style is the one that describes the paragraph.
+
+## `character_index` counts UTF-16 CODE UNITS, not Python characters
+
+**Settled by `36-unicode-text`, and it was the last open question in the object model.**
+pybers previously assumed these indices were Python offsets. That assumption is wrong.
+
+The fixture puts a single astral character between two differently formatted runs — `AB`
+bold, the astral `𠮟` (U+20B9F) left alone, `CD` carrying OpenType features:
+
+```
+text            A    B    𠮟         C    D
+python scalar   0    1    2         3    4
+utf-16 unit     0    1    2    3    4    5
+
+table_char_style:   @0 -> bold      @2 -> inherit      @4 -> font_features
+```
+
+The third run begins at **4**. Under Python indexing it would begin at 3, so the two
+readings reconstruct differently and only one of them is coherent:
+
+```
+utf-16    [0:2] 'AB' bold     [2:4] '𠮟'  inherit    [4:6] 'CD' features    correct
+scalar    [0:2] 'AB' bold     [2:4] '𠮟C' inherit    [4:5] 'D'  features    WRONG
+```
+
+Note the failure mode. The scalar reading does not raise, does not produce an out-of-range
+index, and does not yield an obviously broken result — it produces **three runs of plausible
+text with the wrong boundaries**, which is unfalsifiable without an answer key. This is why
+`02-text-rich` validated perfectly and proved nothing: it is entirely BMP, where the two
+counts agree exactly.
+
+### The scope of the problem, precisely
+
+This affects **run-table indices only**. It is not a general Unicode defect:
+
+- Plain string cells hold their text in a protobuf `string`, which is UTF-8, and Python
+  decodes it natively. `36` has a cell containing 48 Python characters and 53 UTF-16 units
+  of CJK including astral Extension B, stored as an ordinary string with no run tables, and
+  it round-trips with no special handling.
+- **Nineteen of the twenty-one run tables** key on `character_index`, so all nineteen are
+  affected together: character and paragraph styles, language, bidi, drop cap, dictation,
+  tracked insertions and deletions.
+
+So the conversion belongs at the boundary where a run table is read or written, not in the
+text handling generally. A model holding Python strings with Python offsets is the right
+shape; it just has to translate on the way in and out.
+
+### Arabic-Indic digits in a NUMBER cell are not stored at all
+
+`36` puts the same three characters in two adjacent cells and labels both:
+
+```
+r0c8   "Arabic-Indic digits as a cell type number"   type 2, Decimal('123')
+r0c9   "Arabic-Indic digits as a cell type text"     string U+0661 U+0662 U+0663 U+0020
+```
+
+Typing `١٢٣` where Numbers infers a number **parses it and stores the decimal 123**. The
+Arabic-Indic code points are gone from the value entirely; the numeral system is carried by
+the format, consistent with the numeral-system discovery in `16-number-scientific-numeralsystems`.
+The text cell keeps the characters exactly, trailing space included.
+
+So a value's digits are **presentation**, and a round trip that reads a number and rewrites
+it must not attempt to preserve the digit characters — there are none to preserve.
+
+### Skin-tone emoji are a BASE plus a SEPARATE modifier code point
+
+The emoji cell in `36` is 16 code points and 29 UTF-16 units:
+
+```
+U+1F91E  astral   HAND WITH INDEX AND MIDDLE FINGERS CROSSED
+U+1F3FC  astral   EMOJI MODIFIER FITZPATRICK TYPE-3      <- a separate code point
+U+270A   BMP      RAISED FIST                            <- a BMP base ...
+U+1F3FC  astral   EMOJI MODIFIER FITZPATRICK TYPE-3      <- ... with an ASTRAL modifier
+U+2699   BMP      GEAR
+U+FE0F   BMP      VARIATION SELECTOR-16
+```
+
+Three things follow. A skin-toned emoji is **two code points**, so a run boundary can legally
+fall between the base and its modifier — which renders as an unmodified emoji followed by an
+orphan modifier. The base is not always astral (`✊` is BMP) and the modifier is not always
+astral (`U+FE0F` is BMP), so **neither half can be predicted from the other**. And a
+grapheme cluster here spans up to 4 UTF-16 units, so grapheme-safe editing is a separate
+problem from the index conversion above.
+
+No ZWJ sequence (a family or profession emoji) is present, so the multi-person case is still
+untested.
+
+### Numbers NORMALIZES to precomposed form on entry
+
+`36` has a cell labelled "e typed with accent added by long-press of the e key to add the
+accent after". It stores **one** character, `é` U+00E9, not the two-character decomposed
+sequence:
+
+```
+stored          py 1     'é'  U+00E9
+NFD would be    py 2     'e' + U+0301 COMBINING ACUTE ACCENT
+```
+
+So the decomposed form did not survive entry. The accented-Latin cell tells the same story:
+34 characters stored, 39 under NFD.
+
+A reader should therefore expect NFC, and a **writer must not emit decomposed sequences**
+expecting them to round-trip — Numbers would renormalize and the character indices in all
+nineteen run tables would shift underneath.
+
+### Right-to-left is still unresolved, and `36` cannot resolve it
+
+`36` contains four RTL cells — plain Hebrew, Hebrew with niqqud, Arabic, and mixed-direction
+text with both European and Arabic-Indic digits. **All of them are plain strings.** A plain
+string cell has no `StorageArchive` and therefore no run tables at all, so
+`table_para_bidi` remains `(0, 0)` everywhere and its two `uint32` fields are still unmapped.
+
+Answering it needs an RTL cell with **mixed formatting**, which forces a rich-text payload
+into existence. The same is true of `table_language`, which only ever shows `"en"` so far.
+
+### `rich_text_payload` is field 9, and `reference` is field 4
+
+Found while reading `36`, and worth recording because of how it fails. `TableDataList.
+ListEntry` has both:
+
+```protobuf
+optional .TSP.Reference reference = 4;
+optional .TSP.Reference rich_text_payload = 9;
+```
+
+A rich-text entry populates **`rich_text_payload`**. Reading `reference` instead returns an
+unset message whose `identifier` is `0` — no exception, no missing-field error, just a
+reference to nothing. The rich text then appears to be absent rather than misread.
+
 ## Rich text: a StorageArchive with TWENTY-ONE parallel run tables
 
 This is the layer that several earlier findings missed by only reading a table's own

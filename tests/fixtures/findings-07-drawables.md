@@ -399,10 +399,30 @@ So the common geometry — color, angle, offset, radius, opacity, `is_enabled` �
 every kind, and `contactShadow` / `curvedShadow` add the one parameter their kind needs.
 A model with a flat "shadow" record would lose `height` and `curve`.
 
+`type` is a plain integer enum: **0 drop, 1 contact, 2 curved.**
+
 `34` contains **two** contact shadows differing only in `offset` (0 and 14), which shows the
 common fields remain independently settable within a type rather than being fixed by it.
+Both carry the identical `contactShadow { height: 0.173648179 }`.
 
-A reflection is by comparison trivial: `reflection { opacity: 0.5 }` and nothing else.
+#### `contactShadow.height` is a SINE, despite the name
+
+```
+height  = 0.173648179
+asin(height) = 10.000000 degrees exactly     sin(10 deg) = 0.173648178
+```
+
+The value is `sin(10°)` to float32 precision, so what the field stores is the **sine of an
+angle the interface presents in degrees**, under a name that reads like a distance. A writer
+setting a "height" of 10 would produce something wildly wrong, and setting a fraction like
+0.5 would silently mean 30 degrees.
+
+`curvedShadow.curve` is **not** the same encoding — `asin(-0.12309546)` is -7.0708 degrees,
+not a round number — so it reads as a raw curvature parameter and must not be treated as an
+angle by analogy. Two adjacent fields, two different conventions, neither documented.
+
+A reflection is by comparison trivial: `reflection { opacity: 0.5 }` and nothing else. `34`
+carries exactly one, so the only reflection parameter observed is its opacity.
 
 ### A stroke carries a six-slot dash array that nothing in the corpus uses
 
@@ -436,9 +456,56 @@ gradient and image fills    every fill in the fixture is a flat rgb color
 `head_line_end` and `tail_line_end` appear on the style **and** on `ShapeArchive`, and `34`
 resolves which one Numbers uses. Every `ShapeArchive` in the fixture sets exactly
 `style`, `pathsource` and `strokePatternOffsetDistance` — **the line-end fields on the shape
-itself are never set**, including on the plain 45-degree line, where arrowheads would be most
-expected. So the style is where line ends live in practice, and the shape-level fields should
-be read as a fallback rather than written.
+itself are never set**, even on the lines that do carry arrowheads. So the style is where
+line ends live in practice, and the shape-level fields should be read as a fallback rather
+than written.
+
+### Arrowheads: named AND fully described
+
+Ten lines in `34` hold `head_line_end` fixed at `'simple arrow'` and vary only the tail,
+which is what proves which field is which. `TSD.LineEndArchive` carries:
+
+```protobuf
+message LineEndArchive {
+  optional .TSP.Path path = 1;
+  optional .TSD.LineJoin line_join = 2 [default = MiterJoin];
+  optional .TSP.Point end_point = 3;
+  optional bool is_filled = 4;
+  optional string identifier = 5;
+}
+```
+
+```
+identifier         is_filled   end_point        path
+'simple arrow'       True      (3.0,  0.0)     moveTo/lineTo/lineTo/close
+'filled arrow'       True      (3.0,  1.5)     4 straight segments
+'inverted arrow'     True      (3.0,  0.33)    extent only 6 x 3
+'open arrow'         False     (3.0,  0.0)     moveTo/lineTo/lineTo/moveTo/lineTo, OPEN
+'filled circle'      True      (3.0,  0.5)     4 curveTo
+'open circle'        False     (3.0, -0.3)     4 curveTo
+'filled square'      True      (3.0,  0.5)
+'open square'        False     (3.0,  0.2)
+'filled diamond'     True      (3.0,  0.33)
+'line'               False     (3.0, -0.8)     a single lineTo
+```
+
+**Contrast this with `smart_stroke`.** A brush stroke gives only a name and leaves the
+rendering to Apple. A line end gives a name **and the complete path**, so it can be drawn
+without Apple's engine. The `identifier` is a convenience, not the definition — a reader
+should draw the path and use the name only for reporting.
+
+Every arrowhead is authored in a **6 x 6 box** regardless of shape, scaled at draw time.
+`is_filled` distinguishes the open variants, whose paths are deliberately unclosed. And
+`end_point` is where the line attaches, which **may be negative** — `'open circle'` at
+`-0.3` and `'line'` at `-0.8` pull the line back so it does not show through the marker.
+
+`head_line_end` and `tail_line_end` are independently settable; the variations that carry
+them override exactly two properties and nothing else.
+
+The stroke palette offered to lines is the same one text outlines get, brushes included, but
+`34` applies none of them: every stroke in the fixture is `TSDSolidPattern` with `count: 0`,
+at widths 1, 2, 3 and 5. So a **dashed** stroke at two different widths is still the one
+thing `46-stroke-dashes` needs.
 
 ## Images: what is stored, and what Numbers adds
 
