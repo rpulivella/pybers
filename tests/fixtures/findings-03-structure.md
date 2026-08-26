@@ -138,16 +138,113 @@ header_column_style  the header-columns band  (+ header_column_text_style)
 footer_row_style     the footer-rows band     (+ footer_row_text_style)
 ```
 
-There is **no per-row or per-column style reference for body rows.** Formatting body row 7
-therefore writes a style onto each cell in it, and the fact that a whole row was selected is
-not recorded anywhere — afterwards it is N cells that happen to match.
+### CORRECTED by `40-table-bands`: these are PARENT TEMPLATES, not applied styles
 
-**Design consequence.** `setHeaderRowStyle(style)` is a genuine single-property operation
-that round-trips as intent. A `setRowStyle(7, style)` would be sugar over N cell writes and
-could never be read back as "row 7 is styled". The API should not make the two look alike.
+The reading above was from the schema and it was wrong in both halves. Measured against `40`:
 
-Unverified: fixture `43-style-band-vs-row` exists in the list to confirm this by measurement
-rather than leaving it as a reading of the schema.
+**A band style is only a parent.** `header_row_style` is a root `CellStyleArchive`
+(`is_variation: False`, `override_count: 4`) that no cell references directly. Every styled
+cell — header, footer **and body** — carries its own reference to an anonymous *variation*
+whose `parent` is the appropriate template:
+
+```
+header cell   -> #911973  variation, parent = header_row_style,   overrides cell_fill
+footer cell   -> #912075  variation, parent = footer_row_style,   overrides cell_fill
+body cell     -> #928722  variation, parent = the BODY style,     overrides cell_fill
+plain body    -> no style reference at all
+```
+
+So formatting a header row and formatting a body row are **the same operation against
+different parents**. Neither is a single-property band write, and the earlier design
+consequence — that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar —
+does not hold. Both are N cell writes.
+
+**And there IS a per-row and per-column style slot**, in a place the schema reading missed:
+
+```protobuf
+message HeaderStorageBucket {
+  message Header {
+    required uint32 index = 1;
+    required float  size = 2;
+    required uint32 hidingState = 3;
+    required uint32 numberOfCells = 4;
+    optional .TSP.Reference cell_style = 5;
+    optional .TSP.Reference text_style = 6;
+  }
+}
+```
+
+It is **unused** in the corpus: `40`'s deliberately-filled body row wrote per-cell styles and
+left `cell_style` unset on the row. So the slot exists, Numbers did not use it for that
+operation, and a reader must not depend on it being populated.
+
+**A plain body cell carries no style reference at all.** Default body appearance is the
+*absence* of a style, not a reference to a body style.
+
+## Band membership: precedence, overlaps, and what survives un-setting
+
+`40-table-bands` maxes every count — 5 header rows, 5 header columns, 5 footer rows on a
+19x11 table — and labels the two overlap regions, so the corners can be attributed.
+
+**Precedence is header row > header column > footer row.** Styling the header column left
+the top-left corner on the header-**row** style; styling the footer left the bottom-left
+corner on the header style. A corner belongs to the higher band, and styling a lower band
+stops at the boundary rather than painting over it.
+
+**Five is the maximum** for each of the three counts, bands always sit at the top, left and
+bottom, and a band cannot be placed mid-table.
+
+**A band has TWO templates, not one:** `header_row_style` for cell appearance and
+`header_row_text_style` for text, each acting as a parent for its own kind of variation.
+
+**The four cell templates differ in exactly one property.** Body, header row, header column
+and footer row all carry identical `padding` (4 on every side), `text_wrap: True` and
+`vertical_alignment: 0`; only `cell_fill` differs, and the body and footer fills are empty.
+That is why removing a band changes less than expected.
+
+**Un-setting a band re-parents its cells and preserves their overrides.** Setting header rows
+from 5 back to 0 leaves each cell's explicit fill intact but re-parents its style from
+`header_row_style` to the body style. The appearance the user chose survives; the band's own
+default fill, its text-style parent, and the band effects (frozen, repeat-on-print) do not.
+So band membership is **not** recoverable from cell styling after the fact.
+
+### Freezing and repeat-on-print are independent fields
+
+```
+Table 1     header_rows_frozen UNSET   header_columns_frozen False
+Table 1-1   header_rows_frozen True    header_columns_frozen True
+BOTH        repeating_header_rows_enabled = True
+            repeating_header_columns_enabled = True
+```
+
+`repeating_*` is `True` on both tables, including the one where `header_rows_frozen` is not
+set at all. So the freeze control does not touch it — **repeat-on-print is print state**, set
+elsewhere in the print layout UI, and a reader must not infer one from the other.
+
+Print settings generally, along with pagination and per-object page position, are **not
+covered by any fixture** and are real document state a round trip could silently drop.
+
+## Row heights and column widths live in `HeaderStorageBucket`
+
+Not on the table model, which carries only `default_row_height` and `default_column_width`.
+Per-row and per-column state sits in `TST.HeaderStorageBucket`, one `Header` entry each:
+
+```
+index          the row or column number
+size           its height or width  -- 0.00 means USE THE DEFAULT, not zero
+hidingState    0 when visible
+numberOfCells  how many cells that row or column holds
+cell_style     optional, unused in the corpus
+text_style     optional, unused in the corpus
+```
+
+**The two axes are reached differently.** `rowHeaders` is an inline `TST.HeaderStorage`
+message on the data store, while `columnHeaders` is a `TSP.Reference` to one. A walker that
+assumes both are references finds only the columns, silently.
+
+`size = 0.00` reading as "default" rather than "zero" is the trap here: a reader that
+propagates it literally collapses every row to nothing. Nothing in the corpus yet has a
+resized or hidden row, so non-default values of `size` and `hidingState` remain unmeasured.
 
 ## A table over 256 rows splits into tiles, and both facts about tiles are traps
 
@@ -218,17 +315,95 @@ position (0.175, 68)     size 98 x 20.07
 position (165.175, 0)    size 102 x 60
 ```
 
-So placement and size are floating-point canvas coordinates, **`angle` means a table can be
-rotated**, and `locked` and `aspect_ratio_locked` are real state. This validates the
-`Position` and `Size` dataclasses already in `pybers.model.geometry`.
+So placement is in **points**, the same unit as every other coordinate — `41-table-geometry`
+labels its tables and they read exactly: `(144, 144)` is "x2.0in y2.0in", `(-72, 360)` is
+"x-1.0in y5.0in". **A table may sit at a negative position**, off the left edge of the sheet.
+`angle` means a table can be rotated, and `locked` and `aspect_ratio_locked` are real state.
 
 The `title` / `caption` / `title_hidden` / `caption_hidden` fields on the same block are the
 settings switched off in every fixture in this directory, so the "atypical fixtures" note in
 the README is visible right here.
 
-**This substantially covers what `45-table-geometry` and `47-table-titles` were planned to
-establish.** Those fixtures are now about *varying* these values rather than discovering them:
-distinct column widths and row heights, and a table with its title and caption shown.
+### A table's `geometry.size` is STALE and must never be used
+
+The single most dangerous finding about tables. `41` builds a chain of eight tables, each
+duplicated from the last and then resized, and every one of them stores a `geometry.size`
+that describes the **previous** table:
+
+```
+table                  own content     geometry.size    predecessor content + 4
+Table 1-1              216 x 112       220 x 116        220 x 116     MATCH
+Table 1-1-1            360 x 180       220 x 116        220 x 116     MATCH
+Table 1-1-1-1          360 x 72        364 x 184        364 x 184     MATCH
+Table 1-1-1-1-1        360 x 360       364 x 76         364 x 76      MATCH
+Table 1-1-1-1-1-1       72 x 216       364 x 364        364 x 364     MATCH
+Table 1-1-1-1-1-1-1    360 x 216        76 x 220         76 x 220     MATCH
+```
+
+Six for six. `geometry.size` records the content size plus about 4 points of frame **at the
+moment the table was created**, and is **never updated when rows or columns are resized**.
+
+**The real size is `sum(row heights) x sum(column widths)`**, taking `default_row_height` and
+`default_column_width` wherever a `size` reads `0.00`. A reader that trusts `geometry.size`
+gets a plausible wrong number — off by a factor of five in the worst row above — with nothing
+raising.
+
+### Resizing a table distributes the stretch PROPORTIONALLY into rows and columns
+
+Nothing about the stretch is recorded at the table level. Dragging a table's frame multiplies
+every row height, or every column width, by the same factor and writes the results back into
+`HeaderStorageBucket`:
+
+```
+12, 12, 24, 12, 12    sum  72
+60, 60, 120, 60, 60   sum 360     every row x 5.0 exactly
+36, 36, 72, 36, 36    sum 216     every row x 0.6 exactly
+```
+
+Afterwards a proportional stretch is **indistinguishable** from having typed those heights by
+hand, so the operation cannot be recovered — only its result.
+
+## Hiding a row or column: by UUID, and not where the field name suggests
+
+`41` hides one row and one column and labels both. Three things follow, none of them
+guessable.
+
+**`HeaderStorageBucket.hidingState` is NOT user hiding.** It reads `0` on the hidden row and
+the hidden column alike, on every table in the corpus. Whatever it is for, it is not this.
+
+**Hidden state lives on the table model, addressed by UUID:**
+
+```
+TableModelArchive.hidden_states_owner.hidden_states[]
+   .row_hidden_state_extent.base_hidden_states[]
+        row_or_column_uid { lower, upper }
+        user_hidden: true
+   .column_hidden_state_extent.base_hidden_states[]   ... same shape
+```
+
+A table with nothing hidden has the same structure with `base_hidden_states` **empty**. Every
+table also carries a `HiddenStateFormulaOwnerArchive` and a `FilterSetArchive` whether or not
+anything is hidden, so their presence proves nothing — only a non-empty `base_hidden_states`
+does.
+
+**Rows and columns are identified by UUID, not index**, the same identity-based design that
+makes cross-table formula references survive edits. Resolving a UUID to an index needs
+`base_column_row_uids` -> `TST.ColumnRowUIDMapArchive`, and its `*_uid_for_index` is a
+**permutation** into `sorted_*_uids`:
+
+```
+column uid_for_index = [1, 2, 0]                the hidden uid sits at sorted[2]
+                                                which is column index 1, NOT 2
+row    uid_for_index = [1, 6, 2, 3, 5, 4, 0]    the hidden uid is row index 3
+```
+
+Reading the sorted list positionally reports the wrong column. **Sorted order is not document
+order** and the map has to be applied.
+
+`user_hidden` distinguishes manual hiding from filter hiding, which is the sibling
+`filter_set` mechanism (`is_enabled: False` throughout the corpus). A row can therefore be
+hidden two independent ways, and a hidden row **keeps its `size`** — hiding does not zero the
+height.
 
 ## Headers, footers and frozen panes are plain scalars
 

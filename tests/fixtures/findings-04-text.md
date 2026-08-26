@@ -228,6 +228,70 @@ only one.
 `baseline_shift` is likewise on every character style and always `0.0` so far — identified
 but never exercised.
 
+## There is ONE place tabs live, and "cell level" writes the TABLE's text style
+
+`39-text-tabs-indents` looks contradictory in the interface — the same cell shows three tab
+stops when a paragraph is selected and an **empty** Tabs panel when the cell is selected —
+and the archive explains it.
+
+There is no cell-level tab storage at all. `tabs` exists only in `para_properties` on a
+`ParagraphStyleArchive`. What differs is *which* paragraph style gets written:
+
+```
+cell selected        -> a variation of #903892, the table's BODY_TEXT_STYLE,
+                        attached to every cell in the table
+paragraph selected   -> a variation in that cell's rich-text table_para_style run
+```
+
+So setting tabs "on a cell" really sets them for **every paragraph in the table**, which is
+why Numbers shows the table style as dirty (`Table Style 2*` with an Update button). The
+cell-selected panel appears empty because it shows stops defined at that exact scope, and
+they went one level up.
+
+### Tab stops decode directly, in points
+
+```
+tabs { position: 7.2 }                                 0.1in, left, no leader
+tabs { position: 36  leader: " " }                     0.5in
+tabs { position: 108 alignment: kTabAlignmentCenter }  1.5in
+tabs { position: 144 alignment: kTabAlignmentRight }   2.0in
+tabs { position: 72  leader: "-" }                     1.0in with a dash leader
+tabs { position: 72  alignment: kTabAlignmentDecimal } paired with decimal_tab "."
+```
+
+All four alignments are exercised. **`leader` is a single-character string**, and both an
+unset field and `" "` mean no leader — so a reader must treat a space as absence, not as a
+space-filled leader.
+
+`default_tab_stops` is the fallback interval in points, `36.0` in the theme and changed to
+`18.0` on one paragraph. `decimal_tab` is a separate string holding the decimal character.
+
+### Indents: THREE point fields, plus a second mechanism that has no points at all
+
+```
+first_line_indent = 18.0     left_indent = 18.0     right_indent = 18.0      (0.25in each)
+```
+
+Three independent floats, in points, exactly as labelled. But the **indent button** writes
+somewhere else entirely:
+
+```
+"indented using indent button"          table_para_data: @0  (1, 0)
+"...using the indent button again"      table_para_data: @30 (2, 0)
+all three indent fields                 0.0
+```
+
+`table_para_data.first` is an integer indent **level** — one press, then two — with **no point
+value stored anywhere**. It is the first time that run table has carried anything but
+`(0, 0)` in the whole corpus.
+
+So there are two independent indent mechanisms that look identical in the interface, and a
+reader that consults only the paragraph style sees an unindented paragraph and renders it
+flush left. The list style is `'None'` throughout, so this is not list indentation.
+
+**Paragraph borders** are visible in the same panel and present in the schema —
+`border_positions = 0` and `rule_width = 1.0` on the base style — but unexercised.
+
 ## `*_null` booleans mean "explicitly NONE", not "unspecified"
 
 **Settled by `38-text-outline-shadow`, and it changes how the whole style chain resolves.**
