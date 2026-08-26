@@ -78,15 +78,13 @@ run tables that use it. Everything still to make adds coverage rather than archi
 
 **Still to make, in the order worth doing them:**
 
-1. `43-table-titles` — the table title, plus the header/footer settings shown in their
+1. `42-table-titles` — the table title, plus the header/footer settings shown in their
    DEFAULT Numbers state. `40` covered the bands themselves but every fixture in the corpus
    still has titles switched off, so the shape most real documents have is untested.
-2. `42-table-dimensions` — three tables with clearly different row and column COUNTS.
-   `41` covered sizing and hiding thoroughly; this is only about the counts.
-3. `45-line-ends` — MOSTLY DONE. The expanded `34-shape` mapped `TSD.LineEndArchive`
+2. `44-line-ends` — MOSTLY DONE. The expanded `34-shape` mapped `TSD.LineEndArchive`
    completely. What remains is only the connector question: a connector actually attached to
    two shapes, since the one in `34` holds no reference to anything it connects.
-4. `44-stroke-dashes` — now a single question, whether dash lengths are points or multiples
+3. `43-stroke-dashes` — now a single question, whether dash lengths are points or multiples
    of stroke width. Lowest value.
 
 **Two smaller gaps, each needing one cell rather than a fixture:** an RTL cell with MIXED
@@ -726,7 +724,14 @@ shifted down by two.
 
 ```
 
-### Table geometry and placement — the STORE is mapped, the values are not
+### Table geometry and placement — DONE
+
+**`42-table-dimensions` was dropped, not renumbered away.** It asked for a tall-and-narrow
+table, a short-and-wide one, and a single cell. The corpus already holds **24 distinct table
+shapes** including all three — `2001 x 4` in `27`, `2 x 18` in `15`, and `1 x 1` in
+`00-baseline` and eight others. `number_of_rows` and `number_of_columns` are plain scalars
+read on every table in every fixture, so a fourth arrangement of the same two integers
+proves nothing. The numbers after it shifted down by one.
 
 Every fixture so far describes what is *in* a table. None describes the table as an object
 on a canvas: where it sits, how big it is, or how wide its columns are. A round trip that
@@ -766,11 +771,7 @@ resized column, or a hidden row, so every `size` reads 0 and every `hidingState`
                         PERMUTATION — reading sorted order positionally reports the
                         wrong column.
 
-42-table-dimensions     Three tables on one sheet with clearly different row and
-                        column COUNTS: one tall and narrow, one short and wide, one
-                        single-cell. Dimensions are separate from placement and
-                        should be confirmed separately.
-43-table-titles         The table title and header settings that every other fixture
+42-table-titles         The table title and header settings that every other fixture
                         has had switched OFF. One table with its title shown, one
                         with header rows, header columns and a footer row all
                         present. This is the DEFAULT Numbers state, so it is what
@@ -781,17 +782,17 @@ resized column, or a hidden row, so every `size` reads 0 and every `hidingState`
 **Note for every fixture already made:** table titles were unchecked and header rows,
 header columns and footers were all set to zero, which is *not* the Numbers default. That
 was the right call for isolating cell behavior, and it means these fixtures are
-deliberately atypical. `43-table-titles` exists so the default shape is covered too, and
+deliberately atypical. `42-table-titles` exists so the default shape is covered too, and
 nothing assumes the stripped-down form is normal.
 
 ### Drawable gaps — one closed, one narrowed
 
-`45-line-ends` was closed by expanding `34-shape` itself; what is left of it is the connector
-question. `44-stroke-dashes` was answered from an unexpected direction, by text outlines in
+`44-line-ends` was closed by expanding `34-shape` itself; what is left of it is the connector
+question. `43-stroke-dashes` was answered from an unexpected direction, by text outlines in
 `38`, and is now down to a single measurement.
 
 ```
-44-stroke-dashes        NARROWED TWICE, now a single question. 38-text-outline-shadow
+43-stroke-dashes        NARROWED TWICE, now a single question. 38-text-outline-shadow
                         decoded the dash array from text outlines, and 29-style-border
                         confirmed CELL BORDERS USE THE IDENTICAL ENCODING — one stroke
                         message serves shapes, cells and text, and only the menus
@@ -803,7 +804,7 @@ question. `44-stroke-dashes` was answered from an unexpected direction, by text 
                         stroke at two clearly different widths — say 1pt and 4pt —
                         settles it. Nothing else is needed.
 
-45-line-ends            MOSTLY DONE. 34-shape was expanded with ten lines carrying
+44-line-ends            MOSTLY DONE. 34-shape was expanded with ten lines carrying
                         arrowheads, which mapped TSD.LineEndArchive completely: an
                         `identifier` name, the FULL path, `is_filled`, and an
                         `end_point` that MAY BE NEGATIVE so the line stops short of
@@ -830,13 +831,11 @@ question. `44-stroke-dashes` was answered from an unexpected direction, by text 
 **Every fixture that could reshape the object model is made and read.** `36-unicode-text`
 settled the last one. What remains adds coverage only.
 
-Four things are still open, in rough order of value:
+Three things are still open, in rough order of value:
 
-1. **`43-table-titles`** — the default Numbers table shape, which no fixture has.
-2. **`42-table-dimensions`** — row and column counts, the only part of table geometry `41`
-   did not cover.
-3. **`45-line-ends`** — one connector, actually attached to two shapes.
-4. **`44-stroke-dashes`** — one dashed stroke at two widths.
+1. **`42-table-titles`** — the default Numbers table shape, which no fixture has.
+2. **`44-line-ends`** — one connector, actually attached to two shapes.
+3. **`43-stroke-dashes`** — one dashed stroke at two widths.
 
 Plus two single cells rather than fixtures: an RTL cell with **mixed formatting**, to
 populate `table_para_bidi`; and a **ZWJ emoji** sequence.
