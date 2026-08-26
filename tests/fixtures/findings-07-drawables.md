@@ -502,10 +502,57 @@ Every arrowhead is authored in a **6 x 6 box** regardless of shape, scaled at dr
 `head_line_end` and `tail_line_end` are independently settable; the variations that carry
 them override exactly two properties and nothing else.
 
-The stroke palette offered to lines is the same one text outlines get, brushes included, but
-`34` applies none of them: every stroke in the fixture is `TSDSolidPattern` with `count: 0`,
-at widths 1, 2, 3 and 5. So a **dashed** stroke at two different widths is still the one
-thing `46-stroke-dashes` needs.
+The stroke palette offered to lines is the same one text outlines get, brushes included.
+
+### The dash array is in MULTIPLES OF STROKE WIDTH, not points
+
+**Settled by `43-stroke-dashes`**, which draws every preset at two widths so the two readings
+can be told apart:
+
+```
+                   1pt                    5pt                    verdict
+short dashed   [1.0, 1.0]             [1.0, 1.0]             IDENTICAL
+dashed         [2.0, 2.0]             [2.0, 2.0]             IDENTICAL
+wide dashed    [6.0, 6.0]             [6.0, 6.0]             IDENTICAL
+wide dotted    [0.001, 2.0]           [0.001, 2.0]           IDENTICAL, RoundCap
+solid          TSDSolidPattern count 0                       no array at all
+```
+
+Every preset stores the same numbers at both widths. Absolute points would require `[10, 10]`
+at 5pt to look proportional; it stores `[2, 2]`, so a 5pt dashed stroke renders **10pt dashes
+with 10pt gaps**. A reader converting the array to points must multiply by `width`, and a
+writer must divide.
+
+`cap` tracks the preset rather than the width — `RoundCap`/`RoundJoin` on the dotted styles,
+`ButtCap`/`MiterJoin` on the rest — confirming the zero-length-dash-plus-round-cap
+construction for dots.
+
+`43`'s ten specimens are otherwise identical: all `editable_bezier_path_source`, all
+variations of one parent overriding exactly `fill` (empty) and `stroke`, `is_text_box: False`
+despite carrying text. Nothing else in the fixture is unaccounted for.
+
+### Connectors DO record what they connect
+
+`44-line-ends` attaches connectors to shapes, which `34` never did — its lone connector was
+simply unattached. `TSD.ConnectionLineArchive` carries **four** fields for it:
+
+```
+connected_from       TSP.Reference to the source ShapeInfoArchive
+connected_to         TSP.Reference to the target
+connected_from_uuid  TSP.UUID
+connected_to_uuid    TSP.UUID
+```
+
+Both the reference and the UUID are populated on every attached connector, the same
+belt-and-braces identity pairing that row and column hiding uses. The references point
+straight at the drawables in the sheet's `drawable_infos`.
+
+`connection_line_path_source.type` is the routing mode: **`1` on the connector attached to
+the shape labelled "orthogonal connection line", `0` on all six others.** `outset_from` and
+`outset_to` are `0.0` throughout.
+
+One shape acts as a hub with four connectors attached, so a drawable may be referenced by
+many connectors and a reader must not assume one.
 
 ## Images: what is stored, and what Numbers adds
 

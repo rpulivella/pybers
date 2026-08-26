@@ -347,8 +347,8 @@ Table Title 1 (x6)        904094+   'tableName-0-textStyle' ... '-5-'       per-
 never see or select. `Table Title 1` exists as **six separate archives**, one per table slot,
 each with its own `tableName-N-textStyle` key — so it is not one shared browser style either.
 
-**The rule for pybers.** Creating a named style the user can actually use takes two writes,
-not one:
+**The rule for pybers.** Creating a *paragraph* or *list* style the user can actually see
+takes two writes, not one:
 
 ```
 1. the ParagraphStyleArchive with its `name`         -- makes it a named style
@@ -360,11 +360,41 @@ survives a round trip, applies correctly, and is invisible in the browser foreve
 silent failure of the worst kind — everything looks right except the one thing the user asked
 for.
 
-A user-created style's key has **no name suffix** (`'text-0-paragraphstyle'`) where theme
-styles do (`'text-0-paragraphstyle-Title'`), and the two coexist at the same index, so the
-suffix is part of the key rather than decoration. The stylesheet also carries
-`parent_to_children_style_map` and a long series of `styles_for_<version>` lists, neither of
-which is decoded yet.
+### The rule does NOT hold for character styles
+
+Measured against the expanded `32-named-styles`, which adds three user-created character
+styles. **Every named character style in the document is absent from
+`identifier_to_style_map` and visible anyway:**
+
+```
+smallcaps, 'smallcaps +2%', 'tabular numbers'   NO KEY   user-created, visible
+Emphasis, Italic, Underline, Strikethrough, Gray NO KEY  Numbers' own, visible
+Link                                'character-style-hyperlink'   special
+None                                'character-style-null'        special
+```
+
+Only the two special system character styles are keyed. So the registry governs **paragraph
+and list styles**; for character styles a `name` appears to be sufficient on its own. Do not
+generalize the paragraph rule across style kinds — it was stated too broadly on first
+measurement and `32` corrected it.
+
+### How keys are allocated
+
+```
+theme paragraph styles     'text-<N>-paragraphstyle-<Name>'    Body 1, Heading 1, Title...
+USER paragraph styles      'text-<N>-paragraphstyle'           NO name suffix
+theme list styles          'text-<N>-liststyle-<Name>'
+USER list styles           'text-<N>-liststyle'
+per-table-slot title       'tableName-<N>-textStyle'           six of them, hidden
+```
+
+User styles are numbered **from 0 independently of the theme styles**, so `Text` holds
+`'text-0-paragraphstyle'` while `Title` holds `'text-0-paragraphstyle-Title'` in the same
+document. The name suffix is therefore part of the key, not decoration, and is what keeps the
+two namespaces from colliding.
+
+The stylesheet also carries `parent_to_children_style_map` and a long series of
+`styles_for_<version>` lists, neither of which is decoded.
 
 ## Named styles: applying one writes a REFERENCE, overriding one writes a VARIATION
 

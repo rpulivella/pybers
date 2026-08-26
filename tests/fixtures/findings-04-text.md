@@ -674,6 +674,28 @@ None of the text boxes in `33` sets `kind` at all, because protobuf omits a fiel
 default. So **an absent `kind` means text box**, and a writer producing a cell's storage has
 to set `CELL` explicitly or it silently becomes something else.
 
+### `table_para_starts` marks where list numbering RESTARTS
+
+The expanded `32-named-styles` gives this run table its first non-zero value anywhere in the
+corpus. Mapped against paragraph boundaries in a storage holding four different lists:
+
+```
+@0    para_starts (0,0)   list 'None'           "Hello I am set as the named style Text."
+@40   para_starts (1,0)   list 'Bullet'         "...text with bullets."      <-- the ONLY 1
+@93   para_starts (0,0)   list 'Bullet'         "Another bullet."
+@337  para_starts (0,0)   list 'Named Bullet'   "I am a named bullet style..."
+@389  para_starts (0,0)   list 'Numbered'       "I am a CONTINUOUSLY numbered list."
+@424  para_starts (0,0)   list 'Numbered'       "number 2"
+```
+
+`first = 1` appears on exactly one paragraph — the first list item in the storage. Note that
+the numbered list at `@389` begins a different list style and still reads `(0, 0)`, and the
+fixture labels it "continuously numbered". So this is **not** a "list begins here" marker; it
+reads as a **restart-numbering flag**, which is why a continuing sequence leaves it at zero.
+
+One observation only, so treat the reading as provisional. What is certain is that the field
+is not always zero and therefore cannot be dropped.
+
 ### `table_dictation` carries a UUID per dictated word
 
 `33`'s text boxes expose a run table no cell fixture has. Two of them carry:
