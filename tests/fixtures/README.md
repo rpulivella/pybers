@@ -78,20 +78,15 @@ run tables that use it. Everything still to make adds coverage rather than archi
 
 **Still to make, in the order worth doing them:**
 
-1. `40-table-bands` and `45-table-titles` — header rows, header columns, footers and titles.
-   Every fixture here has these switched OFF, which is NOT the Numbers default, so the most
-   common table shape in the world is the one shape never tested. Worth promoting well above
-   their numbers, and they are now the highest-value fixtures remaining.
-2. `41-table-frozen`, `42-style-band-vs-row`, `43-table-geometry`, `44-table-dimensions` —
-   the remaining table settings. Largely covered already by `25`, so these are about varying
-   the values rather than discovering them.
-3. `39-text-tabs-indents` — tab stops are entirely unexercised and are common in real
-   documents. `TabArchive` carries a position, four alignments including decimal, and a
-   leader string, none of it observed anywhere.
-4. `47-line-ends` — MOSTLY DONE. The expanded `34-shape` mapped `TSD.LineEndArchive`
+1. `43-table-titles` — the table title, plus the header/footer settings shown in their
+   DEFAULT Numbers state. `40` covered the bands themselves but every fixture in the corpus
+   still has titles switched off, so the shape most real documents have is untested.
+2. `42-table-dimensions` — three tables with clearly different row and column COUNTS.
+   `41` covered sizing and hiding thoroughly; this is only about the counts.
+3. `45-line-ends` — MOSTLY DONE. The expanded `34-shape` mapped `TSD.LineEndArchive`
    completely. What remains is only the connector question: a connector actually attached to
    two shapes, since the one in `34` holds no reference to anything it connects.
-5. `46-stroke-dashes` — now a single question, whether dash lengths are points or multiples
+4. `44-stroke-dashes` — now a single question, whether dash lengths are points or multiples
    of stroke width. Lowest value.
 
 **Two smaller gaps, each needing one cell rather than a fixture:** an RTL cell with MIXED
@@ -674,80 +669,108 @@ are partly covered by `31-style-inset-2pt`, which picked up the controls sitting
 inset, but tabs are not covered at all and they are common in real documents.
 
 ```
-39-text-tabs-indents    TABS are the point. TabsArchive holds a repeated TabArchive,
-                        each with a `position` float, an `alignment` of
-                        left / center / right / DECIMAL, and a `leader` STRING.
-                        None of that is exercised anywhere in the corpus.
+39-text-tabs-indents    DONE, and it resolved an apparent contradiction in the UI.
+                        The same cell shows three tab stops with a paragraph
+                        selected and an EMPTY Tabs panel with the cell selected.
 
-                          - one cell using only the default tab stops, to see what
-                            `default_tab_stops` (a float, 36.0 in the theme) means
-                            when no explicit stop exists
-                          - one cell with several EXPLICIT stops at different
-                            positions, one of each alignment
-                          - at least one stop with a LEADER, the dotted run-in used
-                            in a table of contents. It is a string field, so what
-                            actually goes in it is worth knowing.
-                          - a DECIMAL tab with numbers that have differing digit
-                            counts, since `decimal_tab` is a separate string field
-                            holding "." in the theme and presumably follows the
-                            locale
+                        There is no cell-level tab storage at all: `tabs` exists
+                        only in para_properties on a ParagraphStyleArchive.
+                        Selecting the CELL writes a variation of the table's
+                        body_text_style and attaches it to every cell, which is why
+                        Numbers marks the table style dirty. Selecting a PARAGRAPH
+                        writes a variation into that cell's own run table.
 
-                        INDENTS: first_line_indent, left_indent and right_indent are
-                        three separate floats. Set all three to DIFFERENT values in
-                        one cell so they cannot be confused, and make one cell a
-                        HANGING indent (first line further left than the body),
-                        which should show as a negative first_line_indent.
-
-                        PARAGRAPH BORDERS are rare — this developer has never used
-                        one, nor seen one in a shared document — so they are the
-                        lowest priority here and one cell is enough. They are worth
-                        a single sample only because pybers must not damage what it
-                        does not understand: `border_positions` (an int32 bitmask),
-                        `stroke` plus `stroke_null`, and `rule_width` all sit on
-                        every paragraph style already, reading 0 or unset. One cell
-                        with a border proves whether carrying them through unchanged
-                        is sufficient.
-
-### Table bands and panes
-
-Grouping is by section, not by adjacent numbers. The list was renumbered once, when
-`unicode-text` was promoted from `45` to `36` — it is a correctness precondition rather
-than coverage — so anything referring to the old numbers is stale.
+                        Also: all four tab alignments incl. decimal; `leader` is a
+                        SINGLE-CHARACTER STRING where unset and " " both mean none;
+                        default_tab_stops is the fallback interval in points; and
+                        there are TWO INDEPENDENT INDENT MECHANISMS — first_line /
+                        left / right_indent in points, and the indent BUTTON which
+                        writes an integer LEVEL to table_para_data with no point
+                        value anywhere. That run table had read (0,0) in every
+                        prior fixture.
 
 ```
-40-table-bands          Set header rows = 1, header columns = 1, footer rows = 1,
-                        all in one file. These are plain scalars on the table model
-                        (number_of_header_rows / _header_columns / _footer_rows), so
-                        one fixture covers all three.
-41-table-frozen         Freeze the header row AND the header column. Note that
-                        freezing (header_rows_frozen) is a SEPARATE field from
-                        repeating-on-print (repeating_header_rows_enabled) — set only
-                        freezing here so the two stay distinguishable.
-42-style-band-vs-row    The important one. Give the HEADER row one fill and BODY row 3
-                        a different fill, in the same file. The schema says a band has
-                        a real style reference (header_row_style) while a body row has
-                        none — so this should show one reference change for the header
-                        and N per-cell styles for the body row. Confirms whether
-                        "format a row" is a real operation or only sugar.
+
+### Table bands and panes — DONE, all three in one file
+
+`40` absorbed `41-table-frozen` and `42-style-band-vs-row`; the numbers after it
+shifted down by two.
+
+```
+40-table-bands          DONE, and it absorbed 41-table-frozen and
+                        42-style-band-vs-row — one file, four tables, all three
+                        questions answered. Renumbering follows from that.
+
+                        Table 1     bands at the MAXIMUM: 5 header rows, 5 header
+                                    columns, 5 footer rows, not frozen. The cells
+                                    label the two OVERLAP regions with "?".
+                        Table 1-1   the same, frozen on both axes.
+                        Table 1-1-1 headers UN-SET back to 0/0, footers kept.
+                        Table 1-2   header columns removed, and individual cells in
+                                    the header row, a body row and the footer given
+                                    their own fills and typefaces.
+
+                        PRECEDENCE, which was the point: header row > header column >
+                        footer row. Styling the header column left the top-left
+                        corner on the header-ROW style; styling the footer left the
+                        bottom-left corner on the header style. Corners belong to the
+                        higher band, and styling a lower band stops at the boundary.
+
+                        Also established: 5 is the maximum for each of the three
+                        counts; bands are always at the top/left/bottom and cannot
+                        sit mid-table; repeating_header_rows_enabled is TRUE on every
+                        table regardless of frozen state, so freezing and
+                        repeat-on-print are independent and the latter is print
+                        state; and un-setting a band re-parents its cells to the body
+                        style while PRESERVING their explicit overrides.
+
 ```
 
-### Table geometry and placement — NOTHING covers this yet
+### Table geometry and placement — the STORE is mapped, the values are not
 
 Every fixture so far describes what is *in* a table. None describes the table as an object
 on a canvas: where it sits, how big it is, or how wide its columns are. A round trip that
 loses any of that has damaged the document just as surely as losing a value.
 
+`40` found WHERE this lives. `TST.HeaderStorageBucket` holds, per row and per column, a
+`size`, a `hidingState`, a `numberOfCells`, and optional `cell_style` / `text_style`
+references. Rows hang off an inline `HeaderStorage` on the data store while columns sit
+behind a `TSP.Reference` — an asymmetry a reader has to handle. **`size = 0.00` means "use
+the default", not zero**, and `default_row_height` / `default_column_width` on the table model
+supply it.
+
+So what is left is not discovery but VALUES: nothing in the corpus has a resized row, a
+resized column, or a hidden row, so every `size` reads 0 and every `hidingState` reads 0.
+
 ```
-43-table-geometry       One table moved somewhere deliberate on the canvas, with
-                        several column widths and row heights set BY HAND to
-                        distinctly different values — not dragged approximately,
-                        typed if the UI allows, so the numbers are recognizable in
-                        the archive.
-44-table-dimensions     Three tables on one sheet with clearly different row and
+41-table-geometry       DONE, and it carries the most dangerous table finding yet.
+                        Eight tables, each duplicated from the last then resized,
+                        plus a hidden row and a hidden column.
+
+                        A table's geometry.size is STALE — it describes the table
+                        it was duplicated FROM and is never updated when rows or
+                        columns are resized. Six of six matched the predecessor's
+                        content size + 4. The real size is sum(row heights) x
+                        sum(column widths). Resizing a table distributes the
+                        stretch PROPORTIONALLY into rows/columns (x5.0 and x0.6
+                        measured exactly) and records nothing at the table level.
+
+                        Positions are points and MAY BE NEGATIVE: (144,144) is
+                        "x2.0in y2.0in", (-72,360) is "x-1.0in y5.0in".
+
+                        HIDING is not HeaderStorageBucket.hidingState, which reads
+                        0 even on the hidden row. It lives on the table model in
+                        hidden_states_owner, addressed BY UUID with user_hidden =
+                        true. Resolving a uuid to an index needs
+                        ColumnRowUIDMapArchive, whose uid_for_index is a
+                        PERMUTATION — reading sorted order positionally reports the
+                        wrong column.
+
+42-table-dimensions     Three tables on one sheet with clearly different row and
                         column COUNTS: one tall and narrow, one short and wide, one
                         single-cell. Dimensions are separate from placement and
                         should be confirmed separately.
-45-table-titles         The table title and header settings that every other fixture
+43-table-titles         The table title and header settings that every other fixture
                         has had switched OFF. One table with its title shown, one
                         with header rows, header columns and a footer row all
                         present. This is the DEFAULT Numbers state, so it is what
@@ -758,17 +781,17 @@ loses any of that has damaged the document just as surely as losing a value.
 **Note for every fixture already made:** table titles were unchecked and header rows,
 header columns and footers were all set to zero, which is *not* the Numbers default. That
 was the right call for isolating cell behavior, and it means these fixtures are
-deliberately atypical. `45-table-titles` exists so the default shape is covered too, and
+deliberately atypical. `43-table-titles` exists so the default shape is covered too, and
 nothing assumes the stripped-down form is normal.
 
 ### Drawable gaps — one closed, one narrowed
 
-`47-line-ends` was closed by expanding `34-shape` itself; what is left of it is the connector
-question. `46-stroke-dashes` was answered from an unexpected direction, by text outlines in
+`45-line-ends` was closed by expanding `34-shape` itself; what is left of it is the connector
+question. `44-stroke-dashes` was answered from an unexpected direction, by text outlines in
 `38`, and is now down to a single measurement.
 
 ```
-46-stroke-dashes        NARROWED TWICE, now a single question. 38-text-outline-shadow
+44-stroke-dashes        NARROWED TWICE, now a single question. 38-text-outline-shadow
                         decoded the dash array from text outlines, and 29-style-border
                         confirmed CELL BORDERS USE THE IDENTICAL ENCODING — one stroke
                         message serves shapes, cells and text, and only the menus
@@ -780,7 +803,7 @@ question. `46-stroke-dashes` was answered from an unexpected direction, by text 
                         stroke at two clearly different widths — say 1pt and 4pt —
                         settles it. Nothing else is needed.
 
-47-line-ends            MOSTLY DONE. 34-shape was expanded with ten lines carrying
+45-line-ends            MOSTLY DONE. 34-shape was expanded with ten lines carrying
                         arrowheads, which mapped TSD.LineEndArchive completely: an
                         `identifier` name, the FULL path, `is_filled`, and an
                         `end_point` that MAY BE NEGATIVE so the line stops short of
@@ -804,22 +827,22 @@ question. `46-stroke-dashes` was answered from an unexpected direction, by text 
 
 ## Highest value first
 
-Every fixture that could reshape the object model is made and read, with one exception.
-What else follows adds coverage.
+**Every fixture that could reshape the object model is made and read.** `36-unicode-text`
+settled the last one. What remains adds coverage only.
 
-**`36-unicode-text` is the exception, and should be next.** It is the last fixture that can
-still change a design decision. `32-named-styles` answered CLAUDE.md decision 2 and is done;
-this one decides how `character_index` is counted, which nineteen run tables depend on.
+Four things are still open, in rough order of value:
 
-**`40-table-bands` should be promoted well above its number.** Every fixture in this
-directory has header rows, header columns, footers and titles switched OFF, which is *not*
-the Numbers default. The most common table shape in the world is therefore the one shape
-never tested here, and `HeaderStorageBucket-*.iwa` members appear in every file without ever
-having been opened.
+1. **`43-table-titles`** — the default Numbers table shape, which no fixture has.
+2. **`42-table-dimensions`** — row and column counts, the only part of table geometry `41`
+   did not cover.
+3. **`45-line-ends`** — one connector, actually attached to two shapes.
+4. **`44-stroke-dashes`** — one dashed stroke at two widths.
 
-The floating objects `33`-`35` are done. After the two above, in rough order of value: the
-remaining table settings (`41`-`44`), the two drawable gaps (`46`-`47`), and the last text
-controls (`37`-`39`), which are lowest.
+Plus two single cells rather than fixtures: an RTL cell with **mixed formatting**, to
+populate `table_para_bidi`; and a **ZWJ emoji** sequence.
+
+`HeaderStorageBucket` is no longer unopened — `40` and `41` decoded it, along with band
+precedence, the stale `geometry.size`, and the UUID-based hiding model.
 
 ---
 
