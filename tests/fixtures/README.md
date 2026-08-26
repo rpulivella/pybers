@@ -771,12 +771,34 @@ resized column, or a hidden row, so every `size` reads 0 and every `hidingState`
                         PERMUTATION — reading sorted order positionally reports the
                         wrong column.
 
-42-table-titles         The table title and header settings that every other fixture
-                        has had switched OFF. One table with its title shown, one
-                        with header rows, header columns and a footer row all
-                        present. This is the DEFAULT Numbers state, so it is what
-                        most real documents look like — the fixtures so far are the
-                        unusual ones.
+42-table-titles-captions  DONE, and RENAMED — it turned out to be as much about
+                        captions as titles, and the captions are the richer half.
+
+                        A table's TITLE is its NAME. There is no separate field:
+                        table_name is what shows above the table and
+                        table_name_enabled is the checkbox. Names are forced UNIQUE
+                        per document, CASE-INSENSITIVELY ("I am a Table" and "I AM a
+                        TAAble" collide). Captions are NOT unique. The title renders
+                        in NEGATIVE page space above the table's origin.
+
+                        A CAPTION IS A TEXT BOX: TSA.CaptionInfoArchive.super is a
+                        TSWP.ShapeInfoArchive, and childInfoKind shows the same
+                        archive type serves titles too. An uncaptioned drawable holds
+                        a StandinCaptionArchive instead, so the slot is always filled
+                        and only its type says whether a caption exists.
+
+                        TEXT INSET LIVES ON THE SHAPE STYLE, not the paragraph style
+                        — proven by two captions sharing 'Special Caption' with
+                        different padding. An inset does not travel with a named
+                        style.
+
+                        THE BIG ONE: a `name` does not make a style visible. Styles
+                        are user-visible only if registered in the stylesheet's
+                        identifier_to_style_map. 'Object Caption' and 'Object Title'
+                        are real named styles with NO map entry and never appear in
+                        the browser. See findings-06-styles.md — this decides how
+                        pybers must create named styles.
+
 ```
 
 **Note for every fixture already made:** table titles were unchecked and header rows,
@@ -837,11 +859,49 @@ Three things are still open, in rough order of value:
 2. **`44-line-ends`** — one connector, actually attached to two shapes.
 3. **`43-stroke-dashes`** — one dashed stroke at two widths.
 
-Plus two single cells rather than fixtures: an RTL cell with **mixed formatting**, to
-populate `table_para_bidi`; and a **ZWJ emoji** sequence.
+Plus small gaps that need a cell or two rather than a fixture:
+
+- an RTL cell with **mixed formatting**, to populate `table_para_bidi`
+- a **ZWJ emoji** sequence (family or profession)
+- **multi-column text** — `TSWP.ShapeStylePropertiesArchive.columns` reads
+  `equal_columns { count: 1 }` everywhere, so text columns are representable and entirely
+  unexercised. One text box set to two columns would close it.
+- a **user-created named paragraph style** in a document that also has theme styles, to
+  confirm how `identifier_to_style_map` keys are allocated when several are added
 
 `HeaderStorageBucket` is no longer unopened — `40` and `41` decoded it, along with band
 precedence, the stale `geometry.size`, and the UUID-based hiding model.
+
+---
+
+## NOT to be fixtured — but must not be broken
+
+A separate category from the gaps above. These are **not** worth building fixtures for, and
+reproducing them is out of scope, but every document already carries them and a writer that
+drops them damages files it never meant to touch.
+
+```
+page setup        in_portrait_page_orientation, print_margins, content_scale,
+                  page_order, layout_direction, show_page_numbers,
+                  using_start_page_number / start_page_number, is_autofit_on,
+                  print_backgrounds, should_print_comments, userDefinedGuideStorage
+page headers      headers: THREE references (left / center / right)
+and footers       footers: THREE references, plus page_header_inset /
+                  page_footer_inset and uses_single_header_footer
+document metadata TN.DocumentArchive, TN.ThemeArchive, TSP.DocumentMetadata,
+                  TSP.PackageMetadata, TSP.DataMetadata / DataMetadataMap,
+                  TSK.AnnotationAuthorStorageArchive (comment authorship)
+```
+
+**The headers and footers are real `TSWP.StorageArchive`s holding editable text** — they are
+the six otherwise-unexplained storages present in every file in this corpus. A writer that
+regenerates storages instead of carrying them through will silently erase a document's page
+headers.
+
+Numbers' page-layout tooling is one of its genuine differentiators over Excel, so losing it
+on a round trip would be a serious defect even though pybers never intends to edit it. The
+requirement is preservation, not comprehension — the same duty the cell decoder already
+honors by carrying an unrecognized type byte through rather than rejecting it.
 
 ---
 
