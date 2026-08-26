@@ -320,6 +320,52 @@ pybers concept rather than presented as a mapping — otherwise a round trip wou
 persistence it cannot deliver.
 
 
+## A `name` does NOT make a style visible — the stylesheet registry does
+
+**The most consequential styles finding, from `42-table-titles-captions`.** A
+`ParagraphStyleArchive` can carry a perfectly good `name` and still never appear in the
+paragraph-styles browser. Being named and being *offerable to the user* are different things,
+and only one of them is what `name` controls.
+
+Every named paragraph style in the document is listed in `TSS.StylesheetArchive.styles`. What
+separates the visible from the hidden is whether it also has an entry in
+**`identifier_to_style_map`**, which keys a style by a stable string:
+
+```
+name                     archive    identifier_to_style_map key
+Body                      903884    'text-6-paragraphstyle-Body 1'          theme, IN BROWSER
+Heading                   903880    'text-2-paragraphstyle-Heading 1'       theme, IN BROWSER
+Title                     903878    'text-0-paragraphstyle-Title'           theme, IN BROWSER
+Table Style 1-7           9038xx    'text-13..19-paragraphstyle-Table...'   theme, IN BROWSER
+Special Caption           914532    'text-0-paragraphstyle'                 USER-MADE, in browser
+Object Caption            904523     NONE                                   HIDDEN
+Object Title              904522     NONE                                   HIDDEN
+Table Title 1 (x6)        904094+   'tableName-0-textStyle' ... '-5-'       per-slot, HIDDEN
+```
+
+`Object Caption` and `Object Title` are real, named, round-trippable styles that the user can
+never see or select. `Table Title 1` exists as **six separate archives**, one per table slot,
+each with its own `tableName-N-textStyle` key — so it is not one shared browser style either.
+
+**The rule for pybers.** Creating a named style the user can actually use takes two writes,
+not one:
+
+```
+1. the ParagraphStyleArchive with its `name`         -- makes it a named style
+2. an identifier_to_style_map entry in the stylesheet -- makes it VISIBLE
+```
+
+Doing only the first produces exactly the `Object Caption` situation: a style that is real,
+survives a round trip, applies correctly, and is invisible in the browser forever. That is a
+silent failure of the worst kind — everything looks right except the one thing the user asked
+for.
+
+A user-created style's key has **no name suffix** (`'text-0-paragraphstyle'`) where theme
+styles do (`'text-0-paragraphstyle-Title'`), and the two coexist at the same index, so the
+suffix is part of the key rather than decoration. The stylesheet also carries
+`parent_to_children_style_map` and a long series of `styles_for_<version>` lists, neither of
+which is decoded yet.
+
 ## Named styles: applying one writes a REFERENCE, overriding one writes a VARIATION
 
 `32-named-styles` answers the open question in `CLAUDE.md` about how named styles and local

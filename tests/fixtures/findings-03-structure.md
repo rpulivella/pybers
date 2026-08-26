@@ -297,6 +297,38 @@ shapes, images and text boxes. Order is recorded, so it is part of the document 
 preserved. The sheet also owns all page setup: orientation, margins, page order, scale,
 headers and footers.
 
+### Print and page setup: unexercised, and MUST NOT BE BROKEN
+
+No fixture tests any of this, and none is planned — Numbers' page-layout tools are a real
+differentiator and reproducing them is out of scope. But every sheet in every fixture already
+carries the state, so a writer that does not round-trip it damages documents it never
+intended to touch:
+
+```
+in_portrait_page_orientation   print_margins { top 54 left 36 bottom 54 right 36 }
+content_scale 0.72             page_order          layout_direction
+show_page_numbers              using_start_page_number / start_page_number
+page_header_inset 20.0         page_footer_inset 20.0
+uses_single_header_footer      print_backgrounds   should_print_comments
+is_autofit_on                  userDefinedGuideStorage    style
+headers: [3 references]        footers: [3 references]
+```
+
+**`headers` and `footers` are three references each** — left, center and right — and they
+point at real `TSWP.StorageArchive`s. Those are the six otherwise-unexplained storages that
+appear in every document in this corpus. They hold **editable text**, so a writer that
+regenerates storages rather than carrying them through can silently erase a document's page
+headers.
+
+Document-level metadata is the same category: `TN.DocumentArchive`, `TN.ThemeArchive`,
+`TSP.DocumentMetadata`, `TSP.PackageMetadata`, `TSP.DataMetadata` / `DataMetadataMap`, and
+`TSK.AnnotationAuthorStorageArchive` (comment authorship). None is decoded and none needs to
+be — the requirement is only that they survive untouched.
+
+This is the same duty the cell decoder already honors by preserving an unrecognized type byte
+rather than rejecting it: **a library whose first job is not to damage documents has to carry
+through what it does not understand.**
+
 ## Table geometry: tables are positioned, sized and rotatable
 
 `TST.TableInfoArchive` wraps each table and its `super` carries the drawable properties:
@@ -362,6 +394,86 @@ every row height, or every column width, by the same factor and writes the resul
 
 Afterwards a proportional stretch is **indistinguishable** from having typed those heights by
 hand, so the operation cannot be recovered — only its result.
+
+## A table's TITLE is its NAME, and names are forced unique
+
+From `42-table-titles-captions`. There is no separate title field: what the interface shows
+above a table is **`table_name`**, and `table_name_enabled` is the checkbox that shows it.
+
+```
+table_name = 'I am a table Title'      table_name_enabled = True      title shown
+table_name = 'I am a table Title-2'    table_name_enabled ABSENT      title hidden
+```
+
+The fixture's own cells state the constraint, and the eight table names confirm it:
+**table names must be unique within a document, and uniqueness is enforced
+case-insensitively** — `I am a Table` and `I AM a TAAble` are treated as the same. Numbers
+appends `-1`, `-2`, `-1-1` to force it. A writer that renames a table has to enforce the same
+rule or it will produce a document Numbers itself would not have written.
+
+`table_name_height` is `0.0` throughout, the same "use the default" convention as row heights.
+
+**The title sits in negative page space**, above the table's own origin — one fixture table
+is at `y = -28.0` with the title rendered above it. So a table's visible extent is larger
+than its geometry when the name is shown.
+
+### The title is a text container, styled like any other
+
+```
+table_name_style       -> TSWP.ParagraphStyleArchive  name='Table Title 1'
+                          full char + para properties
+table_name_shape_style -> TSWP.ShapeStyleArchive
+                          vertical_alignment, padding
+```
+
+Two styles, exactly as a text box has: a paragraph style for the text and a shape style for
+the container. Note that `Table Title 1` exists as six separate archives, one per table slot,
+and is **not** visible in the styles browser — see the registry finding in
+[findings-06-styles.md](findings-06-styles.md).
+
+## A caption IS a text box
+
+`TSA.CaptionInfoArchive` sits in the drawable's `caption` slot, and its `super` is a
+**`TSWP.ShapeInfoArchive`** — the same archive a floating text box uses, with `is_text_box`
+and `owned_storage`:
+
+```
+CaptionInfoArchive {
+  super: TSWP.ShapeInfoArchive     the text box itself
+  placement: TSA.CaptionPlacementArchive
+  childInfoKind: Caption           the SAME archive type also serves titles
+}
+```
+
+An uncaptioned drawable carries `TSD.StandinCaptionArchive` in that slot instead — the empty
+placeholder from `33`. So the slot is always occupied and only its *type* says whether a
+caption exists.
+
+**Captions are NOT forced unique**, unlike table names; the fixture has three reading
+`'I am a table caption'`.
+
+Placement is anchor-based and identical on every caption measured —
+`caption_anchor_location: 1`, `drawable_anchor_location: 7` — which matches the fixture's
+observation that there is no way to set the gap between table and caption.
+
+### Text inset lives on the SHAPE style, not the paragraph style
+
+`42` proves this with a controlled pair: two captions sharing the paragraph style
+`'Special Caption'` but differing in inset.
+
+```
+custom inset      para 'Special Caption'   shape #914776   padding 1/1/1/1
+default inset     para 'Special Caption'   shape #904525   padding 4/4/4/4
+```
+
+Same named paragraph style, different shape styles. So **an inset does not travel with a
+named paragraph style** — applying that style elsewhere will not carry the inset with it, and
+a model that folds padding into the text style will get this wrong.
+
+`TSWP.ShapeStylePropertiesArchive` also carries `shrink_to_fit`, `vertical_alignment`, a
+`paragraph_style` reference for the container default, and **`columns`** — text containers
+support multiple text columns. Every instance in the corpus reads
+`equal_columns { count: 1 }`, so multi-column text is representable and **unexercised**.
 
 ## Hiding a row or column: by UUID, and not where the field name suggests
 
