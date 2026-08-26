@@ -161,14 +161,17 @@ front end while doing so.
      pybers concept, because a round trip cannot persist it. (Confirmed from the UI side
      by `42`: Numbers offers no cell-style concept at all — cell appearance comes only
      from literal inspector values or copy-paste.)
-   - **A `name` does NOT make a style user-visible** — added 2026-08-26 from `42`, and it
-     changes what "create a named style" has to mean. A style appears in the paragraph
-     styles browser only if it is registered in `TSS.StylesheetArchive.
-     identifier_to_style_map` under a `text-N-paragraphstyle` key. `Object Caption` and
-     `Object Title` are real, named, correctly-applied styles with no map entry, and the
-     user can never see or select them. So creating a usable named style is **two writes**:
+   - **For PARAGRAPH and LIST styles, a `name` does NOT make a style user-visible** —
+     added 2026-08-26 from `42`, corrected the same day by the expanded `32`. A paragraph
+     or list style appears in the styles browser only if it is registered in
+     `TSS.StylesheetArchive.identifier_to_style_map`; `Object Caption` and `Object Title`
+     are real, named, correctly-applied paragraph styles with no map entry and the user can
+     never see or select them. So creating a usable named paragraph style is **two writes**:
      the archive with its `name`, and the stylesheet registration. Doing only the first
      fails silently in the worst way — it round-trips perfectly and is invisible forever.
+     **Character styles do not follow this rule**: every named character style in the corpus,
+     Numbers' own and the user's alike, is absent from the map and visible regardless. Only
+     the two special ones (`Link`, `None`) are keyed. Do not generalize across style kinds.
    - **There is no unparented text style.** A cell formatted entirely by hand is still a
      *variation* of a named style. So `styleRef: str | None` should read `None` as "not
      yet resolved", never as "has no style".

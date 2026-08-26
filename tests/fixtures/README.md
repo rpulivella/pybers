@@ -76,21 +76,17 @@ run tables that use it. Everything still to make adds coverage rather than archi
 `38-text-outline-shadow` covers both checkboxes in one file. The number now holds
 `39-text-tabs-indents`, so the sequence stays gapless.
 
-**Still to make, in the order worth doing them:**
+**The fixture corpus is COMPLETE.** Every planned fixture, `00` through `44`, is made and
+read. What follows are small gaps that need a cell or two rather than a new file, and none of
+them blocks the object model.
 
-1. `42-table-titles` — the table title, plus the header/footer settings shown in their
-   DEFAULT Numbers state. `40` covered the bands themselves but every fixture in the corpus
-   still has titles switched off, so the shape most real documents have is untested.
-2. `44-line-ends` — MOSTLY DONE. The expanded `34-shape` mapped `TSD.LineEndArchive`
-   completely. What remains is only the connector question: a connector actually attached to
-   two shapes, since the one in `34` holds no reference to anything it connects.
-3. `43-stroke-dashes` — now a single question, whether dash lengths are points or multiples
-   of stroke width. Lowest value.
-
-**Two smaller gaps, each needing one cell rather than a fixture:** an RTL cell with MIXED
-formatting, to populate `table_para_bidi`, which is still `(0,0)` everywhere because every
-RTL cell in `36` is a plain string; and a ZWJ emoji sequence such as a family or profession
-emoji, which `36`'s skin-tone coverage does not include.
+- an RTL cell with **mixed formatting**, to populate `table_para_bidi`, which still reads
+  `(0,0)` everywhere because every RTL cell in `36` is a plain string
+- a **ZWJ emoji** sequence (family or profession); `36` covers skin-tone modifiers only
+- **multi-column text** — `TSWP.ShapeStylePropertiesArchive.columns` reads
+  `equal_columns { count: 1 }` throughout
+- a **second look at `table_para_starts`**, which `32` showed is a restart-numbering flag on
+  one observation only
 
 ---
 
@@ -814,63 +810,59 @@ question. `43-stroke-dashes` was answered from an unexpected direction, by text 
 `38`, and is now down to a single measurement.
 
 ```
-43-stroke-dashes        NARROWED TWICE, now a single question. 38-text-outline-shadow
-                        decoded the dash array from text outlines, and 29-style-border
-                        confirmed CELL BORDERS USE THE IDENTICAL ENCODING — one stroke
-                        message serves shapes, cells and text, and only the menus
-                        differ.
+43-stroke-dashes        DONE. Ten shapes, every dash preset drawn at BOTH 1pt and
+                        5pt so the two readings could be told apart.
 
-                        Every dashed stroke in the corpus has width 1.0, so whether
-                        the dash numbers are POINTS or MULTIPLES OF THE STROKE WIDTH
-                        cannot be told apart. One line or cell border with a DASHED
-                        stroke at two clearly different widths — say 1pt and 4pt —
-                        settles it. Nothing else is needed.
+                        THE DASH ARRAY IS IN MULTIPLES OF STROKE WIDTH, not points.
+                        Every preset stores identical numbers at both widths —
+                        [1,1] short dashed, [2,2] dashed, [6,6] wide dashed,
+                        [0.001, 2] wide dotted. A 5pt dashed stroke therefore
+                        renders 10pt dashes with 10pt gaps. Readers multiply by
+                        width; writers divide. `cap` tracks the preset, not the
+                        width.
 
-44-line-ends            MOSTLY DONE. 34-shape was expanded with ten lines carrying
-                        arrowheads, which mapped TSD.LineEndArchive completely: an
-                        `identifier` name, the FULL path, `is_filled`, and an
-                        `end_point` that MAY BE NEGATIVE so the line stops short of
-                        the marker. Ten presets observed — simple / filled / inverted
-                        / open arrow, filled / open circle, filled / open square,
-                        filled diamond, and line — every one authored in a 6x6 box.
+44-line-ends            DONE. Connectors attached to shapes, which 34 never had —
+                        its lone connector was simply unattached.
 
-                        Unlike smart_stroke, which gives only a name, a line end
-                        carries its geometry, so pybers can render one without
-                        Apple's engine. head and tail are independently settable; the
-                        fixture holds head fixed and varies only the tail, which is
-                        what proves which field is which.
+                        ConnectionLineArchive carries FOUR attachment fields:
+                        connected_from / connected_to (references to the
+                        ShapeInfoArchives) AND connected_from_uuid /
+                        connected_to_uuid, all four populated. The same
+                        belt-and-braces identity pairing that row/column hiding
+                        uses. connection_line_path_source.type is the routing mode:
+                        1 on the connector attached to the shape labelled
+                        "orthogonal connection line", 0 on the rest. One shape acts
+                        as a hub with four connectors, so a drawable may be
+                        referenced by many.
 
-                        WHAT REMAINS is only the connector question: draw a connector
-                        and actually ATTACH it to two shapes. The connector in 34
-                        holds no reference to anything it connects, so either it was
-                        unattached or attachment is recorded somewhere not yet found.
 ```
 
 ---
 
 ## Highest value first
 
-**Every fixture that could reshape the object model is made and read.** `36-unicode-text`
-settled the last one. What remains adds coverage only.
+**Nothing is outstanding.** The corpus is complete and every fixture that could reshape the
+object model has been made and read.
 
-Three things are still open, in rough order of value:
+Verified exhaustively for `32`, `43` and `44`: every archive in each file was enumerated and
+walked from the document roots, and the only ones never reached are stale
+`DocumentSelectionArchive` / `SheetSelectionArchive` / `CanvasSelectionArchive` triples —
+Numbers leaves orphaned selection state behind, five of each with two reachable. That is
+genuine garbage, not content, and confirms the "what was selected when you saved" note at the
+top of this file.
 
-1. **`42-table-titles`** — the default Numbers table shape, which no fixture has.
-2. **`44-line-ends`** — one connector, actually attached to two shapes.
-3. **`43-stroke-dashes`** — one dashed stroke at two widths.
+The remaining unknowns are named and isolated rather than unexamined:
 
-Plus small gaps that need a cell or two rather than a fixture:
+```
+exterior_text_wrap        type 4, direction 2, fit_type 1 -- magic numbers, no enum in schema
+strokePatternOffsetDistance  0.0 throughout
+table_para_bidi           (0,0) throughout -- needs a formatted RTL cell
+table_drop_cap_style      an entry with no object, on every storage
+columns                   equal_columns { count: 1 } throughout
+parent_to_children_style_map and styles_for_<version> on the stylesheet
+```
 
-- an RTL cell with **mixed formatting**, to populate `table_para_bidi`
-- a **ZWJ emoji** sequence (family or profession)
-- **multi-column text** — `TSWP.ShapeStylePropertiesArchive.columns` reads
-  `equal_columns { count: 1 }` everywhere, so text columns are representable and entirely
-  unexercised. One text box set to two columns would close it.
-- a **user-created named paragraph style** in a document that also has theme styles, to
-  confirm how `identifier_to_style_map` keys are allocated when several are added
-
-`HeaderStorageBucket` is no longer unopened — `40` and `41` decoded it, along with band
-precedence, the stale `geometry.size`, and the UUID-based hiding model.
+Everything else in `32`, `43` and `44` is accounted for field by field.
 
 ---
 
