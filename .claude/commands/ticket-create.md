@@ -37,16 +37,19 @@ Pass `--status Concept` when filing; `Todo` is the default.
 
 1. Read `$ARGUMENTS` — the user's description.
 2. Pick exactly one **label** (the table below). The label IS the classification.
-3. Draft the body using the [exact order](#body--exact-order) below. **Show the draft to
-   the user and wait for explicit approval before filing.** This is the spec-in
-   touchpoint.
-4. Decide the starting Status — see [Concept or Todo](#concept-or-todo--the-spec-in-decision).
-5. On approval, file it:
+3. Draft the body using the [exact order](#body--exact-order) below.
+4. **Run `/standards` on the draft file, both passes, and fix what it finds.** A ticket
+   body is read by people and by agents and is then quoted verbatim into a branch name,
+   a PR title and the CHANGELOG. Proofreading it after filing is too late.
+5. **Show the draft to the user and wait for explicit approval before filing.** This is
+   the spec-in touchpoint.
+6. Decide the starting Status — see [Concept or Todo](#concept-or-todo--the-spec-in-decision).
+7. On approval, file it:
    ```
    python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft>
    python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft> --status Concept
    ```
-6. Report the issue URL the tool prints.
+8. Report the issue URL the tool prints.
 
 ## Title format
 

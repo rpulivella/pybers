@@ -34,14 +34,17 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
    - **Detail your changes**: keep only the checkboxes that apply; remove the rest.
    - **Breaking Changes**: `None` after each heading, or a short list.
    - **Checklist**: check what is genuinely true.
-6. Create the PR as **draft**:
+6. **Run `/standards` on the body file, both passes, and fix what it finds.** A PR
+   description is the durable record of why a change was made, and reviewers read it
+   before they read the diff.
+7. Create the PR as **draft**:
    ```
    python3 scripts/pr.py create --title "[#<N>] <title>" --body-file "$TMPDIR/pybers-pr-body-<N>.md"
    ```
    Head is the checked-out branch and base is `develop`, both by default. `--dry-run`
    first prints the body without opening anything. Pass the body as a **file** — never
    through a shell heredoc, which would mangle the backticks in every code span.
-7. Output the PR URL, which `pr.py` prints.
+8. Output the PR URL, which `pr.py` prints.
 
 ## Hard rules
 

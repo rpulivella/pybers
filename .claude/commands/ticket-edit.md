@@ -48,9 +48,11 @@ means fetching the current body, changing part of it, and writing the whole thin
    already gone.
 3. Draft the revision. Preserve everything not being changed, **verbatim** — a revision
    that silently reflows the SPEC or drops a section is a regression, not an edit.
-4. **Show the user what changes and wait for explicit approval.** This is the same
+4. **Run `/standards` on the revised draft, both passes, and fix what it finds.** `edit`
+   replaces the WHOLE body, so an unproofread revision overwrites a clean one.
+5. **Show the user what changes and wait for explicit approval.** This is the same
    spec-in touchpoint `/ticket-create` has; a revision re-opens it.
-5. On approval, apply it:
+6. On approval, apply it:
    ```
    python3 scripts/ticket.py edit <N> --body-file <draft>
    python3 scripts/ticket.py edit <N> --title "<new title>"
@@ -59,13 +61,13 @@ means fetching the current body, changing part of it, and writing the whole thin
    Flags combine, and `--dry-run` previews any of them. `edit` reads the ticket back and
    verifies what landed against what was sent, so a write that lost a concurrent change
    fails loudly instead of passing silently.
-6. **Delete the local copy as soon as the edit reports the write verified.** A ticket's
+7. **Delete the local copy as soon as the edit reports the write verified.** A ticket's
    contents live in the Project, never on disk. The lingering export is the actual hazard —
    it is a second source of truth that goes stale in minutes and is exactly what a later
    revision gets drafted against. Draft in `$TMPDIR`, never in the repository and not even
    under `workarea/`, and remove it once the verification line appears. Once step 5
    confirms the write landed, the local copy is provably redundant.
-7. Report what changed.
+8. Report what changed.
 
 ## What a revision can break
 
