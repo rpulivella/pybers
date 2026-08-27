@@ -5,7 +5,7 @@ pybers protobuf schema bootstrap
 
 Extract the iWork archive protobuf schemas that pybers builds on, from the Numbers
 application binary on this machine, and report how they differ from the schemas
-vendored under reference/numbers-parser/.
+of numbers-parser, which is not vendored here — see CLAUDE.md.
 
 **Why this exists rather than a vendored copy of someone else's schemas.** Apple
 compiles the protobuf descriptors for its own archive format into the Numbers

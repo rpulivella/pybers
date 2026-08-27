@@ -30,7 +30,8 @@ reflection on the project as a whole. `pybers` exists because this developer wan
 different foundation for those specific bugs and a few other things she'd been wanting
 regardless — dataclasses, a library-and-CLI/TUI split, first-class named styles — not
 because `numbers-parser` did anything wrong. Full story, including the specific bugs, is
-in `CLAUDE.md`. The original is vendored at `reference/numbers-parser/` for study.
+in `CLAUDE.md`. That project is not vendored here — it is a separate checkout kept
+outside this repository.
 
 ## Repository map
 

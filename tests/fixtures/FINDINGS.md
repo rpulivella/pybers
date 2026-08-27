@@ -74,6 +74,6 @@ font feature. pybers must be able to tell them apart and must never write the fa
 ---
 
 Type identifiers throughout are ours, read from `ArchiveInfo.message_infos`. Human-readable
-class names come from `reference/numbers-parser`'s `mapping.py` and are used **for
+class names come from numbers-parser's `mapping.py` and are used **for
 interpretation only** — pybers has not extracted its own mapping yet, and doing so is the half
 of the bootstrap that requires executing an unsigned copy of Numbers.

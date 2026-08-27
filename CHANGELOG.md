@@ -10,6 +10,16 @@ Maintained by `/changelog-add` — one verbatim ticket-title bullet per line und
 
 ## Unreleased
 
+- [init] Map stroke dash arrays and connector attachment
+- [init] Establish that a style name does not make it user-visible
+- [init] Map table titles, captions and text insets
+- [init] Map table geometry, row sizing and UUID-based row hiding
+- [init] Map header bands, band precedence and the header storage bucket
+- [init] Map tab stops, indents and the two indent mechanisms
+- [init] Map text outlines, shadows and the null-property convention
+- [init] Map baseline shift and the four line spacing modes
+- [init] Establish that text run indices count UTF-16 code units
+- [init] Map text boxes, shapes, images and the point coordinate unit
 - [init] Resolve how named styles and local overrides relate
 - [init] Map cell insets and paragraph indents
 - [init] Establish which style kinds can be named, and that cell styles cannot

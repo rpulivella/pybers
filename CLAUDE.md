@@ -19,8 +19,7 @@ The a renovation-budget project used a fork of `numbers-parser` extended with
 formula-writing support, to edit real `.numbers` files directly. Pushing that young
 feature branch further, on real files, surfaced some real correctness bugs — ordinary
 friction from extending a young branch, not a reflection on the project as a whole
-(vendored here at `reference/numbers-parser/`, with the rationale for each fix in
-`reference/patches/`):
+(that fork is a separate checkout kept outside this repository — see the note below):
 
 1. `Table.write()` silently dropped a cell's `Style` (alignment, fill, font) unless a
    `preserve_format=True` flag was passed, and even then only worked after a deeper fix.
@@ -36,9 +35,9 @@ friction from extending a young branch, not a reflection on the project as a who
 Plus a couple of known, unaddressed gaps hit along the way: fragile merged-cell handling
 (a phantom merge-anchor could throw `ValueError: Value out of range` at save time), and no
 way to relocate a block of cells as a unit. Two of the four bugs above were actually
-diagnosed, fixed, and committed back into that fork (see `reference/numbers-parser/`'s own
-git history before it was vendored, and `reference/patches/` for the rest) — the intent
-was always to leave things better, not just extract value.
+diagnosed, fixed, and committed back into that fork (see its own git history, and the
+patch set kept with it). The intent was always to leave things better, not just extract
+value.
 
 `pybers` exists for reasons independent of any of that: this developer wanted dataclasses
 instead of the existing object model, a library-and-CLI/TUI split, and first-class named
@@ -46,10 +45,9 @@ styles from the start — things worth a clean design rather than retrofitting o
 someone else's architecture. **New project, not a fork — decided.** A GitHub-style fork
 carries git lineage and implies staying API-compatible with upstream; neither fits an
 approach this different (dataclasses, camelCase, a dual-consumer library/CLI split, named
-styles). `reference/numbers-parser/` is vendored source to study, copied in with its
-`.git` history stripped (like `another project`'s `reference/ola/`), not a
-dependency this project extends — and some of the fixes documented above may be worth
-proposing back upstream at some point, separate from this project's own direction.
+styles). numbers-parser is **not vendored here** (see the note below), and it is not a
+dependency this project extends. Some of the fixes documented above may be worth proposing
+back upstream at some point, separate from this project's own direction.
 
 **Python, not Rust — decided.** The reverse-engineered iWork archive protobuf schemas
 already exist in Python; rebuilding that reverse-engineering in Rust would re-derive the
@@ -58,6 +56,25 @@ hard part for no functional gain. The actual use case (Python scripts driving re
 Python-ecosystem targets, and `.numbers` files are small enough that this is not a
 performance-bound workload. If a Rust core is ever wanted, PyO3 bindings are the path —
 not a rewrite.
+
+### numbers-parser is NOT vendored here — removed 2026-08-27
+
+It was, under `reference/`: 353 files, 31 MB, committed. That was a mistake and the whole
+path has been **purged from git history**, not merely untracked, because this repository is
+going open source and a rewrite is cheap now and impossible later.
+
+**What it was actually used for was one lookup table.** Every decode in this project needs
+`typeId` -> archive class name, and that came from numbers-parser's generated `mapping.py`.
+That table is now extracted to **`workarea/archive-type-map.json`** (581 entries), which is
+git-ignored, read only by the `workarea/` audit tools, and never imported by anything under
+`src/`. Nothing else in the checkout was in use.
+
+The fork itself still exists as a working clone under the the project it came from,
+which is where it came from. It is the source to re-extract from if the table is ever lost,
+and the place to look when studying how upstream solved something.
+
+**Do not re-vendor it.** If a future need seems to call for it, extract the specific data
+into `workarea/` as data, the way the type map was.
 
 ## Core design contract
 
@@ -116,7 +133,7 @@ front end while doing so.
 
 1. ~~**Protobuf schema reuse.**~~ **DECIDED 2026-08-13: extract our own from Numbers.app.**
    The question was framed as reuse-the-vendored-schemas versus rebuild-from-zero, and both
-   framings were wrong, because `reference/numbers-parser/`'s `.proto` files are not authored
+   framings were wrong, because numbers-parser's `.proto` files are not authored
    work to reuse or re-derive. Its `Makefile` extracts them from `/Applications/Numbers.app`
    — `protodump.py` dumps the protobuf descriptors Apple compiles into the binary,
    `rename_proto_files.py` normalizes them, `protoc --python_out` generates the `_pb2.py`,
@@ -130,7 +147,7 @@ front end while doing so.
    bootstrapped; the step is re-runnable when Apple ships a new Numbers, instead of waiting
    on an upstream refresh or hand-patching; and it keeps the lineage honest — the technique
    is learned from that `Makefile` (credit it in the bootstrap script's docstring) without
-   copying its output. `reference/numbers-parser/src/protos/` becomes a **differential
+   copying its output. numbers-parser's `src/protos/` becomes a **differential
    check**: a matching dump corroborates both, and a difference is a finding worth
    understanding rather than a silent divergence.
 
@@ -141,7 +158,7 @@ front end while doing so.
    depends on a local `Numbers.app`, its **generated output must be committed** so that
    `pip install pybers` works on a machine without Numbers present.
 
-   (Licensing was never the constraint: `reference/numbers-parser/` is MIT, Jon Connell 2021,
+   (Licensing was never the constraint: numbers-parser is MIT, Jon Connell 2021,
    so copying with attribution would have been permitted. The bar here is ownership of the
    foundation and respect for someone else's craft, which is higher than the license.)
 2. ~~**Named styles.**~~ **DECIDED 2026-08-24 by measurement, not by design.** The shape

@@ -22,7 +22,7 @@ Apple ships a new Numbers. See "Open architectural decisions" in `CLAUDE.md` for
 reasoning.
 
 That is not theoretical here. Comparing this extraction against the schemas vendored in
-`reference/numbers-parser/src/protos/` (taken from an earlier Numbers) found **20 of 33
+numbers-parser's own `src/protos/` (taken from an earlier Numbers) found **20 of 33
 schemas differ**. Among the differences, `TSTArchives.proto` — the table archives this
 library is built on — gained an entire `StructuredTextImportRecordUID` message plus
 `source_row_count` and `source_column_count` fields that the older copy does not contain.

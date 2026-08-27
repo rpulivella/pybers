@@ -9,10 +9,9 @@ call this rather than driving the API by hand, so that the board's invariants �
 one classification label, a Status that always moves forward, an issue that is
 always on the board — hold in exactly one place.
 
-Ported from the author's other tooling ticket.py (same author, same conventions, deliberately
-kept in sync) — see CLAUDE.md for the origin story. INERT until a real GitHub
-remote and Project board exist for this repo: set `projectNumber` below once the
-board is created, and everything here starts working unchanged.
+Ported from the author's other tooling ticket.py (same author, same conventions) and since
+carried further here — this copy holds credential and markup fixes another repository has
+not taken back yet. See CLAUDE.md for the origin story.
 
 Talks to GitHub over urllib: REST for issues, GraphQL for the Project board.
 Never shells out to `gh` or `jq`, per the house rules in scripts/README.md.
@@ -40,6 +39,17 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-27  Set projectNumber to the real board (3), and corrected the 404 story, which
+            had been copied in from the FIRST round of GIT-AND-GITHUB-AFTER-CODE-REVIEW.md
+            and was wrong. Round 2 corrected it and `another repository` carries the
+            correction; this repo did not. An expired or revoked token is 401, not 404.
+            What answers 404 on a private repository is a VALID token lacking `repo`
+            scope, or a wrong owner/name — so the old wording sent a reader hunting a
+            dead credential when the fault was a scope or a typo. requestJson now adds a
+            404 hint naming the two real causes. Also fixed an indentation bug in
+            `edit --dry-run`: the body preview sat OUTSIDE its `if body is not None`
+            guard, so `edit --title X --dry-run` printed a bare `None`. Introduced
+            here while applying the markup fix; another repository never had it.
 2026-08-17  Fixed two credential bugs. readTokenFromSecretsFile returned the first line
             matching GITHUB_TOKEN *or* GH_TOKEN, so a stale GH_TOKEN above the real one
             silently decided the identity; GITHUB_TOKEN now wins by name, and two
@@ -94,9 +104,7 @@ console = Console()
 
 repositoryOwner: str = "rpulivella"
 repositoryName: str = "pybers"
-# Placeholder — set to the real Project number once the board exists (see CLAUDE.md /
-# the handoff doc for what to do when the GitHub repo is stood up).
-projectNumber: int = 0
+projectNumber: int = 3
 
 restRoot: str = "https://api.github.com"
 graphqlRoot: str = "https://api.github.com/graphql"
@@ -156,12 +164,13 @@ class GitHubHttpError(RuntimeError):
     caller onto a new failure path.
 
     The status has to survive as an integer because the alternative — recovering
-    it from the formatted message — silently conflates causes. A private
-    repository answers **404** to a token that has expired or lost `repo` scope,
-    exactly as it does to a branch that is genuinely absent, so a guard matching
-    on the string "404" reported a dead credential as an unpushed branch and sent
-    the user off to run a `git push` that could not possibly help. A message is
-    prose and will be reworded; a status code is a value, so carry the value.
+    it from the formatted message — silently conflates causes. On a PRIVATE
+    repository GitHub answers **404** to a VALID token that lacks `repo` scope, and
+    to a wrong owner or name, exactly as it does to a branch that is genuinely
+    absent. An expired or revoked token is **401**, not 404. So a guard matching on
+    the string "404" reports "no such thing" when the truth is "your token cannot
+    see it", and sends someone off fixing the wrong problem. A message is prose and
+    will be reworded; a status code is a value, so carry the value.
     """
 
     def __init__(self, statusCode: int, message: str) -> None:
@@ -267,8 +276,8 @@ def requestJson(
     status *as a number* alongside it, because a caller that needs to branch on
     one must not go looking for it in the prose. A guard that recovered the status
     by searching the message for "404" told a user to push an already-pushed
-    branch whenever a token expired, since a private repository answers 404 rather
-    than 403 for a credential that cannot see it.
+    branch, because a private repository answers 404 rather than 403 to a valid
+    token that cannot see the resource. An expired or revoked token is 401.
     """
     body = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(url, data=body, method=method)
@@ -287,8 +296,15 @@ def requestJson(
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")
+        hint = ""
+        if exc.code == 404:
+            # A private repo answers 404 to a VALID token lacking `repo` scope, and
+            # to a wrong owner/name. An expired or revoked token is 401, not 404 —
+            # do not send anyone hunting an expired credential from here.
+            hint = (" — on a private repository this is also what a valid token "
+                    "without `repo` scope looks like, or a wrong owner/name")
         raise GitHubHttpError(
-            exc.code, f"GitHub returned HTTP {exc.code}: {detail}"
+            exc.code, f"GitHub returned HTTP {exc.code}{hint}: {detail}"
         ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Could not reach GitHub: {exc.reason}") from exc
@@ -769,11 +785,11 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         if body is not None:
             console.print("would replace the body with:")
             # markup=False because this is a PREVIEW of bytes about to be written:
-        # rich reads square brackets as style tags, so a body carrying [hotfix]
-        # or a path like /work/[slug] would display with those words missing.
-        # A dry run whose whole purpose is showing what will be written must not
-        # be the one place the text is altered.
-        console.print(body, markup=False, highlight=False)
+            # rich reads square brackets as style tags, so a body carrying [hotfix]
+            # or a path like /work/[slug] would display with those words missing.
+            # A dry run whose whole purpose is showing what will be written must not
+            # be the one place the text is altered.
+            console.print(body, markup=False, highlight=False)
         return 0
 
     token = resolveToken()
