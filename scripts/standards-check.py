@@ -55,6 +55,20 @@ line of this script, eg:
 /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-27  Added consoleProse, a SECOND view of a Python file. pythonProse
+            blanks string literals wholesale, which is right for docstrings and
+            comments and hid a whole category of prose: console output is read
+            by a person and is subject to the same rules. Measured rather than
+            theorized, scripts/ticket.py carried thirty em dashes and the gate
+            saw eighteen, the other twelve being console strings.
+
+            Only literals passed to a printing call are taken, because a path, a
+            URL, an API field name and a regex are all string literals and none
+            of them is prose. The two views are OVERLAID rather than
+            concatenated: both are the source with other regions blanked, so
+            they are the same length and merge character by character.
+            Concatenating doubled the file and made every line number from the
+            second view wrong by the length of the first.
 2026-08-27  Removed a Python house-style half that had no business here. The
             first version of this file also checked camelCase, module headers,
             pathlib, f-strings and error handling. All of that is code linting,
@@ -329,6 +343,62 @@ def pythonProse(text: str) -> str:
     return re.sub(r'"[^"\n]*"', blank, out)
 
 
+def consoleProse(text: str) -> str:
+    """String literals that reach a user, everything else blanked.
+
+    The SECOND view of a Python file. `pythonProse` blanks string literals
+    wholesale, which is right for docstrings and comments but hides a whole
+    category of prose: `console.print("Dry run - nothing was filed.")` is read
+    by a person and is subject to the same rules as any other sentence.
+
+    Measured, not theorized. `scripts/ticket.py` carried thirty em dashes and
+    the gate saw eighteen; the other twelve were console output.
+
+    Only literals passed to a printing call are taken. A path, a URL, an API
+    field name and a regex are all string literals too, and none of them is
+    prose. Blanking rather than removing keeps line numbers true.
+    """
+    keep = ["\n" if character == "\n" else " " for character in text]
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return "".join(keep)
+
+    lines = text.split("\n")
+    offsets = []
+    running = 0
+    for line in lines:
+        offsets.append(running)
+        running += len(line) + 1
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        target = node.func
+        name = getattr(target, "attr", None) or getattr(target, "id", None)
+        if name not in ("print", "echo", "sys.stdout.write", "write"):
+            continue
+        for argument in node.args:
+            for piece in ast.walk(argument):
+                if not (isinstance(piece, ast.Constant) and isinstance(piece.value, str)):
+                    continue
+                if piece.lineno != piece.end_lineno:
+                    continue
+                start = offsets[piece.lineno - 1] + piece.col_offset
+                end = offsets[piece.end_lineno - 1] + piece.end_col_offset
+                keep[start:end] = text[start:end]
+
+    out = "".join(keep)
+    # Rich markup tags are machine syntax, not words.
+    out = re.sub(r"\[/?[a-z][^\]]*\]", blank, out)
+    return re.sub(r"`[^`\n]*`", blank, out)
+
+
+def mergeViews(first: str, second: str) -> str:
+    """Combine two blanked views of one file, keeping offsets intact."""
+    return "".join(a if a != " " else b for a, b in zip(first, second))
+
+
 def markdownProse(text: str) -> str:
     """Markdown with code fences and inline code blanked.
 
@@ -495,7 +565,12 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
     suffix = path.suffix
 
     if suffix == ".py":
-        prose = pythonProse(body)
+        # Two views: docstrings and comments, then the strings a user sees.
+        # OVERLAID rather than concatenated. Both are the source with the other
+        # regions blanked, so they are the same length and merge character by
+        # character. Concatenating doubles the file and every line number
+        # reported from the second view is wrong by the length of the first.
+        prose = mergeViews(pythonProse(body), consoleProse(body))
         try:
             checkDocstringShape(path, ast.parse(body), findings)
         except SyntaxError:
