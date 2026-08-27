@@ -8,15 +8,25 @@ changes, and get the input byte for byte. Everything above this layer depends on
 that holding, so it is the first test worth having and the one worth breaking the
 build.
 
-The fixtures are currently the three `empty-*.numbers` files vendored under
-`reference/numbers-parser/`. They are third-party test data, and they were saved
-by an older Numbers than the 15.3.1 these schemas were extracted from, so they are
-development fixtures rather than this project's golden corpus. Replacing them with
-files saved by the Numbers on this machine is tracked work — see the fixture note
-in CLAUDE.md. The tests skip rather than fail when they are absent, because a
-missing third-party checkout is not a defect in this library.
+The fixtures are this project's own, under `tests/fixtures/`, and three of the
+forty-five are exercised here. They are chosen to span the shapes the container has
+to survive rather than to be representative: the empty baseline, a document carrying
+floating objects and embedded image assets, and the 2001-row table that forces
+multi-tile storage and the largest members. A failure therefore says something about
+which shape broke.
+
+A missing fixture now FAILS rather than skips. These are first-party files committed
+to this repository, so an absent one is a defect, and a skip would let the round-trip
+contract quietly stop being tested.
 
 UPDATES
+2026-08-27  Repointed from the vendored numbers-parser `empty-*.numbers` files onto
+            this project's own corpus, and turned the skip into a failure. The
+            vendored checkout was purged from the repository, which left all eleven
+            of these tests skipping — green, and testing nothing. The replacement
+            fixtures are better on every axis: first-party, saved by the same Numbers
+            15.3.1 the schemas were extracted from, and already the corpus every
+            other test uses.
 2026-08-16  Written with the container layer.
 """
 from __future__ import annotations
@@ -44,15 +54,13 @@ from pybers.archive import (
     writePackage,
 )
 
-fixtureDirectory: Path = (
-    Path(__file__).resolve().parent.parent
-    / "reference"
-    / "numbers-parser"
-    / "tests"
-    / "examples"
-)
+fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
-fixtureNames: tuple[str, ...] = ("empty-1", "empty-2", "empty-3")
+# Three fixtures spanning the shapes the container has to survive, chosen so a
+# failure says something about WHICH shape broke rather than only that one did:
+# the empty baseline, a document with floating objects and embedded image assets,
+# and the 2001-row table that forces multi-tile storage and the largest members.
+fixtureNames: tuple[str, ...] = ("00-baseline", "35-image", "27-big-table")
 
 # The ZIP64 extended-information extra field Numbers writes into local headers:
 # a 4-byte tag and size, then 16 bytes of payload.
@@ -60,10 +68,15 @@ localExtraFieldLength: int = 20
 
 
 def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping the test when the checkout is absent."""
+    """Return a fixture path, failing when it is absent.
+
+    These are first-party fixtures committed to this repository, so a missing one
+    is a defect rather than an absent optional dependency. It used to skip, because
+    the fixtures were then a third-party checkout that might not be present; that
+    is no longer true and a skip here would hide the round-trip contract failing.
+    """
     path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path} is not present.")
+    assert path.is_file(), f"Fixture {path} is missing from the corpus."
     return path
 
 
@@ -185,10 +198,10 @@ def testDecompressedFrameMatchesItsDeclaredLength() -> None:
     the tag stream that produces it, so agreement is real evidence rather than a
     tautology.
     """
-    package = readPackage(fixturePath("empty-1"))
+    package = readPackage(fixturePath("00-baseline"))
     frameCount = 0
 
-    with zipfile.ZipFile(fixturePath("empty-1")) as archive:
+    with zipfile.ZipFile(fixturePath("00-baseline")) as archive:
         for iwaFile in package.iwaFiles:
             for frame in splitFrames(archive.read(iwaFile.name)):
                 decompressRaw(frame)  # raises on any length mismatch
@@ -204,7 +217,7 @@ def testMultiFrameMemberIsExercised() -> None:
     than covered, and a reader that only ever saw single-frame members could be
     wrong about concatenation without anything noticing.
     """
-    with zipfile.ZipFile(fixturePath("empty-1")) as archive:
+    with zipfile.ZipFile(fixturePath("00-baseline")) as archive:
         counts = [
             len(splitFrames(archive.read(name)))
             for name in archive.namelist()
