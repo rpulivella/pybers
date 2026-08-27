@@ -12,11 +12,11 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 `TST.Tile` holds rows as `TileRowInfo`, and the values are **not protobuf**. They live in an
 opaque `cell_storage_buffer`, indexed by a `cell_offsets` array. Everything below was
 reverse-engineered against `11-value-types-noformats`, whose second row labels every cell in
-text — which is the only reason the decode is verifiable rather than plausible.
+text, which is the only reason the decode is verifiable rather than plausible.
 
 ```
 cell_offsets           fixed 255 entries, uint16 (uint32 when has_wide_offsets)
-                       0xFFFF means NO CELL — an empty cell has no record at all
+                       0xFFFF means NO CELL, an empty cell has no record at all
 cell_storage_buffer    records laid end to end; a record runs to the next live offset
 ```
 
@@ -25,8 +25,8 @@ Record layout, as far as it is needed to read a value:
 ```
 byte  0      storage version (5 in every file seen)
 byte  1      value TYPE (below)
-bytes 4-7    flags bitmask — NOT decoded
-bytes 8-11   purpose unknown — NOT decoded
+bytes 4-7    flags bitmask, NOT decoded
+bytes 8-11   purpose unknown, NOT decoded
 bytes 12+    the value
 ```
 
@@ -34,7 +34,7 @@ bytes 12+    the value
 
 It coincides with `TST.CellType` for every type in `11-value-types-noformats`, which made
 that look settled. `12-number-currency` disproved it: **every currency cell carries type
-`10`, and 10 is outside the `CellType` enum entirely** — that enum stops at 9, and
+`10`, and 10 is outside the `CellType` enum entirely**, that enum stops at 9, and
 `CellValueType` puts currency at 9, not 10.
 
 So the storage byte is its own numbering that happens to agree with `CellType` over the
@@ -47,22 +47,22 @@ The table below is what has been *measured*, with the enum names attached where 
 | value | name | status |
 |---|---|---|
 | 0 | `genericCellType` | not seen |
-| 1 | `spanCellType` | not seen — this is how the cells *covered by a merge* are marked |
-| 2 | `numberCellType` | **decoded** — IEEE-754 decimal128, little-endian, 16 bytes |
-| 3 | `textCellType` | **decoded** — uint32 key into the `STRING` `TableDataList` |
+| 1 | `spanCellType` | not seen. This is how the cells *covered by a merge* are marked |
+| 2 | `numberCellType` | **decoded**, IEEE-754 decimal128, little-endian, 16 bytes |
+| 3 | `textCellType` | **decoded**, uint32 key into the `STRING` `TableDataList` |
 | 4 | `formulaCellType` | not seen |
-| 5 | `dateCellType` | **decoded** — float64 seconds since 2001-01-01 UTC |
-| 6 | `boolCellType` | **decoded** — float64, zero is false |
-| 7 | `durationCellType` | **decoded** — float64 seconds |
+| 5 | `dateCellType` | **decoded**, float64 seconds since 2001-01-01 UTC |
+| 6 | `boolCellType` | **decoded**, float64, zero is false |
+| 7 | `durationCellType` | **decoded**, float64 seconds |
 | 8 | `formulaErrorCellType` | not seen |
 | 9 | `automaticCellType` | not seen |
-| 10 | *(named by neither enum)* | **decoded — currency.** Value is decimal128 at bytes 12-27, identical to a plain number |
+| 10 | *(named by neither enum)* | **decoded, currency.** Value is decimal128 at bytes 12-27, identical to a plain number |
 
 ## Currency is a distinct cell type, but not a distinct value encoding
 
 Measured across `12-number-currency`, which carries nine currency variants beside a plain
 `1234.5` for comparison. All nine are **type 10**; the plain number is type 2. Yet the value
-sits at the same offset in the same decimal128 encoding in both, signs included — the three
+sits at the same offset in the same decimal128 encoding in both, signs included, the three
 negative variants decode to `-1234.5` correctly from decimal128's sign bit.
 
 So currency is a **type marker plus a format reference over an ordinary number**. It needs no
@@ -72,7 +72,7 @@ the currency code and the presentation, because those are not in the value.
 Every one of these is type 10 with the same value, differing only in trailing references:
 basic currency, thousands separator, accounting style, zero decimal digits, negatives as
 `(-100)`, negatives in red, negatives combined with accounting style, and Euros rather than
-dollars. **The currency code itself is part of the format, not the value** — `1234.5` in
+dollars. **The currency code itself is part of the format, not the value**, `1234.5` in
 Euros and `1234.5` in dollars are the same cell value.
 
 ## Percent is NOT a distinct type, and the asymmetry with currency is the point
@@ -81,7 +81,7 @@ Every cell in `13-number-percent` is **type 2**, an ordinary number, with `flags
 format references. Currency gets its own type byte; percent does not.
 
 The distinction is meaningful rather than arbitrary. **Currency carries semantic data the
-value cannot hold** — the currency code. `1234.5` in Euros is different information from
+value cannot hold**, the currency code. `1234.5` in Euros is different information from
 `1234.5` in dollars, and no amount of formatting recovers which was meant. Percent carries
 none: the value is a fraction and the format multiplies by 100 to display it.
 
@@ -102,7 +102,7 @@ entirely reasonable in isolation.
 
 In this fixture the positive cells hold `0.25` while the negative ones hold `-0.0025`,
 despite the same described action. Numbers decided differently for the two, and the exact
-mechanism was not pinned down — order of operations and a sign-dependent parse are both
+mechanism was not pinned down, order of operations and a sign-dependent parse are both
 consistent with what is on disk.
 
 This does **not** affect pybers, which stores and returns the underlying value and does not
@@ -114,7 +114,7 @@ which is not recoverable from the file.
 ## Dates: the time is in the value, and the tail offset is not fixed
 
 From `14-number-date`. Every cell is **type 5** whatever format is applied, so dates behave
-like percent and unlike currency — formatting never changes the type.
+like percent and unlike currency, formatting never changes the type.
 
 **A date-time is a single number, not a date plus a time field.** `11:00` is stored inside
 the same float64 as `11:00:00` past midnight; cells with no time hold exactly `00:00:00`.
@@ -146,7 +146,7 @@ expected content is known independently.
 
 ## Durations, and what finally settles the type-versus-format question
 
-From `15-duration-formats`. Every duration cell is **type 7** regardless of format — automatic
+From `15-duration-formats`. Every duration cell is **type 7** regardless of format, automatic
 units, weeks only, milliseconds abbreviated, no unit shown. So durations behave like percent
 and date.
 
@@ -196,18 +196,18 @@ application does.
 
 **That warning indicator is not stored in the file.** Measured: no archive type appears in
 `15` that is absent from `16`, the `IMPORT_WARNING` and `COMMENT_STORAGE` data lists are both
-empty, and the flagged cell carries no flag bit its unflagged neighbour lacks — the neighbour
+empty, and the flagged cell carries no flag bit its unflagged neighbor lacks, the neighbor
 has an extra bit, not one fewer. Numbers recomputes the indicator when it recalculates,
 knowing the operand was a duration and the result is not.
 
 So a round trip cannot drop it, which is one less thing to preserve. It also means pybers
 cannot surface it without performing the same inference, and that requires evaluating
-formulas — which is Numbers' job, not this library's.
+formulas, which is Numbers' job, not this library's.
 
 ### Three duration behaviors worth knowing
 
 **A leading apostrophe is an input directive and is not stored.** `'10 minutes` becomes an
-ordinary text cell holding `10 minutes` — the quote is consumed by input handling and leaves
+ordinary text cell holding `10 minutes`, the quote is consumed by input handling and leaves
 no trace, so it cannot be recovered or round-tripped.
 
 ### Durations are float64 SECONDS, and that is a trap
@@ -230,7 +230,7 @@ DURATION(,,K1,,,)   via hours      370440000.6000012      drifted
 ```
 
 Divide by 60 and multiply by 60 and the value does not come back. The `DUR2___` and
-`DURATION()` functions exist precisely to leave duration space for arithmetic and return —
+`DURATION()` functions exist precisely to leave duration space for arithmetic and return,
 and every trip through them compounds binary rounding.
 
 **It is UNIT CONVERSION that loses precision, not duration arithmetic.** The same fixture
@@ -247,7 +247,7 @@ round-tripping a duration through a different unit**, not "avoid duration arithm
 
 ### Date minus date yields a duration, automatically
 
-Two type 5 cells subtract to a type **7** cell. Numbers infers the result type — the exact
+Two type 5 cells subtract to a type **7** cell. Numbers infers the result type, the exact
 opposite of what it does when a duration is added to a plain number, where the duration
 format is silently discarded. Subtraction promotes; addition with a bare number demotes.
 
@@ -261,7 +261,7 @@ of a negative duration needs formatting of its own rather than relying on `timed
 
 **The hazard this creates for pybers is our own.** Python's `timedelta` is microsecond
 resolution, so reading `6174000.01000002` into one and writing it back produces
-`6174000.01` — silently "correcting" the drift and changing a file nobody asked us to change.
+`6174000.01`, silently "correcting" the drift and changing a file nobody asked us to change.
 The discipline is the same as for IWA members: **keep the original bytes and re-encode only
 what was actually modified.** Tidying a value we were not asked to touch is a defect, not an
 improvement.
@@ -269,8 +269,8 @@ improvement.
 **Duration arithmetic coerces to hours.** `I1+10` over `71 days 11:00:00.01` yields
 `1725.0000027777799`, and 71 days plus 11 hours is 1715 hours, so `+10` added ten *hours*.
 The cell also demotes to **type 2** with Numbers reporting that the duration format was
-removed. Storage remains **seconds** in the float64 — only the calculation engine works in
-hours — so a reader must not infer the unit from arithmetic behavior.
+removed. Storage remains **seconds** in the float64, only the calculation engine works in
+hours, so a reader must not infer the unit from arithmetic behavior.
 
 **`DURATION()` promotes a number back to type 7**, and the fixture pins its argument order by
 feeding the same value into two different slots:
@@ -307,7 +307,7 @@ value  0        tail=[1, 4, 2]
 ```
 
 So a custom format with distinct presentations for positive, negative and zero is a **single**
-format archive containing all three, not three formats selected by sign. Anything modelling
+format archive containing all three, not three formats selected by sign. Anything modeling
 number formats needs that shape: one object, several conditional presentations.
 
 ### Format is carried by reference, gated by a bitmask
@@ -322,7 +322,7 @@ type 10, flags 0x0882 -> tail [2, 11, 5]    bit 7 adds a different one
 ```
 
 The last element varies with the format variant, so it reads as a key into the `FORMAT`
-`TableDataList`. **The individual flag bits are not decoded** — which bit implies which
+`TableDataList`. **The individual flag bits are not decoded**, which bit implies which
 field is unknown, and guessing would be worse than saying so. A writer must not synthesize
 this bitmask until each bit is understood; round-tripping the original bytes is safe, and
 inventing them is not.
@@ -341,13 +341,13 @@ CellValueType  0 empty  1 number  2 string  3 provided  4 date
 type by one and would misread whole columns silently. Always name which enum is meant.
 
 `CellValueType` also carries two entries `CellType` does not: `richTextCellType`, consistent
-with the separate rich-text payload, and **`currencyCellValueType`** — so **currency appears
+with the separate rich-text payload, and **`currencyCellValueType`**, so **currency appears
 to be a value type in its own right rather than a display format over a number.** That is
 worth confirming with a fixture rather than assuming either way, and it makes
 `12-number-currency` a real unknown rather than a variation on `11`.
 
 Verified end to end: the fixture decodes to `1234.5`, `42`, `2027-06-15`, `0:20:00`, `True`,
-`3`, `50`, `1`, `'Item 1'` — matching all nine of its own labels, with the tenth cell empty
+`3`, `50`, `1`, `'Item 1'`, matching all nine of its own labels, with the tenth cell empty
 and carrying no record.
 
 ### Numbers are decimal128, and this matters more than anything else here
@@ -360,8 +360,8 @@ model rather than leaving it to taste.
 
 ### Interactive controls are ordinary values plus a presentation reference
 
-A checkbox, star rating, slider, stepper and popup menu all store a **normal value** — bool,
-number, or string — and reference a `CONTROL_CELL_SPEC` separately. The control is how the
+A checkbox, star rating, slider, stepper and popup menu all store a **normal value**, bool,
+number, or string, and reference a `CONTROL_CELL_SPEC` separately. The control is how the
 value is edited, not what it is. So they need no new value type, only a reference to carry.
 
 ### Two storage strategies by type

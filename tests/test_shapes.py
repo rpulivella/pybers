@@ -11,7 +11,7 @@ import pybers
 
 
 def testTextBoxHoldsRichTextWithMixedRunStyles() -> None:
-    """A text box's rich text can mix styles within one paragraph — the whole reason
+    """A text box's rich text can mix styles within one paragraph, the whole reason
     plain Cell.value/Style is not enough for text box content."""
     paragraph = pybers.Paragraph(
         runs=(

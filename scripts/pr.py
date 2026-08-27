@@ -4,9 +4,9 @@
 pybers pull request tool
 
 The single sanctioned path to GitHub pull requests. `/pr-draft` and
-`/pr-review-code` call this rather than `gh`, so that the workflow's invariants —
+`/pr-review-code` call this rather than `gh`, so that the workflow's invariants,
 a PR is always opened as a draft, the merge commit carries the house subject, the
-branch is deleted on merge — hold in exactly one place.
+branch is deleted on merge, hold in exactly one place.
 
 **This tool exists to replace `gh`.** `gh` resolves its own identity from an OAuth
 token in the system keyring, which can hold several accounts at once, so the
@@ -17,7 +17,7 @@ PAT for the API, and SSH for git itself.
 
 Talks to GitHub over urllib: REST for the pull request itself, GraphQL for the
 one operation REST does not expose (marking a draft ready for review). Never
-shells out — not to `gh`, not to `git`, not to `curl`. The current branch is read
+shells out, not to `gh`, not to `git`, not to `curl`. The current branch is read
 by parsing `.git/HEAD` directly.
 
 Authentication and the HTTP helpers are reused from `ticket.py` rather than
@@ -39,13 +39,13 @@ UPDATES
 2026-08-17  Round two of the same review. The merge PUT is now guarded as well as the
             branch delete: urllib lets a read-phase TimeoutError through as an OSError
             and a proxy error page makes json.loads raise ValueError, neither of which is
-            a RuntimeError, so both escaped to exit 1 — the code meaning "no pull
-            request" — after a merge that may have landed. main() is broadened for the
+            a RuntimeError, so both escaped to exit 1, the code meaning "no pull
+            request", after a merge that may have landed. main() is broadened for the
             same reason. A delete answering 404 or 422 is now success, because the ref is
             already gone whenever the repository deletes head branches automatically, and
             an alarm that fires on success stops being read. `squash` stays available:
             the tool serves repositories that permit it, and the prohibition belongs in
-            /pr-review-code — but the usage example teaching it is gone, since permitting
+            /pr-review-code, but the usage example teaching it is gone, since permitting
             and advertising are different acts.
 2026-08-16  Fixed the four defects a code review found on 2026-08-14, all of them in
             the half of this file that had never executed. A failed branch delete no
@@ -104,7 +104,7 @@ notFoundExitCode: int = 1
 errorExitCode: int = 2
 
 # The merge landed and only the cleanup did not. Distinct from both of the above
-# because the recovery is neither "retry" nor "investigate" — it is "finish the
+# because the recovery is neither "retry" nor "investigate": it is "finish the
 # last step by hand, and on no account run merge again".
 partialSuccessExitCode: int = 3
 
@@ -194,7 +194,7 @@ def assertBranchIsPushed(ticket: ModuleType, token: str, branch: str) -> None:
 
     The status is read from the exception's own `statusCode`, never by searching
     its message. Matching the string "404" conflated two very different causes:
-    a **private** repository — which this one will be — answers 404 rather than
+    a **private** repository, which this one will be, answers 404 rather than
     403 to a token that has expired or lost `repo` scope, so an expired credential
     was reported as an unpushed branch and sent the user to run a `git push` that
     could not possibly help.
@@ -209,7 +209,7 @@ def assertBranchIsPushed(ticket: ModuleType, token: str, branch: str) -> None:
         if exc.statusCode == 404:
             raise RuntimeError(
                 f"Branch {branch!r} was not found on the remote. Usually that means it "
-                f"is unpushed — push it first:\n  git push -u origin {branch}\n"
+                f"is unpushed, push it first:\n  git push -u origin {branch}\n"
                 f"On a private repository a 404 can also mean the token cannot see the "
                 f"repository at all, so check the credential if the branch is pushed."
             ) from exc
@@ -247,7 +247,7 @@ def findOpenPullRequest(
 
     Filtered by base as well as head, and it must be. GitHub permits several open
     pull requests from one head branch to different bases, and returns them newest
-    first — so taking the first of an unfiltered list picks whichever was opened
+    first, so taking the first of an unfiltered list picks whichever was opened
     most recently rather than the one being asked about. `/pr-review-code` feeds
     that number straight into `ready` and `merge`, so guessing here would promote
     and merge the wrong pull request.
@@ -361,7 +361,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
         return errorExitCode
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — no pull request was opened.[/]")
+        console.print("[yellow]Dry run, no pull request was opened.[/]")
         console.print(f"title: [bold]{escape(arguments.title)}[/]")
         console.print(f"[magenta]{escape(head)}[/] -> [cyan]{escape(arguments.base)}[/]")
         console.print("state: [yellow]draft[/]")
@@ -409,7 +409,7 @@ def cmdFind(arguments: argparse.Namespace) -> int:
         # indistinguishable from a command that failed before it printed anything,
         # which is how "your token expired" came to be reported as "there is no
         # pull request". The exit code below carries the same fact for scripts;
-        # neither is load-bearing on its own.
+        # neither decides the outcome on its own.
         if arguments.numberOnly:
             console.print(noOpenPullRequestMarker)
         else:
@@ -438,7 +438,7 @@ def cmdReady(arguments: argparse.Namespace) -> int:
         return 0
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was changed.[/]")
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
         console.print(f"would mark [bold cyan]#{summary['number']}[/] ready for review")
         return 0
 
@@ -467,7 +467,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         return errorExitCode
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was merged.[/]")
+        console.print("[yellow]Dry run. Nothing was merged.[/]")
         showPullRequest(summary)
         console.print(f"method:  [cyan]{arguments.method}[/]")
         console.print(f"subject: [bold]{escape(arguments.subject)}[/]")
@@ -481,7 +481,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
     # not wrap every failure: a read-phase TimeoutError is an OSError it lets through
     # untouched, and a proxy's HTML error page makes json.loads raise ValueError.
     # Neither is a RuntimeError, so both escaped main()'s handler to a bare traceback
-    # and exit 1 — which is notFoundExitCode. A merge that may well have landed then
+    # and exit 1, which is notFoundExitCode. A merge that may well have landed then
     # reported as "there is no pull request", and the warning below never printed.
     # The merge is the irreversible step, so an unknown outcome here must say so.
     try:
@@ -511,13 +511,13 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
 
     # The merge is irreversible and the delete is a second call, so a failure here
     # must never read as a failure of the whole command. Left to propagate, it
-    # printed a red error and returned non-zero *after* the merge had landed — and
+    # printed a red error and returned non-zero *after* the merge had landed, and
     # the obvious response to that, re-running `merge`, sails past the draft guard
     # (the pull request is closed now, so isDraft is false), gets an opaque
     # "405 not mergeable" from GitHub, and reads as though nothing ever worked.
     # One handler on purpose. GitHubHttpError is a RuntimeError subclass, so catching it
     # separately and re-raising would escape this function entirely rather than fall
-    # through to the sibling clause — which would regress the whole point of this block.
+    # through to the sibling clause, which would regress the whole point of this block.
     try:
         deleteBranch(ticket, token, summary["head"])
     except RuntimeError as exc:
@@ -536,7 +536,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         console.print("[yellow]The merge succeeded. Only the branch delete failed.[/]")
         console.print(f"  [dim]{escape(str(exc))}[/]")
         console.print(
-            f"[bold]Do not re-run merge[/] — #{summary['number']} is already merged. "
+            f"[bold]Do not re-run merge[/], #{summary['number']} is already merged. "
             f"Finish by hand:\n  git push origin --delete {summary['head']}"
         )
         return partialSuccessExitCode
@@ -626,7 +626,7 @@ def main() -> int:
         # Broader than RuntimeError deliberately. urllib lets a read-phase TimeoutError
         # through as a bare OSError, and a proxy error page makes json.loads raise
         # ValueError. Anything escaping to Python's own handler would exit 1, and 1 is
-        # notFoundExitCode — so an unhandled crash would announce itself as "there is no
+        # notFoundExitCode, so an unhandled crash would announce itself as "there is no
         # pull request". No path may reach exit 1 except a considered negative answer.
         console.print(f"[red]{escape(str(exc))}[/]")
         return errorExitCode

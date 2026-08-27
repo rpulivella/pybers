@@ -23,7 +23,7 @@ UPDATES
 2026-08-27  Repointed from the vendored numbers-parser `empty-*.numbers` files onto
             this project's own corpus, and turned the skip into a failure. The
             vendored checkout was purged from the repository, which left all eleven
-            of these tests skipping — green, and testing nothing. The replacement
+            of these tests skipping, green, and testing nothing. The replacement
             fixtures are better on every axis: first-party, saved by the same Numbers
             15.3.1 the schemas were extracted from, and already the corpus every
             other test uses.
@@ -112,7 +112,7 @@ def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(name: str, tmp_path: Path
     `0o600 << 16` in `writestr` and `open(..., "w")` alike.
 
     Getting those bytes back would mean hand-rolling a zip writer and owning it
-    forever. They carry no document content — they are archival metadata — and a
+    forever. They carry no document content. They are archival metadata, and a
     round-tripped file was confirmed on 2026-08-16 to open in Numbers 15.3.1 with
     no warning and no repair prompt. `numbers-parser` reaches the same conclusion
     by using `zipfile` and not attempting byte-identity either.
@@ -168,7 +168,7 @@ def testRoundTripPreservesEveryMemberExactly(name: str, tmp_path: Path) -> None:
             )
             # external_attr is deliberately absent from this comparison. Numbers
             # writes 0, and CPython's zipfile overwrites a zero with 0o600 << 16 on
-            # the way out — in `writestr` and in `open(..., "w")` alike, mutating the
+            # the way out, in `writestr` and in `open(..., "w")` alike, mutating the
             # ZipInfo it was handed. It is not reachable through the standard
             # library at all, so asserting it here would only restate the xfail
             # above with less information.
@@ -230,7 +230,7 @@ def testRejectsAnUnknownFrameFlag() -> None:
     """An unrecognized flag byte stops the read loudly instead of being decoded.
 
     The uncompressed-frame shape has never been observed, so there is no tested
-    branch for it. Failing here is the honest outcome — it names the byte so the
+    branch for it. Failing here is the honest outcome, it names the byte so the
     format can be studied against a real example.
     """
     with pytest.raises(IWAError, match="0x01"):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """A sheet holds tables (row/column grids) and graphical objects (things that float on
-the sheet at an absolute position — text boxes, images, shapes) side by side, since
+the sheet at an absolute position, text boxes, images, shapes) side by side, since
 Numbers lets both live on the same sheet independently. A workbook is a list of sheets.
 
 UPDATES
@@ -27,6 +27,6 @@ class Sheet:
 
 @dataclass(slots=True)
 class Workbook:
-    """The root of the pybers object model — one .numbers document's sheets."""
+    """The root of the pybers object model, one .numbers document's sheets."""
 
     sheets: list[Sheet] = field(default_factory=list)

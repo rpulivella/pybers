@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Objects that float on a sheet at an absolute position, independent of any table's
-grid — text boxes, images, and vector shapes.
+grid, text boxes, images, and vector shapes.
 
 UPDATES
 2026-08-12  Initial scaffold.
@@ -28,7 +28,7 @@ class GraphicalObject:
 
 @dataclass(slots=True)
 class TextBox(GraphicalObject):
-    """A floating text box — placement plus its rich text content."""
+    """A floating text box, placement plus its rich text content."""
 
     richText: RichText = field(default_factory=RichText)
 

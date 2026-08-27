@@ -3,7 +3,7 @@
 """Smoke tests for the pybers object model, proving the package installs, imports, and
 that the model's basic equality behavior holds before any real archive I/O exists. Real
 round-trip tests (read a fixture .numbers file, write it back unchanged, assert byte-for-
-byte equality) land once pybers.archive exists — see CLAUDE.md.
+byte equality) land once pybers.archive exists, see CLAUDE.md.
 
 UPDATES
 2026-08-12  Initial scaffold.
@@ -22,7 +22,7 @@ def testPackageExposesVersion() -> None:
 
 
 def testStyleIsFrozenAndHashable() -> None:
-    """Style must be immutable — the fix for the old fork's shared-mutable-Style bug,
+    """Style must be immutable, the fix for the old fork's shared-mutable-Style bug,
     where two cells could hold the exact same Style object by reference."""
     style = pybers.Style(bold=True)
     assert hash(style) is not None
@@ -41,7 +41,7 @@ def testCellAtCreatesAndReusesCells() -> None:
 
 
 def testWorkbookRoundTripsThroughEquality() -> None:
-    """A model built twice the same way must compare equal — the baseline every future
+    """A model built twice the same way must compare equal, the baseline every future
     real archive round-trip test (read, write, read again) will build on."""
 
     def build() -> pybers.Workbook:

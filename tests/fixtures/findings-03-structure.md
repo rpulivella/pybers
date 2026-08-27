@@ -39,10 +39,10 @@ monotonic and does not reset, so merge indices are never reused.
 
 ### Covered cells do not exist
 
-The cells a merge covers have **no record in the tile at all** — indistinguishable from empty.
+The cells a merge covers have **no record in the tile at all**, indistinguishable from empty.
 `spanCellType` is defined in `CellType` and is not used for this. So a reader cannot tell a
 covered cell from an empty one by looking at the tile; it has to consult the merge ranges.
-That makes merges load-bearing for correct reading, not an optional nicety.
+That makes merges essential to reading a table correctly, not an optional nicety.
 
 ### Merging is destructive, and unmerging does not undo it
 
@@ -66,7 +66,7 @@ and is a **type 8** error. In `22b` that same formula becomes an ordinary type 2
 `0`, because J1 exists again.
 
 So merge state directly determines whether a formula resolves. The error is not recorded as a
-kind — consistent with the finding that error kinds are not stored — it simply becomes an
+kind, consistent with the finding that error kinds are not stored, it simply becomes an
 error cell and un-becomes one.
 
 ### ANSWERED: Numbers rewrites merge ranges on a structural edit
@@ -91,7 +91,7 @@ five became fifteen. Rows 0 and 2 carry merges and no content at all, so **a mer
 entirely empty cells**: "is merged" and "has content" are independent properties, and a reader
 must not infer either from the other.
 
-`next_formula_index` went 5 to 15 — monotonic, never reusing an index.
+`next_formula_index` went 5 to 15, monotonic, never reusing an index.
 
 ### Rows and columns do NOT behave the same way
 
@@ -103,9 +103,9 @@ must not infer either from the other.
               next_formula_index STAYS 5
 ```
 
-Existing merges shifted to their new columns correctly, but **no new merges were created** —
+Existing merges shifted to their new columns correctly, but **no new merges were created**,
 where inserting a row created ten. So an inserted **row** inherits the merge pattern of its
-neighbour and an inserted **column** does not.
+neighbor and an inserted **column** does not.
 
 Had only one of the two been tested, the wrong rule would have been generalized to both. Any
 structural operation in pybers has to be verified in both axes rather than assumed symmetric.
@@ -117,7 +117,7 @@ maintains them.
 
 **Writing is not.** If pybers inserts or deletes a row, *nothing* updates the merge ranges for
 us. They are stored as absolute coordinates in a separate structure from the cells, so a
-structural edit that ignores them leaves merges pointing at the wrong rows — and a merge
+structural edit that ignores them leaves merges pointing at the wrong rows, and a merge
 pointing past the end of the table is precisely the "phantom merge anchor" that raised
 `ValueError: Value out of range` at save time in the defect recorded in `CLAUDE.md`.
 
@@ -144,7 +144,7 @@ The reading above was from the schema and it was wrong in both halves. Measured 
 
 **A band style is only a parent.** `header_row_style` is a root `CellStyleArchive`
 (`is_variation: False`, `override_count: 4`) that no cell references directly. Every styled
-cell — header, footer **and body** — carries its own reference to an anonymous *variation*
+cell, header, footer **and body**, carries its own reference to an anonymous *variation*
 whose `parent` is the appropriate template:
 
 ```
@@ -156,7 +156,7 @@ plain body    -> no style reference at all
 
 So formatting a header row and formatting a body row are **the same operation against
 different parents**. Neither is a single-property band write, and the earlier design
-consequence — that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar —
+consequence, that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar,
 does not hold. Both are N cell writes.
 
 **And there IS a per-row and per-column style slot**, in a place the schema reading missed:
@@ -183,8 +183,8 @@ operation, and a reader must not depend on it being populated.
 
 ## Band membership: precedence, overlaps, and what survives un-setting
 
-`40-table-bands` maxes every count — 5 header rows, 5 header columns, 5 footer rows on a
-19x11 table — and labels the two overlap regions, so the corners can be attributed.
+`40-table-bands` maxes every count, 5 header rows, 5 header columns, 5 footer rows on a
+19x11 table, and labels the two overlap regions, so the corners can be attributed.
 
 **Precedence is header row > header column > footer row.** Styling the header column left
 the top-left corner on the header-**row** style; styling the footer left the bottom-left
@@ -218,7 +218,7 @@ BOTH        repeating_header_rows_enabled = True
 ```
 
 `repeating_*` is `True` on both tables, including the one where `header_rows_frozen` is not
-set at all. So the freeze control does not touch it — **repeat-on-print is print state**, set
+set at all. So the freeze control does not touch it, **repeat-on-print is print state**, set
 elsewhere in the print layout UI, and a reader must not infer one from the other.
 
 Print settings generally, along with pagination and per-object page position, are **not
@@ -254,7 +254,7 @@ following had ever been visible.
 
 ### `tile_row_index` is LOCAL to its tile
 
-Every tile reports rows `0..255` — the index restarts in each one:
+Every tile reports rows `0..255`, the index restarts in each one:
 
 ```
 tile 905818   256 rows, index 0..255
@@ -292,14 +292,14 @@ SheetArchive {
 }
 ```
 
-A table is not a special child of a sheet — it is a **drawable**, and the same list will hold
+A table is not a special child of a sheet. It is a **drawable**, and the same list will hold
 shapes, images and text boxes. Order is recorded, so it is part of the document and must be
 preserved. The sheet also owns all page setup: orientation, margins, page order, scale,
 headers and footers.
 
 ### Print and page setup: unexercised, and MUST NOT BE BROKEN
 
-No fixture tests any of this, and none is planned — Numbers' page-layout tools are a real
+No fixture tests any of this, and none is planned, Numbers' page-layout tools are a real
 differentiator and reproducing them is out of scope. But every sheet in every fixture already
 carries the state, so a writer that does not round-trip it damages documents it never
 intended to touch:
@@ -314,7 +314,7 @@ is_autofit_on                  userDefinedGuideStorage    style
 headers: [3 references]        footers: [3 references]
 ```
 
-**`headers` and `footers` are three references each** — left, center and right — and they
+**`headers` and `footers` are three references each**, left, center and right, and they
 point at real `TSWP.StorageArchive`s. Those are the six otherwise-unexplained storages that
 appear in every document in this corpus. They hold **editable text**, so a writer that
 regenerates storages rather than carrying them through can silently erase a document's page
@@ -323,7 +323,7 @@ headers.
 Document-level metadata is the same category: `TN.DocumentArchive`, `TN.ThemeArchive`,
 `TSP.DocumentMetadata`, `TSP.PackageMetadata`, `TSP.DataMetadata` / `DataMetadataMap`, and
 `TSK.AnnotationAuthorStorageArchive` (comment authorship). None is decoded and none needs to
-be — the requirement is only that they survive untouched.
+be, the requirement is only that they survive untouched.
 
 This is the same duty the cell decoder already honors by preserving an unrecognized type byte
 rather than rejecting it: **a library whose first job is not to damage documents has to carry
@@ -347,7 +347,7 @@ position (0.175, 68)     size 98 x 20.07
 position (165.175, 0)    size 102 x 60
 ```
 
-So placement is in **points**, the same unit as every other coordinate — `41-table-geometry`
+So placement is in **points**, the same unit as every other coordinate, `41-table-geometry`
 labels its tables and they read exactly: `(144, 144)` is "x2.0in y2.0in", `(-72, 360)` is
 "x-1.0in y5.0in". **A table may sit at a negative position**, off the left edge of the sheet.
 `angle` means a table can be rotated, and `locked` and `aspect_ratio_locked` are real state.
@@ -377,7 +377,7 @@ moment the table was created**, and is **never updated when rows or columns are 
 
 **The real size is `sum(row heights) x sum(column widths)`**, taking `default_row_height` and
 `default_column_width` wherever a `size` reads `0.00`. A reader that trusts `geometry.size`
-gets a plausible wrong number — off by a factor of five in the worst row above — with nothing
+gets a plausible wrong number, off by a factor of five in the worst row above, with nothing
 raising.
 
 ### Resizing a table distributes the stretch PROPORTIONALLY into rows and columns
@@ -393,7 +393,7 @@ every row height, or every column width, by the same factor and writes the resul
 ```
 
 Afterwards a proportional stretch is **indistinguishable** from having typed those heights by
-hand, so the operation cannot be recovered — only its result.
+hand, so the operation cannot be recovered, only its result.
 
 ## A table's TITLE is its NAME, and names are forced unique
 
@@ -407,13 +407,13 @@ table_name = 'I am a table Title-2'    table_name_enabled ABSENT      title hidd
 
 The fixture's own cells state the constraint, and the eight table names confirm it:
 **table names must be unique within a document, and uniqueness is enforced
-case-insensitively** — `I am a Table` and `I AM a TAAble` are treated as the same. Numbers
+case-insensitively**, `I am a Table` and `I AM a TAAble` are treated as the same. Numbers
 appends `-1`, `-2`, `-1-1` to force it. A writer that renames a table has to enforce the same
 rule or it will produce a document Numbers itself would not have written.
 
 `table_name_height` is `0.0` throughout, the same "use the default" convention as row heights.
 
-**The title sits in negative page space**, above the table's own origin — one fixture table
+**The title sits in negative page space**, above the table's own origin, one fixture table
 is at `y = -28.0` with the title rendered above it. So a table's visible extent is larger
 than its geometry when the name is shown.
 
@@ -428,13 +428,13 @@ table_name_shape_style -> TSWP.ShapeStyleArchive
 
 Two styles, exactly as a text box has: a paragraph style for the text and a shape style for
 the container. Note that `Table Title 1` exists as six separate archives, one per table slot,
-and is **not** visible in the styles browser — see the registry finding in
+and is **not** visible in the styles browser, see the registry finding in
 [findings-06-styles.md](findings-06-styles.md).
 
 ## A caption IS a text box
 
 `TSA.CaptionInfoArchive` sits in the drawable's `caption` slot, and its `super` is a
-**`TSWP.ShapeInfoArchive`** — the same archive a floating text box uses, with `is_text_box`
+**`TSWP.ShapeInfoArchive`**, the same archive a floating text box uses, with `is_text_box`
 and `owned_storage`:
 
 ```
@@ -445,15 +445,15 @@ CaptionInfoArchive {
 }
 ```
 
-An uncaptioned drawable carries `TSD.StandinCaptionArchive` in that slot instead — the empty
+An uncaptioned drawable carries `TSD.StandinCaptionArchive` in that slot instead, the empty
 placeholder from `33`. So the slot is always occupied and only its *type* says whether a
 caption exists.
 
 **Captions are NOT forced unique**, unlike table names; the fixture has three reading
 `'I am a table caption'`.
 
-Placement is anchor-based and identical on every caption measured —
-`caption_anchor_location: 1`, `drawable_anchor_location: 7` — which matches the fixture's
+Placement is anchor-based and identical on every caption measured,
+`caption_anchor_location: 1`, `drawable_anchor_location: 7`, which matches the fixture's
 observation that there is no way to set the gap between table and caption.
 
 ### Text inset lives on the SHAPE style, not the paragraph style
@@ -467,11 +467,11 @@ default inset     para 'Special Caption'   shape #904525   padding 4/4/4/4
 ```
 
 Same named paragraph style, different shape styles. So **an inset does not travel with a
-named paragraph style** — applying that style elsewhere will not carry the inset with it, and
+named paragraph style**, applying that style elsewhere will not carry the inset with it, and
 a model that folds padding into the text style will get this wrong.
 
 `TSWP.ShapeStylePropertiesArchive` also carries `shrink_to_fit`, `vertical_alignment`, a
-`paragraph_style` reference for the container default, and **`columns`** — text containers
+`paragraph_style` reference for the container default, and **`columns`**, text containers
 support multiple text columns. Every instance in the corpus reads
 `equal_columns { count: 1 }`, so multi-column text is representable and **unexercised**.
 
@@ -495,7 +495,7 @@ TableModelArchive.hidden_states_owner.hidden_states[]
 
 A table with nothing hidden has the same structure with `base_hidden_states` **empty**. Every
 table also carries a `HiddenStateFormulaOwnerArchive` and a `FilterSetArchive` whether or not
-anything is hidden, so their presence proves nothing — only a non-empty `base_hidden_states`
+anything is hidden, so their presence proves nothing, only a non-empty `base_hidden_states`
 does.
 
 **Rows and columns are identified by UUID, not index**, the same identity-based design that
@@ -514,7 +514,7 @@ order** and the map has to be applied.
 
 `user_hidden` distinguishes manual hiding from filter hiding, which is the sibling
 `filter_set` mechanism (`is_enabled: False` throughout the corpus). A row can therefore be
-hidden two independent ways, and a hidden row **keeps its `size`** — hiding does not zero the
+hidden two independent ways, and a hidden row **keeps its `size`**, hiding does not zero the
 height.
 
 ## Headers, footers and frozen panes are plain scalars

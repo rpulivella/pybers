@@ -4,7 +4,7 @@
 The `.numbers` document container: a zip of IWA members and supporting files.
 
 A `.numbers` file is a zip. `Index/*.iwa` members carry the document itself; the
-rest — a preview image, metadata, asset files — are ordinary payloads this layer
+rest, a preview image, metadata, asset files, are ordinary payloads this layer
 carries through untouched.
 
 Every member's storage method is recorded and replayed rather than assumed. In
@@ -55,7 +55,7 @@ class MemberInfo:
 
     Every field here was found the hard way: the byte-identical round trip failed
     until each one was preserved. Python's own defaults disagree with what Numbers
-    writes on three of them — it stamps `createSystem` 3 (Unix) where Numbers
+    writes on three of them, it stamps `createSystem` 3 (Unix) where Numbers
     writes 0 (MS-DOS), `createVersion` 20 where Numbers writes 62, and an epoch
     date of 1980 where the file carries its real timestamp. None of those change
     whether the file opens; all of them change its bytes.
@@ -78,7 +78,7 @@ class StoredMember:
     """A zip member that is not part of the document, kept exactly as found.
 
     The preview image and metadata files travel unchanged, so they are held as
-    bytes rather than modelled.
+    bytes rather than modeled.
     """
 
     name: str
@@ -91,7 +91,7 @@ class NumbersPackage:
 
     `members` carries every member's zip metadata in the order the archive listed
     them, and is the single source of both ordering and header details. Zip has no
-    required ordering, so rewriting alphabetically would still open in Numbers —
+    required ordering, so rewriting alphabetically would still open in Numbers,
     and would still differ byte for byte from the input, which is the property this
     library is built to keep.
     """

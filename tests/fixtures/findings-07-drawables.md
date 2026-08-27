@@ -9,7 +9,7 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 ## A text box IS a shape, with a flag saying so
 
 Both `33-textbox` and `34-shape` produce `TSWP.ShapeInfoArchive`, but it carries
-**`is_text_box`** — `True` for all fifteen drawables in `33`, `False` for every shape in `34`.
+**`is_text_box`**, `True` for all fifteen drawables in `33`, `False` for every shape in `34`.
 So they share the archive and are distinguished by a field, which is why `ShapeStyleArchive`
 was the one style kind with no `name` in the naming survey. A connector is the exception: it
 is a `TSD.ConnectionLineArchive` and has no `is_text_box` at all.
@@ -48,8 +48,8 @@ nudges   stored x   Numbers displays   n / 72
 So the stored unit is **1/72 inch, the PostScript point**, confirmed at three scales three
 orders of magnitude apart and on both axes. **One arrow-key nudge is exactly 1.0 point.**
 
-The third column is the trap. The stored positions are perfectly uniform, one point apart,
-but the inches Numbers *shows* step `0.01, 0.03, 0.04, 0.06` — deltas of 0.02, 0.01, 0.02.
+The third column is where a reader goes wrong. The stored positions are perfectly uniform, one point apart,
+but the inches Numbers *shows* step `0.01, 0.03, 0.04, 0.06`, deltas of 0.02, 0.01, 0.02.
 The UI rounds `n/72` to two decimals, so its readout is neither uniform nor reversible.
 **Any value taken from the displayed inch figure is wrong**: reading `0.01 in` back yields
 0.72 points where the file holds 1.0, and the object moves.
@@ -76,7 +76,7 @@ flags=7   both explicit + flipped
 ```
 
 **A text box never sets bit 2.** Its height is automatic in every specimen, which is why
-`geometry.size.height` is `0.0` on all fifteen — including the ones with an explicit width.
+`geometry.size.height` is `0.0` on all fifteen, including the ones with an explicit width.
 
 ### A vertical flip is a horizontal flip plus a 180 degree rotation
 
@@ -91,7 +91,7 @@ alone cannot:
 
 There is **no vertical-flip bit**. Numbers stores a vertical flip as bit 4 combined with a
 180 degree rotation, which is geometrically the same transform. So `flags=5, angle=180` is
-ambiguous on its face and a reader cannot recover which of the two the user asked for —
+ambiguous on its face and a reader cannot recover which of the two the user asked for,
 nor does it need to, since they render identically. A writer must not invent a second bit.
 
 This also means **rotation and flipping are not independent** in the way the two-by-two of
@@ -124,7 +124,7 @@ geometry.size            naturalSize          text
 
 Two things follow. When a width is explicit, `geometry.size.width` and `naturalSize.width`
 agree exactly, so the explicit width is stored twice. And the height, which `geometry` never
-carries for a text box, is here — growing in 12.0 point steps per wrapped line from a
+carries for a text box, is here, growing in 12.0 point steps per wrapped line from a
 one-line height of 19.692.
 
 So **reporting a text box's footprint does not require laying out its text**: Numbers has
@@ -133,7 +133,7 @@ stale `naturalSize` behind unless it re-derives one, which is a layout problem t
 cannot solve from the archive alone.
 
 The path itself is a plain rectangle, stored in the path's own coordinate space rather than
-in points — see the next section for what that space is.
+in points, see the next section for what that space is.
 
 ```
 moveTo (0,0) -> lineTo (100,0) -> lineTo (100,100) -> lineTo (0,100) -> closeSubpath
@@ -153,11 +153,11 @@ statement true of all of them is that **the path's bounding box maps onto `natur
 33 [0]    (0.000,0.000)-(100.000,100.000)   290.5 x 19.7     2.9053, 0.1969
 ```
 
-**The space is not 0..100** — `[16]` is authored at 400 x 200 and the 45-degree line at
+**The space is not 0..100**, `[16]` is authored at 400 x 200 and the 45-degree line at
 141.421, so a reader has to derive the extent rather than assume it.
 
 Shapes scale **uniformly**, because each is authored at its own natural aspect ratio. The
-text-box rectangle does not, because a rectangle has no aspect to preserve — `2.9053` against
+text-box rectangle does not, because a rectangle has no aspect to preserve, `2.9053` against
 `0.1969` in the last row. So a reader cannot infer a single scale factor either; it has to
 map the extent on each axis independently.
 
@@ -168,22 +168,22 @@ every point stored in the path gives `(-4.882, -4.882)-(104.882, 104.882)`, and 
 the on-path endpoints gives `(14.645, 14.645)-(85.355, 85.355)`. **Neither is the shape.**
 
 It is a circle of radius 50 centered at `(50, 50)`, drawn as four `curveTo` elements whose
-nodes sit at the 45-degree diagonals — `50 ± 50/√2` is exactly 14.645 and 85.355 — with
+nodes sit at the 45-degree diagonals, `50 ± 50/√2` is exactly 14.645 and 85.355, with
 control points pushed out to -4.882 to round the curve. Its true extent is `0..100`, which
 matches `naturalSize` at scale 1.0.
 
 So computing a shape's bounds means **evaluating the beziers**, not scanning the stored
 coordinates. The naive minimum and maximum overstates this shape by about 10 percent, and
 the on-path-only version understates it by about 30 percent. Both are plausible numbers, and
-nothing raises — the characteristic failure of this format.
+nothing raises, the characteristic failure of this format.
 
-Paths made only of `lineTo` — the triangle, the quadrilateral, the line, the text-box
-rectangle — are unaffected, which is exactly why measuring against `33` alone looked
+Paths made only of `lineTo`, the triangle, the quadrilateral, the line, the text-box
+rectangle, are unaffected, which is exactly why measuring against `33` alone looked
 conclusive and was not.
 
 ## Z-order is the order of `drawable_infos`
 
-**There is no z-order field anywhere in the schema** — not on `DrawableArchive`, not on
+**There is no z-order field anywhere in the schema**, not on `DrawableArchive`, not on
 `TN.SheetArchive`. By elimination the list order has to carry it, and `34` demonstrates it
 directly. Every drawable appears in ascending archive-identifier order, which is creation
 order, with exactly one inversion:
@@ -203,7 +203,7 @@ operation to overlapping objects, or something else reorders, needs its own fixt
 
 ## Opacity is quantized to whole percent
 
-`34`'s shape labelled `'z brought to front, 72.1% opacity'` stores:
+`34`'s shape labeled `'z brought to front, 72.1% opacity'` stores:
 
 ```
 opacity = 0.7200000286102295        which is float32(0.72) exactly
@@ -225,7 +225,7 @@ message StandinCaptionArchive {
 }
 ```
 
-Its existence is its whole payload — a placeholder saying "there is a caption slot here and
+Its existence is its whole payload, a placeholder saying "there is a caption slot here and
 nothing is in it". Every drawable therefore costs two extra archives that carry no data, and
 a writer that omits them is not producing an equivalent document.
 
@@ -234,7 +234,7 @@ a writer that omits them is not producing an equivalent document.
 `pathsource` is a union, and `34` exercises all five:
 
 ```
-scalar_path_source           a parametric shape — rectangle, ellipse and friends
+scalar_path_source           a parametric shape, rectangle, ellipse and friends
 bezier_path_source           a fixed bezier path
 point_path_source            a point-defined shape
 editable_bezier_path_source  a shape the user chose "Make Editable" on
@@ -252,7 +252,7 @@ identifies each one, and the fixture is deliberately varied:
 
 ```
 [0]-[11]  kTSDRoundedRectangle   scalar path, scalar 15 (and 21.73 on the resized one)
-[12]      ellipse                4 curveTo, closed — nodes on the 45-degree diagonals
+[12]      ellipse                4 curveTo, closed, nodes on the 45-degree diagonals
 [13]      triangle               2 lineTo, closed
 [15]      quadrilateral          3 lineTo, closed
 [16]      curved 120x60 shape    4 curveTo + 2 lineTo, authored in a 400x200 space
@@ -264,14 +264,14 @@ identifies each one, and the fixture is deliberately varied:
 ```
 
 Element point counts confirm the convention: `lineTo` and `moveTo` carry one point,
-`curveTo` carries **three** — two control points then the endpoint — and `closeSubpath`
+`curveTo` carries **three**, two control points then the endpoint, and `closeSubpath`
 carries none. Every closed path also ends with a trailing `moveTo` back to the start.
 
 A node in an editable bezier carries a `type` of `sharp` or `smooth`, so the smoothness of
 each control point is stored per node rather than inferred from the handles.
 
 `ConnectionLineArchive` sets no fields of its own, but its path source carries `type`,
-**`outset_from`** and **`outset_to`** — the gap left between the connector and each endpoint.
+**`outset_from`** and **`outset_to`**, the gap left between the connector and each endpoint.
 Notably it holds **no reference to the shapes it connects**, so either this connector is
 unattached or attachment is recorded somewhere else entirely; that needs its own fixture.
 
@@ -290,7 +290,7 @@ with it.
 
 `point_path_source` carries a two-component `point` instead, which for an arrow controls the
 shaft proportions. Neither kind stores an expanded path, so **rendering a parametric shape
-means reimplementing Apple's construction for that `type`** — the archive does not describe
+means reimplementing Apple's construction for that `type`**, the archive does not describe
 the geometry, only names it.
 
 `editable_bezier_path_source` has a different shape again: `subpaths`, each with a `closed`
@@ -300,7 +300,7 @@ a parameter.
 
 ### A saved custom shape style is STILL anonymous
 
-`34` carries a shape labelled `'I am text in a rectangle shape and my shape has an
+`34` carries a shape labeled `'I am text in a rectangle shape and my shape has an
 annoymously custom saved style (no ability to name them)'`. Its style archive carries the
 full seven `shape_properties`, **no `name`, and no `is_variation`**.
 
@@ -311,14 +311,14 @@ carry names, and a `NamedStyle` registry for shapes would be a pybers invention 
 trip can persist.
 
 The default shapes in `34` each carry a complete anonymous style with all seven properties,
-while every modified one is a **variation overriding exactly one** — `stroke`, `shadow`,
+while every modified one is a **variation overriding exactly one**, `stroke`, `shadow`,
 `reflection` or `opacity`. So the variation mechanism established for text in `32` is the
 same mechanism shapes use.
 
 ## Style archives are SHARED BY REFERENCE between drawables
 
 The single most important structural fact in `34`. Twenty-one shapes do not have twenty-one
-styles — they have twelve, because unmodified shapes point at the **same archive**:
+styles. They have twelve, because unmodified shapes point at the **same archive**:
 
 ```
 #903914   shapes [0, 12, 13, 14, 15, 16, 17]     seven drawables, one archive
@@ -337,7 +337,7 @@ shapes.** The frozen-`Style` contract in `pybers.model` has to hold on the read 
 when writing.
 
 Numbers itself never mutates a shared archive. Changing one shape produces a **new** archive
-that is a variation of the old one — `[1]` through `[7]` each got a fresh identifier in the
+that is a variation of the old one, `[1]` through `[7]` each got a fresh identifier in the
 918000-933000 range rather than an edit to `#903915`. That is the behavior to copy.
 
 ## Absence has THREE different encodings in one message
@@ -371,7 +371,7 @@ A full `ShapeStyleArchive.shape_properties` holds:
 fill, stroke, opacity, shadow, reflection, head_line_end, tail_line_end
 ```
 
-`34` names each shape by what was done to it, and the styles match exactly — a variation
+`34` names each shape by what was done to it, and the styles match exactly, a variation
 overriding precisely one property:
 
 ```
@@ -395,7 +395,7 @@ type: TSDCurvedShadow    color, angle 90, offset 1,  radius 15, opacity 1
                          curvedShadow { curve: -0.12309546 }
 ```
 
-So the common geometry — color, angle, offset, radius, opacity, `is_enabled` — applies to
+So the common geometry, color, angle, offset, radius, opacity, `is_enabled`, applies to
 every kind, and `contactShadow` / `curvedShadow` add the one parameter their kind needs.
 A model with a flat "shadow" record would lose `height` and `curve`.
 
@@ -417,8 +417,8 @@ angle the interface presents in degrees**, under a name that reads like a distan
 setting a "height" of 10 would produce something wildly wrong, and setting a fraction like
 0.5 would silently mean 30 degrees.
 
-`curvedShadow.curve` is **not** the same encoding — `asin(-0.12309546)` is -7.0708 degrees,
-not a round number — so it reads as a raw curvature parameter and must not be treated as an
+`curvedShadow.curve` is **not** the same encoding, `asin(-0.12309546)` is -7.0708 degrees,
+not a round number, so it reads as a raw curvature parameter and must not be treated as an
 angle by analogy. Two adjacent fields, two different conventions, neither documented.
 
 A reflection is by comparison trivial: `reflection { opacity: 0.5 }` and nothing else. `34`
@@ -435,12 +435,12 @@ pattern { type, phase: 0, count: 0, pattern: 0 x6 }
 
 `pattern.pattern` is a **fixed six-element array** with a `count` saying how many slots are
 live, and `phase` for the dash offset. `count` is `0` in every style in the corpus, so a
-dashed or dotted border is representable but **unexercised** — the layout of the array is
+dashed or dotted border is representable but **unexercised**, the layout of the array is
 inferred from the schema rather than measured, and needs its own fixture before a writer
 should emit one.
 
 The only stroke variation `34` does exercise is `TSDSolidPattern` with `width: 5` for the
-shape labelled `'border'`, against `TSDEmptyPattern` with `width: 1` for the default.
+shape labeled `'border'`, against `TSDEmptyPattern` with `width: 1` for the default.
 
 ### What `34` does NOT cover
 
@@ -455,7 +455,7 @@ gradient and image fills    every fill in the fixture is a flat rgb color
 
 `head_line_end` and `tail_line_end` appear on the style **and** on `ShapeArchive`, and `34`
 resolves which one Numbers uses. Every `ShapeArchive` in the fixture sets exactly
-`style`, `pathsource` and `strokePatternOffsetDistance` — **the line-end fields on the shape
+`style`, `pathsource` and `strokePatternOffsetDistance`, **the line-end fields on the shape
 itself are never set**, even on the lines that do carry arrowheads. So the style is where
 line ends live in practice, and the shape-level fields should be read as a fallback rather
 than written.
@@ -491,12 +491,12 @@ identifier         is_filled   end_point        path
 
 **Contrast this with `smart_stroke`.** A brush stroke gives only a name and leaves the
 rendering to Apple. A line end gives a name **and the complete path**, so it can be drawn
-without Apple's engine. The `identifier` is a convenience, not the definition — a reader
+without Apple's engine. The `identifier` is a convenience, not the definition, a reader
 should draw the path and use the name only for reporting.
 
 Every arrowhead is authored in a **6 x 6 box** regardless of shape, scaled at draw time.
 `is_filled` distinguishes the open variants, whose paths are deliberately unclosed. And
-`end_point` is where the line attaches, which **may be negative** — `'open circle'` at
+`end_point` is where the line attaches, which **may be negative**, `'open circle'` at
 `-0.3` and `'line'` at `-0.8` pull the line back so it does not show through the marker.
 
 `head_line_end` and `tail_line_end` are independently settable; the variations that carry
@@ -523,8 +523,8 @@ at 5pt to look proportional; it stores `[2, 2]`, so a 5pt dashed stroke renders 
 with 10pt gaps**. A reader converting the array to points must multiply by `width`, and a
 writer must divide.
 
-`cap` tracks the preset rather than the width — `RoundCap`/`RoundJoin` on the dotted styles,
-`ButtCap`/`MiterJoin` on the rest — confirming the zero-length-dash-plus-round-cap
+`cap` tracks the preset rather than the width, `RoundCap`/`RoundJoin` on the dotted styles,
+`ButtCap`/`MiterJoin` on the rest, confirming the zero-length-dash-plus-round-cap
 construction for dots.
 
 `43`'s ten specimens are otherwise identical: all `editable_bezier_path_source`, all
@@ -533,7 +533,7 @@ despite carrying text. Nothing else in the fixture is unaccounted for.
 
 ### Connectors DO record what they connect
 
-`44-line-ends` attaches connectors to shapes, which `34` never did — its lone connector was
+`44-line-ends` attaches connectors to shapes, which `34` never did, its lone connector was
 simply unattached. `TSD.ConnectionLineArchive` carries **four** fields for it:
 
 ```
@@ -548,7 +548,7 @@ belt-and-braces identity pairing that row and column hiding uses. The references
 straight at the drawables in the sheet's `drawable_infos`.
 
 `connection_line_path_source.type` is the routing mode: **`1` on the connector attached to
-the shape labelled "orthogonal connection line", `0` on all six others.** `outset_from` and
+the shape labeled "orthogonal connection line", `0` on all six others.** `outset_from` and
 `outset_to` are `0.0` throughout.
 
 One shape acts as a hub with four connectors attached, so a drawable may be referenced by
@@ -568,7 +568,7 @@ Data/tile-pattern-18.png             239,547     byte-identical to the source
 Data/tile-pattern-small-19.png        66,686
 ```
 
-Originals are stored **unmodified** — verified by hash in `28` and consistent here. But each
+Originals are stored **unmodified**, verified by hash in `28` and consistent here. But each
 one gains a `-small` companion, and **the companion of the orientation image is LARGER than
 the original** (18 KB against 14 KB). "Small" means smaller *dimensions*, not fewer bytes:
 the source has large flat regions that compress extremely well and the re-encoded derivative
@@ -591,7 +591,7 @@ derivatives on save could inflate a document** that was previously fine. Carryin
 existing members through untouched is the safe behavior.
 
 The numeric suffix is the asset identifier and matches `ImageArchive.data.identifier`, and
-it increments across the document — `16`, `17`, `18`, `19` here, continuing from `16` in `28`.
+it increments across the document, `16`, `17`, `18`, `19` here, continuing from `16` in `28`.
 
 ### Placement, rotation, flipping and locking
 
@@ -608,7 +608,7 @@ pos=(931.0, 136.1)  size=108.3x 67.7  angle=  0.00  flags=3  lock=True
 pos=(732.7, 343.2)  size= 22.6x 92.0  angle=  0.00  flags=3  lock=False
 ```
 
-**`angle` is in DEGREES here** — 180 and 12.10 — where the gradient angle in `28` was in
+**`angle` is in DEGREES here**, 180 and 12.10, where the gradient angle in `28` was in
 radians. The format is not internally consistent about angular units, and each one has to be
 established separately rather than assumed.
 
@@ -620,7 +620,7 @@ decoded.
 
 ### Distortion is just a size that disagrees with naturalSize
 
-`naturalSize` is the source image's true dimensions and stays constant per asset — `800x500`
+`naturalSize` is the source image's true dimensions and stays constant per asset, `800x500`
 for one image, `1024x1024` for the other. `size` is what is drawn.
 
 ```
@@ -635,14 +635,14 @@ it wants.
 
 `originalSize` tracks the placed size rather than the source, so it is **not** a synonym for
 `naturalSize` despite the name. Measured across all thirteen placements in `35`,
-`originalSize` equals `geometry.size` **exactly, every time** — so it is redundant with the
+`originalSize` equals `geometry.size` **exactly, every time**, so it is redundant with the
 geometry rather than carrying independent information, and a writer has to keep the two in
 step.
 
 ### `aspect_ratio_locked` records the INTENT to distort, separately from the distortion
 
 Twelve of the thirteen images have `aspect_ratio_locked: True`. The one that does not is
-precisely the squashed placement — `22.6 x 92.0` against a natural `800 x 500`.
+precisely the squashed placement, `22.6 x 92.0` against a natural `800 x 500`.
 
 So the flag is the user having unlocked the proportions in the interface, not a derived fact.
 It correlates with distortion here but does not define it: **the distortion is still only
@@ -657,15 +657,15 @@ image on the next drag.
 moveTo (0,0) -> lineTo (800,0) -> lineTo (800,500) -> lineTo (0,500) -> closeSubpath -> moveTo
 ```
 
-This is the instant-alpha outline, and it is stored in **source pixel units** — 800 by 500,
-the image's `naturalSize` — not normalized and not in points. An untraced image still carries
+This is the instant-alpha outline, and it is stored in **source pixel units**, 800 by 500,
+the image's `naturalSize`, not normalized and not in points. An untraced image still carries
 one, describing the full rectangle, so its presence says nothing.
 
 `ImageArchive` also has a **`flags` field of its own**, distinct from `geometry.flags` and
 `0` on every image in the corpus. Nothing observed sets it, so its meaning is unestablished
 and it must be carried through rather than reconstructed.
 
-`interpretsUntaggedImageDataAsGeneric` is `False` throughout — a color-management switch for
+`interpretsUntaggedImageDataAsGeneric` is `False` throughout, a color-management switch for
 images with no embedded profile.
 
 ### Cropping is a mask, and the image keeps its FULL size
@@ -681,7 +681,7 @@ size 800.0x500.0   MASK pos=( -44.0,-44.8)  size=293.3x294.8
 size 632.9x395.6   MASK pos=(-127.6,-97.0)  size=293.3x294.8    cropped AND scaled
 ```
 
-**The image's `size` does not change when it is cropped** — it still describes the whole
+**The image's `size` does not change when it is cropped**, it still describes the whole
 image. The mask's size is what the reader sees.
 
 So **the on-screen footprint of a cropped image is the MASK's size, not the image's**.
@@ -690,13 +690,13 @@ and wrong silently, since both numbers are plausible.
 
 **Mask positions may be negative**, which places the visible window past the image's
 top-left corner. And the last example is cropped *and* scaled, so cropping and scaling are
-independent transforms rather than alternatives — a reader has to resolve both.
+independent transforms rather than alternatives, a reader has to resolve both.
 
 An uncropped image may still carry a mask covering the whole image, so the presence of a
 `MaskArchive` does not by itself mean the image is cropped. Comparing the mask geometry to
 the image size is what answers that.
 
-### The crop is the mask's GEOMETRY — its path is a full-image rectangle
+### The crop is the mask's GEOMETRY: its path is a full-image rectangle
 
 `TSD.MaskArchive` has exactly two fields, `super` and `pathsource`, and the path is the
 misleading one. Every mask in `35` carries the same path:
@@ -709,7 +709,7 @@ mask geometry       pos + size          the crop window, positioned on the image
 
 So the path does **not** describe the crop. It is a plain rectangle covering the entire
 image, identical across cropped and uncropped placements alike, while the actual crop is the
-mask's `geometry` — position and size relative to the image's own top-left corner.
+mask's `geometry`, position and size relative to the image's own top-left corner.
 
 `35` demonstrates one window size at four offsets, two of them negative:
 
@@ -721,6 +721,6 @@ mask pos (-127.56,-96.98)   outside, and on an image also scaled to 632.9 x 395.
 ```
 
 Every mask in the corpus is a rectangle. Masking to a **shape** would presumably use the
-path, which is what the field is for, but nothing here exercises it — so the rule "the crop
+path, which is what the field is for, but nothing here exercises it, so the rule "the crop
 is the geometry" is established only for rectangular crops and should not be assumed for a
 shape mask.

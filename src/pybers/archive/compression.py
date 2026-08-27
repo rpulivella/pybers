@@ -10,13 +10,13 @@ only implements framing cannot read it.
 
 Implemented here rather than taken from `python-snappy` on purpose. That package
 binds to libsnappy through a C extension, which means anyone running
-`pip install pybers` needs a compiler and the library present — a heavy price for
+`pip install pybers` needs a compiler and the library present, a heavy price for
 a format whose decoder is this small. The decoder is also self-checking: the
 varint preamble states the uncompressed length independently of the tag stream,
 so a decode that drifts is caught rather than returning plausible garbage.
 
 Only decompression lives here. Writing a file back does not need a compressor,
-because an unmodified frame is written from the bytes it was read from — see
+because an unmodified frame is written from the bytes it was read from, see
 `pybers.archive.iwa`. A compressor is needed only once a frame is genuinely
 rewritten, and a correct one is a separate piece of work.
 
@@ -66,7 +66,7 @@ def decompressRaw(block: bytes) -> bytes:
 
     The declared length is verified against what the tag stream actually produced.
     They are two independent statements of the same fact, so a mismatch means the
-    block was misframed or truncated — worth raising over, because the alternative
+    block was misframed or truncated, worth raising over, because the alternative
     is handing a protobuf parser bytes that are subtly wrong.
     """
     expectedLength, offset = readVarint(block, 0)

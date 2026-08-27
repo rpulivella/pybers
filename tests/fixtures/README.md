@@ -1,4 +1,4 @@
-# Fixtures — what to make, and how
+# Fixtures: what to make, and how
 
 Real `.numbers` documents used to map Apple's archive format and to lock in round-trip
 behavior. Each one exists to isolate **exactly one** feature.
@@ -8,7 +8,7 @@ the schemas and the files agree.
 
 ---
 
-## The method — this is the part that matters
+## The method: this is the part that matters
 
 **Derive every file from `00-baseline.numbers` by File → Save As. Never create a new
 document from the template.**
@@ -23,7 +23,7 @@ A **star**, not a chain: every file is `00-baseline` plus one change, derived di
 `00-baseline`. Not `02` from `01`, `03` from `02`. A chain accumulates, so isolating the
 third feature means unpicking the first two.
 
-Whatever formatting the default new document carries is fine — **do not try to strip it to
+Whatever formatting the default new document carries is fine, **do not try to strip it to
 truly empty.** The baseline is a subtraction reference, not a minimal document; anything it
 carries cancels out in the diff as long as every file starts from the same one.
 
@@ -31,7 +31,7 @@ carries cancels out in the diff as long as every file starts from the same one.
 
 The label row is the answer key that makes a decode verifiable, so it has to describe
 something checkable. What a cell displays can be confirmed against a screenshot. What was
-typed cannot be recovered from the file at all — and `13-number-percent` showed the two can
+typed cannot be recovered from the file at all, and `13-number-percent` showed the two can
 differ, where typing `0.25` and `-0.25` into percent cells did not store symmetric values.
 
 Describing the formatting applied is useful too. Just do not assume the stored value equals
@@ -53,7 +53,7 @@ into the same lineage as everything else. Verified: 36 to 37 of 37 members share
 of `01` through `10`.
 
 Everything through `10-text-ligatures` is present and has been read. What each one
-established is in [FINDINGS.md](FINDINGS.md) — read that before making more, because several
+established is in [FINDINGS.md](FINDINGS.md), read that before making more, because several
 fixtures turned out to carry more than they were asked for and the list below has been
 adjusted accordingly.
 
@@ -65,8 +65,8 @@ findings can now state which characters a style covers, not just that the style 
 
 **Made so far: 00 through 35, plus 22b.** Text and formatting are done. The cell-value
 encoding is broken open for every type. Formulas are fully mapped. Merges, structural edits,
-tiles, sheets, table geometry, the fill subsystem and the floating objects — text boxes,
-shapes and images — are all understood.
+tiles, sheets, table geometry, the fill subsystem and the floating objects, text boxes,
+shapes and images, are all understood.
 
 **The object model has NO remaining unknowns.** `36-unicode-text` settled the last one:
 `character_index` counts **UTF-16 code units**, not Python characters, across all nineteen
@@ -83,14 +83,14 @@ them blocks the object model.
 - an RTL cell with **mixed formatting**, to populate `table_para_bidi`, which still reads
   `(0,0)` everywhere because every RTL cell in `36` is a plain string
 - a **ZWJ emoji** sequence (family or profession); `36` covers skin-tone modifiers only
-- **multi-column text** — `TSWP.ShapeStylePropertiesArchive.columns` reads
+- **multi-column text**, `TSWP.ShapeStylePropertiesArchive.columns` reads
   `equal_columns { count: 1 }` throughout
 - a **second look at `table_para_starts`**, which `32` showed is a restart-numbering flag on
   one observation only
 
 ---
 
-## Made — 00 through 10, all text and formatting
+## Made: 00 through 10, all text and formatting
 
 All read, all mapped. What each established is in [FINDINGS.md](FINDINGS.md); the notes
 here are only what is worth knowing about the *fixture*.
@@ -112,7 +112,7 @@ here are only what is worth knowing about the *fixture*.
                         never-write-the-fake-one rule testable rather than asserted.
 08-text-para-backgrounds  Corrected a wrong expectation. The UI calls this "Text
                         Background" and offers it in the character panel, but it writes to
-                        TWO DIFFERENT FIELDS by scope — paragraph to
+                        TWO DIFFERENT FIELDS by scope, paragraph to
                         ParagraphStylePropertiesArchive.fill, character to
                         CharacterStylePropertiesArchive.background_color. Carries one of
                         each and names them in its own text, which is what made the
@@ -120,7 +120,7 @@ here are only what is worth knowing about the *fixture*.
 09-text-capitalization  All caps. Established that it is TWO settings in two places:
                         capitalization=kAllCaps plus the two OpenType capital features,
                         because the enum alone renders badly.
-10-text-ligatures       A LAYERED case — None on the paragraph, Default overridden onto
+10-text-ligatures       A LAYERED case, None on the paragraph, Default overridden onto
                         specific letters. The only fixture with paragraph-value-plus-
                         character-override, which is the structure named styles will need.
                         Also proved ligatures are their own enum, not an OpenType feature.
@@ -134,11 +134,11 @@ apart and must never write the fake form. All caps is a genuine feature Numbers 
 and `pybers` should support it too.
 
 **Note on `calt`.** Contextual alternates were on throughout, as they almost always are.
-So its presence is a baseline condition rather than a signal — a feature record appearing
+So its presence is a baseline condition rather than a signal, a feature record appearing
 does not by itself mean the fixture's feature was applied.
 
 **Nothing further is needed for text properties.** 37-39 below are the remaining controls
-from the "More Text Options" panel, and they are low priority — the structural lessons are
+from the "More Text Options" panel, and they are low priority, the structural lessons are
 already learned. The one text fixture that is NOT low priority is `36-unicode-text`, which
 is about how character indices are counted rather than about a formatting control.
 
@@ -153,7 +153,7 @@ Each line is one Save As from `00-baseline`, one change, save. Nothing else touc
 ```
 11-value-types-noformats  DONE, and the highest-yield fixture in the whole set. It
                         broke open the cell-value encoding, which is the one part of
-                        the format the protobuf schemas do not describe at all — the
+                        the format the protobuf schemas do not describe at all, the
                         values live in an opaque binary buffer.
 
                         It worked because its second row labels every cell in text.
@@ -161,13 +161,13 @@ Each line is one Save As from `00-baseline`, one change, save. Nothing else touc
                         verifiable ones. Any future fixture over an opaque encoding
                         should be built the same way: put the answer key in the file.
 
-                        It also carried more than was asked — a star rating, slider,
-                        stepper and popup menu — which established that interactive
+                        It also carried more than was asked, a star rating, slider,
+                        stepper and popup menu, which established that interactive
                         controls are ordinary values plus a presentation reference,
                         not new value types. See FINDINGS.md.
 ```
 
-### Number formats — after 11
+### Number formats: after 11
 
 These layer a display format over a value, which is a separate concern from the value
 itself. `11` must come first or there is nothing to compare them against.
@@ -175,19 +175,19 @@ itself. `11` must come first or there is nothing to compare them against.
 ```
 12-number-currency      DONE, and it settled the question both ways. Currency IS a
                         distinct cell type (10) but is NOT a distinct value
-                        encoding — the decimal128 sits at the same offset as a
+                        encoding, the decimal128 sits at the same offset as a
                         plain number. It also disproved the assumption that the
                         storage type byte is TST.CellType: 10 is in neither enum.
                         Nine variants in one file, with a plain number beside them
                         for comparison, is what made both conclusions provable.
                         See FINDINGS.md.
-13-number-percent       DONE. Percent is NOT its own cell type — it is an ordinary
+13-number-percent       DONE. Percent is NOT its own cell type. It is an ordinary
                         number plus a format, which is the opposite of currency and
                         makes the pair worth reading together. Confirmed the stored
                         value is always the fraction, never the displayed figure.
                         See FINDINGS.md.
-14-number-date          DONE. Established that a date-time is ONE float64 — the time
-                        lives in the value, not in a separate field — and that dates
+14-number-date          DONE. Established that a date-time is ONE float64, the time
+                        lives in the value, not in a separate field, and that dates
                         keep type 5 whatever format is applied. Also exposed that the
                         trailing references start after the value, whose width varies
                         by type, so there is no fixed tail offset. See FINDINGS.md.
@@ -197,7 +197,7 @@ itself. `11` must come first or there is nothing to compare them against.
                         durations keep type 7 across EVERY format, so currency stays
                         the only type that changes its type byte for a format. Also
                         gave the controlled experiment identifying the format key as
-                        the LAST trailing reference — one value, five presentations,
+                        the LAST trailing reference, one value, five presentations,
                         one slot moving. Plus three behaviors nobody asked for: a
                         leading apostrophe is an input directive and is not stored,
                         duration arithmetic coerces to HOURS, and feeding one value
@@ -205,13 +205,13 @@ itself. `11` must come first or there is nothing to compare them against.
                         FINDINGS.md.
 16-number-scientific-numeralsystems  DONE, with a surprise: Numbers has NUMERAL SYSTEMS, base 2,
                         10 and 16 with configurable places and two's complement for
-                        negatives. All display only — the value never changes.
+                        negatives. All display only, the value never changes.
 17-number-custom        DONE. Established that ONE custom format archive holds its
                         positive, negative and zero presentations together, rather
                         than three formats chosen by sign.
 ```
 
-Note these are *number formats*, not typography — but `onum` versus `lnum` (oldstyle
+Note these are *number formats*, not typography, but `onum` versus `lnum` (oldstyle
 versus lining figures) is typography applied to numerals, and the two are stored in
 different places. Keep them in separate fixtures so that stays visible.
 
@@ -229,13 +229,13 @@ different places. Keep them in separate fixtures so that stays visible.
                           =ROUND(2.5,0)        ROUND needs value AND digits
                           =IF(1>0,1,2)         nesting plus a comparison operator
                           ="a"&"b"             string concatenation
-                        Substitute freely if Numbers rejects any of these — the point
+                        Substitute freely if Numbers rejects any of these, the point
                         is a spread of shapes (operator, function, nesting, string),
                         not these exact calls.
                         Include one plain number cell as well, so a formula cell
                         and a value cell can be compared side by side.
 
-19-formula-dragged      THE DECISIVE ONE — do not retype anything, DRAG it.
+19-formula-dragged      THE DECISIVE ONE, do not retype anything, DRAG it.
                         Values run ACROSS a row, matching the label-row pattern the
                         other fixtures use:
                           A1, B1, C1 = 1, 2, 3
@@ -249,17 +249,17 @@ different places. Keep them in separate fixtures so that stays visible.
                                                     row locked on the second
                           drag D1 -> D2, E1 -> E2, F1 -> F2
                         F1 is the sharpest test. Dragged down it should become
-                        $A2 + B$1 — the $A holds the column while the row moves, the
+                        $A2 + B$1, the $A holds the column while the row moves, the
                         $1 holds the row while the column does not. One formula
                         exercising both flags in opposite directions.
                         Three questions answered at once. If D1/D2/D3 hold
                         IDENTICAL stored bytes then references are relative offsets
-                        and movement is structural — the good case, and the reason
+                        and movement is structural, the good case, and the reason
                         Numbers needs no $ kludge. If they differ, references are
                         resolved addresses and pybers must do the shifting itself,
                         which is exactly where the range-shift bug in CLAUDE.md
                         lived. The E and F columns show how anchoring is encoded
-                        differently — a flag on a reference, or a separate node.
+                        differently, a flag on a reference, or a separate node.
 
 20-formula-shapes       DONE. Established that cross-table references are relative
                         offsets plus a table UUID, that multi-range functions carry
@@ -268,7 +268,7 @@ different places. Keep them in separate fixtures so that stays visible.
                         original request is kept below for the record:
 
                         Put these across row 11 beside the existing SUM, then a
-                        LABEL ROW in row 12 under each one saying what it is — the
+                        LABEL ROW in row 12 under each one saying what it is, the
                         labels are what make a decode checkable rather than assumed.
 
                           B11 = =SUM(A1:A10)+1
@@ -283,7 +283,7 @@ different places. Keep them in separate fixtures so that stays visible.
 
                           D11 = =IF(SUM(A1:A5)>10,"big","small")
                                 a call nested inside a call, with a comparison and
-                                two string literals — shows how nesting appears in
+                                two string literals, shows how nesting appears in
                                 postfix order
 
                           E11 = =A11*2
@@ -293,7 +293,7 @@ different places. Keep them in separate fixtures so that stays visible.
                           F11 = =SUM(A)
                                 a whole-column reference, made by clicking the
                                 column header rather than typing. If Numbers writes
-                                something different, that is the finding — an
+                                something different, that is the finding, an
                                 unbounded range has to encode differently from
                                 A1:A10. Skip it if the UI will not produce one.
 
@@ -311,14 +311,14 @@ different places. Keep them in separate fixtures so that stays visible.
                         an ASTLocalCellReferenceNodeArchive, and the schema also has
                         ASTCrossTableCellReferenceNodeArchive carrying a table UUID.
                         Nothing has ever populated it, so how a reference survives
-                        leaving its own table is completely unknown — and it is the
+                        leaving its own table is completely unknown, and it is the
                         mechanism that decides whether moving a table breaks the
                         formulas pointing into it.
 
 21-formula-errors       DONE, and richer than asked. Established that a broken
                         reference is node type 46 with sentinel coordinates, that an
                         unknown function keeps its spelling, that circularity is not
-                        recorded at all, and that the FORMULA_ERROR list is empty —
+                        recorded at all, and that the FORMULA_ERROR list is empty,
                         the KIND of error is not stored. See FINDINGS.md.
 ```
 
@@ -334,7 +334,7 @@ list above may want revising rather than following.
                         held content, plus formulas reading both a merge anchor and a
                         covered cell. That range is what made the findings possible.
 22b-merge-2x2-unmerged  The SAME file with every merge removed and nothing else
-                        touched. This pair is what located merge storage — a presence
+                        touched. This pair is what located merge storage, a presence
                         check had already failed, because the field exists in both and
                         only its CONTENT differs. Established that merges live in
                         TableModelArchive.merge_owner.formula_store as full formula
@@ -346,36 +346,36 @@ list above may want revising rather than following.
                         make the same file with and without it. Two files differing in
                         one property beat any amount of searching by field name.
 23-row-inserted         DONE, and it explained an existing bug. Numbers DOES rewrite
-                        merge ranges on a structural edit — the originals moved from
+                        merge ranges on a structural edit, the originals moved from
                         row 0 to row 1. Inserted rows also INHERIT the merge pattern
                         of their neighbour, so 5 merges became 15, and a merge can
                         cover entirely empty cells. See FINDINGS.md.
 
 24-column-inserted      DONE, and it proved rows and columns differ. Merges shifted
                         to their new columns correctly, but NO new merges were
-                        created — where a row insert created ten. Testing only one
+                        created, where a row insert created ten. Testing only one
                         axis would have produced the wrong rule for both.
 
 25-multi-tables         DONE, and it answered more than asked. Sheets hold an ORDERED
                         list of drawable_infos and a table is simply a drawable.
-                        TableInfoArchive.super carries geometry — position, size,
-                        angle, locked — so tables can be ROTATED. This largely covers
+                        TableInfoArchive.super carries geometry, position, size,
+                        angle, locked, so tables can be ROTATED. This largely covers
                         what 45 and 47 were meant to discover.
 
 26-multi-sheets         DONE. Three sheets, one with a tab color and one with a
                         background color. Both live in SheetStyleArchive
-                        .sheet_properties (tab_color and fill), NOT as sheet fields —
+                        .sheet_properties (tab_color and fill), NOT as sheet fields,
                         and the styled sheets carry parent + is_variation + an
                         override_count, which is the named-style layering from
                         CLAUDE.md decision 2 visible in the wild.
 
 27-big-table            DONE, and it was discovery rather than confirmation. A table
-                        over 256 rows SPLITS INTO TILES — 2001 rows became 8. Two
+                        over 256 rows SPLITS INTO TILES, 2001 rows became 8. Two
                         traps followed: tile_row_index restarts at 0 in every tile, so
                         a document row is tileid * tile_size + tile_row_index; and
                         tile archive identifiers are NOT in row order, so
                         TileStorage.tiles is the authoritative sequence. Built by
-                        importing a generated CSV, which breaks Save-As lineage — fine
+                        importing a generated CSV, which breaks Save-As lineage, fine
                         here, because this fixture is not compared against a baseline.
 ```
 
@@ -398,17 +398,17 @@ list above may want revising rather than following.
                         and one copy serves every fill. Techniques are a small enum
                         and scale is stored as a rendered fillsize in points, not a
                         percentage. The tile itself is tests/fixtures/tile-pattern.png,
-                        generated by workarea/make-tile.py — seamless by construction
+                        generated by workarea/make-tile.py, seamless by construction
                         and original, so there is no licence to track.
 29-style-border        DONE, and it disproved all three reasonable guesses. Five
                         tables: per-cell borders, table outline, gridlines on, off,
                         and banding. Table-level settings write NOTHING into the
-                        stroke sidecar — they are a separate mechanism in the table
+                        stroke sidecar. They are a separate mechanism in the table
                         style, not convenience over cell borders. And a single line
                         between two cells is stored TWICE, once on each facing edge.
                         See findings-06-styles.md.
 30-style-align          DONE, and it resolved the variable-length style tail. The
-                        STYLE list is HETEROGENEOUS — horizontal alignment is a
+                        STYLE list is HETEROGENEOUS, horizontal alignment is a
                         paragraph style, vertical alignment and wrap are cell styles,
                         and a cell referencing both carries two style keys. Also
                         established the alignment enum by measurement, because the
@@ -416,7 +416,7 @@ list above may want revising rather than following.
                         findings-06-styles.md.
 31-style-inset-2pt          DONE, and extended with the indent controls that sit beside
                         inset in the UI. Established that insets are CELL padding
-                        while indents are PARAGRAPH properties — the cell owns its
+                        while indents are PARAGRAPH properties, the cell owns its
                         box, the paragraph owns its text. Also confirmed everything
                         is stored in points (0.25in -> 18.0) and that the 4pt default
                         writes no style at all. See findings-06-styles.md.
@@ -424,13 +424,13 @@ list above may want revising rather than following.
                         style writes a REFERENCE to the shared style; formatting on top
                         of one creates an anonymous VARIATION carrying parent,
                         is_variation and override_count, storing only the overridden
-                        properties. The design CLAUDE.md proposed — a style reference
-                        plus an optional local override — is what Numbers does.
+                        properties. The design CLAUDE.md proposed, a style reference
+                        plus an optional local override, is what Numbers does.
 
                         Two things nobody predicted. override_count counts LOGICAL
                         properties, not fields: a color change stores font_color and
                         tsd_fill but counts as 1. And there is NO unparented text
-                        style — the cell labelled "manually styled" is still a
+                        style, the cell labelled "manually styled" is still a
                         variation of Body, so manual formatting is an anonymous
                         variation of a named style rather than the absence of one.
 
@@ -454,7 +454,7 @@ list above may want revising rather than following.
                         flipping, locking, deliberate distortion and four crops.
 ```
 
-### Unicode — NOT COVERED, and one hazard is live
+### Unicode: NOT COVERED, and one hazard is live
 
 The corpus contains four non-ASCII characters in total, all smart quotes Numbers inserted
 by autocorrect, all in the Basic Multilingual Plane. **Zero astral-plane characters.** So
@@ -464,7 +464,7 @@ nothing here tests Unicode deliberately.
 **UTF-16 code units**, not Python characters. The decisive cell is `AB𠮟CD` with `AB` bold and
 `CD` in a small-caps character style: the third run begins at index **4**, where Python
 indexing would put it at 3. Only the UTF-16 reading reconstructs `AB` / `𠮟` / `CD`; the scalar
-reading yields `AB` / `𠮟C` / `D` — plausible, wrong, and silent. pybers assumed Python offsets
+reading yields `AB` / `𠮟C` / `D`, plausible, wrong, and silent. pybers assumed Python offsets
 and that assumption is now known to be wrong. Full detail in
 [findings-04-text.md](findings-04-text.md).
 
@@ -494,7 +494,7 @@ ZWJ sequences       The emoji cell covers skin-tone modifiers and variation
 36-unicode-text         ONE cell per case, labelled as usual:
                           - accented Latin: naive, cafe with an acute, Straße   [DONE]
                           - CJK: see the paste-ready block below
-                          - EMOJI, and more than one — this is the important case
+                          - EMOJI, and more than one. This is the important case
                           - an emoji with a skin-tone modifier, and a family emoji
                             (those are multi-codepoint sequences)
                           - Hebrew or Arabic, for right-to-left
@@ -509,7 +509,7 @@ ZWJ sequences       The emoji cell covers skin-tone modifiers and variation
                         counts scalars. For BMP text the two agree exactly, which is
                         why 02-text-rich validated perfectly and proved nothing. One
                         emoji makes a Python character two UTF-16 units, and every run
-                        boundary after it drifts — silently, producing plausible wrong
+                        boundary after it drifts, silently, producing plausible wrong
                         runs rather than an error.
 
                         pybers currently ASSUMES the indices are Python offsets. That
@@ -517,12 +517,12 @@ ZWJ sequences       The emoji cell covers skin-tone modifiers and variation
 
                         It is not only the char style table. `33-textbox` showed a
                         StorageArchive carries TWENTY-ONE parallel run tables,
-                        NINETEEN of them keyed by character_index — styles, language,
+                        NINETEEN of them keyed by character_index, styles, language,
                         bidi, drop cap, dictation, tracked changes. All nineteen drift
                         together, and a structural edit has to reindex every one.
 ```
 
-#### CJK — paste-ready, one cell each
+#### CJK: paste-ready, one cell each
 
 The first five are BMP and prove nothing about indexing; they cover encoding, script mixing
 and normalization. **The last four are the ones that matter**, because a Python scalar count
@@ -551,7 +551,7 @@ Three of these are deliberately sly:
 
 - **U+2F804 looks exactly like U+4F60 and is twice the length.** It is a compatibility
   ideograph with a canonical decomposition, so **any NFC normalization anywhere in the path
-  silently replaces it with the ordinary BMP character** — which is what happened on the
+  silently replaces it with the ordinary BMP character**, which is what happened on the
   first attempt to write it into this README, turning a 2-unit astral character into a
   1-unit BMP one with nothing to show for it. Generate it at the terminal with the command
   above rather than copying it from anywhere, and check the cell afterwards. Visually
@@ -561,16 +561,16 @@ Three of these are deliberately sly:
   decomposed into jamo (`U+1112 U+1161 U+11AB U+1100 U+116E U+11A8 U+110B U+1165`) it is 8,
   and both display identically. If a decomposed paste comes back as 3, Numbers applied NFC,
   and a round trip must not silently reapply or undo that. The Japanese line has the same
-  property in miniature — `じ` is one character in NFC and two in NFD.
+  property in miniature, `じ` is one character in NFC and two in NFD.
 - **`AB𠮟CD` is the whole experiment.** Format `AB` one way and `CD` another, leaving the
   astral character between them untouched. The second run's `character_index` will be **4**
   if Numbers counts UTF-16 code units and **3** if it counts Python scalars. Label which
-  formatting is on which side — that label is the answer key, and without it the result is
+  formatting is on which side, that label is the answer key, and without it the result is
   a number with nothing to check it against.
 
 One cell, an unambiguous answer, and it decides how nineteen run tables are indexed.
 
-#### Hebrew and Arabic — paste-ready, one cell each
+#### Hebrew and Arabic: paste-ready, one cell each
 
 Every one of these is BMP, so a Python count and a UTF-16 count agree and **none of them
 tests the indexing question**. They are here for a different unknown: `table_para_bidi` is a
@@ -597,7 +597,7 @@ What each is actually for:
 - **The niqqud and harakat cells test what "one character" means.** `שָׁלוֹם` is 4 visible
   letters, 7 code points and 7 UTF-16 units, with 3 combining marks; the Arabic one carries
   4. If `character_index` should turn out to count grapheme clusters rather than code units,
-  these are the only cells that can reveal it — Latin and CJK samples have no combining
+  these are the only cells that can reveal it, Latin and CJK samples have no combining
   marks and would agree either way.
 - **`١٢٣` is bidi class `AN`, not `EN`.** Arabic-Indic digits are a different directional
   class from the European digits one line above, so the two cells together separate "there
@@ -606,7 +606,7 @@ What each is actually for:
 Arabic letters join contextually when rendered but are **stored as isolated code points**, so
 a decode that shows unjoined forms is correct rather than broken. Do not chase it.
 
-### The "More Text Options" panel — mostly covered now
+### The "More Text Options" panel: mostly covered now
 
 `37` and `38` are done and both carried far more than their names suggested. What is left of
 this panel is tabs and indents, specced below as `39`.
@@ -638,7 +638,7 @@ this panel is tabs and indents, specced below as `39`.
 
                         It also settled what the *_null booleans mean. shadow_null =
                         True is an override to EXPLICITLY NOTHING, not "unspecified"
-                        — it counts toward override_count exactly as setting a value
+, it counts toward override_count exactly as setting a value
                         does. And its own label caught, and correctly diagnosed, that
                         text shadow is specified at BOTH the cell level and the
                         character-run level, so resolving one means walking both.
@@ -677,7 +677,7 @@ inset, but tabs are not covered at all and they are common in real documents.
                         Also: all four tab alignments incl. decimal; `leader` is a
                         SINGLE-CHARACTER STRING where unset and " " both mean none;
                         default_tab_stops is the fallback interval in points; and
-                        there are TWO INDEPENDENT INDENT MECHANISMS — first_line /
+                        there are TWO INDEPENDENT INDENT MECHANISMS, first_line /
                         left / right_indent in points, and the indent BUTTON which
                         writes an integer LEVEL to table_para_data with no point
                         value anywhere. That run table had read (0,0) in every
@@ -685,14 +685,14 @@ inset, but tabs are not covered at all and they are common in real documents.
 
 ```
 
-### Table bands and panes — DONE, all three in one file
+### Table bands and panes: DONE, all three in one file
 
 `40` absorbed `41-table-frozen` and `42-style-band-vs-row`; the numbers after it
 shifted down by two.
 
 ```
 40-table-bands          DONE, and it absorbed 41-table-frozen and
-                        42-style-band-vs-row — one file, four tables, all three
+                        42-style-band-vs-row, one file, four tables, all three
                         questions answered. Renumbering follows from that.
 
                         Table 1     bands at the MAXIMUM: 5 header rows, 5 header
@@ -720,11 +720,11 @@ shifted down by two.
 
 ```
 
-### Table geometry and placement — DONE
+### Table geometry and placement: DONE
 
 **`42-table-dimensions` was dropped, not renumbered away.** It asked for a tall-and-narrow
 table, a short-and-wide one, and a single cell. The corpus already holds **24 distinct table
-shapes** including all three — `2001 x 4` in `27`, `2 x 18` in `15`, and `1 x 1` in
+shapes** including all three, `2001 x 4` in `27`, `2 x 18` in `15`, and `1 x 1` in
 `00-baseline` and eight others. `number_of_rows` and `number_of_columns` are plain scalars
 read on every table in every fixture, so a fourth arrangement of the same two integers
 proves nothing. The numbers after it shifted down by one.
@@ -736,7 +736,7 @@ loses any of that has damaged the document just as surely as losing a value.
 `40` found WHERE this lives. `TST.HeaderStorageBucket` holds, per row and per column, a
 `size`, a `hidingState`, a `numberOfCells`, and optional `cell_style` / `text_style`
 references. Rows hang off an inline `HeaderStorage` on the data store while columns sit
-behind a `TSP.Reference` — an asymmetry a reader has to handle. **`size = 0.00` means "use
+behind a `TSP.Reference`, an asymmetry a reader has to handle. **`size = 0.00` means "use
 the default", not zero**, and `default_row_height` / `default_column_width` on the table model
 supply it.
 
@@ -748,7 +748,7 @@ resized column, or a hidden row, so every `size` reads 0 and every `hidingState`
                         Eight tables, each duplicated from the last then resized,
                         plus a hidden row and a hidden column.
 
-                        A table's geometry.size is STALE — it describes the table
+                        A table's geometry.size is STALE, it describes the table
                         it was duplicated FROM and is never updated when rows or
                         columns are resized. Six of six matched the predecessor's
                         content size + 4. The real size is sum(row heights) x
@@ -764,10 +764,10 @@ resized column, or a hidden row, so every `size` reads 0 and every `hidingState`
                         hidden_states_owner, addressed BY UUID with user_hidden =
                         true. Resolving a uuid to an index needs
                         ColumnRowUIDMapArchive, whose uid_for_index is a
-                        PERMUTATION — reading sorted order positionally reports the
+                        PERMUTATION, reading sorted order positionally reports the
                         wrong column.
 
-42-table-titles-captions  DONE, and RENAMED — it turned out to be as much about
+42-table-titles-captions  DONE, and RENAMED, it turned out to be as much about
                         captions as titles, and the captions are the richer half.
 
                         A table's TITLE is its NAME. There is no separate field:
@@ -784,7 +784,7 @@ resized column, or a hidden row, so every `size` reads 0 and every `hidingState`
                         and only its type says whether a caption exists.
 
                         TEXT INSET LIVES ON THE SHAPE STYLE, not the paragraph style
-                        — proven by two captions sharing 'Special Caption' with
+, proven by two captions sharing 'Special Caption' with
                         different padding. An inset does not travel with a named
                         style.
 
@@ -792,7 +792,7 @@ resized column, or a hidden row, so every `size` reads 0 and every `hidingState`
                         are user-visible only if registered in the stylesheet's
                         identifier_to_style_map. 'Object Caption' and 'Object Title'
                         are real named styles with NO map entry and never appear in
-                        the browser. See findings-06-styles.md — this decides how
+                        the browser. See findings-06-styles.md, this decides how
                         pybers must create named styles.
 
 ```
@@ -803,7 +803,7 @@ was the right call for isolating cell behavior, and it means these fixtures are
 deliberately atypical. `42-table-titles` exists so the default shape is covered too, and
 nothing assumes the stripped-down form is normal.
 
-### Drawable gaps — one closed, one narrowed
+### Drawable gaps: one closed, one narrowed
 
 `44-line-ends` was closed by expanding `34-shape` itself; what is left of it is the connector
 question. `43-stroke-dashes` was answered from an unexpected direction, by text outlines in
@@ -814,14 +814,14 @@ question. `43-stroke-dashes` was answered from an unexpected direction, by text 
                         5pt so the two readings could be told apart.
 
                         THE DASH ARRAY IS IN MULTIPLES OF STROKE WIDTH, not points.
-                        Every preset stores identical numbers at both widths —
+                        Every preset stores identical numbers at both widths,
                         [1,1] short dashed, [2,2] dashed, [6,6] wide dashed,
                         [0.001, 2] wide dotted. A 5pt dashed stroke therefore
                         renders 10pt dashes with 10pt gaps. Readers multiply by
                         width; writers divide. `cap` tracks the preset, not the
                         width.
 
-44-line-ends            DONE. Connectors attached to shapes, which 34 never had —
+44-line-ends            DONE. Connectors attached to shapes, which 34 never had,
                         its lone connector was simply unattached.
 
                         ConnectionLineArchive carries FOUR attachment fields:
@@ -846,7 +846,7 @@ object model has been made and read.
 
 Verified exhaustively for `32`, `43` and `44`: every archive in each file was enumerated and
 walked from the document roots, and the only ones never reached are stale
-`DocumentSelectionArchive` / `SheetSelectionArchive` / `CanvasSelectionArchive` triples —
+`DocumentSelectionArchive` / `SheetSelectionArchive` / `CanvasSelectionArchive` triples,
 Numbers leaves orphaned selection state behind, five of each with two reachable. That is
 genuine garbage, not content, and confirms the "what was selected when you saved" note at the
 top of this file.
@@ -866,7 +866,7 @@ Everything else in `32`, `43` and `44` is accounted for field by field.
 
 ---
 
-## NOT to be fixtured — but must not be broken
+## NOT to be fixtured: but must not be broken
 
 A separate category from the gaps above. These are **not** worth building fixtures for, and
 reproducing them is out of scope, but every document already carries them and a writer that
@@ -885,14 +885,14 @@ document metadata TN.DocumentArchive, TN.ThemeArchive, TSP.DocumentMetadata,
                   TSK.AnnotationAuthorStorageArchive (comment authorship)
 ```
 
-**The headers and footers are real `TSWP.StorageArchive`s holding editable text** — they are
+**The headers and footers are real `TSWP.StorageArchive`s holding editable text**. They are
 the six otherwise-unexplained storages present in every file in this corpus. A writer that
 regenerates storages instead of carrying them through will silently erase a document's page
 headers.
 
 Numbers' page-layout tooling is one of its genuine differentiators over Excel, so losing it
 on a round trip would be a serious defect even though pybers never intends to edit it. The
-requirement is preservation, not comprehension — the same duty the cell decoder already
+requirement is preservation, not comprehension, the same duty the cell decoder already
 honors by carrying an unrecognized type byte through rather than rejecting it.
 
 ---

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Rich text — a run of characters sharing one Style, grouped into paragraphs.
+"""Rich text, a run of characters sharing one Style, grouped into paragraphs.
 
 Numbers allows mixed formatting within a single text box or cell (part of a sentence
 bold, part a different color). A plain Cell.value/Style pair cannot express that, so
@@ -29,7 +29,7 @@ class TextRun:
 
 @dataclass(frozen=True, slots=True)
 class Paragraph:
-    """One paragraph — a sequence of styled runs plus paragraph-level alignment."""
+    """One paragraph, a sequence of styled runs plus paragraph-level alignment."""
 
     runs: tuple[TextRun, ...] = ()
     alignment: str = "left"
@@ -37,6 +37,6 @@ class Paragraph:
 
 @dataclass(frozen=True, slots=True)
 class RichText:
-    """A block of text — the content of a TextBox, made of one or more paragraphs."""
+    """A block of text, the content of a TextBox, made of one or more paragraphs."""
 
     paragraphs: tuple[Paragraph, ...] = ()

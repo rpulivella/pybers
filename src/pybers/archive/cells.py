@@ -7,7 +7,7 @@ A table's rows live in `TST.Tile`, but the cells inside a row do not. They sit i
 opaque `cell_storage_buffer` indexed by a `cell_offsets` array, in a layout Apple
 never published. Everything here was reverse-engineered against the fixtures under
 tests/fixtures/, each of which carries a row of text labels describing its own
-contents — which is what makes a decode verifiable rather than merely plausible.
+contents, which is what makes a decode verifiable rather than merely plausible.
 
 The failure mode to keep in mind while reading this module: a wrong offset in this
 format yields **wrong numbers, not an exception**. Every field is a fixed-width
@@ -69,7 +69,7 @@ class CellRecord:
     library whose first duty is not to damage documents it does not fully understand.
 
     `references` are the trailing uint32 values, whose presence is gated by the flags
-    bitmask. They point into the table's data lists — the last one varies with the
+    bitmask. They point into the table's data lists, the last one varies with the
     display format. Their individual meanings are not established, so they are kept
     as read.
     """
@@ -102,7 +102,7 @@ def decodeDecimal128(raw: bytes) -> Decimal:
     When both selector bits are set the fields move: the exponent sits at bits
     124-111 and the coefficient gains an implied leading `100`. That form can only
     express coefficients of 2^113 or more, which is already past the 10^34 - 1 this
-    format may hold — so a canonical encoder never emits it, which is why it has
+    format may hold, so a canonical encoder never emits it, which is why it has
     never been seen here. It is decoded anyway rather than refused, because a reader
     that rejects a file over a corner the specification already defines is worse than
     one that follows the specification. Per IEEE 754 a coefficient beyond the maximum
@@ -153,7 +153,7 @@ def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
     if typeByte == 9:
         # Rich text: a key into the table's RICH_TEXT_PAYLOAD list rather than the
         # string list. Same four-byte shape as a plain string, and that similarity is
-        # exactly the trap — before this branch existed the width defaulted to zero,
+        # exactly what made it dangerous. Before this branch existed the width defaulted to zero,
         # so the payload key was mistaken for the first trailing reference and every
         # reference on a rich-text cell was read one slot early. It produced plausible
         # style keys pointing at the wrong styles, with nothing raising.

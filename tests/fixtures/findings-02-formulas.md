@@ -7,10 +7,10 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 
 ---
 
-## Formulas are a postfix AST, not text — and this decides the object model
+## Formulas are a postfix AST, not text: and this decides the object model
 
 From `18-formula-literals`. A formula is stored in a `FORMULA` `TableDataList` as a
-`TSCE.FormulaArchive`, whose whole content is a flat array of nodes in **postfix order** —
+`TSCE.FormulaArchive`, whose whole content is a flat array of nodes in **postfix order**,
 a stack machine, with no text anywhere:
 
 ```
@@ -24,7 +24,7 @@ Operators are nodes with implied arity; functions carry a numeric `index` and an
 encoding as cell values, alongside a float64 convenience copy.
 
 **`Cell.formula: str | None` is therefore wrong** and must become a structured type. A string
-would mean emitting a language Numbers then has to re-parse — a lossy conversion in each
+would mean emitting a language Numbers then has to re-parse, a lossy conversion in each
 direction around a format that is already a tree.
 
 ### A formula cell stores its computed RESULT, typed by that result
@@ -34,7 +34,7 @@ direction around a format that is already a tree.
 and the value slot caches what it evaluated to.
 
 Two consequences. Reading a value never requires evaluating anything, because the answer is
-already stored. And **writing a formula means writing a plausible cached result too** — a
+already stored. And **writing a formula means writing a plausible cached result too**, a
 stale or missing one would display the wrong number until Numbers recalculated.
 
 A failing formula is different: `18` includes `=ROUND(2.5)`, invalid because ROUND needs two
@@ -52,7 +52,7 @@ ASTLocalCellReferenceNodeArchive {
 }
 ```
 
-**`$` is not an escape hatch in this format — it is two booleans on a reference.** `$A1`,
+**`$` is not an escape hatch in this format. It is two booleans on a reference.** `$A1`,
 `A$1` and `$A$1` are three combinations of the same two flags, which is why mixed locking
 behaves correctly in Numbers and why dragging never needs a textual workaround. Anchoring is
 a genuine property of a reference, and pybers should model it as one rather than as
@@ -63,7 +63,7 @@ references are distinct node kinds rather than one kind with an optional table.
 
 ### ANSWERED: references are relative offsets, and one formula is shared by many cells
 
-`19-formula-dragged` settles it. Every formula there has **`refcount = 2`** — a single
+`19-formula-dragged` settles it. Every formula there has **`refcount = 2`**, a single
 stored archive shared by the original cell and its dragged copy, producing *different*
 results in each. That is only possible if references resolve against the containing cell.
 
@@ -86,8 +86,8 @@ absolute_column { range_begin: 1, range_end: 3 }
 absolute_row    { range_begin: 0 }
 ```
 
-`ASTStickyBits` records the same fact alongside — all four false for the relative form, all
-four true for the locked one — so anchoring is expressed twice, in the field variant and in
+`ASTStickyBits` records the same fact alongside, all four false for the relative form, all
+four true for the locked one, so anchoring is expressed twice, in the field variant and in
 the bits.
 
 **Mixed locking is per axis on one reference.** `$B1+C$1` decodes to two coordinate nodes
@@ -103,12 +103,12 @@ An absolute column beside a relative row, then the reverse, on the same formula.
 ### What this decides
 
 **Moving a cell requires no reference rewriting.** A relative reference is already relative
-to wherever the cell sits, so a moved or copied formula is correct by construction — which
+to wherever the cell sits, so a moved or copied formula is correct by construction, which
 is why Numbers never needs `$` as a workaround, and why a user can drag freely without
 anything breaking. Locking is then free to mean what it should: *this one stays put*.
 
 For pybers this removes an entire class of work. There is no formula text to parse, no
-reference rewriting on move, and no regex — the defect in CLAUDE.md's bug list came from
+reference rewriting on move, and no regex, the defect in CLAUDE.md's bug list came from
 treating as text something the format never stored as text. What remains is a walk over
 nodes, and unrecognized node types should be carried through untouched rather than
 interpreted, since a formula is shared state that other cells depend on.
@@ -117,7 +117,7 @@ interpreted, since a formula is shared state that other cells depend on.
 
 From `20-formula-shapes`, which points one cell at a second table on the same sheet and
 another at a table on a second sheet. Both produce the **same** node type as an ordinary
-reference — `36` — with one extra field:
+reference, `36`, with one extra field:
 
 ```
 column: -6, absolute: false          an ordinary relative offset
@@ -143,7 +143,7 @@ schema permits.
 ```
 
 This is the exact shape of the range-shift bug in CLAUDE.md. Because each range is its own
-node with its own anchoring, adjusting one cannot disturb the other — the structure makes
+node with its own anchoring, adjusting one cannot disturb the other, the structure makes
 the correct behavior the default, which is precisely what a regex over formula text could
 not do.
 
@@ -156,7 +156,7 @@ is expressed by absence rather than by a sentinel or a flag.
 
 From `21-formula-errors`.
 
-A **deleted reference** becomes node type `46` — not the usual `36` — carrying sentinel
+A **deleted reference** becomes node type `46`, not the usual `36`, carrying sentinel
 coordinates:
 
 ```
@@ -168,7 +168,7 @@ So `#REF` is a coordinate deliberately pointing nowhere, and is recognizable str
 
 An **unknown function keeps its spelling**: node type `31` carries
 `unknown_function_node_string = "UNKNOWNFUNC"` with its argument count. Numbers preserves
-the text of a function it cannot resolve, so an unrecognized formula still round-trips —
+the text of a function it cannot resolve, so an unrecognized formula still round-trips,
 the same instinct pybers applies to unknown cell types.
 
 **A circular reference is not marked at all.** Two cells referring to each other hold
@@ -178,7 +178,7 @@ one the file records.
 **The kind of error is not stored.** The `FORMULA_ERROR` data list is empty; an error cell is
 simply type 8 pointing at an ordinary formula. Division by zero is indistinguishable in the
 file from any other failure. Only `#REF` is visible, through those sentinels. So pybers can
-report *that* a cell errored and, for broken references, *why* — but reproducing Numbers'
+report *that* a cell errored and, for broken references, *why*, but reproducing Numbers'
 error text for anything else would mean evaluating the formula.
 
 ### Node types identified so far
@@ -195,6 +195,6 @@ Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS**. These are numeric, so a 
 eventually needed and must be derived rather than borrowed, per the schema-ownership
 decision.
 
-The node message has 45 fields, so exhaustive modelling is neither necessary nor wise.
-Unrecognized nodes should be carried through untouched — a formula is shared state that
+The node message has 45 fields, so exhaustive modeling is neither necessary nor wise.
+Unrecognized nodes should be carried through untouched, a formula is shared state that
 other cells depend on.

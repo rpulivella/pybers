@@ -5,19 +5,19 @@ pybers ticket tool
 
 The single sanctioned path to GitHub Issues and the pybers Project board.
 The /ticket-create, /ticket-startwork, /changelog-add and /pr-draft skills all
-call this rather than driving the API by hand, so that the board's invariants —
+call this rather than driving the API by hand, so that the board's invariants,
 one classification label, a Status that always moves forward, an issue that is
-always on the board — hold in exactly one place.
+always on the board, hold in exactly one place.
 
 Ported from the author's other tooling ticket.py (same author, same conventions) and since
-carried further here — this copy holds credential and markup fixes another repository has
+carried further here, this copy holds credential and markup fixes another repository has
 not taken back yet. See CLAUDE.md for the origin story.
 
 Talks to GitHub over urllib: REST for issues, GraphQL for the Project board.
 Never shells out to `gh` or `jq`, per the house rules in scripts/README.md.
 
 Authentication resolves in this order, and there is deliberately no third
-fallback — a missing token is a loud failure, never a guess:
+fallback, a missing token is a loud failure, never a guess:
     1. GITHUB_TOKEN or GH_TOKEN in the environment
     2. a GITHUB_TOKEN= line in the git-ignored .dev.vars at the repository root
 
@@ -44,7 +44,7 @@ UPDATES
             and was wrong. Round 2 corrected it and `another repository` carries the
             correction; this repo did not. An expired or revoked token is 401, not 404.
             What answers 404 on a private repository is a VALID token lacking `repo`
-            scope, or a wrong owner/name — so the old wording sent a reader hunting a
+            scope, or a wrong owner/name, so the old wording sent a reader hunting a
             dead credential when the fault was a scope or a typo. requestJson now adds a
             404 hint naming the two real causes. Also fixed an indentation bug in
             `edit --dry-run`: the body preview sat OUTSIDE its `if body is not None`
@@ -55,7 +55,7 @@ UPDATES
             silently decided the identity; GITHUB_TOKEN now wins by name, and two
             different values refuse rather than picking. resolveToken tested the
             environment variable for truth before stripping it, so a whitespace-only
-            value sent `Authorization: Bearer ` — it now strips first and raises on
+            value sent `Authorization: Bearer `, it now strips first and raises on
             set-but-empty rather than falling through to another source.
 2026-08-17  `edit` now reads the ticket back and compares body, title and label against
             what was sent. `edit` replaces the WHOLE body and GitHub has no conflict
@@ -163,8 +163,8 @@ class GitHubHttpError(RuntimeError):
     keeps catching it unchanged, so this adds a capability without moving any
     caller onto a new failure path.
 
-    The status has to survive as an integer because the alternative — recovering
-    it from the formatted message — silently conflates causes. On a PRIVATE
+    The status has to survive as an integer because the alternative, recovering
+    it from the formatted message, silently conflates causes. On a PRIVATE
     repository GitHub answers **404** to a VALID token that lacks `repo` scope, and
     to a wrong owner or name, exactly as it does to a branch that is genuinely
     absent. An expired or revoked token is **401**, not 404. So a guard matching on
@@ -187,7 +187,7 @@ def readTokenFromSecretsFile() -> str | None:
 
     `GITHUB_TOKEN` wins over `GH_TOKEN` **by name, not by position**. Returning the
     first line matching either name let a stale `GH_TOKEN=` sitting above the real
-    one silently decide the identity — and on a machine with two GitHub accounts
+    one silently decide the identity, and on a machine with two GitHub accounts
     that means every issue filed and every commit authored as the wrong person,
     with nothing to show for it but the wrong name in the history.
 
@@ -216,7 +216,7 @@ def readTokenFromSecretsFile() -> str | None:
     if primary and secondary and primary != secondary:
         raise RuntimeError(
             f"{secretsPath} sets GITHUB_TOKEN and GH_TOKEN to different values. "
-            "Refusing to guess which account you meant — delete whichever is stale. "
+            "Refusing to guess which account you meant, delete whichever is stale. "
             "Picking one silently is how work gets filed under the wrong identity."
         )
     return primary or secondary or None
@@ -245,7 +245,7 @@ def resolveToken() -> str:
         if not cleaned:
             raise RuntimeError(
                 f"{variableName} is set but empty. That is a misconfiguration, not a "
-                "request to look elsewhere — unset it to fall back to .dev.vars, or "
+                "request to look elsewhere, unset it to fall back to .dev.vars, or "
                 "give it a real value."
             )
         return cleaned
@@ -272,7 +272,7 @@ def requestJson(
     """Perform one authenticated JSON request and return the decoded body.
 
     Raises ``GitHubHttpError`` carrying GitHub's own message, because the API
-    explains its refusals far better than a status code does — and carrying the
+    explains its refusals far better than a status code does, and carrying the
     status *as a number* alongside it, because a caller that needs to branch on
     one must not go looking for it in the prose. A guard that recovered the status
     by searching the message for "404" told a user to push an already-pushed
@@ -299,9 +299,9 @@ def requestJson(
         hint = ""
         if exc.code == 404:
             # A private repo answers 404 to a VALID token lacking `repo` scope, and
-            # to a wrong owner/name. An expired or revoked token is 401, not 404 —
+            # to a wrong owner/name. An expired or revoked token is 401, not 404,
             # do not send anyone hunting an expired credential from here.
-            hint = (" — on a private repository this is also what a valid token "
+            hint = (", on a private repository this is also what a valid token "
                     "without `repo` scope looks like, or a wrong owner/name")
         raise GitHubHttpError(
             exc.code, f"GitHub returned HTTP {exc.code}{hint}: {detail}"
@@ -606,7 +606,7 @@ def printBodyAsRawString(summary: TicketSummary) -> None:
 
     Anything that passes through rich is unusable for that. rich hard-wraps to the
     terminal width, expands tabs to spaces, substitutes emoji shortcodes (`:warning:`
-    becomes a glyph), and reads square brackets as style markup — a body containing
+    becomes a glyph), and reads square brackets as style markup, a body containing
     `[bold]`, `[red]` or `[hotfix]` loses those words SILENTLY, with no error.
     Measured 2026-08-13: "use [bold] tags and [red] markers, plus [88] and [hotfix]"
     renders as "use  tags and  markers, plus [88] and ". Passing markup=False,
@@ -658,7 +658,7 @@ def showTicket(summary: TicketSummary) -> None:
         # highlight=False stops it recoloring numbers and URLs inside prose it does
         # not own. Wrapping stays ON: this is the human-reading path and
         # terminal-width wrapping is wanted here. It is also why this cannot
-        # round-trip — for that use printBodyAsRawString(), which touches nothing.
+        # round-trip, for that use printBodyAsRawString(), which touches nothing.
         console.print(summary["body"], markup=False, highlight=False)
 
 
@@ -676,7 +676,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     body = bodyPath.read_text(encoding="utf-8")
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was filed.[/]")
+        console.print("[yellow]Dry run. Nothing was filed.[/]")
         console.print(f"label:  [magenta]{arguments.label}[/]")
         console.print(f"title:  [bold]{escape(arguments.title)}[/]")
         console.print(f"status: [cyan]{arguments.status}[/]")
@@ -712,7 +712,7 @@ def cmdShow(arguments: argparse.Namespace) -> int:
     `show` renders; `export-as-source` does not. That is the whole distinction, and the names
     are meant to carry it without anyone having to read this file. This one is free
     to change its formatting at any time, which is exactly why its output must never
-    be sent back — use `export-as-source` for that.
+    be sent back, use `export-as-source` for that.
     """
     summary = readTicket(resolveToken(), arguments.number)
     showTicket(summary)
@@ -725,7 +725,7 @@ def cmdExportAsSource(arguments: argparse.Namespace) -> int:
     Separate from `show` because displaying and round-tripping are different actions
     with incompatible contracts: `show` may reformat freely, `export-as-source` must never
     transform a single byte. Both of them "read" a ticket, which is why neither is
-    called that — the name has to say what comes out.
+    called that, the name has to say what comes out.
     """
     summary = readTicket(resolveToken(), arguments.number)
     if arguments.body:
@@ -741,7 +741,7 @@ def cmdStart(arguments: argparse.Namespace) -> int:
     summary = readTicket(token, arguments.number)
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was changed.[/]")
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
         console.print(f"would assign #{summary['number']} to {arguments.assignee}")
         console.print("would set Status to [cyan]In Progress[/]")
         return 0
@@ -777,7 +777,7 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         body = bodyPath.read_text(encoding="utf-8")
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was changed.[/]")
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
         if arguments.title:
             console.print(f"would set title: [bold]{escape(arguments.title)}[/]")
         if arguments.label:
@@ -797,7 +797,7 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
 
     # Read the ticket back and confirm what landed. `edit` replaces the WHOLE body
     # and GitHub offers no conflict detection, so a revision drafted against a copy
-    # exported even minutes earlier silently discards whatever changed in between —
+    # exported even minutes earlier silently discards whatever changed in between,
     # no error, no conflict marker, the other edit simply gone. Verifying cannot
     # prevent that, but it makes it visible immediately to whoever caused it, which
     # is the difference between losing data and failing a command. It is also what
@@ -838,7 +838,7 @@ def cmdClose(arguments: argparse.Namespace) -> int:
     """Close a ticket and move it to Done.
 
     Merging a pull request whose body carries `Closes #N` already closes the
-    issue, which leaves the board behind — an already-closed issue is the normal
+    issue, which leaves the board behind, an already-closed issue is the normal
     case after a merge, not an error, so this command still sets the Status and
     only skips the close itself.
     """
@@ -848,7 +848,7 @@ def cmdClose(arguments: argparse.Namespace) -> int:
     alreadyClosed = summary["state"] == "closed"
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was changed.[/]")
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
         if alreadyClosed:
             console.print(f"#{summary['number']} is already closed; would leave the issue alone")
         else:
@@ -858,7 +858,7 @@ def cmdClose(arguments: argparse.Namespace) -> int:
 
     if alreadyClosed:
         console.print(
-            f"[yellow]#{arguments.number} is already closed[/] — setting Status only."
+            f"[yellow]#{arguments.number} is already closed[/], setting Status only."
         )
     else:
         closeTicket(token, arguments.number, reason)
@@ -888,7 +888,7 @@ def cmdStatus(arguments: argparse.Namespace) -> int:
         return 1
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was changed.[/]")
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
         console.print(f"would set #{arguments.number} to [cyan]{arguments.setStatus}[/]")
         return 0
 
@@ -948,7 +948,7 @@ def cmdList(arguments: argparse.Namespace) -> int:
                 unreadableCount += 1
                 continue
             statusValue = item.get("fieldValueByName") or {}
-            statusName = statusValue.get("name") or "—"
+            statusName = statusValue.get("name") or ", "
             if arguments.status and statusName != arguments.status:
                 continue
             labelNames = [entry["name"] for entry in content["labels"]["nodes"]]
@@ -962,14 +962,14 @@ def cmdList(arguments: argparse.Namespace) -> int:
     if unreadableCount:
         console.print(
             f"[red]{unreadableCount} board item(s) could not be read.[/] "
-            "The token reaches the board but not the issues behind it — "
+            "The token reaches the board but not the issues behind it, "
             "check that it carries the full [bold]repo[/] scope, not only repo:status."
         )
 
     for typeName, title in nonTickets:
         kind = "draft" if typeName == "DraftIssue" else typeName.lower()
         console.print(
-            f"[yellow]{kind:<12}[/] [dim]—[/]    {escape(title)}  "
+            f"[yellow]{kind:<12}[/] [dim], [/]    {escape(title)}  "
             "[dim](on the board but not a ticket)[/]"
         )
 
@@ -991,7 +991,7 @@ def cmdBlock(arguments: argparse.Namespace) -> int:
     number = arguments.number
 
     if arguments.dryRun:
-        console.print("[yellow]Dry run — nothing was changed.[/]")
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
         for blocker in arguments.blockedBy:
             console.print(f"would mark #{number} blocked by #{blocker}")
         for blocker in arguments.unblock:

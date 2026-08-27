@@ -5,7 +5,7 @@ pybers protobuf schema bootstrap
 
 Extract the iWork archive protobuf schemas that pybers builds on, from the Numbers
 application binary on this machine, and report how they differ from the schemas
-of numbers-parser, which is not vendored here — see CLAUDE.md.
+of numbers-parser, which is not vendored here, see CLAUDE.md.
 
 **Why this exists rather than a vendored copy of someone else's schemas.** Apple
 compiles the protobuf descriptors for its own archive format into the Numbers
@@ -46,7 +46,7 @@ Python from the dumped schemas requires protoc on PATH.
 UPDATES
 2026-08-16  Pinned encoding on both subprocess calls. text=True alone decodes with the
             ambient locale, so a context without LANG mangled the toolchain's own
-            diagnostics — which are the text quoted into the RuntimeError, making the
+            diagnostics, which are the text quoted into the RuntimeError, making the
             one explanation of a failure the thing that got corrupted.
 2026-08-13  Written. Replaces the abandoned "reuse the vendored _pb2 classes" plan;
             see CLAUDE.md decision 1 for why extracting our own is the correct call.
@@ -77,8 +77,8 @@ console = Console()
 # Committed, because the artifacts it produces are committed: src/pybers/protos/ and
 # src/pybers/_generated/ are machine output, and an artifact whose generator is missing
 # is the same opacity this project refused when it declined to vendor someone else's
-# dump. It cannot run on a fresh clone — it needs a local Numbers and a separately
-# obtained protodump — which is exactly why the output is committed rather than built.
+# dump. It cannot run on a fresh clone: it needs a local Numbers and a separately
+# obtained protodump: which is exactly why the output is committed rather than built.
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 
 # Where the dumped schemas and the generated Python land once --write is passed. Both
@@ -86,13 +86,13 @@ repositoryRoot: Path = Path(__file__).resolve().parent.parent
 schemaDirectory: Path = repositoryRoot / "src" / "pybers" / "protos"
 generatedDirectory: Path = repositoryRoot / "src" / "pybers" / "_generated"
 
-# The vendored schemas this dump is compared against. Reference only — never a source.
+# The vendored schemas this dump is compared against. Reference only: never a source.
 referenceSchemaDirectory: Path = (
     repositoryRoot / "reference" / "numbers-parser" / "src" / "protos"
 )
 
 # protodump stays in workarea/, which is git-ignored and therefore never committed,
-# published, or distributed — the whole of the licensing concern, since that file
+# published, or distributed: the whole of the licensing concern, since that file
 # carries a copyright line but no license statement. This script is committed; the
 # third-party tool it invokes is not.
 # Overridable with --protodump or the PROTODUMP environment variable.
@@ -215,7 +215,7 @@ def resolveProtodumpPath(requestedPath: Path | None) -> Path:
             return candidate
 
     raise RuntimeError(
-        "protodump.py was not found. It is deliberately not vendored in this repo — "
+        "protodump.py was not found. It is deliberately not vendored in this repo, "
         f"obtain it once and place it at {defaultProtodumpPath}, or pass --protodump / "
         "set PROTODUMP. See this script's docstring for the provenance and the two "
         "packages it needs (protobuf, tqdm)."
@@ -238,7 +238,7 @@ def runProtodump(
         capture_output=True,
         # text=True alone decodes with the ambient locale, so the same run under a
         # cron or launchd context with no LANG turns an em-dash in protodump's own
-        # output into mojibake — silently, without raising. That matters here because
+        # output into mojibake, silently, without raising. That matters here because
         # this output IS the error message raised below.
         text=True,
         encoding="utf-8",
@@ -287,7 +287,7 @@ def compareSchemas(extractedDirectory: Path, referenceDirectory: Path) -> Schema
     """Compare two directories of .proto files by name and by content.
 
     This is the point of the default run: a dump matching the vendored schemas
-    corroborates both, while a difference is a real finding — most likely a Numbers
+    corroborates both, while a difference is a real finding, most likely a Numbers
     version that moved on from whatever the vendored copy was taken from.
     """
     extracted = {path.name: path for path in extractedDirectory.glob("*.proto")}
@@ -361,7 +361,7 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
             modulePath.write_text(rewritten, encoding="utf-8")
 
     (outputDirectory / "__init__.py").write_text(
-        '"""Generated protobuf modules. Do not edit — see workarea/bootstrap/."""\n',
+        '"""Generated protobuf modules. Do not edit, see workarea/bootstrap/."""\n',
         encoding="utf-8",
     )
     return len(generated)
@@ -430,7 +430,7 @@ def cmdExtract(arguments: argparse.Namespace) -> int:
 
         dumped = sorted(extractedDirectory.glob("*.proto"))
         if arguments.dryRun:
-            console.print("[yellow]Dry run — nothing was written.[/]")
+            console.print("[yellow]Dry run. Nothing was written.[/]")
             console.print(
                 f"would write [bold]{len(dumped)}[/] schemas to "
                 f"{escape(str(schemaDirectory))}"

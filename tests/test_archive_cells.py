@@ -129,7 +129,7 @@ def testDecimal128ReadsTheLargeCoefficientFormAsZero() -> None:
 
     Setting both selector bits selects the form whose coefficient carries an implied
     leading `100`, which puts it past the 10^34 - 1 this format may hold. IEEE 754
-    calls that non-canonical and gives it the value zero — so this must return a
+    calls that non-canonical and gives it the value zero, so this must return a
     number rather than raising, and the number must be zero.
     """
     selector = (0x03 << 61) | (exponentBias << 47)
@@ -159,7 +159,7 @@ def testValueTypesFixture() -> None:
     assert values[6] == Decimal("50")
     assert values[7] == Decimal("1")
 
-    # The cell labelled "empty" has no record at all, so it never appears.
+    # The cell labeled "empty" has no record at all, so it never appears.
     assert 9 not in values
 
 
@@ -236,7 +236,7 @@ def testRichTextCellConsumesItsPayloadKey() -> None:
     Type 9 carries a four-byte key into the table's RICH_TEXT_PAYLOAD list, the same
     shape as a plain string's key into the STRING list. Before that was known the width
     defaulted to zero, so the payload key was mistaken for the first trailing reference
-    and every reference on a rich-text cell was read one slot early — yielding plausible
+    and every reference on a rich-text cell was read one slot early, yielding plausible
     style keys that pointed at the wrong styles, with nothing raising.
 
     Built by hand so it tests the decoder rather than a fixture.

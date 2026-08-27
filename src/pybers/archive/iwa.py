@@ -3,8 +3,8 @@
 """\
 IWA files: compressed frames wrapping a stream of length-prefixed archives.
 
-One `.iwa` member is a sequence of frames. Each frame is a four-byte header — a
-flag byte, then a three-byte little-endian compressed length — followed by that
+One `.iwa` member is a sequence of frames. Each frame is a four-byte header, a
+flag byte, then a three-byte little-endian compressed length, followed by that
 many bytes of raw Snappy. Concatenating every decompressed frame gives the
 payload, which is a stream of archives, each one a varint-prefixed `ArchiveInfo`
 followed by the message bodies its `message_infos` describe.
@@ -13,8 +13,8 @@ Message bodies are kept as **raw bytes**, deliberately, and are not parsed here.
 Two reasons. Deciding which protobuf class a `type` identifier maps to is a
 separate concern with its own source of truth, and it does not belong in the
 layer that finds message boundaries. More importantly, protobuf re-serialization
-is not guaranteed to reproduce the input byte for byte — field ordering and
-varint encoding both have latitude — so a reader that parsed eagerly could not
+is not guaranteed to reproduce the input byte for byte, field ordering and
+varint encoding both have latitude, so a reader that parsed eagerly could not
 promise the round trip this library is built around.
 
 For the same reason an unmodified file writes back from `originalBytes` rather
@@ -46,7 +46,7 @@ frameHeaderLength: int = 4
 
 # The only flag byte ever observed. Snappy's own framing format uses a similar
 # leading byte to mark a chunk as stored rather than compressed, so an uncompressed
-# IWA frame is conceivable — but none exists in any file examined here, and the
+# IWA frame is conceivable: but none exists in any file examined here, and the
 # reference implementation raises on this too rather than handling it.
 #
 # Deliberately an assertion and not a second code path. Writing a stored-frame
@@ -83,7 +83,7 @@ class Archive:
     """One addressable object: its identifier and the messages that describe it.
 
     The identifier is what cross-references elsewhere in the document point at,
-    which is what makes this the unit worth modelling rather than the frame.
+    which is what makes this the unit worth modeling rather than the frame.
     """
 
     identifier: int
@@ -147,7 +147,7 @@ def readArchives(payload: bytes) -> list[Archive]:
     """Parse a decompressed payload into its archives.
 
     Each archive is a varint-prefixed `ArchiveInfo` followed by one body per
-    entry in its `message_infos`, laid end to end with no padding — so the
+    entry in its `message_infos`, laid end to end with no padding, so the
     lengths are the only thing separating them, and a wrong one desynchronizes
     everything after it. Ending anywhere but exactly on the final byte therefore
     means the parse went wrong earlier, and is raised rather than ignored.
@@ -208,7 +208,7 @@ def writeIWAFile(iwaFile: IWAFile) -> bytes:
 
     An unmodified file returns the bytes it was read from, which is what makes
     the no-change round trip exact. Rewriting a modified one needs a Snappy
-    compressor, which does not exist yet — so this raises rather than silently
+    compressor, which does not exist yet, so this raises rather than silently
     emitting a file that would differ from what Numbers wrote.
     """
     if not iwaFile.originalBytes:

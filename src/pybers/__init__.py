@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""pybers — a clean, round-trip-tested library for reading and writing Apple Numbers documents.
+"""pybers, a clean, round-trip-tested library for reading and writing Apple Numbers documents.
 
 Built in deep respect for Apple Numbers itself, and standing on the shoulders of
 numbers-parser (https://github.com/masaccio/numbers-parser), whose reverse-engineering of

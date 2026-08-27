@@ -321,7 +321,12 @@ def pythonProse(text: str) -> str:
         span = "\n".join(lines[start - 1:end])
         keep[offset:offset + len(span)] = span
 
-    return "".join(keep)
+    # Docstrings quote code constantly — `open(..., "w")`, a usage synopsis, a
+    # proto import. Those are samples, not sentences, exactly as a markdown fence
+    # is, so they come out before any prose rule sees them.
+    out = "".join(keep)
+    out = re.sub(r"`[^`\n]*`", blank, out)
+    return re.sub(r'"[^"\n]*"', blank, out)
 
 
 def markdownProse(text: str) -> str:

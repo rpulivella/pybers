@@ -7,7 +7,7 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 
 ---
 
-## How cell text is stored — three tiers, not two
+## How cell text is stored: three tiers, not two
 
 | what the cell has | what the archive gains |
 |---|---|
@@ -31,7 +31,7 @@ reported that all-caps was stored nowhere.
 
 Formatting applied to a whole cell lands on the **paragraph** style's `char_properties`.
 Formatting applied to part of a cell lands on a **character** style. Both use the same
-`CharacterStylePropertiesArchive` message, so the property list is identical either way —
+`CharacterStylePropertiesArchive` message, so the property list is identical either way,
 only the owner differs.
 
 ## Text background is TWO different fields, chosen by scope
@@ -53,11 +53,11 @@ own text:
 ```
 
 **A model with one `backgroundColor` on a text run cannot round-trip this.** The two are not
-the same property at different scopes — they are different fields with different names and
+the same property at different scopes. They are different fields with different names and
 different companions, and writing a paragraph-scoped background into the character field
 would change what Numbers displays. Both need representing.
 
-Neither is `TST.CellStylePropertiesArchive.cell_fill`, which is the cell's own background —
+Neither is `TST.CellStylePropertiesArchive.cell_fill`, which is the cell's own background,
 a third thing again.
 
 ### Do not mistake `tsd_fill` for a background
@@ -70,7 +70,7 @@ white, so a search for "fills" returns hundreds of irrelevant hits. `font_color`
 
 There is also `tsd_fill_should_fill_text_container`, which looks like it might turn a glyph
 fill into a container fill. Nothing observed sets it, so its behavior is **untested and
-unknown** — recorded only so it is not assumed to be the background field.
+unknown**, recorded only so it is not assumed to be the background field.
 
 ## Synthetic typography sits right beside the real thing
 
@@ -91,8 +91,8 @@ repeated FontFeatureArchive font_features  = 34;
 - `capitalization = kSmallCaps` **scales down capitals.** Synthetic. Never write it.
 - The real forms are OpenType features in `font_features`, using the font's own designed
   glyphs.
-- `capitalization = kAllCaps` is legitimate — it is a genuine case transform, not a faked
-  glyph — and is the one member of that enum pybers should write.
+- `capitalization = kAllCaps` is legitimate. It is a genuine case transform, not a faked
+  glyph, and is the one member of that enum pybers should write.
 
 `07-text-superscript` contains both routes side by side, which is what makes this testable
 rather than asserted: archive `912364` uses `superscript = kSuperscript`, while `912394`,
@@ -117,7 +117,7 @@ optional LigaturesType ligatures = 16;
 All four paragraph styles in `10-text-ligatures` carry *identical* `font_features`, which is
 what proves the setting does not travel through the AAT list.
 
-`kStandardLigatures` **is written explicitly** — it is set on roughly 240 inherited styles in
+`kStandardLigatures` **is written explicitly**. It is set on roughly 240 inherited styles in
 every fixture. A paragraph set to "Use Default" therefore produces no *new* style, because an
 existing one already carries that value and gets reused. That is style deduplication, not an
 absent field, and the distinction matters: **do not read a missing `ligatures` field as
@@ -136,14 +136,14 @@ value across the document** rather than created per use site.
 ### The layered case, and the capability it exposes
 
 One paragraph in `10` sets **None on the whole paragraph and Default on specific letters**
-(`ff ffi ffl ct`). That is a paragraph-level value with a character-level override on top —
+(`ff ffi ffl ct`). That is a paragraph-level value with a character-level override on top,
 exactly the layering CLAUDE.md anticipates for named styles.
 
 The data is consistent with the new character style `914565` (`kRequiredLigatures`) covering
 the paragraph's ordinary text while the overridden letters reuse an existing
 `kStandardLigatures` character style. **This is not confirmed.** Confirming it needs the
-*style run table* — `StorageArchive.table_char_style`, which maps character ranges to style
-identifiers — and that is not parsed yet.
+*style run table*, `StorageArchive.table_char_style`, which maps character ranges to style
+identifiers, and that is not parsed yet.
 
 That is the honest boundary of what the fixtures can currently prove: which styles exist and
 what they contain, but not yet which characters they apply to. Parsing the run tables is the
@@ -175,7 +175,7 @@ Observed, with readings of varying confidence:
 
 | pair | evidence | confidence |
 |---|---|---|
-| `(10, 1) (10, 2) (10, 3) (10, 4)` | the four vertical-position variants, in the fixture built from superscript / subscript / ordinal / scientific | **high** — fixture design corroborates it independently |
+| `(10, 1) (10, 2) (10, 3) (10, 4)` | the four vertical-position variants, in the fixture built from superscript / subscript / ordinal / scientific | **high**, fixture design corroborates it independently |
 | `(33, 2)` and `(33, 0)` | present only on the all-caps run that renders correctly | **high that these are the two capital features**, from matching the maker's own description |
 | `(21, 0)` and `(6, 1)` | on essentially every style in every fixture | baseline defaults; **meaning not established** |
 | `(38, 1) (37, 1)` | on one inherited style across several fixtures | **unknown** |
@@ -183,7 +183,7 @@ Observed, with readings of varying confidence:
 **Two structural facts, both certain and both consequential:**
 
 1. **Several entries may share one `feature_type`.** `914066` carries `(33,2)` *and*
-   `(33,0)`. So this cannot be modeled as a `dict[featureType, selector]` — it is an
+   `(33,0)`. So this cannot be modeled as a `dict[featureType, selector]`. It is an
    ordered list, and pybers must treat it as one.
 2. **`font_features_null` is a distinct state from an absent list.** One style in `05`
    carries `font_features_null` with no `font_features` at all, which reads as features
@@ -217,7 +217,7 @@ default and is present in the untouched baseline, which is precisely why a value
 in a fixture is not evidence that the fixture's author put it there. It was briefly reported
 here as a deliberate setting; it is not.
 
-The `0.02` sits on the custom named paragraph style in `32`, not on any text box — so
+The `0.02` sits on the custom named paragraph style in `32`, not on any text box, so
 character spacing is a *paragraph-reachable character property* like the rest, with nothing
 text-box-specific about it.
 
@@ -225,13 +225,13 @@ text-box-specific about it.
 are distinct properties rather than one control under two names, even though the UI exposes
 only one.
 
-`baseline_shift` is likewise on every character style and always `0.0` so far — identified
+`baseline_shift` is likewise on every character style and always `0.0` so far, identified
 but never exercised.
 
 ## There is ONE place tabs live, and "cell level" writes the TABLE's text style
 
-`39-text-tabs-indents` looks contradictory in the interface — the same cell shows three tab
-stops when a paragraph is selected and an **empty** Tabs panel when the cell is selected —
+`39-text-tabs-indents` looks contradictory in the interface, the same cell shows three tab
+stops when a paragraph is selected and an **empty** Tabs panel when the cell is selected,
 and the archive explains it.
 
 There is no cell-level tab storage at all. `tabs` exists only in `para_properties` on a
@@ -260,7 +260,7 @@ tabs { position: 72  alignment: kTabAlignmentDecimal } paired with decimal_tab "
 ```
 
 All four alignments are exercised. **`leader` is a single-character string**, and both an
-unset field and `" "` mean no leader — so a reader must treat a space as absence, not as a
+unset field and `" "` mean no leader, so a reader must treat a space as absence, not as a
 space-filled leader.
 
 `default_tab_stops` is the fallback interval in points, `36.0` in the theme and changed to
@@ -272,7 +272,7 @@ space-filled leader.
 first_line_indent = 18.0     left_indent = 18.0     right_indent = 18.0      (0.25in each)
 ```
 
-Three independent floats, in points, exactly as labelled. But the **indent button** writes
+Three independent floats, in points, exactly as labeled. But the **indent button** writes
 somewhere else entirely:
 
 ```
@@ -281,7 +281,7 @@ somewhere else entirely:
 all three indent fields                 0.0
 ```
 
-`table_para_data.first` is an integer indent **level** — one press, then two — with **no point
+`table_para_data.first` is an integer indent **level**, one press, then two, with **no point
 value stored anywhere**. It is the first time that run table has carried anything but
 `(0, 0)` in the whole corpus.
 
@@ -289,13 +289,13 @@ So there are two independent indent mechanisms that look identical in the interf
 reader that consults only the paragraph style sees an unindented paragraph and renders it
 flush left. The list style is `'None'` throughout, so this is not list indentation.
 
-**Paragraph borders** are visible in the same panel and present in the schema —
-`border_positions = 0` and `rule_width = 1.0` on the base style — but unexercised.
+**Paragraph borders** are visible in the same panel and present in the schema,
+`border_positions = 0` and `rule_width = 1.0` on the base style, but unexercised.
 
 ## `*_null` booleans mean "explicitly NONE", not "unspecified"
 
 **Settled by `38-text-outline-shadow`, and it changes how the whole style chain resolves.**
-`CharacterStylePropertiesArchive` is littered with paired fields — `shadow` / `shadow_null`,
+`CharacterStylePropertiesArchive` is littered with paired fields, `shadow` / `shadow_null`,
 `background_color` / `background_color_null`, `font_features` / `font_features_null` and
 many more. The pair is a tri-state that protobuf cannot express on its own.
 
@@ -325,7 +325,7 @@ all.
 
 `38` demonstrates this by accident, and the fixture labels the accident, which is what makes
 it usable. One cell was copied from another; the copy kept the source's **cell-level** style
-archive — `c7` and `c8` share style key 4, carrying a black shadow — and then had a blue
+archive, `c7` and `c8` share style key 4, carrying a black shadow, and then had a blue
 shadow applied to part of its text:
 
 ```
@@ -342,7 +342,7 @@ suspicious.
 
 ## Text outline is `tsd_stroke`, and it DECODES THE DASH ARRAY
 
-The Outline checkbox writes a full `tsd_stroke` on the character properties — the same stroke
+The Outline checkbox writes a full `tsd_stroke` on the character properties, the same stroke
 message shapes use for borders. `38` carries five outline styles and so resolves the dash
 array that `34-shape` left completely unexercised:
 
@@ -357,7 +357,7 @@ circular dotted  TSDPattern           2     0.001, 2.0         RoundCap RoundJoi
 
 Four things this settles. A solid stroke has its **own pattern type** and leaves the array
 empty rather than filling it. `count` says how many of the six slots are live, and dashes use
-**two** — dash length then gap length. **Circular dots are a zero-length dash with a round
+**two**, dash length then gap length. **Circular dots are a zero-length dash with a round
 cap**, the classic construction, not a distinct pattern kind: `0.001` is as close to zero as
 Numbers writes. And `cap` and `join` change with the preset, so they are part of the style
 rather than constants.
@@ -406,11 +406,11 @@ width 8.0  RoundCap  stroke_name 'Pen'
 ```
 
 Four consequences. The `pattern` on these is an ordinary `TSDSolidPattern` with `count: 0`,
-so **a reader checking only the pattern would call a chalk stroke solid** — `smart_stroke`
+so **a reader checking only the pattern would call a chalk stroke solid**, `smart_stroke`
 has to be checked before the pattern is believed. `stroke_name` is an internal identifier,
 not a localized label: `'Chalk2'` carries a digit no menu shows. `cap` varies with the brush
 (`Calligraphy` uses `ButtCap` where the others use `RoundCap`), so it is part of the preset
-rather than a constant. And `random_seed` exists because these strokes are randomized —
+rather than a constant. And `random_seed` exists because these strokes are randomized,
 preserving it is what keeps a document rendering identically, so it must be carried through
 rather than regenerated.
 
@@ -419,7 +419,7 @@ possible but unexercised. Brush strokes default to **8pt**; the fixture includes
 of two of them to show the width is independent of the preset.
 
 pybers can round-trip all of this faithfully without being able to render any of it, which is
-the correct outcome — the geometry lives in Apple's renderer, keyed by that name.
+the correct outcome, the geometry lives in Apple's renderer, keyed by that name.
 
 ## Baseline shift is the THIRD route to a raised character
 
@@ -432,7 +432,7 @@ font_features    AAT sups / subs / ordn                       the real OpenType 
 baseline_shift   a float, SIGNED POINTS                       a manual nudge, no semantics
 ```
 
-`baseline_shift` is plain signed points — `-1.0`, `3.0`, `-3.0`, `5.0`, `10.0` across the
+`baseline_shift` is plain signed points, `-1.0`, `3.0`, `-3.0`, `5.0`, `10.0` across the
 fixture. It carries no meaning about what the text *is*, unlike a real superscript feature,
 so it must never be used to represent one and must never be mistaken for one on read.
 
@@ -500,7 +500,7 @@ on its paragraph style inside the payload while its own cell-level style sets no
 **Settled by `36-unicode-text`, and it was the last open question in the object model.**
 pybers previously assumed these indices were Python offsets. That assumption is wrong.
 
-The fixture puts a single astral character between two differently formatted runs — `AB`
+The fixture puts a single astral character between two differently formatted runs, `AB`
 bold, the astral `𠮟` (U+20B9F) left alone, `CD` carrying OpenType features:
 
 ```
@@ -520,7 +520,7 @@ scalar    [0:2] 'AB' bold     [2:4] '𠮟C' inherit    [4:5] 'D'  features    WR
 ```
 
 Note the failure mode. The scalar reading does not raise, does not produce an out-of-range
-index, and does not yield an obviously broken result — it produces **three runs of plausible
+index, and does not yield an obviously broken result, it produces **three runs of plausible
 text with the wrong boundaries**, which is unfalsifiable without an answer key. This is why
 `02-text-rich` validated perfectly and proved nothing: it is entirely BMP, where the two
 counts agree exactly.
@@ -556,7 +556,7 @@ the format, consistent with the numeral-system discovery in `16-number-scientifi
 The text cell keeps the characters exactly, trailing space included.
 
 So a value's digits are **presentation**, and a round trip that reads a number and rewrites
-it must not attempt to preserve the digit characters — there are none to preserve.
+it must not attempt to preserve the digit characters. There are none to preserve.
 
 ### Skin-tone emoji are a BASE plus a SEPARATE modifier code point
 
@@ -572,7 +572,7 @@ U+FE0F   BMP      VARIATION SELECTOR-16
 ```
 
 Three things follow. A skin-toned emoji is **two code points**, so a run boundary can legally
-fall between the base and its modifier — which renders as an unmodified emoji followed by an
+fall between the base and its modifier, which renders as an unmodified emoji followed by an
 orphan modifier. The base is not always astral (`✊` is BMP) and the modifier is not always
 astral (`U+FE0F` is BMP), so **neither half can be predicted from the other**. And a
 grapheme cluster here spans up to 4 UTF-16 units, so grapheme-safe editing is a separate
@@ -583,7 +583,7 @@ untested.
 
 ### Numbers NORMALIZES to precomposed form on entry
 
-`36` has a cell labelled "e typed with accent added by long-press of the e key to add the
+`36` has a cell labeled "e typed with accent added by long-press of the e key to add the
 accent after". It stores **one** character, `é` U+00E9, not the two-character decomposed
 sequence:
 
@@ -596,12 +596,12 @@ So the decomposed form did not survive entry. The accented-Latin cell tells the 
 34 characters stored, 39 under NFD.
 
 A reader should therefore expect NFC, and a **writer must not emit decomposed sequences**
-expecting them to round-trip — Numbers would renormalize and the character indices in all
+expecting them to round-trip, Numbers would renormalize and the character indices in all
 nineteen run tables would shift underneath.
 
 ### Right-to-left is still unresolved, and `36` cannot resolve it
 
-`36` contains four RTL cells — plain Hebrew, Hebrew with niqqud, Arabic, and mixed-direction
+`36` contains four RTL cells, plain Hebrew, Hebrew with niqqud, Arabic, and mixed-direction
 text with both European and Arabic-Indic digits. **All of them are plain strings.** A plain
 string cell has no `StorageArchive` and therefore no run tables at all, so
 `table_para_bidi` remains `(0, 0)` everywhere and its two `uint32` fields are still unmapped.
@@ -620,7 +620,7 @@ optional .TSP.Reference rich_text_payload = 9;
 ```
 
 A rich-text entry populates **`rich_text_payload`**. Reading `reference` instead returns an
-unset message whose `identifier` is `0` — no exception, no missing-field error, just a
+unset message whose `identifier` is `0`, no exception, no missing-field error, just a
 reference to nothing. The rich text then appears to be absent rather than misread.
 
 ## Rich text: a StorageArchive with TWENTY-ONE parallel run tables
@@ -642,7 +642,7 @@ table_overlapping_highlight             table_pencil_annotation
 ```
 
 `table_language` and `table_para_bidi` mean **language and text direction are RUN properties**,
-not document or paragraph settings — relevant to the unresolved Unicode questions.
+not document or paragraph settings, relevant to the unresolved Unicode questions.
 `table_insertion` and `table_deletion` are tracked changes; `table_tatechuyoko` is Japanese
 horizontal-in-vertical text; `table_pencil_annotation` is Apple Pencil markup.
 
@@ -688,7 +688,7 @@ corpus. Mapped against paragraph boundaries in a storage holding four different 
 @424  para_starts (0,0)   list 'Numbered'       "number 2"
 ```
 
-`first = 1` appears on exactly one paragraph — the first list item in the storage. Note that
+`first = 1` appears on exactly one paragraph, the first list item in the storage. Note that
 the numbered list at `@389` begins a different list style and still reads `(0, 0)`, and the
 fixture labels it "continuously numbered". So this is **not** a "list begins here" marker; it
 reads as a **restart-numbering flag**, which is why a continuing sequence leaves it at zero.
@@ -711,7 +711,7 @@ autocorrected text with a per-word UUID, and it persists in the saved document.
 
 Two consequences. It is **user-provenance metadata that travels with any shared file**, which
 is worth knowing before a library silently preserves or strips it. And because it is keyed by
-character index, **any insertion or deletion must shift it exactly like a style run** — a
+character index, **any insertion or deletion must shift it exactly like a style run**, a
 structural edit that reindexes only the style tables leaves the UUID pointing at the wrong
 word.
 
@@ -729,8 +729,8 @@ to say the slot exists.
 
 ### A text box's paragraph style is a NAMED reference with no variation
 
-Every text box in `33` points its `table_para_style` at a theme style — `'Body'` on fourteen
-of them, `'Heading'` on the one labelled "this paragraph is a heading". Neither is a variation
+Every text box in `33` points its `table_para_style` at a theme style, `'Body'` on fourteen
+of them, `'Heading'` on the one labeled "this paragraph is a heading". Neither is a variation
 and **neither has a parent**, so theme base styles are roots.
 
 The two differ in exactly three properties:
@@ -750,7 +750,7 @@ written.
 ### A run with no object inherits from the paragraph
 
 The character run table alternates styled and unstyled spans. An entry whose `object` field is
-**absent** — `HasField("object")` is false, not an identifier of zero — carries no character
+**absent**, `HasField("object")` is false, not an identifier of zero, carries no character
 style, and the text there takes the paragraph's formatting:
 
 ```
@@ -766,12 +766,12 @@ missing object as "inherit" rather than skipping the entry or treating it as an 
 
 A table's `styleTable` holds paragraph and cell styles. **Character styles appear only inside
 rich-text storages**, reached through the run table. Any survey of "the styles in a table" that
-reads `styleTable` alone will not see a single character style — which is what caused two
+reads `styleTable` alone will not see a single character style, which is what caused two
 wrong attributions recorded and corrected earlier in this file.
 
 This matches the behavior the fixture documents in its own text: a character style cannot be
-applied by selecting a cell, only by selecting text. It is available to text anywhere — cells,
-text boxes, shapes — but always to a *range*, never to a container.
+applied by selecting a cell, only by selecting text. It is available to text anywhere, cells,
+text boxes, shapes, but always to a *range*, never to a container.
 
 ### Named character styles carry real properties, including tracking
 
@@ -805,7 +805,7 @@ one override.
 ```
 
 `(33, 2)` retroactively explains `09-text-capitalization`, where `(33, 2)` and `(33, 0)` appear
-together with `capitalization = kAllCaps` — feature type 33 is the letter-case family, and its
+together with `capitalization = kAllCaps`, feature type 33 is the letter-case family, and its
 selectors are what the earlier finding described only as "the two capital features".
 
 `(6, 0)` is the counterpart of the `(6, 1)` that appears as a default throughout, so feature
@@ -828,7 +828,7 @@ SkolarSansLatn-ElIt   bold=(unset) italic=True     the italic face AND the flag
 SkolarSansLatn-Rg     bold=False  italic=False
 ```
 
-**Weight and slant are part of `font_name`** — the PostScript name — and `bold` / `italic` are
+**Weight and slant are part of `font_name`**, the PostScript name, and `bold` / `italic` are
 independent booleans layered on top. So:
 
 - `bold=True` on a regular face is **faux bold**, the same class of defect as the synthetic
@@ -868,7 +868,7 @@ A bullet's size is `geometries[level].scale` and its vertical nudge is
 
 `scale` is a multiplier where 1.0 is 100%, so the UI percentage divided by a hundred.
 
-List styles follow the same reference-and-variation model as everything else: named ones —
-`'None'`, `'Bullet'`, `'Numbered'`, and a user-created `'Named Bullet'` — plus anonymous
+List styles follow the same reference-and-variation model as everything else: named ones,
+`'None'`, `'Bullet'`, `'Numbered'`, and a user-created `'Named Bullet'`, plus anonymous
 variations carrying only what differs, such as a single overridden `strings` array to change
 one glyph.

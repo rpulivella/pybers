@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""The pybers object model — typed dataclasses standing in for a .numbers document's real
+"""The pybers object model, typed dataclasses standing in for a .numbers document's real
 structure, split by feature area rather than by class: style, geometry, rich text,
 floating shapes, table/cell, sheet/workbook.
 

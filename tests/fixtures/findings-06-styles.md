@@ -1,6 +1,6 @@
 # Cell styling: borders, fills and alignment
 
-How a cell gets its borders, its background and its alignment — three subsystems that turn
+How a cell gets its borders, its background and its alignment, three subsystems that turn
 out to share almost nothing.
 
 Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
@@ -26,7 +26,7 @@ refs=(1,5,1)      one paragraph style      h: left
 refs=(6,1,5,1)    a cell style AND a paragraph style    h: left, v: middle
 ```
 
-This is what the flags bitmask on a cell record gates — not one style slot, but several, of
+This is what the flags bitmask on a cell record gates, not one style slot, but several, of
 different kinds. That resolves the variable-length tail that had been unexplained since the
 value fixtures.
 
@@ -48,7 +48,7 @@ alignment 1 = right     alignment 3 = justify
 Note that **1 is right and 2 is center**, which is not the order anyone would guess. `TATvalue4`
 is not exercised by this fixture and remains unknown.
 
-**Horizontal "auto" is the ABSENCE of a paragraph style**, not a value — the auto cells carry
+**Horizontal "auto" is the ABSENCE of a paragraph style**, not a value, the auto cells carry
 no paragraph reference at all. Same for vertical top and wrap-on: they are defaults expressed
 by omission.
 
@@ -58,7 +58,7 @@ Vertical alignment on the cell style:
 0 = top (default, never written)    1 = middle    2 = bottom
 ```
 
-**Where a schema gives placeholder names, only a labelled fixture can supply meaning.** That
+**Where a schema gives placeholder names, only a labeled fixture can supply meaning.** That
 makes fixtures the source of truth for parts of this format, not merely a check on it.
 
 ## The cell owns its box, the paragraph owns its text
@@ -87,17 +87,17 @@ The rule that now covers every styling fixture:
 Inches, and any other unit the UI offers, are a display convenience with no presence in the
 file.
 
-**A 4pt inset is the default and needs no per-cell style** — the 4pt cell carries no cell
+**A 4pt inset is the default and needs no per-cell style**, the 4pt cell carries no cell
 style key of its own, where the 2pt and 0pt cells do. The value is not absent from the
 document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 times. So the
 default lives in the inherited style and the cell simply declines to override it.
 
 **Padding is always uniform in practice.** Across every fixture here, 3,368 cell styles carry
-padding and **not one is uneven** — only `4/4/4/4`, `2/2/2/2` and `0/0/0/0` appear. The UI
+padding and **not one is uneven**, only `4/4/4/4`, `2/2/2/2` and `0/0/0/0` appear. The UI
 offers a single value and Numbers never writes anything else.
 
 That leaves an open **write** question rather than a read one. `PaddingArchive` has four
-independent floats, so pybers is able to emit `L2 T0 R4 B8`; whether Numbers honours it,
+independent floats, so pybers is able to emit `L2 T0 R4 B8`; whether Numbers honors it,
 normalizes it, or rejects the file cannot be known until such a file exists. It is recorded
 here so the capability is not assumed in either direction.
 
@@ -135,7 +135,7 @@ bottom_row_stroke_layers     one layer per ROW,    runs indexed by column
 ```
 
 Each run carries an origin, a length, and a stroke with width, color and a dash pattern. A
-width of `0` is how "no border" is expressed, so the layers are dense rather than sparse —
+width of `0` is how "no border" is expressed, so the layers are dense rather than sparse,
 every position has a run, most of them empty.
 
 Verified against the fixture: a 3pt top border on B1 is `top_row` layer 0 at column 1; a 0.5pt
@@ -153,19 +153,19 @@ two independent stored strokes on the facing edges.
 So **setting a border between two cells means writing both sides.** Writing one leaves the
 pair disagreeing, and which one Numbers renders is not something this fixture establishes.
 Reading has the mirror problem: a border reported from one cell's perspective may or may not
-be matched by its neighbour, and those are different document states.
+be matched by its neighbor, and those are different document states.
 
 ### The table style has more than sixty stroke slots
 
 Beyond the visibility flags, `table_properties` carries header row, header column, footer,
 body horizontal and vertical strokes, five levels of category strokes, and a set of pivot
 variants. The border vocabulary is large and almost all of it is **band-level** rather than
-cell-level — consistent with the earlier finding that styles exist per band and not per row
+cell-level, consistent with the earlier finding that styles exist per band and not per row
 or column.
 
 Tables that only change a table-level setting show it as an override list on a variation
-style — `Table 1-1-1-1` sets exactly `v_strokes_visible`, `h_strokes_visible` and
-`table_border_visible` — the same parent-plus-override pattern seen in sheet tab colors.
+style, `Table 1-1-1-1` sets exactly `v_strokes_visible`, `h_strokes_visible` and
+`table_border_visible`, the same parent-plus-override pattern seen in sheet tab colors.
 
 ## A fill is a three-way union
 
@@ -178,8 +178,8 @@ gradient    an ordered stop list
 image       a reference to image data, plus placement and tint
 ```
 
-The cell style itself is reached through the `STYLE` data list — `refs[0]` on the cell record
-is the style key. The cell labelled "No fill" has **no style reference at all**: its record is
+The cell style itself is reached through the `STYLE` data list, `refs[0]` on the cell record
+is the style key. The cell labeled "No fill" has **no style reference at all**: its record is
 two references where the others are three. Absence of a style is how "no fill" is expressed,
 not a fill archive saying nothing.
 
@@ -212,7 +212,7 @@ anglegradient { gradientangle }     radians
 ```
 
 `fraction` is the stop's position from 0 to 1. **`inflection` is the midpoint handle between
-this stop and the next** — the control that makes a gradient non-uniform. It defaults to `0.5`,
+this stop and the next**, the control that makes a gradient non-uniform. It defaults to `0.5`,
 and the "advanced" fixture carries `0.153` on its first stop. A reader that ignored
 `inflection` would render every gradient as evenly distributed and look approximately right,
 which is the worst kind of wrong.
@@ -231,12 +231,12 @@ Data/tile-pattern-16.png    239,547 bytes
 Three things follow, all verified.
 
 **The bytes are stored unmodified.** The embedded member is byte-identical to the source PNG
-by SHA-256 — Numbers does not re-encode, resample or strip it. So an image survives a round
+by SHA-256, Numbers does not re-encode, resample or strip it. So an image survives a round
 trip exactly, provided the member is carried through untouched.
 
 **The filename encodes the asset identifier.** `tile-pattern-16.png` is the original name plus
 the `imagedata` identifier `16`. Every one of the six fills references `imagedata = 16`, and
-there is exactly **one** `Data/` member — so image bytes are deduplicated across every use.
+there is exactly **one** `Data/` member, so image bytes are deduplicated across every use.
 
 **Styles are deduplicated by value too.** Two cells given the identical fill share one style
 archive with `refcount = 2`, exactly as formulas do. Changing only the scale produces a
@@ -275,7 +275,7 @@ referencecolor
 ```
 
 Before a real image was added, `28`'s fills pointed at `imagedata` identifier **8** with **no
-archive 8 anywhere in the file** — the default image Numbers offers resolves to application
+archive 8 anywhere in the file**, the default image Numbers offers resolves to application
 resources rather than to document content.
 
 That state is worth remembering even now that supplied images are understood: **a reader must
@@ -283,17 +283,17 @@ tolerate an image reference that does not resolve**, because it is a legitimate 
 rather than corruption. A document using only Numbers' own default imagery carries no `Data/`
 member at all.
 
-## Only SOME style kinds can be named — and cell styles never are
+## Only SOME style kinds can be named: and cell styles never are
 
 Counted across `30-style-align`, `02-text-rich` and `10-text-ligatures`. `TSS.StyleArchive`,
 the shared base of every style, carries `name`, `style_identifier`, `parent` and
-`is_variation` — but only some kinds ever populate `name`.
+`is_variation`, but only some kinds ever populate `name`.
 
 | kind | named | anonymous |
 |---|---|---|
-| `TSWP.ParagraphStyleArchive` | 21 — Body, Title, Heading, Caption, Table Style 1-7 | 667 |
-| `TSWP.CharacterStyleArchive` | 8 — Emphasis, Italic, Link, Underline, Strikethrough | 5 |
-| `TSWP.ListStyleArchive` | 5 — Bullet, Numbered, Lettered, Image, None | 0 |
+| `TSWP.ParagraphStyleArchive` | 21, Body, Title, Heading, Caption, Table Style 1-7 | 667 |
+| `TSWP.CharacterStyleArchive` | 8, Emphasis, Italic, Link, Underline, Strikethrough | 5 |
+| `TSWP.ListStyleArchive` | 5, Bullet, Numbered, Lettered, Image, None | 0 |
 | `TST.CellStyleArchive` | **0** | **309** |
 | `TST.TableStyleArchive` | **0** | 18 |
 | `TN.SheetStyleArchive` | **0** | 3 |
@@ -302,7 +302,7 @@ the shared base of every style, carries `name`, `style_identifier`, `parent` and
 only as anonymous archives deduplicated by value and reached through a table's `STYLE` list.
 
 Two details worth keeping. A **user-created** character style appears in the same registry as
-Apple's own — `'smallcap'`, made while building `09-text-capitalization` — so named styles are
+Apple's own, `'smallcap'`, made while building `09-text-capitalization`, so named styles are
 not a fixed built-in set. And `Table Style 1` through `Table Style 7` are **paragraph** styles
 despite the name, so the table styling vocabulary is expressed through named paragraph styles
 rather than through named table styles.
@@ -310,17 +310,17 @@ rather than through named table styles.
 ### What this decides for the named-style question in CLAUDE.md
 
 The layering machinery is real and already observed: a style may carry a `parent`, be marked
-`is_variation`, and record an `override_count` — seen directly in the sheet tab colors of
+`is_variation`, and record an `override_count`, seen directly in the sheet tab colors of
 `26-multi-sheets` and in the table-level border settings of `29-style-border`.
 
 But it applies to **paragraph, character and list** styles only. A `NamedStyle` registry that
 covers those maps onto something Numbers really has. Extending it to cell styles would be
-inventing a concept the format does not carry, and any such feature has to be labelled a
-pybers concept rather than presented as a mapping — otherwise a round trip would promise a
+inventing a concept the format does not carry, and any such feature has to be labeled a
+pybers concept rather than presented as a mapping, otherwise a round trip would promise a
 persistence it cannot deliver.
 
 
-## A `name` does NOT make a style visible — the stylesheet registry does
+## A `name` does NOT make a style visible: the stylesheet registry does
 
 **The most consequential styles finding, from `42-table-titles-captions`.** A
 `ParagraphStyleArchive` can carry a perfectly good `name` and still never appear in the
@@ -345,7 +345,7 @@ Table Title 1 (x6)        904094+   'tableName-0-textStyle' ... '-5-'       per-
 
 `Object Caption` and `Object Title` are real, named, round-trippable styles that the user can
 never see or select. `Table Title 1` exists as **six separate archives**, one per table slot,
-each with its own `tableName-N-textStyle` key — so it is not one shared browser style either.
+each with its own `tableName-N-textStyle` key, so it is not one shared browser style either.
 
 **The rule for pybers.** Creating a *paragraph* or *list* style the user can actually see
 takes two writes, not one:
@@ -357,7 +357,7 @@ takes two writes, not one:
 
 Doing only the first produces exactly the `Object Caption` situation: a style that is real,
 survives a round trip, applies correctly, and is invisible in the browser forever. That is a
-silent failure of the worst kind — everything looks right except the one thing the user asked
+silent failure of the worst kind, everything looks right except the one thing the user asked
 for.
 
 ### The rule does NOT hold for character styles
@@ -375,7 +375,7 @@ None                                'character-style-null'        special
 
 Only the two special system character styles are keyed. So the registry governs **paragraph
 and list styles**; for character styles a `name` appears to be sufficient on its own. Do not
-generalize the paragraph rule across style kinds — it was stated too broadly on first
+generalize the paragraph rule across style kinds. It was stated too broadly on first
 measurement and `32` corrected it.
 
 ### How keys are allocated
@@ -399,8 +399,8 @@ The stylesheet also carries `parent_to_children_style_map` and a long series of
 ## Named styles: applying one writes a REFERENCE, overriding one writes a VARIATION
 
 `32-named-styles` answers the open question in `CLAUDE.md` about how named styles and local
-formatting relate. The design that document proposed — a style reference plus an optional
-local override layered on top — is what Numbers actually does.
+formatting relate. The design that document proposed, a style reference plus an optional
+local override layered on top, is what Numbers actually does.
 
 Applying a named style to a cell stores a **direct reference** to the shared style:
 
@@ -425,7 +425,7 @@ formatting means walking it.
 
 ### `override_count` counts logical properties, not fields
 
-Key 6 changed one thing — the color — and stores **two** fields, `font_color` and `tsd_fill`,
+Key 6 changed one thing, the color, and stores **two** fields, `font_color` and `tsd_fill`,
 which are the legacy and modern spellings of the same property. `override_count` is 1. Key 8
 changed three genuinely different things and reports 3.
 
@@ -434,8 +434,8 @@ recomputed.
 
 ### There is no unparented text style
 
-The cell in `32` labelled as manually styled — the fixture's own note says it was hard to
-"remove all styling" — is **still a variation of `Body`**. Nothing in the document carries text
+The cell in `32` labeled as manually styled, the fixture's own note says it was hard to
+"remove all styling", is **still a variation of `Body`**. Nothing in the document carries text
 formatting without a named parent.
 
 **Manual formatting is not the absence of a named style; it is an anonymous variation of one.**
@@ -447,6 +447,6 @@ For the model this means a text style reference is never genuinely absent, and a
 Recorded in the fixture's own text: a character style can only be applied to **selected text**,
 never to a whole cell by clicking it. Paragraph styles can be applied either way.
 
-That matches the earlier finding that the cell owns its box and the paragraph owns its text —
+That matches the earlier finding that the cell owns its box and the paragraph owns its text,
 and it means a per-cell API for character styling would be offering something the application
 cannot express.

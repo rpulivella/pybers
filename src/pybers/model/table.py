@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""A table's grid — cells, addressed by row/column, and their merge ranges.
+"""A table's grid, cells, addressed by row/column, and their merge ranges.
 
 UPDATES
 2026-08-17  Typed Cell.value, and pinned numbers to Decimal rather than float. Numbers
@@ -27,7 +27,7 @@ decimal128Context: Context = Context(prec=34, Emax=6144, Emin=-6143)
 #
 # Decimal is not a compromise here, it is the matching type. Verified 2026-08-17:
 # Decimal("0.1") + Decimal("0.2") == Decimal("0.3") is True, and 1.1 * 1.1 is exactly
-# 1.21, where float64 gets both wrong. Division still rounds — 1/3 * 3 is 0.999...9 —
+# 1.21, where float64 gets both wrong. Division still rounds: 1/3 * 3 is 0.999...9,
 # but that is inherent to decimal arithmetic and Numbers, using the same decimal128,
 # behaves identically. Matching its rounding is the point.
 #
@@ -36,7 +36,7 @@ decimal128Context: Context = Context(prec=34, Emax=6144, Emin=-6143)
 # ranges from 1e-300 to 1e300. It would also mean converting between two number systems
 # on every read and write, which reintroduces exactly the error being avoided.
 #
-# THE TRAP, and the reason to build values from strings: Decimal(0.1) carries the
+# THE FAILURE THIS PREVENTS, and the reason to build values from strings: Decimal(0.1) carries the
 # float's binary error straight in, yielding 0.1000000000000000055511151231257827...
 # Decimal("0.1") does not. Never construct a cell value from a float.
 CellValue = (
@@ -72,7 +72,7 @@ class Cell:
 
 @dataclass(slots=True)
 class Table:
-    """A single table on a sheet — a sparse grid of cells plus its merge ranges."""
+    """A single table on a sheet, a sparse grid of cells plus its merge ranges."""
 
     name: str
     cells: dict[tuple[int, int], Cell] = field(default_factory=dict)
