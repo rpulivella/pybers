@@ -1,15 +1,15 @@
 ---
-description: Begin work on a ticket — fetch it, surface ACs + SPEC, branch, set Status In Progress, and load the SPEC into the task list. No code written.
+description: Begin work on a ticket, fetch it, surface ACs + SPEC, branch, set Status In Progress, and load the SPEC into the task list. No code written.
 argument-hint: <issue number, #number, or issue URL>
 ---
 
 # /ticket-startwork
 
-Preparation only — **write no code in this skill.** It fetches the ticket, surfaces the
+Preparation only, **write no code in this skill.** It fetches the ticket, surfaces the
 contract, opens the working branch, moves the Project card, and turns the ticket's SPEC
 steps into tasks.
 
-**INERT until the GitHub repo and Project board exist** — see `CLAUDE.md` / the handoff
+**INERT until the GitHub repo and Project board exist**. See `CLAUDE.md` / the handoff
 doc.
 
 ## Steps
@@ -25,7 +25,7 @@ doc.
    ```
    python3 scripts/ticket.py start <N> --assignee rpulivella
    ```
-6. **Load the SPEC into the task list** with `TaskCreate` — one task per ordered SPEC
+6. **Load the SPEC into the task list** with `TaskCreate`, one task per ordered SPEC
    step, each naming the AC it satisfies. Check `TaskList` first so a resumed session
    extends the existing list rather than duplicating it. Move exactly one task to
    `in_progress` at a time with `TaskUpdate`, and use `addBlockedBy` for a task that
@@ -42,7 +42,7 @@ doc.
 
 ## Moving the card afterward
 
-The tool is the only sanctioned path — never hand-run the GitHub API.
+The tool is the only sanctioned path. Never hand-run the GitHub API.
 
 ```
 python3 scripts/ticket.py status <N> --set "Code Review"   # PR opened, awaiting agentic review

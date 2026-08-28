@@ -9,9 +9,8 @@ call this rather than driving the API by hand, so that the board's invariants,
 one classification label, a Status that always moves forward, an issue that is
 always on the board, hold in exactly one place.
 
-Ported from the author's other tooling ticket.py (same author, same conventions) and since
-carried further here, this copy holds credential and markup fixes another repository has
-not taken back yet. See CLAUDE.md for the origin story.
+Adapted from the same author's tooling in another repository and carried further
+here; this copy holds credential and markup fixes that predecessor does not.
 
 Talks to GitHub over urllib: REST for issues, GraphQL for the Project board.
 Never shells out to `gh` or `jq`, per the house rules in scripts/README.md.
@@ -41,7 +40,7 @@ Requires rich:
 UPDATES
 2026-08-27  Set projectNumber to the real board (3), and corrected the 404 story, which
             had been copied in from the FIRST round of GIT-AND-GITHUB-AFTER-CODE-REVIEW.md
-            and was wrong. Round 2 corrected it and `another repository` carries the
+            and was wrong. Round 2 corrected it and the upstream tooling carries the
             correction; this repo did not. An expired or revoked token is 401, not 404.
             What answers 404 on a private repository is a VALID token lacking `repo`
             scope, or a wrong owner/name, so the old wording sent a reader hunting a
@@ -49,7 +48,7 @@ UPDATES
             404 hint naming the two real causes. Also fixed an indentation bug in
             `edit --dry-run`: the body preview sat OUTSIDE its `if body is not None`
             guard, so `edit --title X --dry-run` printed a bare `None`. Introduced
-            here while applying the markup fix; another repository never had it.
+            here while applying the markup fix; the predecessor never had it.
 2026-08-17  Fixed two credential bugs. readTokenFromSecretsFile returned the first line
             matching GITHUB_TOKEN *or* GH_TOKEN, so a stale GH_TOKEN above the real one
             silently decided the identity; GITHUB_TOKEN now wins by name, and two
@@ -76,7 +75,7 @@ UPDATES
 2026-08-13  Removed the system-keyring fallback from resolveToken. `gh` can hold
             several accounts at once, so the keyring was a silent path to the
             wrong identity. A missing token now fails loudly.
-2026-08-12  Ported from another repository. projectNumber is a placeholder until the
+2026-08-12  Adapted from the author's existing tooling. projectNumber is a placeholder until the
             pybers GitHub repo and Project board exist.
 """
 __author__ = "Richard P Ulivella"

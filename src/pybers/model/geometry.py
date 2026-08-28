@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Absolute placement for objects that float on a sheet, text boxes, images, shapes,
+"""Absolute placement for objects that float on a sheet (text boxes, images, shapes)
 as opposed to cells, which are placed by row/column in a table's grid.
 
 UPDATES

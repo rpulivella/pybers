@@ -66,7 +66,7 @@ and is a **type 8** error. In `22b` that same formula becomes an ordinary type 2
 `0`, because J1 exists again.
 
 So merge state directly determines whether a formula resolves. The error is not recorded as a
-kind, consistent with the finding that error kinds are not stored, it simply becomes an
+kind (consistent with the finding that error kinds are not stored) it simply becomes an
 error cell and un-becomes one.
 
 ### ANSWERED: Numbers rewrites merge ranges on a structural edit
@@ -144,7 +144,7 @@ The reading above was from the schema and it was wrong in both halves. Measured 
 
 **A band style is only a parent.** `header_row_style` is a root `CellStyleArchive`
 (`is_variation: False`, `override_count: 4`) that no cell references directly. Every styled
-cell, header, footer **and body**, carries its own reference to an anonymous *variation*
+cell (header, footer **and body**) carries its own reference to an anonymous *variation*
 whose `parent` is the appropriate template:
 
 ```
@@ -156,7 +156,7 @@ plain body    -> no style reference at all
 
 So formatting a header row and formatting a body row are **the same operation against
 different parents**. Neither is a single-property band write, and the earlier design
-consequence, that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar,
+consequence (that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar)
 does not hold. Both are N cell writes.
 
 **And there IS a per-row and per-column style slot**, in a place the schema reading missed:
@@ -314,7 +314,7 @@ is_autofit_on                  userDefinedGuideStorage    style
 headers: [3 references]        footers: [3 references]
 ```
 
-**`headers` and `footers` are three references each**, left, center and right, and they
+**`headers` and `footers` are three references each** (left, center and right) and they
 point at real `TSWP.StorageArchive`s. Those are the six otherwise-unexplained storages that
 appear in every document in this corpus. They hold **editable text**, so a writer that
 regenerates storages rather than carrying them through can silently erase a document's page
@@ -377,7 +377,7 @@ moment the table was created**, and is **never updated when rows or columns are 
 
 **The real size is `sum(row heights) x sum(column widths)`**, taking `default_row_height` and
 `default_column_width` wherever a `size` reads `0.00`. A reader that trusts `geometry.size`
-gets a plausible wrong number, off by a factor of five in the worst row above, with nothing
+gets a plausible wrong number (off by a factor of five in the worst row above) with nothing
 raising.
 
 ### Resizing a table distributes the stretch PROPORTIONALLY into rows and columns

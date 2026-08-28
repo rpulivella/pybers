@@ -1,5 +1,5 @@
 ---
-description: Review an open pull request — run the deterministic preflight first, then review the changed files against the rubric, and take the PR out of draft only if everything is clean.
+description: Review an open pull request. Run the deterministic preflight first, then review the changed files against the rubric, and take the PR out of draft only if everything is clean.
 argument-hint: <optional PR number; inferred from the branch if omitted>
 ---
 
@@ -13,7 +13,7 @@ This skill carries **process only**. The laws are in `CLAUDE.md`, and the review
 is in `.github/code-review-rubric.md`. Never restate either here.
 
 **INERT until the GitHub repo exists, and `scripts/pr-preflight-check.py` still needs
-authoring** (via `/script-write`) before step 2 below is real — see `CLAUDE.md` / the
+authoring** (via `/script-write`) before step 2 below is real. See `CLAUDE.md` / the
 handoff doc.
 
 ## Steps
@@ -21,15 +21,15 @@ handoff doc.
 1. Get the PR number from `$ARGUMENTS`, or from the current branch
    (`python3 scripts/pr.py find --number-only`). **Read what it printed.** One of three
    things:
-   - a bare number — that is the PR;
-   - `no-open-pull-request` — there genuinely is none for this branch and base; stop and
+   - a bare number. That is the PR;
+   - `no-open-pull-request`, there genuinely is none for this branch and base; stop and
      say so;
-   - anything else — the question could not be asked at all (no credential, a 401, GitHub
+   - anything else, the question could not be asked at all (no credential, a 401, GitHub
      unreachable). Report *that*. It is a different claim from "there is no pull request",
      and reporting it as one states a fact you do not have.
 
    Exit codes carry the same three cases (`0`, `1`, `2`) for anything scripting this, but
-   the printed output is the contract here — do not depend on `$?`.
+   the printed output is the contract here. Do not depend on `$?`.
 2. **Run the preflight and stop if it fails:**
    ```
    python3 scripts/pr-preflight-check.py --pr <N>
@@ -37,7 +37,7 @@ handoff doc.
    At minimum this runs `pytest` and checks the PR body against its template. Non-zero
    means **do not review**: report every failing stage and its reason verbatim, invoke no
    agent, and stop. Do not soften a machine reason into something friendlier. The one
-   exception is a waiver — see below.
+   exception is a waiver. See below.
 3. **Establish the scope**, which is the changed files and nothing else:
    ```
    git diff develop...HEAD --stat
@@ -49,18 +49,18 @@ handoff doc.
    concurrently in one message, each given the file list from step 3 and told that
    anything outside it is out of scope.
 
-   **Every agent is conditional — spend one only where the diff gives it something to
+   **Every agent is conditional, spend one only where the diff gives it something to
    find.** An agent costs roughly 50k tokens whatever it is handed, and one launched
    against a diff with nothing in its subject returns a confident "no issues" for that
    price. Read the diff first, then pick:
-   - `pr-review-toolkit:pr-test-analyzer` — the rubric's Tests question. Always.
-   - `pr-review-toolkit:code-reviewer` — house laws, checked against `CLAUDE.md`. Skip
+   - `pr-review-toolkit:pr-test-analyzer`, the rubric's Tests question. Always.
+   - `pr-review-toolkit:code-reviewer`, house laws, checked against `CLAUDE.md`. Skip
      when the diff is predominantly comments or configuration.
-   - `pr-review-toolkit:comment-analyzer` — only when the diff adds substantial
+   - `pr-review-toolkit:comment-analyzer`, only when the diff adds substantial
      documentation, and especially when a comment asserts something empirical.
-   - `pr-review-toolkit:silent-failure-hunter` — only when the diff contains error
+   - `pr-review-toolkit:silent-failure-hunter`, only when the diff contains error
      handling, a fallback, a `catch`, or a broad `except`.
-   - `pr-review-toolkit:type-design-analyzer` — only when the diff introduces a
+   - `pr-review-toolkit:type-design-analyzer`, only when the diff introduces a
      dataclass or other new type.
 
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
@@ -73,7 +73,7 @@ handoff doc.
 
 A failing stage may be **waived**, and only when all three hold:
 
-1. The failure is **provably outside the diff** — `git diff develop...HEAD --name-only`
+1. The failure is **provably outside the diff**, `git diff develop...HEAD --name-only`
    shows the change could not have caused it.
 2. It is **already tracked by a ticket**, named in the waiver.
 3. The waiver is **written into the pull request body**, so it is on the record rather
@@ -104,7 +104,7 @@ concerns and each commit earned its place; squashing would destroy which change 
 The branch is deleted on merge unless `--keep-branch` is passed.
 
 **`--method squash` is the exception, not a preference.** Reach for it only when the branch
-is one logical change whose history is fixup churn rather than separable steps — and say in
+is one logical change whose history is fixup churn rather than separable steps, and say in
 the review why.
 
 `--subject` is required, so the merge commit follows the house format rather than GitHub's

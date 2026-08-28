@@ -281,7 +281,7 @@ somewhere else entirely:
 all three indent fields                 0.0
 ```
 
-`table_para_data.first` is an integer indent **level**, one press, then two, with **no point
+`table_para_data.first` is an integer indent **level** (one press, then two) with **no point
 value stored anywhere**. It is the first time that run table has carried anything but
 `(0, 0)` in the whole corpus.
 
@@ -325,7 +325,7 @@ all.
 
 `38` demonstrates this by accident, and the fixture labels the accident, which is what makes
 it usable. One cell was copied from another; the copy kept the source's **cell-level** style
-archive, `c7` and `c8` share style key 4, carrying a black shadow, and then had a blue
+archive (`c7` and `c8` share style key 4, carrying a black shadow) and then had a blue
 shadow applied to part of its text:
 
 ```
@@ -750,7 +750,7 @@ written.
 ### A run with no object inherits from the paragraph
 
 The character run table alternates styled and unstyled spans. An entry whose `object` field is
-**absent**, `HasField("object")` is false, not an identifier of zero, carries no character
+**absent** (`HasField("object")` is false, not an identifier of zero) carries no character
 style, and the text there takes the paragraph's formatting:
 
 ```
@@ -828,7 +828,7 @@ SkolarSansLatn-ElIt   bold=(unset) italic=True     the italic face AND the flag
 SkolarSansLatn-Rg     bold=False  italic=False
 ```
 
-**Weight and slant are part of `font_name`**, the PostScript name, and `bold` / `italic` are
+**Weight and slant are part of `font_name`** (the PostScript name) and `bold` / `italic` are
 independent booleans layered on top. So:
 
 - `bold=True` on a regular face is **faux bold**, the same class of defect as the synthetic

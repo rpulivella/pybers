@@ -27,7 +27,7 @@ decimal128Context: Context = Context(prec=34, Emax=6144, Emin=-6143)
 #
 # Decimal is not a compromise here, it is the matching type. Verified 2026-08-17:
 # Decimal("0.1") + Decimal("0.2") == Decimal("0.3") is True, and 1.1 * 1.1 is exactly
-# 1.21, where float64 gets both wrong. Division still rounds: 1/3 * 3 is 0.999...9,
+# 1.21, where float64 gets both wrong. Division still rounds (1/3 * 3 is 0.999...9)
 # but that is inherent to decimal arithmetic and Numbers, using the same decimal128,
 # behaves identically. Matching its rounding is the point.
 #

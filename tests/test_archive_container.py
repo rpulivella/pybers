@@ -112,7 +112,7 @@ def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(name: str, tmp_path: Path
     `0o600 << 16` in `writestr` and `open(..., "w")` alike.
 
     Getting those bytes back would mean hand-rolling a zip writer and owning it
-    forever. They carry no document content. They are archival metadata, and a
+    forever. They carry no document content (they are archival metadata) and a
     round-tripped file was confirmed on 2026-08-16 to open in Numbers 15.3.1 with
     no warning and no repair prompt. `numbers-parser` reaches the same conclusion
     by using `zipfile` and not attempting byte-identity either.

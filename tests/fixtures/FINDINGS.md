@@ -59,7 +59,7 @@ font feature. pybers must be able to tell them apart and must never write the fa
   key.
 - **Node type 32** appears after a function call in several files with no established meaning,
   and the AST node message has 45 fields of which a handful are identified.
-- **Function indices are numeric**, 168 is SUM, 62 is IF, 231 is SUMIFS, and a full name map
+- **Function indices are numeric** (168 is SUM, 62 is IF, 231 is SUMIFS) and a full name map
   has to be derived rather than borrowed, per the schema-ownership decision in `CLAUDE.md`.
 - **Header rows, header columns and footers** are switched off in every fixture here, so the
   default Numbers table shape is untested. `39-table-bands` covers it and is worth promoting.

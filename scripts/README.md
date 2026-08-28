@@ -3,7 +3,7 @@
 Personal tooling for this repo: the ticket/PR workflow tools and any future build/release
 utilities. Every script is self-contained, runnable from the repo root, and reports
 through [`rich`](https://github.com/Textualize/rich). This house style mirrors
-`another repository`'s and `another repository`'s `scripts/README.md` exactly, same author,
+the same author's other repositories exactly,
 same conventions, deliberately kept in sync. It governs `scripts/` (repo tooling) only,
 `src/pybers/` (the library itself) follows the same core conventions but uses dataclasses
 rather than TypedDict for data, and is documented in `CLAUDE.md`.
@@ -37,7 +37,7 @@ The **`test-` prefix is the deliberate exception** for a hand-rolled test script
 used here since this project's tests are real `pytest` under `tests/`, not hand-rolled
 `scripts/test-*.py`. If a repo-tooling script ever needs its own test outside pytest's
 reach, follow the `test-<topic>.py` / synthetic-data / glob-discovered convention from
-`another repository`'s `scripts/README.md`.
+the author's other repositories.
 
 - A **`-check`** asserts something about the repository as it stands right now, and can
   fail because a *file* changed. Run it against the working tree.

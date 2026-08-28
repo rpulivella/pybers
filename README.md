@@ -27,8 +27,8 @@ handful of correctness bugs along the way, style loss on write, a shared mutable
 object corrupting an unrelated cell, a row-insert regex that shifted the wrong end of a
 formula range, ordinary friction from pushing a young feature branch further, not a
 reflection on the project as a whole. `pybers` exists because this developer wanted a
-different foundation for those specific bugs and a few other things she would been wanting
-regardless, dataclasses, a library-and-CLI/TUI split, first-class named styles, not
+different foundation for those specific bugs and a few other things he had been wanting
+regardless (dataclasses, a library-and-CLI/TUI split, first-class named styles), not
 because `numbers-parser` did anything wrong. Full story, including the specific bugs, is
 in `CLAUDE.md`. That project is not vendored here. It is a separate checkout kept
 outside this repository.

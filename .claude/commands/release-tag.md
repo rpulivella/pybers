@@ -5,7 +5,7 @@ argument-hint: <release type and version, e.g. "beta 0.1.0" or "final 0.1.0">
 
 # /release-tag
 
-Create and push an annotated release tag on `develop`. There are no release branches —
+Create and push an annotated release tag on `develop`. There are no release branches,
 the tag alone records exactly what shipped.
 
 ## Steps
@@ -15,8 +15,8 @@ the tag alone records exactly what shipped.
    - `final <version>` → `release/v<version>-Final`
 2. Show the exact tag that will be created. Confirm with the user before doing anything.
 3. Verify the current state:
-   - `git status` — working tree should be clean
-   - `git log --oneline -3` — confirm the commit being tagged looks right
+   - `git status`, working tree should be clean
+   - `git log --oneline -3`, confirm the commit being tagged looks right
    - Confirm the `version` field in `pyproject.toml` matches `<version>`
    - Warn if there are uncommitted changes
 4. **Update `CHANGELOG.md`** before a `final` tag. List what shipped and reconcile it
@@ -41,7 +41,7 @@ release/v0.1.0-Final   # shipped PyPI release
 - Never push a tag without explicit user confirmation.
 - Always lowercase prefix; always a `v` prefix on the version.
 - Leading zeros on iteration suffixes: `-b01`, never `-b1`.
-- Never reuse a tag — increment the iteration if a rebuild is needed.
+- Never reuse a tag, increment the iteration if a rebuild is needed.
 - Update `CHANGELOG.md` before a `final` release tag.
 
 $ARGUMENTS

@@ -16,7 +16,7 @@ the script's `UPDATES` block.
 ## ⚠ /standards IS TWO PASSES. ALWAYS BOTH. NO EXCEPTIONS.
 
 **1. `scripts/standards-check.py`**
-**2. The judgment read** — the inlined rubric at the end of this file.
+**2. The judgment read**, the inlined rubric at the end of this file.
 
 **Every invocation. No conditions.** Not "the change was small", not "it was only
 a docstring", not "the script came back clean". The script cannot see slop; it
@@ -64,7 +64,7 @@ Two things neither tells you:
   is stricter than its own upstream. Expect this to be the loudest finding on any
   file written before the gate existed.
 - **Split verbs and stranded prepositions are heuristics, and they WARN.** A good
-  number are benign — "can only express" is correct English, not a split verb.
+  number are benign, "can only express" is correct English, not a split verb.
   Read them, do not obey them.
 
 ## ⚠ This is NOT a code linter
@@ -86,7 +86,7 @@ long after the exception was justified. File-level findings report line 0 and ca
 suppressed at all, by design. Use it for quoted third-party copy and upstream
 identifiers; `rg standards-ok` audits every one.
 
-## The second pass — the judgment read
+## The second pass: the judgment read
 
 **Deliberately NOT an external skill.** The sibling repos call one, and it is installed
 on this machine. This repo does not, for a reason that matters more here than there: pybers is going open source, and a contributor should

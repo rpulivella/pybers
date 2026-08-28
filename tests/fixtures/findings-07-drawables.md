@@ -168,7 +168,7 @@ every point stored in the path gives `(-4.882, -4.882)-(104.882, 104.882)`, and 
 the on-path endpoints gives `(14.645, 14.645)-(85.355, 85.355)`. **Neither is the shape.**
 
 It is a circle of radius 50 centered at `(50, 50)`, drawn as four `curveTo` elements whose
-nodes sit at the 45-degree diagonals, `50 ± 50/√2` is exactly 14.645 and 85.355, with
+nodes sit at the 45-degree diagonals (`50 ± 50/√2` is exactly 14.645 and 85.355) with
 control points pushed out to -4.882 to round the curve. Its true extent is `0..100`, which
 matches `naturalSize` at scale 1.0.
 
@@ -264,7 +264,7 @@ identifies each one, and the fixture is deliberately varied:
 ```
 
 Element point counts confirm the convention: `lineTo` and `moveTo` carry one point,
-`curveTo` carries **three**, two control points then the endpoint, and `closeSubpath`
+`curveTo` carries **three** (two control points then the endpoint) and `closeSubpath`
 carries none. Every closed path also ends with a trailing `moveTo` back to the start.
 
 A node in an editable bezier carries a `type` of `sharp` or `smooth`, so the smoothness of
@@ -395,7 +395,7 @@ type: TSDCurvedShadow    color, angle 90, offset 1,  radius 15, opacity 1
                          curvedShadow { curve: -0.12309546 }
 ```
 
-So the common geometry, color, angle, offset, radius, opacity, `is_enabled`, applies to
+So the common geometry (color, angle, offset, radius, opacity, `is_enabled`) applies to
 every kind, and `contactShadow` / `curvedShadow` add the one parameter their kind needs.
 A model with a flat "shadow" record would lose `height` and `curve`.
 
@@ -608,7 +608,7 @@ pos=(931.0, 136.1)  size=108.3x 67.7  angle=  0.00  flags=3  lock=True
 pos=(732.7, 343.2)  size= 22.6x 92.0  angle=  0.00  flags=3  lock=False
 ```
 
-**`angle` is in DEGREES here**, 180 and 12.10, where the gradient angle in `28` was in
+**`angle` is in DEGREES here** (180 and 12.10) where the gradient angle in `28` was in
 radians. The format is not internally consistent about angular units, and each one has to be
 established separately rather than assumed.
 

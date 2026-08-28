@@ -302,7 +302,7 @@ the shared base of every style, carries `name`, `style_identifier`, `parent` and
 only as anonymous archives deduplicated by value and reached through a table's `STYLE` list.
 
 Two details worth keeping. A **user-created** character style appears in the same registry as
-Apple's own, `'smallcap'`, made while building `09-text-capitalization`, so named styles are
+Apple's own (`'smallcap'`, made while building `09-text-capitalization`) so named styles are
 not a fixed built-in set. And `Table Style 1` through `Table Style 7` are **paragraph** styles
 despite the name, so the table styling vocabulary is expressed through named paragraph styles
 rather than through named table styles.
@@ -425,7 +425,7 @@ formatting means walking it.
 
 ### `override_count` counts logical properties, not fields
 
-Key 6 changed one thing, the color, and stores **two** fields, `font_color` and `tsd_fill`,
+Key 6 changed one thing (the color) and stores **two** fields, `font_color` and `tsd_fill`,
 which are the legacy and modern spellings of the same property. `override_count` is 1. Key 8
 changed three genuinely different things and reports 3.
 

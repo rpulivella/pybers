@@ -4,7 +4,7 @@
 The `.numbers` document container: a zip of IWA members and supporting files.
 
 A `.numbers` file is a zip. `Index/*.iwa` members carry the document itself; the
-rest, a preview image, metadata, asset files, are ordinary payloads this layer
+rest (a preview image, metadata, asset files) are ordinary payloads this layer
 carries through untouched.
 
 Every member's storage method is recorded and replayed rather than assumed. In

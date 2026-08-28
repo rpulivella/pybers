@@ -117,7 +117,7 @@ interpreted, since a formula is shared state that other cells depend on.
 
 From `20-formula-shapes`, which points one cell at a second table on the same sheet and
 another at a table on a second sheet. Both produce the **same** node type as an ordinary
-reference, `36`, with one extra field:
+reference (`36`) with one extra field:
 
 ```
 column: -6, absolute: false          an ordinary relative offset
@@ -156,7 +156,7 @@ is expressed by absence rather than by a sentinel or a flag.
 
 From `21-formula-errors`.
 
-A **deleted reference** becomes node type `46`, not the usual `36`, carrying sentinel
+A **deleted reference** becomes node type `46` (not the usual `36`) carrying sentinel
 coordinates:
 
 ```

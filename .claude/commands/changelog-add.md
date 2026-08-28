@@ -15,7 +15,7 @@ Add an entry to the `CHANGELOG.md` Unreleased list for the current ticket.
    [Entries with no ticket](#entries-with-no-ticket) below and write the summary
    yourself.
 3. Read `CHANGELOG.md`, find the `## Unreleased` header, and insert **at the top of its
-   list** (reverse-chronological — newest first) exactly:
+   list** (reverse-chronological, newest first) exactly:
    ```
    - [#<N>] <issue title verbatim>
    ```
@@ -24,7 +24,7 @@ Add an entry to the `CHANGELOG.md` Unreleased list for the current ticket.
 
 ## Entries with no ticket
 
-Not every change has an issue behind it, so the bracket is never empty — it carries the
+Not every change has an issue behind it, so the bracket is never empty. It carries the
 same vocabulary `/commit` uses, and for the same reasons:
 
 ```
@@ -40,9 +40,9 @@ ticket title would use: imperative, verb-first, sentence case, no trailing punct
 
 ## Hard rules
 
-- **One line per ticket** — never a multi-line entry.
-- **Verbatim** — do not paraphrase or summarize the title.
-- **Never a bare bullet.** Every line opens with a bracket — `[#<N>]`, `[init]`, or
+- **One line per ticket**. Never a multi-line entry.
+- **Verbatim**. Do not paraphrase or summarize the title.
+- **Never a bare bullet.** Every line opens with a bracket, `[#<N>]`, `[init]`, or
   `[hotfix]`.
 - **No headers, no blank lines, no formatting** beyond the bullet.
 - Newest entry goes to the top of the Unreleased list.
