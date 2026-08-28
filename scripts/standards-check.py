@@ -3,7 +3,7 @@
 """\
 Standards Check
 
-Lint this repository's WRITING — the prose that humans and agents both read.
+Lint this repository's WRITING, the prose that humans and agents both read.
 One deterministic pass over every file in scope; reports FAILURES (hard blocks)
 and WARNINGS (review items).
 
@@ -23,7 +23,8 @@ What that leaves in scope, and why it includes Python:
     weak-"let" check needs no carve-out for a `let` identifier: code is never in
     scope to be misread as English.
 
-Adapted from `another repository`'s standards-check.py, which is upstream. Its
+Adapted from the same author's standards-check.py in another repository, which
+remains upstream for the prose rules. Its
 CSS, HTML and Astro checks are dropped whole, since there is no markup here.
 When a prose check improves upstream, diff the two files and re-import rather
 than letting them drift. Deliberate divergences are recorded below, and they are
@@ -79,7 +80,7 @@ UPDATES
             mypy are configured in pyproject.toml as exclude stanzas ONLY, with
             no rule selection, and neither is installed. Nothing lints this code
             today. That is a ticket, not a reason to widen this script.
-2026-08-27  First version, porting the prose checks from another repository.
+2026-08-27  First version, porting the prose checks from that upstream.
 
             TWO DIVERGENCES from upstream, both deliberate:
               - EM DASHES FAIL, and the ceiling is zero. The global writing
@@ -144,9 +145,20 @@ generatedOnly: tuple[str, ...] = (
 allRoots: tuple[str, ...] = ("src", "tests", "scripts", "docs", ".claude")
 checkExtensions: tuple[str, ...] = (".py", ".md")
 
-# Files that DOCUMENT the banned language rather than commit it.  They state the
+# Files that DOCUMENT the banned language rather than commit it. They state the
 # forbidden words in order to forbid them, so flagging them is pure noise.
-ruleDocPaths: tuple[str, ...] = (".claude/commands/", "CLAUDE.md")
+#
+# NARROW ON PURPOSE, and narrower than it first was. The exemption used to cover
+# every check and to include CLAUDE.md, which made the repository's primary and
+# most public document the LEAST checked prose in it. That is backwards, and it
+# cost real violations: thirty-seven em dashes and a contraction sat in CLAUDE.md
+# reporting clean. Only a file that enumerates banned words needs the carve-out,
+# and it needs it only for the checks that read those words.
+ruleDocPaths: tuple[str, ...] = (".claude/commands/",)
+
+# The only checks a rule doc is exempt from. Everything else applies in full,
+# because quoting a banned word is no reason to stop counting em dashes.
+ruleDocExemptChecks: tuple[str, ...] = ("banned", "british", "weakLet")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PROSE RULES
@@ -168,7 +180,7 @@ contractionRe = re.compile(
 )
 
 # British to American.  US English is a hard rule with no exceptions in prose.
-# Curated word by word — deliberately NO blanket -ise/-our rule, which would
+# Curated word by word: deliberately NO blanket -ise/-our rule, which would
 # trip promise, exercise, our and four.  A match preceded by an identifier
 # separator (/ @ . - _) is skipped: that is a third-party identifier, which the
 # global rule explicitly carves out.
@@ -213,11 +225,11 @@ bannedPhrases: tuple[tuple[re.Pattern, str], ...] = (
     (re.compile(r"\bworth stating plainly\b", re.I), "banned phrase"),
     (re.compile(r"\bfull stop\b", re.I), "banned phrase"),
     (re.compile(r"\bcarry the argument\b", re.I), "banned phrase"),
-    (re.compile(r"\bthe trap\b", re.I), "banned phrase — name the failure instead"),
+    (re.compile(r"\bthe trap\b", re.I), "banned phrase, name the failure instead"),
     (re.compile(r"\bleverag(?:e|es|ed|ing)\b", re.I),
-     "corporate filler — use use / apply / draw on / build on"),
+     "corporate filler, use use / apply / draw on / build on"),
     (re.compile(r"\bstanding up\b", re.I),
-     "corporate filler — use opening / building / bringing online"),
+     "corporate filler, use opening / building / bringing online"),
 )
 
 # "isn't just X, it's Y" and its variants.  Banned as a rhetorical move, not as
@@ -291,8 +303,14 @@ def suppressedLines(text: str) -> set[int]:
             if suppressRe.search(line)}
 
 
-def isRuleDoc(path: Path) -> bool:
-    """True for files that DOCUMENT the banned language rather than commit it."""
+def isRuleDoc(path: Path, check: str) -> bool:
+    """True when this file is exempt from THIS check for documenting the rule.
+
+    Takes the check name rather than answering in general. A blanket exemption
+    silenced every rule on the files most likely to be read.
+    """
+    if check not in ruleDocExemptChecks:
+        return False
     normalized = path.as_posix()
     if path.name == "standards-check.py":
         return True
@@ -335,7 +353,7 @@ def pythonProse(text: str) -> str:
         span = "\n".join(lines[start - 1:end])
         keep[offset:offset + len(span)] = span
 
-    # Docstrings quote code constantly — `open(..., "w")`, a usage synopsis, a
+    # Docstrings quote code constantly, `open(..., "w")`, a usage synopsis, a
     # proto import. Those are samples, not sentences, exactly as a markdown fence
     # is, so they come out before any prose rule sees them.
     out = "".join(keep)
@@ -417,7 +435,7 @@ def markdownProse(text: str) -> str:
 
 def checkContractions(path: Path, prose: str, findings: list) -> None:
     """No contractions in docstrings, comments or docs."""
-    if isRuleDoc(path):
+    if isRuleDoc(path, "contractions"):
         return
     for match in contractionRe.finditer(prose):
         findings.append(("FAIL", path, lineNo(prose, match.start()),
@@ -444,7 +462,7 @@ def checkBritish(path: Path, prose: str, findings: list) -> None:
     committing the offense. Upstream exempts only this script by name, which
     left its own skill file failing on the word it exists to forbid.
     """
-    if isRuleDoc(path):
+    if isRuleDoc(path, "british"):
         return
     for pattern, hint in britishSpellings:
         for match in pattern.finditer(prose):
@@ -452,7 +470,7 @@ def checkBritish(path: Path, prose: str, findings: list) -> None:
             if start and prose[start - 1] in "/@.-_":
                 continue
             findings.append(("FAIL", path, lineNo(prose, start),
-                             f"British spelling '{match.group(0)}' — use {hint}"))
+                             f"British spelling '{match.group(0)}', use {hint}"))
 
 
 def checkEmDash(path: Path, prose: str, findings: list) -> None:
@@ -462,40 +480,45 @@ def checkEmDash(path: Path, prose: str, findings: list) -> None:
     per file and warns above that.  The rule here has no ceiling, so neither
     does the check, and it FAILS rather than warning.
     """
-    if isRuleDoc(path):
+    if isRuleDoc(path, "emdash"):
         return
-    for match in re.finditer("—", prose):
+    # The literal this searches for is the character it bans, so a prose sweep
+    # over this file will rewrite it and turn the detector into a comma
+    # finder. That happened once. Built from a code point so no text
+    # transform can reach it.
+    emDash = chr(0x2014)
+    for match in re.finditer(emDash, prose):
         findings.append(("FAIL", path, lineNo(prose, match.start()),
-                         "em dash — use a comma, parentheses, or a new sentence"))
+                         "em dash, use a comma, parentheses, or a new sentence"))
 
 
 def checkBannedPhrases(path: Path, prose: str, findings: list) -> None:
     """The global banned list, plus the not-just-X-but-Y rhetorical move."""
-    if isRuleDoc(path):
+    if isRuleDoc(path, "banned"):
         return
     for pattern, hint in bannedPhrases:
         for match in pattern.finditer(prose):
             findings.append(("FAIL", path, lineNo(prose, match.start()),
-                             f"'{match.group(0)}' — {hint}"))
+                             f"'{match.group(0)}', {hint}"))
     for match in notJustRe.finditer(prose):
         findings.append(("FAIL", path, lineNo(prose, match.start()),
-                         f"'{match.group(0)}' — state the claim directly"))
+                         f"'{match.group(0)}', state the claim directly"))
 
 
 def checkWeakLet(path: Path, prose: str, findings: list) -> None:
     """A product enables or gives the ability; it does not 'let'."""
-    if isRuleDoc(path):
+    if isRuleDoc(path, "weakLet"):
         return
     for match in weakLetRe.finditer(prose):
         if letCarveOut.match(prose, match.start()):
             continue
         findings.append(("WARN", path, lineNo(prose, match.start()),
-                         f"weak '{match.group(0)}' — prefer enables / gives the ability"))
+                         f"weak '{match.group(0)}', prefer enables / gives the ability"))
 
 
 def checkSplitVerb(path: Path, prose: str, findings: list) -> None:
     """The adverb belongs before the auxiliary, not inside the verb."""
-    if isRuleDoc(path):
+    if isRuleDoc(path, "splitVerb"):
         return
     for match in splitVerbRe.finditer(prose):
         findings.append(("WARN", path, lineNo(prose, match.start()),
@@ -504,7 +527,7 @@ def checkSplitVerb(path: Path, prose: str, findings: list) -> None:
 
 def checkStrandedPreposition(path: Path, prose: str, findings: list) -> None:
     """A sentence does not end on a preposition."""
-    if isRuleDoc(path):
+    if isRuleDoc(path, "strandedPrep"):
         return
     for match in strandedPrepRe.finditer(prose):
         findings.append(("WARN", path, lineNo(prose, match.start()),
@@ -527,7 +550,7 @@ def checkEllipsis(path: Path, prose: str, findings: list) -> None:
 
 def checkSemicolons(path: Path, prose: str, findings: list) -> None:
     """Semicolons in prose should be near zero."""
-    if isRuleDoc(path) or path.suffix == ".py":
+    if isRuleDoc(path, "semicolons") or path.suffix == ".py":
         return
     count = prose.count(";")
     if count > semicolonMax:
@@ -536,7 +559,7 @@ def checkSemicolons(path: Path, prose: str, findings: list) -> None:
 
 
 def checkDocstringShape(path: Path, tree: ast.Module, findings: list) -> None:
-    """No Args/Returns/Raises sections — a docstring is prose, not a form.
+    """No Args/Returns/Raises sections, a docstring is prose, not a form.
 
     This is the one docstring rule that is about WRITING rather than structure.
     Whether a function HAS a docstring is a code-lint question and belongs to
@@ -551,7 +574,7 @@ def checkDocstringShape(path: Path, tree: ast.Module, findings: list) -> None:
         for section in ("Args:", "Returns:", "Raises:"):
             if section in docstring:
                 findings.append(("WARN", path, node.lineno,
-                                 f"'{node.name}' docstring uses a '{section}' section — "
+                                 f"'{node.name}' docstring uses a '{section}' section, "
                                  "write the free-form why instead"))
 
 
@@ -652,7 +675,7 @@ def report(findings: list, files: list[Path], warnings: list) -> int:
     reviews = [f for f in findings if f[0] == "WARN"]
 
     if not findings:
-        console.print(f"[green]PASS[/] — {len(files)} file(s) checked, no issues found.")
+        console.print(f"[green]PASS[/], {len(files)} file(s) checked, no issues found.")
         return 0
 
     for level, colour in (("FAIL", "red"), ("WARN", "yellow")):
@@ -664,7 +687,7 @@ def report(findings: list, files: list[Path], warnings: list) -> int:
             where = f"{path}:{line}" if line else str(path)
             console.print(f"  [{colour}]{where}[/]  {message}")
 
-    console.print(f"\n{len(files)} file(s) checked — "
+    console.print(f"\n{len(files)} file(s) checked, "
                   f"[red]{len(failures)} failure(s)[/], "
                   f"[yellow]{len(reviews)} warning(s)[/].")
     return 1 if failures else 0
@@ -692,7 +715,7 @@ def main() -> int:
 
     files = collectFiles(arguments, warnings)
     if not files:
-        console.print("[green]PASS[/] — nothing in scope to check.")
+        console.print("[green]PASS[/], nothing in scope to check.")
         return 0
     for path in files:
         checkFile(path, findings)
