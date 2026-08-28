@@ -219,7 +219,7 @@ linter will assume. Follow them as written.
   `UPDATES` changelog block. No contractions in docstrings/comments.
 - Module header block on every file: `#!/usr/bin/env python3`, `# -*- coding: utf-8 -*-`,
   module docstring, then `__author__`/`__copyright__`/`__license__`/`__version__`/
-  `__email__`/`__status__`/`__date__` (`Richard P Ulivella` / `rpulivella@icloud.com` /
+  `__email__`/`__status__`/`__date__` (`Richard P Ulivella` / `pybers@richardulivella.com` /
   `Copyright 2026`).
 - `RuntimeError` subclasses for internal failures, always `raise ... from exc` to
   preserve the chain. No bare `except Exception: pass` swallows.

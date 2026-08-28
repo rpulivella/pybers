@@ -9,7 +9,7 @@ description = "A clean, round-trip-tested Python library for reading and writing
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-    { name = "Richard P Ulivella", email = "rpulivella@icloud.com" },
+    { name = "Richard P Ulivella", email = "pybers@richardulivella.com" },
 ]
 dependencies = [
     # Required at import time, not merely to build: every module in pybers/_generated
