@@ -9,6 +9,14 @@ UPDATES
 
 from __future__ import annotations
 
+__author__ = "Richard P Ulivella"
+__copyright__ = "Copyright 2026 Richard P Ulivella"
+__license__ = "Apache-2.0"
+__version__ = "0.1.0"
+__email__ = "pybers@richardulivella.com"
+__status__ = "Development"
+__date__ = "2026/08/12"
+
 from dataclasses import dataclass
 
 
