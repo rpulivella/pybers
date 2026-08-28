@@ -10,25 +10,26 @@ convention shared across this developer's repos.
 
 ## Steps
 
-1. Run `git branch --show-current`. **If the branch is `develop`**, routine work may
-   commit directly there. Ticketed feature work should be on its own `<type>/<id>-slug`
-   branch. If it is not, ask before proceeding.
+1. Run `git branch --show-current`. **If the branch is `develop`**, the only thing that
+   belongs there is a `[hotfix]`. Every ticket lands through a pull request from its own
+   `<type>/<id>-slug` branch. If ticketed work is sitting on `develop`, ask before
+   proceeding.
 2. Run `git status` and `git diff` (staged + unstaged) to understand what changed. If
    there is nothing to commit, say so and stop.
 3. Compose the message:
    - **`[<N>] <prefix>: <summary>`**, the ticket number first, in brackets, read from
-     the branch name (`<label>/<N>-...`). Only usable once GitHub Issues + `scripts/
-     ticket.py` are wired up. See `CONTRIBUTING.md`.
+     the branch name (`<label>/<N>-...`). The normal form. See `CONTRIBUTING.md`.
+   - **`[hotfix]`** for a ticketless urgent or infrastructural change where a ticket
+     adds no value (tooling, a skill, CI, docs): `[hotfix] <prefix>: …`. Use sparingly.
    - **`[init]`** for pre-ticket bootstrap (scaffolding, architecture de-risking, before
-     shipping): `[init] <prefix>: …`. **The default for this phase**. Nothing has
-     shipped, so nothing is a "fix".
-   - **`[hotfix]`** for a ticketless fix **after shipping**, once the ticket workflow
-     exists (tooling, a skill, CI). Not used during bootstrap.
-   - **`[workarea]`** for a ticketless change confined to `workarea/`: `[workarea]
-     chore: …`.
+     the ticket workflow begins and before anything ships). **Retired**: real ticket
+     numbers exist now, so a new `[init]` commit is almost certainly a `[hotfix]`.
    - **Single line only**, no body, no footer, nothing after the first line.
-   - **Conventional-Commits prefix required:** `feat` `fix` `perf` `refactor` `style`
-     `docs` `chore`. Always include it, even when it matches the branch label.
+   - **A Conventional-Commits inspired prefix always:** `feat` `fix` `perf` `refactor`
+     `style` `docs` `chore`. Chosen per commit, from what that commit did, never from
+     the branch. A `feature/14-...` branch normally carries `feat:` several times and
+     then `docs:`, `fix:` and `refactor:` as the work turns; that is correct, not drift.
+     The branch prefix and the commit prefix are two different axes.
    - **≤ 60 characters** (aim 50), bracket included. Imperative mood ("add", "fix").
    - **No "Co-Authored-By", no footer, no second line.**
 4. **STOP. Present the plan and wait for explicit approval.**
@@ -61,28 +62,30 @@ convention shared across this developer's repos.
 
 ## Choosing the boundary
 
-- **One acceptance criterion, one commit, at a minimum**, once tickets exist.
+- **One acceptance criterion, one commit, at a minimum.** A hard criterion usually earns
+  several: the type it needed, the behavior it added, a fix found while exercising it.
+  One commit for a whole ticket is always wrong.
 - **Small related changes may combine.** A message with "and" in it is fine; the
   one-line sixty-character limit already stops that going far.
 - **Every commit's test suite is green.** No exceptions. "It passes once the next one
   lands" is not two commits, it is one.
 - **Tests may trail the code they cover by a commit**, which is often the right shape
-  after a large one.
-- **Ticketless work interleaved with a ticket gets its own commit**, `[hotfix]` or
-  `[workarea]`, even mid-branch.
+  after a large one. They may not trail the pull request.
+- **Ticketless work interleaved with a ticket gets its own `[hotfix]` commit**, even
+  mid-branch. It is not the ticket's deliverable and does not belong buried in it.
 
 ## Correct examples
 
 ```
-[init] chore: scaffold the project, package graph, and pytest gate
-[init] feat: add the dataclass object model
+[14] feat: decode merged cell ranges from the merge store
+[27] perf: drop the per-tile allocation from the cell reader
+[31] fix: keep run indices aligned across astral characters
 [hotfix] docs: correct the install instructions
-[workarea] chore: capture archive-format research
 ```
 
 ## Hard rules
 
-- NEVER omit the bracketed id (except the literal `[hotfix]` / `[workarea]`).
+- NEVER omit the bracketed id (except the literal `[hotfix]`).
 - NEVER produce a multi-line message. NEVER add Co-Authored-By or any AI attribution.
 - NEVER use `--no-verify`. NEVER push without asking.
 - NEVER stage secrets, build artifacts, or `workarea/`.

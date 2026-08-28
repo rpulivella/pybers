@@ -9,45 +9,45 @@ laws of the codebase live in `CLAUDE.md`; this file is only about the git workfl
 One scannable line per commit. The shape:
 
 - `[<N>] <prefix>: <summary>`, the ticket number first, in brackets, read from the branch
-  name. (No ticket system exists yet, this form starts once one does.)
-- `[init] <prefix>: <summary>`, pre-ticket bootstrap: initial scaffolding and architecture
-  de-risking, before the ticket workflow begins and before anything ships. **The default
-  for this phase**. There is nothing shipped to "fix", so `[hotfix]` is wrong here.
+  name.
 - `[hotfix] <prefix>: <summary>`, a ticketless urgent or infrastructural change (tooling,
-  a skill, CI, docs) **after shipping**, once a ticket workflow exists. Not used during
-  bootstrap.
-- `[workarea] <prefix>: <summary>`, a change confined to the non-shipping `workarea/`
-  tree.
+  a skill, CI, docs) where a ticket adds no value. Use sparingly.
+- `[init] <prefix>: <summary>`, pre-ticket bootstrap: initial scaffolding and architecture
+  de-risking, before the ticket workflow begins and before anything ships. Retired, since
+  real ticket numbers exist now.
 
 Rules: single line, no body, no footer; at most 60 characters including the bracket;
-imperative mood; a Conventional-Commits prefix always (`feat` `fix` `perf` `refactor`
-`style` `docs` `chore`). Never a `Co-Authored-By` trailer, it breaks the one-line log.
+imperative mood; a Conventional-Commits-inspired prefix always (`feat` `fix` `perf`
+`refactor` `style` `docs` `chore`). Never a `Co-Authored-By` trailer, it breaks the
+one-line log.
 
 ```
 [init] chore: scaffold the project, package graph, and pytest gate
 [init] feat: add the dataclass object model
 [hotfix] docs: correct the install instructions
-[workarea] chore: capture archive-format research
 ```
 
 ## Branch strategy
 
-**`develop` is the one long-lived branch**, the trunk, the default, and the release
+**`develop` is the one long-lived trunk branch**, the default, and the release
 line. There is no `main` and there are no standing release branches: a solo project does
 not need a parallel production line, and a tag already records exactly what shipped.
 
 ```
-routine:     commit on develop
 per ticket:  <type>/<id>-verbose-slug  ->  PR into develop  ->  delete branch
 release:     annotated tag on develop  ->  CI build
 ```
 
-- **`develop`** stays green. Routine and interactive work lands here directly. Once a
-  ticket system exists, every ticket merges here through a pull request instead.
-- **`type`** matches the ticket's one label: `feature` `fix` `bugfix` `chore` `docs`
-  `perf` `refactor` `style`. The branch carries `feature/`; the commit inside it still
-  carries the Conventional prefix `feat:`, the branch label and the commit prefix are
-  two different axes.
+- **`develop`** stays green. Every ticket merges here through a pull request, and the
+  only thing that lands directly is the occasional `[hotfix]`, to a doc for example.
+- **`type`** is mapped from the ticket's label rather than copied from it, because two
+  of the six read badly as a branch prefix: `feat` becomes `feature` and `fix` becomes
+  `bugfix`, while `perf`, `refactor`, `docs` and `chore` are already their own prefix.
+  Those six are the closed set.
+- **The branch prefix and the commit prefix are two different axes.** A branch carries
+  one `type` for the life of the ticket; the commits inside it each carry whichever
+  Conventional prefix describes that commit. A `feature/12-...` branch normally holds
+  several `feat:` commits and then `docs:`, `fix:` and `refactor:` as the work turns.
 
 ## Release tagging
 

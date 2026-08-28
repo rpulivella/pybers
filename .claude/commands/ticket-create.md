@@ -11,9 +11,6 @@ which adds it to the pybers Project board and sets its Status. It does NOT assig
 issue, assignment happens at `/ticket-startwork`, when work begins. Never hand-run the
 GitHub API outside the tool.
 
-**INERT until the GitHub repo and Project board exist**. See `CLAUDE.md` / the handoff
-doc for what to stand up first.
-
 ## Concept or Todo: the spec-in decision
 
 Every ticket is filed into one of two starting states, and the difference is not

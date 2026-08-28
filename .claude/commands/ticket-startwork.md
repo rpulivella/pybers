@@ -9,9 +9,6 @@ Preparation only, **write no code in this skill.** It fetches the ticket, surfac
 contract, opens the working branch, moves the Project card, and turns the ticket's SPEC
 steps into tasks.
 
-**INERT until the GitHub repo and Project board exist**. See `CLAUDE.md` / the handoff
-doc.
-
 ## Steps
 
 1. Get the issue number from `$ARGUMENTS` (`42`, `#42`, or the URL). If missing, ask.
@@ -20,7 +17,22 @@ doc.
    acceptance criteria (preserve numbering/nesting), SPEC.
 4. **Branch.** Every ticket gets its own branch. First check for an existing one
    (`git branch -a | grep -E "/<N>-"`); if one exists, stop and tell the user. Otherwise
-   create `<label>/<N>-<kebab-title>` from an up-to-date `develop`.
+   create `<type>/<N>-<kebab-title>` from an up-to-date `develop`.
+
+   **`<type>` is mapped from the ticket's label, not copied from it.** Two of the six
+   read badly as a branch prefix, so:
+
+   | label      | branch `<type>` |
+   | ---------- | --------------- |
+   | `feat`     | `feature`       |
+   | `fix`      | `bugfix`        |
+   | `perf`     | `perf`          |
+   | `refactor` | `refactor`      |
+   | `docs`     | `docs`          |
+   | `chore`    | `chore`         |
+
+   The commit inside still carries the Conventional prefix, so a `feature/12-...` branch
+   holds `feat:` commits. Those are two different axes; see `CONTRIBUTING.md`.
 5. **Set Status In Progress and assign:**
    ```
    python3 scripts/ticket.py start <N> --assignee rpulivella
@@ -34,7 +46,8 @@ doc.
 ## Hard rules
 
 - Write no code. Always fetch before acting; never guess ACs or SPEC.
-- Branch from a current `develop`, never guess the branch name.
+- Branch from a current `develop`. Never guess the branch name, and never use the raw
+  label as `<type>`; run it through the mapping in step 4.
 - One task `in_progress` at a time.
 - **Never hand-build a progress file.** The task tool is the dashboard; a markdown
   checklist under `workarea/` is not a substitute and goes stale the moment it is

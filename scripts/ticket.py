@@ -111,12 +111,13 @@ graphqlRoot: str = "https://api.github.com/graphql"
 dependencyApiVersion: str = "2026-03-10"
 
 
+# "style" is absent because a library with no interface to restyle gives it nothing to
+# label. It survives as a commit prefix, which CONTRIBUTING.md keeps separate.
 validLabels: tuple[str, ...] = (
     "feat",
     "fix",
     "perf",
     "refactor",
-    "style",
     "docs",
     "chore",
 )
@@ -185,8 +186,8 @@ def readTokenFromSecretsFile() -> str | None:
     inherited from ambient machine state.
 
     `GITHUB_TOKEN` wins over `GH_TOKEN` **by name, not by position**. Returning the
-    first line matching either name let a stale `GH_TOKEN=` sitting above the real
-    one silently decide the identity, and on a machine with two GitHub accounts
+    first line matching either name meant a stale `GH_TOKEN=` sitting above the real
+    one silently decided the identity, and on a machine with two GitHub accounts
     that means every issue filed and every commit authored as the wrong person,
     with nothing to show for it but the wrong name in the history.
 

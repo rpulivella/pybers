@@ -8,8 +8,6 @@ argument-hint: <optional issue number; inferred from the branch if omitted>
 Create a **draft** pull request following this repo's mandatory PR format. The PR is the
 **PR-out** touchpoint.
 
-**INERT until the GitHub repo exists.**
-
 ## Steps
 
 1. `git branch --show-current`. Read the ticket number `<N>` from the branch

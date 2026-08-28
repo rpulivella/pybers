@@ -9,9 +9,6 @@ Revise a ticket that is already filed. The body format is identical to `/ticket-
 Read that skill's [Body, exact order](ticket-create.md) section rather than restating it
 here. This skill exists because a revision can break things a fresh filing cannot.
 
-**INERT until the GitHub repo and Project board exist**. See `CLAUDE.md` / the handoff
-doc.
-
 `edit` replaces the **whole** body. There is no partial update, so a revision always
 means fetching the current body, changing part of it, and writing the whole thing back.
 

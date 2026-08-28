@@ -17,16 +17,15 @@ rather than TypedDict for data, and is documented in `CLAUDE.md`.
 ```
 ticket.py    file and move tickets on GitHub Issues and the pybers Project board,
              the single sanctioned path, never hand-run the GitHub API around it
-             (see the command map below). INERT until a Project board exists and
-             projectNumber is set, see CLAUDE.md / the handoff doc.
+             (see the command map below). Live now.
 pr.py        open, inspect, promote and merge pull requests. Exists so that no
              skill needs `gh`, whose identity is an ambient keyring holding
              several accounts at once. Live now.
 ```
 
-`pr-preflight-check.py` (the deterministic half of `/pr-review-code`) does not exist yet
-, author it with `/script-write` once there is a real CI/test story to gate on beyond
-plain `pytest`.
+`pr-preflight-check.py` (the deterministic half of `/pr-review-code`) does not exist yet.
+Author it with `/script-write` once there is a real CI/test story to gate on beyond plain
+`pytest`.
 
 ## Naming
 

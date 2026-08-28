@@ -12,9 +12,8 @@ state, so draft-versus-ready stays a real signal.
 This skill carries **process only**. The laws are in `CLAUDE.md`, and the review mindset
 is in `.github/code-review-rubric.md`. Never restate either here.
 
-**INERT until the GitHub repo exists, and `scripts/pr-preflight-check.py` still needs
-authoring** (via `/script-write`) before step 2 below is real. See `CLAUDE.md` / the
-handoff doc.
+**`scripts/pr-preflight-check.py` still needs authoring** (via `/script-write`) before
+step 2 below is real.
 
 ## Steps
 

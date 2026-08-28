@@ -11,7 +11,9 @@ Add an entry to the `CHANGELOG.md` Unreleased list for the current ticket.
 
 1. Get the ticket number from `$ARGUMENTS` or the branch name (`<label>/<N>-...`).
 2. **If there is a ticket number**, fetch the **issue title only**:
-   `python3 scripts/ticket.py export-as-source <N> --title`. **If there is none**, see
+   `python3 scripts/ticket.py export-as-source <N> --title`. It is copied verbatim into
+   `CHANGELOG.md`, so it must come from `export-as-source`; `show` prefixes `#<N> ` and
+   wraps. **If there is none**, see
    [Entries with no ticket](#entries-with-no-ticket) below and write the summary
    yourself.
 3. Read `CHANGELOG.md`, find the `## Unreleased` header, and insert **at the top of its
@@ -28,12 +30,12 @@ Not every change has an issue behind it, so the bracket is never empty. It carri
 same vocabulary `/commit` uses, and for the same reasons:
 
 ```
-- [init] <summary>       pre-ticket-system work; retires once real ticket numbers exist
-- [hotfix] <summary>     urgent ticketless fix — tooling, a skill, CI
+- [hotfix] <summary>     urgent ticketless change: tooling, a skill, CI, docs
+- [init] <summary>       pre-ticket-system work, retired now that ticket numbers exist
 ```
 
-A change confined to `workarea/` is scratch space and does **not** earn a CHANGELOG line
-at all, which is why `[workarea]` has no entry form here.
+`workarea/` is gitignored here, so nothing in it reaches a commit and there is no
+`[workarea]` entry form to write.
 
 Without a ticket there is no title to fetch, so write the summary in the same voice a
 ticket title would use: imperative, verb-first, sentence case, no trailing punctuation.
