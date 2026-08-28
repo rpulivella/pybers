@@ -68,15 +68,19 @@ __date__ = "2026/08/13"
 __usage__ = "python3 scripts/pr.py <command> [options]"
 
 import argparse
-import importlib.util
 import sys
 import urllib.parse
 from pathlib import Path
-from types import ModuleType
 from typing import Any, TypedDict
 
 from rich.console import Console
 from rich.markup import escape
+
+# scripts/ is not a package, but Python puts a script's OWN directory at the
+# front of sys.path, so this resolves to scripts/ticket.py and takes precedence
+# over any installed package of the same name. Reused rather than
+# reimplemented so this repository keeps exactly one auth story.
+import ticket
 
 console = Console()
 
@@ -129,22 +133,6 @@ class PullRequestSummary(TypedDict):
     nodeId: str
 
 
-def loadTicketModule() -> ModuleType:
-    """Load scripts/ticket.py as a module for its auth and HTTP helpers.
-
-    Reused rather than reimplemented so this repository keeps exactly one auth
-    story. ticket.py guards its entry point, so importing runs no commands.
-    """
-    spec = importlib.util.spec_from_file_location(
-        "ticketForPullRequests", repositoryRoot / "scripts" / "ticket.py"
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError("Could not load scripts/ticket.py.")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def readCurrentBranch() -> str:
     """Return the checked-out branch name by reading .git/HEAD.
 
@@ -185,7 +173,7 @@ def summarizePullRequest(payload: dict[str, Any]) -> PullRequestSummary:
     )
 
 
-def assertBranchIsPushed(ticket: ModuleType, token: str, branch: str) -> None:
+def assertBranchIsPushed(token: str, branch: str) -> None:
     """Raise a clear error when the branch does not exist on the remote yet.
 
     GitHub refuses to open a pull request from an unpushed branch with a message
@@ -194,7 +182,7 @@ def assertBranchIsPushed(ticket: ModuleType, token: str, branch: str) -> None:
 
     The status is read from the exception's own `statusCode`, never by searching
     its message. Matching the string "404" conflated two very different causes:
-    a **private** repository, which this one will be, answers 404 rather than
+    a **private** repository (which this one will be) answers 404 rather than
     403 to a token that has expired or lost `repo` scope, so an expired credential
     was reported as an unpushed branch and sent the user to run a `git push` that
     could not possibly help.
@@ -217,7 +205,6 @@ def assertBranchIsPushed(ticket: ModuleType, token: str, branch: str) -> None:
 
 
 def createDraftPullRequest(
-    ticket: ModuleType,
     token: str,
     title: str,
     body: str,
@@ -241,7 +228,7 @@ def createDraftPullRequest(
 
 
 def findOpenPullRequest(
-    ticket: ModuleType, token: str, head: str, base: str
+    token: str, head: str, base: str
 ) -> PullRequestSummary | None:
     """Return the open pull request for a branch and base, or None when there is none.
 
@@ -276,7 +263,7 @@ def findOpenPullRequest(
     return summarizePullRequest(matches[0])
 
 
-def readPullRequest(ticket: ModuleType, token: str, number: int) -> PullRequestSummary:
+def readPullRequest(token: str, number: int) -> PullRequestSummary:
     """Fetch one pull request by number."""
     url = (
         f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
@@ -285,7 +272,7 @@ def readPullRequest(ticket: ModuleType, token: str, number: int) -> PullRequestS
     return summarizePullRequest(ticket.requestJson(url, token))
 
 
-def markReadyForReview(ticket: ModuleType, token: str, nodeId: str) -> None:
+def markReadyForReview(token: str, nodeId: str) -> None:
     """Take a pull request out of draft.
 
     REST does not expose this transition at all, so it is the one operation here
@@ -302,7 +289,6 @@ def markReadyForReview(ticket: ModuleType, token: str, nodeId: str) -> None:
 
 
 def mergePullRequest(
-    ticket: ModuleType,
     token: str,
     number: int,
     method: str,
@@ -324,7 +310,7 @@ def mergePullRequest(
     return str(result["sha"])
 
 
-def deleteBranch(ticket: ModuleType, token: str, branch: str) -> None:
+def deleteBranch(token: str, branch: str) -> None:
     """Delete a merged branch from the remote."""
     url = (
         f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}/"
@@ -369,10 +355,9 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
         console.print(body, markup=False, highlight=False)
         return 0
 
-    ticket = loadTicketModule()
     token = ticket.resolveToken()
 
-    existing = findOpenPullRequest(ticket, token, head, arguments.base)
+    existing = findOpenPullRequest(token, head, arguments.base)
     if existing is not None:
         console.print(
             f"[yellow]An open pull request already exists for {head!r} "
@@ -381,7 +366,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
         showPullRequest(existing)
         return errorExitCode
 
-    assertBranchIsPushed(ticket, token, head)
+    assertBranchIsPushed(token, head)
     summary = createDraftPullRequest(
         ticket, token, arguments.title, body, head, arguments.base
     )
@@ -399,9 +384,8 @@ def cmdFind(arguments: argparse.Namespace) -> int:
     the consumer is an agent reading stdout rather than a shell reading `$?`.
     """
     head = arguments.head or readCurrentBranch()
-    ticket = loadTicketModule()
     summary = findOpenPullRequest(
-        ticket, ticket.resolveToken(), head, arguments.base
+        ticket.resolveToken(), head, arguments.base
     )
 
     if summary is None:
@@ -429,9 +413,8 @@ def cmdFind(arguments: argparse.Namespace) -> int:
 
 def cmdReady(arguments: argparse.Namespace) -> int:
     """Take a draft pull request out of draft."""
-    ticket = loadTicketModule()
     token = ticket.resolveToken()
-    summary = readPullRequest(ticket, token, arguments.number)
+    summary = readPullRequest(token, arguments.number)
 
     if not summary["isDraft"]:
         console.print(f"[yellow]#{summary['number']} is already out of draft.[/]")
@@ -442,7 +425,7 @@ def cmdReady(arguments: argparse.Namespace) -> int:
         console.print(f"would mark [bold cyan]#{summary['number']}[/] ready for review")
         return 0
 
-    markReadyForReview(ticket, token, summary["nodeId"])
+    markReadyForReview(token, summary["nodeId"])
     console.print(f"[green]Ready for review[/] [bold cyan]#{summary['number']}[/]")
     console.print(summary["url"])
     return 0
@@ -455,9 +438,8 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         console.print(f"Choose one of: {', '.join(validMergeMethods)}")
         return errorExitCode
 
-    ticket = loadTicketModule()
     token = ticket.resolveToken()
-    summary = readPullRequest(ticket, token, arguments.number)
+    summary = readPullRequest(token, arguments.number)
 
     if summary["isDraft"]:
         console.print(
@@ -519,7 +501,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
     # separately and re-raising would escape this function entirely rather than fall
     # through to the sibling clause, which would regress the whole point of this block.
     try:
-        deleteBranch(ticket, token, summary["head"])
+        deleteBranch(token, summary["head"])
     except RuntimeError as exc:
         # 404 or 422 means the ref is already gone, which is the NORMAL outcome when the
         # repository has "automatically delete head branches" enabled. Reporting that as
