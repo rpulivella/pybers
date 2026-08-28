@@ -35,7 +35,7 @@ steps into tasks.
    holds `feat:` commits. Those are two different axes; see `CONTRIBUTING.md`.
 5. **Set Status In Progress and assign:**
    ```
-   python3 scripts/ticket.py start <N> --assignee rpulivella
+   python3 scripts/ticket.py start <N>
    ```
 6. **Load the SPEC into the task list** with `TaskCreate`, one task per ordered SPEC
    step, each naming the AC it satisfies. Check `TaskList` first so a resumed session

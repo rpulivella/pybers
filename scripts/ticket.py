@@ -39,8 +39,8 @@ Requires rich:
 
 UPDATES
 2026-08-27  Set projectNumber to the real board (3), and corrected the 404 story, which
-            had been copied in from the FIRST round of GIT-AND-GITHUB-AFTER-CODE-REVIEW.md
-            and was wrong. Round 2 corrected it and the upstream tooling carries the
+            had been carried in from an early revision of the upstream notes and was
+            wrong. A later revision corrected it and the upstream tooling carries that
             correction; this repo did not. An expired or revoked token is 401, not 404.
             What answers 404 on a private repository is a VALID token lacking `repo`
             scope, or a wrong owner/name, so the old wording sent a reader hunting a
@@ -82,7 +82,7 @@ __author__ = "Richard P Ulivella"
 __copyright__ = "Copyright 2026 Richard P Ulivella"
 __license__ = "Apache-2.0"
 __version__ = "0.1.0"
-__email__ = "rpulivella@icloud.com"
+__email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 __usage__ = "python3 scripts/ticket.py <command> [options]"
