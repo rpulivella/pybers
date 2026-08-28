@@ -20,10 +20,14 @@ dependencies = [
     "protobuf>=6.32.1",
 ]
 
-# License is intentionally undecided — see CLAUDE.md. Not set here until chosen.
+# PEP 639 SPDX expression rather than a "License ::" classifier, which that PEP
+# deprecates. NOTICE ships alongside LICENSE because Apache-2.0 section 4(d) requires
+# a derived work to carry it forward.
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 
 [project.optional-dependencies]
-# rich and rich_argparse are for scripts/, not for the library — pybers itself must
+# rich and rich_argparse are for scripts/, not for the library. pybers itself must
 # never import them, which the library-purity check enforces. Declared here so that
 # one `pip install -e ".[dev]"` equips the venv for both the test suite and the repo
 # tooling, rather than the tooling depending on whatever the system interpreter

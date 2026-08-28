@@ -16,7 +16,7 @@ UPDATES
 
 __author__ = "Richard P Ulivella"
 __copyright__ = "Copyright 2026 Richard P Ulivella"
-__license__ = "TBD"
+__license__ = "Apache-2.0"
 __version__ = "0.1.0"
 __email__ = "rpulivella@icloud.com"
 __status__ = "Development"

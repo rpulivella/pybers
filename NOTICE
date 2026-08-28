@@ -1,0 +1,18 @@
+pybers
+Copyright 2026 Richard P Ulivella
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file for terms.
+
+Acknowledgment
+--------------
+
+pybers reads and writes Apple's undocumented iWork archive format. numbers-parser
+(https://github.com/masaccio/numbers-parser), by masaccio, under the MIT license, was
+the first public project to reverse-engineer that format. It established that Apple
+compiles the protobuf descriptors into Numbers.app, and it provided the dumper that
+recovers them.
+
+pybers includes no numbers-parser source code. Its protobuf schemas are extracted
+independently from a local copy of Numbers.app by scripts/protos-extract.py, and its
+object model and archive layer are separate implementations. This acknowledgment
+credits the technique.

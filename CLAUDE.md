@@ -282,12 +282,18 @@ run table is read or written; plain string cells need no special handling.
 shapes resolve to twelve styles, one of which backs seven drawables directly and another
 backs eight, two directly and six more as the `parent` their variations inherit from. So the
 aliasing defect listed above is not an upstream implementation slip but a hazard the format
-creates: a decoder that hands the same mutable object to every user of an archive lets one
-edit silently restyle seven unrelated shapes. The frozen-`Style` contract has to hold on the
+creates: a decoder that hands the same mutable object to every user of an archive turns one
+edit into a silent restyle of seven unrelated shapes. The frozen-`Style` contract has to hold on the
 **read** path, not only when writing. Numbers itself never mutates a shared archive, it
 writes a new variation and repoints the one object that changed.
 
-License: undecided, not yet set in `pyproject.toml`.
+**Apache-2.0, decided 2026-08-28.** Permissive, so a `pip install pybers` carries no
+obligation back onto its user, and compatible with the MIT-licensed prior art. Two things
+MIT does not offer decided it: an explicit patent grant, which matters for a library
+built on a reverse-engineered proprietary format, and a `NOTICE` file, which is a
+propagating place to credit numbers-parser rather than a line in a README that a fork can
+drop. `NOTICE` states plainly that no numbers-parser code is included, so the credit
+cannot be misread as a claim about provenance.
 
 This is its own repository, on `develop`, no longer nested inside another project.
 
