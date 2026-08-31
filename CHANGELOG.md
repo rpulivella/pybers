@@ -10,6 +10,9 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [init] Cut implementation steps from the ticket SPEC section
+- [init] Adopt subject-first verb-last method naming
+- [init] Make Document the single in-memory handle for a document
 - [init] Catch markdown hard breaks in the standards gate
 - [init] Rewrite the README for a public audience
 - [init] Rename Workbook to Document to match the archive format
