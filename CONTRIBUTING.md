@@ -13,8 +13,8 @@ One scannable line per commit. The shape:
 - `[hotfix] <prefix>: <summary>`, a ticketless urgent or infrastructural change (tooling,
   a skill, CI, docs) where a ticket adds no value. Use sparingly.
 - `[init] <prefix>: <summary>`, pre-ticket bootstrap: initial scaffolding and architecture
-  de-risking, before the ticket workflow begins and before anything ships. Retired, since
-  real ticket numbers exist now.
+  de-risking, before the ticket workflow begins and before anything ships. **The default
+  for this phase**, and it retires the day the first ticket-numbered commit lands.
 
 Rules: single line, no body, no footer; at most 60 characters including the bracket;
 imperative mood; a Conventional-Commits-inspired prefix always (`feat` `fix` `perf`

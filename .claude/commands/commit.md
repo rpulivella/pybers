@@ -22,8 +22,9 @@ convention shared across this developer's repos.
    - **`[hotfix]`** for a ticketless urgent or infrastructural change where a ticket
      adds no value (tooling, a skill, CI, docs): `[hotfix] <prefix>: …`. Use sparingly.
    - **`[init]`** for pre-ticket bootstrap (scaffolding, architecture de-risking, before
-     the ticket workflow begins and before anything ships). **Retired**: real ticket
-     numbers exist now, so a new `[init]` commit is almost certainly a `[hotfix]`.
+     the ticket workflow begins and before anything ships). **The default for this
+     phase**, and it retires the day the first ticket-numbered commit lands. Filing a
+     ticket does not retire it; landing work under one does.
    - **Single line only**, no body, no footer, nothing after the first line.
    - **A Conventional-Commits inspired prefix always:** `feat` `fix` `perf` `refactor`
      `style` `docs` `chore`. Chosen per commit, from what that commit did, never from
