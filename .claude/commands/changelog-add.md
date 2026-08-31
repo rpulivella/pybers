@@ -31,7 +31,7 @@ same vocabulary `/commit` uses, and for the same reasons:
 
 ```
 - [hotfix] <summary>     urgent ticketless change: tooling, a skill, CI, docs
-- [init] <summary>       pre-ticket-system work, retired now that ticket numbers exist
+- [init] <summary>       pre-ticket-system work, until the first ticket-numbered commit
 ```
 
 `workarea/` is gitignored here, so nothing in it reaches a commit and there is no
