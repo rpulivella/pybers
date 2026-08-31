@@ -103,7 +103,7 @@ convention than a Python one.
 
 Current modules: `style.py` (`Style`), `geometry.py` (`Position`, `Size`), `text.py`
 (`TextRun`, `Paragraph`, `RichText`), `shapes.py` (`GraphicalObject`, `TextBox`, `Image`,
-`Shape`), `table.py` (`Cell`, `MergeRange`, `Table`), `sheet.py` (`Sheet`, `Workbook`).
+`Shape`), `table.py` (`Cell`, `MergeRange`, `Table`), `sheet.py` (`Sheet`, `Document`).
 Everything re-exports through `pybers/model/__init__.py` and then `pybers/__init__.py`,
 so `import pybers; pybers.Cell` stays stable regardless of internal file layout, keep
 that re-export chain intact when adding a new feature-area module.

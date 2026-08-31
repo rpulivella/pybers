@@ -1,4 +1,4 @@
-<!-- PR title format: [#<N>] Ticket title verbatim — this comment does not render in the PR body -->
+<!-- PR title format: [#<N>] Ticket title verbatim. This comment does not render in the PR body. -->
 
 ## Ticket
 Link: https://github.com/rpulivella/pybers/issues/<N>
@@ -10,7 +10,7 @@ _Describe what this PR achieves in 2-3 sentences. Borrow from the ticket._
 <!-- Remove any checkbox that does not apply. Do not leave irrelevant unchecked boxes. -->
 - [ ] No regressions / known issues found
 - [ ] Known issues remain (described below)
-- [ ] No change to the object-model shape (Cell/Table/Sheet/Workbook fields)
+- [ ] No change to the object-model shape (Cell/Table/Sheet/Document fields)
 - [ ] Object-model shape changed (compatibility note in Breaking Changes below)
 - [ ] No change to the on-disk archive round-trip contract
 - [ ] Archive round-trip behavior changed (new golden-file test attached)

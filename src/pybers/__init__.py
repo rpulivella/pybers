@@ -37,7 +37,7 @@ from pybers.model import (
     Table,
     TextBox,
     TextRun,
-    Workbook,
+    Document,
 )
 
 __all__ = [
@@ -55,5 +55,5 @@ __all__ = [
     "Table",
     "TextBox",
     "TextRun",
-    "Workbook",
+    "Document",
 ]

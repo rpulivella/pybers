@@ -40,13 +40,13 @@ def testCellAtCreatesAndReusesCells() -> None:
     assert first is second
 
 
-def testWorkbookRoundTripsThroughEquality() -> None:
+def testDocumentRoundTripsThroughEquality() -> None:
     """A model built twice the same way must compare equal, the baseline every future
     real archive round-trip test (read, write, read again) will build on."""
 
-    def build() -> pybers.Workbook:
+    def build() -> pybers.Document:
         table = pybers.Table(name="Table 1")
         table.cellAt(0, 0).value = 42
-        return pybers.Workbook(sheets=[pybers.Sheet(name="Sheet 1", tables=[table])])
+        return pybers.Document(sheets=[pybers.Sheet(name="Sheet 1", tables=[table])])
 
     assert build() == build()
