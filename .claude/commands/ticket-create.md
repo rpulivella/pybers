@@ -17,8 +17,8 @@ Every ticket is filed into one of two starting states, and the difference is not
 readiness of the *work* but readiness of the *specification*.
 
 - **`Todo`** asserts the ticket is specified well enough to drive autonomously. Its ACs
-  are concrete and testable and its SPEC answers the questions an agent will hit. File
-  here only when that is genuinely true.
+  are concrete and testable, and any decision the build cannot make for itself has already
+  been made. File here only when that is genuinely true.
 - **`Concept`** means a human still has to think. Use it for work that is wanted but not
   yet pinned down, for anything blocked on a decision (e.g. the dual-consumer library/CLI
   split, or the named-styles design), and for a placeholder that will later split into
@@ -68,10 +68,15 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
    because…"). ACs may nest **one level**, no deeper, `4.a`, `4.b` under `4`. A third
    level means the parent is really two tickets. **No label may repeat anywhere in the
    list**.
-3. **SPEC** (agent · read + execute). The plan the agent runs: the approach, the ordered
-   implementation steps, the exact object-model / archive-layer primitives to compose (a
-   missing primitive is a *separate prerequisite ticket*), the module and the types
-   involved.
+3. **SPEC** (agent · read before building). **Not a plan, and never ordered
+   implementation steps.** The ACs are the contract and they drive the build. The SPEC
+   holds only what a competent build cannot derive from them and would otherwise get
+   wrong *without failing*: a format trap the fixtures established, a decision that is
+   still open, a constraint that rules out the obvious approach. Restating an AC as a verb
+   ("add the module, populate the values, add the tests") is the failure mode to watch
+   for, and a SPEC as long as its ACs has it. **Omit the section entirely when nothing
+   qualifies**, which is common. A missing primitive is still a *separate prerequisite
+   ticket*.
 4. **Out of scope** (optional, OMIT BY DEFAULT).
 5. **Context / notes** (optional, OMIT BY DEFAULT).
 

@@ -1,13 +1,13 @@
 ---
-description: Begin work on a ticket, fetch it, surface ACs + SPEC, branch, set Status In Progress, and load the SPEC into the task list. No code written.
+description: Begin work on a ticket, fetch it, surface ACs + SPEC, branch, set Status In Progress, and load the acceptance criteria into the task list. No code written.
 argument-hint: <issue number, #number, or issue URL>
 ---
 
 # /ticket-startwork
 
 Preparation only, **write no code in this skill.** It fetches the ticket, surfaces the
-contract, opens the working branch, moves the Project card, and turns the ticket's SPEC
-steps into tasks.
+contract, opens the working branch, moves the Project card, and turns the ticket's
+acceptance criteria into tasks.
 
 ## Steps
 
@@ -37,11 +37,13 @@ steps into tasks.
    ```
    python3 scripts/ticket.py start <N>
    ```
-6. **Load the SPEC into the task list** with `TaskCreate`, one task per ordered SPEC
-   step, each naming the AC it satisfies. Check `TaskList` first so a resumed session
-   extends the existing list rather than duplicating it. Move exactly one task to
-   `in_progress` at a time with `TaskUpdate`, and use `addBlockedBy` for a task that
-   genuinely cannot start yet. If a task wants subtasks, it is a ticket in disguise.
+6. **Load the acceptance criteria into the task list** with `TaskCreate`, one task per
+   AC, in the ticket's own numbering. The ACs are the contract, so they are the work. The
+   SPEC is read for its constraints and never becomes tasks. Check `TaskList` first so a
+   resumed session extends the existing list rather than duplicating it. Move exactly one
+   task to `in_progress` at a time with `TaskUpdate`, and use `addBlockedBy` for an AC
+   that genuinely cannot start yet. If a task wants subtasks, that AC is a ticket in
+   disguise.
 
 ## Hard rules
 
