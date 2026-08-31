@@ -56,6 +56,15 @@ line of this script, eg:
 /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-31  Added checkHardBreak. A markdown line ending in two or more spaces
+            renders as a forced <br>, so it silently changes how a paragraph
+            reflows, and the cause is invisible in the source. This repository
+            hard-wraps its prose for line-based diffs, which makes the hazard
+            routine rather than exotic: every paragraph line is a candidate.
+            Runs against the RAW text rather than a prose view, because blanking
+            a code fence replaces it with spaces and every blanked line would
+            otherwise report as a finding. A LOCAL check with no upstream, so
+            expect it to diverge.
 2026-08-27  Added consoleProse, a SECOND view of a Python file. pythonProse
             blanks string literals wholesale, which is right for docstrings and
             comments and hid a whole category of prose: console output is read
@@ -548,6 +557,31 @@ def checkEllipsis(path: Path, prose: str, findings: list) -> None:
                          "'...' must be a real ellipsis (…)"))
 
 
+def checkHardBreak(path: Path, text: str, findings: list) -> None:
+    """A markdown line ending in two or more spaces renders as a forced line break.
+
+    Never deliberate here, and invisible in the source, so it changes how a paragraph
+    reflows with nothing to see in review. Write an explicit <br> when a break is
+    genuinely wanted, which also says so to the next reader.
+
+    Takes the raw text, not a prose view: blanking replaces a region with spaces of the
+    same length, so every blanked line ends in whitespace and would report as a finding.
+    """
+    if path.suffix != ".md":
+        return
+    fenced = False
+    for index, line in enumerate(text.split("\n"), start=1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        # Inside a fence the spaces are literal content, not a break.
+        if fenced:
+            continue
+        if line.strip() and line.endswith("  "):
+            findings.append(("FAIL", path, index,
+                             "line ends in trailing spaces, rendering as a forced <br>"))
+
+
 def checkSemicolons(path: Path, prose: str, findings: list) -> None:
     """Semicolons in prose should be near zero."""
     if isRuleDoc(path, "semicolons") or path.suffix == ".py":
@@ -604,7 +638,9 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
         prose = markdownProse(body)
 
     local: list = []
+    # Both of these take the RAW body rather than the prose view.
     checkCoAuthored(path, body, local)
+    checkHardBreak(path, body, local)
     for check in (checkContractions, checkBritish, checkEmDash, checkBannedPhrases,
                   checkWeakLet, checkSplitVerb, checkStrandedPreposition,
                   checkYearHyphen, checkEllipsis, checkSemicolons):
