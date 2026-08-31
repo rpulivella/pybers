@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [init] Catch markdown hard breaks in the standards gate
 - [init] Rewrite the README for a public audience
 - [init] Rename Workbook to Document to match the archive format
 - [init] License the project under Apache-2.0
