@@ -10,6 +10,9 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [init] Rewrite the README for a public audience
+- [init] Rename Workbook to Document to match the archive format
+- [init] License the project under Apache-2.0
 - [init] Map stroke dash arrays and connector attachment
 - [init] Establish that a style name does not make it user-visible
 - [init] Map table titles, captions and text insets
@@ -40,5 +43,4 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 - [init] Declare the protobuf runtime dependency
 - [init] Extract the iWork protobuf schemas from Numbers 15.3.1
 - [init] Add the object model split by feature area (style, geometry, text, shapes, table, sheet)
-- [init] Vendor the numbers-parser fork and its patch rationale as reference material
 - [init] Scaffold the project, package graph, and pytest gate
