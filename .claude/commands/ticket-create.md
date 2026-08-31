@@ -50,8 +50,8 @@ Pass `--status Concept` when filing; `Todo` is the default.
 
 ## Title format
 
-The title is load-bearing: it becomes the **branch slug**, the **PR title**, and the
-**CHANGELOG entry**, so it must be short and useful in all three.
+The title carries three jobs: it becomes the **branch slug**, the **PR title**, and
+the **CHANGELOG entry**, so it must be short and useful in all three.
 
 - **≤ ~60 characters**, imperative and **verb-first**, or an `Area:` prefix when it aids
   scanning. e.g. "Read a real .numbers file into the object model", "Fix merge-range
@@ -83,7 +83,6 @@ The title is load-bearing: it becomes the **branch slug**, the **PR title**, and
 | `fix` | Bug fix, round-trip, formula, style |
 | `perf` | Parse/write speed, memory |
 | `refactor` | Restructure without behavior change |
-| `style` | (Not code style, reserved, per Conventional Commits, for formatting-only changes) |
 | `docs` | Repo docs only, CLAUDE.md, READMEs, workarea, code comments. |
 | `chore` | Config, tooling, dependencies, scripts |
 
