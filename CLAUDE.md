@@ -93,6 +93,28 @@ into `workarea/` as data, the way the type map was.
 - Row/column insert-delete will be done via a real formula AST walker, not regex, so it
   actually knows which end of a range is supposed to move (see bug #3 above).
 
+## Document is the single handle, decided 2026-08-31
+
+`pybers.open(path)` returns a `Document`, and that one object is the whole public surface.
+It holds the entire document in memory, it is what `document.save()` writes back, and
+every edit a developer makes is a method on it or on something reached through it. There
+is no session, no workbook, and no second noun to learn.
+
+The alternative considered was a separate object owning the package while `Document`
+stayed pure data. It buys layering purity at the price of handing the caller two things
+that are always used together, which is the wrong trade for a library meant to make
+editing a `.numbers` file as ordinary as opening one.
+
+Two consequences that are easy to get wrong:
+
+- **`Document` carries archive state, not only model state.** Saving mutates the archives
+  that were read rather than constructing new ones, so that whatever the model does not
+  yet represent survives untouched. That state is private, and excluded from equality and
+  `repr`, so `Document` still reads as a dataclass to a caller.
+- **`pybers.model` must stay importable without `pybers.archive`.** Whatever mechanism
+  `Document.save()` uses to reach the writer, it cannot be a module-scope import from the
+  model layer into the archive layer.
+
 ## The object model is split by feature area, not by class
 
 `src/pybers/model/` is a real subpackage, not one flat file, the model is expected to
@@ -208,6 +230,16 @@ linter will assume. Follow them as written.
   the opposite of what most Python tooling assumes, so a linter has to be configured for
   it rather than against it. Module and file names stay lowercase (Python import rules),
   and classes stay PascalCase.
+- **Method names are subject first, verb last**: `rowAdd`, `rowDelete`, `colAdd`,
+  `cellStyleRemove`, `paragraphStyleApply`, `cellFormatNumberApply`. This is the opposite
+  of both idiomatic Python (`add_row`) and ordinary English word order, and it is
+  deliberate. Sorting by name then groups everything that acts on a row together, in
+  autocomplete and in generated documentation alike, which is what a developer needs when
+  they are asking what can be done to a row. The subject is as specific as the method is,
+  so `cellStyle` and `cellFormatNumber` are the subjects in those two, not `cell`. The
+  rule governs methods on the public object graph. Module-level functions keep ordinary
+  verb-first names, which is why the entry point is `pybers.open` rather than
+  `pybers.documentOpen`.
 - **Dataclasses, not `TypedDict`**, for structured data, the user's explicit call for
   this project; `TypedDict` showed up elsewhere but for reasons specific to those repos'
   own dependencies, not a rule to import here. Frozen where immutability is what keeps a
