@@ -26,6 +26,7 @@ to a caller:
 
 UPDATES
 2026-08-31  Written for #1: document, sheets, tables and cell values.
+2026-09-01  The package read here travels with the document, for #2.
 """
 from __future__ import annotations
 
@@ -336,11 +337,13 @@ def open(path: Path | str) -> Document:  # noqa: A001
     library is meant to be used through, and it reads as it should at the call
     site. The builtin is still reachable here as `builtins.open`.
     """
-    package = readPackage(Path(path))
+    source = Path(path)
+    package = readPackage(source)
     index = ArchiveIndex(package)
     root = findRoot(index)
 
-    document = Document()
+    # The package travels with the document because `Document.save` writes it back.
+    document = Document(_package=package, _sourcePath=source)
     for reference in root.sheets:
         document.sheets.append(
             readSheet(index, index.resolve(reference, tn.SheetArchive))
