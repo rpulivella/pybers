@@ -47,7 +47,15 @@ from ._generated import TSTArchives_pb2 as tst
 from ._generated import TSWPArchives_pb2 as tswp
 from .archive import Archive, NumbersPackage, decodeRow, readPackage
 from .archive.types import archiveTypeId, parseArchive
-from .model import CellValue, Document, MergeRange, Sheet, Table
+from .model import (
+    CellRange,
+    CellReference,
+    CellValue,
+    Document,
+    MergeRange,
+    Sheet,
+    Table,
+)
 
 # The archive counts rows and columns from zero. The model counts from one,
 # because that is what Numbers shows and what a caller means by "row 1". The two
@@ -236,10 +244,12 @@ def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
             lastRow = row.range_end if row.HasField("range_end") else row.range_begin
             merges.append(
                 MergeRange(
-                    anchorRow=row.range_begin + originOffset,
-                    anchorCol=column.range_begin + originOffset,
-                    rowSpan=lastRow - row.range_begin + 1,
-                    colSpan=lastColumn - column.range_begin + 1,
+                    CellRange(
+                        row.range_begin + originOffset,
+                        column.range_begin + originOffset,
+                        lastRow + originOffset,
+                        lastColumn + originOffset,
+                    )
                 )
             )
     return merges
@@ -252,7 +262,15 @@ def readTable(index: ArchiveIndex, tableInfo: tst.TableInfoArchive) -> Table:
     strings = readStringTable(index, dataStore)
     richText = readRichTextTable(index, dataStore)
 
-    table = Table(name=model.table_name, mergeRanges=readMerges(model))
+    # The grid size is declared by the table, never inferred from which cells hold
+    # something. Seven of the corpus's tables declare more rows or columns than
+    # their populated cells reach, so an inferred size is silently short.
+    table = Table(
+        name=model.table_name,
+        rowCount=model.number_of_rows,
+        colCount=model.number_of_columns,
+        mergeRanges=readMerges(model),
+    )
     tileSize = dataStore.tiles.tile_size
 
     # The tile LIST is authoritative. Its `tileid` gives the row range, and the
@@ -272,8 +290,8 @@ def readTable(index: ArchiveIndex, tableInfo: tst.TableInfoArchive) -> Table:
             # and raises nothing. See findings-03-structure.md.
             row = firstRow + rowInfo.tile_row_index
             for record in records:
-                cell = table.cellAt(
-                    row + originOffset, record.column + originOffset
+                cell = table.cell(
+                    CellReference(row + originOffset, record.column + originOffset)
                 )
                 cell.value = resolveValue(record, strings, richText)
     return table

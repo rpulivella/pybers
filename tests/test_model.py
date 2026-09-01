@@ -10,6 +10,7 @@ UPDATES
 """
 
 import dataclasses
+from decimal import Decimal
 
 import pytest
 
@@ -30,12 +31,12 @@ def testStyleIsFrozenAndHashable() -> None:
         style.bold = False  # type: ignore[misc]
 
 
-def testCellAtCreatesAndReusesCells() -> None:
-    """Table.cellAt() creates a cell on first access and returns the same one after."""
-    table = pybers.Table(name="Table 1")
-    first = table.cellAt(1, 1)
+def testCellCreatesAndReusesCells() -> None:
+    """Table.cell() creates a cell on first access and returns the same one after."""
+    table = pybers.Table(name="Table 1", rowCount=1, colCount=1)
+    first = table.cell("A1")
     first.value = "hello"
-    second = table.cellAt(1, 1)
+    second = table.cell(pybers.CellReference(1, 1))
     assert second.value == "hello"
     assert first is second
 
@@ -45,8 +46,8 @@ def testDocumentRoundTripsThroughEquality() -> None:
     real archive round-trip test (read, write, read again) will build on."""
 
     def build() -> pybers.Document:
-        table = pybers.Table(name="Table 1")
-        table.cellAt(1, 1).value = 42
+        table = pybers.Table(name="Table 1", rowCount=1, colCount=1)
+        table.cell("A1").value = Decimal("42")
         return pybers.Document(sheets=[pybers.Sheet(name="Sheet 1", tables=[table])])
 
     assert build() == build()

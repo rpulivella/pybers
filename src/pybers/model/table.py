@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""A table's grid, cells, addressed by row/column, and their merge ranges.
+"""A table's grid, the cells in it, and the regions merged across it.
+
+Addressing lives in `pybers.model.reference` and `pybers.model.ranges`. Nothing
+here takes a bare row and column pair, so the only way to name a cell is with an
+address that has already been validated.
 
 UPDATES
-2026-08-17  Typed Cell.value, and pinned numbers to Decimal rather than float. Numbers
-            stores them as IEEE-754 decimal128, measured in the fixtures, so a float
-            would introduce binary rounding error into documents that never had any.
+2026-09-01  Addressing moved out to the reference types (#9). `cellAt(row, col)`
+            and the loose reference helpers are gone; `MergeRange` now carries a
+            `CellRange` rather than repeating the span arithmetic itself.
+2026-08-17  Typed Cell.value, and pinned numbers to Decimal rather than float.
+            Numbers stores them as IEEE-754 decimal128, measured in the fixtures,
+            so a float would introduce binary rounding error into documents that
+            never had any.
 2026-08-12  Initial scaffold.
 """
 
@@ -20,10 +28,18 @@ __status__ = "Development"
 __date__ = "2026/08/12"
 
 import datetime
-import re
 from dataclasses import dataclass, field
 from decimal import Context, Decimal
 
+from pybers.model.ranges import CellRange, RangeAddress, toCellRanges
+from pybers.model.reference import (
+    CellAddress,
+    CellReference,
+    ReferenceError,
+    firstColumn,
+    firstRow,
+    toCellReference,
+)
 from pybers.model.style import Style
 
 # IEEE-754 decimal128, which is exactly what Numbers stores a numeric cell as: 34
@@ -58,136 +74,123 @@ CellValue = (
 )
 
 
-# Rows and columns count from ONE throughout the model, because that is what
-# Numbers shows and what a caller means by "row 1" or "column A". The archive
-# counts from zero, and the two systems meet only at the read and write boundary
-# in `pybers.reader`. Nothing here ever holds an archive coordinate.
-firstRow: int = 1
-firstColumn: int = 1
-
-# Twenty-six letters, so a column label is base-26 with no zero digit: Z is 26
-# and AA is 27, which is why this cannot be written as an ordinary base
-# conversion.
-alphabetSize: int = 26
-
-referencePattern: re.Pattern = re.compile(r"^\$?([A-Za-z]+)\$?([0-9]+)$")
-
-
-class ReferenceError(ValueError):
-    """A cell reference that is not a valid A1-style address."""
-
-
-def columnLetter(col: int) -> str:
-    """Return the letter label for a column number, 1 to A and 27 to AA."""
-    if col < firstColumn:
-        raise ReferenceError(f"Column {col} is before column {firstColumn}.")
-    letters = ""
-    while col > 0:
-        col, remainder = divmod(col - 1, alphabetSize)
-        letters = chr(ord("A") + remainder) + letters
-    return letters
-
-
-def columnNumber(letters: str) -> int:
-    """Return the column number for a letter label, A to 1 and AA to 27."""
-    if not letters or not letters.isalpha():
-        raise ReferenceError(f"{letters!r} is not a column label.")
-    col = 0
-    for letter in letters.upper():
-        col = col * alphabetSize + (ord(letter) - ord("A") + 1)
-    return col
-
-
-def parseReference(reference: str) -> tuple[int, int]:
-    """Return the (row, col) a single A1-style reference addresses.
-
-    Accepts the dollar signs Numbers writes for an absolute reference and ignores
-    them. Locking is a property of a formula, not of an address, so `$A$1` and
-    `A1` name the same cell and both resolve here.
-    """
-    match = referencePattern.match(reference.strip())
-    if match is None:
-        raise ReferenceError(f"{reference!r} is not an A1-style cell reference.")
-    return int(match.group(2)), columnNumber(match.group(1))
-
-
 @dataclass(frozen=True, slots=True)
 class MergeRange:
     """A rectangular block of cells merged into one, anchored at its top-left cell.
 
-    Counted from one, like everything else in the model.
+    The extent is a `CellRange` rather than four numbers of its own, so that the
+    question of which cells a merge covers has one answer in the codebase. A merge
+    is always bounded, unlike a range in general, which is checked rather than
+    assumed.
     """
 
-    anchorRow: int
-    anchorCol: int
-    rowSpan: int
-    colSpan: int
+    extent: CellRange
 
-    def covers(self, row: int, col: int) -> bool:
-        """Report whether this range occupies a cell, its anchor included."""
-        return (
-            self.anchorRow <= row < self.anchorRow + self.rowSpan
-            and self.anchorCol <= col < self.anchorCol + self.colSpan
-        )
+    def __post_init__(self) -> None:
+        """Reject an unbounded extent, which no merged region can have."""
+        if self.extent.rowsUnbounded or self.extent.colsUnbounded:
+            raise ReferenceError(
+                f"A merge covers a fixed block of cells, and {self.extent} is "
+                "unbounded."
+            )
+
+    @property
+    def anchor(self) -> CellReference:
+        """Return the top-left cell, the one that holds the merged region's value."""
+        anchor = self.extent.start
+        if anchor is None:
+            raise ReferenceError(f"{self.extent} has no anchor cell.")
+        return anchor
+
+    def covers(self, address: CellAddress) -> bool:
+        """Report whether this merge occupies a cell, its anchor included."""
+        return self.extent.covers(address)
 
 
 @dataclass(slots=True)
 class Cell:
-    """One cell's value, optional formula, and style, at a specific row/column.
+    """One cell's value, optional formula, and style, at an address."""
 
-    `row` and `col` count from one.
-    """
-
-    row: int
-    col: int
+    reference: CellReference
     value: CellValue = None
     formula: str | None = None
     style: Style = field(default_factory=Style)
 
-    @property
-    def reference(self) -> str:
-        """Return this cell's A1-style address."""
-        return f"{columnLetter(self.col)}{self.row}"
-
 
 @dataclass(slots=True)
 class Table:
-    """A single table on a sheet, a sparse grid of cells plus its merge ranges."""
+    """A single table on a sheet, a sparse grid of cells plus its merged regions."""
 
     name: str
-    cells: dict[tuple[int, int], Cell] = field(default_factory=dict)
+    rowCount: int = 0
+    colCount: int = 0
+    cells: dict[CellReference, Cell] = field(default_factory=dict)
     mergeRanges: list[MergeRange] = field(default_factory=list)
 
-    def cellAt(self, row: int, col: int) -> Cell:
-        """Return the cell at (row, col), creating an empty one on first access.
+    def cell(self, address: CellAddress) -> Cell:
+        """Return the cell at an address, creating an empty one on first access.
 
-        A cell absent from the archive is empty rather than missing, so reading
-        one is not an error and must not shift its neighbors.
+        A cell absent from the archive is empty rather than missing, so reading one
+        inside the grid is not an error and must not shift its neighbors. Outside
+        the grid is a different thing entirely and raises, because a Numbers table
+        is a fixed number of rows and columns rather than an endless sheet.
         """
-        if row < firstRow or col < firstColumn:
+        # Unlocked before it is used as a key, because `$A$1` and `A1` compare
+        # unequal and are one cell. Without this the same cell files itself under
+        # four spellings and a write through one is invisible to the other three.
+        key = toCellReference(address).asUnlocked()
+        extent = self.extent
+        if extent is None or not extent.covers(key):
             raise ReferenceError(
-                f"({row}, {col}) is outside the grid, which starts at "
-                f"({firstRow}, {firstColumn}). Rows and columns count from one."
+                f"{key} is outside {self.name!r}, which is {self.rowCount} rows "
+                f"by {self.colCount} columns."
             )
-        key = (row, col)
         if key not in self.cells:
-            self.cells[key] = Cell(row=row, col=col)
+            self.cells[key] = Cell(reference=key)
         return self.cells[key]
 
-    def cell(self, reference: str) -> Cell:
-        """Return the cell an A1-style reference addresses."""
-        return self.cellAt(*parseReference(reference))
+    def range(self, address: RangeAddress) -> list[Cell]:
+        """Return the cells one or more ranges cover, in the order they name them.
 
-    def mergeCovering(self, row: int, col: int) -> MergeRange | None:
+        An unbounded range is bounded by this table's own extent, which is the only
+        place that extent is known. A table with nothing in it has no extent, so an
+        unbounded range over one covers nothing.
+        """
+        extent = self.extent
+        found: list[Cell] = []
+        for item in toCellRanges(address):
+            if item.rowsUnbounded or item.colsUnbounded:
+                if extent is None:
+                    continue
+                item = item.boundedBy(extent)
+            found.extend(self.cell(reference) for reference in item)
+        return found
+
+    @property
+    def extent(self) -> CellRange | None:
+        """Return the grid this table declares, or None when it has none.
+
+        Read from the table's own declared size rather than derived from the cells
+        that happen to hold something. A Numbers table is a fixed number of rows and
+        columns, and 7 of the 74 tables in the fixture corpus have a declared size
+        larger than their populated cells reach, so deriving it returns a real
+        rectangle that is smaller than the table.
+        """
+        if self.rowCount < 1 or self.colCount < 1:
+            return None
+        return CellRange(firstRow, firstColumn, self.rowCount, self.colCount)
+
+    def mergeCovering(self, address: CellAddress) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
 
-        This is how a covered cell is told from an empty one, and there is no
-        other way: a merged region's covered cells have NO record in the tile at
-        all, so the grid cannot distinguish them. Derived from `mergeRanges` on
-        every call rather than stored on the cell, because a copy of this would
-        go stale the moment a merge changed.
+        This is how a covered cell is told from an empty one, and there is no other
+        way: a merged region's covered cells have NO record in the tile at all, so
+        the grid cannot distinguish them. Derived from `mergeRanges` on every call
+        rather than stored on the cell, because a copy of this would go stale the
+        moment a merge changed.
         """
+        reference = toCellReference(address)
         for merge in self.mergeRanges:
-            if merge.covers(row, col):
+            if merge.covers(reference):
                 return merge
         return None

@@ -10,6 +10,7 @@ deliberate: it is what makes the round-trip contract testable (build a model, wr
 read it back, assert equality) without needing a real .numbers file for every test.
 
 UPDATES
+2026-09-01  Addressing added as its own feature area (#9): reference, ranges.
 2026-08-12  Initial scaffold: style, geometry, text, shapes, table, sheet.
 """
 
@@ -22,27 +23,36 @@ __status__ = "Development"
 __date__ = "2026/08/12"
 
 from pybers.model.geometry import Position, Size
+from pybers.model.ranges import CellRange, CellRangeList, RangeAddress, toCellRanges
+from pybers.model.reference import (
+    CellAddress,
+    CellReference,
+    ReferenceError,
+    columnLetter,
+    columnNumber,
+    toCellReference,
+)
 from pybers.model.shapes import GraphicalObject, Image, Shape, TextBox
 from pybers.model.sheet import Sheet, Document
 from pybers.model.style import Style
-from pybers.model.table import (
-    Cell,
-    CellValue,
-    MergeRange,
-    ReferenceError,
-    Table,
-    columnLetter,
-    columnNumber,
-    parseReference,
-)
+from pybers.model.table import Cell, CellValue, MergeRange, Table
 from pybers.model.text import Paragraph, RichText, TextRun
 
+# Re-exported explicitly, which a type checker requires of a package that hands on
+# names it did not define. The leaf modules carry no `__all__` of their own: a name
+# defined in the module it lives in is already public there, and a second list
+# repeating it is one more thing to forget.
 __all__ = [
     "Cell",
+    "CellAddress",
+    "CellRange",
+    "CellRangeList",
+    "CellReference",
     "CellValue",
     "GraphicalObject",
     "Image",
     "MergeRange",
+    "RangeAddress",
     "ReferenceError",
     "Paragraph",
     "Position",
@@ -57,5 +67,6 @@ __all__ = [
     "Document",
     "columnLetter",
     "columnNumber",
-    "parseReference",
+    "toCellRanges",
+    "toCellReference",
 ]
