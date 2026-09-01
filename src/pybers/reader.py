@@ -90,6 +90,12 @@ class ArchiveIndex:
     """
 
     def __init__(self, package: NumbersPackage) -> None:
+        """Index every archive in the package by identifier.
+
+        Built eagerly and in full, because a reference gives no hint which member
+        holds its target, so a lazy index would have to scan every member on the
+        first miss anyway.
+        """
         self.byIdentifier: dict[int, Archive] = {}
         for iwaFile in package.iwaFiles:
             for archive in iwaFile.archives:

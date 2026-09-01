@@ -9,11 +9,16 @@ and `container` handles the zip that holds them. Everything re-exports through
 here so that `pybers.archive.readPackage` stays stable regardless of which module
 a name lives in.
 
-This layer stops at message boundaries on purpose. It finds every archive and
-every message body but parses none of them, because mapping a type identifier to
-a generated protobuf class is a separate concern with its own source of truth.
+`compression`, `iwa` and `container` stop at message boundaries on purpose. They
+find every archive and every message body and parse none of them, because mapping
+a type identifier to a generated protobuf class needs a source of truth none of
+them owns. `types` is that source of truth, and parsing an archive is the one
+thing it does, which keeps the boundary a module apart rather than absent.
 
 UPDATES
+2026-08-31  Added `types`, and corrected this docstring, which claimed the whole
+            layer parses nothing. That was true until `types` arrived and would
+            have read as a rule the package was breaking.
 2026-08-16  Written alongside the container layer.
 """
 from __future__ import annotations
