@@ -36,6 +36,15 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-08-31  Added `edit`, and fixed two calls that passed a `ticket` argument their
+            signatures stopped taking when this module moved from injecting that
+            dependency to importing it. Both were unreachable until now: the first
+            blocked the first pull request this repository ever opened, and the
+            second sat on the MERGE path inside a handler that reports "whether it
+            landed is unknown", so a merge would have claimed an unknown outcome
+            having sent nothing at all. `edit` exists because a body is a durable
+            record that a branch outgrows, and because a waived preflight stage has
+            to be written into the body to count.
 2026-08-17  Round two of the same review. The merge PUT is now guarded as well as the
             branch delete: urllib lets a read-phase TimeoutError through as an OSError
             and a proxy error page makes json.loads raise ValueError, neither of which is
@@ -272,6 +281,41 @@ def readPullRequest(token: str, number: int) -> PullRequestSummary:
     return summarizePullRequest(ticket.requestJson(url, token))
 
 
+def readPullRequestBody(token: str, number: int) -> str:
+    """Return a pull request's body text, which the summary deliberately omits.
+
+    `PullRequestSummary` carries what the skills report on, and a whole description
+    is not that. It is needed only to verify an edit landed.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+        f"{ticket.repositoryName}/pulls/{number}"
+    )
+    return ticket.requestJson(url, token).get("body") or ""
+
+
+def editPullRequest(
+    token: str, number: int, title: str | None, body: str | None
+) -> PullRequestSummary:
+    """Revise an open pull request's title or body and return what landed.
+
+    Sends only the fields given, because a PATCH carrying `body: null` would erase
+    the description rather than leave it alone.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+        f"{ticket.repositoryName}/pulls/{number}"
+    )
+    payload: dict[str, str] = {}
+    if title is not None:
+        payload["title"] = title
+    if body is not None:
+        payload["body"] = body
+    return summarizePullRequest(
+        ticket.requestJson(url, token, method="PATCH", payload=payload)
+    )
+
+
 def markReadyForReview(token: str, nodeId: str) -> None:
     """Take a pull request out of draft.
 
@@ -408,6 +452,64 @@ def cmdFind(arguments: argparse.Namespace) -> int:
         return 0
 
     showPullRequest(summary)
+    return 0
+
+
+def cmdEdit(arguments: argparse.Namespace) -> int:
+    """Revise an open pull request's title or body.
+
+    Exists because the body is a durable record rather than a first draft: a branch
+    grows commits after the pull request opens, and a waiver has to be written into
+    the body to count at all. Without this the only ways to correct one were to hand
+    run the GitHub API, which this repository forbids, or to leave it wrong.
+    """
+    if arguments.title is None and arguments.bodyFile is None:
+        console.print("[red]Nothing to change.[/] Pass --title, --body-file, or both.")
+        return errorExitCode
+
+    body: str | None = None
+    if arguments.bodyFile is not None:
+        bodyPath = Path(arguments.bodyFile)
+        if not bodyPath.is_file():
+            console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
+            return errorExitCode
+        body = bodyPath.read_text(encoding="utf-8")
+
+    if arguments.dryRun:
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
+        if arguments.title is not None:
+            console.print(f"would set title: [bold]{escape(arguments.title)}[/]")
+        if body is not None:
+            console.print("would replace the body with:")
+            console.print(body, markup=False, highlight=False)
+        return 0
+
+    token = ticket.resolveToken()
+    summary = editPullRequest(token, arguments.number, arguments.title, body)
+
+    # Read it back rather than trusting the write's echo. A body edit replaces the
+    # WHOLE description and GitHub offers no conflict detection, so a revision
+    # drafted against a copy fetched earlier discards anything changed in between
+    # with no error and no marker. Verifying does not prevent that, it makes it
+    # visible to whoever caused it, which is the difference between losing the
+    # record and failing a command.
+    mismatches: list[str] = []
+    if body is not None and readPullRequestBody(token, arguments.number) != body:
+        mismatches.append("body")
+    if arguments.title is not None and summary["title"] != arguments.title:
+        mismatches.append("title")
+
+    if mismatches:
+        console.print(
+            f"[red]Edit did not land cleanly:[/] {', '.join(mismatches)} differs "
+            "from what was sent."
+        )
+        console.print(summary["url"])
+        return errorExitCode
+
+    console.print(f"[green]Edited[/] [bold cyan]#{summary['number']}[/]")
+    console.print("[dim]verified against the pull request[/]")
+    console.print(summary["url"])
     return 0
 
 
@@ -564,6 +666,15 @@ def buildParser() -> argparse.ArgumentParser:
         help="print just the number, for a skill that only needs to resolve it",
     )
     findParser.set_defaults(handler=cmdFind)
+
+    editParser = subparsers.add_parser("edit", help="revise a pull request's title or body")
+    editParser.add_argument("number", type=int)
+    editParser.add_argument("--title", help="replacement title, verbatim")
+    editParser.add_argument(
+        "--body-file", dest="bodyFile", help="file holding the replacement body"
+    )
+    editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    editParser.set_defaults(handler=cmdEdit)
 
     readyParser = subparsers.add_parser("ready", help="take a draft out of draft")
     readyParser.add_argument("number", type=int)
