@@ -80,7 +80,7 @@ copy once the write reports verified.
 
 ## After approval
 
-Merging belongs to `/pr-review-code`, which owns the command and the reasons behind it.
-Do not merge from here, and do not restate its instruction.
+Review belongs to `/pr-review-code` and merging to `/pr-merge`. Do not do either from
+here, and do not restate their instructions.
 
 $ARGUMENTS

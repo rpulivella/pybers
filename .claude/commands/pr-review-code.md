@@ -118,23 +118,8 @@ more than the one stage in question.
 
 ## Merging
 
-One command, watched, needing no ceremony. After a clean review:
-
-```
-python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
-```
-
-**A real merge is the default and the norm.** A branch usually carries genuinely separate
-concerns and each commit earned its place; squashing would destroy which change was which.
-The branch is deleted on merge unless `--keep-branch` is passed.
-
-**`--method squash` is the exception, not a preference.** Reach for it only when the branch
-is one logical change whose history is fixup churn rather than separable steps, and say in
-the review why.
-
-`--subject` is required, so the merge commit follows the house format rather than GitHub's
-generated default. `Closes #<N>` in the body closes the issue.
-
-`pr.py` refuses to merge a PR that is still a draft, so step 6 cannot be skipped.
+`/pr-merge`, which owns the command and the reasons behind it. This skill promotes a pull
+request out of draft and stops there, and `pr.py` refuses to merge a draft, so step 6
+cannot be skipped.
 
 $ARGUMENTS
