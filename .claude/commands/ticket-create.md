@@ -68,11 +68,12 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
    That someone is whoever uses the thing, and for a repo tool or a skill it is the
    developer, who is still a user. "The writer mutates the archives rather than
    rebuilding them" is a design note wearing an AC's clothes, settling a decision the
-   build has not reached yet. **Conformance to a format is an outcome rather than an
-   implementation detail**, so "the value is written as decimal128" and "the saved
-   package opens with the macOS unzip tool" both belong. The line is whether the AC
-   fixes what the artifact must BE or dictates how the code gets WRITTEN, and **of ten
-   ACs nine still read from the outside**.
+   build has not reached yet. **Conformance is an outcome rather than an implementation
+   detail, and it counts for an API as much as for a file format**, so "the value is
+   written as decimal128", "the saved package opens with the macOS unzip tool" and
+   "`pybers.open` returns one object that owns every edit" all belong. The line is
+   whether the AC fixes what the artifact must BE or dictates how the code gets
+   WRITTEN, and **of ten ACs nine still read from the outside**.
    Each AC is concrete, testable and individually referenceable ("AC 3 fails because…").
    ACs may nest **one level**, no deeper, `4.a`, `4.b` under `4`. A third level means the
    parent is really two tickets. **No label may repeat anywhere in the list**.
