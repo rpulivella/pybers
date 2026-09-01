@@ -97,7 +97,8 @@ A failing stage may be **waived**, and only when all three hold:
    shows the change could not have caused it.
 2. It is **already tracked by a ticket**, named in the waiver.
 3. The waiver is **written into the pull request body**, so it is on the record rather
-   than in someone's memory.
+   than in someone's memory. Write it with `/pr-draft edit <N>`, which owns the
+   mechanism.
 
 Never waive silently, never waive a stage the diff could have caused, and never waive
 more than the one stage in question.
@@ -107,6 +108,8 @@ more than the one stage in question.
 - **Never review on a red gate**, unless the failing stage is waived above. A gate that
   does not exist yet is not a green one, and saying so in the report is the whole duty.
 - **Never launch a review agent unless the user asks for one.** See #12.
+- **Never edit a body to make a finding go away.** Recording a waiver puts a fact on the
+  record; rewriting a description until a gate reads green removes one.
 - **The preflight is repository-wide; the review is diff-wide.** Never narrow the
   preflight to changed files, and never let the review wander outside them.
 - **A recurring violation earns a lint rule, not a longer rubric.**

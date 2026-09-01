@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [#19] Add export-as-source to pr.py
 - [#9] Add a cell reference type for A1 and range addressing
 - [#1] Read a .numbers document into the object model
 - [init] Cut implementation steps from the ticket SPEC section

@@ -1,12 +1,12 @@
 ---
-description: Create a draft pull request for the current ticket branch, filling the repo's mandatory PR template.
-argument-hint: <optional issue number; inferred from the branch if omitted>
+description: Create a draft pull request for the current ticket branch, or revise a filed one's body, filling the repo's mandatory PR template.
+argument-hint: [edit] <optional issue number; inferred from the branch if omitted>
 ---
 
 # /pr-draft
 
-Create a **draft** pull request following this repo's mandatory PR format. The PR is the
-**PR-out** touchpoint.
+Create a **draft** pull request following this repo's mandatory PR format, or revise a
+filed one. The PR is the **PR-out** touchpoint, both directions of it.
 
 ## Steps
 
@@ -31,7 +31,13 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
    - **Intro**: 2-3 sentences on what the PR achieves.
    - **Detail your changes**: keep only the checkboxes that apply; remove the rest.
    - **Breaking Changes**: `None` after each heading, or a short list.
-   - **Checklist**: check what is genuinely true.
+   - **Checklist**: check what is genuinely true. Unchecked means **not done**, so an
+     item that cannot apply moves to the end of the list with `NA` in place of its
+     checkbox. That records it as considered rather than skipped, which deleting it
+     would lose. Say in the body why, when the reason is worth knowing.
+     **Detail your changes** keeps its own rule and deletes instead, because its boxes
+     are paired alternatives rather than obligations. One of each pair is asserted and
+     the other is not a gap, so `NA` would be noise there.
 6. **Run `/standards` on the body file, both passes, and fix what it finds.** A PR
    description is the durable record of why a change was made, and reviewers read it
    before they read the diff.
@@ -55,6 +61,22 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
   *leave* draft, not to enter it, `/pr-review-code` enforces that. Being feature complete
   with tests still being written is exactly what draft is for. See
   [What review-ready means](../../CONTRIBUTING.md) for the three conditions.
+
+## `edit`: revising a filed body
+
+`/pr-draft edit [<N>]` swaps steps 1 to 4 and 7 for the two commands below. **Steps 5 and 6
+still govern**, so the template still decides what a body may say and `/standards` still
+gates it.
+
+```
+python3 scripts/pr.py export-as-source <N> --body > "$TMPDIR/pybers-pr-body-<N>.md"
+python3 scripts/pr.py edit <N> --body-file "$TMPDIR/pybers-pr-body-<N>.md"
+```
+
+Fetch immediately before drafting and never from memory: `edit` replaces the WHOLE body and
+GitHub has no conflict detection, so anything that changed in between is discarded
+silently. Same rule and same reasoning as `/ticket-edit`, which spells it out. Delete the
+copy once the write reports verified.
 
 ## After approval
 

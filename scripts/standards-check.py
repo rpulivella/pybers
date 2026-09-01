@@ -56,6 +56,16 @@ line of this script, eg:
 /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-01  Fixed a hole in the banned-phrase check that had been open since the
+            list was written: every separator was a literal space, so a phrase a
+            line wrap fell inside matched nothing at all. This repository wraps
+            prose near 88 columns, which makes that roughly a coin flip on every
+            occurrence rather than a rare case. Found by the gate passing a body
+            containing "worth stating plainly" wrapped after "worth", and proved
+            by the same phrase failing on one line and passing across two. All
+            separators are now `\s+`, and a new entry must follow suit; notJustRe
+            already did, which is why it was never affected. No existing file was
+            hiding one, so the fix closed the hole without a cleanup behind it.
 2026-08-31  Added checkHardBreak. A markdown line ending in two or more spaces
             renders as a forced <br>, so it silently changes how a paragraph
             reflows, and the cause is invisible in the source. This repository
@@ -229,15 +239,21 @@ britishSpellings: tuple[tuple[re.Pattern, str], ...] = (
 
 # The global banned list.  These are this developer's own, and differ from the
 # site's, which polices positioning claims the site makes and this repo does not.
+# EVERY separator here is `\s+`, never a literal space, and a new entry must follow
+# suit. Prose in this repository wraps near 88 columns, so a banned phrase meets a
+# line break roughly as often as it does not, and a pattern written with a literal
+# space matches the unwrapped half and misses the wrapped half in silence. Measured
+# 2026-09-01: "worth stating plainly" failed on one line and PASSED across two, which
+# is how it reached a pull request body through a gate that reported clean.
 bannedPhrases: tuple[tuple[re.Pattern, str], ...] = (
-    (re.compile(r"\bload[- ]bearing\b", re.I), "banned phrase"),
-    (re.compile(r"\bworth stating plainly\b", re.I), "banned phrase"),
-    (re.compile(r"\bfull stop\b", re.I), "banned phrase"),
-    (re.compile(r"\bcarry the argument\b", re.I), "banned phrase"),
-    (re.compile(r"\bthe trap\b", re.I), "banned phrase, name the failure instead"),
+    (re.compile(r"\bload[-\s]bearing\b", re.I), "banned phrase"),
+    (re.compile(r"\bworth\s+stating\s+plainly\b", re.I), "banned phrase"),
+    (re.compile(r"\bfull\s+stop\b", re.I), "banned phrase"),
+    (re.compile(r"\bcarry\s+the\s+argument\b", re.I), "banned phrase"),
+    (re.compile(r"\bthe\s+trap\b", re.I), "banned phrase, name the failure instead"),
     (re.compile(r"\bleverag(?:e|es|ed|ing)\b", re.I),
      "corporate filler, use use / apply / draw on / build on"),
-    (re.compile(r"\bstanding up\b", re.I),
+    (re.compile(r"\bstanding\s+up\b", re.I),
      "corporate filler, use opening / building / bringing online"),
 )
 

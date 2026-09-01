@@ -28,6 +28,8 @@ Usage:
     python3 scripts/pr.py create --title "..." --body-file draft.md --base main
     python3 scripts/pr.py find
     python3 scripts/pr.py find --number-only
+    python3 scripts/pr.py export-as-source 8 --body
+    python3 scripts/pr.py export-as-source 8 --title
     python3 scripts/pr.py ready 8
     python3 scripts/pr.py merge 8 --subject "[14] feat: add a thing"
     python3 scripts/pr.py merge 8 --subject "..." --keep-branch
@@ -36,6 +38,14 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-01  Added `export-as-source`, matching ticket.py's command of the same name
+            down to the flags and the handler name. `edit` replaces the WHOLE body
+            and GitHub has no conflict detection, so a revision drafted from memory
+            silently discards whatever changed in between. ticket.py has carried the
+            remedy since 2026-08-13 and this tool carried only the hazard, which was
+            hit twice in one day revising pull request 15. One divergence, forced by
+            the data rather than chosen: PullRequestSummary omits the body, so the
+            body emitter takes a string where ticket.py's takes a summary.
 2026-08-31  Added `edit`, and fixed two calls that passed a `ticket` argument their
             signatures stopped taking when this module moved from injecting that
             dependency to importing it. Both were unreachable until now: the first
@@ -294,6 +304,30 @@ def readPullRequestBody(token: str, number: int) -> str:
     return ticket.requestJson(url, token).get("body") or ""
 
 
+def printBodyAsRawString(body: str) -> None:
+    """Write a pull request body to stdout byte for byte, so it can be sent back.
+
+    Nothing here passes through rich, and that is the whole point. rich hard-wraps
+    to the terminal width, expands tabs, substitutes emoji shortcodes, and reads
+    square brackets as style markup, so a body carrying `[#14]` or `[hotfix]` loses
+    those words silently. A pull request body is full of both.
+
+    Without this the only way to fetch an editable body is to reach around the tool,
+    which is forbidden. If a future operation is not covered here, add a subcommand.
+    """
+    sys.stdout.write(body)
+
+
+def printTitleAsRawString(summary: PullRequestSummary) -> None:
+    """Write a pull request title to stdout with nothing added but its own newline.
+
+    Deliberately bare. `find` prints `#<N> <title>` for a reader, which is the right
+    shape to look at and the wrong one to copy: a title reused verbatim would arrive
+    carrying a number it never had.
+    """
+    print(summary["title"])
+
+
 def editPullRequest(
     token: str, number: int, title: str | None, body: str | None
 ) -> PullRequestSummary:
@@ -452,6 +486,23 @@ def cmdFind(arguments: argparse.Namespace) -> int:
         return 0
 
     showPullRequest(summary)
+    return 0
+
+
+def cmdExportAsSource(arguments: argparse.Namespace) -> int:
+    """Emit one field of a pull request verbatim, for a skill that will send it back.
+
+    Separate from `find` because displaying and round-tripping are different actions
+    with incompatible contracts: `find` may decorate freely, this must never
+    transform a byte. `edit` replaces the WHOLE body and GitHub has no conflict
+    detection, so a revision drafted from memory silently discards whatever changed
+    in between. This is what makes drafting one against the current text possible.
+    """
+    token = ticket.resolveToken()
+    if arguments.body:
+        printBodyAsRawString(readPullRequestBody(token, arguments.number))
+    else:
+        printTitleAsRawString(readPullRequest(token, arguments.number))
     return 0
 
 
@@ -666,6 +717,23 @@ def buildParser() -> argparse.ArgumentParser:
         help="print just the number, for a skill that only needs to resolve it",
     )
     findParser.set_defaults(handler=cmdFind)
+
+    exportParser = subparsers.add_parser(
+        "export-as-source",
+        help="The SOURCE, byte for byte, nothing rendered: the form to edit and send "
+        "back to `edit`. Contrast `find`, which renders.",
+    )
+    exportParser.add_argument("number", type=int)
+    # Mutually exclusive and required, because these never compose: each is a whole
+    # output, not a modifier on a shared one. Same shape as ticket.py's.
+    fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
+    fieldGroup.add_argument(
+        "--body", action="store_true", help="the body, byte for byte, nothing rendered"
+    )
+    fieldGroup.add_argument(
+        "--title", action="store_true", help="the title, with nothing added"
+    )
+    exportParser.set_defaults(handler=cmdExportAsSource)
 
     editParser = subparsers.add_parser("edit", help="revise a pull request's title or body")
     editParser.add_argument("number", type=int)
