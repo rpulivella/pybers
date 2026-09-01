@@ -1,0 +1,67 @@
+---
+description: Merge a reviewed pull request and get develop current. The only skill that runs pr.py merge.
+argument-hint: <optional PR number; resolved from the current branch if omitted>
+---
+
+# /pr-merge
+
+The last step of the workflow. `/pr-review-code` assesses and is forbidden to merge, and
+this one acts. Keeping the two apart means a review can be re-run at any time without a
+trigger sitting on it.
+
+## Steps
+
+1. **Resolve the pull request** from `$ARGUMENTS`, or with
+   `python3 scripts/pr.py find --number-only`. **Read what it printed.** A bare number
+   is the PR, `no-open-pull-request` means there is none, and anything else means the
+   question could not be asked at all. Those are three different facts, and only one of
+   them is "no pull request".
+2. **Refuse on an unclean state.** Run `git status --short --branch` and stop if either is
+   true, saying which:
+   - the working tree is dirty;
+   - the branch is `ahead` of its remote.
+
+   Both merge a tree that differs from the one that was reviewed. Neither is waivable:
+   commit or push first, and re-run the review if the code changed.
+3. **Compose the subject** in the house format from the ticket,
+   `[<N>] <prefix>: <summary>`, by the same rules `/commit` states. `--subject` is
+   required exactly so that GitHub's generated default never lands.
+4. **Merge.**
+   ```
+   python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
+   ```
+   The source branch is deleted unless `--keep-branch` is passed. `pr.py` refuses a draft,
+   so a pull request that never went through `/pr-review-code` cannot arrive here.
+5. **Get `develop` current, and read what the pull printed.**
+   ```
+   git checkout develop
+   git pull origin develop
+   ```
+   The remote and the branch are named rather than left to tracking configuration. A pull
+   that fails prints an error, changes nothing, and leaves a stale `develop` behind, so
+   the merge looks complete when it is not. Confirm the merge commit is in `git log`
+   rather than assuming it arrived.
+6. **Report** the merge commit, whether the branch was deleted, and the state of `develop`.
+
+## A real merge is the default
+
+A branch usually carries genuinely separate concerns and each commit earned its place, so
+squashing destroys which change was which. **`--method squash` is the exception**, and
+it fits only when the branch is one logical change whose history is fixup churn rather
+than separable steps. Say in the report why it was chosen.
+
+## The board moves itself
+
+The Project's `Pull request merged` workflow sets Status to Done server-side the moment
+the pull request lands, so **run no command to move it**. `close --reason completed`
+after a merge only restates what already happened. Those workflows are configured in the
+Project and are invisible from the repository, which is what makes that stale instruction
+easy to re-add.
+
+## Hard rules
+
+- **Never merge a draft.** `/pr-review-code` promotes out of draft, and this skill merges.
+- **Never merge with a dirty tree or unpushed commits.**
+- **Never hand-run the GitHub API.** `pr.py merge` is the only sanctioned path.
+- **Never move the board by hand after a merge.**
+- Nothing here needs a script of its own. Every action is `pr.py merge` or plain git.
