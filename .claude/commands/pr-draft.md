@@ -1,12 +1,12 @@
 ---
-description: Create a draft pull request for the current ticket branch, filling the repo's mandatory PR template.
-argument-hint: <optional issue number; inferred from the branch if omitted>
+description: Create a draft pull request for the current ticket branch, or revise a filed one's body, filling the repo's mandatory PR template.
+argument-hint: [edit] <optional issue number; inferred from the branch if omitted>
 ---
 
 # /pr-draft
 
-Create a **draft** pull request following this repo's mandatory PR format. The PR is the
-**PR-out** touchpoint.
+Create a **draft** pull request following this repo's mandatory PR format, or revise a
+filed one. The PR is the **PR-out** touchpoint, both directions of it.
 
 ## Steps
 
@@ -56,20 +56,21 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
   with tests still being written is exactly what draft is for. See
   [What review-ready means](../../CONTRIBUTING.md) for the three conditions.
 
-## Revising a body after it is filed
+## `edit`: revising a filed body
 
-`/pr-draft` writes a body once. Correcting one afterward is `edit`, and it replaces the
-WHOLE body with no conflict detection, so the current text has to be fetched rather than
-remembered:
+`/pr-draft edit [<N>]` swaps steps 1 to 4 and 7 for the two commands below. **Steps 5 and 6
+still govern**, so the template still decides what a body may say and `/standards` still
+gates it.
 
 ```
 python3 scripts/pr.py export-as-source <N> --body > "$TMPDIR/pybers-pr-body-<N>.md"
 python3 scripts/pr.py edit <N> --body-file "$TMPDIR/pybers-pr-body-<N>.md"
 ```
 
-Same rule as `/ticket-edit`, for the same reason, and `export-as-source` is deliberately
-the same command name in both tools. Draft in `$TMPDIR`, never in the repository, and
-delete the copy once `edit` reports the write verified.
+Fetch immediately before drafting and never from memory: `edit` replaces the WHOLE body and
+GitHub has no conflict detection, so anything that changed in between is discarded
+silently. Same rule and same reasoning as `/ticket-edit`, which spells it out. Delete the
+copy once the write reports verified.
 
 ## After approval
 
