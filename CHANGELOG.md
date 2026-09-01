@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [#1] Read a .numbers document into the object model
 - [init] Cut implementation steps from the ticket SPEC section
 - [init] Adopt subject-first verb-last method naming
 - [init] Make Document the single in-memory handle for a document
