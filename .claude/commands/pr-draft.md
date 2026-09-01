@@ -31,7 +31,9 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    - **Intro**: 2-3 sentences on what the PR achieves.
    - **Detail your changes**: keep only the checkboxes that apply; remove the rest.
    - **Breaking Changes**: `None` after each heading, or a short list.
-   - **Checklist**: check what is genuinely true.
+   - **Checklist**: check what is genuinely true, and **delete any box that cannot
+     apply**. Unchecked means not done; a box that could never apply is noise that
+     reads as a gap. Say in the body why, if the reason is worth knowing.
 6. **Run `/standards` on the body file, both passes, and fix what it finds.** A PR
    description is the durable record of why a change was made, and reviewers read it
    before they read the diff.
