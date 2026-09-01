@@ -26,8 +26,10 @@ None
 **Archive round-trip**: any change to what a written `.numbers` file looks like on disk
 
 ## Checklist (before requesting review)
-<!-- Same rule as above: remove any checkbox that does not apply. An unchecked box says
-     "not done"; a box for something that cannot apply says nothing and reads as a gap. -->
+<!-- An unchecked box means NOT DONE. For an item that cannot apply at all, move the line
+     to the end of this list and replace its checkbox with NA, so the record shows it was
+     considered rather than skipped. Deleting it would lose that. Say why in the body when
+     the reason is worth knowing. -->
 - [ ] I performed a self-review
 - [ ] The CHANGELOG.md Unreleased entry is in this PR (`/changelog-add`)
 - [ ] I added or updated pytest tests covering the change

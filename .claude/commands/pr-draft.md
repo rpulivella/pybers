@@ -31,9 +31,13 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    - **Intro**: 2-3 sentences on what the PR achieves.
    - **Detail your changes**: keep only the checkboxes that apply; remove the rest.
    - **Breaking Changes**: `None` after each heading, or a short list.
-   - **Checklist**: check what is genuinely true, and **delete any box that cannot
-     apply**. Unchecked means not done; a box that could never apply is noise that
-     reads as a gap. Say in the body why, if the reason is worth knowing.
+   - **Checklist**: check what is genuinely true. Unchecked means **not done**, so an
+     item that cannot apply moves to the end of the list with `NA` in place of its
+     checkbox. That records it as considered rather than skipped, which deleting it
+     would lose. Say in the body why, when the reason is worth knowing.
+     **Detail your changes** keeps its own rule and deletes instead, because its boxes
+     are paired alternatives rather than obligations. One of each pair is asserted and
+     the other is not a gap, so `NA` would be noise there.
 6. **Run `/standards` on the body file, both passes, and fix what it finds.** A PR
    description is the durable record of why a change was made, and reviewers read it
    before they read the diff.
