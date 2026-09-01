@@ -25,6 +25,8 @@ UPDATES
 2026-09-01  Fixed decodeDecimal128 obeying the caller's decimal context, which
             rounded a value on read and made a file's contents depend on what
             the calling program had set.
+2026-09-01  Added encodeDecimal128 for #2. Re-encodes all 6,091 decimal128
+            values in the corpus to the exact bytes Numbers wrote.
 """
 from __future__ import annotations
 
@@ -137,6 +139,63 @@ def decodeDecimal128(raw: bytes) -> Decimal:
     # turned 1234567.891 on disk into 1.23457E+6 with nothing raising. What a file
     # says cannot depend on what the calling program happens to be doing.
     return Decimal((0 if sign > 0 else 1, tuple(int(d) for d in str(mantissa)), exponent))
+
+
+# The largest biased exponent the common layout can carry. The field is fourteen
+# bits, but a value whose top two bits are both set selects the other layout
+# instead, so the usable ceiling is 3 * 2^12 - 1 rather than 2^14 - 1. Encoding
+# past it produced no error and no large number: 1E+7000 came back as 0E-2624.
+maximumBiasedExponent: int = 3 * (1 << 12) - 1
+
+# The number of decimal digits a decimal128 coefficient can hold. A value needing
+# more is refused rather than rounded, because rounding a spreadsheet number
+# silently is the failure this library exists to avoid.
+maximumSignificantDigits: int = 34
+
+
+class CellEncodeError(RuntimeError):
+    """A value that cannot be written into a cell record."""
+
+
+def encodeDecimal128(value: Decimal) -> bytes:
+    """Encode a Decimal as 16 bytes of little-endian IEEE-754 decimal128.
+
+    The inverse of `decodeDecimal128`, and it emits only the common layout, which
+    is the one every value in every file examined uses. The other layout exists to
+    express coefficients of 2^113 or more, which is already past the largest a
+    decimal128 may hold, so a canonical encoder never reaches for it.
+
+    A value too large, too precise, or not finite is refused rather than rounded or
+    clamped. Numbers stores exact decimals, and a spreadsheet that quietly changes
+    one is worse than a save that stops and says why.
+    """
+    sign, digits, exponent = value.as_tuple()
+    if not isinstance(exponent, int):
+        raise CellEncodeError(
+            f"{value} is not a finite number, and a cell can hold only finite "
+            "values. Numbers has no cell representation for a NaN or an infinity."
+        )
+    if len(digits) > maximumSignificantDigits:
+        raise CellEncodeError(
+            f"{value} carries {len(digits)} significant digits, and decimal128 "
+            f"holds {maximumSignificantDigits}. Round it yourself if that is what "
+            "you intend, so the rounding is yours rather than this library's."
+        )
+
+    coefficient = 0
+    for digit in digits:
+        coefficient = coefficient * 10 + digit
+
+    biasedExponent = exponent + exponentBias
+    if not 0 <= biasedExponent <= maximumBiasedExponent:
+        raise CellEncodeError(
+            f"{value} has exponent {exponent}, outside the "
+            f"{-exponentBias} to {maximumBiasedExponent - exponentBias} a "
+            "decimal128 exponent can carry."
+        )
+
+    combined = (sign << 127) | (biasedExponent << 113) | coefficient
+    return combined.to_bytes(16, "little")
 
 
 def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
