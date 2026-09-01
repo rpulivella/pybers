@@ -63,8 +63,8 @@ UPDATES
             occurrence rather than a rare case. Found by the gate passing a body
             containing "worth stating plainly" wrapped after "worth", and proved
             by the same phrase failing on one line and passing across two. All
-            separators are now `\s+`, and a new entry must follow suit; notJustRe
-            already did, which is why it was never affected. No existing file was
+            separators now match any whitespace run, and a new entry must follow
+            suit. notJustRe already did, which is why it was never affected. No existing file was
             hiding one, so the fix closed the hole without a cleanup behind it.
 2026-08-31  Added checkHardBreak. A markdown line ending in two or more spaces
             renders as a forced <br>, so it silently changes how a paragraph
