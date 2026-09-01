@@ -25,14 +25,25 @@ from pybers.model.geometry import Position, Size
 from pybers.model.shapes import GraphicalObject, Image, Shape, TextBox
 from pybers.model.sheet import Sheet, Document
 from pybers.model.style import Style
-from pybers.model.table import Cell, MergeRange, Table
+from pybers.model.table import (
+    Cell,
+    CellValue,
+    MergeRange,
+    ReferenceError,
+    Table,
+    columnLetter,
+    columnNumber,
+    parseReference,
+)
 from pybers.model.text import Paragraph, RichText, TextRun
 
 __all__ = [
     "Cell",
+    "CellValue",
     "GraphicalObject",
     "Image",
     "MergeRange",
+    "ReferenceError",
     "Paragraph",
     "Position",
     "RichText",
@@ -44,4 +55,7 @@ __all__ = [
     "TextBox",
     "TextRun",
     "Document",
+    "columnLetter",
+    "columnNumber",
+    "parseReference",
 ]

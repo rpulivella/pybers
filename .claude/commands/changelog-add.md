@@ -30,7 +30,7 @@ Not every change has an issue behind it, so the bracket is never empty. It carri
 same vocabulary `/commit` uses, and for the same reasons:
 
 ```
-- [hotfix] <summary>     urgent ticketless change: tooling, a skill, CI, docs
+- [hotfix] <summary>     genuinely ticketless, a commit landing straight on develop
 - [init] <summary>       pre-ticket-system work, until the first ticket-numbered commit
 ```
 

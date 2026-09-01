@@ -19,15 +19,22 @@ convention shared across this developer's repos.
 3. Compose the message:
    - **`[<N>] <prefix>: <summary>`**, the ticket number first, in brackets, read from
      the branch name (`<label>/<N>-...`). The normal form. See `CONTRIBUTING.md`.
-   - **`[hotfix]`** for a ticketless urgent or infrastructural change where a ticket
-     adds no value (tooling, a skill, CI, docs): `[hotfix] <prefix>: …`. Use sparingly.
+   - **`[hotfix]`** when there is genuinely no ticket, which in practice means a commit
+     landing directly on `develop`: `[hotfix] <prefix>: …`. Use sparingly.
+     **Being on a ticket branch settles it.** Work the ticket surfaced along the way is
+     the ticket's, even when it touches tooling, a skill, CI or docs, and even when it
+     was not in the acceptance criteria. It was discovered doing that work and belongs
+     with it.
    - **`[init]`** for pre-ticket bootstrap (scaffolding, architecture de-risking, before
      the ticket workflow begins and before anything ships). **The default for this
      phase**, and it retires the day the first ticket-numbered commit lands. Filing a
      ticket does not retire it; landing work under one does.
    - **Single line only**, no body, no footer, nothing after the first line.
    - **A Conventional-Commits inspired prefix always:** `feat` `fix` `perf` `refactor`
-     `style` `docs` `chore`. Chosen per commit, from what that commit did, never from
+     `style` `docs` `chore`. Those seven are the closed set, and **`test` is deliberately
+     not among them**: it does not say whether a test was written or a test was run, and
+     a prefix that needs the body to disambiguate it has failed at its one job. Writing,
+     changing or deleting tests is `chore`. Chosen per commit, from what that commit did, never from
      the branch. A `feature/14-...` branch normally carries `feat:` several times and
      then `docs:`, `fix:` and `refactor:` as the work turns; that is correct, not drift.
      The branch prefix and the commit prefix are two different axes.
@@ -72,8 +79,9 @@ convention shared across this developer's repos.
   lands" is not two commits, it is one.
 - **Tests may trail the code they cover by a commit**, which is often the right shape
   after a large one. They may not trail the pull request.
-- **Ticketless work interleaved with a ticket gets its own `[hotfix]` commit**, even
-  mid-branch. It is not the ticket's deliverable and does not belong buried in it.
+- **Work a ticket surfaces gets its own commit, under that ticket's number.** It is not
+  the ticket's deliverable and should not be buried inside a commit that is, but it is
+  not ticketless either, and `[hotfix]` on a ticket branch is always wrong.
 
 ## Correct examples
 

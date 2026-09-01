@@ -33,9 +33,9 @@ def testStyleIsFrozenAndHashable() -> None:
 def testCellAtCreatesAndReusesCells() -> None:
     """Table.cellAt() creates a cell on first access and returns the same one after."""
     table = pybers.Table(name="Table 1")
-    first = table.cellAt(0, 0)
+    first = table.cellAt(1, 1)
     first.value = "hello"
-    second = table.cellAt(0, 0)
+    second = table.cellAt(1, 1)
     assert second.value == "hello"
     assert first is second
 
@@ -46,7 +46,7 @@ def testDocumentRoundTripsThroughEquality() -> None:
 
     def build() -> pybers.Document:
         table = pybers.Table(name="Table 1")
-        table.cellAt(0, 0).value = 42
+        table.cellAt(1, 1).value = 42
         return pybers.Document(sheets=[pybers.Sheet(name="Sheet 1", tables=[table])])
 
     assert build() == build()

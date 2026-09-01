@@ -49,6 +49,26 @@ release:     annotated tag on develop  ->  CI build
   Conventional prefix describes that commit. A `feature/12-...` branch normally holds
   several `feat:` commits and then `docs:`, `fix:` and `refactor:` as the work turns.
 
+## What review-ready means
+
+A pull request leaves draft when three things are true, and not before:
+
+1. Every acceptance criterion the ticket carries is met.
+2. Test coverage appropriate to the ticket exists and passes. What is appropriate is a
+   judgment the ticket's own criteria settle: a decoder earns assertions against a fixture
+   whose contents are known independently, and a configuration change earns proof it takes
+   effect.
+3. The gates pass. Today that is `.venv/bin/python3 -m pytest` and
+   `scripts/standards-check.py` with zero failures. Ruff and mypy join them once #4 lands,
+   and this list is meant to grow rather than to stay accurate by omission.
+
+**A draft PR is the right place to be feature complete with tests still being written.**
+Opening one early is encouraged, because the diff is easier to follow as it grows than as
+one arrival. Marking it ready for review is the assertion that all three hold.
+
+The board mirrors this: `Code Review` means an open, non-draft pull request. A branch whose
+tests are still being written stays `In Progress` even though the feature works.
+
 ## Release tagging
 
 Releases are annotated tags on `develop`. There are no release branches.

@@ -52,7 +52,9 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
   the PR body.**
 - Base branch is always `develop`. Do not guess the description, fetch the issue first.
 - **A draft may be opened at any point, including mid-work.** Green is required to
-  *leave* draft, not to enter it, `/pr-review-code` enforces that.
+  *leave* draft, not to enter it, `/pr-review-code` enforces that. Being feature complete
+  with tests still being written is exactly what draft is for. See
+  [What review-ready means](../../CONTRIBUTING.md) for the three conditions.
 
 ## After approval
 

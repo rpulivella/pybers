@@ -24,6 +24,11 @@ __date__ = "2026/08/12"
 
 from pybers.model import (
     Cell,
+    CellValue,
+    ReferenceError,
+    columnLetter,
+    columnNumber,
+    parseReference,
     GraphicalObject,
     Image,
     MergeRange,
@@ -39,9 +44,16 @@ from pybers.model import (
     TextRun,
     Document,
 )
+from pybers.reader import open
 
 __all__ = [
     "Cell",
+    "CellValue",
+    "ReferenceError",
+    "columnLetter",
+    "columnNumber",
+    "open",
+    "parseReference",
     "GraphicalObject",
     "Image",
     "MergeRange",
