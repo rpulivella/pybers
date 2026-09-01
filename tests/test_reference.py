@@ -303,6 +303,38 @@ def test_aMergeCannotBeUnbounded() -> None:
         MergeRange(CellRange.parse("A"))
 
 
+def mergedTable() -> Table:
+    """Return a one-by-three table whose first two cells are merged."""
+    table = Table(name="Table 1", rowCount=1, colCount=3)
+    table.mergeRanges.append(MergeRange(CellRange.parse("A1:B1")))
+    table.cell("A1").value = "Hello"
+    return table
+
+
+def test_aCellSwallowedByAMergeIsNotAddressable() -> None:
+    """A covered cell has NO record in the tile, so handing back an empty one on
+    access files a record the archive never had, and a save would then emit it.
+    That is the phantom merge anchor CLAUDE.md lists among the defects this
+    project exists to avoid."""
+    table = mergedTable()
+    stored = len(table.cells)
+    with pytest.raises(ReferenceError):
+        table.cell("B1")
+    assert len(table.cells) == stored
+    assert table.cell("A1").value == "Hello"
+
+
+def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
+    """A merged region is one cell, so a range over it returns one cell."""
+    table = mergedTable()
+    assert [cell.reference.asReference() for cell in table.range("A1:C1")] == [
+        "A1", "C1"
+    ]
+    assert table.range("B1") == []
+    assert table.addressable("A1") is True
+    assert table.addressable("B1") is False
+
+
 def test_mergeCoveringStillTellsACoveredCellFromAnEmptyOne() -> None:
     table = sampleTable()
     table.mergeRanges.append(MergeRange(CellRange.parse("A1:B1")))

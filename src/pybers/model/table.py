@@ -8,8 +8,11 @@ address that has already been validated.
 
 UPDATES
 2026-09-01  Addressing moved out to the reference types (#9). `cellAt(row, col)`
-            and the loose reference helpers are gone; `MergeRange` now carries a
-            `CellRange` rather than repeating the span arithmetic itself.
+            and the loose reference helpers are gone, and `MergeRange` now carries
+            a `CellRange` rather than repeating the span arithmetic itself. A table
+            also holds its declared row and column count, and two kinds of address
+            name nothing and raise: one beyond that grid, and one swallowed by a
+            merge.
 2026-08-17  Typed Cell.value, and pinned numbers to Decimal rather than float.
             Numbers stores them as IEEE-754 decimal128, measured in the fixtures,
             so a float would introduce binary rounding error into documents that
@@ -131,9 +134,11 @@ class Table:
         """Return the cell at an address, creating an empty one on first access.
 
         A cell absent from the archive is empty rather than missing, so reading one
-        inside the grid is not an error and must not shift its neighbors. Outside
-        the grid is a different thing entirely and raises, because a Numbers table
-        is a fixed number of rows and columns rather than an endless sheet.
+        inside the grid is not an error and must not shift its neighbors. Two
+        addresses name nothing at all and raise instead: one outside the declared
+        grid, because a Numbers table is a fixed number of rows and columns rather
+        than an endless sheet, and one swallowed by a merge, because a merged region
+        is a single cell reached through its anchor.
         """
         # Unlocked before it is used as a key, because `$A$1` and `A1` compare
         # unequal and are one cell. Without this the same cell files itself under
@@ -145,6 +150,15 @@ class Table:
                 f"{key} is outside {self.name!r}, which is {self.rowCount} rows "
                 f"by {self.colCount} columns."
             )
+        merge = self.mergeCovering(key)
+        if merge is not None and merge.anchor != key:
+            # Creating one here is what produces a phantom record: a covered cell
+            # has NO record in the tile, so a table read and then written back
+            # would gain one Numbers never writes. See findings-03-structure.md.
+            raise ReferenceError(
+                f"{key} is covered by the merge {merge.extent}, whose anchor is "
+                f"{merge.anchor}."
+            )
         if key not in self.cells:
             self.cells[key] = Cell(reference=key)
         return self.cells[key]
@@ -155,6 +169,9 @@ class Table:
         An unbounded range is bounded by this table's own extent, which is the only
         place that extent is known. A table with nothing in it has no extent, so an
         unbounded range over one covers nothing.
+
+        Positions swallowed by a merge are skipped, so a range across a merged block
+        yields its anchor once rather than one cell for every position it occupies.
         """
         extent = self.extent
         found: list[Cell] = []
@@ -163,8 +180,22 @@ class Table:
                 if extent is None:
                     continue
                 item = item.boundedBy(extent)
-            found.extend(self.cell(reference) for reference in item)
+            found.extend(
+                self.cell(reference)
+                for reference in item
+                if self.addressable(reference)
+            )
         return found
+
+    def addressable(self, address: CellAddress) -> bool:
+        """Report whether an address names a cell this table can hand over.
+
+        False for a position swallowed by a merge, which is why a range over a
+        merged block yields the anchor once rather than one cell per position.
+        """
+        reference = toCellReference(address).asUnlocked()
+        merge = self.mergeCovering(reference)
+        return merge is None or merge.anchor == reference
 
     @property
     def extent(self) -> CellRange | None:

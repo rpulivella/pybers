@@ -233,6 +233,16 @@ def test_aCoveredCellIsDistinguishableFromAnEmptyOne() -> None:
     assert table.mergeCovering("H2") is None
 
 
+def test_aCoveredCellIsNotAddressableAndLeavesNoRecord() -> None:
+    """`22-merge-2x2` merges A1:B1, so B1 is swallowed and only A1 addresses it."""
+    table = onlyTable("22-merge-2x2")
+    stored = len(table.cells)
+    with pytest.raises(ReferenceError):
+        table.cell("B1")
+    assert len(table.cells) == stored
+    assert table.cell("A1").value == "Hello"
+
+
 # ── AC 8: the whole corpus reads, and the traps stay caught ──────────────────
 
 @pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
