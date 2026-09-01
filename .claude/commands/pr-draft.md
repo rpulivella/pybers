@@ -56,6 +56,21 @@ Create a **draft** pull request following this repo's mandatory PR format. The P
   with tests still being written is exactly what draft is for. See
   [What review-ready means](../../CONTRIBUTING.md) for the three conditions.
 
+## Revising a body after it is filed
+
+`/pr-draft` writes a body once. Correcting one afterward is `edit`, and it replaces the
+WHOLE body with no conflict detection, so the current text has to be fetched rather than
+remembered:
+
+```
+python3 scripts/pr.py export-as-source <N> --body > "$TMPDIR/pybers-pr-body-<N>.md"
+python3 scripts/pr.py edit <N> --body-file "$TMPDIR/pybers-pr-body-<N>.md"
+```
+
+Same rule as `/ticket-edit`, for the same reason, and `export-as-source` is deliberately
+the same command name in both tools. Draft in `$TMPDIR`, never in the repository, and
+delete the copy once `edit` reports the write verified.
+
 ## After approval
 
 Merging belongs to `/pr-review-code`, which owns the command and the reasons behind it.

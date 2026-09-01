@@ -97,7 +97,15 @@ A failing stage may be **waived**, and only when all three hold:
    shows the change could not have caused it.
 2. It is **already tracked by a ticket**, named in the waiver.
 3. The waiver is **written into the pull request body**, so it is on the record rather
-   than in someone's memory.
+   than in someone's memory. Fetch the current body first, never draft the revision from
+   memory:
+   ```
+   python3 scripts/pr.py export-as-source <N> --body > "$TMPDIR/pybers-pr-body-<N>.md"
+   python3 scripts/pr.py edit <N> --body-file "$TMPDIR/pybers-pr-body-<N>.md"
+   ```
+   `edit` replaces the WHOLE body and GitHub has no conflict detection, so a revision
+   written from what you remember of the body silently discards anything that changed in
+   between. Delete the local copy once `edit` reports the write verified.
 
 Never waive silently, never waive a stage the diff could have caused, and never waive
 more than the one stage in question.

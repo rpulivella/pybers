@@ -65,7 +65,8 @@ They live in `pr.py`, which shares this tool's auth rather than duplicating it.
 |---|---|
 | `create` | `/pr-draft`, always opens a draft; there is no flag to open otherwise |
 | `edit` | no skill, run by hand to correct a filed PR's title or body. Reads the body back and compares, so a write that did not land fails loudly |
-| `find` | `/pr-review-code` (`--number-only`), resolve the PR for the current branch |
+| `export-as-source` | `/pr-draft` and `/pr-review-code` (`--body` and `--title`), **byte-exact, for round-tripping**. Contrast `find`, which renders |
+| `find` | `/pr-review-code` (`--number-only`), resolve the PR for the current branch. **Rendered, for reading only** |
 | `ready` | `/pr-review-code`, the only sanctioned promotion out of draft |
 | `merge` | `/pr-review-code`, `--subject` required; `merge` by default, `squash` by exception |
 
