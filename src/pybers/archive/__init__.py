@@ -35,10 +35,10 @@ from .cells import (
     CellDecodeError,
     CellRecord,
     decodeCellValue,
-    decodeDecimal128,
     decodeRecord,
     decodeRow,
 )
+from .decimal128 import Decimal128, Decimal128Error
 from .compression import (
     SnappyError,
     compressRaw,
@@ -77,6 +77,8 @@ __all__ = [
     "CellDecodeError",
     "CellRecord",
     "ContainerError",
+    "Decimal128",
+    "Decimal128Error",
     "IWAError",
     "IWAFile",
     "MemberInfo",
@@ -86,7 +88,6 @@ __all__ = [
     "compressPayload",
     "compressRaw",
     "decodeCellValue",
-    "decodeDecimal128",
     "decodeRecord",
     "decodeRow",
     "decompressPayload",

@@ -23,7 +23,6 @@ __status__ = "Development"
 __date__ = "2026/08/18"
 
 import datetime
-import decimal
 from decimal import Decimal
 from pathlib import Path
 
@@ -32,12 +31,7 @@ import pytest
 from pybers.archive import readPackage
 from pybers.archive.cells import (
     CellDecodeError,
-    CellEncodeError,
-    CellRecord,
-    decodeDecimal128,
     decodeRow,
-    encodeDecimal128,
-    exponentBias,
 )
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
@@ -54,32 +48,6 @@ def fixturePath(name: str) -> Path:
     if not path.is_file():
         pytest.skip(f"Fixture {path.name} is not present.")
     return path
-
-
-def everyCellRecord(path: Path) -> list[CellRecord]:
-    """Decode every populated cell record in a fixture, from every tile.
-
-    Walks the tile archives directly rather than through the tile list, because the
-    caller here wants all records rather than records at known addresses, and the
-    row numbering the tile list resolves does not matter for that.
-    """
-    from pybers._generated import TSTArchives_pb2 as tst
-
-    package = readPackage(path)
-    records: list[CellRecord] = []
-    for iwaFile in package.iwaFiles:
-        for archive in iwaFile.archives:
-            for message in archive.messages:
-                if message.typeId != tileTypeId:
-                    continue
-                tile = tst.Tile()
-                tile.ParseFromString(message.data)
-                for info in tile.rowInfos:
-                    wide = info.has_wide_offsets or tile.should_use_wide_rows
-                    records += decodeRow(
-                        info.cell_offsets, info.cell_storage_buffer, wide
-                    )
-    return records
 
 
 def valueRow(name: str) -> dict[int, object]:
@@ -134,44 +102,6 @@ def valueRow(name: str) -> dict[int, object]:
                         if records:
                             return {r.column: r.value for r in records}
     raise AssertionError(f"No populated row 0 found in {name}.")
-
-
-def testDecimal128DecodesExactly() -> None:
-    """1234.5 is exact, which is the whole reason values are not floats.
-
-    Built by hand rather than read from a file, so this tests the decoder and not the
-    fixture: mantissa 12345 with exponent -1.
-    """
-    raw = (12345).to_bytes(8, "little") + ((6176 - 1) << 49).to_bytes(8, "little")
-    assert decodeDecimal128(raw) == Decimal("1234.5")
-    assert decodeDecimal128(raw) != Decimal("1234.4999999999999")
-
-
-def testDecimal128CarriesSign() -> None:
-    """The sign is the top bit, not a separate field."""
-    negative = (12345).to_bytes(8, "little") + (
-        (1 << 63) | ((6176 - 1) << 49)
-    ).to_bytes(8, "little")
-    assert decodeDecimal128(negative) == Decimal("-1234.5")
-
-
-def testDecimal128ReadsTheLargeCoefficientFormAsZero() -> None:
-    """The second BID layout decodes, and a non-canonical coefficient is zero.
-
-    Setting both selector bits selects the form whose coefficient carries an implied
-    leading `100`, which puts it past the 10^34 - 1 this format may hold. IEEE 754
-    calls that non-canonical and gives it the value zero, so this must return a
-    number rather than raising, and the number must be zero.
-    """
-    selector = (0x03 << 61) | (exponentBias << 47)
-    raw = (0).to_bytes(8, "little") + selector.to_bytes(8, "little")
-    assert decodeDecimal128(raw) == Decimal(0)
-
-
-def testDecimal128RejectsAShortBuffer() -> None:
-    """Too few bytes raises rather than decoding whatever happens to be there."""
-    with pytest.raises(CellDecodeError, match="16 bytes"):
-        decodeDecimal128(b"\x00" * 8)
 
 
 def testValueTypesFixture() -> None:
@@ -284,103 +214,3 @@ def testRichTextCellConsumesItsPayloadKey() -> None:
     assert decoded.typeByte == 9
     assert decoded.value == 7, "the payload key is the value"
     assert decoded.references == (4, 1), "references start AFTER the payload key"
-
-
-# ── The decode must not depend on the caller's decimal context ───────────────
-
-@pytest.mark.parametrize("precision", [3, 6, 10, 28, 50])
-def testDecimal128DecodesTheSameUnderAnyCallerContext(precision: int) -> None:
-    """A regression. `scaleb` is arithmetic, so it obeyed the thread-local context.
-
-    Under the default precision of 28 that rounded away the 34 digits decimal128
-    can hold, and a caller who had set `prec=6` for their own arithmetic read
-    1234567.891 out of a file as 1.23457E+6, with nothing raising. No fixture
-    caught it because the most precise value in the whole corpus has 15 digits.
-    """
-    # A byte literal rather than a call to the encoder, so this regression stands
-    # on its own if the encoder ever changes or breaks.
-    raw = b"\xd3\x02\x96\x49" + bytes(10) + b"\x3a\x30"
-    previous = decimal.getcontext().prec
-    decimal.getcontext().prec = precision
-    try:
-        assert decodeDecimal128(raw) == Decimal("1234567.891")
-    finally:
-        decimal.getcontext().prec = previous
-
-
-def testDecimal128KeepsAllThirtyFourDigits() -> None:
-    """The format holds 34 significant digits and the decoder must return them all."""
-    # 3.141592653589793238462643383279502, encoded by hand so the assertion does
-    # not lean on the encoder.
-    value = Decimal("3.141592653589793238462643383279502")
-    assert len(value.as_tuple().digits) == 34
-    raw = ((0 << 127) | ((-33 + exponentBias) << 113) | int("3141592653589793238462643383279502")).to_bytes(16, "little")
-    assert decodeDecimal128(raw) == value
-
-
-# ── The encoder ──────────────────────────────────────────────────────────────
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "0", "-0", "1", "-1", "1.50", "0.00", "-0.001", "1234.5678",
-        "1E+100", "1E-100", "9999999999999999999999999999999999",
-        "-9999999999999999999999999999999999",
-        "3.141592653589793238462643383279502",
-        # The exact ends of the stored-exponent range. One step past either is
-        # refused below, and used to encode silently to a different number.
-        "1E+6111", "1E-6176",
-    ],
-)
-def testEncodeDecimal128RoundTripsThroughTheDecoder(text: str) -> None:
-    """Identity including trailing zeros, which carry a cell's displayed precision."""
-    value = Decimal(text)
-    decoded = decodeDecimal128(encodeDecimal128(value))
-    assert decoded == value
-    assert str(decoded) == str(value), "the scale changed, so trailing zeros moved"
-
-
-def testEncodeDecimal128IsSixteenBytes() -> None:
-    assert len(encodeDecimal128(Decimal("1"))) == 16
-
-
-def testEncodeDecimal128MatchesWhatNumbersWroteForEveryCorpusValue() -> None:
-    """The encoder reproduces Apple's own bytes, not merely a valid encoding.
-
-    Measured on 2026-09-01 over all 6,091 decimal128 values in the fixture corpus:
-    every one re-encodes to the exact bytes Numbers wrote. That is a far stronger
-    statement than a round trip through our own decoder, which could agree with
-    itself while both halves were wrong.
-    """
-    examined = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
-        for record in everyCellRecord(path):
-            if not isinstance(record.value, Decimal):
-                continue
-            examined += 1
-            assert encodeDecimal128(record.value) == record.raw[12:28], (
-                f"{path.name}: {record.value} did not re-encode to Apple's bytes"
-            )
-    assert examined > 5000, f"only {examined} values examined; the corpus shrank"
-
-
-@pytest.mark.parametrize(
-    "value, reason",
-    [
-        (Decimal("NaN"), "not a finite number"),
-        (Decimal("Infinity"), "not a finite number"),
-        (Decimal("-Infinity"), "not a finite number"),
-        (Decimal("1" * 35), "significant digits"),
-        # One step outside the stored-exponent range at each end. Before the bound
-        # was corrected these encoded without complaint, and 1E+7000 read back as
-        # 0E-2624, because a biased exponent that high selects the other layout.
-        (Decimal("1E+6112"), "exponent"),
-        (Decimal("1E-6177"), "exponent"),
-    ],
-)
-def testEncodeDecimal128RefusesWhatItCannotRepresent(
-    value: Decimal, reason: str
-) -> None:
-    """Refused rather than rounded or clamped, so a lost digit is never silent."""
-    with pytest.raises(CellEncodeError, match=reason):
-        encodeDecimal128(value)
