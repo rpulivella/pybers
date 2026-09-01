@@ -53,7 +53,7 @@ the author's other repositories.
 | `export-as-source` | `/ticket-edit` (`--body` and `--title`), `/changelog-add` and `/pr-draft` (`--title`), **byte-exact, for round-tripping** |
 | `start` | `/ticket-startwork` |
 | `status` | `/ticket-startwork`, the move to `Code Review`, and the move back to `Concept` when a spec proves inadequate |
-| `close` | `/ticket-startwork`, `--reason completed` on delivery, `--reason not-planned` on abandonment |
+| `close` | `/ticket-startwork`, `--reason not-planned` on abandonment. **Not on delivery**: the Project's own `Pull request merged` workflow sets Status to Done server-side when the PR lands, so closing a delivered ticket by hand only restates what already happened |
 | `list` | `/release-tag`, reconciling shipped tickets against `CHANGELOG.md`. Also the everyday manual command for reading the board. |
 
 Pull requests are **not** here: `ticket.py` owns Issues and the Project board only.
@@ -64,6 +64,7 @@ They live in `pr.py`, which shares this tool's auth rather than duplicating it.
 | Command | Called by |
 |---|---|
 | `create` | `/pr-draft`, always opens a draft; there is no flag to open otherwise |
+| `edit` | no skill, run by hand to correct a filed PR's title or body. Reads the body back and compares, so a write that did not land fails loudly |
 | `find` | `/pr-review-code` (`--number-only`), resolve the PR for the current branch |
 | `ready` | `/pr-review-code`, the only sanctioned promotion out of draft |
 | `merge` | `/pr-review-code`, `--subject` required; `merge` by default, `squash` by exception |
