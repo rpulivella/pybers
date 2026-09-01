@@ -269,6 +269,19 @@ def test_anUnboundedRangeIsBoundedByTheTablesOwnExtent() -> None:
     ]
 
 
+def test_aRangeReachingPastTheGridIsRefusedByItsOwnName() -> None:
+    """The refusal names the range the caller wrote. Letting the first cell past
+    the edge raise instead reports an interior address nobody asked for, which is
+    a worse answer to the same question."""
+    table = sampleTable()
+    with pytest.raises(ReferenceError) as raised:
+        table.range("A1:Z99")
+    assert "A1:Z99" in str(raised.value)
+    with pytest.raises(ReferenceError) as listed:
+        table.range("A1:B2,Z99")
+    assert "Z99" in str(listed.value)
+
+
 def test_aTableWithNoDeclaredGridHasNoExtentAndHoldsNoCells() -> None:
     empty = Table(name="Table 1")
     assert empty.extent is None

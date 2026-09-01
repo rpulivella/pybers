@@ -180,6 +180,18 @@ class Table:
                 if extent is None:
                     continue
                 item = item.boundedBy(extent)
+            # Checked whole and up front, rather than left to the first cell that
+            # falls off the end, which would name an interior address the caller
+            # never wrote. Both corners exist here because an unbounded axis was
+            # filled in above.
+            corners = [item.start, item.end]
+            if extent is None or not all(
+                corner is not None and extent.covers(corner) for corner in corners
+            ):
+                raise ReferenceError(
+                    f"{item} reaches outside {self.name!r}, which is "
+                    f"{self.rowCount} rows by {self.colCount} columns."
+                )
             found.extend(
                 self.cell(reference)
                 for reference in item
