@@ -368,7 +368,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
 
     assertBranchIsPushed(token, head)
     summary = createDraftPullRequest(
-        ticket, token, arguments.title, body, head, arguments.base
+        token, arguments.title, body, head, arguments.base
     )
     console.print("[green]Opened as draft[/]")
     showPullRequest(summary)
@@ -468,7 +468,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
     # The merge is the irreversible step, so an unknown outcome here must say so.
     try:
         sha = mergePullRequest(
-            ticket, token, arguments.number, arguments.method, arguments.subject
+            token, arguments.number, arguments.method, arguments.subject
         )
     except Exception as exc:
         console.print(
