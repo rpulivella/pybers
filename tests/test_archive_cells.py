@@ -10,6 +10,7 @@ only be checked against content established outside itself.
 
 UPDATES
 2026-08-18  Written with pybers.archive.cells.
+2026-09-01  Added the caller-context regression, for #2.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ __status__ = "Development"
 __date__ = "2026/08/18"
 
 import datetime
+import decimal
 from decimal import Decimal
 from pathlib import Path
 
@@ -253,3 +255,35 @@ def testRichTextCellConsumesItsPayloadKey() -> None:
     assert decoded.typeByte == 9
     assert decoded.value == 7, "the payload key is the value"
     assert decoded.references == (4, 1), "references start AFTER the payload key"
+
+
+# ── The decode must not depend on the caller's decimal context ───────────────
+
+@pytest.mark.parametrize("precision", [3, 6, 10, 28, 50])
+def testDecimal128DecodesTheSameUnderAnyCallerContext(precision: int) -> None:
+    """A regression. `scaleb` is arithmetic, so it obeyed the thread-local context.
+
+    Under the default precision of 28 that rounded away the 34 digits decimal128
+    can hold, and a caller who had set `prec=6` for their own arithmetic read
+    1234567.891 out of a file as 1.23457E+6, with nothing raising. No fixture
+    caught it because the most precise value in the whole corpus has 15 digits.
+    """
+    # A byte literal rather than a call to the encoder, so this regression stands
+    # on its own if the encoder ever changes or breaks.
+    raw = b"\xd3\x02\x96\x49" + bytes(10) + b"\x3a\x30"
+    previous = decimal.getcontext().prec
+    decimal.getcontext().prec = precision
+    try:
+        assert decodeDecimal128(raw) == Decimal("1234567.891")
+    finally:
+        decimal.getcontext().prec = previous
+
+
+def testDecimal128KeepsAllThirtyFourDigits() -> None:
+    """The format holds 34 significant digits and the decoder must return them all."""
+    # 3.141592653589793238462643383279502, encoded by hand so the assertion does
+    # not lean on the encoder.
+    value = Decimal("3.141592653589793238462643383279502")
+    assert len(value.as_tuple().digits) == 34
+    raw = ((0 << 127) | ((-33 + exponentBias) << 113) | int("3141592653589793238462643383279502")).to_bytes(16, "little")
+    assert decodeDecimal128(raw) == value

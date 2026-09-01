@@ -22,6 +22,9 @@ rounding error into a document that never had any. See `pybers.model.table`.
 UPDATES
 2026-08-18  Written. Decodes numbers, currency, text, dates, booleans and durations,
             verified against fixtures 11 through 14.
+2026-09-01  Fixed decodeDecimal128 obeying the caller's decimal context, which
+            rounded a value on read and made a file's contents depend on what
+            the calling program had set.
 """
 from __future__ import annotations
 
@@ -127,7 +130,13 @@ def decodeDecimal128(raw: bytes) -> Decimal:
     if mantissa > maximumCoefficient:
         mantissa = 0
 
-    return Decimal(sign * mantissa).scaleb(exponent)
+    # Built from its digit tuple rather than with `scaleb`, which is an arithmetic
+    # operation and therefore obeys the caller's thread-local decimal context. Under
+    # the default precision of 28 that silently rounded the 34 digits decimal128 can
+    # hold, and under a caller who had set `prec=6` for their own arithmetic it
+    # turned 1234567.891 on disk into 1.23457E+6 with nothing raising. What a file
+    # says cannot depend on what the calling program happens to be doing.
+    return Decimal((0 if sign > 0 else 1, tuple(int(d) for d in str(mantissa)), exponent))
 
 
 def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
