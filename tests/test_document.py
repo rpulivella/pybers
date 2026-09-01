@@ -30,7 +30,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from pybers.model import ReferenceError, columnLetter, columnNumber, parseReference
+from pybers.model import CellReference, ReferenceError, columnLetter, columnNumber
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -90,24 +90,35 @@ def test_aSheetWithNoTableYieldsNone() -> None:
 # ── AC 4: addressing, and an absent cell reading as empty ────────────────────
 
 def test_anAbsentCellReadsAsEmptyRatherThanRaising() -> None:
+    """J1 is the one cell inside this table's declared 2 by 10 grid that holds
+    nothing, so it is absent from the archive without being outside the table."""
     table = onlyTable("11-value-types-noformats")
-    assert (400, 40) not in table.cells
-    assert table.cellAt(400, 40).value is None
+    assert CellReference.parse("J1") not in table.cells
+    assert table.cell("J1").value is None
+
+
+def test_aCellOutsideTheDeclaredGridIsRefused() -> None:
+    """A Numbers table is a fixed number of rows and columns, unlike a sheet in
+    Excel, so an address beyond it names nothing rather than naming an empty cell."""
+    table = onlyTable("11-value-types-noformats")
+    assert table.extent is not None
+    with pytest.raises(ReferenceError):
+        table.cell("AN400")
 
 
 def test_readingAnAbsentCellDoesNotDisturbItsNeighbors() -> None:
     table = onlyTable("11-value-types-noformats")
-    before = table.cellAt(1, 1).value
-    table.cellAt(1, 40)
-    assert table.cellAt(1, 1).value == before
+    before = table.cell("A1").value
+    table.cell("J1")
+    assert table.cell("A1").value == before
 
 
 def test_rowsAndColumnsCountFromOne() -> None:
     """A1 is the first cell, and the Python instinct of zero fails loudly."""
     table = onlyTable("11-value-types-noformats")
-    assert table.cell("A1") is table.cellAt(1, 1)
+    assert table.cell("A1") is table.cell(CellReference(1, 1))
     with pytest.raises(ReferenceError):
-        table.cellAt(0, 0)
+        CellReference(0, 0)
 
 
 def test_columnLabelsAndNumbersAgreeAcrossTheBase26Boundary() -> None:
@@ -119,14 +130,20 @@ def test_columnLabelsAndNumbersAgreeAcrossTheBase26Boundary() -> None:
         assert columnNumber(columnLetter(col)) == col
 
 
-def test_aReferenceIgnoresTheDollarSignsNumbersWrites() -> None:
-    """Locking belongs to a formula, so `$A$1` and `A1` name the same cell."""
-    assert parseReference("$A$1") == parseReference("A1") == (1, 1)
+def test_aLockedReferenceAddressesTheSameCellAndIsNotTheSameReference() -> None:
+    """`$A$1` and `A1` name one cell, and a table stores it once either way.
+
+    They still compare unequal, because locking is part of what was written. AC 2
+    covers that side; this covers the side a table cares about.
+    """
+    table = onlyTable("11-value-types-noformats")
+    assert CellReference.parse("$A$1").asRowColumn() == (1, 1)
+    assert table.cell("$A$1") is table.cell("A1")
 
 
 def test_aCellKnowsItsOwnReference() -> None:
     table = onlyTable("11-value-types-noformats")
-    assert table.cellAt(1, 9).reference == "I1"
+    assert table.cell("I1").reference == CellReference(1, 9)
 
 
 # ── AC 5: every value type the archive layer reads ───────────────────────────
@@ -135,7 +152,8 @@ def test_everyValueTypeDecodesAsTheFixtureLabelsIt() -> None:
     """Row 1 holds the values; row 2 labels each one in the fixture's own words."""
     table = onlyTable("11-value-types-noformats")
     labels = {
-        column: table.cellAt(2, column).value for column in range(1, 10)
+        column: table.cell(CellReference(2, column)).value
+        for column in range(1, 10)
     }
     assert labels[1] == "plain number 1234.5"
     assert labels[3] == "date june 15 2027"
@@ -175,11 +193,11 @@ def test_aValueRoundTripsThroughStringWithNoDigitsGainedOrLost() -> None:
 def test_aFormulaCellExposesItsCachedResult() -> None:
     """`18-formula-literals` labels each formula in the row beneath its result."""
     table = onlyTable("18-formula-literals")
-    assert table.cellAt(2, 1).value == "1+1"
+    assert table.cell("A2").value == "1+1"
     assert table.cell("A1").value == Decimal("2")
-    assert table.cellAt(2, 3).value == "SUM(1,2,3)"
+    assert table.cell("C2").value == "SUM(1,2,3)"
     assert table.cell("C1").value == Decimal("6")
-    assert table.cellAt(2, 7).value == '"a"&"b"'
+    assert table.cell("G2").value == '"a"&"b"'
     assert table.cell("G1").value == "ab"
 
 
@@ -188,11 +206,12 @@ def test_aFormulaCellExposesItsCachedResult() -> None:
 def test_mergesComeBackFromTheMergeStore() -> None:
     """`22-merge-2x2` carries five merged pairs across row 1, per findings-03."""
     table = onlyTable("22-merge-2x2")
-    anchors = sorted(
-        (merge.anchorRow, merge.anchorCol) for merge in table.mergeRanges
-    )
+    anchors = sorted(merge.anchor.asRowColumn() for merge in table.mergeRanges)
     assert anchors == [(1, 1), (1, 3), (1, 5), (1, 7), (1, 9)]
-    assert all(merge.rowSpan == 1 and merge.colSpan == 2 for merge in table.mergeRanges)
+    assert all(
+        merge.extent.rowSpan == 1 and merge.extent.colSpan == 2
+        for merge in table.mergeRanges
+    )
 
 
 def test_theUnmergedTwinReportsNoMerges() -> None:
@@ -208,10 +227,20 @@ def test_aCoveredCellIsDistinguishableFromAnEmptyOne() -> None:
     consults only the tiles reports a merged table as a table full of holes.
     """
     table = onlyTable("22-merge-2x2")
-    assert (1, 2) not in table.cells
-    assert (2, 8) not in table.cells
-    assert table.mergeCovering(1, 2) is not None
-    assert table.mergeCovering(2, 8) is None
+    assert CellReference.parse("B1") not in table.cells
+    assert CellReference.parse("H2") not in table.cells
+    assert table.mergeCovering("B1") is not None
+    assert table.mergeCovering("H2") is None
+
+
+def test_aCoveredCellIsNotAddressableAndLeavesNoRecord() -> None:
+    """`22-merge-2x2` merges A1:B1, so B1 is swallowed and only A1 addresses it."""
+    table = onlyTable("22-merge-2x2")
+    stored = len(table.cells)
+    with pytest.raises(ReferenceError):
+        table.cell("B1")
+    assert len(table.cells) == stored
+    assert table.cell("A1").value == "Hello"
 
 
 # ── AC 8: the whole corpus reads, and the traps stay caught ──────────────────
@@ -221,9 +250,9 @@ def test_everyCellOfEveryTableReads(path: Path) -> None:
     document = pybers.open(path)
     for sheet in document.sheets:
         for table in sheet.tables:
-            for (row, col), cell in table.cells.items():
-                assert row >= 1 and col >= 1
-                assert cell.row == row and cell.col == col
+            for reference, cell in table.cells.items():
+                assert reference.row >= 1 and reference.col >= 1
+                assert cell.reference == reference
 
 
 def test_aMultiTileTableKeepsItsRowsInOrder() -> None:
@@ -234,11 +263,11 @@ def test_aMultiTileTableKeepsItsRowsInOrder() -> None:
     nothing. Row 2000 saying "row 2000" is what catches that.
     """
     table = onlyTable("27-big-table")
-    rows = sorted({row for row, _ in table.cells})
+    rows = sorted({reference.row for reference in table.cells})
     assert rows == list(range(1, 2002))
     assert table.cell("A1").value == "Label"
-    assert table.cellAt(2002 - 1, 1).value == "row 2000"
-    assert isinstance(table.cellAt(2001, 2).value, Decimal)
+    assert table.cell("A2001").value == "row 2000"
+    assert isinstance(table.cell("B2001").value, Decimal)
 
 
 def test_astralCharactersSurviveTheRead() -> None:

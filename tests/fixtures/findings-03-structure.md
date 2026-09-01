@@ -279,6 +279,36 @@ on each entry is what maps a tile to its row range.
 
 `maxRow` reads 0 on every tile here, confirming again that it is not maintained.
 
+## A table declares its size, and it is often larger than its cells reach
+
+From the whole corpus, measured 2026-09-01.
+
+**`TableModelArchive.number_of_rows` and `number_of_columns` are explicitly set on all 74
+tables**, and they are the table's real size. A Numbers table is a fixed grid rather than the
+endless sheet Excel presents, so an address beyond it names nothing at all rather than naming
+an empty cell.
+
+Deriving the size from the cells that hold something instead returns a real rectangle that is
+too small on **7 of those 74 tables**:
+
+```
+00-baseline                declared=(1, 1)   cells reach=(0, 0)
+20-formula-shapes          declared=(10, 5)  cells reach=(1, 1)
+20-formula-shapes          declared=(10, 5)  cells reach=(1, 1)
+29-style-border            declared=(2, 9)   cells reach=(1, 8)
+30-style-align             declared=(3, 9)   cells reach=(3, 8)
+42-table-titles-captions   declared=(1, 1)   cells reach=(0, 0)
+42-table-titles-captions   declared=(1, 1)   cells reach=(0, 0)
+```
+
+Every gap is ordinary: an empty trailing column, or a 10 by 5 table holding one value. The
+derived rectangle is a perfectly plausible one, which is the usual shape of a mistake in this
+format.
+
+**No cell record anywhere in the corpus falls outside its table's declared size**, so the
+declaration and the tiles agree and the declaration can be read as authoritative rather than
+as a hint to be checked against the data.
+
 ## Sheets hold ordered DRAWABLES, and a table is one of them
 
 From `25-two-tables`, which puts three tables on one sheet.
@@ -395,7 +425,7 @@ every row height, or every column width, by the same factor and writes the resul
 Afterwards a proportional stretch is **indistinguishable** from having typed those heights by
 hand, so the operation cannot be recovered, only its result.
 
-## A table's TITLE is its NAME, and names are forced unique
+## A table's TITLE is its NAME, and names are forced unique per SHEET
 
 From `42-table-titles-captions`. There is no separate title field: what the interface shows
 above a table is **`table_name`**, and `table_name_enabled` is the checkbox that shows it.
@@ -406,10 +436,17 @@ table_name = 'I am a table Title-2'    table_name_enabled ABSENT      title hidd
 ```
 
 The fixture's own cells state the constraint, and the eight table names confirm it:
-**table names must be unique within a document, and uniqueness is enforced
+**table names must be unique within a sheet, and uniqueness is enforced
 case-insensitively**, `I am a Table` and `I AM a TAAble` are treated as the same. Numbers
 appends `-1`, `-2`, `-1-1` to force it. A writer that renames a table has to enforce the same
 rule or it will produce a document Numbers itself would not have written.
+
+**Corrected 2026-09-01: the scope is the sheet, not the document.** This section read "unique
+within a document", generalized from `42`, whose eight tables all sit on one sheet.
+`20-formula-shapes` disproves that reading directly: it carries `Table 1` on Sheet 1 and
+another `Table 1` on Sheet 2, in one document, with `Table 2` alongside the first. So a name
+identifies a table within its own sheet and nowhere wider, and a lookup that takes a table
+name has to be reached through the sheet that holds it.
 
 `table_name_height` is `0.0` throughout, the same "use the default" convention as row heights.
 
