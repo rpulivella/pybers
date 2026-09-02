@@ -19,6 +19,7 @@ than assumed to be a harmless re-encoding.
 
 UPDATES
 2026-09-01  Written for #2, AC 1: the unchanged round trip.
+2026-09-01  Numeric edits, for #2 AC 2, 3, 4 and 6.
 """
 from __future__ import annotations
 
@@ -31,19 +32,44 @@ __status__ = "Development"
 __date__ = "2026/09/01"
 
 import shutil
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
 import pybers
-from pybers.numbersfile import NumbersPackage, readPackage
+from pybers.numbersfile import CellRecord, NumbersPackage, decodeRow, readPackage
 from pybers.numbersfile.types import archiveTypes
-from pybers.model import Document
+from pybers.model import Document, toCellReference
 from pybers.writer import WriteError, writeDocument
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
+
+
+def numericRecords(path: Path) -> list[CellRecord]:
+    """Every numeric cell record in a file, in tile order, for archive-level checks."""
+    from pybers._generated import TSTArchives_pb2 as tst
+
+    records: list[CellRecord] = []
+    for iwaFile in readPackage(path).iwaFiles:
+        for archive in iwaFile.archives:
+            for message in archive.messages:
+                if message.typeId != 6002:
+                    continue
+                tile = tst.Tile()
+                tile.ParseFromString(message.data)
+                for info in tile.rowInfos:
+                    wide = info.has_wide_offsets or tile.should_use_wide_rows
+                    records += [
+                        record
+                        for record in decodeRow(
+                            info.cell_offsets, info.cell_storage_buffer, wide
+                        )
+                        if record.typeByte in (2, 10)
+                    ]
+    return records
 
 
 def messagesAreEquivalent(typeId: int, before: bytes, after: bytes) -> bool:
@@ -251,3 +277,175 @@ def test_writeDocumentIsTheSameCallAsSave(tmp_path: Path) -> None:
     document.save(viaMethod)
 
     assert viaFunction.read_bytes() == viaMethod.read_bytes()
+
+
+# ── AC 2, 3 and 4: a numeric edit reaches its cell and touches nothing else ──
+
+def workingCopy(name: str, tmp_path: Path) -> Path:
+    """Copy a fixture somewhere writable, since a save lands in place by default."""
+    working = tmp_path / f"{name}-edited.numbers"
+    shutil.copy(fixtureDirectory / f"{name}.numbers", working)
+    return working
+
+
+def test_aDecimalWrittenToACellIsThereWhenTheFileIsReopened(tmp_path: Path) -> None:
+    """AC 2 and AC 3 together, which is the pair a caller actually experiences."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("98765.4321")
+    document.save()
+
+    assert pybers.open(working).sheets[0].tables[0].cell("A1").value == Decimal(
+        "98765.4321"
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "0", "-1", "1.50", "0.001", "-98765.4321", "1E+20",
+        "9999999999999999999999999999999999",
+        "3.141592653589793238462643383279502",
+    ],
+)
+def test_noDigitsAreGainedOrLostAcrossTheRoundTrip(text: str, tmp_path: Path) -> None:
+    """AC 3 exactly: the scale survives too, so 1.50 does not come back as 1.5.
+
+    A cell's trailing zeros are how Numbers shows its precision, so a value that
+    round trips numerically but changes scale has still lost something visible.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal(text)
+    document.save()
+
+    written = pybers.open(working).sheets[0].tables[0].cell("A1").value
+    assert written == Decimal(text)
+    assert str(written) == str(Decimal(text)), "the scale moved"
+
+
+def test_oneEditChangesOneArchiveAndLeavesEveryOtherAlone(tmp_path: Path) -> None:
+    """AC 4, by the same comparison AC 1 uses.
+
+    The record is patched in its sixteen value bytes rather than rebuilt, so the
+    tile does not even change length. Everything the model does not represent
+    survives because nothing touched it.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    source = fixtureDirectory / "11-value-types-noformats.numbers"
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("4242.42")
+    document.save()
+
+    differences = archiveDifferences(readPackage(source), readPackage(working))
+    assert len(differences) == 1, (
+        f"expected one changed archive, got {len(differences)}:\n  "
+        + "\n  ".join(differences)
+    )
+    assert "type 6002" in differences[0], "the change was not in a tile"
+
+
+def test_theNeighborsOfAnEditedCellAreUntouched(tmp_path: Path) -> None:
+    """A wrong offset here writes into the wrong cell and raises nothing."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = pybers.open(working).sheets[0].tables[0]
+    expected = {
+        reference: cell.value
+        for reference, cell in before.cells.items()
+        if reference != toCellReference("A1")
+    }
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("4242.42")
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0]
+    for reference, value in expected.items():
+        assert after.cells[reference].value == value, f"{reference} changed"
+
+
+def test_aCellsNumberFormatSurvivesAnEdit(tmp_path: Path) -> None:
+    """The trailing references carry the format, so a rebuilt record would drop it.
+
+    Asserted through the archive rather than the model, because pybers does not read
+    number formats yet and so cannot see the loss from the model side.
+    """
+    source = fixtureDirectory / "12-number-currency.numbers"
+    working = workingCopy("12-number-currency", tmp_path)
+
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    target = next(
+        reference for reference, cell in sorted(table.cells.items(), key=lambda kv: (kv[0].row, kv[0].col))
+        if isinstance(cell.value, Decimal)
+    )
+    table.cells[target].value = Decimal("77.77")
+    document.save()
+
+    beforeRecords = numericRecords(source)
+    afterRecords = numericRecords(working)
+    assert len(beforeRecords) == len(afterRecords)
+    for before, after in zip(beforeRecords, afterRecords):
+        assert before.references == after.references, (
+            "a cell's format references changed, so its formatting was dropped"
+        )
+
+
+# ── AC 6 and its siblings: a write that cannot be correct raises ─────────────
+
+def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
+    """AC 6. The formula and its cached result are separate storage.
+
+    Writing only the result leaves a document whose formula and displayed value
+    disagree until Numbers recalculates, so this refuses instead.
+    """
+    working = workingCopy("18-formula-literals", tmp_path)
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("999")
+
+    with pytest.raises(WriteError, match="backed by a formula"):
+        document.save()
+
+
+def test_aRefusedSaveLeavesTheFileExactlyAsItWas(tmp_path: Path) -> None:
+    """The refusal is worth nothing if half the package has already been written."""
+    working = workingCopy("18-formula-literals", tmp_path)
+    before = working.read_bytes()
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("999")
+    with pytest.raises(WriteError):
+        document.save()
+
+    assert working.read_bytes() == before
+
+
+def test_writingTextIsRefusedRatherThanDropped(tmp_path: Path) -> None:
+    """Text needs the table's pooled string list, which this version does not write."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = "not a number"
+
+    with pytest.raises(WriteError, match="only a Decimal"):
+        document.save()
+
+
+def test_changingACellsTypeIsRefused(tmp_path: Path) -> None:
+    """A number written over a date needs a new record, not a patched one."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    dateCell = next(
+        cell for cell in table.cells.values()
+        if cell.value is not None and not isinstance(cell.value, (Decimal, str, bool))
+    )
+    dateCell.value = Decimal("1")
+
+    with pytest.raises(WriteError, match="Changing a cell's type"):
+        document.save()
