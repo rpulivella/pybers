@@ -415,7 +415,8 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    body = bodyPath.read_text(encoding="utf-8")
+    body, joinedLines = ticket.readBodyFile(bodyPath)
+    ticket.reportUnwrapping(joinedLines)
 
     head = arguments.head or readCurrentBranch()
     if head == arguments.base:
@@ -524,7 +525,8 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return errorExitCode
-        body = bodyPath.read_text(encoding="utf-8")
+        body, joinedLines = ticket.readBodyFile(bodyPath)
+        ticket.reportUnwrapping(joinedLines)
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")

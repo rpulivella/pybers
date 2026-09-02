@@ -90,6 +90,7 @@ __usage__ = "python3 scripts/ticket.py <command> [options]"
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -176,6 +177,103 @@ class GitHubHttpError(RuntimeError):
     def __init__(self, statusCode: int, message: str) -> None:
         super().__init__(message)
         self.statusCode = statusCode
+
+
+# A markdown block opens only when a space follows its marker, so `**bold**:` is
+# ordinary prose rather than a bullet. Getting this wrong splits a bolded paragraph
+# across two lines, which is the exact defect this whole mechanism exists to stop.
+blockOpener = re.compile(r"^(#{1,6} |> |\||```|~~~|:{3})")
+
+# A list item is the one block whose wrapped continuation belongs to it rather than
+# standing alone, so it is matched separately from the openers above.
+listOpener = re.compile(r"^([-*+] |\d+[.)] )")
+
+# The two lines of a ticket body that GitHub links, kept on their own lines because
+# each is a statement rather than part of a paragraph.
+standaloneLines: tuple[str, ...] = ("Link:", "Closes ")
+
+
+def unwrapParagraphs(body: str) -> tuple[str, int]:
+    """Join every hard-wrapped paragraph onto one line, and say how many were joined.
+
+    **GitHub renders an issue, pull request or comment body with GFM hard line breaks
+    turned on**, so a single newline inside a paragraph becomes a `<br>` rather than
+    reflowing. Text wrapped at eighty-eight columns therefore reproduces its own wrap
+    points on screen, at any window width, and a wrapped continuation under a list
+    item breaks the item apart. A `.md` file committed to the repository has the
+    opposite behavior, which is why the same habit is right in `CLAUDE.md` and wrong
+    the moment the text is posted. Both are markdown and both end in `.md`, and that
+    is why this went unnoticed for eighteen tickets.
+
+    Only prose is joined. Headings, list items, tables, block quotes and fenced code
+    are emitted exactly as given, because a newline is meaningful in every one of
+    them. Returning the count keeps the transformation visible: a caller reports it
+    rather than rewriting the author's text in silence.
+    """
+    lines = body.splitlines()
+    out: list[str] = []
+    paragraph: list[str] = []
+    joined = 0
+    inFence = False
+
+    def flush() -> None:
+        nonlocal joined
+        if paragraph:
+            joined += len(paragraph) - 1
+            out.append(" ".join(paragraph))
+            paragraph.clear()
+
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith(("```", "~~~")):
+            flush()
+            inFence = not inFence
+            out.append(line)
+            continue
+        if inFence:
+            out.append(line)
+            continue
+
+        if not stripped or stripped.startswith(standaloneLines):
+            flush()
+            out.append(line)
+            continue
+
+        if listOpener.match(stripped):
+            # A list item opens a paragraph of its own, so its wrapped continuation
+            # joins the item rather than becoming a stray line outside the list.
+            flush()
+            paragraph.append(line.rstrip())
+            continue
+
+        if blockOpener.match(stripped):
+            flush()
+            out.append(line)
+            continue
+
+        paragraph.append(stripped)
+    flush()
+
+    return "\n".join(out) + ("\n" if body.endswith("\n") else ""), joined
+
+
+def readBodyFile(path: Path) -> tuple[str, int]:
+    """Read a drafted body and unwrap it, because it is bound for GitHub.
+
+    Every body this tool posts is destined for GitHub and nowhere else, so it is
+    normalized on the way out rather than left to whoever drafted it to remember.
+    """
+    return unwrapParagraphs(path.read_text(encoding="utf-8"))
+
+
+def reportUnwrapping(joined: int) -> None:
+    """Say what was joined, so the normalization is never a silent rewrite."""
+    if joined:
+        console.print(
+            f"[dim]unwrapped {joined} hard-wrapped line(s); GitHub renders a "
+            f"newline inside a paragraph as a line break[/]"
+        )
 
 
 def readTokenFromSecretsFile() -> str | None:
@@ -673,7 +771,8 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
-    body = bodyPath.read_text(encoding="utf-8")
+    body, joinedLines = readBodyFile(bodyPath)
+    reportUnwrapping(joinedLines)
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was filed.[/]")
@@ -774,7 +873,8 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return 1
-        body = bodyPath.read_text(encoding="utf-8")
+        body, joinedLines = readBodyFile(bodyPath)
+        reportUnwrapping(joinedLines)
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
