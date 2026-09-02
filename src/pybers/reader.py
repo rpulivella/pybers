@@ -312,15 +312,14 @@ def resolveValue(
     assumed: a decoder that stopped returning one would otherwise index the pool
     with something else and hand back None, which reads as an empty cell.
     """
-    pools = {stringKeyType: strings, richTextKeyType: richText}
-    pool = pools.get(record.typeByte)
-    if pool is not None:
+    if record.typeByte in (stringKeyType, richTextKeyType):
         key = record.value
         if not isinstance(key, int):
             raise ReadError(
                 f"A type {record.typeByte} cell holds a key into a pooled list, "
                 f"and this one decoded as {type(key).__name__}."
             )
+        pool = strings if record.typeByte == stringKeyType else richText
         return pool.get(key)
     # Everything the decoder returns beyond a pooled key is already a CellValue:
     # a Decimal, a datetime, a timedelta, a bool, or None for a type it does not
