@@ -134,6 +134,16 @@ def test_aPositionBeyondTheEndSaysHowManyThereAre() -> None:
     assert "3 tables" in str(raised.value)
 
 
+def test_askingAnEmptyContainerSaysNothingIsPresent() -> None:
+    """An empty list still has to produce a sentence, not a dangling colon."""
+    with pytest.raises(SelectionError) as raised:
+        Sheet(name="Empty").table("Anything")
+    assert "Present: nothing." in str(raised.value)
+    with pytest.raises(SelectionError) as raised:
+        Document().sheet("Anything")
+    assert "Present: nothing." in str(raised.value)
+
+
 def test_aTableNameMatchesRegardlessOfCase() -> None:
     """AC 3.i. Numbers treats two table names differing only in case as one name and
     will not create both, stated by the cells of `42-table-titles-captions`, so
