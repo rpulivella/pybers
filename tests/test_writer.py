@@ -41,7 +41,7 @@ import pybers
 from pybers.numbersfile import CellRecord, NumbersPackage, decodeRow, readPackage
 from pybers.numbersfile.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.model import Document, toCellReference
-from pybers.reader import ArchiveIndex, findRoot, tableInfoTypeId
+from pybers.reader import ArchiveIndex, findRoot, readMerges, tableInfoTypeId
 from pybers.writer import (
     WriteError,
     calculationEngineTypeId,
@@ -50,6 +50,7 @@ from pybers.writer import (
 )
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
+from pybers._generated import TSTArchives_pb2 as tst
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -662,6 +663,147 @@ def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
             assert reference.identifier in ownerIds, (
                 f"table archive {reference.identifier} has no owner id"
             )
+
+
+# ── #16: merges written back into the merge store ────────────────────────────
+
+def storedMerges(path: Path) -> list[str]:
+    """Return a table's merges as the file holds them, decoded through the reader."""
+    index = ArchiveIndex(readPackage(path))
+    for sheetReference in findRoot(index).sheets:
+        sheet = index.resolve(sheetReference, tn.SheetArchive)
+        for reference in sheet.drawable_infos:
+            if index.typeOf(reference) != tableInfoTypeId:
+                continue
+            model = index.resolve(
+                index.resolve(reference, tst.TableInfoArchive).tableModel,
+                tst.TableModelArchive,
+            )
+            return [str(merge.extent) for merge in readMerges(model)]
+    return []
+
+
+def rowColumns(path: Path, row: int = 0) -> list[int]:
+    """Return which columns of one row hold a record at all.
+
+    A covered cell has NO record, so this is how a swallowed cell is told from an
+    empty one: the offset slot carries the sentinel and the bytes are gone.
+    """
+    index = ArchiveIndex(readPackage(path))
+    for sheetReference in findRoot(index).sheets:
+        sheet = index.resolve(sheetReference, tn.SheetArchive)
+        for reference in sheet.drawable_infos:
+            if index.typeOf(reference) != tableInfoTypeId:
+                continue
+            model = index.resolve(
+                index.resolve(reference, tst.TableInfoArchive).tableModel,
+                tst.TableModelArchive,
+            )
+            store = model.base_data_store
+            tile = index.resolve(store.tiles.tiles[0].tile, tst.Tile)
+            info = tile.rowInfos[row]
+            wide = info.has_wide_offsets or tile.should_use_wide_rows
+            return sorted(
+                record.column
+                for record in decodeRow(
+                    info.cell_offsets, info.cell_storage_buffer, wide
+                )
+            )
+    return []
+
+
+def test_aMergeSurvivesASaveAndAReopen(tmp_path: Path) -> None:
+    """AC 5, through this library. Numbers itself is the golden's job."""
+    working = workingCopy("22b-merge-2x2-unmerged", tmp_path)
+    document = pybers.open(working)
+    document.sheet(1).table(1).mergeAdd("A1:B1")
+    document.sheet(1).table(1).mergeAdd("C1:D1")
+    document.save()
+
+    assert storedMerges(working) == ["A1:B1", "C1:D1"]
+    reopened = pybers.open(working).sheet(1).table(1)
+    assert [str(merge.extent) for merge in reopened.mergeRanges] == ["A1:B1", "C1:D1"]
+    assert reopened.addressable("B1") is False
+    assert reopened.cell("A1").value == "Hello"
+
+
+def test_aMergeRemovesTheRecordOfEveryCellItSwallows(tmp_path: Path) -> None:
+    """AC 1.i, at the only level where it can be checked.
+
+    `11-value-types-noformats` holds a record in every column of row 1, so merging
+    over one has something to delete. A record left behind would be a cell Numbers
+    never wrote, and no model-level assertion can see it.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    assert rowColumns(working) == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+    document = pybers.open(working)
+    document.sheet(1).table(1).mergeAdd("B1:C1")
+    document.save()
+
+    # Column 2 is C1, the swallowed cell. Its anchor at column 1 stays.
+    assert rowColumns(working) == [0, 1, 3, 4, 5, 6, 7, 8]
+    assert pybers.open(working).sheet(1).table(1).cell("B1").value == Decimal(42)
+
+
+def test_unmergingEmptiesTheStoreAndKeepsIt(tmp_path: Path) -> None:
+    """AC 6, and the SPEC's measurement: `22b` still carries `merge_owner`.
+
+    Deleting the owner rather than emptying it would produce something Numbers does
+    not write, so the archive is asserted rather than only the decoded merges.
+    """
+    working = workingCopy("22-merge-2x2", tmp_path)
+    assert len(storedMerges(working)) == 5
+
+    document = pybers.open(working)
+    table = document.sheet(1).table(1)
+    for merge in list(table.mergeRanges):
+        table.mergeRemove(merge.anchor)
+    document.save()
+
+    assert storedMerges(working) == []
+    index = ArchiveIndex(readPackage(working))
+    for sheetReference in findRoot(index).sheets:
+        sheet = index.resolve(sheetReference, tn.SheetArchive)
+        for reference in sheet.drawable_infos:
+            if index.typeOf(reference) != tableInfoTypeId:
+                continue
+            model = index.resolve(
+                index.resolve(reference, tst.TableInfoArchive).tableModel,
+                tst.TableModelArchive,
+            )
+            assert model.HasField(
+                "merge_owner"
+            ), "merge_owner was removed, not emptied"
+            assert model.merge_owner.formula_store.next_formula_index == 0
+
+
+def test_aMergeWrittenHereMatchesTheOneNumbersWrote(tmp_path: Path) -> None:
+    """Rebuild `22-merge-2x2`'s five merges into its unmerged twin and compare.
+
+    The strongest check available without opening Numbers: the twin fixtures differ
+    only by the merges, so writing them into `22b` should reproduce what `22` holds.
+    """
+    working = workingCopy("22b-merge-2x2-unmerged", tmp_path)
+    document = pybers.open(working)
+    table = document.sheet(1).table(1)
+    for start in "ACEGI":
+        table.mergeAdd(f"{start}1:{chr(ord(start) + 1)}1")
+    document.save()
+
+    assert storedMerges(working) == storedMerges(
+        fixtureDirectory / "22-merge-2x2.numbers"
+    )
+
+
+def test_savingATableWhoseMergesDidNotChangeRewritesNothing(tmp_path: Path) -> None:
+    """The store is compared, not rewritten, so an untouched save stays identical."""
+    working = workingCopy("22-merge-2x2", tmp_path)
+    source = fixtureDirectory / "22-merge-2x2.numbers"
+
+    pybers.open(working).save()
+
+    assert not archiveDifferences(readPackage(source), readPackage(working))
 
 
 def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
