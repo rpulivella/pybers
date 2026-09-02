@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [#14] Reach sheets and tables by name and walk every cell
 - [#2] Write a document back to a .numbers package
 - [#2] Rename pybers.archive to pybers.numbersfile
 - [#2] Fix decimal128 decoding obeying the caller's decimal context
