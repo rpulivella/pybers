@@ -749,11 +749,15 @@ def showTicket(summary: TicketSummary) -> None:
     )
     if summary["assignees"]:
         console.print(f"assigned: [green]{escape(', '.join(summary['assignees']))}[/]")
-    for direction, label in (("blocked_by", "blocked by"), ("blocking", "blocking")):
-        related = summary.get(direction) or []
+    # Indexed directly rather than through a variable key: `TicketSummary` is a
+    # TypedDict, so a non-literal key gives back `object` and the tuple unpacking
+    # below stops being checkable.
+    for related, label, tint in (
+        (summary["blocked_by"], "blocked by", "red"),
+        (summary["blocking"], "blocking", "yellow"),
+    ):
         if related:
             listed = ", ".join(f"#{number} {title}" for number, title in related)
-            tint = "red" if direction == "blocked_by" else "yellow"
             console.print(f"{label}: [{tint}]{escape(listed)}[/]")
     if summary["body"]:
         console.print()

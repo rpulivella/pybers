@@ -372,6 +372,8 @@ def pythonProse(text: str) -> str:
         if docstring is None:
             continue
         body = node.body[0]
+        if not isinstance(body, ast.Expr):
+            continue
         start, end = body.value.lineno, body.value.end_lineno
         lines = text.split("\n")
         offset = sum(len(line) + 1 for line in lines[:start - 1])
@@ -424,6 +426,8 @@ def consoleProse(text: str) -> str:
         for argument in node.args:
             for piece in ast.walk(argument):
                 if not (isinstance(piece, ast.Constant) and isinstance(piece.value, str)):
+                    continue
+                if piece.end_lineno is None or piece.end_col_offset is None:
                     continue
                 if piece.lineno != piece.end_lineno:
                     continue
