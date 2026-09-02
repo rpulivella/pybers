@@ -75,8 +75,8 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
    whether the AC fixes what the artifact must BE or dictates how the code gets
    WRITTEN, and **of ten ACs nine still read from the outside**.
    Each AC is concrete, testable and individually referenceable ("AC 3 fails because…").
-   ACs may nest **one level**, no deeper, `4.a`, `4.b` under `4`. A third level means the
-   parent is really two tickets. **No label may repeat anywhere in the list**.
+   ACs nest **one level**, as `- **4.a**` bullets under `4`, since markdown has no alpha
+   marker. A third level means two tickets. **No label may repeat anywhere**.
 3. **SPEC** (agent · read before building). **Usually absent, and never a plan.** When a
    ticket is written nobody knows yet how it will be built, so anything resembling
    ordered steps is a guess that gets obeyed anyway. Two or three lines at most, holding
