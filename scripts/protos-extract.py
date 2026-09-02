@@ -40,7 +40,8 @@ Usage:
     python3 scripts/protos-extract.py --write --dry-run
 
 Requires rich. protodump additionally requires protobuf and tqdm, and generating
-Python from the dumped schemas requires protoc on PATH.
+Python from the dumped schemas requires protoc on PATH, and the type stubs
+beside it require mypy-protobuf's `protoc-gen-mypy` plugin there too.
 
 UPDATES
 2026-08-16  Pinned encoding on both subprocess calls. text=True alone decodes with the
@@ -330,6 +331,11 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
             "protoc",
             f"--proto_path={schemaSource}",
             f"--python_out={outputDirectory}",
+            # Type stubs come out of the SAME invocation deliberately. Generating
+            # them separately would be a step someone forgets, and a stale stub is
+            # worse than none: it reports errors for fields that do exist. Requires
+            # the `protoc-gen-mypy` plugin from mypy-protobuf on PATH.
+            f"--mypy_out=quiet:{outputDirectory}",
             *[str(path) for path in schemas],
         ],
         capture_output=True,
@@ -346,6 +352,13 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
         raise RuntimeError(f"protoc failed (exit {completed.returncode}).\n{detail}")
 
     generated = sorted(outputDirectory.glob("*_pb2.py"))
+    stubs = {path.stem for path in outputDirectory.glob("*_pb2.pyi")}
+    missing = sorted(path.stem for path in generated if path.stem not in stubs)
+    if missing:
+        raise RuntimeError(
+            f"protoc produced no type stub for {len(missing)} module(s): "
+            f"{', '.join(missing[:5])}. Is protoc-gen-mypy on PATH?"
+        )
     moduleNames = {path.stem for path in generated}
     packagePath = f"{outputDirectory.parent.name}.{outputDirectory.name}"
 
