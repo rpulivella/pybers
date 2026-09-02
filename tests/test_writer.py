@@ -504,6 +504,63 @@ def test_theGoldenFileHoldsWhatItClaimsTo() -> None:
     assert table.cell("I1").value == "Item 1"
 
 
+def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
+    """The same check one sheet wider, driven by `Document.cellsIterate`.
+
+    Every other edit test here changes one table on one sheet, so nothing covered
+    `documentEditsApplied` walking sheets and filtering tables out of each drawable
+    list. That code decides which table an edit lands in, and its failure mode is the
+    format's usual one, a plausible file with the right number in the wrong table.
+
+    Confirmed on 2026-09-02 in Numbers 15.3.1: the file opened with no warning and no
+    repair prompt, and all twelve edits landed in the table they were addressed to. The
+    same confirmation found that Numbers does NOT recalculate the formulas depending on
+    those cells, which is why the guard below asserts the stale cached results rather
+    than the arithmetic. See `tests/golden/README.md`.
+    """
+    golden = goldenDirectory / "20-formula-shapes-multisheet-edited.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = workingCopy("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    for _, _, cell in document.cellsIterate():
+        # Rows 11 and 12 are the formula row and its labels. A formula-backed cell is
+        # refused rather than overwritten, and a label is not a number.
+        if isinstance(cell.value, Decimal) and cell.reference.row <= 10:
+            cell.value = cell.value + Decimal(1000)
+    document.save()
+
+    differences = archiveDifferences(readPackage(golden), readPackage(working))
+    assert not differences, (
+        "the writer no longer produces the confirmed output:\n  "
+        + "\n  ".join(differences)
+    )
+
+
+def test_theMultiSheetGoldenHoldsWhatItClaimsTo() -> None:
+    """Guard the guard, the same way the single-table golden is guarded.
+
+    Asserted per table rather than in one sweep, because the whole point of this
+    golden is which table each edit landed in.
+    """
+    document = pybers.open(
+        goldenDirectory / "20-formula-shapes-multisheet-edited.numbers"
+    )
+
+    first = document.sheet("Sheet 1").table("Table 1")
+    assert [first.cell(f"A{row}").value for row in range(1, 11)] == [
+        Decimal(1000 + row) for row in range(1, 11)
+    ]
+    # Deliberately stale, and confirmed stale on screen: `A11` is `SUM(A1:A10)`, whose
+    # operands now sum to 10055, and Numbers displays the cached 55 after an open.
+    assert first.cell("A12").value == "Typed directly: SUM(A1:A10)"
+    assert first.cell("A11").value == Decimal(55)
+    assert sum(first.cell(f"A{row}").value for row in range(1, 11)) == Decimal(10055)
+
+    assert document.sheet("Sheet 1").table("Table 2").cell("A1").value == Decimal(1042)
+    assert document.sheet("Sheet 2").table("Table 1").cell("A1").value == Decimal(1053)
+
+
 def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     """A save rewrites the archives it read, so a second one has to see the first.
 

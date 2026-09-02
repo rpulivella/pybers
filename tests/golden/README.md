@@ -19,6 +19,28 @@ other when reaching for something to test against.
 | File | Source fixture | Mutation | Confirmed |
 | --- | --- | --- | --- |
 | `11-value-types-noformats-A1-edited.numbers` | `11-value-types-noformats.numbers` | `A1` set to `Decimal("98765.4321")` | 2026-09-01, Numbers 15.3.1 |
+| `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, Numbers 15.3.1 |
+
+The multi-sheet golden exists because every other golden and every other edit test
+covers one table on one sheet, which left `documentEditsApplied` walking sheets and
+filtering tables out of each drawable list with no confirmed file behind it. The
+2026-09-02 confirmation settled that: both tabs are present, `Sheet 1 / Table 1` reads
+1001 down to 1010, `Table 2` on that sheet reads 1042, `Sheet 2 / Table 1` reads 1053,
+and the file opened with no warning and no repair prompt. Twelve edits across three
+tables and two sheets each landed in the table they were addressed to. The copy that
+was opened is not the copy committed here: autosave rewrote it on open, growing it by
+1,574 bytes and renaming `Index/ViewState.iwa`, so it was discarded and the untouched
+output was committed in its place.
+
+**It also measured something new, and the file records it deliberately.** Row 11 of
+`Table 1` still displays 55, 56, 40, `big`, 110, 110, 42 and 53, which are the results
+those formulas cached BEFORE the edit. `A11` reads `SUM(A1:A10)` and shows 55 while
+`A1:A10` now sums to 10055. **Numbers did not recalculate on open**, so the document is
+arithmetically inconsistent on screen and nothing warns about it. Patching a cell's
+value bytes leaves the calculation engine with no reason to know a dependency moved,
+and `findings-02-formulas.md` had recorded that a formula caches its result without
+establishing that opening the file does not refresh it. That is a limitation of the
+write path rather than of this golden, and this file is the evidence for it.
 
 The 2026-09-01 confirmation checked more than the edited cell. Every interactive control
 in the row survived: the checkbox, the three-star rating, the slider at 50, the stepper at

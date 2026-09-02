@@ -10,6 +10,8 @@ deliberate: it is what makes the round-trip contract testable (build a model, wr
 read it back, assert equality) without needing a real .numbers file for every test.
 
 UPDATES
+2026-09-02  The document cell iteration (#14).
+2026-09-02  Sheet and table selection (#14).
 2026-09-01  Addressing added as its own feature area (#9): reference, ranges.
 2026-08-12  Initial scaffold: style, geometry, text, shapes, table, sheet.
 """
@@ -33,7 +35,7 @@ from pybers.model.reference import (
     toCellReference,
 )
 from pybers.model.shapes import GraphicalObject, Image, Shape, TextBox
-from pybers.model.sheet import Sheet, Document
+from pybers.model.sheet import Sheet, SelectionError, Document
 from pybers.model.style import Style
 from pybers.model.table import Cell, CellValue, MergeRange, Table
 from pybers.model.text import Paragraph, RichText, TextRun
@@ -57,6 +59,7 @@ __all__ = [
     "Paragraph",
     "Position",
     "RichText",
+    "SelectionError",
     "Shape",
     "Sheet",
     "Size",
