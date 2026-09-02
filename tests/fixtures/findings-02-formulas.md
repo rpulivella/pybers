@@ -37,6 +37,13 @@ Two consequences. Reading a value never requires evaluating anything, because th
 already stored. And **writing a formula means writing a plausible cached result too**, a
 stale or missing one would display the wrong number until Numbers recalculated.
 
+**Opening the document is not when it recalculates**, measured 2026-09-02 against
+`tests/golden/20-formula-shapes-multisheet-edited.numbers`. That file's `A1:A10` were
+raised to 10055 while `A11`, holding `SUM(A1:A10)`, still displayed the cached 55 after
+a clean open with no warning. So the staleness above is not a transient a writer can
+count on Numbers resolving: it survives on screen, and it reaches every formula
+depending on an edited cell, not only a formula the writer wrote itself.
+
 A failing formula is different: `18` includes `=ROUND(2.5)`, invalid because ROUND needs two
 arguments, and that cell is **type 8** (`formulaErrorCellType`) carrying its formula key in
 the value slot rather than the tail.
