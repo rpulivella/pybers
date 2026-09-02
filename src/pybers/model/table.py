@@ -65,8 +65,9 @@ decimal128Context: Context = Context(prec=34, Emax=6144, Emin=-6143)
 # ranges from 1e-300 to 1e300. It would also mean converting between two number systems
 # on every read and write, which reintroduces exactly the error being avoided.
 #
-# THE FAILURE THIS PREVENTS, and the reason to build values from strings: Decimal(0.1) carries the
-# float's binary error straight in, yielding 0.1000000000000000055511151231257827...
+# THE FAILURE THIS PREVENTS, and the reason to build values from strings:
+# Decimal(0.1) carries the float's binary error straight in, yielding
+# 0.1000000000000000055511151231257827...
 # Decimal("0.1") does not. Never construct a cell value from a float.
 CellValue = (
     Decimal

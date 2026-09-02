@@ -178,7 +178,9 @@ def emitCopy(out: bytearray, offset: int, length: int) -> None:
         shortCopyMinimumLength <= length <= shortCopyMaximumLength
         and offset <= shortCopyMaximumOffset
     ):
-        out.append(((offset >> 8) << 5) | ((length - shortCopyMinimumLength) << 2) | 0x01)
+        out.append(
+            ((offset >> 8) << 5) | ((length - shortCopyMinimumLength) << 2) | 0x01
+        )
         out.append(offset & 0xFF)
         return
     out.append(((length - 1) << 2) | 0x02)
@@ -197,7 +199,10 @@ def matchLength(data: bytes, candidate: int, current: int, limit: int) -> int:
         == data[current + length:current + length + matchStrideLength]
     ):
         length += matchStrideLength
-    while current + length < limit and data[candidate + length] == data[current + length]:
+    while (
+        current + length < limit
+        and data[candidate + length] == data[current + length]
+    ):
         length += 1
     return length
 

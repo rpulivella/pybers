@@ -34,8 +34,9 @@ from pybers.numbersfile.cells import (
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
-# TST.Tile and TST.TableModelArchive. Named here rather than imported because these
-# identifiers are ours, read from the archive, and do not come from a generated constant.
+# TST.Tile and TST.TableModelArchive. Named here rather than imported because
+# these identifiers are ours, read from the archive, and do not come from a
+# generated constant.
 tileTypeId: int = 6002
 tableModelTypeId: int = 6001
 
@@ -103,7 +104,8 @@ def valueRow(name: str) -> dict[int, object]:
 
 
 def testValueTypesFixture() -> None:
-    """Every value type in 11, matching the labels that fixture carries in its own text."""
+    """Every value type in 11, matching the labels that fixture carries in its
+    own text."""
     values = valueRow("11-value-types-noformats")
 
     assert values[0] == Decimal("1234.5")

@@ -99,7 +99,9 @@ def testReadsEveryIWAMember(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", fixtureNames)
-def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(name: str, tmp_path: Path) -> None:
+def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(
+    name: str, tmp_path: Path
+) -> None:
     """Pin the one accepted divergence, so it stays understood rather than drifting.
 
     The zip envelope is not reproduced byte for byte, and that is a decision rather

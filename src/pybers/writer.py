@@ -3,8 +3,8 @@
 Write a `Document` back to a `.numbers` package: the write half of the binding.
 
 The mirror of `pybers.reader`, and it lives outside `pybers.model` for the same
-reason that one does, so that importing the model never drags in the
-persistence layer. `Document.save` reaches this module through a function-local import. See
+reason that one does, so that importing the model never drags in the persistence
+layer. `Document.save` reaches this module through a function-local import. See
 CLAUDE.md, "Document is the single handle".
 
 **Saving mutates the archives that were read rather than building new ones.** A
@@ -150,7 +150,9 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
             f"The record for column {record.column + originOffset} is "
             f"{len(record.raw)} bytes, too short to hold a decimal128 value."
         )
-    return record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
+    return (
+        record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
+    )
 
 
 def rewriteRow(

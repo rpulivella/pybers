@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""pybers, a clean, round-trip-tested library for reading and writing Apple Numbers documents.
+"""pybers, a clean, round-trip-tested library for reading and writing Apple Numbers
+documents.
 
 Built in deep respect for Apple Numbers itself, and standing on the shoulders of
-numbers-parser (https://github.com/masaccio/numbers-parser), whose reverse-engineering of
-Apple's undocumented .numbers archive format is the foundation this project depends on.
-The goal here is for editing a .numbers file programmatically to be as reliable as using
-Numbers by hand, built as a clean, dataclass-based design with a library-and-CLI/TUI split
-and first-class named styles from the start. See CLAUDE.md for the full origin story and
-design contract.
+numbers-parser (https://github.com/masaccio/numbers-parser), whose reverse-engineering
+of Apple's undocumented .numbers archive format is the foundation this project depends
+on. The goal here is for editing a .numbers file programmatically to be as reliable as
+using Numbers by hand, built as a clean, dataclass-based design with a
+library-and-CLI/TUI split and first-class named styles from the start. See CLAUDE.md for
+the full origin story and design contract.
 
 UPDATES
 2026-09-02  SelectionError re-exported (#14).

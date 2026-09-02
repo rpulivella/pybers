@@ -129,7 +129,9 @@ def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[st
             )
             continue
 
-        for beforeArchive, afterArchive in zip(beforeFile.archives, afterFile.archives, strict=True):
+        for beforeArchive, afterArchive in zip(
+            beforeFile.archives, afterFile.archives, strict=True
+        ):
             beforeShape = [(m.typeId, m.version) for m in beforeArchive.messages]
             afterShape = [(m.typeId, m.version) for m in afterArchive.messages]
             if beforeShape != afterShape:
@@ -271,7 +273,9 @@ def test_aFailedSaveLeavesTheExistingFileIntact(
         document.save()
 
     assert working.read_bytes() == before, "a failed save damaged the original"
-    leftovers = [item.name for item in tmp_path.iterdir() if item.name != "precious.numbers"]
+    leftovers = [
+        item.name for item in tmp_path.iterdir() if item.name != "precious.numbers"
+    ]
     assert not leftovers, f"a failed save left {leftovers} behind"
 
 
@@ -410,7 +414,10 @@ def test_aCellsNumberFormatSurvivesAnEdit(tmp_path: Path) -> None:
     document = pybers.open(working)
     table = document.sheets[0].tables[0]
     target = next(
-        reference for reference, cell in sorted(table.cells.items(), key=lambda kv: (kv[0].row, kv[0].col))
+        reference
+        for reference, cell in sorted(
+            table.cells.items(), key=lambda kv: (kv[0].row, kv[0].col)
+        )
         if isinstance(cell.value, Decimal)
     )
     table.cells[target].value = Decimal("77.77")
@@ -619,7 +626,10 @@ def test_theGoldenAsksNumbersToRecalculateTheCellsThatMoved() -> None:
     ]
     marked = {
         entry.owner_id: [
-            (column.column, [(run.range_begin, run.range_end) for run in column.row_set.entries])
+            (
+                column.column,
+                [(run.range_begin, run.range_end) for run in column.row_set.entries],
+            )
             for column in entry.coord_set.column_entries
         ]
         for entry in dirty.to_dirty_cells.owner_entries
@@ -882,12 +892,14 @@ def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("111.11")
     document.save()
-    assert pybers.open(working).sheets[0].tables[0].cell("A1").value == Decimal("111.11")
+    reopened = pybers.open(working).sheets[0].tables[0]
+    assert reopened.cell("A1").value == Decimal("111.11")
 
     # Same handle, edited again.
     document.sheets[0].tables[0].cell("A1").value = Decimal("222.22")
     document.save()
-    assert pybers.open(working).sheets[0].tables[0].cell("A1").value == Decimal("222.22")
+    reopened = pybers.open(working).sheets[0].tables[0]
+    assert reopened.cell("A1").value == Decimal("222.22")
 
     # A fresh handle editing a different cell leaves the first edit alone.
     second = pybers.open(working)
