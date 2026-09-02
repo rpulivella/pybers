@@ -34,7 +34,7 @@ from pathlib import Path
 import pytest
 
 from pybers._generated import TSPArchiveMessages_pb2 as archiveMessages
-from pybers.archive.compression import readVarint
+from pybers.archive.varint import readVarint
 from pybers.archive.iwa import (
     Archive,
     ArchiveMessage,

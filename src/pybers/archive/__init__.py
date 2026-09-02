@@ -39,13 +39,7 @@ from .cells import (
     decodeRow,
 )
 from .decimal128 import Decimal128, Decimal128Error
-from .compression import (
-    SnappyError,
-    compressRaw,
-    decompressRaw,
-    readVarint,
-    writeVarint,
-)
+from .compression import SnappyError, compressRaw, decompressRaw
 from .container import (
     ContainerError,
     MemberInfo,
@@ -56,6 +50,7 @@ from .container import (
     toZipInfo,
     writePackage,
 )
+from .varint import VarintError, readVarint, writeVarint
 from .iwa import (
     Archive,
     ArchiveMessage,
@@ -85,6 +80,7 @@ __all__ = [
     "NumbersPackage",
     "SnappyError",
     "StoredMember",
+    "VarintError",
     "compressPayload",
     "compressRaw",
     "decodeCellValue",

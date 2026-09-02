@@ -16,6 +16,7 @@ each tag boundary.
 
 UPDATES
 2026-09-01  Written for #2, alongside the encoder.
+2026-09-01  Varints moved to test_varint.py with the code they cover.
 """
 from __future__ import annotations
 
@@ -33,13 +34,7 @@ from pathlib import Path
 
 import pytest
 
-from pybers.archive.compression import (
-    SnappyError,
-    compressRaw,
-    decompressRaw,
-    readVarint,
-    writeVarint,
-)
+from pybers.archive.compression import compressRaw, decompressRaw
 from pybers.archive.iwa import splitFrames
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
@@ -57,24 +52,6 @@ def everyFrameOf(path: Path) -> list[bytes]:
             for frame in splitFrames(archive.read(info.filename)):
                 payloads.append(decompressRaw(frame))
     return payloads
-
-
-# ── Varints: the encoder is the stated inverse of the decoder ────────────────
-
-@pytest.mark.parametrize(
-    "value", [0, 1, 127, 128, 129, 300, 16383, 16384, 65535, 2**31, 2**63 - 1]
-)
-def test_aVarintRoundTripsThroughBothHalves(value: int) -> None:
-    encoded = writeVarint(value)
-    decoded, offset = readVarint(encoded, 0)
-    assert decoded == value
-    assert offset == len(encoded), "the decoder consumed a different span"
-
-
-def test_aNegativeVarintIsRefusedRatherThanTruncated() -> None:
-    """There is no negative varint, and a silent wrap would encode a huge length."""
-    with pytest.raises(SnappyError, match="negative"):
-        writeVarint(-1)
 
 
 # ── The identity that matters: whatever is encoded decodes back ──────────────

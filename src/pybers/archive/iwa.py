@@ -45,7 +45,8 @@ __date__ = "2026/08/16"
 from dataclasses import dataclass, field, replace
 
 from .._generated import TSPArchiveMessages_pb2 as archiveMessages
-from .compression import compressRaw, decompressRaw, readVarint, writeVarint
+from .compression import compressRaw, decompressRaw
+from .varint import readVarint, writeVarint
 
 # The frame header is one flag byte plus a three-byte little-endian length.
 frameHeaderLength: int = 4

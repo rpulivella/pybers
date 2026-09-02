@@ -30,6 +30,8 @@ UPDATES
 2026-08-16  Written. Validated against all 213 frames of empty-1/2/3.numbers:
             every frame decoded to exactly its declared uncompressed length.
 2026-09-01  Added the encoder for #2, so a rewritten frame can be stored.
+2026-09-01  Varints moved to pybers.archive.varint, which the IWA archive
+            stream needs as much as this codec does.
 """
 from __future__ import annotations
 
@@ -41,31 +43,11 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/16"
 
+from .varint import readVarint, writeVarint
+
 
 class SnappyError(RuntimeError):
     """A raw Snappy block that could not be decoded."""
-
-
-def readVarint(data: bytes, offset: int) -> tuple[int, int]:
-    """Read one base-128 varint, returning its value and the offset after it.
-
-    Shared with the IWA message reader, which length-prefixes every archive the
-    same way, so the two formats are decoded by one implementation rather than
-    two that could disagree.
-    """
-    value = 0
-    shift = 0
-    while True:
-        if offset >= len(data):
-            raise SnappyError("Varint ran past the end of the buffer.")
-        byte = data[offset]
-        offset += 1
-        value |= (byte & 0x7F) << shift
-        if not byte & 0x80:
-            return value, offset
-        shift += 7
-        if shift > 63:
-            raise SnappyError("Varint is longer than 64 bits.")
 
 
 def decompressRaw(block: bytes) -> bytes:
@@ -157,24 +139,6 @@ minimumMatchLength: int = 4
 # iteration rather than per byte, and the corpus is full of long runs, so
 # comparing a slice at a time is what keeps a rewrite off the critical path.
 matchStrideLength: int = 16
-
-
-def writeVarint(value: int) -> bytes:
-    """Encode a non-negative integer as a base-128 varint.
-
-    The inverse of `readVarint`, and kept beside it so the two cannot drift.
-    """
-    if value < 0:
-        raise SnappyError(f"A varint cannot carry the negative value {value}.")
-    out = bytearray()
-    while True:
-        byte = value & 0x7F
-        value >>= 7
-        if value:
-            out.append(byte | 0x80)
-            continue
-        out.append(byte)
-        return bytes(out)
 
 
 def emitLiteral(out: bytearray, data: bytes, start: int, end: int) -> None:
