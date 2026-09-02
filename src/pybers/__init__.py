@@ -11,7 +11,6 @@ and first-class named styles from the start. See CLAUDE.md for the full origin s
 design contract.
 
 UPDATES
-2026-09-02  CellVisit re-exported (#14).
 2026-09-02  SelectionError re-exported (#14).
 2026-08-12  Initial scaffold.
 """
@@ -31,7 +30,6 @@ from pybers.model import (
     CellRangeList,
     CellReference,
     CellValue,
-    CellVisit,
     RangeAddress,
     ReferenceError,
     columnLetter,
@@ -63,7 +61,6 @@ __all__ = [
     "CellRangeList",
     "CellReference",
     "CellValue",
-    "CellVisit",
     "RangeAddress",
     "ReferenceError",
     "columnLetter",

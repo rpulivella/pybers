@@ -505,7 +505,7 @@ def test_theGoldenFileHoldsWhatItClaimsTo() -> None:
 
 
 def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
-    """The same check one sheet wider, driven by the walk `Document.cellsWalk` gives.
+    """The same check one sheet wider, driven by `Document.cellsIterate`.
 
     Every other edit test here changes one table on one sheet, so nothing covered
     `documentEditsApplied` walking sheets and filtering tables out of each drawable
@@ -523,11 +523,11 @@ def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
 
     working = workingCopy("20-formula-shapes", tmp_path)
     document = pybers.open(working)
-    for visit in document.cellsWalk():
+    for _, _, cell in document.cellsIterate():
         # Rows 11 and 12 are the formula row and its labels. A formula-backed cell is
         # refused rather than overwritten, and a label is not a number.
-        if isinstance(visit.cell.value, Decimal) and visit.cell.reference.row <= 10:
-            visit.cell.value = visit.cell.value + Decimal(1000)
+        if isinstance(cell.value, Decimal) and cell.reference.row <= 10:
+            cell.value = cell.value + Decimal(1000)
     document.save()
 
     differences = archiveDifferences(readPackage(golden), readPackage(working))

@@ -24,7 +24,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
-2026-09-02  The whole-document cell walk, for #14.
+2026-09-02  The whole-document cell iteration, for #14.
 2026-09-02  Reaching a sheet or a table by name or by position, for #14.
 2026-09-01  Document carries the package it was read from, and gained save, for #2.
 2026-08-12  Initial scaffold.
@@ -170,22 +170,6 @@ class Sheet:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class CellVisit:
-    """One cell of a walk, with the table and the sheet holding it.
-
-    The cell alone would not be enough. A cell knows its own reference and nothing
-    else, so two cells at B2 in two different tables are indistinguishable once they
-    leave the table they came from. The sheet is carried for the same reason one step
-    further out: table names repeat across sheets, so a walk reporting only a table
-    name cannot say which `Table 1` it meant.
-    """
-
-    sheet: Sheet
-    table: Table
-    cell: Cell
-
-
 @dataclass(slots=True)
 class Document:
     """The root of the pybers object model, matching Apple's own TN.DocumentArchive.
@@ -213,28 +197,34 @@ class Document:
             self.sheets, nameOrPosition, "sheet", "this document", foldCase=False
         )
 
-    def cellsWalk(self) -> Iterator[CellVisit]:
-        """Walk every cell this document stores, in one defined order.
+    def cellsIterate(self) -> Iterator[tuple[Sheet, Table, Cell]]:
+        """Yield every cell this document stores, in one defined order.
 
         Sheets in document order, tables in sheet order, and cells row by row and
         left to right within each table. The order is stated rather than inherited
-        from a dictionary, because a walk driving an edit has to survive a save and
-        a reopen unchanged.
+        from a dictionary, because an iteration driving an edit has to survive a
+        save and a reopen unchanged. It holds across the whole corpus today without
+        the sort, which is exactly why the sort is here: the format promises nothing
+        about the order records sit in a tile.
 
-        Only cells that exist are visited. A Numbers table is sparse: an empty cell
-        has no record at all, and a cell covered by a merge has none either, so
-        walking stored cells and walking the declared rectangle are two different
-        traversals. `Table.extent` is what turns the second into the first, and it
-        is spelled differently on purpose.
+        Each cell arrives with the table and the sheet holding it, because a cell
+        knows only its own reference and `Table 1` on two sheets is otherwise
+        indistinguishable. A plain tuple rather than a type of its own, since a
+        caller writes `for sheet, table, cell in ...` and there is no fourth thing
+        to carry.
+
+        Only stored cells are yielded. A Numbers table is sparse: an empty cell has
+        no record at all, and a cell covered by a merge has none either, so
+        iterating stored cells and iterating the declared rectangle are two
+        different traversals. `Table.extent` is what turns the second into the
+        first, and it is spelled differently on purpose.
         """
         for sheet in self.sheets:
             for table in sheet.tables:
                 for reference in sorted(
                     table.cells, key=lambda address: address.asRowColumn()
                 ):
-                    yield CellVisit(
-                        sheet=sheet, table=table, cell=table.cells[reference]
-                    )
+                    yield (sheet, table, table.cells[reference])
 
     def save(self, path: Path | str | None = None) -> None:
         """Write this document back to a `.numbers` package, in place by default.

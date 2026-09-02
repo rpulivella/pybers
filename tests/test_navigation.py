@@ -33,7 +33,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from pybers.model import CellVisit, Document, SelectionError, Sheet, Table
+from pybers.model import Cell, Document, SelectionError, Sheet, Table
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -144,6 +144,16 @@ def test_askingAnEmptyContainerSaysNothingIsPresent() -> None:
     assert "Present: nothing." in str(raised.value)
 
 
+def test_askingAnEmptyContainerSaysNothingIsPresent() -> None:
+    """An empty list still has to produce a sentence, not a dangling colon."""
+    with pytest.raises(SelectionError) as raised:
+        Sheet(name="Empty").table("Anything")
+    assert "Present: nothing." in str(raised.value)
+    with pytest.raises(SelectionError) as raised:
+        Document().sheet("Anything")
+    assert "Present: nothing." in str(raised.value)
+
+
 def test_aTableNameMatchesRegardlessOfCase() -> None:
     """AC 3.i. Numbers treats two table names differing only in case as one name and
     will not create both, stated by the cells of `42-table-titles-captions`, so
@@ -189,13 +199,13 @@ def test_theWalkTakesSheetsThenTablesThenRowsThenColumns() -> None:
     """`20-formula-shapes` is two sheets, three tables, and a table whose cells run
     down column A and then across rows 11 and 12."""
     document = fixture("20-formula-shapes")
-    visits = list(document.cellsWalk())
-    assert [visit.sheet.name for visit in visits[:1]] == ["Sheet 1"]
-    assert [visit.sheet.name for visit in visits[-1:]] == ["Sheet 2"]
+    found = list(document.cellsIterate())
+    assert [sheet.name for sheet, _, _ in found[:1]] == ["Sheet 1"]
+    assert [sheet.name for sheet, _, _ in found[-1:]] == ["Sheet 2"]
 
     firstTable = document.sheet(1).table("Table 1")
     references = [
-        str(visit.cell.reference) for visit in visits if visit.table is firstTable
+        str(cell.reference) for _, table, cell in found if table is firstTable
     ]
     assert references == (
         [f"A{row}" for row in range(1, 11)]
@@ -207,9 +217,9 @@ def test_theWalkTakesSheetsThenTablesThenRowsThenColumns() -> None:
 def test_theWalkVisitsTablesInSheetOrder() -> None:
     document = fixture("20-formula-shapes")
     seen: list[tuple[str, str]] = []
-    for visit in document.cellsWalk():
-        if not seen or seen[-1] != (visit.sheet.name, visit.table.name):
-            seen.append((visit.sheet.name, visit.table.name))
+    for sheet, table, _ in document.cellsIterate():
+        if not seen or seen[-1] != (sheet.name, table.name):
+            seen.append((sheet.name, table.name))
     assert seen == [
         ("Sheet 1", "Table 1"),
         ("Sheet 1", "Table 2"),
@@ -223,9 +233,9 @@ def test_aCellArrivesWithTheTableAndSheetHoldingIt() -> None:
     apart in none of the three cases."""
     document = fixture("20-formula-shapes")
     atA1 = [
-        (visit.sheet.name, visit.table.name, visit.cell.value)
-        for visit in document.cellsWalk()
-        if str(visit.cell.reference) == "A1"
+        (sheet.name, table.name, cell.value)
+        for sheet, table, cell in document.cellsIterate()
+        if str(cell.reference) == "A1"
     ]
     assert atA1 == [
         ("Sheet 1", "Table 1", Decimal(1)),
@@ -236,10 +246,10 @@ def test_aCellArrivesWithTheTableAndSheetHoldingIt() -> None:
 
 def test_theVisitedCellIsTheTablesOwnCellAndNotACopy() -> None:
     document = fixture("20-formula-shapes")
-    visit = next(iter(document.cellsWalk()))
-    assert visit.cell is visit.table.cells[visit.cell.reference]
-    assert visit.table is visit.sheet.tables[0]
-    assert isinstance(visit, CellVisit)
+    sheet, table, cell = next(iter(document.cellsIterate()))
+    assert cell is table.cells[cell.reference]
+    assert table is sheet.tables[0]
+    assert isinstance(cell, Cell)
 
 
 def test_theWalkCoversStoredCellsAndNotAnEmptyRectangle() -> None:
@@ -248,7 +258,7 @@ def test_theWalkCoversStoredCellsAndNotAnEmptyRectangle() -> None:
     kind has a record in a tile at all."""
     document = fixture("22-merge-2x2")
     table = document.sheet(1).table(1)
-    visited = [str(visit.cell.reference) for visit in document.cellsWalk()]
+    visited = [str(cell.reference) for _, _, cell in document.cellsIterate()]
     assert len(visited) == len(table.cells) == 18
     assert table.rowCount * table.colCount == 26
     # A1:B1 is merged, so A1 is visited once and B1 not at all.
@@ -257,7 +267,7 @@ def test_theWalkCoversStoredCellsAndNotAnEmptyRectangle() -> None:
 
 def test_aDocumentWithNoTablesWalksNothing() -> None:
     """`34-shape` holds only drawables that are not tables."""
-    assert list(fixture("34-shape").cellsWalk()) == []
+    assert list(fixture("34-shape").cellsIterate()) == []
 
 
 @pytest.mark.parametrize(
@@ -269,9 +279,9 @@ def test_everyFixtureWalksEveryCellItStores(path: Path) -> None:
     stored = sum(
         len(table.cells) for sheet in document.sheets for table in sheet.tables
     )
-    visits = list(document.cellsWalk())
-    assert len(visits) == stored
-    assert len({id(visit.cell) for visit in visits}) == stored
+    found = list(document.cellsIterate())
+    assert len(found) == stored
+    assert len({id(cell) for _, _, cell in found}) == stored
 
 
 # ── AC 6: the walk drives a whole-document edit that survives a save ─────────
@@ -291,31 +301,29 @@ def test_theWalkDrivesAWholeDocumentEditThatSurvivesAReopen(tmp_path: Path) -> N
 
     countBySheet: dict[str, int] = {}
     edited: dict[tuple[str, str, str], Decimal] = {}
-    for visit in document.cellsWalk():
-        countBySheet[visit.sheet.name] = countBySheet.get(visit.sheet.name, 0) + 1
-        if not isinstance(visit.cell.value, Decimal) or visit.cell.reference.row > 10:
+    for sheet, table, cell in document.cellsIterate():
+        countBySheet[sheet.name] = countBySheet.get(sheet.name, 0) + 1
+        if not isinstance(cell.value, Decimal) or cell.reference.row > 10:
             continue
-        replacement = visit.cell.value + Decimal(1000)
-        visit.cell.value = replacement
-        edited[
-            (visit.sheet.name, visit.table.name, str(visit.cell.reference))
-        ] = replacement
+        replacement = cell.value + Decimal(1000)
+        cell.value = replacement
+        edited[(sheet.name, table.name, str(cell.reference))] = replacement
 
     assert countBySheet == {"Sheet 1": 27, "Sheet 2": 1}
     assert len(edited) == 12
     order = [
-        (visit.sheet.name, visit.table.name, str(visit.cell.reference))
-        for visit in document.cellsWalk()
+        (sheet.name, table.name, str(cell.reference))
+        for sheet, table, cell in document.cellsIterate()
     ]
 
     document.save()
     reopened = pybers.open(target)
 
     assert [
-        (visit.sheet.name, visit.table.name, str(visit.cell.reference))
-        for visit in reopened.cellsWalk()
+        (sheet.name, table.name, str(cell.reference))
+        for sheet, table, cell in reopened.cellsIterate()
     ] == order
-    for visit in reopened.cellsWalk():
-        key = (visit.sheet.name, visit.table.name, str(visit.cell.reference))
+    for sheet, table, cell in reopened.cellsIterate():
+        key = (sheet.name, table.name, str(cell.reference))
         if key in edited:
-            assert visit.cell.value == edited[key]
+            assert cell.value == edited[key]
