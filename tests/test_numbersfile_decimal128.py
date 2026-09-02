@@ -28,9 +28,9 @@ from pathlib import Path
 
 import pytest
 
-from pybers.archive import readPackage
-from pybers.archive.cells import decodeRow
-from pybers.archive.decimal128 import (
+from pybers.numbersfile import readPackage
+from pybers.numbersfile.cells import decodeRow
+from pybers.numbersfile.decimal128 import (
     Decimal128,
     Decimal128Error,
     exponentBias,

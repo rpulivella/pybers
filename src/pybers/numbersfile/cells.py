@@ -22,7 +22,7 @@ rounding error into a document that never had any. See `pybers.model.table`.
 UPDATES
 2026-08-18  Written. Decodes numbers, currency, text, dates, booleans and durations,
             verified against fixtures 11 through 14.
-2026-09-01  Moved the decimal128 codec out to pybers.archive.decimal128, which
+2026-09-01  Moved the decimal128 codec out to pybers.numbersfile.decimal128, which
             owns the format's limits and its 16-byte form as a real type. This
             module keeps only Apple's own undocumented cell layout.
 """

@@ -133,7 +133,7 @@ class Table:
     def cell(self, address: CellAddress) -> Cell:
         """Return the cell at an address, creating an empty one on first access.
 
-        A cell absent from the archive is empty rather than missing, so reading one
+        A cell absent from the file is empty rather than missing, so reading one
         inside the grid is not an error and must not shift its neighbors. Two
         addresses name nothing at all and raise instead: one outside the declared
         grid, because a Numbers table is a fixed number of rows and columns rather

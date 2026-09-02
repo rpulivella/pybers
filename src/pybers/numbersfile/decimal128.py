@@ -14,12 +14,12 @@ format's arithmetic rules. Every limit below is derived from it rather than writ
 out, because a hand-derived limit here was wrong once already: an exponent ceiling of
 2^14 - 1 let 1E+7000 encode to a value that read back as 0E-2624.
 
-Its own module because it is not an Apple concept. `pybers.archive.cells` decodes a
+Its own module because it is not an Apple concept. `pybers.numbersfile.cells` decodes a
 layout Apple never published, and this is a published international standard that
 happens to be used there.
 
 UPDATES
-2026-09-01  Extracted from pybers.archive.cells and given a type, for #2.
+2026-09-01  Extracted from pybers.numbersfile.cells and given a type, for #2.
 """
 from __future__ import annotations
 

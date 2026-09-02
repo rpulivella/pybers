@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """\
-The archive layer: reading and writing the `.numbers` container.
+The persistence layer: reading and writing the `.numbers` file on disk.
 
 Split by feature area, matching `pybers.model`: `compression` decodes raw Snappy
 blocks, `iwa` turns a compressed member into archives of raw protobuf messages,
 and `container` handles the zip that holds them. Everything re-exports through
-here so that `pybers.archive.readPackage` stays stable regardless of which module
+here so that `pybers.numbersfile.readPackage` stays stable regardless of which module
 a name lives in.
 
 `compression`, `iwa` and `container` stop at message boundaries on purpose. They

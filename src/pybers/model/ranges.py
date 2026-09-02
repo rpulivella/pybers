@@ -4,7 +4,7 @@
 
 Split from `pybers.model.reference` because only a range has to represent the
 absence of a coordinate. A whole-column reference is a column with no row at all,
-which is how the archive stores it too, and no single-cell address may hold that.
+which is how the file stores it too, and no single-cell address may hold that.
 
 **Unboundedness is absence, never a sentinel.** A range standing in for `A` with
 rows 1 through 1048576 would compare equal to a bounded range that happens to span

@@ -3,10 +3,10 @@
 """\
 Turn a `.numbers` package into the object model: the read half of the binding.
 
-`pybers.archive` reads the container and decodes cell records; `pybers.model`
+`pybers.numbersfile` reads the container and decodes cell records; `pybers.model`
 holds the dataclasses. Neither knows about the other, and this module is what
 joins them. It lives outside `pybers.model` on purpose, so that importing the
-model never drags in the archive layer. See CLAUDE.md, "Document is the single
+model never drags in the persistence layer. See CLAUDE.md, "Document is the
 handle".
 
 Three traps the fixtures established, all of which produce a plausible wrong
@@ -46,8 +46,8 @@ from google.protobuf.message import Message
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSTArchives_pb2 as tst
 from ._generated import TSWPArchives_pb2 as tswp
-from .archive import Archive, NumbersPackage, decodeRow, readPackage
-from .archive.types import archiveTypeId, parseArchive
+from .numbersfile import Archive, NumbersPackage, decodeRow, readPackage
+from .numbersfile.types import archiveTypeId, parseArchive
 from .model import (
     CellRange,
     CellReference,
@@ -58,9 +58,9 @@ from .model import (
     Table,
 )
 
-# The archive counts rows and columns from zero. The model counts from one,
-# because that is what Numbers shows and what a caller means by "row 1". The two
-# systems meet HERE and nowhere else: an archive coordinate never reaches the
+# The stored format counts rows and columns from zero. The model counts from
+# one, because that is what Numbers shows and what a caller means by "row 1". The
+# two systems meet HERE and nowhere else: a stored coordinate never reaches the
 # model, and a model coordinate never reaches a decoder. A design keeping both in
 # one object is how a reader comes to be off by one in only some places.
 originOffset: int = 1
@@ -76,7 +76,7 @@ documentTypeId: int = 1
 tableInfoTypeId: int = 6000
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
-# rather than the value itself. See `pybers.archive.cells`.
+# rather than the value itself. See `pybers.numbersfile.cells`.
 stringKeyType: int = 3
 richTextKeyType: int = 9
 

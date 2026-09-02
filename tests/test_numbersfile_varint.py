@@ -9,7 +9,7 @@ that matters most: every archive in every fixture is reached by reading a varint
 a bad decode desynchronizes the whole stream rather than raising.
 
 UPDATES
-2026-09-01  Split out of test_archive_compression.py with the code it covers.
+2026-09-01  Split out of the Snappy codec's tests with the code they cover.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ __date__ = "2026/09/01"
 
 import pytest
 
-from pybers.archive.varint import VarintError, readVarint, writeVarint
+from pybers.numbersfile.varint import VarintError, readVarint, writeVarint
 
 
 @pytest.mark.parametrize(

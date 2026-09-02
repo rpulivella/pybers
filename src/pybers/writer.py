@@ -4,8 +4,8 @@
 Write a `Document` back to a `.numbers` package: the write half of the binding.
 
 The mirror of `pybers.reader`, and it lives outside `pybers.model` for the same
-reason that one does, so that importing the model never drags in the archive
-layer. `Document.save` reaches this module through a function-local import. See
+reason that one does, so that importing the model never drags in the
+persistence layer. `Document.save` reaches this module through a function-local import. See
 CLAUDE.md, "Document is the single handle".
 
 **Saving mutates the archives that were read rather than building new ones.** A
@@ -31,7 +31,7 @@ __date__ = "2026/09/01"
 import tempfile
 from pathlib import Path
 
-from .archive import NumbersPackage, writePackage
+from .numbersfile import NumbersPackage, writePackage
 from .model import Document
 
 
@@ -85,7 +85,7 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
 
     Reached through `Document.save`, which is the caller-facing spelling. This
     function exists separately so the model layer can stay free of any import of
-    the archive layer.
+    the persistence layer.
     """
     package = document._package
     if package is None:

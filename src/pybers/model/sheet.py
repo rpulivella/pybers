@@ -31,8 +31,8 @@ from pybers.model.shapes import GraphicalObject
 from pybers.model.table import Table
 
 if TYPE_CHECKING:
-    # Guarded so that importing the model never drags in the archive layer.
-    from pybers.archive import NumbersPackage
+    # Guarded so that importing the model never drags in the persistence layer.
+    from pybers.numbersfile import NumbersPackage
 
 
 @dataclass(slots=True)
@@ -49,7 +49,7 @@ class Document:
     """The root of the pybers object model, matching Apple's own TN.DocumentArchive.
 
     Named for the format rather than for the spreadsheet convention: Numbers has no
-    workbook, and calling it one would invent a concept the archive does not carry.
+    workbook, and calling it one would invent a concept the format does not carry.
 
     The two private fields hold the archives this document was read from and its
     origin on disk. Both are excluded from equality and from `repr`, so a Document
@@ -69,7 +69,7 @@ class Document:
         there is no `close` and no context manager to pair with `pybers.open`.
         """
         # Imported here rather than at module scope, because the writer reaches into
-        # `pybers.archive` and the model layer must stay importable without it.
+        # `pybers.numbersfile` and the model layer must stay importable without it.
         from pybers.writer import writeDocument
 
         writeDocument(self, path)

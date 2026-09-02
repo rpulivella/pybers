@@ -1,7 +1,7 @@
 # What the fixtures have established
 
 Findings derived from the `.numbers` files in this directory, each one reproducible by
-reading those files with `pybers.archive`. Recorded so they are not re-derived, and so a
+reading those files with `pybers.numbersfile`. Recorded so they are not re-derived, and so a
 later contradiction is recognizable as a contradiction rather than a surprise.
 
 Split by topic, this file is the index.
