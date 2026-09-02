@@ -186,7 +186,12 @@ blockOpener = re.compile(r"^(#{1,6} |> |\||```|~~~|:{3})")
 
 # A list item is the one block whose wrapped continuation belongs to it rather than
 # standing alone, so it is matched separately from the openers above.
-listOpener = re.compile(r"^([-*+] |\d+[.)] )")
+#
+# The third alternative is this repository's own sub-criterion form, `1.a` and `4.b`,
+# which carries no space after the period and so is invisible to the ordinary list
+# patterns. Without it a sub-criterion is read as prose and joined onto its parent,
+# which silently collapses a nested acceptance criterion into the one above it.
+listOpener = re.compile(r"^([-*+] |\d+[.)] |\d+\.[a-z] )")
 
 # The two lines of a ticket body that GitHub links, kept on their own lines because
 # each is a statement rather than part of a paragraph.
