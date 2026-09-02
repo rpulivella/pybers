@@ -275,8 +275,11 @@ linter will assume. Follow them as written.
   testing that is the explicit point of this project.
 - **`pyproject.toml`, not `requirements.txt`.** A repository that is an application, not
   a package, has no build metadata to publish. A library published to PyPI needs
-  `pyproject.toml`. Dependencies should be exact pins with
-  grouped section comments explaining each one.
+  `pyproject.toml`. **Dependencies are declared as floors, never as exact pins**,
+  corrected 2026-09-02 to match what the file has always done. A library that pins
+  exactly makes itself uninstallable beside anything else that pins the same package
+  differently, and the choice belongs to whoever assembles the environment rather
+  than to a dependency of it. Grouped section comments explain each one.
 
 ## Status
 
