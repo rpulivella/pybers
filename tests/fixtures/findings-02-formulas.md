@@ -44,6 +44,37 @@ a clean open with no warning. So the staleness above is not a transient a writer
 count on Numbers resolving: it survives on screen, and it reaches every formula
 depending on an edited cell, not only a formula the writer wrote itself.
 
+**But a writer can ask for the recalculation, and marking the edited cells is enough.**
+Measured 2026-09-02 for #25. `TSCE.CalculationEngineArchive.refs_to_dirty` points at a
+`TSCE.ReferencesToDirtyArchive` that every clean document carries and every clean
+document serializes to zero bytes. Populating it with the cells that changed, and
+nothing else, makes Numbers recalculate on open:
+
+```
+A11  SUM(A1:A10)                        55  ->  10055
+B11  SUM(A1:A10)+1                      56  ->  10056
+C11  SUMIFS(A1:A10,A1:A10,">5")         40  ->  10055
+E11  =A11*2                            110  ->  20110
+F11  =SUM(A)                           110  ->  20110
+G11  reference into another table       42  ->   1042
+H11  reference into another sheet       53  ->   1053
+```
+
+Two measurements, not one. A **broad** set naming the ten edited operands *and* the eight
+dependent formula cells recalculated all eight. A **minimal** set naming only the twelve
+edited cells across three tables, never mentioning row 11, produced byte-for-byte the same
+eight results. **So Numbers walks its own dependency graph from the cells it is told
+about**, and a writer needs to know only what it wrote. `E11` depends on `A11` rather than
+on any edited cell, and `G11` and `H11` reach into another table and another sheet, so the
+propagation is transitive and crosses owners.
+
+The structure is `to_dirty_owner_ids` (an `IndexSetArchive` of internal owner ids) plus
+`to_dirty_cells`, an `InternalCellRefSetArchive` of per-owner column entries each holding
+a row `IndexSetArchive`. **A table's internal owner id is not stored on the table.** It is
+read the other way round: the `FormulaOwnerDependenciesArchive` whose `owner_kind` is 1 and
+whose `formula_owner` reference points at a `TST.TableInfoArchive` carries the
+`internal_formula_owner_id` for that table.
+
 A failing formula is different: `18` includes `=ROUND(2.5)`, invalid because ROUND needs two
 arguments, and that cell is **type 8** (`formulaErrorCellType`) carrying its formula key in
 the value slot rather than the tail.
