@@ -95,7 +95,7 @@ def carriesFormula(record: CellRecord) -> bool:
     )
 
 
-def valueChecked(cell: Cell, record: CellRecord) -> Decimal:
+def checkedValue(cell: Cell, record: CellRecord) -> Decimal:
     """Return the Decimal to write, or refuse and say exactly what is unsupported.
 
     Three refusals, and every one of them replaces a silent loss. Writing over a
@@ -126,7 +126,7 @@ def valueChecked(cell: Cell, record: CellRecord) -> Decimal:
     return cell.value
 
 
-def recordPatched(record: CellRecord, value: Decimal) -> bytes:
+def patchRecord(record: CellRecord, value: Decimal) -> bytes:
     """Return one cell record with its number replaced and everything else kept.
 
     Only the sixteen value bytes move. The header carries the storage version, the
@@ -142,7 +142,7 @@ def recordPatched(record: CellRecord, value: Decimal) -> bytes:
     return record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
 
 
-def rowRewritten(
+def rewriteRow(
     offsets: bytes, buffer: bytes, wide: bool, replacements: dict[int, bytes]
 ) -> tuple[bytes, bytes]:
     """Rebuild one row's offset array and storage buffer with some records replaced.
@@ -169,7 +169,7 @@ def rowRewritten(
     return bytes(rebuiltOffsets), bytes(rebuiltBuffer)
 
 
-def tableEditsApplied(
+def applyTableEdits(
     index: ArchiveIndex,
     owners: dict[int, IWAFile],
     table: Table,
@@ -216,12 +216,12 @@ def tableEditsApplied(
                     record, strings, richText
                 ):
                     continue
-                replacements[record.column] = recordPatched(
-                    record, valueChecked(cell, record)
+                replacements[record.column] = patchRecord(
+                    record, checkedValue(cell, record)
                 )
             if not replacements:
                 continue
-            rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rowRewritten(
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
                 rowInfo.cell_offsets,
                 rowInfo.cell_storage_buffer,
                 wide,
@@ -260,7 +260,7 @@ def tableOwnerIds(
     return ownerIds
 
 
-def dirtySetBuilt(
+def buildDirtySet(
     edits: dict[int, list[tuple[int, int]]]
 ) -> tsce.ReferencesToDirtyArchive:
     """Return the archive naming every cell that moved, grouped as Numbers groups them.
@@ -294,7 +294,7 @@ def dirtySetBuilt(
     return dirty
 
 
-def recalculationRequested(
+def requestRecalculation(
     index: ArchiveIndex,
     owners: dict[int, IWAFile],
     written: dict[int, list[tuple[int, int]]],
@@ -356,11 +356,11 @@ def recalculationRequested(
         edits.setdefault(ownerId, []).extend(cells)
 
     target = engine.refs_to_dirty.identifier
-    owners[target].messageReplace(target, 0, dirtySetBuilt(edits).SerializeToString())
+    owners[target].messageReplace(target, 0, buildDirtySet(edits).SerializeToString())
     return sum(len(cells) for cells in edits.values())
 
 
-def documentEditsApplied(document: Document, package: NumbersPackage) -> int:
+def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     """Write every changed cell of every table back into the package.
 
     The model is compared against the archives rather than tracked as it is edited.
@@ -384,7 +384,7 @@ def documentEditsApplied(document: Document, package: NumbersPackage) -> int:
         ]
         for table, tableReference in zip(sheet.tables, tableReferences):
             tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
-            cells = tableEditsApplied(
+            cells = applyTableEdits(
                 index,
                 owners,
                 table,
@@ -393,7 +393,7 @@ def documentEditsApplied(document: Document, package: NumbersPackage) -> int:
             if cells:
                 written[tableReference.identifier] = cells
 
-    recalculationRequested(index, owners, written)
+    requestRecalculation(index, owners, written)
     return sum(len(cells) for cells in written.values())
 
 
@@ -452,5 +452,13 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
             "a document from `pybers.open` can be saved; building one from scratch "
             "is not supported yet."
         )
-    documentEditsApplied(document, package)
+    applyDocumentEdits(document, package)
     writeAtomically(package, targetFor(document, path))
+
+
+# `Document.save` reaches `writeDocument` and nothing else, and no other module in
+# `src/` imports from here at all. Everything above exists to get that one function
+# its job done, so it is named for the call site rather than for a caller who does
+# not exist. Stated rather than assumed, because a published package makes every
+# undeclared name someone else's dependency.
+__all__ = ["WriteError", "writeDocument"]

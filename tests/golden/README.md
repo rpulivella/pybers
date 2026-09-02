@@ -22,7 +22,7 @@ other when reaching for something to test against.
 | `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after #25, Numbers 15.3.1 |
 
 The multi-sheet golden exists because every other golden and every other edit test
-covers one table on one sheet, which left `documentEditsApplied` walking sheets and
+covers one table on one sheet, which left `applyDocumentEdits` walking sheets and
 filtering tables out of each drawable list with no confirmed file behind it. The
 2026-09-02 confirmation settled that: both tabs are present, `Sheet 1 / Table 1` reads
 1001 down to 1010, `Table 2` on that sheet reads 1042, `Sheet 2 / Table 1` reads 1053,

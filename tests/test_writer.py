@@ -540,7 +540,7 @@ def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
     """The same check one sheet wider, driven by `Document.cellsIterate`.
 
     Every other edit test here changes one table on one sheet, so nothing covered
-    `documentEditsApplied` walking sheets and filtering tables out of each drawable
+    `applyDocumentEdits` walking sheets and filtering tables out of each drawable
     list. That code decides which table an edit lands in, and its failure mode is the
     format's usual one, a plausible file with the right number in the wrong table.
 
@@ -636,7 +636,7 @@ def test_theGoldenAsksNumbersToRecalculateTheCellsThatMoved() -> None:
 
 @pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
 def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
-    """The guards in `recalculationRequested` rest on this, so it is asserted.
+    """The guards in `requestRecalculation` rest on this, so it is asserted.
 
     A table with no owner id cannot be marked, and the writer refuses the save rather
     than producing a file with stale results. That refusal is unreachable today, and
