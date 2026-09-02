@@ -188,10 +188,17 @@ def test_twoMergesThatDoNotTouchAreBothKept() -> None:
         ("A1:Z1", "reaches outside"),
         ("A1:A9", "reaches outside"),
         ("A1:B1,C1:D1", "names 2"),
+        ("A1:A1", "one cell"),
+        ("A1", "one cell"),
     ],
 )
 def test_aMergeThatCannotBeABlockIsRefused(address: str, reason: str) -> None:
-    """`22b` is 2 rows by 13 columns, so `Z1` and `A9` are both off the grid."""
+    """`22b` is 2 rows by 13 columns, so `Z1` and `A9` are both off the grid.
+
+    A single cell is refused for a different reason: Numbers offers no way to make a
+    one-cell merge, so writing the formula for one would put an unconfirmed construct
+    into the file.
+    """
     table = unmergedTable()
     with pytest.raises(ReferenceError, match=reason):
         table.mergeAdd(address)

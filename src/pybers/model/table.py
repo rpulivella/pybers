@@ -234,7 +234,18 @@ class Table:
         unmerged file too. Leaving them in the model would also write records Numbers
         never had, since a covered cell has no record in a tile at all.
         """
-        merge = MergeRange(self.rangeSingle(address, "merge"))
+        extent = self.rangeSingle(address, "merge")
+        # A single cell is refused because Numbers cannot produce one: no fixture holds
+        # a merge covering one cell and the interface offers no way to make one, so
+        # writing the formula for it would put a construct in the file that has never
+        # been confirmed to open. Declining to invent is not the same as inventing a
+        # rule.
+        if extent.start == extent.end:
+            raise ReferenceError(
+                f"{extent} is one cell, and a merge joins two or more. Numbers has no "
+                "way to make a single-cell merge, so neither does this."
+            )
+        merge = MergeRange(extent)
         # Checked against the whole block before anything is discarded, so a refused
         # merge leaves the table exactly as it was rather than half applied.
         for existing in self.mergeRanges:
@@ -269,10 +280,11 @@ class Table:
     def rangeSingle(self, address: RangeAddress, action: str) -> CellRange:
         """Return the one bounded rectangle an address names, inside this table.
 
-        Shared by everything that acts on a block as a unit, so that "one rectangle,
-        bounded, inside the grid" is checked in one place rather than in each caller.
-        An unbounded range is refused rather than bounded by the table, because a
-        block that follows the grid as it grows is not a block.
+        Split out of `mergeAdd` rather than left inline because it is the whole of
+        what "names a block of this table" means, and reads better named than as
+        twenty lines before the first useful one. An unbounded range is refused rather
+        than bounded by the table, because a block that follows the grid as it grows
+        is not a block.
         """
         ranges = toCellRanges(address)
         if len(ranges) != 1:
