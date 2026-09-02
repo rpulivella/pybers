@@ -123,6 +123,7 @@ __usage__ = "python3 scripts/standards-check.py [--all | PATH ... | --text STRIN
 
 import argparse
 import ast
+import contextlib
 import re
 import subprocess
 import sys
@@ -648,12 +649,10 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
         # character. Concatenating doubles the file and every line number
         # reported from the second view is wrong by the length of the first.
         prose = mergeViews(pythonProse(body), consoleProse(body))
-        try:
+        # A file that does not parse still has comments worth checking, and
+        # reporting the syntax error is ruff's job rather than this gate's.
+        with contextlib.suppress(SyntaxError):
             checkDocstringShape(path, ast.parse(body), findings)
-        except SyntaxError:
-            # A file that does not parse still has comments worth checking, and
-            # reporting the syntax error is ruff's job rather than this gate's.
-            pass
     else:
         prose = markdownProse(body)
 

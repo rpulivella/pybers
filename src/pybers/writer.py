@@ -629,11 +629,13 @@ def writeAtomically(package: NumbersPackage, target: Path) -> None:
     if not directory.is_dir():
         raise WriteError(f"Cannot save to {target}: {directory} is not a directory.")
 
-    handle = tempfile.NamedTemporaryFile(
+    # Opened only to reserve a unique name in the target's own directory, so that
+    # the replace below is atomic on the same filesystem. `delete=False` keeps the
+    # file after the block, and the block is what closes it.
+    with tempfile.NamedTemporaryFile(
         dir=directory, prefix=f".{target.stem}-", suffix=".numbers", delete=False
-    )
-    handle.close()
-    temporary = Path(handle.name)
+    ) as handle:
+        temporary = Path(handle.name)
     try:
         writePackage(package, temporary)
         temporary.replace(target)
