@@ -41,6 +41,11 @@ dev = [
     "ruff>=0.16.0",
     "mypy>=1.11.0",
     "types-protobuf>=5.27.0",
+    # `build` rather than `hatchling`: the backend belongs in [build-system] requires,
+    # where pip installs it into an isolated environment on its own. This is the
+    # front end that drives it, and without it `python3 -m build --wheel` depends on
+    # whatever the machine happens to carry.
+    "build>=1.2.0",
 ]
 
 [tool.pytest.ini_options]
