@@ -69,11 +69,11 @@ extend-exclude = ["src/pybers/_generated", "src/pybers/protos"]
 #   E    pycodestyle errors, which is mostly E501 line-too-long at the 88 columns
 #        this repository already writes to by hand.
 #   I    import ordering, entirely mechanical and entirely auto-fixable.
-#   UP   syntax a supported Python makes obsolete, which mechanises the CLAUDE.md
+#   UP   syntax a supported Python makes obsolete, which enforces the CLAUDE.md
 #        rule about `list[str]` over `typing.List` rather than leaving it to review.
 #   B    bugbear: mutable default arguments, loop variables captured by a closure,
 #        and `zip()` without `strict=`, which silently drops the tail of the longer
-#        argument. That last one is the format's characteristic failure exactly.
+#        argument, which is the silent-wrongness this format specializes in.
 #   SIM  simpler equivalents for constructs that read as more than they are.
 #
 # NOT selected, and why, so nobody adds them thinking it was an oversight:

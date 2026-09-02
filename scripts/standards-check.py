@@ -233,7 +233,7 @@ britishSpellings: tuple[tuple[re.Pattern, str], ...] = (
     (re.compile(r"\btravell(?:ed|ing|er)\b", re.I), "single-l traveled"),
     (re.compile(r"\b(?:recogn|organ|optim|custom|initial|serial|normal|capital"
                 r"|priorit|summar|minim|maxim|util|special|emphas|categor"
-                r"|standard)is(?:e|ed|es|ing|ation|ations)\b", re.I),
+                r"|mechan|standard)is(?:e|ed|es|ing|ation|ations)\b", re.I),
      "-ize / -ization"),
     (re.compile(r"\bgrey(?:s|ed|ing|ish)?\b"), "gray"),
     (re.compile(r"\bcentre(?:s|d)?\b"), "center"),
