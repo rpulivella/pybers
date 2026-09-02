@@ -52,4 +52,4 @@ class Shape(GraphicalObject):
     """A floating vector shape (rectangle, line, arrow, etc.) and its fill/stroke."""
 
     shapeType: str = "rectangle"
-    style: Style = field(default_factory=lambda: __import__("pybers.model.style", fromlist=["Style"]).Style())
+    style: Style = field(default_factory=Style)
