@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 The archive type registry: which generated protobuf class a `typeId` selects.
 

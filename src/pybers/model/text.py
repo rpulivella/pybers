@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Rich text, a run of characters sharing one Style, grouped into paragraphs.
 
 Numbers allows mixed formatting within a single text box or cell (part of a sentence

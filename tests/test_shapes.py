@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Smoke tests for floating graphical objects (text boxes, images, shapes) and the rich
 text primitives a text box's content is made of.
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Writing a document back out, asserted archive by archive against what was read.
 
@@ -38,9 +37,12 @@ from pathlib import Path
 import pytest
 
 import pybers
+from pybers._generated import TNArchives_pb2 as tn
+from pybers._generated import TSCEArchives_pb2 as tsce
+from pybers._generated import TSTArchives_pb2 as tst
+from pybers.model import Document, toCellReference
 from pybers.numbersfile import CellRecord, NumbersPackage, decodeRow, readPackage
 from pybers.numbersfile.types import archiveTypeId, archiveTypes, parseArchive
-from pybers.model import Document, toCellReference
 from pybers.reader import ArchiveIndex, findRoot, readMerges, tableInfoTypeId
 from pybers.writer import (
     WriteError,
@@ -48,9 +50,6 @@ from pybers.writer import (
     tableOwnerIds,
     writeDocument,
 )
-from pybers._generated import TNArchives_pb2 as tn
-from pybers._generated import TSCEArchives_pb2 as tsce
-from pybers._generated import TSTArchives_pb2 as tst
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 

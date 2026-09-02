@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Turn a `.numbers` package into the object model: the read half of the binding.
 
@@ -46,8 +45,6 @@ from google.protobuf.message import Message
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSTArchives_pb2 as tst
 from ._generated import TSWPArchives_pb2 as tswp
-from .numbersfile import Archive, NumbersPackage, decodeRow, readPackage
-from .numbersfile.types import archiveTypeId, parseArchive
 from .model import (
     CellRange,
     CellReference,
@@ -57,6 +54,8 @@ from .model import (
     Sheet,
     Table,
 )
+from .numbersfile import Archive, NumbersPackage, decodeRow, readPackage
+from .numbersfile.types import archiveTypeId, parseArchive
 
 # The stored format counts rows and columns from zero. The model counts from
 # one, because that is what Numbers shows and what a caller means by "row 1". The

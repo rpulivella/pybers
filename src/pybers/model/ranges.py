@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """A rectangle of cells, and a list of rectangles addressed at once.
 
 Split from `pybers.model.reference` because only a range has to represent the

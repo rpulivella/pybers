@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """A table's grid, the cells in it, and the regions merged across it.
 
 Addressing lives in `pybers.model.reference` and `pybers.model.ranges`. Nothing

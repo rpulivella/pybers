@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """A sheet holds tables (row/column grids) and graphical objects (things that float on
 the sheet at an absolute position, text boxes, images, shapes) side by side, since
 Numbers places both on the same sheet independently. A document is a list of sheets.
@@ -44,7 +43,7 @@ __date__ = "2026/09/02"
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol, TypeVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from pybers.model.shapes import GraphicalObject
 from pybers.model.table import Cell, Table

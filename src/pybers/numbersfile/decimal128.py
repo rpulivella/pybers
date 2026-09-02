@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 IEEE-754 decimal128: the type Python does not ship, and its binary interchange form.
 

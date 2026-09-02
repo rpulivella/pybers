@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Reaching a sheet or a table by name or position, and iterating a document's cells.
 

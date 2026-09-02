@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """One cell's address, and the column letter conversion everything else reaches for.
 
 Rectangles live in `pybers.model.ranges`, which imports this module and never the

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Objects that float on a sheet at an absolute position, independent of any table's
 grid, text boxes, images, and vector shapes.
 

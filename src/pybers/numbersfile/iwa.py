@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 IWA files: compressed frames wrapping a stream of length-prefixed archives.
 

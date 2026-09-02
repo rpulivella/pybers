@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Cell decoding, asserted against fixtures whose contents are known independently.
 
@@ -30,7 +29,6 @@ import pytest
 
 from pybers.numbersfile import readPackage
 from pybers.numbersfile.cells import (
-    CellDecodeError,
     decodeRow,
 )
 
@@ -110,7 +108,7 @@ def testValueTypesFixture() -> None:
 
     assert values[0] == Decimal("1234.5")
     assert values[1] == Decimal("42")
-    assert values[2] == datetime.datetime(2027, 6, 15, tzinfo=datetime.timezone.utc)
+    assert values[2] == datetime.datetime(2027, 6, 15, tzinfo=datetime.UTC)
     assert values[3] == datetime.timedelta(minutes=20)
     assert values[4] is True
     # A star rating, a slider and a stepper: interactive controls store ordinary
@@ -151,8 +149,8 @@ def testPercentStoresTheFractionNotTheDisplayedNumber() -> None:
 def testDateTimeLivesInsideTheValue() -> None:
     """A date-time is one number: the time is not a separate field."""
     values = valueRow("14-number-date")
-    midnight = datetime.datetime(2027, 6, 15, tzinfo=datetime.timezone.utc)
-    withTime = datetime.datetime(2027, 6, 15, 11, tzinfo=datetime.timezone.utc)
+    midnight = datetime.datetime(2027, 6, 15, tzinfo=datetime.UTC)
+    withTime = datetime.datetime(2027, 6, 15, 11, tzinfo=datetime.UTC)
 
     assert values[0] == midnight
     assert values[1] == withTime

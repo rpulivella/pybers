@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Base-128 varints, the length prefix two unrelated layers of this format both use.
 

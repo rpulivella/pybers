@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Base-128 varints, checked as an exact inverse pair and against real archive streams.
 

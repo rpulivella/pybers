@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """A1-style addressing: one cell, a rectangle, a list of rectangles.
 
 The round trips here are the point. This format's characteristic failure is a

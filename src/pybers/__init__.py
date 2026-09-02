@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """pybers, a clean, round-trip-tested library for reading and writing Apple Numbers documents.
 
 Built in deep respect for Apple Numbers itself, and standing on the shoulders of
@@ -30,17 +29,14 @@ from pybers.model import (
     CellRangeList,
     CellReference,
     CellValue,
-    RangeAddress,
-    ReferenceError,
-    columnLetter,
-    columnNumber,
-    toCellRanges,
-    toCellReference,
+    Document,
     GraphicalObject,
     Image,
     MergeRange,
     Paragraph,
     Position,
+    RangeAddress,
+    ReferenceError,
     RichText,
     SelectionError,
     Shape,
@@ -50,7 +46,10 @@ from pybers.model import (
     Table,
     TextBox,
     TextRun,
-    Document,
+    columnLetter,
+    columnNumber,
+    toCellRanges,
+    toCellReference,
 )
 from pybers.reader import open
 

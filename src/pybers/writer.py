@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Write a `Document` back to a `.numbers` package: the write half of the binding.
 
@@ -41,7 +40,6 @@ from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
 from .model import Cell, CellRange, CellReference, Document, Table
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
-from .numbersfile.types import archiveTypeId, parseArchive
 from .numbersfile.cells import (
     CellRecord,
     emptyOffsetNarrow,
@@ -49,11 +47,12 @@ from .numbersfile.cells import (
     valueOffset,
 )
 from .numbersfile.decimal128 import Decimal128, encodedLength
+from .numbersfile.types import archiveTypeId, parseArchive
 from .reader import (
     ArchiveIndex,
-    readMerges,
     findRoot,
     originOffset,
+    readMerges,
     readRichTextTable,
     readStringTable,
     resolveValue,

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Cell values: the one part of the format the protobuf schemas do not describe.
 
@@ -39,13 +38,12 @@ __date__ = "2026/08/18"
 import datetime
 import struct
 from dataclasses import dataclass
-from decimal import Decimal
 
 from .decimal128 import Decimal128
 
 # Apple counts dates from 2001-01-01 UTC rather than the Unix epoch.
 appleEpoch: datetime.datetime = datetime.datetime(
-    2001, 1, 1, tzinfo=datetime.timezone.utc
+    2001, 1, 1, tzinfo=datetime.UTC
 )
 
 # Offsets are uint16 unless the row says otherwise, and this value marks a column

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 pybers pull request tool
 
@@ -92,14 +91,13 @@ import urllib.parse
 from pathlib import Path
 from typing import Any, TypedDict
 
-from rich.console import Console
-from rich.markup import escape
-
 # scripts/ is not a package, but Python puts a script's OWN directory at the
 # front of sys.path, so this resolves to scripts/ticket.py and takes precedence
 # over any installed package of the same name. Reused rather than
 # reimplemented so this repository keeps exactly one auth story.
 import ticket
+from rich.console import Console
+from rich.markup import escape
 
 console = Console()
 
