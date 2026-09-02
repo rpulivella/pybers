@@ -37,7 +37,12 @@ from ._generated import TNArchives_pb2 as tn
 from ._generated import TSTArchives_pb2 as tst
 from .model import Cell, CellReference, Document, Table
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
-from .numbersfile.cells import CellRecord, valueOffset
+from .numbersfile.cells import (
+    CellRecord,
+    emptyOffsetNarrow,
+    emptyOffsetWide,
+    valueOffset,
+)
 from .numbersfile.decimal128 import Decimal128, encodedLength
 from .reader import (
     ArchiveIndex,
@@ -139,7 +144,7 @@ def rowRewritten(
     from, so a row with one edit differs in exactly one record.
     """
     width = 4 if wide else 2
-    empty = (1 << (width * 8)) - 1
+    empty = emptyOffsetWide if wide else emptyOffsetNarrow
     slots = len(offsets) // width
     existing = {record.column: record for record in decodeRow(offsets, buffer, wide)}
 
