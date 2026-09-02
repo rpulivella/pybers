@@ -69,6 +69,15 @@ So merge state directly determines whether a formula resolves. The error is not 
 kind (consistent with the finding that error kinds are not stored) it simply becomes an
 error cell and un-becomes one.
 
+**So merging is a recalculation event, and a writer that forgets this ships a wrong
+number.** Added 2026-09-02 from #16: writing the merge store alone leaves `L1` holding
+whatever it resolved to before, so a file merged by this library displayed 0 where the
+error belonged and an unmerged one displayed the error where 0 belonged. Numbers does not
+notice on its own, for the same reason it does not notice an edited operand, see
+`findings-02-formulas.md`. Every position whose merge state changed has to go into
+`refs_to_dirty`, and then Numbers recomputes on open. Both directions are locked in by
+`tests/golden/22b-merged-by-pybers.numbers` and its opposite.
+
 ### ANSWERED: Numbers rewrites merge ranges on a structural edit
 
 `23-row-inserted` takes `22` and inserts rows around the merged row.

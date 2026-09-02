@@ -20,9 +20,11 @@ other when reaching for something to test against.
 | --- | --- | --- | --- |
 | `11-value-types-noformats-A1-edited.numbers` | `11-value-types-noformats.numbers` | `A1` set to `Decimal("98765.4321")` | 2026-09-01, re-confirmed 2026-09-02 after #25, Numbers 15.3.1 |
 | `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after #25, Numbers 15.3.1 |
+| `22b-merged-by-pybers.numbers` | `22b-merge-2x2-unmerged.numbers` | five merges added across row 1 | 2026-09-02, Numbers 15.3.1 |
+| `22-unmerged-by-pybers.numbers` | `22-merge-2x2.numbers` | all five merges removed | 2026-09-02, Numbers 15.3.1 |
 
 The multi-sheet golden exists because every other golden and every other edit test
-covers one table on one sheet, which left `documentEditsApplied` walking sheets and
+covers one table on one sheet, which left `applyDocumentEdits` walking sheets and
 filtering tables out of each drawable list with no confirmed file behind it. The
 2026-09-02 confirmation settled that: both tabs are present, `Sheet 1 / Table 1` reads
 1001 down to 1010, `Table 2` on that sheet reads 1042, `Sheet 2 / Table 1` reads 1053,
@@ -64,6 +66,33 @@ The source fixture labels itself: row 2 describes what each cell of row 1 holds.
 the mutation `A2` still reads "plain number 1234.5" while `A1` holds 98765.4321, which is
 deliberate. The stale label is how a reader confirms at a glance that the edit landed in
 the right cell and that nothing else moved.
+
+## The merge pair, and what it caught
+
+`22b-merged-by-pybers` and `22-unmerged-by-pybers` run the twin fixtures through this
+library in both directions: merges added to the file that had none, and every merge
+removed from the file that had five. Each should end up looking like the twin it was
+built from.
+
+**The first attempt was wrong, and only Numbers could say so.** `L1` holds `=J1`, and
+row 2 labels it "produces cell ref error". Merging `I1:J1` covers `J1` and makes that
+reference invalid; unmerging makes it valid again. So a merge changes what a reference
+means, which changes a result, and the first candidates carried the result from before
+the change: the merged one displayed 0 where an error belonged and the unmerged one
+displayed the error where 0 belonged. `findings-03-structure.md` had recorded that a
+reference to a covered cell is an error and recovers on unmerge; what nobody had drawn
+from it was that merging is therefore a recalculation event. The fix was the mechanism
+#25 had already built.
+
+**Their stored cell types deliberately differ from the twins.** `L1` is type 2 in
+`22-merge-2x2` and type 8 in `22b`, and these two hold the opposite, because this
+library never evaluates a formula. Each carries the result Numbers last computed plus a
+dirty set asking for a fresh one, so reading them back through pybers shows the stale
+type while opening them in Numbers shows the right value. Do not "fix" that.
+
+**They also carry a stale selection.** Numbers saves the last selected range in its view
+state and pybers does not touch it, so each opens with whatever was selected when its
+fixture was made. Cosmetic, and not a statement about anything.
 
 ## Confirming one
 
