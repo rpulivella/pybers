@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """\
-Reaching a sheet or a table by name or position, and walking a whole document's cells.
+Reaching a sheet or a table by name or position, and iterating a document's cells.
 
 Anchored in fixtures the same way `test_document.py` is: a table named `Lower` is
 named that because it sits below the first one, and `20-formula-shapes` carries a
@@ -193,9 +193,9 @@ def test_twoTablesSharingANameSelectNeither() -> None:
     assert "'costs'" in str(raised.value)
 
 
-# ── AC 5: the walk, in a stated order ────────────────────────────────────────
+# ── AC 5: the iteration, in a stated order ───────────────────────────────────
 
-def test_theWalkTakesSheetsThenTablesThenRowsThenColumns() -> None:
+def test_theIterationTakesSheetsThenTablesThenRowsThenColumns() -> None:
     """`20-formula-shapes` is two sheets, three tables, and a table whose cells run
     down column A and then across rows 11 and 12."""
     document = fixture("20-formula-shapes")
@@ -214,7 +214,7 @@ def test_theWalkTakesSheetsThenTablesThenRowsThenColumns() -> None:
     )
 
 
-def test_theWalkVisitsTablesInSheetOrder() -> None:
+def test_theIterationTakesTablesInSheetOrder() -> None:
     document = fixture("20-formula-shapes")
     seen: list[tuple[str, str]] = []
     for sheet, table, _ in document.cellsIterate():
@@ -244,7 +244,7 @@ def test_aCellArrivesWithTheTableAndSheetHoldingIt() -> None:
     ]
 
 
-def test_theVisitedCellIsTheTablesOwnCellAndNotACopy() -> None:
+def test_theYieldedCellIsTheTablesOwnCellAndNotACopy() -> None:
     document = fixture("20-formula-shapes")
     sheet, table, cell = next(iter(document.cellsIterate()))
     assert cell is table.cells[cell.reference]
@@ -252,20 +252,20 @@ def test_theVisitedCellIsTheTablesOwnCellAndNotACopy() -> None:
     assert isinstance(cell, Cell)
 
 
-def test_theWalkCoversStoredCellsAndNotAnEmptyRectangle() -> None:
+def test_theIterationCoversStoredCellsAndNotAnEmptyRectangle() -> None:
     """AC 5.ii. `22-merge-2x2` declares a 2 by 13 grid, 26 positions, and stores 18
     cells: the rest are empty or swallowed by one of its five merges, and neither
     kind has a record in a tile at all."""
     document = fixture("22-merge-2x2")
     table = document.sheet(1).table(1)
-    visited = [str(cell.reference) for _, _, cell in document.cellsIterate()]
-    assert len(visited) == len(table.cells) == 18
+    yielded = [str(cell.reference) for _, _, cell in document.cellsIterate()]
+    assert len(yielded) == len(table.cells) == 18
     assert table.rowCount * table.colCount == 26
-    # A1:B1 is merged, so A1 is visited once and B1 not at all.
-    assert "A1" in visited and "B1" not in visited
+    # A1:B1 is merged, so A1 is yielded once and B1 not at all.
+    assert "A1" in yielded and "B1" not in yielded
 
 
-def test_aDocumentWithNoTablesWalksNothing() -> None:
+def test_aDocumentWithNoTablesYieldsNothing() -> None:
     """`34-shape` holds only drawables that are not tables."""
     assert list(fixture("34-shape").cellsIterate()) == []
 
@@ -273,8 +273,8 @@ def test_aDocumentWithNoTablesWalksNothing() -> None:
 @pytest.mark.parametrize(
     "path", sorted(fixtureDirectory.glob("*.numbers")), ids=lambda path: path.stem
 )
-def test_everyFixtureWalksEveryCellItStores(path: Path) -> None:
-    """The walk is total: across the corpus it reaches every stored cell once."""
+def test_everyFixtureYieldsEveryCellItStores(path: Path) -> None:
+    """Totality: across the corpus every stored cell is yielded exactly once."""
     document = pybers.open(path)
     stored = sum(
         len(table.cells) for sheet in document.sheets for table in sheet.tables
@@ -284,16 +284,16 @@ def test_everyFixtureWalksEveryCellItStores(path: Path) -> None:
     assert len({id(cell) for _, _, cell in found}) == stored
 
 
-# ── AC 6: the walk drives a whole-document edit that survives a save ─────────
+# ── AC 6: the iteration drives an edit that survives a save ─────────────────
 
-def test_theWalkDrivesAWholeDocumentEditThatSurvivesAReopen(tmp_path: Path) -> None:
-    """Read each cell's value and type through the walk, change it, count as it goes,
+def test_theIterationDrivesAnEditThatSurvivesAReopen(tmp_path: Path) -> None:
+    """Read each cell's value and type as it arrives, change it, count as it goes,
     then save and reopen and find the same order and the new values.
 
     Only the typed numbers are edited. Rows 11 and 12 of `Table 1` are the formula
     row and its commentary, and the writer refuses a formula-backed cell rather than
     discarding the formula, which is a stated limit of the write path rather than
-    anything about the walk.
+    anything about the iteration.
     """
     target = tmp_path / "20-formula-shapes.numbers"
     shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", target)
