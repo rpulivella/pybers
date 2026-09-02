@@ -7,6 +7,8 @@ here takes a bare row and column pair, so the only way to name a cell is with an
 address that has already been validated.
 
 UPDATES
+2026-09-02  Merging and unmerging a block of cells (#16). A merge discards
+            the cells it covers, which is measured rather than chosen.
 2026-09-01  Addressing moved out to the reference types (#9). `cellAt(row, col)`
             and the loose reference helpers are gone, and `MergeRange` now carries
             a `CellRange` rather than repeating the span arithmetic itself. A table
@@ -28,7 +30,7 @@ __license__ = "Apache-2.0"
 __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
-__date__ = "2026/08/12"
+__date__ = "2026/09/02"
 
 import datetime
 from dataclasses import dataclass, field
@@ -222,6 +224,76 @@ class Table:
         if self.rowCount < 1 or self.colCount < 1:
             return None
         return CellRange(firstRow, firstColumn, self.rowCount, self.colCount)
+
+    def mergeAdd(self, address: RangeAddress) -> MergeRange:
+        """Merge a block of cells into one, anchored at its top-left, and return it.
+
+        **The covered cells are discarded, permanently, and unmerging does not bring
+        them back.** That is measured rather than chosen: `22-merge-2x2` and its
+        unmerged twin `22b` hold the same 18 cells, so `B1` is absent from the
+        unmerged file too. Leaving them in the model would also write records Numbers
+        never had, since a covered cell has no record in a tile at all.
+        """
+        merge = MergeRange(self.rangeSingle(address, "merge"))
+        # Checked against the whole block before anything is discarded, so a refused
+        # merge leaves the table exactly as it was rather than half applied.
+        for existing in self.mergeRanges:
+            if any(existing.covers(reference) for reference in merge.extent):
+                raise ReferenceError(
+                    f"{merge.extent} overlaps the merge {existing.extent}, and two "
+                    "merges cannot claim the same cell. Remove that one first."
+                )
+        self.mergeRanges.append(merge)
+        for reference in merge.extent:
+            if reference != merge.anchor:
+                self.cells.pop(reference, None)
+        return merge
+
+    def mergeRemove(self, address: CellAddress) -> MergeRange:
+        """Unmerge the block occupying a cell, and return the merge that was removed.
+
+        Takes any cell of the block rather than its extent, because two merges can
+        never claim one cell and the caller usually holds an address rather than a
+        rectangle. Every position the merge covered reads as empty afterward: the
+        values were discarded when it was made, and nothing restores them.
+        """
+        merge = self.mergeCovering(address)
+        if merge is None:
+            raise ReferenceError(
+                f"No merge in {self.name!r} covers "
+                f"{toCellReference(address).asUnlocked()}."
+            )
+        self.mergeRanges.remove(merge)
+        return merge
+
+    def rangeSingle(self, address: RangeAddress, action: str) -> CellRange:
+        """Return the one bounded rectangle an address names, inside this table.
+
+        Shared by everything that acts on a block as a unit, so that "one rectangle,
+        bounded, inside the grid" is checked in one place rather than in each caller.
+        An unbounded range is refused rather than bounded by the table, because a
+        block that follows the grid as it grows is not a block.
+        """
+        ranges = toCellRanges(address)
+        if len(ranges) != 1:
+            raise ReferenceError(
+                f"A {action} covers one block, and {address} names {len(ranges)}."
+            )
+        item = ranges[0]
+        if item.rowsUnbounded or item.colsUnbounded:
+            raise ReferenceError(
+                f"{item} is unbounded, and a {action} covers a fixed block of cells."
+            )
+        extent = self.extent
+        corners = [item.start, item.end]
+        if extent is None or not all(
+            corner is not None and extent.covers(corner) for corner in corners
+        ):
+            raise ReferenceError(
+                f"{item} reaches outside {self.name!r}, which is {self.rowCount} "
+                f"rows by {self.colCount} columns."
+            )
+        return item
 
     def mergeCovering(self, address: CellAddress) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
