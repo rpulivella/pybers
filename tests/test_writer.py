@@ -449,3 +449,56 @@ def test_changingACellsTypeIsRefused(tmp_path: Path) -> None:
 
     with pytest.raises(WriteError, match="Changing a cell's type"):
         document.save()
+
+
+# ── AC 5: the golden file ────────────────────────────────────────────────────
+
+goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
+
+
+def test_aNumericEditMatchesTheGoldenFile(tmp_path: Path) -> None:
+    """AC 5. One mutation against a fixture, compared to a file Numbers accepted.
+
+    Every other test here checks pybers against pybers, which can agree with itself
+    while both halves are wrong. This one compares against output that a human opened
+    in Numbers and confirmed, which is the only check that reaches outside this
+    library. This one was confirmed on 2026-09-01 in Numbers 15.3.1: it opened with no
+    warning and no repair prompt, and every interactive control in the row survived
+    the edit. See `tests/golden/README.md`.
+
+    Compared with `archiveDifferences` rather than byte for byte, because the zip
+    envelope is known to differ by the local extra fields `zipfile` cannot emit.
+    """
+    golden = goldenDirectory / "11-value-types-noformats-A1-edited.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("98765.4321")
+    document.save()
+
+    differences = archiveDifferences(readPackage(golden), readPackage(working))
+    assert not differences, (
+        "the writer no longer produces the confirmed output:\n  "
+        + "\n  ".join(differences)
+    )
+
+
+def test_theGoldenFileHoldsWhatItClaimsTo() -> None:
+    """Guard the guard: a golden that stopped holding the edit would pass silently.
+
+    The test above compares two files this library produced. If the golden were
+    replaced by an unedited copy, that comparison would still pass on the day the
+    writer broke in the same direction, so the golden's own contents are asserted
+    here against the values confirmed on screen on 2026-09-01.
+    """
+    table = pybers.open(
+        goldenDirectory / "11-value-types-noformats-A1-edited.numbers"
+    ).sheets[0].tables[0]
+
+    assert table.cell("A1").value == Decimal("98765.4321")
+    # The label row is deliberately stale, which is how the edit is visible by eye.
+    assert table.cell("A2").value == "plain number 1234.5"
+    assert table.cell("B1").value == Decimal("42")
+    assert table.cell("E1").value is True
+    assert table.cell("I1").value == "Item 1"
