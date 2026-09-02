@@ -85,9 +85,20 @@ one states a fact nobody has.
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
 5. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
-6. **Only on green gates with no unresolved finding**, promote it:
-   `python3 scripts/pr.py ready <N>`. Until #3 lands, "green gates" means the two commands
-   above run clean, and the report says that is what was run.
+6. **Only on green gates with no unresolved finding**, promote it, and move the card in
+   the same breath:
+   ```
+   python3 scripts/pr.py ready <N>
+   python3 scripts/ticket.py status <ticket> --set "Code Review"
+   ```
+   Until #3 lands, "green gates" means the two commands above run clean, and the report
+   says that is what was run.
+
+   **Both, or neither.** Opening a draft PR is allowed mid-work and says nothing about a
+   ticket being reviewable, so the card moves here rather than at `/pr-draft`, at the one
+   moment the pull request stops being a draft. Splitting them across two skills is how
+   #14 sat at `In Progress` with an open pull request. Setting a status that is already
+   set is harmless, so re-running this skill costs nothing.
 
 ## Waiving a stage
 

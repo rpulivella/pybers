@@ -75,11 +75,14 @@ acceptance criteria into tasks.
 The tool is the only sanctioned path. Never hand-run the GitHub API.
 
 ```
-python3 scripts/ticket.py status <N> --set "Code Review"   # PR opened, awaiting review
 python3 scripts/ticket.py close <N> --reason not-planned   # abandoned; Status -> Done, closed unplanned
 ```
 
-Every one of these accepts `--dry-run`.
+`--dry-run` is accepted here and everywhere else the tool is used.
+
+**`Code Review` is not set from this skill**, which has exited long before a pull request
+exists. `/pr-review-code` owns it, and sets it at the moment it takes the pull request out
+of draft, because a draft opened mid-work does not mean a ticket is reviewable.
 
 **Done is not one of them.** The Project's own `Pull request merged` and `Item closed`
 workflows set it, server-side, the moment the pull request lands. Running `close --reason
