@@ -53,13 +53,20 @@ one states a fact nobody has.
    means **do not review**: report every failing stage and its reason verbatim, invoke no
    agent, and stop. Do not soften a machine reason into something friendlier. The one
    exception is a waiver. See below.
-3. **Establish the scope**, which is the changed files and nothing else:
+3. **Move the card, before reviewing anything:**
+   ```
+   python3 scripts/ticket.py status <ticket> --set "Code Review"
+   ```
+   Set when a review starts, not when it passes, so a review that stops on a finding
+   still leaves the board saying what is happening. Re-setting it is harmless.
+
+4. **Establish the scope**, which is the changed files and nothing else:
    ```
    git diff develop...HEAD --stat
    git diff develop...HEAD
    python3 scripts/ticket.py show <ticket>
    ```
-4. **Review against the rubric.** Read `.github/code-review-rubric.md` and answer its six
+5. **Review against the rubric.** Read `.github/code-review-rubric.md` and answer its six
    questions for this change, yourself. **The delegation below is suspended pending #12**,
    and is kept because the selection rule it encodes is the part worth preserving, not
    because it should be run. Do not launch these agents without the user asking.
@@ -83,22 +90,14 @@ one states a fact nobody has.
      dataclass or other new type.
 
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
-5. **Report**, separating what you verified by execution from what you only read. Name
+6. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
-6. **Only on green gates with no unresolved finding**, promote it, and move the card in
-   the same breath:
-   ```
-   python3 scripts/pr.py ready <N>
-   python3 scripts/ticket.py status <ticket> --set "Code Review"
-   ```
-   Until #3 lands, "green gates" means the two commands above run clean, and the report
-   says that is what was run.
+7. **Only on green gates with no unresolved finding**, promote it:
+   `python3 scripts/pr.py ready <N>`. Until #3 lands, "green gates" means the two
+   commands above run clean, and the report says that is what was run.
 
-   **Both, or neither.** Opening a draft PR is allowed mid-work and says nothing about a
-   ticket being reviewable, so the card moves here rather than at `/pr-draft`, at the one
-   moment the pull request stops being a draft. Splitting them across two skills is how
-   #14 sat at `In Progress` with an open pull request. Setting a status that is already
-   set is harmless, so re-running this skill costs nothing.
+   Promotion is the review's outcome; step 3 is its beginning. What draft should mean
+   once CI exists is unsettled and belongs to #12.
 
 ## Waiving a stage
 
