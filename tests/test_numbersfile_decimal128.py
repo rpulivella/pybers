@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 The decimal128 type: its limits, its 16-byte form, and what it refuses.
 

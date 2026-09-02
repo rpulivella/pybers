@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Cell values: the one part of the format the protobuf schemas do not describe.
 
@@ -39,13 +38,12 @@ __date__ = "2026/08/18"
 import datetime
 import struct
 from dataclasses import dataclass
-from decimal import Decimal
 
 from .decimal128 import Decimal128
 
 # Apple counts dates from 2001-01-01 UTC rather than the Unix epoch.
 appleEpoch: datetime.datetime = datetime.datetime(
-    2001, 1, 1, tzinfo=datetime.timezone.utc
+    2001, 1, 1, tzinfo=datetime.UTC
 )
 
 # Offsets are uint16 unless the row says otherwise, and this value marks a column
@@ -110,10 +108,10 @@ def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
     if typeByte == 9:
         # Rich text: a key into the table's RICH_TEXT_PAYLOAD list rather than the
         # string list. Same four-byte shape as a plain string, and that similarity is
-        # exactly what made it dangerous. Before this branch existed the width defaulted to zero,
-        # so the payload key was mistaken for the first trailing reference and every
-        # reference on a rich-text cell was read one slot early. It produced plausible
-        # style keys pointing at the wrong styles, with nothing raising.
+        # exactly what made it dangerous. Before this branch existed the width defaulted
+        # to zero, so the payload key was mistaken for the first trailing reference and
+        # every reference on a rich-text cell was read one slot early. It produced
+        # plausible style keys pointing at the wrong styles, with nothing raising.
         return int.from_bytes(body[:4], "little"), 4
     if typeByte == 5:
         seconds = struct.unpack("<d", body[:8])[0]
@@ -151,7 +149,9 @@ def decodeRecord(column: int, record: bytes) -> CellRecord:
     )
 
 
-def decodeRow(cellOffsets: bytes, storageBuffer: bytes, wideOffsets: bool) -> list[CellRecord]:
+def decodeRow(
+    cellOffsets: bytes, storageBuffer: bytes, wideOffsets: bool
+) -> list[CellRecord]:
     """Decode every populated cell in one row.
 
     The offsets array has a fixed slot per possible column, most of them marked
@@ -161,11 +161,17 @@ def decodeRow(cellOffsets: bytes, storageBuffer: bytes, wideOffsets: bool) -> li
     width = 4 if wideOffsets else 2
     empty = emptyOffsetWide if wideOffsets else emptyOffsetNarrow
     count = len(cellOffsets) // width
-    unpacked = struct.unpack(f"<{count}{'I' if wideOffsets else 'H'}", cellOffsets[:count * width])
+    unpacked = struct.unpack(
+        f"<{count}{'I' if wideOffsets else 'H'}", cellOffsets[:count * width]
+    )
 
     populated = [(column, at) for column, at in enumerate(unpacked) if at != empty]
     records: list[CellRecord] = []
     for index, (column, at) in enumerate(populated):
-        end = populated[index + 1][1] if index + 1 < len(populated) else len(storageBuffer)
+        end = (
+            populated[index + 1][1]
+            if index + 1 < len(populated)
+            else len(storageBuffer)
+        )
         records.append(decodeRecord(column, storageBuffer[at:end]))
     return records

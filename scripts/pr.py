@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 pybers pull request tool
 
@@ -57,15 +56,15 @@ UPDATES
             to be written into the body to count.
 2026-08-17  Round two of the same review. The merge PUT is now guarded as well as the
             branch delete: urllib lets a read-phase TimeoutError through as an OSError
-            and a proxy error page makes json.loads raise ValueError, neither of which is
-            a RuntimeError, so both escaped to exit 1, the code meaning "no pull
+            and a proxy error page makes json.loads raise ValueError, neither of which
+            is a RuntimeError, so both escaped to exit 1, the code meaning "no pull
             request", after a merge that may have landed. main() is broadened for the
-            same reason. A delete answering 404 or 422 is now success, because the ref is
-            already gone whenever the repository deletes head branches automatically, and
-            an alarm that fires on success stops being read. `squash` stays available:
-            the tool serves repositories that permit it, and the prohibition belongs in
-            /pr-review-code, but the usage example teaching it is gone, since permitting
-            and advertising are different acts.
+            same reason. A delete answering 404 or 422 is now success, because the ref
+            is already gone whenever the repository deletes head branches automatically,
+            and an alarm that fires on success stops being read. `squash` stays
+            available: the tool serves repositories that permit it, and the prohibition
+            belongs in /pr-review-code, but the usage example teaching it is gone, since
+            permitting and advertising are different acts.
 2026-08-16  Fixed the four defects a code review found on 2026-08-14, all of them in
             the half of this file that had never executed. A failed branch delete no
             longer reports the completed merge as a failure; `find` says which of
@@ -92,14 +91,13 @@ import urllib.parse
 from pathlib import Path
 from typing import Any, TypedDict
 
-from rich.console import Console
-from rich.markup import escape
-
 # scripts/ is not a package, but Python puts a script's OWN directory at the
 # front of sys.path, so this resolves to scripts/ticket.py and takes precedence
 # over any installed package of the same name. Reused rather than
 # reimplemented so this repository keeps exactly one auth story.
 import ticket
+from rich.console import Console
+from rich.markup import escape
 
 console = Console()
 
@@ -235,7 +233,10 @@ def createDraftPullRequest(
     Always a draft, with no option to open otherwise: draft-versus-ready is a real
     signal in this workflow, and only /pr-review-code may clear it.
     """
-    url = f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}/pulls"
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+        f"{ticket.repositoryName}/pulls"
+    )
     payload = {
         "title": title,
         "body": body,
@@ -243,7 +244,9 @@ def createDraftPullRequest(
         "base": base,
         "draft": True,
     }
-    return summarizePullRequest(ticket.requestJson(url, token, method="POST", payload=payload))
+    return summarizePullRequest(
+        ticket.requestJson(url, token, method="POST", payload=payload)
+    )
 
 
 def findOpenPullRequest(
@@ -275,7 +278,8 @@ def findOpenPullRequest(
     if len(matches) > 1:
         numbers = ", ".join(f"#{match['number']}" for match in matches)
         raise RuntimeError(
-            f"{len(matches)} open pull requests from {head!r} into {base!r}: {numbers}. "
+            f"{len(matches)} open pull requests from {head!r} into {base!r}: "
+            f"{numbers}. "
             "Refusing to choose one. Close the ones that do not belong, or name the "
             "number explicitly."
         )
@@ -401,7 +405,10 @@ def showPullRequest(summary: PullRequestSummary) -> None:
     """Print one pull request, color-coded and unbordered."""
     state = "draft" if summary["isDraft"] else summary["state"]
     tint = "yellow" if summary["isDraft"] else "green"
-    console.print(f"[bold cyan]#{summary['number']}[/] [bold]{escape(summary['title'])}[/]")
+    console.print(
+        f"[bold cyan]#{summary['number']}[/] "
+        f"[bold]{escape(summary['title'])}[/]"
+    )
     console.print(f"[dim]{escape(summary['url'])}[/]")
     console.print(
         f"state: [{tint}]{state}[/]   "
@@ -428,7 +435,9 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     if arguments.dryRun:
         console.print("[yellow]Dry run, no pull request was opened.[/]")
         console.print(f"title: [bold]{escape(arguments.title)}[/]")
-        console.print(f"[magenta]{escape(head)}[/] -> [cyan]{escape(arguments.base)}[/]")
+        console.print(
+            f"[magenta]{escape(head)}[/] -> [cyan]{escape(arguments.base)}[/]"
+        )
         console.print("state: [yellow]draft[/]")
         console.print()
         console.print(body, markup=False, highlight=False)
@@ -610,7 +619,11 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         console.print(f"subject: [bold]{escape(arguments.subject)}[/]")
         console.print(
             "branch:  "
-            + ("[dim]kept[/]" if arguments.keepBranch else f"would delete {summary['head']}")
+            + (
+                "[dim]kept[/]"
+                if arguments.keepBranch
+                else f"would delete {summary['head']}"
+            )
         )
         return 0
 
@@ -685,13 +698,18 @@ def buildParser() -> argparse.ArgumentParser:
     """Assemble the command line, one subcommand per cmd-prefixed handler."""
     parser = argparse.ArgumentParser(
         prog="pr.py",
-        description="Open, inspect, promote and merge pybers pull requests over the GitHub API.",
+        description="Open, inspect, promote and merge pybers pull requests over "
+        "the GitHub API.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     createParser = subparsers.add_parser("create", help="open a draft pull request")
-    createParser.add_argument("--title", required=True, help="pull request title, verbatim")
-    createParser.add_argument("--body-file", dest="bodyFile", required=True, help="drafted body")
+    createParser.add_argument(
+        "--title", required=True, help="pull request title, verbatim"
+    )
+    createParser.add_argument(
+        "--body-file", dest="bodyFile", required=True, help="drafted body"
+    )
     createParser.add_argument(
         "--head", default=None, help="source branch (default: the checked-out branch)"
     )
@@ -703,7 +721,9 @@ def buildParser() -> argparse.ArgumentParser:
     createParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     createParser.set_defaults(handler=cmdCreate)
 
-    findParser = subparsers.add_parser("find", help="print the open pull request for a branch")
+    findParser = subparsers.add_parser(
+        "find", help="print the open pull request for a branch"
+    )
     findParser.add_argument(
         "--head", default=None, help="source branch (default: the checked-out branch)"
     )
@@ -737,7 +757,9 @@ def buildParser() -> argparse.ArgumentParser:
     )
     exportParser.set_defaults(handler=cmdExportAsSource)
 
-    editParser = subparsers.add_parser("edit", help="revise a pull request's title or body")
+    editParser = subparsers.add_parser(
+        "edit", help="revise a pull request's title or body"
+    )
     editParser.add_argument("number", type=int)
     editParser.add_argument("--title", help="replacement title, verbatim")
     editParser.add_argument(

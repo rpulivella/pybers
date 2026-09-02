@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Turn a `.numbers` package into the object model: the read half of the binding.
 
@@ -44,10 +43,9 @@ from typing import TypeVar, cast
 from google.protobuf.message import Message
 
 from ._generated import TNArchives_pb2 as tn
+from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
 from ._generated import TSWPArchives_pb2 as tswp
-from .numbersfile import Archive, NumbersPackage, decodeRow, readPackage
-from .numbersfile.types import archiveTypeId, parseArchive
 from .model import (
     CellRange,
     CellReference,
@@ -57,6 +55,9 @@ from .model import (
     Sheet,
     Table,
 )
+from .numbersfile import Archive, NumbersPackage, decodeRow, readPackage
+from .numbersfile.cells import CellRecord
+from .numbersfile.types import archiveTypeId, parseArchive
 
 # The stored format counts rows and columns from zero. The model counts from
 # one, because that is what Numbers shows and what a caller means by "row 1". The
@@ -119,7 +120,9 @@ class ArchiveIndex:
             )
         return found
 
-    def resolve(self, reference, expected: type[ArchiveT]) -> ArchiveT:
+    def resolve(
+        self, reference: tsp.Reference, expected: type[ArchiveT]
+    ) -> ArchiveT:
         """Parse the archive a `TSP.Reference` points at, as the class named.
 
         The expected class is required rather than inferred, and it is checked.
@@ -137,7 +140,7 @@ class ArchiveIndex:
             )
         return message
 
-    def typeOf(self, reference) -> int:
+    def typeOf(self, reference: tsp.Reference) -> int:
         """Return a reference target's type without parsing it.
 
         Needed for the drawable list, which mixes tables with shapes, images and
@@ -170,7 +173,7 @@ def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
 
 
 def readDataList(
-    index: ArchiveIndex, reference, listType: int
+    index: ArchiveIndex, reference: tsp.Reference, listType: int
 ) -> dict[int, tst.TableDataList.ListEntry]:
     """Return one pooled data list as key to entry.
 
@@ -299,13 +302,25 @@ def readTable(index: ArchiveIndex, tableInfo: tst.TableInfoArchive) -> Table:
 
 
 def resolveValue(
-    record, strings: dict[int, str], richText: dict[int, str]
+    record: CellRecord, strings: dict[int, str], richText: dict[int, str]
 ) -> CellValue:
-    """Return a cell's value, following a pooled key when the record holds one."""
-    if record.typeByte == stringKeyType:
-        return strings.get(record.value)
-    if record.typeByte == richTextKeyType:
-        return richText.get(record.value)
+    """Return a cell's value, following a pooled key when the record holds one.
+
+    `CellRecord.value` is deliberately `object`, because the decoder returns a
+    Decimal for one type byte and an integer key for another. The invariant that a
+    key-bearing type really did decode to an integer is checked here rather than
+    assumed: a decoder that stopped returning one would otherwise index the pool
+    with something else and hand back None, which reads as an empty cell.
+    """
+    if record.typeByte in (stringKeyType, richTextKeyType):
+        key = record.value
+        if not isinstance(key, int):
+            raise ReadError(
+                f"A type {record.typeByte} cell holds a key into a pooled list, "
+                f"and this one decoded as {type(key).__name__}."
+            )
+        pool = strings if record.typeByte == stringKeyType else richText
+        return pool.get(key)
     # Everything the decoder returns beyond a pooled key is already a CellValue:
     # a Decimal, a datetime, a timedelta, a bool, or None for a type it does not
     # recognize. The two key-bearing types are the only integers, and both are

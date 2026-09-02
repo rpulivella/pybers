@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 The IWA write path: rebuilding an archive stream, framing it, and choosing between
 replaying a member and rewriting one.
@@ -34,7 +33,6 @@ from pathlib import Path
 import pytest
 
 from pybers._generated import TSPArchiveMessages_pb2 as archiveMessages
-from pybers.numbersfile.varint import readVarint
 from pybers.numbersfile.iwa import (
     Archive,
     ArchiveMessage,
@@ -49,6 +47,7 @@ from pybers.numbersfile.iwa import (
     writeArchives,
     writeIWAFile,
 )
+from pybers.numbersfile.varint import readVarint
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 

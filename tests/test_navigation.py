@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Reaching a sheet or a table by name or position, and iterating a document's cells.
 
@@ -132,16 +131,6 @@ def test_aPositionBeyondTheEndSaysHowManyThereAre() -> None:
     with pytest.raises(SelectionError) as raised:
         sheet.table(4)
     assert "3 tables" in str(raised.value)
-
-
-def test_askingAnEmptyContainerSaysNothingIsPresent() -> None:
-    """An empty list still has to produce a sentence, not a dangling colon."""
-    with pytest.raises(SelectionError) as raised:
-        Sheet(name="Empty").table("Anything")
-    assert "Present: nothing." in str(raised.value)
-    with pytest.raises(SelectionError) as raised:
-        Document().sheet("Anything")
-    assert "Present: nothing." in str(raised.value)
 
 
 def test_askingAnEmptyContainerSaysNothingIsPresent() -> None:

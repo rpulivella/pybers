@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 The `.numbers` document container: a zip of IWA members and supporting files.
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Appearance, the properties shared by cells, shapes, and text runs.
 
 UPDATES

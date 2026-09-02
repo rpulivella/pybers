@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 pybers protobuf schema bootstrap
 
@@ -35,13 +34,15 @@ rather than a silent divergence.
 
 Usage:
     python3 scripts/protos-extract.py
-    python3 scripts/protos-extract.py --numbers "/Applications/Numbers Creator Studio.app"
+    python3 scripts/protos-extract.py \
+        --numbers "/Applications/Numbers Creator Studio.app"
     python3 scripts/protos-extract.py --protodump ~/.local/share/protodump/protodump.py
     python3 scripts/protos-extract.py --write
     python3 scripts/protos-extract.py --write --dry-run
 
 Requires rich. protodump additionally requires protobuf and tqdm, and generating
-Python from the dumped schemas requires protoc on PATH.
+Python from the dumped schemas requires protoc on PATH, and the type stubs
+beside it require mypy-protobuf's `protoc-gen-mypy` plugin there too.
 
 UPDATES
 2026-08-16  Pinned encoding on both subprocess calls. text=True alone decodes with the
@@ -165,7 +166,8 @@ def readBundleIdentity(bundlePath: Path) -> NumbersApplication | None:
 
 
 def locateNumbers(requestedPath: Path | None) -> NumbersApplication:
-    """Find the Numbers install to dump from, searching only if it is not where expected.
+    """Find the Numbers install to dump from, searching only if it is not where
+    expected.
 
     An explicit --numbers path is trusted and its failure is loud. Otherwise the usual
     location is tried first, then every application bundle is inspected, because the
@@ -234,7 +236,12 @@ def runProtodump(
     """
     outputDirectory.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
-        [sys.executable, str(protodumpPath), str(application.bundlePath), str(outputDirectory)],
+        [
+            sys.executable,
+            str(protodumpPath),
+            str(application.bundlePath),
+            str(outputDirectory),
+        ],
         capture_output=True,
         # text=True alone decodes with the ambient locale, so the same run under a
         # cron or launchd context with no LANG turns an em-dash in protodump's own
@@ -248,7 +255,8 @@ def runProtodump(
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "").strip()
         raise RuntimeError(
-            f"protodump failed (exit {completed.returncode}). Its own message follows.\n{detail}"
+            f"protodump failed (exit {completed.returncode}). Its own message "
+            f"follows.\n{detail}"
         )
 
 
@@ -276,14 +284,18 @@ def normalizeSchemaNames(directory: Path) -> int:
         original = schemaPath.read_text(encoding="utf-8", errors="replace")
         rewritten = original
         for oldName, newName in replacements.items():
-            rewritten = rewritten.replace(f'import "{oldName}";', f'import "{newName}";')
+            rewritten = rewritten.replace(
+                f'import "{oldName}";', f'import "{newName}";'
+            )
         if rewritten != original:
             schemaPath.write_text(rewritten, encoding="utf-8")
 
     return len(replacements)
 
 
-def compareSchemas(extractedDirectory: Path, referenceDirectory: Path) -> SchemaComparison:
+def compareSchemas(
+    extractedDirectory: Path, referenceDirectory: Path
+) -> SchemaComparison:
     """Compare two directories of .proto files by name and by content.
 
     This is the point of the default run: a dump matching the vendored schemas
@@ -331,6 +343,11 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
             "protoc",
             f"--proto_path={schemaSource}",
             f"--python_out={outputDirectory}",
+            # Type stubs come out of the SAME invocation deliberately. Generating
+            # them separately would be a step someone forgets, and a stale stub is
+            # worse than none: it reports errors for fields that do exist. Requires
+            # the `protoc-gen-mypy` plugin from mypy-protobuf on PATH.
+            f"--mypy_out=quiet:{outputDirectory}",
             *[str(path) for path in schemas],
         ],
         capture_output=True,
@@ -347,6 +364,13 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
         raise RuntimeError(f"protoc failed (exit {completed.returncode}).\n{detail}")
 
     generated = sorted(outputDirectory.glob("*_pb2.py"))
+    stubs = {path.stem for path in outputDirectory.glob("*_pb2.pyi")}
+    missing = sorted(path.stem for path in generated if path.stem not in stubs)
+    if missing:
+        raise RuntimeError(
+            f"protoc produced no type stub for {len(missing)} module(s): "
+            f"{', '.join(missing[:5])}. Is protoc-gen-mypy on PATH?"
+        )
     moduleNames = {path.stem for path in generated}
     packagePath = f"{outputDirectory.parent.name}.{outputDirectory.name}"
 
@@ -369,7 +393,10 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
 
 def showApplication(application: NumbersApplication) -> None:
     """Print the located Numbers install."""
-    console.print(f"[bold]Numbers {application.version}[/] [dim](build {application.build})[/]")
+    console.print(
+        f"[bold]Numbers {application.version}[/] "
+        f"[dim](build {application.build})[/]"
+    )
     console.print(f"  bundle     [cyan]{escape(str(application.bundlePath))}[/]")
     console.print(f"  identifier [dim]{application.bundleIdentifier}[/]")
 
@@ -395,7 +422,8 @@ def showComparison(comparison: SchemaComparison) -> None:
 
 
 def cmdExtract(arguments: argparse.Namespace) -> int:
-    """Dump the schemas, compare them with the reference set, and optionally commit them."""
+    """Dump the schemas, compare them with the reference set, and optionally
+    commit them."""
     application = locateNumbers(Path(arguments.numbers) if arguments.numbers else None)
     protodumpPath = resolveProtodumpPath(
         Path(arguments.protodump) if arguments.protodump else None
@@ -479,7 +507,8 @@ def buildParser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--write",
         action="store_true",
-        help="copy the dumped schemas into the repository (default is a read-only report)",
+        help="copy the dumped schemas into the repository "
+        "(default is a read-only report)",
     )
     parser.add_argument("--dry-run", dest="dryRun", action="store_true")
     parser.set_defaults(handler=cmdExtract)

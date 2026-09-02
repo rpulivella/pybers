@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Standards Check
 
@@ -124,6 +123,7 @@ __usage__ = "python3 scripts/standards-check.py [--all | PATH ... | --text STRIN
 
 import argparse
 import ast
+import contextlib
 import re
 import subprocess
 import sys
@@ -233,7 +233,8 @@ britishSpellings: tuple[tuple[re.Pattern, str], ...] = (
     (re.compile(r"\btravell(?:ed|ing|er)\b", re.I), "single-l traveled"),
     (re.compile(r"\b(?:recogn|organ|optim|custom|initial|serial|normal|capital"
                 r"|priorit|summar|minim|maxim|util|special|emphas|categor"
-                r"|standard)is(?:e|ed|es|ing|ation|ations)\b", re.I), "-ize / -ization"),
+                r"|mechan|standard)is(?:e|ed|es|ing|ation|ations)\b", re.I),
+     "-ize / -ization"),
     (re.compile(r"\bgrey(?:s|ed|ing|ish)?\b"), "gray"),
     (re.compile(r"\bcentre(?:s|d)?\b"), "center"),
 )
@@ -373,6 +374,8 @@ def pythonProse(text: str) -> str:
         if docstring is None:
             continue
         body = node.body[0]
+        if not isinstance(body, ast.Expr):
+            continue
         start, end = body.value.lineno, body.value.end_lineno
         lines = text.split("\n")
         offset = sum(len(line) + 1 for line in lines[:start - 1])
@@ -424,7 +427,12 @@ def consoleProse(text: str) -> str:
             continue
         for argument in node.args:
             for piece in ast.walk(argument):
-                if not (isinstance(piece, ast.Constant) and isinstance(piece.value, str)):
+                if not (
+                    isinstance(piece, ast.Constant)
+                    and isinstance(piece.value, str)
+                ):
+                    continue
+                if piece.end_lineno is None or piece.end_col_offset is None:
                     continue
                 if piece.lineno != piece.end_lineno:
                     continue
@@ -440,7 +448,7 @@ def consoleProse(text: str) -> str:
 
 def mergeViews(first: str, second: str) -> str:
     """Combine two blanked views of one file, keeping offsets intact."""
-    return "".join(a if a != " " else b for a, b in zip(first, second))
+    return "".join(a if a != " " else b for a, b in zip(first, second, strict=True))
 
 
 def markdownProse(text: str) -> str:
@@ -539,7 +547,8 @@ def checkWeakLet(path: Path, prose: str, findings: list) -> None:
         if letCarveOut.match(prose, match.start()):
             continue
         findings.append(("WARN", path, lineNo(prose, match.start()),
-                         f"weak '{match.group(0)}', prefer enables / gives the ability"))
+                         f"weak '{match.group(0)}', prefer enables / gives the "
+                         "ability"))
 
 
 def checkSplitVerb(path: Path, prose: str, findings: list) -> None:
@@ -596,7 +605,8 @@ def checkHardBreak(path: Path, text: str, findings: list) -> None:
             continue
         if line.strip() and line.endswith("  "):
             findings.append(("FAIL", path, index,
-                             "line ends in trailing spaces, rendering as a forced <br>"))
+                             "line ends in trailing spaces, rendering as a "
+                             "forced <br>"))
 
 
 def checkSemicolons(path: Path, prose: str, findings: list) -> None:
@@ -645,12 +655,10 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
         # character. Concatenating doubles the file and every line number
         # reported from the second view is wrong by the length of the first.
         prose = mergeViews(pythonProse(body), consoleProse(body))
-        try:
+        # A file that does not parse still has comments worth checking, and
+        # reporting the syntax error is ruff's job rather than this gate's.
+        with contextlib.suppress(SyntaxError):
             checkDocstringShape(path, ast.parse(body), findings)
-        except SyntaxError:
-            # A file that does not parse still has comments worth checking, and
-            # reporting the syntax error is ruff's job rather than this gate's.
-            pass
     else:
         prose = markdownProse(body)
 
@@ -678,7 +686,10 @@ def collectFiles(arguments: argparse.Namespace, warnings: list) -> list[Path]:
             if candidate.is_dir():
                 for child in sorted(candidate.rglob("*")):
                     if child.suffix in checkExtensions and child.is_file() \
-                            and not any(marker in child.as_posix() for marker in generatedOnly):
+                            and not any(
+                                marker in child.as_posix()
+                                for marker in generatedOnly
+                            ):
                         found.append(child)
             elif candidate.is_file():
                 found.append(candidate)
@@ -707,13 +718,19 @@ def collectFiles(arguments: argparse.Namespace, warnings: list) -> list[Path]:
     for command in (["git", "diff", "--name-only", "HEAD"],
                     ["git", "ls-files", "--others", "--exclude-standard"]):
         try:
-            result = subprocess.run(command, capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                command, capture_output=True, text=True, check=False
+            )
         except OSError as exc:
             warnings.append(f"could not ask git for changed files: {exc}")
             continue
         for line in result.stdout.split("\n"):
             candidate = Path(line.strip())
-            if line.strip() and candidate.suffix in checkExtensions and candidate.is_file():
+            if (
+                line.strip()
+                and candidate.suffix in checkExtensions
+                and candidate.is_file()
+            ):
                 changed.add(candidate)
     return [p for p in sorted(changed)
             if not any(marker in p.as_posix() for marker in skipSubstrings)]

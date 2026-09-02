@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Write a `Document` back to a `.numbers` package: the write half of the binding.
 
 The mirror of `pybers.reader`, and it lives outside `pybers.model` for the same
-reason that one does, so that importing the model never drags in the
-persistence layer. `Document.save` reaches this module through a function-local import. See
+reason that one does, so that importing the model never drags in the persistence
+layer. `Document.save` reaches this module through a function-local import. See
 CLAUDE.md, "Document is the single handle".
 
 **Saving mutates the archives that were read rather than building new ones.** A
@@ -39,9 +38,8 @@ from ._generated import TNArchives_pb2 as tn
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
-from .model import Cell, CellRange, CellReference, Document, Table
+from .model import Cell, CellReference, Document, MergeRange, Table
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
-from .numbersfile.types import archiveTypeId, parseArchive
 from .numbersfile.cells import (
     CellRecord,
     emptyOffsetNarrow,
@@ -49,11 +47,12 @@ from .numbersfile.cells import (
     valueOffset,
 )
 from .numbersfile.decimal128 import Decimal128, encodedLength
+from .numbersfile.types import archiveTypeId, parseArchive
 from .reader import (
     ArchiveIndex,
-    readMerges,
     findRoot,
     originOffset,
+    readMerges,
     readRichTextTable,
     readStringTable,
     resolveValue,
@@ -151,7 +150,9 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
             f"The record for column {record.column + originOffset} is "
             f"{len(record.raw)} bytes, too short to hold a decimal128 value."
         )
-    return record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
+    return (
+        record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
+    )
 
 
 def rewriteRow(
@@ -291,17 +292,16 @@ def buildDirtySet(
         for column, rows in sorted(byColumn.items()):
             entry = owner.coord_set.column_entries.add()
             entry.column = column
-            start = previous = rows[0]
-            for row in rows[1:] + [None]:
-                if row == previous + 1:
-                    previous = row
-                    continue
-                added = entry.row_set.entries.add(range_begin=start)
-                if previous != start:
-                    added.range_end = previous
-                if row is None:
-                    break
-                start = previous = row
+            runs: list[list[int]] = []
+            for row in rows:
+                if runs and row == runs[-1][1] + 1:
+                    runs[-1][1] = row
+                else:
+                    runs.append([row, row])
+            for begin, end in runs:
+                added = entry.row_set.entries.add(range_begin=begin)
+                if end != begin:
+                    added.range_end = end
     return dirty
 
 
@@ -378,7 +378,7 @@ def tableOwnerIds(
 
 
 def writeMergeFormula(
-    store: tst.FormulaStoreArchive, extent: CellRange, ownerUid: tsp.UUID
+    store: tst.FormulaStoreArchive, merge: MergeRange, ownerUid: tsp.UUID
 ) -> None:
     """Add one merged region to a table's merge store, as the formula Numbers writes.
 
@@ -406,17 +406,18 @@ def writeMergeFormula(
     node.AST_sticky_bits.end_row_is_absolute = True
     node.AST_sticky_bits.end_column_is_absolute = True
 
+    startRow, startCol, endRow, endCol = merge.bounds
     tract = node.AST_colon_tract
     columns = tract.absolute_column.add()
-    columns.range_begin = extent.startCol - originOffset
+    columns.range_begin = startCol - originOffset
     rows = tract.absolute_row.add()
-    rows.range_begin = extent.startRow - originOffset
+    rows.range_begin = startRow - originOffset
     # `range_end` is omitted for a span of one rather than repeating the beginning,
     # which is how Numbers writes its own and how the reader expects to find them.
-    if extent.endCol != extent.startCol:
-        columns.range_end = extent.endCol - originOffset
-    if extent.endRow != extent.startRow:
-        rows.range_end = extent.endRow - originOffset
+    if endCol != startCol:
+        columns.range_end = endCol - originOffset
+    if endRow != startRow:
+        rows.range_end = endRow - originOffset
     tract.preserve_rectangular = True
 
     function = pair.formula.AST_node_array.AST_node.add()
@@ -455,7 +456,7 @@ def applyMerges(
     store = model.merge_owner.formula_store
     del store.formulas[:]
     for merge in table.mergeRanges:
-        writeMergeFormula(store, merge.extent, ownerUid)
+        writeMergeFormula(store, merge, ownerUid)
     store.next_formula_index = len(store.formulas)
 
     # Both directions matter: a merge that appeared invalidates references INTO it,
@@ -553,13 +554,29 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     written: dict[int, list[tuple[int, int]]] = {}
     entries = tableOwnerEntries(index, calculationEngine(index))
 
-    for sheet, reference in zip(document.sheets, root.sheets):
+    # Both pairings are checked rather than zipped loosely. A plain `zip` stops at
+    # the shorter side, so a model holding fewer sheets than the document does would
+    # write some of them and skip the rest in silence, which is the failure this
+    # format specializes in. Neither count can legitimately differ: the model was
+    # built from these archives.
+    if len(document.sheets) != len(root.sheets):
+        raise WriteError(
+            f"This document holds {len(root.sheets)} sheets and the model holds "
+            f"{len(document.sheets)}. Adding or removing a sheet is not supported."
+        )
+    for sheet, reference in zip(document.sheets, root.sheets, strict=True):
         sheetArchive = index.resolve(reference, tn.SheetArchive)
         tableReferences = [
             drawable for drawable in sheetArchive.drawable_infos
             if index.typeOf(drawable) == tableInfoTypeId
         ]
-        for table, tableReference in zip(sheet.tables, tableReferences):
+        if len(sheet.tables) != len(tableReferences):
+            raise WriteError(
+                f"{sheet.name!r} holds {len(tableReferences)} tables and the model "
+                f"holds {len(sheet.tables)}. Adding or removing a table is not "
+                "supported."
+            )
+        for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
             tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
             modelArchive = index.archive(tableInfo.tableModel.identifier)
             model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
@@ -614,11 +631,13 @@ def writeAtomically(package: NumbersPackage, target: Path) -> None:
     if not directory.is_dir():
         raise WriteError(f"Cannot save to {target}: {directory} is not a directory.")
 
-    handle = tempfile.NamedTemporaryFile(
+    # Opened only to reserve a unique name in the target's own directory, so that
+    # the replace below is atomic on the same filesystem. `delete=False` keeps the
+    # file after the block, and the block is what closes it.
+    with tempfile.NamedTemporaryFile(
         dir=directory, prefix=f".{target.stem}-", suffix=".numbers", delete=False
-    )
-    handle.close()
-    temporary = Path(handle.name)
+    ) as handle:
+        temporary = Path(handle.name)
     try:
         writePackage(package, temporary)
         temporary.replace(target)

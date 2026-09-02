@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 The persistence layer against real `.numbers` files.
 
@@ -100,7 +99,9 @@ def testReadsEveryIWAMember(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", fixtureNames)
-def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(name: str, tmp_path: Path) -> None:
+def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(
+    name: str, tmp_path: Path
+) -> None:
     """Pin the one accepted divergence, so it stays understood rather than drifting.
 
     The zip envelope is not reproduced byte for byte, and that is a decision rather
@@ -162,7 +163,7 @@ def testRoundTripPreservesEveryMemberExactly(name: str, tmp_path: Path) -> None:
 
     with zipfile.ZipFile(source) as original, zipfile.ZipFile(destination) as written:
         assert original.namelist() == written.namelist()
-        for before, after in zip(original.infolist(), written.infolist()):
+        for before, after in zip(original.infolist(), written.infolist(), strict=True):
             assert original.read(before.filename) == written.read(after.filename), (
                 f"{before.filename} changed content."
             )

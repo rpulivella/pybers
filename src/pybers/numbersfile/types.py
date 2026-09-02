@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 The archive type registry: which generated protobuf class a `typeId` selects.
 
@@ -111,7 +110,8 @@ def parseArchive(archive: Archive) -> Message:
     except Exception as exc:
         raise ArchiveTypeError(
             f"Archive {archive.identifier} declares type {typeId} "
-            f"({messageClass.DESCRIPTOR.full_name}) but its {len(archive.messages[0].data)} "
+            f"({messageClass.DESCRIPTOR.full_name}) but its "
+            f"{len(archive.messages[0].data)} "
             "bytes did not parse as one."
         ) from exc
     return message

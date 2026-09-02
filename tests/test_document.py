@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 Reading a `.numbers` file into the object model, asserted against fixture contents.
 
@@ -161,7 +160,7 @@ def test_everyValueTypeDecodesAsTheFixtureLabelsIt() -> None:
     assert table.cell("A1").value == Decimal("1234.5")
     assert table.cell("B1").value == Decimal("42")
     assert table.cell("C1").value == datetime.datetime(
-        2027, 6, 15, tzinfo=datetime.timezone.utc
+        2027, 6, 15, tzinfo=datetime.UTC
     )
     assert table.cell("D1").value == datetime.timedelta(minutes=20)
     assert table.cell("E1").value is True

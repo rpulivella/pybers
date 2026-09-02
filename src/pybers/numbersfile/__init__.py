@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 The persistence layer: reading and writing the `.numbers` file on disk.
 
@@ -38,7 +37,6 @@ from .cells import (
     decodeRecord,
     decodeRow,
 )
-from .decimal128 import Decimal128, Decimal128Error
 from .compression import SnappyError, compressRaw, decompressRaw
 from .container import (
     ContainerError,
@@ -50,7 +48,7 @@ from .container import (
     toZipInfo,
     writePackage,
 )
-from .varint import VarintError, readVarint, writeVarint
+from .decimal128 import Decimal128, Decimal128Error
 from .iwa import (
     Archive,
     ArchiveMessage,
@@ -65,6 +63,7 @@ from .iwa import (
     writeArchives,
     writeIWAFile,
 )
+from .varint import VarintError, readVarint, writeVarint
 
 __all__ = [
     "Archive",

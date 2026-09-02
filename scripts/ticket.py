@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """\
 pybers ticket tool
 
@@ -21,7 +20,8 @@ fallback, a missing token is a loud failure, never a guess:
     2. a GITHUB_TOKEN= line in the git-ignored .dev.vars at the repository root
 
 Usage:
-    python3 scripts/ticket.py create --label feat --title "Add a thing" --body-file draft.md
+    python3 scripts/ticket.py create --label feat --title "Add a thing" \
+        --body-file draft.md
     python3 scripts/ticket.py show 14
     python3 scripts/ticket.py export-as-source 14 --title
     python3 scripts/ticket.py export-as-source 14 --body
@@ -67,16 +67,17 @@ UPDATES
             for "404", which reported an expired token as an unpushed branch: a
             private repository answers 404, not 403, to a credential that cannot see
             it. A RuntimeError subclass, so every existing handler keeps working.
-2026-08-13  Split `export-as-source` out of `show`. Displaying and round-tripping are separate
-            actions: `show` renders through rich and may reformat freely, `export-as-source`
-            emits bytes and must never transform any. Named for what each returns,
-            not for the verb, because both of them read. /ticket-edit was reading the
-            rendered view and writing part of it back, silently reflowing bodies.
-2026-08-13  Removed the system-keyring fallback from resolveToken. `gh` can hold
-            several accounts at once, so the keyring was a silent path to the
-            wrong identity. A missing token now fails loudly.
-2026-08-12  Adapted from the author's existing tooling. projectNumber is a placeholder until the
-            pybers GitHub repo and Project board exist.
+2026-08-13  Split `export-as-source` out of `show`. Displaying and round-tripping are
+            separate actions: `show` renders through rich and may reformat freely,
+            `export-as-source` emits bytes and must never transform any. Named for what
+            each returns, not for the verb, because both of them read. /ticket-edit was
+            reading the rendered view and writing part of it back, silently reflowing
+            bodies.
+2026-08-13  Removed the system-keyring fallback from resolveToken. `gh` can hold several
+            accounts at once, so the keyring was a silent path to the wrong identity. A
+            missing token now fails loudly.
+2026-08-12  Adapted from the author's existing tooling. projectNumber is a placeholder
+            until the pybers GitHub repo and Project board exist.
 """
 __author__ = "Richard P Ulivella"
 __copyright__ = "Copyright 2026 Richard P Ulivella"
@@ -108,7 +109,8 @@ projectNumber: int = 3
 
 restRoot: str = "https://api.github.com"
 graphqlRoot: str = "https://api.github.com/graphql"
-# Issue dependencies arrived after the unversioned endpoints and require this explicitly.
+# Issue dependencies arrived after the unversioned endpoints and require this
+# explicitly.
 dependencyApiVersion: str = "2026-03-10"
 
 
@@ -447,10 +449,14 @@ def readBoardCoordinates(token: str) -> BoardCoordinates:
       }
     }
     """
-    data = requestGraphql(token, query, {"owner": repositoryOwner, "number": projectNumber})
+    data = requestGraphql(
+        token, query, {"owner": repositoryOwner, "number": projectNumber}
+    )
     project = data["user"]["projectV2"]
     if project is None:
-        raise RuntimeError(f"Project #{projectNumber} was not found for {repositoryOwner}.")
+        raise RuntimeError(
+            f"Project #{projectNumber} was not found for {repositoryOwner}."
+        )
 
     field = project["field"]
     if field is None:
@@ -606,7 +612,8 @@ def setBoardStatus(
 
 
 def findBoardItem(token: str, coordinates: BoardCoordinates, number: int) -> str | None:
-    """Return the board item identifier for an issue, or None if it is not on the board."""
+    """Return the board item identifier for an issue, or None if it is not on the
+    board."""
     query = """
     query($projectId: ID!, $cursor: String) {
       node(id: $projectId) {
@@ -697,12 +704,18 @@ def closeTicket(token: str, number: int, reason: str) -> None:
     an abandoned ticket is `not_planned`, a delivered one is `completed`.
     """
     url = f"{restRoot}/repos/{repositoryOwner}/{repositoryName}/issues/{number}"
-    requestJson(url, token, method="PATCH", payload={"state": "closed", "state_reason": reason})
+    requestJson(
+        url, token, method="PATCH",
+        payload={"state": "closed", "state_reason": reason},
+    )
 
 
 def assignTicket(token: str, number: int, assignee: str) -> None:
     """Assign an issue. Assignment marks the moment work actually begins."""
-    url = f"{restRoot}/repos/{repositoryOwner}/{repositoryName}/issues/{number}/assignees"
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}/issues/{number}"
+        "/assignees"
+    )
     requestJson(url, token, method="POST", payload={"assignees": [assignee]})
 
 
@@ -743,18 +756,25 @@ def showTicket(summary: TicketSummary) -> None:
     swallowed.
     """
     labelText = ", ".join(summary["labels"]) or "none"
-    console.print(f"[bold cyan]#{summary['number']}[/] [bold]{escape(summary['title'])}[/]")
+    console.print(
+        f"[bold cyan]#{summary['number']}[/] "
+        f"[bold]{escape(summary['title'])}[/]"
+    )
     console.print(f"[dim]{escape(summary['url'])}[/]")
     console.print(
         f"label: [magenta]{escape(labelText)}[/]   state: [yellow]{summary['state']}[/]"
     )
     if summary["assignees"]:
         console.print(f"assigned: [green]{escape(', '.join(summary['assignees']))}[/]")
-    for direction, label in (("blocked_by", "blocked by"), ("blocking", "blocking")):
-        related = summary.get(direction) or []
+    # Indexed directly rather than through a variable key: `TicketSummary` is a
+    # TypedDict, so a non-literal key gives back `object` and the tuple unpacking
+    # below stops being checkable.
+    for related, label, tint in (
+        (summary["blocked_by"], "blocked by", "red"),
+        (summary["blocking"], "blocking", "yellow"),
+    ):
         if related:
             listed = ", ".join(f"#{number} {title}" for number, title in related)
-            tint = "red" if direction == "blocked_by" else "yellow"
             console.print(f"{label}: [{tint}]{escape(listed)}[/]")
     if summary["body"]:
         console.print()
@@ -815,10 +835,10 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
 def cmdShow(arguments: argparse.Namespace) -> int:
     """Print one ticket for a human reader.
 
-    `show` renders; `export-as-source` does not. That is the whole distinction, and the names
-    are meant to carry it without anyone having to read this file. This one is free
-    to change its formatting at any time, which is exactly why its output must never
-    be sent back, use `export-as-source` for that.
+    `show` renders; `export-as-source` does not. That is the whole distinction, and the
+    names are meant to carry it without anyone having to read this file. This one is
+    free to change its formatting at any time, which is exactly why its output must
+    never be sent back, use `export-as-source` for that.
     """
     summary = readTicket(resolveToken(), arguments.number)
     showTicket(summary)
@@ -829,8 +849,8 @@ def cmdExportAsSource(arguments: argparse.Namespace) -> int:
     """Emit one field of a ticket verbatim, for a skill that will send it back.
 
     Separate from `show` because displaying and round-tripping are different actions
-    with incompatible contracts: `show` may reformat freely, `export-as-source` must never
-    transform a single byte. Both of them "read" a ticket, which is why neither is
+    with incompatible contracts: `show` may reformat freely, `export-as-source` must
+    never transform a single byte. Both of them "read" a ticket, which is why neither is
     called that, the name has to say what comes out.
     """
     summary = readTicket(resolveToken(), arguments.number)
@@ -856,14 +876,19 @@ def cmdStart(arguments: argparse.Namespace) -> int:
     coordinates = readBoardCoordinates(token)
     itemId = findBoardItem(token, coordinates, arguments.number)
     if itemId is None:
-        itemId = placeOnBoard(token, coordinates, readIssueNodeId(token, arguments.number))
+        itemId = placeOnBoard(
+            token, coordinates, readIssueNodeId(token, arguments.number)
+        )
         console.print("[yellow]Ticket was not on the board; added it.[/]")
     setBoardStatus(token, coordinates, itemId, "In Progress")
 
     console.print(
         f"[green]Started[/] [bold cyan]#{summary['number']}[/] {summary['title']}"
     )
-    console.print(f"assigned to [green]{arguments.assignee}[/], Status [cyan]In Progress[/]")
+    console.print(
+        f"assigned to [green]{arguments.assignee}[/], "
+        "Status [cyan]In Progress[/]"
+    )
     return 0
 
 
@@ -957,7 +982,10 @@ def cmdClose(arguments: argparse.Namespace) -> int:
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
         if alreadyClosed:
-            console.print(f"#{summary['number']} is already closed; would leave the issue alone")
+            console.print(
+                f"#{summary['number']} is already closed; "
+                "would leave the issue alone"
+            )
         else:
             console.print(f"would close #{summary['number']} as [cyan]{reason}[/]")
         console.print("would set Status to [cyan]Done[/]")
@@ -974,7 +1002,9 @@ def cmdClose(arguments: argparse.Namespace) -> int:
     if itemId is not None:
         setBoardStatus(token, coordinates, itemId, "Done")
     else:
-        console.print("[yellow]Ticket was not on the board; only the issue was closed.[/]")
+        console.print(
+            "[yellow]Ticket was not on the board; only the issue was closed.[/]"
+        )
 
     verb = "Completed" if reason == "completed" else "Abandoned"
     console.print(
@@ -996,7 +1026,9 @@ def cmdStatus(arguments: argparse.Namespace) -> int:
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
-        console.print(f"would set #{arguments.number} to [cyan]{arguments.setStatus}[/]")
+        console.print(
+            f"would set #{arguments.number} to [cyan]{arguments.setStatus}[/]"
+        )
         return 0
 
     itemId = findBoardItem(token, coordinates, arguments.number)
@@ -1005,7 +1037,9 @@ def cmdStatus(arguments: argparse.Namespace) -> int:
         return 1
 
     setBoardStatus(token, coordinates, itemId, arguments.setStatus)
-    console.print(f"[green]#{arguments.number}[/] is now [cyan]{arguments.setStatus}[/]")
+    console.print(
+        f"[green]#{arguments.number}[/] is now [cyan]{arguments.setStatus}[/]"
+    )
     return 0
 
 
@@ -1084,10 +1118,16 @@ def cmdList(arguments: argparse.Namespace) -> int:
         console.print("[dim]No tickets match.[/]")
         return 1 if unreadableCount else 0
 
-    rows.sort(key=lambda row: (statusOrder.index(row[0]) if row[0] in statusOrder else 99, row[1]))
+    rows.sort(
+        key=lambda row: (
+            statusOrder.index(row[0]) if row[0] in statusOrder else 99,
+            row[1],
+        )
+    )
     for statusName, number, title, labelText in rows:
         console.print(
-            f"[cyan]{statusName:<12}[/] [bold]#{number:<4}[/] {title}  [magenta]{labelText}[/]"
+            f"[cyan]{statusName:<12}[/] [bold]#{number:<4}[/] {title}  "
+            f"[magenta]{labelText}[/]"
         )
     return 0
 
@@ -1114,7 +1154,9 @@ def cmdBlock(arguments: argparse.Namespace) -> int:
 
     for blocker in arguments.unblock:
         removeBlockedBy(token, number, blocker)
-        console.print(f"[green]#{number}[/] no longer blocked by [bold cyan]#{blocker}[/]")
+        console.print(
+            f"[green]#{number}[/] no longer blocked by [bold cyan]#{blocker}[/]"
+        )
 
     blockedBy = readDependencies(token, number, "blocked_by")
     blocking = readDependencies(token, number, "blocking")
@@ -1135,21 +1177,29 @@ def buildParser() -> argparse.ArgumentParser:
     """Assemble the command line, one subcommand per cmd-prefixed handler."""
     parser = argparse.ArgumentParser(
         prog="ticket.py",
-        description="File and move pybers tickets on GitHub Issues and the Project board.",
+        description="File and move pybers tickets on GitHub Issues and the "
+        "Project board.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     createParser = subparsers.add_parser("create", help="file a new ticket")
-    createParser.add_argument("--label", required=True, help=f"one of: {', '.join(validLabels)}")
+    createParser.add_argument(
+        "--label", required=True, help=f"one of: {', '.join(validLabels)}"
+    )
     createParser.add_argument("--title", required=True, help="issue title, verbatim")
-    createParser.add_argument("--body-file", dest="bodyFile", required=True, help="drafted body")
-    createParser.add_argument("--status", default="Todo", help="starting Status (default: Todo)")
+    createParser.add_argument(
+        "--body-file", dest="bodyFile", required=True, help="drafted body"
+    )
+    createParser.add_argument(
+        "--status", default="Todo", help="starting Status (default: Todo)"
+    )
     createParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     createParser.set_defaults(handler=cmdCreate)
 
     showParser = subparsers.add_parser(
         "show",
-        help="RENDERED for reading: colored, wrapped to your terminal. Never copy from it.",
+        help="RENDERED for reading: colored, wrapped to your terminal. "
+        "Never copy from it.",
     )
     showParser.add_argument("number", type=int)
     showParser.set_defaults(handler=cmdShow)
@@ -1180,12 +1230,18 @@ def buildParser() -> argparse.ArgumentParser:
     editParser = subparsers.add_parser("edit", help="revise a filed ticket")
     editParser.add_argument("number", type=int)
     editParser.add_argument("--title", default=None, help="replace the title")
-    editParser.add_argument("--body-file", dest="bodyFile", default=None, help="replace the body")
-    editParser.add_argument("--label", default=None, help=f"one of: {', '.join(validLabels)}")
+    editParser.add_argument(
+        "--body-file", dest="bodyFile", default=None, help="replace the body"
+    )
+    editParser.add_argument(
+        "--label", default=None, help=f"one of: {', '.join(validLabels)}"
+    )
     editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     editParser.set_defaults(handler=cmdEdit)
 
-    closeParser = subparsers.add_parser("close", help="close a ticket and set Status to Done")
+    closeParser = subparsers.add_parser(
+        "close", help="close a ticket and set Status to Done"
+    )
     closeParser.add_argument("number", type=int)
     closeParser.add_argument(
         "--reason",

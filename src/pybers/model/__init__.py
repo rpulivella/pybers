@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """The pybers object model, typed dataclasses standing in for a .numbers document's real
 structure, split by feature area rather than by class: style, geometry, rich text,
 floating shapes, table/cell, sheet/document.
@@ -35,7 +34,7 @@ from pybers.model.reference import (
     toCellReference,
 )
 from pybers.model.shapes import GraphicalObject, Image, Shape, TextBox
-from pybers.model.sheet import Sheet, SelectionError, Document
+from pybers.model.sheet import Document, SelectionError, Sheet
 from pybers.model.style import Style
 from pybers.model.table import Cell, CellValue, MergeRange, Table
 from pybers.model.text import Paragraph, RichText, TextRun

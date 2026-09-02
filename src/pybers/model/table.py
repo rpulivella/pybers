@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """A table's grid, the cells in it, and the regions merged across it.
 
 Addressing lives in `pybers.model.reference` and `pybers.model.ranges`. Nothing
@@ -66,8 +65,9 @@ decimal128Context: Context = Context(prec=34, Emax=6144, Emin=-6143)
 # ranges from 1e-300 to 1e300. It would also mean converting between two number systems
 # on every read and write, which reintroduces exactly the error being avoided.
 #
-# THE FAILURE THIS PREVENTS, and the reason to build values from strings: Decimal(0.1) carries the
-# float's binary error straight in, yielding 0.1000000000000000055511151231257827...
+# THE FAILURE THIS PREVENTS, and the reason to build values from strings:
+# Decimal(0.1) carries the float's binary error straight in, yielding
+# 0.1000000000000000055511151231257827...
 # Decimal("0.1") does not. Never construct a cell value from a float.
 CellValue = (
     Decimal
@@ -106,6 +106,21 @@ class MergeRange:
         if anchor is None:
             raise ReferenceError(f"{self.extent} has no anchor cell.")
         return anchor
+
+    @property
+    def bounds(self) -> tuple[int, int, int, int]:
+        """Return the block's corners as (startRow, startCol, endRow, endCol).
+
+        `__post_init__` already rejects an unbounded extent, so these four are
+        always present. Saying so in a return type rather than leaving four
+        `int | None` for every caller to re-check is the point: a merge that cannot
+        be unbounded should not look like one that can.
+        """
+        startRow, startCol = self.extent.startRow, self.extent.startCol
+        endRow, endCol = self.extent.endRow, self.extent.endCol
+        if startRow is None or startCol is None or endRow is None or endCol is None:
+            raise ReferenceError(f"{self.extent} is unbounded and bounds no merge.")
+        return (startRow, startCol, endRow, endCol)
 
     def covers(self, address: CellAddress) -> bool:
         """Report whether this merge occupies a cell, its anchor included."""

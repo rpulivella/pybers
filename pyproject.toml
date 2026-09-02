@@ -38,6 +38,9 @@ dev = [
     "pytest>=8.3.0",
     "rich>=13.7.0",
     "rich_argparse>=1.4.0",
+    "ruff>=0.16.0",
+    "mypy>=1.11.0",
+    "types-protobuf>=5.27.0",
 ]
 
 [tool.pytest.ini_options]
@@ -55,5 +58,71 @@ packages = ["src/pybers"]
 [tool.ruff]
 extend-exclude = ["src/pybers/_generated", "src/pybers/protos"]
 
+[tool.ruff.lint]
+# Six sets, each earning its place on this codebase rather than chosen by habit.
+# Measured 2026-09-02 on the tree as it stood: F found a test defined twice and two
+# unused imports, B found ten `zip()` calls that truncate in silence, E found 84
+# over-long lines nothing had been checking.
+#
+#   F    pyflakes: unused imports, undefined names, a value assigned and never read.
+#        The set closest to finding real mistakes rather than style.
+#   E    pycodestyle errors, which is mostly E501 line-too-long at the 88 columns
+#        this repository already writes to by hand.
+#   I    import ordering, entirely mechanical and entirely auto-fixable.
+#   UP   syntax a supported Python makes obsolete, which enforces the CLAUDE.md
+#        rule about `list[str]` over `typing.List` rather than leaving it to review.
+#   B    bugbear: mutable default arguments, loop variables captured by a closure,
+#        and `zip()` without `strict=`, which silently drops the tail of the longer
+#        argument, which is the silent-wrongness this format specializes in.
+#   SIM  simpler equivalents for constructs that read as more than they are.
+#
+# NOT selected, and why, so nobody adds them thinking it was an oversight:
+#
+#   N    pep8-naming demands snake_case and this repository uses camelCase
+#        deliberately (see CLAUDE.md, "House style"). It reported 752 violations,
+#        which is the whole set firing on almost every function. Half-disabling it
+#        by ignoring N802/N803/N806 leaves something that reads as an accident.
+#   ANN  missing-annotation rules duplicate what mypy already checks here.
+#   D    pydocstyle enforces a docstring shape this repository does not use: the
+#        house form is a one-line imperative summary and free-form why, with no
+#        `Args:` or `Returns:` sections.
+select = ["F", "E", "I", "UP", "B", "SIM"]
+
 [tool.mypy]
+# Strict on the library, because it already carries full type hints and the
+# measurement showed strict costing five errors more than default. Loose settings
+# would be describing this codebase inaccurately.
+strict = true
 exclude = ["^src/pybers/_generated/", "^src/pybers/protos/"]
+# Both trees are checked by a bare `mypy`, so nobody has to remember two commands
+# and CI runs one line.
+files = ["src/pybers", "scripts"]
+
+[[tool.mypy.overrides]]
+# The generated protobuf modules build their classes at import time through the
+# descriptor pool, so mypy sees a module with no attributes and reported 53 errors
+# for uses that are perfectly correct. `protoc --mypy_out` now writes a `.pyi`
+# beside each one, so those uses are checked properly rather than silenced.
+#
+# Measured 2026-09-02, and this is why the stubs are worth their 3.1 MB: with them,
+# `root.sheetz` fails as `"DocumentArchive" has no attribute "sheetz"; maybe
+# "sheets"?`. Told to skip the import instead, that line passes, and a mistyped
+# field is exactly the failure this format answers with a plausible wrong number.
+#
+# The stubs themselves are machine output and are not checked, the same way the
+# modules beside them are not.
+module = "pybers._generated.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# Repository tooling, checked but not held to the library's standard. AC 7 of #4 is
+# why it is checked at all: two calls in `scripts/pr.py` whose arguments did not
+# match the signature sat undiscovered until a real pull request ran one of them,
+# and that is a call-signature check rather than a strictness one.
+#
+# `scripts/` has no `__init__.py`, so mypy names each file by its stem rather than
+# as a package. Matching on `scripts.*` silently matched nothing.
+module = ["pr", "ticket", "standards-check", "protos-extract"]
+disallow_untyped_defs = false
+disallow_any_generics = false
+warn_return_any = false
