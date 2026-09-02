@@ -24,6 +24,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-09-02  Save states what happens to a dependent formula, for #25.
 2026-09-02  The whole-document cell iteration, for #14.
 2026-09-02  Reaching a sheet or a table by name or by position, for #14.
 2026-09-01  Document carries the package it was read from, and gained save, for #2.
@@ -235,6 +236,15 @@ class Document:
         Nothing is closed and nothing is invalidated. A Document holds no file handle,
         so saving is repeatable and the object stays usable afterward, which is why
         there is no `close` and no context manager to pair with `pybers.open`.
+
+        **A formula depending on a cell you changed is recalculated by Numbers when it
+        next opens the file, not by this library.** Saving marks the edited cells in
+        the document's calculation engine, and Numbers walks its own dependency graph
+        from there, so a `SUM` over cells you raised shows the new total. pybers never
+        evaluates a formula and never writes a result, which is why the value stored
+        for such a formula is still the one Numbers last computed. Reading the file
+        back through pybers therefore shows the old result; opening it in Numbers
+        shows the new one.
         """
         # Imported here rather than at module scope, because the writer reaches into
         # `pybers.numbersfile` and the model layer must stay importable without it.

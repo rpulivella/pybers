@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [#25] Fix an edit leaving dependent formula results stale
 - [#14] Reach sheets and tables by name and walk every cell
 - [#2] Write a document back to a .numbers package
 - [#2] Rename pybers.archive to pybers.numbersfile

@@ -22,6 +22,8 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-09-02  The three TSCE types the write path needs to request a recalculation,
+            for #25.
 2026-08-31  Written for the document read path: root, sheets, tables, tiles,
             data lists and cell styles.
 """
@@ -38,6 +40,7 @@ __date__ = "2026/08/31"
 from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
+from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
@@ -54,6 +57,9 @@ archiveTypes: dict[int, type[Message]] = {
     2: tn.SheetArchive,             # a tab: its name and its ordered drawables
     401: tss.StylesheetArchive,     # the shared style registry
     2001: tswp.StorageArchive,      # rich text, reached from a cell payload
+    4000: tsce.CalculationEngineArchive,     # the dependency graph and dirty set
+    4008: tsce.FormulaOwnerDependenciesArchive,  # one owner's dependencies
+    4011: tsce.ReferencesToDirtyArchive,     # cells to recalculate on next open
     6000: tst.TableInfoArchive,     # the drawable that wraps a table
     6001: tst.TableModelArchive,    # the table proper: geometry, stores, merges
     6002: tst.Tile,                 # one block of rows and their cell records

@@ -39,9 +39,17 @@ import pytest
 
 import pybers
 from pybers.numbersfile import CellRecord, NumbersPackage, decodeRow, readPackage
-from pybers.numbersfile.types import archiveTypes
+from pybers.numbersfile.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.model import Document, toCellReference
-from pybers.writer import WriteError, writeDocument
+from pybers.reader import ArchiveIndex, findRoot, tableInfoTypeId
+from pybers.writer import (
+    WriteError,
+    calculationEngineTypeId,
+    tableOwnerIds,
+    writeDocument,
+)
+from pybers._generated import TNArchives_pb2 as tn
+from pybers._generated import TSCEArchives_pb2 as tsce
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -326,12 +334,18 @@ def test_noDigitsAreGainedOrLostAcrossTheRoundTrip(text: str, tmp_path: Path) ->
     assert str(written) == str(Decimal(text)), "the scale moved"
 
 
-def test_oneEditChangesOneArchiveAndLeavesEveryOtherAlone(tmp_path: Path) -> None:
-    """AC 4, by the same comparison AC 1 uses.
+def test_oneEditChangesOnlyItsTileAndTheDirtySet(tmp_path: Path) -> None:
+    """AC 4 of #2, widened by #25 from one archive to exactly two.
 
     The record is patched in its sixteen value bytes rather than rebuilt, so the
     tile does not even change length. Everything the model does not represent
     survives because nothing touched it.
+
+    The second archive is the calculation engine's dirty set, which grows from
+    nothing to name the edited cell. It is not optional and it is not conditional on
+    the document holding formulas, because none of the 46 fixtures reports zero:
+    `00-baseline` and this fixture both carry seven, since merges and interactive
+    controls are stored as formulas too.
     """
     working = workingCopy("11-value-types-noformats", tmp_path)
     source = fixtureDirectory / "11-value-types-noformats.numbers"
@@ -341,11 +355,28 @@ def test_oneEditChangesOneArchiveAndLeavesEveryOtherAlone(tmp_path: Path) -> Non
     document.save()
 
     differences = archiveDifferences(readPackage(source), readPackage(working))
-    assert len(differences) == 1, (
-        f"expected one changed archive, got {len(differences)}:\n  "
+    assert len(differences) == 2, (
+        f"expected the tile and the dirty set, got {len(differences)}:\n  "
         + "\n  ".join(differences)
     )
-    assert "type 6002" in differences[0], "the change was not in a tile"
+    changed = " ".join(differences)
+    assert "type 6002" in changed, "the tile was not the archive that changed"
+    assert "type 4011" in changed, "the dirty set was not written"
+
+
+def test_aSaveThatChangesNothingWritesNoDirtySet(tmp_path: Path) -> None:
+    """AC 4 of #25: an unchanged round trip stays byte-for-byte unchanged.
+
+    The engine is reached only when a cell actually moved, so a document read and
+    written back does no calculation-engine work at all and its dirty set stays the
+    empty archive Numbers wrote.
+    """
+    working = workingCopy("20-formula-shapes", tmp_path)
+    source = fixtureDirectory / "20-formula-shapes.numbers"
+
+    pybers.open(working).save()
+
+    assert not archiveDifferences(readPackage(source), readPackage(working))
 
 
 def test_theNeighborsOfAnEditedCellAreUntouched(tmp_path: Path) -> None:
@@ -462,9 +493,10 @@ def test_aNumericEditMatchesTheGoldenFile(tmp_path: Path) -> None:
     Every other test here checks pybers against pybers, which can agree with itself
     while both halves are wrong. This one compares against output that a human opened
     in Numbers and confirmed, which is the only check that reaches outside this
-    library. This one was confirmed on 2026-09-01 in Numbers 15.3.1: it opened with no
-    warning and no repair prompt, and every interactive control in the row survived
-    the edit. See `tests/golden/README.md`.
+    library. Re-confirmed on 2026-09-02 in Numbers 15.3.1 after #25 added the dirty
+    set: it opened with no warning and no repair prompt, and the checkbox, the
+    three-star rating, the slider at 50, the stepper at 1 and the popup menu all
+    still render and still work. See `tests/golden/README.md`.
 
     Compared with `archiveDifferences` rather than byte for byte, because the zip
     envelope is known to differ by the local extra fields `zipfile` cannot emit.
@@ -512,11 +544,11 @@ def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
     list. That code decides which table an edit lands in, and its failure mode is the
     format's usual one, a plausible file with the right number in the wrong table.
 
-    Confirmed on 2026-09-02 in Numbers 15.3.1: the file opened with no warning and no
-    repair prompt, and all twelve edits landed in the table they were addressed to. The
-    same confirmation found that Numbers does NOT recalculate the formulas depending on
-    those cells, which is why the guard below asserts the stale cached results rather
-    than the arithmetic. See `tests/golden/README.md`.
+    Confirmed on 2026-09-02 in Numbers 15.3.1, twice. The first confirmation found
+    all twelve edits in the right tables and every dependent formula displaying the
+    result it had cached BEFORE the edit. #25 added the dirty set, and the second
+    confirmation of this regenerated file shows row 11 recalculated: 10055, 10056,
+    10055, `big`, 20110, 20110, 1042 and 1053. See `tests/golden/README.md`.
     """
     golden = goldenDirectory / "20-formula-shapes-multisheet-edited.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
@@ -551,14 +583,85 @@ def test_theMultiSheetGoldenHoldsWhatItClaimsTo() -> None:
     assert [first.cell(f"A{row}").value for row in range(1, 11)] == [
         Decimal(1000 + row) for row in range(1, 11)
     ]
-    # Deliberately stale, and confirmed stale on screen: `A11` is `SUM(A1:A10)`, whose
-    # operands now sum to 10055, and Numbers displays the cached 55 after an open.
+    # `A11` still holds 55 ON DISK and that is correct: this library never evaluates
+    # a formula. Numbers recomputes it to 10055 on open, because the dirty set asks it
+    # to, which is what the 2026-09-02 confirmation saw on screen.
     assert first.cell("A12").value == "Typed directly: SUM(A1:A10)"
     assert first.cell("A11").value == Decimal(55)
     assert sum(first.cell(f"A{row}").value for row in range(1, 11)) == Decimal(10055)
 
     assert document.sheet("Sheet 1").table("Table 2").cell("A1").value == Decimal(1042)
     assert document.sheet("Sheet 2").table("Table 1").cell("A1").value == Decimal(1053)
+
+
+def test_theGoldenAsksNumbersToRecalculateTheCellsThatMoved() -> None:
+    """The dirty set is the whole mechanism, so assert its contents, not its size.
+
+    A golden that merely differed by some bytes in the calculation engine would pass
+    while naming the wrong cells, and the failure would only show as a wrong number
+    on someone's screen months later.
+    """
+    index = ArchiveIndex(
+        readPackage(goldenDirectory / "20-formula-shapes-multisheet-edited.numbers")
+    )
+    engine = next(
+        parseArchive(archive)
+        for archive in index.byIdentifier.values()
+        if archiveTypeId(archive) == calculationEngineTypeId
+    )
+    dirty = index.resolve(engine.refs_to_dirty, tsce.ReferencesToDirtyArchive)
+
+    # Three tables were edited, so three owners are marked.
+    assert [entry.range_begin for entry in dirty.to_dirty_owner_ids.entries] == [
+        23,
+        36,
+        49,
+    ]
+    marked = {
+        entry.owner_id: [
+            (column.column, [(run.range_begin, run.range_end) for run in column.row_set.entries])
+            for column in entry.coord_set.column_entries
+        ]
+        for entry in dirty.to_dirty_cells.owner_entries
+    }
+    # Column 0 rows 0 to 9 for the ten operands, and a single row 0 for each of the
+    # two one-cell tables. Row 11's formulas are deliberately NOT named: Numbers
+    # reaches them through its own dependency graph.
+    assert marked == {
+        23: [(0, [(0, 9)])],
+        36: [(0, [(0, 0)])],
+        49: [(0, [(0, 0)])],
+    }
+
+
+@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
+    """The guards in `recalculationRequested` rest on this, so it is asserted.
+
+    A table with no owner id cannot be marked, and the writer refuses the save rather
+    than producing a file with stale results. That refusal is unreachable today, and
+    this is what says so: 74 tables across the corpus, every one resolving. A future
+    fixture that broke the assumption would fail here rather than in someone's save.
+    """
+    index = ArchiveIndex(readPackage(path))
+    engineArchive = next(
+        (
+            archive for archive in index.byIdentifier.values()
+            if archiveTypeId(archive) == calculationEngineTypeId
+        ),
+        None,
+    )
+    assert engineArchive is not None, "no calculation engine in this document"
+    ownerIds = tableOwnerIds(index, parseArchive(engineArchive))
+
+    for sheetReference in findRoot(index).sheets:
+        sheet = index.resolve(sheetReference, tn.SheetArchive)
+        for reference in sheet.drawable_infos:
+            if index.typeOf(reference) != tableInfoTypeId:
+                continue
+            assert reference.identifier in ownerIds, (
+                f"table archive {reference.identifier} has no owner id"
+            )
 
 
 def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:

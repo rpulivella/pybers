@@ -18,8 +18,8 @@ other when reaching for something to test against.
 
 | File | Source fixture | Mutation | Confirmed |
 | --- | --- | --- | --- |
-| `11-value-types-noformats-A1-edited.numbers` | `11-value-types-noformats.numbers` | `A1` set to `Decimal("98765.4321")` | 2026-09-01, Numbers 15.3.1 |
-| `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, Numbers 15.3.1 |
+| `11-value-types-noformats-A1-edited.numbers` | `11-value-types-noformats.numbers` | `A1` set to `Decimal("98765.4321")` | 2026-09-01, re-confirmed 2026-09-02 after #25, Numbers 15.3.1 |
+| `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after #25, Numbers 15.3.1 |
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `documentEditsApplied` walking sheets and
@@ -32,15 +32,27 @@ was opened is not the copy committed here: autosave rewrote it on open, growing 
 1,574 bytes and renaming `Index/ViewState.iwa`, so it was discarded and the untouched
 output was committed in its place.
 
-**It also measured something new, and the file records it deliberately.** Row 11 of
-`Table 1` still displays 55, 56, 40, `big`, 110, 110, 42 and 53, which are the results
-those formulas cached BEFORE the edit. `A11` reads `SUM(A1:A10)` and shows 55 while
-`A1:A10` now sums to 10055. **Numbers did not recalculate on open**, so the document is
-arithmetically inconsistent on screen and nothing warns about it. Patching a cell's
-value bytes leaves the calculation engine with no reason to know a dependency moved,
-and `findings-02-formulas.md` had recorded that a formula caches its result without
-establishing that opening the file does not refresh it. That is a limitation of the
-write path rather than of this golden, and this file is the evidence for it.
+**Both goldens were regenerated and re-confirmed on 2026-09-02 for #25**, because the
+writer's output changed: it now also marks the edited cells in the calculation engine.
+
+That change came out of what the first multi-sheet confirmation found. Row 11 of
+`Table 1` displayed 55, 56, 40, `big`, 110, 110, 42 and 53, the results those formulas
+had cached BEFORE the edit, because **Numbers does not recalculate on open** and
+patching a cell's value bytes leaves the calculation engine with no reason to know a
+dependency moved. The regenerated file populates `refs_to_dirty`, and the second
+confirmation shows row 11 reading 10055, 10056, 10055, `big`, 20110, 20110, 1042 and
+1053.
+
+**The value stored on disk for `A11` is still 55, and that is correct.** This library
+never evaluates a formula. It names the cells that moved and Numbers does the
+arithmetic, so reading the golden back through pybers shows 55 while opening it in
+Numbers shows 10055. A test asserting the recalculated number against the file would be
+asserting something the file does not contain.
+
+The single-cell golden matters for the opposite reason: `11-value-types-noformats` has
+no user formulas, and its re-confirmation checked that the checkbox, the three-star
+rating, the slider at 50, the stepper at 1 and the popup menu all still render and still
+work. That is where a too-eager dirty set would show as damage.
 
 The 2026-09-01 confirmation checked more than the edited cell. Every interactive control
 in the row survived: the checkbox, the three-star rating, the slider at 50, the stepper at

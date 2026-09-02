@@ -18,6 +18,7 @@ gone, rather than as an error.
 UPDATES
 2026-09-01  Written for #2: the unchanged round trip.
 2026-09-01  Numeric edits reach the tile they came from, for #2.
+2026-09-02  Edited cells are marked for recalculation, for #25.
 """
 from __future__ import annotations
 
@@ -27,16 +28,18 @@ __license__ = "Apache-2.0"
 __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
-__date__ = "2026/09/01"
+__date__ = "2026/09/02"
 
 import tempfile
 from decimal import Decimal
 from pathlib import Path
 
 from ._generated import TNArchives_pb2 as tn
+from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSTArchives_pb2 as tst
 from .model import Cell, CellReference, Document, Table
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
+from .numbersfile.types import archiveTypeId, parseArchive
 from .numbersfile.cells import (
     CellRecord,
     emptyOffsetNarrow,
@@ -57,6 +60,12 @@ from .reader import (
 # `TST.Tile` and the type bytes a numeric record may carry. 2 is a plain number
 # and 10 is currency, which is the same encoding under a different type.
 tileTypeId: int = 6002
+
+# `TSCE.CalculationEngineArchive`, and the `owner_kind` a table's dependency entry
+# carries. Both are named rather than written as literals where they are used,
+# because a bare 4000 in a comprehension says nothing about what is being looked for.
+calculationEngineTypeId: int = 4000
+tableOwnerKind: int = 1
 numericTypeBytes: tuple[int, ...] = (2, 10)
 
 # Byte 9 of a record's header is a bitmask, and this bit marks a cell backed by a
@@ -165,8 +174,13 @@ def tableEditsApplied(
     owners: dict[int, IWAFile],
     table: Table,
     model: tst.TableModelArchive,
-) -> int:
+) -> list[tuple[int, int]]:
     """Write every changed cell of one table back into the tiles it came from.
+
+    Returns the stored coordinates it wrote, counted from zero, because the
+    calculation engine has to be told which cells moved and this is the only place
+    that knows. Returning them rather than a count is what lets `refs_to_dirty` name
+    exactly the cells that changed.
 
     Walks the tile list rather than the archives, matching the read path exactly.
     Tile archive identifiers are not in row order, so iterating archives as found
@@ -174,13 +188,13 @@ def tableEditsApplied(
     """
     store = model.base_data_store
     tileSize = store.tiles.tile_size
-    changed = 0
 
     # Resolved through the same tables the reader used, because a record holds a
     # pooled key rather than its text. Comparing the model's string against that
     # key would make every text cell look edited on every save.
     strings = readStringTable(index, store)
     richText = readRichTextTable(index, store)
+    written: list[tuple[int, int]] = []
 
     for entry in store.tiles.tiles:
         archive = index.archive(entry.tile.identifier)
@@ -213,14 +227,137 @@ def tableEditsApplied(
                 wide,
                 replacements,
             )
-            changed += len(replacements)
+            written.extend((row, column) for column in replacements)
             touched = True
 
         if touched:
             owners[archive.identifier].messageReplace(
                 archive.identifier, 0, tile.SerializeToString()
             )
-    return changed
+    return written
+
+
+def tableOwnerIds(
+    index: ArchiveIndex, engine: tsce.CalculationEngineArchive
+) -> dict[int, int]:
+    """Return each table's internal calculation-engine owner id, keyed by its archive.
+
+    Read the long way round because there is no short one: a table does not record
+    its owner id. The mapping lives in the dependency tracker, where the entry whose
+    `owner_kind` is 1 and whose `formula_owner` points at a `TST.TableInfoArchive`
+    carries the id for that table. Measured 2026-09-02, see findings-02-formulas.md.
+    """
+    ownerIds: dict[int, int] = {}
+    for reference in engine.dependency_tracker.formula_owner_dependencies:
+        dependencies = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
+        if dependencies.owner_kind != tableOwnerKind:
+            continue
+        if not dependencies.HasField("formula_owner"):
+            continue
+        ownerIds[dependencies.formula_owner.identifier] = (
+            dependencies.internal_formula_owner_id
+        )
+    return ownerIds
+
+
+def dirtySetBuilt(
+    edits: dict[int, list[tuple[int, int]]]
+) -> tsce.ReferencesToDirtyArchive:
+    """Return the archive naming every cell that moved, grouped as Numbers groups them.
+
+    Owners hold columns, columns hold a set of row ranges. Contiguous rows collapse
+    into one range, which is how Numbers writes its own, and a run of one omits
+    `range_end` rather than repeating the beginning.
+    """
+    dirty = tsce.ReferencesToDirtyArchive()
+    for ownerId, cells in sorted(edits.items()):
+        dirty.to_dirty_owner_ids.entries.add(range_begin=ownerId)
+        owner = dirty.to_dirty_cells.owner_entries.add()
+        owner.owner_id = ownerId
+        byColumn: dict[int, list[int]] = {}
+        for row, column in sorted(set(cells)):
+            byColumn.setdefault(column, []).append(row)
+        for column, rows in sorted(byColumn.items()):
+            entry = owner.coord_set.column_entries.add()
+            entry.column = column
+            start = previous = rows[0]
+            for row in rows[1:] + [None]:
+                if row == previous + 1:
+                    previous = row
+                    continue
+                added = entry.row_set.entries.add(range_begin=start)
+                if previous != start:
+                    added.range_end = previous
+                if row is None:
+                    break
+                start = previous = row
+    return dirty
+
+
+def recalculationRequested(
+    index: ArchiveIndex,
+    owners: dict[int, IWAFile],
+    written: dict[int, list[tuple[int, int]]],
+) -> int:
+    """Tell Numbers which cells moved, so it recalculates whatever depends on them.
+
+    **A formula caches its result, and opening the document does not refresh it.**
+    Patching a cell's value bytes leaves the calculation engine with no reason to know
+    a dependency changed, so a document saved without this displays arithmetic that
+    disagrees with its own operands, silently and with no repair prompt.
+
+    Naming the edited cells is enough. Numbers walks its own dependency graph from
+    there, transitively and across tables and sheets, which is why this library never
+    evaluates a formula and never writes a result. Measured 2026-09-02 twice, a broad
+    set naming the dependent formulas and a minimal one naming only the edited cells
+    producing identical output; findings-02-formulas.md records both.
+
+    Everything here is reached only when something actually changed, so a save that
+    edits nothing does no engine work at all.
+    """
+    if not written:
+        return 0
+    engineArchive = next(
+        (
+            archive for archive in index.byIdentifier.values()
+            if archiveTypeId(archive) == calculationEngineTypeId
+        ),
+        None,
+    )
+    if engineArchive is None:
+        raise WriteError(
+            "This document has no TSCE.CalculationEngineArchive, so Numbers cannot "
+            "be asked to recalculate and the saved file would display stale formula "
+            "results. Every document in the fixture corpus carries one."
+        )
+    engine = parseArchive(engineArchive)
+    if not isinstance(engine, tsce.CalculationEngineArchive):
+        raise WriteError(
+            f"Archive {engineArchive.identifier} carries the calculation engine's "
+            f"type but parsed as {type(engine).__name__}."
+        )
+    if not engine.HasField("refs_to_dirty"):
+        raise WriteError(
+            "The calculation engine carries no refs_to_dirty reference, so the cells "
+            "that changed cannot be marked and the saved file would display stale "
+            "formula results."
+        )
+
+    ownerIds = tableOwnerIds(index, engine)
+    edits: dict[int, list[tuple[int, int]]] = {}
+    for tableIdentifier, cells in written.items():
+        ownerId = ownerIds.get(tableIdentifier)
+        if ownerId is None:
+            raise WriteError(
+                f"The table in archive {tableIdentifier} has no calculation-engine "
+                "owner id, so the cells edited in it cannot be marked for "
+                "recalculation and the saved file would display stale results."
+            )
+        edits.setdefault(ownerId, []).extend(cells)
+
+    target = engine.refs_to_dirty.identifier
+    owners[target].messageReplace(target, 0, dirtySetBuilt(edits).SerializeToString())
+    return sum(len(cells) for cells in edits.values())
 
 
 def documentEditsApplied(document: Document, package: NumbersPackage) -> int:
@@ -237,7 +374,7 @@ def documentEditsApplied(document: Document, package: NumbersPackage) -> int:
         for archive in iwaFile.archives
     }
     root = findRoot(index)
-    changed = 0
+    written: dict[int, list[tuple[int, int]]] = {}
 
     for sheet, reference in zip(document.sheets, root.sheets):
         sheetArchive = index.resolve(reference, tn.SheetArchive)
@@ -247,13 +384,17 @@ def documentEditsApplied(document: Document, package: NumbersPackage) -> int:
         ]
         for table, tableReference in zip(sheet.tables, tableReferences):
             tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
-            changed += tableEditsApplied(
+            cells = tableEditsApplied(
                 index,
                 owners,
                 table,
                 index.resolve(tableInfo.tableModel, tst.TableModelArchive),
             )
-    return changed
+            if cells:
+                written[tableReference.identifier] = cells
+
+    recalculationRequested(index, owners, written)
+    return sum(len(cells) for cells in written.values())
 
 
 def targetFor(document: Document, path: Path | str | None) -> Path:
