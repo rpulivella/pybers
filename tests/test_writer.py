@@ -502,3 +502,32 @@ def test_theGoldenFileHoldsWhatItClaimsTo() -> None:
     assert table.cell("B1").value == Decimal("42")
     assert table.cell("E1").value is True
     assert table.cell("I1").value == "Item 1"
+
+
+def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
+    """A save rewrites the archives it read, so a second one has to see the first.
+
+    The package travels with the `Document` and `messageReplace` swaps the archive in
+    place, so a second save indexes the already-edited archives. Nothing else asserts
+    that, and a stale index would write the second edit on top of the original bytes.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("111.11")
+    document.save()
+    assert pybers.open(working).sheets[0].tables[0].cell("A1").value == Decimal("111.11")
+
+    # Same handle, edited again.
+    document.sheets[0].tables[0].cell("A1").value = Decimal("222.22")
+    document.save()
+    assert pybers.open(working).sheets[0].tables[0].cell("A1").value == Decimal("222.22")
+
+    # A fresh handle editing a different cell leaves the first edit alone.
+    second = pybers.open(working)
+    second.sheets[0].tables[0].cell("B1").value = Decimal("777")
+    second.save()
+
+    table = pybers.open(working).sheets[0].tables[0]
+    assert table.cell("A1").value == Decimal("222.22")
+    assert table.cell("B1").value == Decimal("777")
