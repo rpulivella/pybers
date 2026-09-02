@@ -51,7 +51,7 @@ class ContainerError(RuntimeError):
 
 @dataclass(frozen=True)
 class MemberInfo:
-    """The zip-level metadata for one member, carried so the archive rewrites exactly.
+    """The zip-level metadata for one member, carried so the zip rewrites exactly.
 
     Every field here was found the hard way: the byte-identical round trip failed
     until each one was preserved. Python's own defaults disagree with what Numbers
@@ -89,7 +89,7 @@ class StoredMember:
 class NumbersPackage:
     """One `.numbers` document: its IWA members, its other files, and their order.
 
-    `members` carries every member's zip metadata in the order the archive listed
+    `members` carries every member's zip metadata in the order the zip listed
     them, and is the single source of both ordering and header details. Zip has no
     required ordering, so rewriting alphabetically would still open in Numbers,
     and would still differ byte for byte from the input, which is the property this
@@ -116,7 +116,7 @@ def isDocumentMember(name: str) -> bool:
 def readPackage(path: Path) -> NumbersPackage:
     """Read a `.numbers` file into its members.
 
-    Members are read in the order the archive lists them, and that order is kept,
+    Members are read in the order the zip lists them, and that order is kept,
     because reproducing it is part of writing the file back unchanged.
     """
     if not path.is_file():

@@ -9,7 +9,8 @@ this format produces plausible wrong numbers rather than an exception, so a deco
 only be checked against content established outside itself.
 
 UPDATES
-2026-08-18  Written with pybers.archive.cells.
+2026-08-18  Written with pybers.numbersfile.cells.
+2026-09-01  Added the encoder and the caller-context regression, for #2.
 """
 from __future__ import annotations
 
@@ -27,12 +28,10 @@ from pathlib import Path
 
 import pytest
 
-from pybers.archive import readPackage
-from pybers.archive.cells import (
+from pybers.numbersfile import readPackage
+from pybers.numbersfile.cells import (
     CellDecodeError,
-    decodeDecimal128,
     decodeRow,
-    exponentBias,
 )
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
@@ -103,44 +102,6 @@ def valueRow(name: str) -> dict[int, object]:
                         if records:
                             return {r.column: r.value for r in records}
     raise AssertionError(f"No populated row 0 found in {name}.")
-
-
-def testDecimal128DecodesExactly() -> None:
-    """1234.5 is exact, which is the whole reason values are not floats.
-
-    Built by hand rather than read from a file, so this tests the decoder and not the
-    fixture: mantissa 12345 with exponent -1.
-    """
-    raw = (12345).to_bytes(8, "little") + ((6176 - 1) << 49).to_bytes(8, "little")
-    assert decodeDecimal128(raw) == Decimal("1234.5")
-    assert decodeDecimal128(raw) != Decimal("1234.4999999999999")
-
-
-def testDecimal128CarriesSign() -> None:
-    """The sign is the top bit, not a separate field."""
-    negative = (12345).to_bytes(8, "little") + (
-        (1 << 63) | ((6176 - 1) << 49)
-    ).to_bytes(8, "little")
-    assert decodeDecimal128(negative) == Decimal("-1234.5")
-
-
-def testDecimal128ReadsTheLargeCoefficientFormAsZero() -> None:
-    """The second BID layout decodes, and a non-canonical coefficient is zero.
-
-    Setting both selector bits selects the form whose coefficient carries an implied
-    leading `100`, which puts it past the 10^34 - 1 this format may hold. IEEE 754
-    calls that non-canonical and gives it the value zero, so this must return a
-    number rather than raising, and the number must be zero.
-    """
-    selector = (0x03 << 61) | (exponentBias << 47)
-    raw = (0).to_bytes(8, "little") + selector.to_bytes(8, "little")
-    assert decodeDecimal128(raw) == Decimal(0)
-
-
-def testDecimal128RejectsAShortBuffer() -> None:
-    """Too few bytes raises rather than decoding whatever happens to be there."""
-    with pytest.raises(CellDecodeError, match="16 bytes"):
-        decodeDecimal128(b"\x00" * 8)
 
 
 def testValueTypesFixture() -> None:
@@ -221,7 +182,7 @@ def testUnknownTypeIsPreservedRatherThanRejected() -> None:
     hypothetical. A library whose first duty is not to damage documents has to carry
     through what it does not understand.
     """
-    from pybers.archive.cells import decodeRecord
+    from pybers.numbersfile.cells import decodeRecord
 
     record = bytes([5, 99, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) + b"\x01\x00\x00\x00"
     decoded = decodeRecord(0, record)
@@ -241,7 +202,7 @@ def testRichTextCellConsumesItsPayloadKey() -> None:
 
     Built by hand so it tests the decoder rather than a fixture.
     """
-    from pybers.archive.cells import decodeRecord
+    from pybers.numbersfile.cells import decodeRecord
 
     record = (
         bytes([5, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])

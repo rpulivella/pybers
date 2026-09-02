@@ -64,19 +64,27 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
 1. **Persona opener** (human). One sentence: "As a [role] I want [outcome] so that
    [reason]."
 2. **Acceptance criteria** (human · the outcome). Numbered list immediately after the
-   opener. Each AC is concrete and testable and individually referenceable ("AC 3 fails
-   because…"). ACs may nest **one level**, no deeper, `4.a`, `4.b` under `4`. A third
-   level means the parent is really two tickets. **No label may repeat anywhere in the
-   list**.
-3. **SPEC** (agent · read before building). **Not a plan, and never ordered
-   implementation steps.** The ACs are the contract and they drive the build. The SPEC
-   holds only what a competent build cannot derive from them and would otherwise get
-   wrong *without failing*: a format trap the fixtures established, a decision that is
-   still open, a constraint that rules out the obvious approach. Restating an AC as a verb
-   ("add the module, populate the values, add the tests") is the failure mode to watch
-   for, and a SPEC as long as its ACs has it. **Omit the section entirely when nothing
-   qualifies**, which is common. A missing primitive is still a *separate prerequisite
-   ticket*.
+   opener. **An AC states an outcome someone can check, never how the code is built.**
+   That someone is whoever uses the thing, and for a repo tool or a skill it is the
+   developer, who is still a user. "The writer mutates the archives rather than
+   rebuilding them" is a design note wearing an AC's clothes, settling a decision the
+   build has not reached yet. **Conformance is an outcome rather than an implementation
+   detail, and it counts for an API as much as for a file format**, so "the value is
+   written as decimal128", "the saved package opens with the macOS unzip tool" and
+   "`pybers.open` returns one object that owns every edit" all belong. The line is
+   whether the AC fixes what the artifact must BE or dictates how the code gets
+   WRITTEN, and **of ten ACs nine still read from the outside**.
+   Each AC is concrete, testable and individually referenceable ("AC 3 fails because…").
+   ACs may nest **one level**, no deeper, `4.a`, `4.b` under `4`. A third level means the
+   parent is really two tickets. **No label may repeat anywhere in the list**.
+3. **SPEC** (agent · read before building). **Usually absent, and never a plan.** When a
+   ticket is written nobody knows yet how it will be built, so anything resembling
+   ordered steps is a guess that gets obeyed anyway. Two or three lines at most, holding
+   only a fact already established that a competent build would otherwise get wrong
+   *without failing*: a format trap the fixtures proved, a decision still open, a
+   constraint that rules out the obvious approach. Anything phrasable as observable
+   belongs in the ACs instead, and a SPEC as long as its ACs is a plan. A missing
+   primitive is still a *separate prerequisite ticket*.
 4. **Out of scope** (optional, OMIT BY DEFAULT).
 5. **Context / notes** (optional, OMIT BY DEFAULT).
 

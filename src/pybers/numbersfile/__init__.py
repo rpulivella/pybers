@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """\
-The archive layer: reading and writing the `.numbers` container.
+The persistence layer: reading and writing the `.numbers` file on disk.
 
 Split by feature area, matching `pybers.model`: `compression` decodes raw Snappy
 blocks, `iwa` turns a compressed member into archives of raw protobuf messages,
 and `container` handles the zip that holds them. Everything re-exports through
-here so that `pybers.archive.readPackage` stays stable regardless of which module
+here so that `pybers.numbersfile.readPackage` stays stable regardless of which module
 a name lives in.
 
 `compression`, `iwa` and `container` stop at message boundaries on purpose. They
@@ -35,11 +35,11 @@ from .cells import (
     CellDecodeError,
     CellRecord,
     decodeCellValue,
-    decodeDecimal128,
     decodeRecord,
     decodeRow,
 )
-from .compression import SnappyError, decompressRaw, readVarint
+from .decimal128 import Decimal128, Decimal128Error
+from .compression import SnappyError, compressRaw, decompressRaw
 from .container import (
     ContainerError,
     MemberInfo,
@@ -50,15 +50,19 @@ from .container import (
     toZipInfo,
     writePackage,
 )
+from .varint import VarintError, readVarint, writeVarint
 from .iwa import (
     Archive,
     ArchiveMessage,
     IWAError,
     IWAFile,
+    compressPayload,
     decompressPayload,
     readArchives,
     readIWAFile,
     splitFrames,
+    writeArchiveInfo,
+    writeArchives,
     writeIWAFile,
 )
 
@@ -68,14 +72,18 @@ __all__ = [
     "CellDecodeError",
     "CellRecord",
     "ContainerError",
+    "Decimal128",
+    "Decimal128Error",
     "IWAError",
     "IWAFile",
     "MemberInfo",
     "NumbersPackage",
     "SnappyError",
     "StoredMember",
+    "VarintError",
+    "compressPayload",
+    "compressRaw",
     "decodeCellValue",
-    "decodeDecimal128",
     "decodeRecord",
     "decodeRow",
     "decompressPayload",
@@ -87,6 +95,9 @@ __all__ = [
     "readVarint",
     "splitFrames",
     "toZipInfo",
+    "writeArchiveInfo",
+    "writeArchives",
     "writeIWAFile",
     "writePackage",
+    "writeVarint",
 ]

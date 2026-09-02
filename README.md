@@ -4,10 +4,11 @@ A round-trip-tested Python library for reading and writing Apple Numbers documen
 built in deep respect for Apple Numbers itself. The goal is for editing a `.numbers`
 file programmatically to be as reliable as editing it by hand.
 
-> **Status: not yet usable.** The archive layer reads a real `.numbers` package end to
-> end and the object model exists, but nothing connects them, so there is no supported
-> way to open a file yet. See [What works today](#what-works-today) for the honest line
-> between finished and not.
+> **Status: early, and narrow.** A real `.numbers` file opens, its cells read, a number
+> can be changed, and the file saves back so that Numbers opens it showing the new value
+> with nothing else altered. Everything past that, writing text, formulas, styles and
+> structural edits, is not built. See [What works today](#what-works-today) for the
+> honest line between finished and not.
 
 ## Why this exists
 
@@ -32,14 +33,23 @@ every reader of this format builds on it. No code from it is used here, and the
 
 | Layer | State |
 | --- | --- |
-| `pybers.archive` | **Reads** a `.numbers` package: zip container, IWA frames, a pure-Python Snappy decoder with no C dependency, length-prefixed protobuf archives, and cell values including numbers, text, dates, booleans, durations and currency. **Writes** a package back, with one bounded and documented difference in the zip envelope, confirmed to open cleanly in Numbers. |
+| `pybers.numbersfile` | The persistence layer. **Reads** a `.numbers` package: zip container, IWA frames, a pure-Python Snappy codec with no C dependency, base-128 varints, length-prefixed protobuf archives, IEEE-754 decimal128, and cell values including numbers, text, dates, booleans, durations and currency. **Writes** one back, replaying an untouched member exactly and re-encoding an edited one. |
 | `pybers.model` | The dataclass object model, split by feature area: style, geometry, rich text, floating shapes, tables and cells, sheets and documents. |
-| The binding between them | **Does not exist.** This is the next work. |
+| The binding between them | `pybers.open(path)` returns a `Document` and `document.save()` writes it back. A cell set to a `Decimal` reaches the tile it came from; writing over a formula, writing text, and changing a cell's type all raise rather than losing anything. |
 | `pybers.cli`, `pybers.tui` | Not started. |
 
-The next milestone is deliberately small and measurable: change one number in a real
-`.numbers` file, save it, and have Numbers open it showing the new value with nothing
-else altered.
+```python
+import pybers
+from decimal import Decimal
+
+document = pybers.open("budget.numbers")
+document.sheets[0].tables[0].cell("B4").value = Decimal("1250.00")
+document.save()
+```
+
+That milestone is met: every one of the 46 fixtures reads and writes back with each of
+its archives unchanged, and one numeric edit was confirmed in Numbers 15.3.1 by opening
+the saved file and reading it on screen.
 
 ## The format, and why there are so many fixtures
 

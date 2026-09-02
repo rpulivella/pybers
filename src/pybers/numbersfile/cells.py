@@ -22,6 +22,9 @@ rounding error into a document that never had any. See `pybers.model.table`.
 UPDATES
 2026-08-18  Written. Decodes numbers, currency, text, dates, booleans and durations,
             verified against fixtures 11 through 14.
+2026-09-01  Moved the decimal128 codec out to pybers.numbersfile.decimal128, which
+            owns the format's limits and its 16-byte form as a real type. This
+            module keeps only Apple's own undocumented cell layout.
 """
 from __future__ import annotations
 
@@ -37,6 +40,8 @@ import datetime
 import struct
 from dataclasses import dataclass
 from decimal import Decimal
+
+from .decimal128 import Decimal128
 
 # Apple counts dates from 2001-01-01 UTC rather than the Unix epoch.
 appleEpoch: datetime.datetime = datetime.datetime(
@@ -82,54 +87,6 @@ class CellRecord:
     raw: bytes
 
 
-# Both IEEE-754 decimal128 forms are implemented. The largest coefficient the format
-# may hold is 10^34 - 1; anything above it is non-canonical and reads as zero.
-maximumCoefficient: int = 10**34 - 1
-
-# The exponent is stored biased so it can be unsigned.
-exponentBias: int = 6176
-
-
-def decodeDecimal128(raw: bytes) -> Decimal:
-    """Decode 16 bytes of little-endian IEEE-754 decimal128 into a Decimal.
-
-    Apple stores numbers in the binary-integer (BID) interchange form, which has two
-    layouts selected by the two bits below the sign.
-
-    The common one puts a 14-bit biased exponent at bits 126-113 and a 113-bit
-    coefficient below it. Every value in every file examined uses this.
-
-    When both selector bits are set the fields move: the exponent sits at bits
-    124-111 and the coefficient gains an implied leading `100`. That form can only
-    express coefficients of 2^113 or more, which is already past the 10^34 - 1 this
-    format may hold, so a canonical encoder never emits it, which is why it has
-    never been seen here. It is decoded anyway rather than refused, because a reader
-    that rejects a file over a corner the specification already defines is worse than
-    one that follows the specification. Per IEEE 754 a coefficient beyond the maximum
-    is non-canonical and its value is zero.
-    """
-    if len(raw) < 16:
-        raise CellDecodeError(f"decimal128 needs 16 bytes, got {len(raw)}.")
-    low = int.from_bytes(raw[:8], "little")
-    high = int.from_bytes(raw[8:16], "little")
-
-    sign = -1 if (high >> 63) & 1 else 1
-
-    if (high >> 61) & 0x03 == 0x03:
-        exponent = ((high >> 47) & 0x3FFF) - exponentBias
-        # 47 bits of the high word, then the whole low word, under an implied 0b100.
-        mantissa = (0b100 << 111) | ((high & 0x00007FFFFFFFFFFF) << 64) | low
-    else:
-        exponent = ((high >> 49) & 0x3FFF) - exponentBias
-        # 49 bits of the high word, then the whole low word.
-        mantissa = ((high & 0x0001FFFFFFFFFFFF) << 64) | low
-
-    if mantissa > maximumCoefficient:
-        mantissa = 0
-
-    return Decimal(sign * mantissa).scaleb(exponent)
-
-
 def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
     """Return one cell's value and the number of bytes it occupied.
 
@@ -145,7 +102,7 @@ def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
         # 2 is a plain number, 10 is currency. Currency is a distinct type but not a
         # distinct encoding: the amount sits here identically, and which currency it
         # is belongs to the format, not the value.
-        return decodeDecimal128(body[:16]), 16
+        return Decimal128.fromBytes(body[:16]).value, 16
     if typeByte == 3:
         # A key into the table's STRING data list. Strings are pooled and shared
         # across cells; only the key lives in the record.

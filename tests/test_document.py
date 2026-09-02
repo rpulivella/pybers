@@ -146,7 +146,7 @@ def test_aCellKnowsItsOwnReference() -> None:
     assert table.cell("I1").reference == CellReference(1, 9)
 
 
-# ── AC 5: every value type the archive layer reads ───────────────────────────
+# ── AC 5: every value type the persistence layer reads ───────────────────────
 
 def test_everyValueTypeDecodesAsTheFixtureLabelsIt() -> None:
     """Row 1 holds the values; row 2 labels each one in the fixture's own words."""

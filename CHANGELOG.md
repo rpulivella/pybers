@@ -10,6 +10,9 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [#2] Write a document back to a .numbers package
+- [#2] Rename pybers.archive to pybers.numbersfile
+- [#2] Fix decimal128 decoding obeying the caller's decimal context
 - [#20] Add a pr-merge skill to own the merge step
 - [#19] Add export-as-source to pr.py
 - [#9] Add a cell reference type for A1 and range addressing

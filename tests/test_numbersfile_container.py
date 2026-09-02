@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """\
-The archive layer against real `.numbers` files.
+The persistence layer against real `.numbers` files.
 
 Carries the base contract from CLAUDE.md: read a real file, write it back with no
 changes, and get the input byte for byte. Everything above this layer depends on
@@ -45,7 +45,7 @@ from pathlib import Path
 
 import pytest
 
-from pybers.archive import (
+from pybers.numbersfile import (
     IWAError,
     decompressRaw,
     isDocumentMember,

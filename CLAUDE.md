@@ -111,9 +111,13 @@ Two consequences that are easy to get wrong:
   that were read rather than constructing new ones, so that whatever the model does not
   yet represent survives untouched. That state is private, and excluded from equality and
   `repr`, so `Document` still reads as a dataclass to a caller.
-- **`pybers.model` must stay importable without `pybers.archive`.** Whatever mechanism
-  `Document.save()` uses to reach the writer, it cannot be a module-scope import from the
-  model layer into the archive layer.
+- **No module under `pybers.model` may import `pybers.numbersfile` at module scope.**
+  Whatever mechanism `Document.save()` uses to reach the writer, a function-local import
+  is the only form allowed, and `sheet.py` guards its one type reference behind
+  `TYPE_CHECKING`. Stated as a rule about the model's own modules because that is what is
+  enforceable: `import pybers.model` runs `pybers/__init__.py` first, which imports
+  `pybers.reader`, so the persistence layer arrives regardless. The earlier wording said
+  the model stays importable without it, which was never true through the ordinary path.
 
 ## The object model is split by feature area, not by class
 
@@ -141,7 +145,7 @@ functionality, not be retrofitted later:
 
 This means the existing house rule **"separate logic from presentation"** is not
 optional here. It is the entire reason the two consumers can share one core. `pybers.
-model` and the future `pybers.archive` must never import anything CLI/TUI-related or
+model` and `pybers.numbersfile` must never import anything CLI/TUI-related or
 print anything; a `pybers.cli` (argparse, following `scripts/README.md`'s conventions)
 and/or a `pybers.tui` (Textual, with dependencies injected into the `App` subclass rather
 than imported, to dodge circular imports) sit on top as thin, separately-packaged front
@@ -274,12 +278,12 @@ linter will assume. Follow them as written.
 
 ## Status
 
-`pybers.model` (the dataclass object model, split by feature area) and `pybers.archive`
+`pybers.model` (the dataclass object model, split by feature area) and `pybers.numbersfile`
 (the `.numbers` container and cell reader) both exist and are tested. Run the suite as
 **`.venv/bin/python3 -m pytest`**, that exact spelling, because `.claude/settings.json`
 matches permission strings as text and a grant that never fires reads as coverage.
 
-`pybers.archive` reads a `.numbers` file end to end: zip, IWA frames, a pure-Python
+`pybers.numbersfile` reads a `.numbers` file end to end: zip, IWA frames, a pure-Python
 Snappy decoder with no C dependency, length-prefixed protobuf archives, and cell values
 including numbers, text, dates, booleans, durations and currency. It writes a package back
 with one bounded, documented difference in the zip envelope, confirmed to open cleanly in

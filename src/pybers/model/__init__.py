@@ -4,8 +4,8 @@
 structure, split by feature area rather than by class: style, geometry, rich text,
 floating shapes, table/cell, sheet/document.
 
-Nothing here knows how to read or write the underlying iWork archive format; that lives
-in pybers.archive once it exists. Keeping the model isolated from the archive format is
+Nothing here knows how to read or write the underlying file format; that lives in
+pybers.numbersfile. Keeping the model isolated from the stored format is
 deliberate: it is what makes the round-trip contract testable (build a model, write it,
 read it back, assert equality) without needing a real .numbers file for every test.
 
