@@ -427,8 +427,16 @@ def writeMergeFormula(
 
 def applyMerges(
     table: Table, model: tst.TableModelArchive, ownerUid: tsp.UUID
-) -> bool:
-    """Rewrite a table's merge store when its merges differ, and say whether it did.
+) -> frozenset[tuple[int, int]]:
+    """Rewrite a table's merge store when its merges differ, and say which cells moved.
+
+    **A merge changes what a formula reference means, so it changes results.** A cell
+    covered by a merge cannot be referenced, so `=J1` is a valid number while `I1:J1`
+    is apart and an invalid reference once it is merged. Measured 2026-09-02 across
+    `22-merge-2x2` and its unmerged twin: the same `L1` is a formula-error cell in
+    one and a plain number in the other. So every position whose merge state changed
+    is returned, for the same dirty-marking that a value edit gets, or the saved file
+    displays the result the reference had before.
 
     **The store is emptied rather than removed when the last merge goes.** Measured
     across `22-merge-2x2` and its unmerged twin: the merged table holds five formulas
@@ -439,16 +447,27 @@ def applyMerges(
     same reason cell edits are: a caller reaches `mergeRanges` directly, so there is
     no hook, and a comparison cannot go stale the way a dirty flag can.
     """
+    stored = readMerges(model)
     wanted = sorted(str(merge.extent) for merge in table.mergeRanges)
-    if wanted == sorted(str(merge.extent) for merge in readMerges(model)):
-        return False
+    if wanted == sorted(str(merge.extent) for merge in stored):
+        return frozenset()
 
     store = model.merge_owner.formula_store
     del store.formulas[:]
     for merge in table.mergeRanges:
         writeMergeFormula(store, merge.extent, ownerUid)
     store.next_formula_index = len(store.formulas)
-    return True
+
+    # Both directions matter: a merge that appeared invalidates references INTO it,
+    # and one that went away makes references valid again.
+    before = {str(merge.extent): merge for merge in stored}
+    after = {str(merge.extent): merge for merge in table.mergeRanges}
+    changed = (set(before) ^ set(after))
+    return frozenset(
+        (reference.row - originOffset, reference.col - originOffset)
+        for extent in changed
+        for reference in (before.get(extent) or after[extent]).extent
+    )
 
 
 def requestRecalculation(
@@ -555,12 +574,13 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 if reference != merge.anchor
             )
             cells = applyTableEdits(index, owners, table, model, swallowed)
-            if cells:
-                written[tableReference.identifier] = cells
-            if applyMerges(table, model, entry.formula_owner_uid) or swallowed:
+            moved = applyMerges(table, model, entry.formula_owner_uid)
+            if moved or swallowed:
                 owners[modelArchive.identifier].messageReplace(
                     modelArchive.identifier, 0, model.SerializeToString()
                 )
+            if cells or moved:
+                written[tableReference.identifier] = cells + sorted(moved)
 
     requestRecalculation(index, owners, written)
     return sum(len(cells) for cells in written.values())

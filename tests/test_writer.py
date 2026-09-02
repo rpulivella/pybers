@@ -806,6 +806,71 @@ def test_savingATableWhoseMergesDidNotChangeRewritesNothing(tmp_path: Path) -> N
     assert not archiveDifferences(readPackage(source), readPackage(working))
 
 
+def test_theMergeGoldensMatchWhatThisLibraryProduces(tmp_path: Path) -> None:
+    """AC 5 and AC 6, against two files Numbers opened and confirmed on 2026-09-02.
+
+    Merging `22b` and unmerging `22` are the two directions, and each golden should be
+    reproduced exactly by running the same operation again.
+    """
+    for golden, fixture, operation in (
+        ("22b-merged-by-pybers", "22b-merge-2x2-unmerged", "merge"),
+        ("22-unmerged-by-pybers", "22-merge-2x2", "unmerge"),
+    ):
+        expected = goldenDirectory / f"{golden}.numbers"
+        assert expected.is_file(), f"{expected.name} is missing; see the golden README"
+
+        directory = tmp_path / operation
+        directory.mkdir()
+        working = workingCopy(fixture, directory)
+        document = pybers.open(working)
+        table = document.sheet(1).table(1)
+        if operation == "merge":
+            for start in "ACEGI":
+                table.mergeAdd(f"{start}1:{chr(ord(start) + 1)}1")
+        else:
+            for merge in list(table.mergeRanges):
+                table.mergeRemove(merge.anchor)
+        document.save()
+
+        differences = archiveDifferences(readPackage(expected), readPackage(working))
+        assert not differences, (
+            f"the writer no longer produces the confirmed {operation}:\n  "
+            + "\n  ".join(differences)
+        )
+
+
+def test_theMergeGoldensHoldWhatTheyClaimTo() -> None:
+    """Guard the guard, including the part that looks like a bug and is not.
+
+    Each golden keeps the cached result from BEFORE its merge changed, because this
+    library evaluates nothing. `L1` holds `=J1`, so merging `I1:J1` invalidates that
+    reference and unmerging restores it, and Numbers recomputes on open because the
+    dirty set asks it to. Asserting the stale type here is what stops someone
+    "correcting" it to match the fixture it was built from.
+    """
+    merged = pybers.open(
+        goldenDirectory / "22b-merged-by-pybers.numbers"
+    ).sheet(1).table(1)
+    unmerged = pybers.open(
+        goldenDirectory / "22-unmerged-by-pybers.numbers"
+    ).sheet(1).table(1)
+
+    assert [str(merge.extent) for merge in merged.mergeRanges] == [
+        "A1:B1",
+        "C1:D1",
+        "E1:F1",
+        "G1:H1",
+        "I1:J1",
+    ]
+    assert unmerged.mergeRanges == []
+    # The anchor survives the merge and every covered position is gone from the model.
+    assert merged.cell("A1").value == "Hello"
+    assert merged.addressable("B1") is False
+    # Unmerging returns the positions and leaves them empty, never restoring a value.
+    assert unmerged.addressable("B1") is True
+    assert unmerged.cell("B1").value is None
+
+
 def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     """A save rewrites the archives it read, so a second one has to see the first.
 
