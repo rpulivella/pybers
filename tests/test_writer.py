@@ -41,8 +41,14 @@ import pybers
 from pybers.numbersfile import CellRecord, NumbersPackage, decodeRow, readPackage
 from pybers.numbersfile.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.model import Document, toCellReference
-from pybers.reader import ArchiveIndex
-from pybers.writer import WriteError, calculationEngineTypeId, writeDocument
+from pybers.reader import ArchiveIndex, findRoot, tableInfoTypeId
+from pybers.writer import (
+    WriteError,
+    calculationEngineTypeId,
+    tableOwnerIds,
+    writeDocument,
+)
+from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
@@ -626,6 +632,36 @@ def test_theGoldenAsksNumbersToRecalculateTheCellsThatMoved() -> None:
         36: [(0, [(0, 0)])],
         49: [(0, [(0, 0)])],
     }
+
+
+@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
+    """The guards in `recalculationRequested` rest on this, so it is asserted.
+
+    A table with no owner id cannot be marked, and the writer refuses the save rather
+    than producing a file with stale results. That refusal is unreachable today, and
+    this is what says so: 74 tables across the corpus, every one resolving. A future
+    fixture that broke the assumption would fail here rather than in someone's save.
+    """
+    index = ArchiveIndex(readPackage(path))
+    engineArchive = next(
+        (
+            archive for archive in index.byIdentifier.values()
+            if archiveTypeId(archive) == calculationEngineTypeId
+        ),
+        None,
+    )
+    assert engineArchive is not None, "no calculation engine in this document"
+    ownerIds = tableOwnerIds(index, parseArchive(engineArchive))
+
+    for sheetReference in findRoot(index).sheets:
+        sheet = index.resolve(sheetReference, tn.SheetArchive)
+        for reference in sheet.drawable_infos:
+            if index.typeOf(reference) != tableInfoTypeId:
+                continue
+            assert reference.identifier in ownerIds, (
+                f"table archive {reference.identifier} has no owner id"
+            )
 
 
 def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:

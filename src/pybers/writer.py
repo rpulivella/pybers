@@ -39,7 +39,7 @@ from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSTArchives_pb2 as tst
 from .model import Cell, CellReference, Document, Table
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
-from .numbersfile.types import archiveTypeId
+from .numbersfile.types import archiveTypeId, parseArchive
 from .numbersfile.cells import (
     CellRecord,
     emptyOffsetNarrow,
@@ -330,8 +330,12 @@ def recalculationRequested(
             "be asked to recalculate and the saved file would display stale formula "
             "results. Every document in the fixture corpus carries one."
         )
-    engine = tsce.CalculationEngineArchive()
-    engine.ParseFromString(engineArchive.messages[0].data)
+    engine = parseArchive(engineArchive)
+    if not isinstance(engine, tsce.CalculationEngineArchive):
+        raise WriteError(
+            f"Archive {engineArchive.identifier} carries the calculation engine's "
+            f"type but parsed as {type(engine).__name__}."
+        )
     if not engine.HasField("refs_to_dirty"):
         raise WriteError(
             "The calculation engine carries no refs_to_dirty reference, so the cells "
