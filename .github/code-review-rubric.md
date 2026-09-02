@@ -13,7 +13,7 @@ this codebase have built it this way?**
 ---
 
 **Design** — Is the work at the right altitude? Does it belong in the object model
-(`pybers.model`), the archive layer (`pybers.archive`), or the CLI/TUI layer — and does
+(`pybers.model`), the persistence layer (`pybers.numbersfile`), or the CLI/TUI layer — and does
 it stay there? Building archive-format knowledge into the object model, or vice versa, is
 the same defect seen from opposite sides.
 
@@ -24,7 +24,7 @@ tickets for follow-up, or did scope quietly change?
 **Complexity** — Could a skilled developer have done this more simply? Is anything here
 solving a problem nobody has yet?
 
-**Tests** — Does new behavior have tests? Does an archive-layer change have a round-trip
+**Tests** — Does new behavior have tests? Does a persistence-layer change have a round-trip
 or golden-file test, not just a model-level equality check? Was the current coverage of
 the modules this ticket touched actually assessed for thoroughness?
 
