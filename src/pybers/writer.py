@@ -19,6 +19,7 @@ UPDATES
 2026-09-01  Written for #2: the unchanged round trip.
 2026-09-01  Numeric edits reach the tile they came from, for #2.
 2026-09-02  Edited cells are marked for recalculation, for #25.
+2026-09-02  Merges are written back to the merge store, for #16.
 """
 from __future__ import annotations
 
@@ -36,8 +37,9 @@ from pathlib import Path
 
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSCEArchives_pb2 as tsce
+from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
-from .model import Cell, CellReference, Document, Table
+from .model import Cell, CellRange, CellReference, Document, Table
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
 from .numbersfile.types import archiveTypeId, parseArchive
 from .numbersfile.cells import (
@@ -49,6 +51,7 @@ from .numbersfile.cells import (
 from .numbersfile.decimal128 import Decimal128, encodedLength
 from .reader import (
     ArchiveIndex,
+    readMerges,
     findRoot,
     originOffset,
     readRichTextTable,
@@ -66,6 +69,15 @@ tileTypeId: int = 6002
 # because a bare 4000 in a comprehension says nothing about what is being looked for.
 calculationEngineTypeId: int = 4000
 tableOwnerKind: int = 1
+
+# A merge is written as `SUM($A$1:$B$1)`, so it carries SUM's index in Apple's own
+# function table. The number is theirs and is not derivable from the schemas.
+sumFunctionIndex: int = 168
+
+# A `TSP.UUID` is two 64-bit halves and a formula's table identifier is four 32-bit
+# words, so the same value is spelled two ways and has to be converted between them.
+wordBits: int = 32
+wordMask: int = 0xFFFFFFFF
 numericTypeBytes: tuple[int, ...] = (2, 10)
 
 # Byte 9 of a record's header is a bitmask, and this bit marks a cell backed by a
@@ -143,14 +155,22 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
 
 
 def rewriteRow(
-    offsets: bytes, buffer: bytes, wide: bool, replacements: dict[int, bytes]
+    offsets: bytes,
+    buffer: bytes,
+    wide: bool,
+    replacements: dict[int, bytes],
+    removals: frozenset[int] = frozenset(),
 ) -> tuple[bytes, bytes]:
-    """Rebuild one row's offset array and storage buffer with some records replaced.
+    """Rebuild one row's offset array and storage buffer, replacing and dropping.
 
     The whole row is rebuilt rather than patched in place because a record's offset
     is where the previous ones ended, so a record that changes length moves every
     record after it. Untouched records are re-emitted from the bytes they were read
     from, so a row with one edit differs in exactly one record.
+
+    A dropped column takes the same empty offset a column that never held anything
+    takes, which is what a cell swallowed by a merge looks like in the file: no
+    record at all rather than an empty one.
     """
     width = 4 if wide else 2
     empty = emptyOffsetWide if wide else emptyOffsetNarrow
@@ -161,7 +181,7 @@ def rewriteRow(
     rebuiltBuffer = bytearray()
     for column in range(slots):
         record = existing.get(column)
-        if record is None:
+        if record is None or column in removals:
             rebuiltOffsets += empty.to_bytes(width, "little")
             continue
         rebuiltOffsets += len(rebuiltBuffer).to_bytes(width, "little")
@@ -174,6 +194,7 @@ def applyTableEdits(
     owners: dict[int, IWAFile],
     table: Table,
     model: tst.TableModelArchive,
+    swallowed: frozenset[tuple[int, int]] = frozenset(),
 ) -> list[tuple[int, int]]:
     """Write every changed cell of one table back into the tiles it came from.
 
@@ -206,9 +227,14 @@ def applyTableEdits(
             wide = rowInfo.has_wide_offsets or tile.should_use_wide_rows
             row = firstRow + rowInfo.tile_row_index
             replacements: dict[int, bytes] = {}
+            removals = frozenset(
+                column for (swallowedRow, column) in swallowed if swallowedRow == row
+            )
             for record in decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, wide
             ):
+                if (row, record.column) in swallowed:
+                    continue
                 cell = table.cells.get(
                     CellReference(row + originOffset, record.column + originOffset)
                 )
@@ -219,13 +245,21 @@ def applyTableEdits(
                 replacements[record.column] = patchRecord(
                     record, checkedValue(cell, record)
                 )
-            if not replacements:
+            present = frozenset(
+                record.column
+                for record in decodeRow(
+                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, wide
+                )
+            )
+            dropped = removals & present
+            if not replacements and not dropped:
                 continue
             rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
                 rowInfo.cell_offsets,
                 rowInfo.cell_storage_buffer,
                 wide,
                 replacements,
+                dropped,
             )
             written.extend((row, column) for column in replacements)
             touched = True
@@ -235,29 +269,6 @@ def applyTableEdits(
                 archive.identifier, 0, tile.SerializeToString()
             )
     return written
-
-
-def tableOwnerIds(
-    index: ArchiveIndex, engine: tsce.CalculationEngineArchive
-) -> dict[int, int]:
-    """Return each table's internal calculation-engine owner id, keyed by its archive.
-
-    Read the long way round because there is no short one: a table does not record
-    its owner id. The mapping lives in the dependency tracker, where the entry whose
-    `owner_kind` is 1 and whose `formula_owner` points at a `TST.TableInfoArchive`
-    carries the id for that table. Measured 2026-09-02, see findings-02-formulas.md.
-    """
-    ownerIds: dict[int, int] = {}
-    for reference in engine.dependency_tracker.formula_owner_dependencies:
-        dependencies = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
-        if dependencies.owner_kind != tableOwnerKind:
-            continue
-        if not dependencies.HasField("formula_owner"):
-            continue
-        ownerIds[dependencies.formula_owner.identifier] = (
-            dependencies.internal_formula_owner_id
-        )
-    return ownerIds
 
 
 def buildDirtySet(
@@ -292,6 +303,152 @@ def buildDirtySet(
                     break
                 start = previous = row
     return dirty
+
+
+def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
+    """Return the document's one calculation engine, or refuse and say why.
+
+    Exactly one archive in a document carries this type, the same way exactly one
+    carries `TN.DocumentArchive`. All 46 fixtures have one, so a document without
+    one is not what this library expects rather than a case to work around.
+    """
+    found = [
+        archive for archive in index.byIdentifier.values()
+        if archiveTypeId(archive) == calculationEngineTypeId
+    ]
+    if len(found) != 1:
+        raise WriteError(
+            f"Expected exactly one TSCE.CalculationEngineArchive, found {len(found)}. "
+            "Without it neither a merge nor a recalculation request can be written."
+        )
+    engine = parseArchive(found[0])
+    if not isinstance(engine, tsce.CalculationEngineArchive):
+        raise WriteError(
+            f"Archive {found[0].identifier} carries the calculation engine's type "
+            f"but parsed as {type(engine).__name__}."
+        )
+    return engine
+
+
+def ownerEntryFor(
+    entries: dict[int, tsce.FormulaOwnerDependenciesArchive],
+    identifier: int,
+    name: str,
+) -> tsce.FormulaOwnerDependenciesArchive:
+    """Return one table's dependency entry, or refuse naming the table."""
+    entry = entries.get(identifier)
+    if entry is None:
+        raise WriteError(
+            f"{name!r} has no calculation-engine owner entry, so neither its merges "
+            "nor its edited cells can be written. Every table in the fixture corpus "
+            "has one."
+        )
+    return entry
+
+
+def tableOwnerEntries(
+    index: ArchiveIndex, engine: tsce.CalculationEngineArchive
+) -> dict[int, tsce.FormulaOwnerDependenciesArchive]:
+    """Return each table's dependency entry, keyed by its `TST.TableInfoArchive`.
+
+    Read the long way round because there is no short one: a table records neither
+    its internal owner id nor its owner uid. Both live here, on the entry whose
+    `owner_kind` is 1 and whose `formula_owner` points back at the table. Measured
+    2026-09-02, see findings-02-formulas.md and findings-03-structure.md.
+    """
+    entries: dict[int, tsce.FormulaOwnerDependenciesArchive] = {}
+    for reference in engine.dependency_tracker.formula_owner_dependencies:
+        dependencies = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
+        if dependencies.owner_kind != tableOwnerKind:
+            continue
+        if not dependencies.HasField("formula_owner"):
+            continue
+        entries[dependencies.formula_owner.identifier] = dependencies
+    return entries
+
+
+def tableOwnerIds(
+    index: ArchiveIndex, engine: tsce.CalculationEngineArchive
+) -> dict[int, int]:
+    """Return each table's internal owner id, keyed by its own archive."""
+    return {
+        identifier: entry.internal_formula_owner_id
+        for identifier, entry in tableOwnerEntries(index, engine).items()
+    }
+
+
+def writeMergeFormula(
+    store: tst.FormulaStoreArchive, extent: CellRange, ownerUid: tsp.UUID
+) -> None:
+    """Add one merged region to a table's merge store, as the formula Numbers writes.
+
+    **A merge is stored as a formula, not as a flag on a cell.** Each region is a
+    complete formula shaped like `SUM($A$1:$B$1)`: a colon-tract node carrying the
+    rectangle with all four sticky bits set, then the function node for SUM. Nothing
+    evaluates it; the shape is how a merge is expressed.
+
+    The tract's table identifier is the table's own `formula_owner_uid`, split from
+    two 64-bit halves into four 32-bit words, which is a different spelling of the
+    same value in a different archive. Measured 2026-09-02 against `22-merge-2x2`.
+    """
+    pair = store.formulas.add()
+    pair.formula_index = len(store.formulas) - 1
+
+    node = pair.formula.AST_node_array.AST_node.add()
+    node.AST_node_type = tsce.ASTNodeArrayArchive.COLON_TRACT_NODE
+    identifier = node.AST_cross_table_reference_extra_info.table_id
+    identifier.uuid_w0 = ownerUid.lower & wordMask
+    identifier.uuid_w1 = ownerUid.lower >> wordBits
+    identifier.uuid_w2 = ownerUid.upper & wordMask
+    identifier.uuid_w3 = ownerUid.upper >> wordBits
+    node.AST_sticky_bits.begin_row_is_absolute = True
+    node.AST_sticky_bits.begin_column_is_absolute = True
+    node.AST_sticky_bits.end_row_is_absolute = True
+    node.AST_sticky_bits.end_column_is_absolute = True
+
+    tract = node.AST_colon_tract
+    columns = tract.absolute_column.add()
+    columns.range_begin = extent.startCol - originOffset
+    rows = tract.absolute_row.add()
+    rows.range_begin = extent.startRow - originOffset
+    # `range_end` is omitted for a span of one rather than repeating the beginning,
+    # which is how Numbers writes its own and how the reader expects to find them.
+    if extent.endCol != extent.startCol:
+        columns.range_end = extent.endCol - originOffset
+    if extent.endRow != extent.startRow:
+        rows.range_end = extent.endRow - originOffset
+    tract.preserve_rectangular = True
+
+    function = pair.formula.AST_node_array.AST_node.add()
+    function.AST_node_type = tsce.ASTNodeArrayArchive.FUNCTION_NODE
+    function.AST_function_node_index = sumFunctionIndex
+    function.AST_function_node_numArgs = 1
+
+
+def applyMerges(
+    table: Table, model: tst.TableModelArchive, ownerUid: tsp.UUID
+) -> bool:
+    """Rewrite a table's merge store when its merges differ, and say whether it did.
+
+    **The store is emptied rather than removed when the last merge goes.** Measured
+    across `22-merge-2x2` and its unmerged twin: the merged table holds five formulas
+    and the unmerged one holds zero, and `merge_owner` is present in both. Deleting
+    it would produce something Numbers does not write.
+
+    Compared against what is stored rather than tracked as merges are added, for the
+    same reason cell edits are: a caller reaches `mergeRanges` directly, so there is
+    no hook, and a comparison cannot go stale the way a dirty flag can.
+    """
+    wanted = sorted(str(merge.extent) for merge in table.mergeRanges)
+    if wanted == sorted(str(merge.extent) for merge in readMerges(model)):
+        return False
+
+    store = model.merge_owner.formula_store
+    del store.formulas[:]
+    for merge in table.mergeRanges:
+        writeMergeFormula(store, merge.extent, ownerUid)
+    store.next_formula_index = len(store.formulas)
+    return True
 
 
 def requestRecalculation(
@@ -375,6 +532,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     }
     root = findRoot(index)
     written: dict[int, list[tuple[int, int]]] = {}
+    entries = tableOwnerEntries(index, calculationEngine(index))
 
     for sheet, reference in zip(document.sheets, root.sheets):
         sheetArchive = index.resolve(reference, tn.SheetArchive)
@@ -384,14 +542,25 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
         ]
         for table, tableReference in zip(sheet.tables, tableReferences):
             tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
-            cells = applyTableEdits(
-                index,
-                owners,
-                table,
-                index.resolve(tableInfo.tableModel, tst.TableModelArchive),
+            modelArchive = index.archive(tableInfo.tableModel.identifier)
+            model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
+            entry = ownerEntryFor(entries, tableReference.identifier, table.name)
+
+            # A cell a merge swallowed has NO record in the file, so its record is
+            # dropped rather than left behind as an empty one Numbers never wrote.
+            swallowed = frozenset(
+                (reference.row - originOffset, reference.col - originOffset)
+                for merge in table.mergeRanges
+                for reference in merge.extent
+                if reference != merge.anchor
             )
+            cells = applyTableEdits(index, owners, table, model, swallowed)
             if cells:
                 written[tableReference.identifier] = cells
+            if applyMerges(table, model, entry.formula_owner_uid) or swallowed:
+                owners[modelArchive.identifier].messageReplace(
+                    modelArchive.identifier, 0, model.SerializeToString()
+                )
 
     requestRecalculation(index, owners, written)
     return sum(len(cells) for cells in written.values())
