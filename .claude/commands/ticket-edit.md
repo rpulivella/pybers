@@ -86,8 +86,9 @@ means fetching the current body, changing part of it, and writing the whole thin
 - **A dropped AC is struck through, never deleted.** Wrap it in `~~` and leave it where
   it is: `4. ~~The old requirement.~~` A deleted AC leaves every existing reference
   pointing at nothing, or worse, at whatever slid into its place.
-- **Nesting is one level deep and labels never repeat.** `4.a` and `4.b` under `4` are
-  fine; a third level means the parent was really two tickets.
+- **Nesting is one level deep and labels never repeat.** `4.i` and `4.ii` under `4` are
+  fine; a third level means the parent was really two tickets. A ticket already carrying
+  the superseded `4.a` form keeps it, since renumbering orphans every reference to it.
 - **The title is the branch slug, the PR title, and the CHANGELOG entry.** Retitling a
   ticket that is already `In Progress` orphans its branch name.
 - **Dropping scope is a status change, not an edit.** A ticket whose spec turns out to be

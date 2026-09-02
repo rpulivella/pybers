@@ -14,7 +14,10 @@ acceptance criteria into tasks.
 1. Get the issue number from `$ARGUMENTS` (`42`, `#42`, or the URL). If missing, ask.
 2. Fetch it: `python3 scripts/ticket.py show <N>`.
 3. Display to the user, exactly as written (do not paraphrase): title + label,
-   acceptance criteria (preserve numbering/nesting), SPEC.
+   acceptance criteria (preserve numbering/nesting), SPEC. Sub-criteria are an
+   indented list of `1.` markers that GitHub renders `i.`, `ii.`, so cite `4.ii`.
+   Tickets filed before 2026-09-02 carry the superseded `4.a` form; cite those as
+   written.
 4. **Branch.** Every ticket gets its own branch. First check for an existing one
    (`git branch -a | grep -E "/<N>-"`); if one exists, stop and tell the user.
 
