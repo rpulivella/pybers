@@ -253,10 +253,12 @@ linter will assume. Follow them as written.
 - Docstring on every function/class: one-line imperative summary, then free-form *why*
   when there is one, no `Args:`/`Returns:` sections. Module docstrings carry a dated
   `UPDATES` changelog block. No contractions in docstrings/comments.
-- Module header block on every file: `#!/usr/bin/env python3`, `# -*- coding: utf-8 -*-`,
-  module docstring, then `__author__`/`__copyright__`/`__license__`/`__version__`/
-  `__email__`/`__status__`/`__date__` (`Richard P Ulivella` / `pybers@richardulivella.com` /
-  `Copyright 2026`).
+- Module header block on every file: `#!/usr/bin/env python3`, module docstring, then
+  `__author__`/`__copyright__`/`__license__`/`__version__`/`__email__`/`__status__`/
+  `__date__` (`Richard P Ulivella` / `pybers@richardulivella.com` / `Copyright 2026`).
+  **The `# -*- coding: utf-8 -*-` line was dropped on 2026-09-02** and must not come
+  back: Python 3 reads source as UTF-8 already, so it declares nothing, and ruff's
+  `UP009` flags all 37 of them.
 - `RuntimeError` subclasses for internal failures, always `raise ... from exc` to
   preserve the chain. No bare `except Exception: pass` swallows.
 - `pathlib.Path` exclusively, never `os.path`. f-strings exclusively, never `.format()`.
