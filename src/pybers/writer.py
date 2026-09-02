@@ -38,7 +38,7 @@ from ._generated import TNArchives_pb2 as tn
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
-from .model import Cell, CellRange, CellReference, Document, Table
+from .model import Cell, CellReference, Document, MergeRange, Table
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
 from .numbersfile.cells import (
     CellRecord,
@@ -290,17 +290,16 @@ def buildDirtySet(
         for column, rows in sorted(byColumn.items()):
             entry = owner.coord_set.column_entries.add()
             entry.column = column
-            start = previous = rows[0]
-            for row in rows[1:] + [None]:
-                if row == previous + 1:
-                    previous = row
-                    continue
-                added = entry.row_set.entries.add(range_begin=start)
-                if previous != start:
-                    added.range_end = previous
-                if row is None:
-                    break
-                start = previous = row
+            runs: list[list[int]] = []
+            for row in rows:
+                if runs and row == runs[-1][1] + 1:
+                    runs[-1][1] = row
+                else:
+                    runs.append([row, row])
+            for begin, end in runs:
+                added = entry.row_set.entries.add(range_begin=begin)
+                if end != begin:
+                    added.range_end = end
     return dirty
 
 
@@ -377,7 +376,7 @@ def tableOwnerIds(
 
 
 def writeMergeFormula(
-    store: tst.FormulaStoreArchive, extent: CellRange, ownerUid: tsp.UUID
+    store: tst.FormulaStoreArchive, merge: MergeRange, ownerUid: tsp.UUID
 ) -> None:
     """Add one merged region to a table's merge store, as the formula Numbers writes.
 
@@ -405,17 +404,18 @@ def writeMergeFormula(
     node.AST_sticky_bits.end_row_is_absolute = True
     node.AST_sticky_bits.end_column_is_absolute = True
 
+    startRow, startCol, endRow, endCol = merge.bounds
     tract = node.AST_colon_tract
     columns = tract.absolute_column.add()
-    columns.range_begin = extent.startCol - originOffset
+    columns.range_begin = startCol - originOffset
     rows = tract.absolute_row.add()
-    rows.range_begin = extent.startRow - originOffset
+    rows.range_begin = startRow - originOffset
     # `range_end` is omitted for a span of one rather than repeating the beginning,
     # which is how Numbers writes its own and how the reader expects to find them.
-    if extent.endCol != extent.startCol:
-        columns.range_end = extent.endCol - originOffset
-    if extent.endRow != extent.startRow:
-        rows.range_end = extent.endRow - originOffset
+    if endCol != startCol:
+        columns.range_end = endCol - originOffset
+    if endRow != startRow:
+        rows.range_end = endRow - originOffset
     tract.preserve_rectangular = True
 
     function = pair.formula.AST_node_array.AST_node.add()
@@ -454,7 +454,7 @@ def applyMerges(
     store = model.merge_owner.formula_store
     del store.formulas[:]
     for merge in table.mergeRanges:
-        writeMergeFormula(store, merge.extent, ownerUid)
+        writeMergeFormula(store, merge, ownerUid)
     store.next_formula_index = len(store.formulas)
 
     # Both directions matter: a merge that appeared invalidates references INTO it,

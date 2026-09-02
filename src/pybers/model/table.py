@@ -106,6 +106,21 @@ class MergeRange:
             raise ReferenceError(f"{self.extent} has no anchor cell.")
         return anchor
 
+    @property
+    def bounds(self) -> tuple[int, int, int, int]:
+        """Return the block's corners as (startRow, startCol, endRow, endCol).
+
+        `__post_init__` already rejects an unbounded extent, so these four are
+        always present. Saying so in a return type rather than leaving four
+        `int | None` for every caller to re-check is the point: a merge that cannot
+        be unbounded should not look like one that can.
+        """
+        startRow, startCol = self.extent.startRow, self.extent.startCol
+        endRow, endCol = self.extent.endRow, self.extent.endCol
+        if startRow is None or startCol is None or endRow is None or endCol is None:
+            raise ReferenceError(f"{self.extent} is unbounded and bounds no merge.")
+        return (startRow, startCol, endRow, endCol)
+
     def covers(self, address: CellAddress) -> bool:
         """Report whether this merge occupies a cell, its anchor included."""
         return self.extent.covers(address)

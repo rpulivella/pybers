@@ -80,14 +80,25 @@ class Decimal128:
 
     value: Decimal
 
-    def __post_init__(self) -> None:
-        """Refuse anything decimal128 cannot hold, naming which limit was passed."""
+    def finiteParts(self) -> tuple[int, tuple[int, ...], int]:
+        """Return sign, digits and exponent, the exponent known to be a number.
+
+        `Decimal.as_tuple()` types its exponent as `int` or one of the three
+        markers `'n'`, `'N'` and `'F'`, for NaN, signalling NaN and infinity. None
+        of those is representable here, so they are refused once, and every caller
+        gets integers rather than repeating the check or assuming it happened.
+        """
         sign, digits, exponent = self.value.as_tuple()
         if not isinstance(exponent, int):
             raise Decimal128Error(
                 f"{self.value} is not a finite number, and decimal128 as Numbers "
                 "uses it has no representation for a NaN or an infinity."
             )
+        return sign, digits, exponent
+
+    def __post_init__(self) -> None:
+        """Refuse anything decimal128 cannot hold, naming which limit was passed."""
+        _, digits, exponent = self.finiteParts()
         if len(digits) > maximumSignificantDigits:
             raise Decimal128Error(
                 f"{self.value} carries {len(digits)} significant digits, and "
@@ -151,7 +162,7 @@ class Decimal128:
         Emits only the common layout. The other exists to express coefficients past
         the maximum this format may hold, so a canonical encoder never reaches for it.
         """
-        sign, digits, exponent = self.value.as_tuple()
+        sign, digits, exponent = self.finiteParts()
         coefficient = 0
         for digit in digits:
             coefficient = coefficient * 10 + digit
