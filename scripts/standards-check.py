@@ -443,7 +443,7 @@ def consoleProse(text: str) -> str:
 
 def mergeViews(first: str, second: str) -> str:
     """Combine two blanked views of one file, keeping offsets intact."""
-    return "".join(a if a != " " else b for a, b in zip(first, second))
+    return "".join(a if a != " " else b for a, b in zip(first, second, strict=True))
 
 
 def markdownProse(text: str) -> str:

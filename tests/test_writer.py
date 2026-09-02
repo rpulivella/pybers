@@ -119,7 +119,7 @@ def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[st
         )
         return differences
 
-    for beforeFile, afterFile in zip(before.iwaFiles, after.iwaFiles):
+    for beforeFile, afterFile in zip(before.iwaFiles, after.iwaFiles, strict=True):
         beforeIds = [archive.identifier for archive in beforeFile.archives]
         afterIds = [archive.identifier for archive in afterFile.archives]
         if beforeIds != afterIds:
@@ -129,7 +129,7 @@ def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[st
             )
             continue
 
-        for beforeArchive, afterArchive in zip(beforeFile.archives, afterFile.archives):
+        for beforeArchive, afterArchive in zip(beforeFile.archives, afterFile.archives, strict=True):
             beforeShape = [(m.typeId, m.version) for m in beforeArchive.messages]
             afterShape = [(m.typeId, m.version) for m in afterArchive.messages]
             if beforeShape != afterShape:
@@ -139,7 +139,7 @@ def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[st
                 )
                 continue
             for index, (beforeMessage, afterMessage) in enumerate(
-                zip(beforeArchive.messages, afterArchive.messages)
+                zip(beforeArchive.messages, afterArchive.messages, strict=True)
             ):
                 if not messagesAreEquivalent(
                     beforeMessage.typeId, beforeMessage.data, afterMessage.data
@@ -419,7 +419,7 @@ def test_aCellsNumberFormatSurvivesAnEdit(tmp_path: Path) -> None:
     beforeRecords = numericRecords(source)
     afterRecords = numericRecords(working)
     assert len(beforeRecords) == len(afterRecords)
-    for before, after in zip(beforeRecords, afterRecords):
+    for before, after in zip(beforeRecords, afterRecords, strict=True):
         assert before.references == after.references, (
             "a cell's format references changed, so its formatting was dropped"
         )

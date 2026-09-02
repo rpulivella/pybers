@@ -276,10 +276,11 @@ def writeArchiveInfo(archive: Archive) -> bytes:
     lengths = [len(message.data) for message in archive.messages]
     if all(
         declared.length == actual
-        for declared, actual in zip(info.message_infos, lengths)
+        # strict is safe rather than merely tidy: the count is checked above.
+        for declared, actual in zip(info.message_infos, lengths, strict=True)
     ):
         return archive.infoBytes
-    for declared, actual in zip(info.message_infos, lengths):
+    for declared, actual in zip(info.message_infos, lengths, strict=True):
         declared.length = actual
     return info.SerializeToString()
 

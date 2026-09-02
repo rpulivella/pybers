@@ -552,13 +552,29 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     written: dict[int, list[tuple[int, int]]] = {}
     entries = tableOwnerEntries(index, calculationEngine(index))
 
-    for sheet, reference in zip(document.sheets, root.sheets):
+    # Both pairings are checked rather than zipped loosely. A plain `zip` stops at
+    # the shorter side, so a model holding fewer sheets than the document does would
+    # write some of them and skip the rest in silence, which is the failure this
+    # format specializes in. Neither count can legitimately differ: the model was
+    # built from these archives.
+    if len(document.sheets) != len(root.sheets):
+        raise WriteError(
+            f"This document holds {len(root.sheets)} sheets and the model holds "
+            f"{len(document.sheets)}. Adding or removing a sheet is not supported."
+        )
+    for sheet, reference in zip(document.sheets, root.sheets, strict=True):
         sheetArchive = index.resolve(reference, tn.SheetArchive)
         tableReferences = [
             drawable for drawable in sheetArchive.drawable_infos
             if index.typeOf(drawable) == tableInfoTypeId
         ]
-        for table, tableReference in zip(sheet.tables, tableReferences):
+        if len(sheet.tables) != len(tableReferences):
+            raise WriteError(
+                f"{sheet.name!r} holds {len(tableReferences)} tables and the model "
+                f"holds {len(sheet.tables)}. Adding or removing a table is not "
+                "supported."
+            )
+        for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
             tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
             modelArchive = index.archive(tableInfo.tableModel.identifier)
             model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)

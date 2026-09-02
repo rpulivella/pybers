@@ -161,7 +161,7 @@ def testRoundTripPreservesEveryMemberExactly(name: str, tmp_path: Path) -> None:
 
     with zipfile.ZipFile(source) as original, zipfile.ZipFile(destination) as written:
         assert original.namelist() == written.namelist()
-        for before, after in zip(original.infolist(), written.infolist()):
+        for before, after in zip(original.infolist(), written.infolist(), strict=True):
             assert original.read(before.filename) == written.read(after.filename), (
                 f"{before.filename} changed content."
             )
