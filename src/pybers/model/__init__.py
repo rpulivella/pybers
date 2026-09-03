@@ -23,6 +23,17 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
+from pybers.model.formula import (
+    Coordinate,
+    Formula,
+    FormulaError,
+    FormulaNode,
+    FormulaRange,
+    FormulaReference,
+    FunctionCall,
+    Span,
+    UnknownFunction,
+)
 from pybers.model.geometry import Position, Size
 from pybers.model.ranges import CellRange, CellRangeList, RangeAddress, toCellRanges
 from pybers.model.reference import (
@@ -44,6 +55,15 @@ from pybers.model.text import Paragraph, RichText, TextRun
 # defined in the module it lives in is already public there, and a second list
 # repeating it is one more thing to forget.
 __all__ = [
+    "UnknownFunction",
+    "Span",
+    "FunctionCall",
+    "FormulaReference",
+    "FormulaRange",
+    "FormulaNode",
+    "FormulaError",
+    "Formula",
+    "Coordinate",
     "Cell",
     "CellAddress",
     "CellRange",

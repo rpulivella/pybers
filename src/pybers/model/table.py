@@ -35,6 +35,7 @@ import datetime
 from dataclasses import dataclass, field
 from decimal import Context, Decimal
 
+from pybers.model.formula import Formula
 from pybers.model.ranges import CellRange, RangeAddress, toCellRanges
 from pybers.model.reference import (
     CellAddress,
@@ -129,11 +130,23 @@ class MergeRange:
 
 @dataclass(slots=True)
 class Cell:
-    """One cell's value, optional formula, and style, at an address."""
+    """One cell's value, optional formula, and style, at an address.
+
+    `value` on a formula-backed cell is the result Numbers last computed and
+    cached, not something derived from `formula`. Reading a value therefore never
+    evaluates anything, and the two can disagree until Numbers recalculates.
+
+    `errored` says the formula failed and nothing more, because nothing more is
+    stored. The file records that a cell errored, never why: the error list is
+    empty in every fixture, and division by zero is indistinguishable from any
+    other failure. A broken reference is the one exception and is visible through
+    the formula itself.
+    """
 
     reference: CellReference
     value: CellValue = None
-    formula: str | None = None
+    formula: Formula | None = None
+    errored: bool = False
     style: Style = field(default_factory=Style)
 
 
