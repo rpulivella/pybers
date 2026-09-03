@@ -31,7 +31,10 @@ trigger sitting on it.
    python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
    ```
    The source branch is deleted unless `--keep-branch` is passed. `pr.py` refuses a draft,
-   so a pull request that never went through `/pr-review-code` cannot arrive here.
+   so a pull request that never went through `/pr-review-code` cannot arrive here, and it
+   refuses any CI state other than passed, including a state it could not read. Neither
+   refusal is restated as a step here, because a check a skill performs is a check a
+   skimmed skill skips.
 5. **Get `develop` current, and read what the pull printed.**
    ```
    git checkout develop

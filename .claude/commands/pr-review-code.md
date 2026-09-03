@@ -66,7 +66,7 @@ perform yourself, and the report says so rather than implying the machine did it
    because it should be run. Do not launch these agents without the user asking.
 
    Delegate the parts that suit an agent, launched
-   concurrently in one message, each given the file list from step 3 and told that
+   concurrently in one message, each given the file list from step 4 and told that
    anything outside it is out of scope.
 
    **Every agent is conditional, spend one only where the diff gives it something to
@@ -84,9 +84,12 @@ perform yourself, and the report says so rather than implying the machine did it
      dataclass or other new type.
 
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
-6. **Report**, separating what you verified by execution from what you only read. Name
+6. **Read CI and report it, without gating on it:** `python3 scripts/pr.py checks <N>`.
+   A review runs before promotion, so `checks-not-passed` is the ordinary answer here
+   and is never a finding. `/pr-merge` is where it becomes a refusal.
+7. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
-7. **Only on green gates with no unresolved finding**, promote it:
+8. **Only on green gates with no unresolved finding**, promote it:
    `python3 scripts/pr.py ready <N>`. Until #3 lands, "green gates" means the two
    commands above run clean, and the report says that is what was run.
 
@@ -123,7 +126,7 @@ more than the one stage in question.
 ## Merging
 
 `/pr-merge`, which owns the command and the reasons behind it. This skill promotes a pull
-request out of draft and stops there, and `pr.py` refuses to merge a draft, so step 6
+request out of draft and stops there, and `pr.py` refuses to merge a draft, so step 8
 cannot be skipped.
 
 $ARGUMENTS

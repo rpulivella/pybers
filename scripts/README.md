@@ -69,6 +69,7 @@ They live in `pr.py`, which shares this tool's auth rather than duplicating it.
 | `export-as-source` | `/pr-draft edit` (`--body` and `--title`), **byte-exact, for round-tripping**. Contrast `find`, which renders. `/pr-review-code` reaches it through that skill rather than directly, so the mechanism lives in one place |
 | `find` | `/pr-review-code` and `/pr-merge` (`--number-only`), resolve the PR for the current branch. **Rendered, for reading only** |
 | `ready` | `/pr-review-code`, the only sanctioned promotion out of draft |
+| `checks` | `/pr-review-code`, which reports the state without gating on it. `merge` calls the same helpers itself and refuses anything but passed, so the guard cannot be skipped by skipping a skill |
 | `merge` | `/pr-merge`, the only skill that runs it. `--subject` required, `merge` by default and `squash` by exception |
 
 `--base` defaults to `develop`. A web-facing repository whose deploy tracks another branch
