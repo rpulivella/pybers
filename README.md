@@ -1,5 +1,7 @@
 # pybers
 
+[![preflight](https://github.com/rpulivella/pybers/actions/workflows/preflight.yml/badge.svg?branch=develop)](https://github.com/rpulivella/pybers/actions/workflows/preflight.yml)
+
 A round-trip-tested Python library for reading and writing Apple Numbers documents,
 built in deep respect for Apple Numbers itself. The goal is for editing a `.numbers`
 file programmatically to be as reliable as editing it by hand.
