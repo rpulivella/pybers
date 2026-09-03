@@ -43,7 +43,7 @@ __date__ = "2026/09/02"
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, TypeVar
+from typing import TYPE_CHECKING, Protocol
 
 from pybers.model.shapes import GraphicalObject
 from pybers.model.table import Cell, Table
@@ -72,9 +72,6 @@ class Named(Protocol):
     name: str
 
 
-NamedT = TypeVar("NamedT", bound=Named)
-
-
 def namesListed(items: Sequence[Named]) -> str:
     """Return the names present, for an error message that says what to ask for."""
     if not items:
@@ -82,7 +79,7 @@ def namesListed(items: Sequence[Named]) -> str:
     return ", ".join(repr(item.name) for item in items)
 
 
-def selectedByName(
+def selectedByName[NamedT: Named](
     items: Sequence[NamedT], name: str, kind: str, within: str, foldCase: bool
 ) -> NamedT:
     """Return the one item carrying a name, raising when none or several do.
@@ -114,7 +111,7 @@ def selectedByName(
     return matched[0][1]
 
 
-def selectedByPosition(
+def selectedByPosition[NamedT: Named](
     items: Sequence[NamedT], position: int, kind: str, within: str
 ) -> NamedT:
     """Return the item at a one-based position in the file's own order."""
@@ -126,7 +123,7 @@ def selectedByPosition(
     return items[position - firstPosition]
 
 
-def selected(
+def selected[NamedT: Named](
     items: Sequence[NamedT],
     nameOrPosition: str | int,
     kind: str,
