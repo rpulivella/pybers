@@ -21,11 +21,12 @@ ticket.py    file and move tickets on GitHub Issues and the pybers Project board
 pr.py        open, inspect, promote and merge pull requests. Exists so that no
              skill needs `gh`, whose identity is an ambient keyring holding
              several accounts at once. Live now.
+pr-preflight-check.py
+             run every gate in one pass and report all of them: pytest, the
+             prose gate, ruff and mypy. The deterministic half of
+             `/pr-review-code`, and what #5's CI workflow calls, so the gate
+             list lives here rather than in two places. Live now.
 ```
-
-`pr-preflight-check.py` (the deterministic half of `/pr-review-code`) does not exist yet.
-Author it with `/script-write` once there is a real CI/test story to gate on beyond plain
-`pytest`.
 
 ## Naming
 
@@ -151,9 +152,12 @@ relying on captured stdout, `workarea/logs/<script>-<timestamp>.log`.
 /usr/bin/env python3 -m pip install --upgrade rich rich_argparse
 ```
 
-**Run these scripts with the system interpreter, not the project venv.** `rich` is
-installed for system Python; `.venv` carries only the library's own test dependencies, so
-`source .venv/bin/activate && python3 scripts/pr.py` fails on the `rich` import. `pytest`
-is the reverse, it runs under `.venv`.
+**Either interpreter runs these, corrected 2026-09-02.** `rich` and `rich_argparse` moved
+into the `dev` extra, so `pip install -e ".[dev]"` equips the venv for the tooling as well
+as the suite, and this section's earlier claim that the venv carried only test
+dependencies stopped being true then.
+
+**`pr-preflight-check.py` is the exception and must use the venv**, because pytest, ruff
+and mypy exist nowhere else.
 
 See each script's docstring for its specific prerequisites.
