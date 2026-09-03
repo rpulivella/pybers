@@ -95,7 +95,7 @@ Requires Python 3.11 or newer. The only runtime dependency is `protobuf`.
 
 | Path | What lives here |
 | --- | --- |
-| `src/pybers/` | The library. `model/` is the object model, `archive/` is the container and reader, `protos/` and `_generated/` are the extracted iWork schemas. |
+| `src/pybers/` | The library. `model/` is the object model, `numbersfile/` is the container and reader, `protos/` and `_generated/` are the extracted iWork schemas with their type stubs. |
 | `tests/` | The pytest suite, plus `fixtures/`: real `.numbers` files and the findings written from them. |
 | `scripts/` | Repository tooling, including the schema extractor and the writing gate. See `scripts/README.md`. |
 | `.claude/` | Project slash-commands used by the agentic workflow. |
