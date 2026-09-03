@@ -136,6 +136,18 @@ partialSuccessExitCode: int = 3
 # a number and not a valid PR reference, so it can never be mistaken for one.
 noOpenPullRequestMarker: str = "no-open-pull-request"
 
+# What `checks` prints as its verdict. Words rather than color alone, for the
+# reason the marker above exists: the consumer is an agent reading stdout, and it
+# must be able to tell an answer from a command that died before printing one.
+checksPassedMarker: str = "checks-passed"
+checksNotPassedMarker: str = "checks-not-passed"
+
+# A conclusion that does not block a merge. `skipped` belongs here because #5's
+# workflow skips its job on a draft, and that skipped run attaches to the SAME
+# commit the real run does once the pull request is promoted, so treating it as a
+# failure would leave every promoted pull request permanently red.
+passingConclusions: frozenset[str] = frozenset({"success", "skipped"})
+
 
 class PullRequestSummary(TypedDict):
     """An open or merged pull request, as the skills need to see it."""
@@ -146,8 +158,17 @@ class PullRequestSummary(TypedDict):
     state: str
     isDraft: bool
     head: str
+    headSha: str
     base: str
     nodeId: str
+
+
+class CheckRun(TypedDict):
+    """One check run on a commit, reduced to what a merge decision needs."""
+
+    name: str
+    status: str
+    conclusion: str
 
 
 def readCurrentBranch() -> str:
@@ -185,6 +206,7 @@ def summarizePullRequest(payload: dict[str, Any]) -> PullRequestSummary:
         state=payload["state"],
         isDraft=bool(payload.get("draft", False)),
         head=payload["head"]["ref"],
+        headSha=payload["head"]["sha"],
         base=payload["base"]["ref"],
         nodeId=payload["node_id"],
     )
@@ -306,6 +328,43 @@ def readPullRequestBody(token: str, number: int) -> str:
         f"{ticket.repositoryName}/pulls/{number}"
     )
     return ticket.requestJson(url, token).get("body") or ""
+
+
+def readCheckRuns(token: str, sha: str) -> list[CheckRun]:
+    """Return every check run GitHub reports for one commit.
+
+    The check-runs endpoint, never the legacy commit statuses one. Actions writes
+    no legacy status, so `/commits/{sha}/status` answers an empty `success` for a
+    repository whose only CI is Actions. That reads as green and is precisely the
+    silent pass this command exists to prevent.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+        f"{ticket.repositoryName}/commits/{sha}/check-runs"
+    )
+    payload = ticket.requestJson(url, token, apiVersion="2022-11-28")
+    return [
+        CheckRun(
+            name=run["name"],
+            status=run["status"],
+            # Null until a run completes, and "" reports better than "None".
+            conclusion=run.get("conclusion") or "",
+        )
+        for run in payload.get("check_runs", [])
+    ]
+
+
+def checksHavePassed(runs: list[CheckRun]) -> bool:
+    """Return whether every check completed with a conclusion that permits a merge.
+
+    An empty list is False, deliberately. No checks means CI has not started or
+    the workflow failed to parse, and reading an absent answer as a green one is
+    the whole failure this guards against.
+    """
+    return bool(runs) and all(
+        run["status"] == "completed" and run["conclusion"] in passingConclusions
+        for run in runs
+    )
 
 
 def printBodyAsRawString(body: str) -> None:
@@ -499,6 +558,43 @@ def cmdFind(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def cmdChecks(arguments: argparse.Namespace) -> int:
+    """Print every check on a pull request's head commit and whether all passed.
+
+    Three outcomes, the contract `find` already carries: passed, not passed, and
+    the question could not be asked, which main() turns into errorExitCode. Only
+    the first means a merge is safe, and a pull request with no checks at all is
+    the second rather than the first.
+    """
+    token = ticket.resolveToken()
+    summary = readPullRequest(token, arguments.number)
+    runs = readCheckRuns(token, summary["headSha"])
+    commit = summary["headSha"][:12]
+
+    for run in runs:
+        if run["status"] != "completed":
+            mark = "[yellow]WAIT[/]"
+        elif run["conclusion"] in passingConclusions:
+            mark = "[green]PASS[/]"
+        else:
+            mark = "[red]FAIL[/]"
+        state = run["conclusion"] or run["status"]
+        console.print(f"{mark} [bold]{escape(run['name'])}[/]  {escape(state)}")
+
+    if checksHavePassed(runs):
+        console.print(f"[green]{checksPassedMarker}[/] on {commit}")
+        return 0
+
+    if not runs:
+        console.print(
+            f"[yellow]{checksNotPassedMarker}[/] on {commit}: nothing has "
+            "reported. CI has not started, or the workflow failed to parse."
+        )
+    else:
+        console.print(f"[red]{checksNotPassedMarker}[/] on {commit}")
+    return notFoundExitCode
+
+
 def cmdExportAsSource(arguments: argparse.Namespace) -> int:
     """Emit one field of a pull request verbatim, for a skill that will send it back.
 
@@ -609,6 +705,13 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         console.print(
             f"[red]#{summary['number']} is still a draft.[/] "
             "Run /pr-review-code, which owns the promotion out of draft."
+        )
+        return errorExitCode
+
+    if not checksHavePassed(readCheckRuns(token, summary["headSha"])):
+        console.print(
+            f"[red]CI has not passed on #{summary['number']}.[/] "
+            f"Run `python3 scripts/pr.py checks {summary['number']}` for which."
         )
         return errorExitCode
 
@@ -767,6 +870,12 @@ def buildParser() -> argparse.ArgumentParser:
     )
     editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     editParser.set_defaults(handler=cmdEdit)
+
+    checksParser = subparsers.add_parser(
+        "checks", help="report whether every check on a pull request has passed"
+    )
+    checksParser.add_argument("number", type=int)
+    checksParser.set_defaults(handler=cmdChecks)
 
     readyParser = subparsers.add_parser("ready", help="take a draft out of draft")
     readyParser.add_argument("number", type=int)
