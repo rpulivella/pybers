@@ -110,11 +110,7 @@ projectNumber: int = 3
 
 
 def readTicketPrefix() -> str:
-    """Return the ticket key `pyproject.toml` declares.
-
-    Read rather than hard-coded so the key has one home. A constant here would be
-    a second declaration that drifts from the one a human reads.
-    """
+    """Return the ticket key `pyproject.toml` declares, so it has one home."""
     config = Path(__file__).resolve().parent.parent / "pyproject.toml"
     with config.open("rb") as handle:
         return str(tomllib.load(handle)["tool"]["pybers"]["ticketPrefix"])
@@ -124,13 +120,9 @@ ticketPrefix: str = readTicketPrefix()
 
 
 def ticketNumber(value: str) -> int:
-    """Parse a ticket argument in any form this tool prints or a person types.
+    """Parse `PYB-39`, `39`, `#39` or the issue URL, which cannot differ here.
 
-    `PYB-39`, `39`, `#39` and the issue URL all mean the same ticket, and none of
-    them can mean anything else in this position, so accepting all four costs
-    nothing and spares a reader translating a reference back into a bare number.
-    An argparse type function must raise ArgumentTypeError to produce a usage
-    message rather than a traceback.
+    ArgumentTypeError rather than ValueError, so argparse prints usage.
     """
     text = value.strip()
     if text.lower().startswith(f"{ticketPrefix.lower()}-"):
@@ -148,9 +140,7 @@ def ticketNumber(value: str) -> int:
 def ticketRef(number: int) -> str:
     """Return a ticket reference in the house form, never a bare number.
 
-    GitHub numbers issues and pull requests from one counter, so a bare `#34`
-    names two things. Every printed reference goes through here, which is what
-    keeps the convention from depending on anyone remembering it.
+    GitHub numbers issues and pull requests from one counter, so `#34` names two.
     """
     return f"{ticketPrefix}-{number}"
 

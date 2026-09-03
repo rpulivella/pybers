@@ -138,12 +138,7 @@ noOpenPullRequestMarker: str = "no-open-pull-request"
 
 
 def pullRequestNumber(value: str) -> int:
-    """Parse a pull request argument in any form this tool prints or a person types.
-
-    `PR #38`, `#38`, `38` and the pull request URL all mean the same thing here.
-    `ticket.ticketNumber` is the matching half, and both exist so a reference can
-    be pasted back into the tool that printed it.
-    """
+    """Parse `PR #38`, `#38`, `38` or the pull request URL."""
     text = value.strip()
     if text.lower().startswith("pr"):
         text = text[2:].strip()
@@ -158,11 +153,7 @@ def pullRequestNumber(value: str) -> int:
 
 
 def pullRequestRef(number: int) -> str:
-    """Return a pull request reference in the house form, both parts always.
-
-    GitHub numbers issues and pull requests from one counter, so `#38` alone
-    names two things. `ticket.ticketRef` is the matching half for issues.
-    """
+    """Return a pull request reference in the house form, both parts always."""
     return f"PR #{number}"
 
 
