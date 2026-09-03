@@ -4,11 +4,11 @@ A round-trip-tested Python library for reading and writing Apple Numbers documen
 built in deep respect for Apple Numbers itself. The goal is for editing a `.numbers`
 file programmatically to be as reliable as editing it by hand.
 
-> **Status: early, and narrow.** A real `.numbers` file opens, its cells read, a number
-> can be changed, and the file saves back so that Numbers opens it showing the new value
-> with nothing else altered. Everything past that, writing text, formulas, styles and
-> structural edits, is not built. See [What works today](#what-works-today) for the
-> honest line between finished and not.
+> **Status: early, and narrow.** A real `.numbers` file opens, its cells read, numbers
+> and merges can be changed, and the file saves back so that Numbers opens it showing
+> the result with nothing else altered. Writing text, writing formulas, styles, and
+> inserting or deleting rows and columns are not built. See
+> [What works today](#what-works-today) for the honest line between finished and not.
 
 ## Why this exists
 
@@ -36,6 +36,9 @@ every reader of this format builds on it. No code from it is used here, and the
 | `pybers.numbersfile` | The persistence layer. **Reads** a `.numbers` package: zip container, IWA frames, a pure-Python Snappy codec with no C dependency, base-128 varints, length-prefixed protobuf archives, IEEE-754 decimal128, and cell values including numbers, text, dates, booleans, durations and currency. **Writes** one back, replaying an untouched member exactly and re-encoding an edited one. |
 | `pybers.model` | The dataclass object model, split by feature area: style, geometry, rich text, floating shapes, tables and cells, sheets and documents. |
 | The binding between them | `pybers.open(path)` returns a `Document` and `document.save()` writes it back. A cell set to a `Decimal` reaches the tile it came from; writing over a formula, writing text, and changing a cell's type all raise rather than losing anything. |
+| Reaching and walking | `document.sheet(...)` and `sheet.table(...)` take a name or a position counted from one, and both refuse a name no sheet or table carries rather than returning whichever came first. `document.cellsIterate()` yields every cell a document stores, in a stated order, with the table and sheet holding it. |
+| Merging | `table.mergeAdd("A1:B1")` and `table.mergeRemove("A1")`. A merge discards the cells it covers, permanently, because that is what Numbers does. |
+| Recalculation | An edit marks the cells it changed, so Numbers recomputes whatever depended on them when it next opens the file. This library never evaluates a formula. |
 | `pybers.cli`, `pybers.tui` | Not started. |
 
 ```python
@@ -43,13 +46,21 @@ import pybers
 from decimal import Decimal
 
 document = pybers.open("budget.numbers")
-document.sheets[0].tables[0].cell("B4").value = Decimal("1250.00")
+
+for sheet, table, cell in document.cellsIterate():
+    print(sheet.name, table.name, cell.reference, cell.value)
+
+costs = document.sheet("Summary").table("Costs")
+costs.cell("B4").value = Decimal("1250.00")
+costs.mergeAdd("A1:C1")
+
 document.save()
 ```
 
-That milestone is met: every one of the 46 fixtures reads and writes back with each of
-its archives unchanged, and one numeric edit was confirmed in Numbers 15.3.1 by opening
-the saved file and reading it on screen.
+Every one of the 46 fixtures reads and writes back with each of its archives unchanged.
+Four saved files have been opened in Numbers 15.3.1 and confirmed on screen, covering a
+numeric edit, an edit across two sheets, a merge and an unmerge. Those live in
+`tests/golden/`, and the reasoning for keeping them is in its README.
 
 ## The format, and why there are so many fixtures
 
@@ -95,7 +106,7 @@ Requires Python 3.11 or newer. The only runtime dependency is `protobuf`.
 
 | Path | What lives here |
 | --- | --- |
-| `src/pybers/` | The library. `model/` is the object model, `archive/` is the container and reader, `protos/` and `_generated/` are the extracted iWork schemas. |
+| `src/pybers/` | The library. `model/` is the object model, `numbersfile/` is the container and reader, `protos/` and `_generated/` are the extracted iWork schemas with their type stubs. |
 | `tests/` | The pytest suite, plus `fixtures/`: real `.numbers` files and the findings written from them. |
 | `scripts/` | Repository tooling, including the schema extractor and the writing gate. See `scripts/README.md`. |
 | `.claude/` | Project slash-commands used by the agentic workflow. |
@@ -119,9 +130,18 @@ credits it in its docstring.
 [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the commit format, branch strategy and
 release tagging. Other details:
 
-- **Prose is linted.** `scripts/standards-check.py` checks documentation, docstrings and
-  comments against the project's writing rules, the way a linter checks code. Run it
-  before opening a pull request.
+- **Four gates run before a pull request**, and all four are expected to be clean:
+
+  ```bash
+  pytest
+  ruff check .
+  mypy
+  python3 scripts/standards-check.py
+  ```
+
+  The last one is unusual and worth explaining: it lints **prose**. Documentation,
+  docstrings and comments are checked against the project's writing rules the way ruff
+  checks code, because this repository treats a wrong comment as a defect.
 - **The house style is camelCase** for functions, variables and parameters, which is the
   opposite of what most Python tooling assumes. This is deliberate. Modules stay
   lowercase and classes stay PascalCase.
