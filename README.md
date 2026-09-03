@@ -135,15 +135,16 @@ release tagging. Other details:
 - **Four gates run before a pull request**, and all four are expected to be clean:
 
   ```bash
-  pytest
-  ruff check .
-  mypy
-  python3 scripts/standards-check.py
+  .venv/bin/python3 scripts/pr-preflight-check.py
   ```
 
-  The last one is unusual and worth explaining: it lints **prose**. Documentation,
-  docstrings and comments are checked against the project's writing rules the way ruff
-  checks code, because this repository treats a wrong comment as a defect.
+  One command runs pytest, ruff, mypy and the prose gate, and reports every one rather
+  than stopping at the first. GitHub Actions runs that same command on every pull
+  request, so no second copy of the gate list exists to drift.
+
+  The prose gate is the unusual one and worth explaining: it lints **prose**.
+  Documentation, docstrings and comments are checked against the project's writing rules
+  the way ruff checks code, because this repository treats a wrong comment as a defect.
 - **The house style is camelCase** for functions, variables and parameters, which is the
   opposite of what most Python tooling assumes. This is deliberate. Modules stay
   lowercase and classes stay PascalCase.
