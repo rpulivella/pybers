@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [#34] Raise the Python floor to 3.14
 - [#36] Refuse a merge when CI has not passed
 - [#5] Run the preflight in CI on every pull request
 - [#3] Author the pull request preflight check script

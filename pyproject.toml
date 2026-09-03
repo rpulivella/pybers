@@ -7,17 +7,22 @@ name = "pybers"
 version = "0.1.0"
 description = "A clean, round-trip-tested Python library for reading and writing Apple Numbers documents."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 authors = [
     { name = "Richard P Ulivella", email = "pybers@richardulivella.com" },
 ]
 dependencies = [
     # Required at import time, not merely to build: every module in pybers/_generated
     # imports google.protobuf and calls ValidateProtobufRuntimeVersion, which raises
-    # VersionError when the runtime is older than the gencode. The floor is the gencode
-    # version stamped into those modules (6.32.1, from protoc 32.1); re-running
-    # scripts/protos-extract.py with a newer protoc raises it and this must follow.
-    "protobuf>=6.32.1",
+    # VersionError when the runtime is older than the gencode stamped into those
+    # modules (6.32.1, from protoc 32.1). That is the version below which this
+    # provably cannot work, and it is NOT the floor declared here. The floor is the
+    # oldest version the suite has actually been run against, which is higher, and
+    # re-running scripts/protos-extract.py with a newer protoc can only raise the
+    # mechanical minimum toward it. The development environment and a clean install
+    # both run 7.36.1, so one number covers both rather than the manifest allowing
+    # a version nobody exercises.
+    "protobuf>=7.36.1",
 ]
 
 # PEP 639 SPDX expression rather than a "License ::" classifier, which that PEP
@@ -35,17 +40,17 @@ license-files = ["LICENSE", "NOTICE"]
 # and the scripts run fine there; this makes the venv self-sufficient as well, so a
 # fresh clone needs one command and neither environment has to be reasoned about.
 dev = [
-    "pytest>=8.3.0",
-    "rich>=13.7.0",
-    "rich_argparse>=1.4.0",
-    "ruff>=0.16.0",
-    "mypy>=1.11.0",
-    "types-protobuf>=5.27.0",
+    "pytest>=9.1.1",
+    "rich>=15.0.0",
+    "rich_argparse>=1.8.0",
+    "ruff>=0.16.5",
+    "mypy>=2.3.1",
+    "types-protobuf>=7.35.1.20260827",
     # `build` rather than `hatchling`: the backend belongs in [build-system] requires,
     # where pip installs it into an isolated environment on its own. This is the
     # front end that drives it, and without it `python3 -m build --wheel` depends on
     # whatever the machine happens to carry.
-    "build>=1.2.0",
+    "build>=1.6.0",
 ]
 
 [tool.pytest.ini_options]

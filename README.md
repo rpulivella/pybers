@@ -102,7 +102,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Requires Python 3.11 or newer. The only runtime dependency is `protobuf`.
+Requires Python 3.14 or newer. The only runtime dependency is `protobuf`.
 
 ## Repository map
 
