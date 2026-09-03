@@ -64,6 +64,7 @@ except ImportError:  # rich_argparse is optional, per scripts/README.md
 
 console: Console = Console()
 
+
 @dataclass(frozen=True)
 class GateResult:
     """One gate's verdict, its one-line summary, and everything it printed.
@@ -242,7 +243,7 @@ def main() -> int:
         help="run only this gate, repeatable (default: all of them)",
     )
     arguments = parser.parse_args()
-    chosen = arguments.gate or ["pytest", "standards", "ruff", "mypy"]
+    chosen = arguments.gate or list(gates)
 
     # Every gate reads configuration relative to the root: mypy and ruff find
     # pyproject.toml there, and the standards checker resolves its own roots.
