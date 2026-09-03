@@ -1,0 +1,70 @@
+# Runs the same gates a contributor runs locally, on a machine that is not
+# theirs. Whether a cold install passes at the declared floor is the one thing a
+# local run cannot answer, which is what earns this its runtime. See #5.
+name: preflight
+
+on:
+  pull_request:
+    branches: [develop]
+    # `ready_for_review` fires this the moment a pull request leaves draft, so a
+    # branch is covered without any draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [develop]
+
+# Pushing three commits in a row cancels the two superseded runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: preflight (${{ matrix.label }})
+    # A draft skips rather than runs: the same preflight already ran on the
+    # developer's machine, a draft cannot merge, and a skipped job costs nothing.
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    strategy:
+      # A failure on the floor and one on stable are different findings.
+      fail-fast: false
+      matrix:
+        include:
+          # The floor is read from `requires-python`, so raising it needs no edit
+          # here. Exactly one of these two keys is set per leg, and the unset one
+          # reaches the action as an empty string, which it treats as absent.
+          - label: floor
+            versionFile: pyproject.toml
+          - label: stable
+            version: '3.x'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.version }}
+          python-version-file: ${{ matrix.versionFile }}
+
+      - name: Install the project
+        run: pip install -e ".[dev]"
+
+      - name: Run the preflight
+        # `pipefail` because the default shell reports the exit code of `tee`.
+        shell: bash -o pipefail -e {0}
+        run: python scripts/pr-preflight-check.py 2>&1 | tee "$RUNNER_TEMP/preflight.log"
+
+      - name: Summarize the gates
+        # A verdict is matched by its two-space column rather than by any gate
+        # name, because a failing checker prints its own `FAIL (1)` header and
+        # AC 3 forbids this file from carrying a copy of the gate list.
+        if: always()
+        run: |
+          {
+            echo "### preflight, Python $(python -V | cut -d' ' -f2)"
+            echo
+            echo '```'
+            grep -E '^(PASS|FAIL) [^ ]+  ' "$RUNNER_TEMP/preflight.log" || echo 'The preflight produced no gate lines.'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
