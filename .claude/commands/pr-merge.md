@@ -11,7 +11,7 @@ trigger sitting on it.
 
 ## Steps
 
-1. **Resolve the pull request** from `$ARGUMENTS`, or with
+1. **Resolve the pull request** from `$ARGUMENTS` (`PR #42`, `#42`, `42`, URL), or with
    `python3 scripts/pr.py find --number-only`. **Read what it printed.** A bare number
    is the PR, `no-open-pull-request` means there is none, and anything else means the
    question could not be asked at all. Those are three different facts, and only one of

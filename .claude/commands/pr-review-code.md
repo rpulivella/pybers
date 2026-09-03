@@ -27,7 +27,7 @@ perform yourself, and the report says so rather than implying the machine did it
 
 ## Steps
 
-1. Get the PR number from `$ARGUMENTS`, or from the current branch
+1. Get the pull request from `$ARGUMENTS` (`PR #42`, `#42`, `42`, URL) or the branch
    (`python3 scripts/pr.py find --number-only`). **Read what it printed.** One of three
    things:
    - a bare number. That is the PR;

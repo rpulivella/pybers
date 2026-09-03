@@ -11,7 +11,7 @@ acceptance criteria into tasks.
 
 ## Steps
 
-1. Get the issue number from `$ARGUMENTS` (`42`, `#42`, or the URL). If missing, ask.
+1. Get the ticket from `$ARGUMENTS`: `PYB-42`, `42`, `#42` or the URL. If missing, ask.
 2. Fetch it: `python3 scripts/ticket.py show <N>`.
 3. Display to the user, exactly as written (do not paraphrase): title + label,
    acceptance criteria (preserve numbering/nesting), SPEC. Sub-criteria are an

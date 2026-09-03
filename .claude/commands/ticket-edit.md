@@ -14,7 +14,7 @@ means fetching the current body, changing part of it, and writing the whole thin
 
 ## Steps
 
-1. Get the issue number from `$ARGUMENTS`. If missing, ask.
+1. Get the ticket from `$ARGUMENTS`: `PYB-42`, `42`, `#42` or the URL. If missing, ask.
 2. **Pull the ticket fresh, immediately before drafting, every time, no exceptions.**
    `edit` replaces the WHOLE body and GitHub offers no conflict detection, so a revision
    drafted against a copy fetched earlier silently discards anything that changed in
@@ -30,7 +30,7 @@ means fetching the current body, changing part of it, and writing the whole thin
    - `python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"`
 , to **edit**. The body byte for byte, which is what gets revised and written back.
    - `python3 scripts/ticket.py export-as-source <N> --title`, whenever the revision
-     keeps any part of the existing title. `show` prints it as `#<N> <title>` and wraps
+     keeps any part of the existing title. `show` prints it as `PYB-<N> <title>` and wraps
      at eighty columns, so a long title taken from there comes back with the number glued
      on and split across lines.
 
