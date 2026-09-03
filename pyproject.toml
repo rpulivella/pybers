@@ -53,6 +53,13 @@ dev = [
     "build>=1.6.0",
 ]
 
+[tool.pybers]
+# The ticket key. Declared here because this is the file that already names the
+# project, and read by scripts/ticket.py so that one edit moves the key everywhere
+# the tools print it. README.md and CLAUDE.md restate it for a human reading the
+# repository; neither owns it.
+ticketPrefix = "PYB"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
