@@ -22,6 +22,8 @@ other when reaching for something to test against.
 | `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after PYB-25, Numbers 15.3.1 |
 | `22b-merged-by-pybers.numbers` | `22b-merge-2x2-unmerged.numbers` | five merges added across row 1 | 2026-09-02, Numbers 15.3.1 |
 | `22-unmerged-by-pybers.numbers` | `22-merge-2x2.numbers` | all five merges removed | 2026-09-02, Numbers 15.3.1 |
+| `18-formula-literals-A1-changed.numbers` | `18-formula-literals.numbers` | `A1` changed from `=1+1` to `=1+5` | 2026-09-03, Numbers 15.3.1 |
+| `19-formula-dragged-F2-narrowed.numbers` | `19-formula-dragged.numbers` | `F2` narrowed from `SUM($B$1:$D$1)` to `SUM($B$1:$C$1)`, leaving `F3` on the archive they shared | 2026-09-03, Numbers 15.3.1 |
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `applyDocumentEdits` walking sheets and
@@ -93,6 +95,44 @@ type while opening them in Numbers shows the right value. Do not "fix" that.
 **They also carry a stale selection.** Numbers saves the last selected range in its view
 state and pybers does not touch it, so each opens with whatever was selected when its
 fixture was made. Cosmetic, and not a statement about anything.
+
+## The formula pair, and what each one is for
+
+Added 2026-09-03 for PYB-41, the first goldens covering a changed FORMULA rather
+than a changed value.
+
+`18-formula-literals-A1-changed` is the simple case: one literal inside an
+unshared formula, with row 2's labels deliberately left stale so the edit is
+visible by eye.
+
+`19-formula-dragged-F2-narrowed` is the case that could fail silently. `F2` and
+`F3` both hold `SUM($B$1:$D$1)` and, in the fixture, both display 6, because
+Numbers stores ONE archive at refcount 2 and points both cells at it. Narrowing
+`F2` alone therefore has to split that entry rather than overwrite it. Had it been
+overwritten, one edit would have reached two cells, which is the same aliasing
+defect the frozen model closes on the read side.
+
+Neither cached value on disk changes, and that is correct: this library never
+evaluates a formula. Each file names its changed cell in `refs_to_dirty` and
+Numbers does the arithmetic, so reading them back through pybers shows the old
+number while opening them in Numbers shows the new one.
+
+**Both were confirmed on 2026-09-03 in Numbers 15.3.1**, and each showed more
+than the edit itself.
+
+`18` opened with no warning and no repair prompt. `A1` reads 6 against a label row
+still saying `1+1`, and the rest of the row is untouched: `B1` 6, `C1` 6, `E1` 3,
+`F1` 1 and `G1` `ab`. `D1` still shows the error triangle it always had, which
+matters more than it looks. An error cell holds no value at all, so its formula
+key sits at byte 12 where every other cell keeps a result, and a writer that
+assumed a fixed offset would have corrupted exactly that cell and no other.
+
+`19` confirmed the split from both sides, which the grid alone could not do.
+Selecting `F2` shows `SUM($B$1:$C$1)` in the formula bar with two cells
+highlighted and a result of 3; selecting `F3` shows `SUM($B$1:$D$1)` with three
+cells highlighted and a result of 6. Every other cell is unmoved, including the
+mixed-locking pair `G2` at 3 and `G3` at 2. Had the pooled entry been overwritten
+instead of split, both would read 3 and both formula bars would say `$B$1:$C$1`.
 
 ## Confirming one
 
