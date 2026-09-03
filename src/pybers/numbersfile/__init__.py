@@ -33,6 +33,7 @@ __date__ = "2026/08/16"
 from .cells import (
     CellDecodeError,
     CellRecord,
+    carriesFormula,
     decodeCellValue,
     decodeRecord,
     decodeRow,
@@ -66,6 +67,7 @@ from .iwa import (
 from .varint import VarintError, readVarint, writeVarint
 
 __all__ = [
+    "carriesFormula",
     "Archive",
     "ArchiveMessage",
     "CellDecodeError",

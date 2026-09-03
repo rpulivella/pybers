@@ -21,6 +21,8 @@ rounding error into a document that never had any. See `pybers.model.table`.
 UPDATES
 2026-08-18  Written. Decodes numbers, currency, text, dates, booleans and durations,
             verified against fixtures 11 through 14.
+2026-09-03  The formula flag moved here from the writer for #41, so the one
+            module documenting the record layout owns all of it.
 2026-09-01  Moved the decimal128 codec out to pybers.numbersfile.decimal128, which
             owns the format's limits and its 16-byte form as a real type. This
             module keeps only Apple's own undocumented cell layout.
@@ -55,6 +57,14 @@ emptyOffsetWide: int = 0xFFFFFFFF
 # The value begins here in every record seen. Bytes 0-11 carry the storage version,
 # the type, a flags bitmask at 6-7, and four bytes whose purpose is not established.
 valueOffset: int = 12
+
+# Byte 9 of the header is a second bitmask, and this bit marks a cell backed by a
+# formula. Established across the corpus on 2026-09-01: in all 74 tables, a table
+# declaring formulas has marked records and a table declaring none has none. The
+# marked count can exceed the declared count, because the formula list is pooled,
+# so a dragged formula and a merge both reuse one entry across several cells.
+formulaFlagOffset: int = 9
+formulaFlagBit: int = 0x02
 
 
 class CellDecodeError(RuntimeError):
@@ -146,6 +156,14 @@ def decodeRecord(column: int, record: bytes) -> CellRecord:
         value=value,
         references=references,
         raw=record,
+    )
+
+
+def carriesFormula(record: CellRecord) -> bool:
+    """Report whether a cell record is backed by a formula."""
+    return (
+        len(record.raw) > formulaFlagOffset
+        and bool(record.raw[formulaFlagOffset] & formulaFlagBit)
     )
 
 

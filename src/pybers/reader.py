@@ -26,6 +26,8 @@ to a caller:
 UPDATES
 2026-08-31  Written for #1: document, sheets, tables and cell values.
 2026-09-01  The package read here travels with the document, for #2.
+2026-09-03  Formulas, for #41. The key slot and the sticky-bits rule were
+            measured against the corpus, not read off the schema.
 """
 from __future__ import annotations
 
@@ -37,12 +39,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/31"
 
+import struct
 from pathlib import Path
 from typing import cast
 
 from google.protobuf.message import Message
 
 from ._generated import TNArchives_pb2 as tn
+from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
 from ._generated import TSWPArchives_pb2 as tswp
@@ -50,13 +54,34 @@ from .model import (
     CellRange,
     CellReference,
     CellValue,
+    Coordinate,
     Document,
+    Formula,
+    FormulaNode,
+    FormulaRange,
+    FormulaReference,
+    FunctionCall,
     MergeRange,
     Sheet,
+    Span,
     Table,
+    UnknownFunction,
 )
-from .numbersfile import Archive, NumbersPackage, decodeRow, readPackage
+from .model.formula import (
+    NodeContent,
+    brokenColumnSentinel,
+    brokenReferenceNodeType,
+    brokenRowSentinel,
+    functionNodeType,
+    numberNodeType,
+    rangeNodeType,
+    referenceNodeType,
+    stringNodeType,
+    unknownFunctionNodeType,
+)
+from .numbersfile import Archive, NumbersPackage, carriesFormula, decodeRow, readPackage
 from .numbersfile.cells import CellRecord
+from .numbersfile.decimal128 import Decimal128
 from .numbersfile.types import archiveTypeId, parseArchive
 
 # The stored format counts rows and columns from zero. The model counts from
@@ -76,10 +101,29 @@ tableInfoTypeId: int = 6000
 stringKeyType: int = 3
 richTextKeyType: int = 9
 
+# A cell whose formula failed. It holds no value at all, so byte 12 is where its
+# formula key sits rather than a result, and `decodeCellValue` consuming nothing
+# for this type is what puts that key in the usual slot.
+formulaErrorType: int = 8
+
 # `TST.TableDataList.ListType` values, restated so that reading this file does not
 # require the generated enum in hand.
 stringListType: int = 1
+formulaListType: int = 3
 richTextListType: int = 8
+
+# A formula-backed cell names its formula in the FIRST of its trailing
+# references. Established on 2026-09-03 by reproducing declared refcounts: in all
+# nine tables in the corpus that declare formulas, counting the cells that name
+# each key through slot 0 equals the refcount the table declares, and no other
+# slot does so in any table. Value matching alone could not settle it, because
+# formula keys and style indices are both small integers and several slots
+# coincide by chance. An error cell consumes no value, so byte 12 is at once its
+# value slot and this slot, which is why one rule covers both.
+formulaKeySlot: int = 0
+
+# A number literal carries decimal128 as two 64-bit halves rather than as bytes.
+decimalHalfFormat: str = "<QQ"
 
 
 class ReadError(RuntimeError):
@@ -214,6 +258,215 @@ def readRichTextTable(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int
     return text
 
 
+def readUuid(archive: tsp.CFUUIDArchive) -> str:
+    """Return a `TSP.CFUUIDArchive` as a canonical hexadecimal identity.
+
+    A table is named by identity rather than by name or position, which is why
+    renaming a table cannot break a formula pointing into it. The archive spells
+    that identity either as raw bytes or as four 32-bit words, so both are read
+    and only the string form travels into the model.
+    """
+    if archive.HasField("uuid_bytes"):
+        return archive.uuid_bytes.hex()
+    words = (archive.uuid_w0, archive.uuid_w1, archive.uuid_w2, archive.uuid_w3)
+    return "".join(f"{word:08x}" for word in words)
+
+
+def readCoordinate(value: int, absolute: bool) -> Coordinate:
+    """Return one axis of a reference, converting only when it is a real line.
+
+    A relative axis is a signed distance and means the same in either counting
+    system, so it passes through untouched. An absolute axis is a stored
+    coordinate counting from zero and becomes the model's counting from one. This
+    is the one place that distinction is applied, and applying it to an offset
+    would shift every relative reference by one silently.
+    """
+    return Coordinate(
+        value + originOffset if absolute else value, absolute=absolute
+    )
+
+
+def readSpan(entry: object, absolute: bool) -> Span:
+    """Return one axis of a range tract, in the model's counting.
+
+    `range_end` is omitted for a span of one line rather than repeating the
+    beginning, so its absence is preserved rather than filled in.
+    """
+    begin = entry.range_begin  # type: ignore[attr-defined]
+    end = (
+        entry.range_end  # type: ignore[attr-defined]
+        if entry.HasField("range_end")  # type: ignore[attr-defined]
+        else None
+    )
+    shift = originOffset if absolute else 0
+    return Span(
+        begin=begin + shift,
+        end=None if end is None else end + shift,
+        absolute=absolute,
+    )
+
+
+def readFormulaReference(
+    node: tsce.ASTNodeArrayArchive.ASTNodeArchive,
+) -> FormulaReference:
+    """Return a single-cell reference, recognizing the sentinels that mean broken.
+
+    An axis that is absent stays absent, because unboundedness is expressed that
+    way rather than by a flag: `SUM(A)` stores a column and no row at all.
+    """
+    column = (
+        readCoordinate(node.AST_column.column, node.AST_column.absolute)
+        if node.HasField("AST_column")
+        else None
+    )
+    row = (
+        readCoordinate(node.AST_row.row, node.AST_row.absolute)
+        if node.HasField("AST_row")
+        else None
+    )
+    tableId = (
+        readUuid(node.AST_cross_table_reference_extra_info.table_id)
+        if node.HasField("AST_cross_table_reference_extra_info")
+        else None
+    )
+    # Node type 46 is the archive's own statement that this reference points
+    # nowhere, and the coordinates beside it are sentinels rather than a cell.
+    # They are checked as well, because reading them as real coordinates names a
+    # cell far outside any table and raises nothing.
+    broken = node.AST_node_type == brokenReferenceNodeType or (
+        node.HasField("AST_column")
+        and node.HasField("AST_row")
+        and node.AST_column.column == brokenColumnSentinel
+        and node.AST_row.row == brokenRowSentinel
+    )
+    if broken:
+        return FormulaReference(tableId=tableId, broken=True)
+    return FormulaReference(column=column, row=row, tableId=tableId)
+
+
+def readFormulaRange(
+    node: tsce.ASTNodeArrayArchive.ASTNodeArchive,
+) -> FormulaRange:
+    """Return one range tract, taking each axis from whichever field holds it.
+
+    Anchoring lives in the field variant an axis sits in, and `ASTStickyBits`
+    records the same fact beside it. The variant is read and the bits are not,
+    because a single-cell reference carries no bits at all and one rule covering
+    both is what keeps the two node kinds from drifting apart.
+    """
+    tract = node.AST_colon_tract
+    columns = (
+        readSpan(tract.relative_column[0], absolute=False)
+        if tract.relative_column
+        else readSpan(tract.absolute_column[0], absolute=True)
+        if tract.absolute_column
+        else None
+    )
+    rows = (
+        readSpan(tract.relative_row[0], absolute=False)
+        if tract.relative_row
+        else readSpan(tract.absolute_row[0], absolute=True)
+        if tract.absolute_row
+        else None
+    )
+    tableId = (
+        readUuid(node.AST_cross_table_reference_extra_info.table_id)
+        if node.HasField("AST_cross_table_reference_extra_info")
+        else None
+    )
+    return FormulaRange(columns=columns, rows=rows, tableId=tableId)
+
+
+def readFormulaNode(
+    node: tsce.ASTNodeArrayArchive.ASTNodeArchive,
+) -> FormulaNode:
+    """Return one node, giving meaning only to the types the model claims.
+
+    Everything else keeps its type and its bytes and nothing more. The node
+    message carries 45 fields and the corpus uses 16, so interpreting the rest
+    would be describing the schema rather than the documents, and a formula is
+    shared state that other cells depend on.
+    """
+    content: object = None
+    kind = node.AST_node_type
+    if kind == numberNodeType:
+        # decimal128, never the float64 copy beside it. The float is a
+        # convenience Apple stores as well, and reading it would introduce binary
+        # rounding error into a document that never had any.
+        packed = struct.pack(
+            decimalHalfFormat,
+            node.AST_number_node_decimal_low,
+            node.AST_number_node_decimal_high,
+        )
+        content = Decimal128.fromBytes(packed).value
+    elif kind == stringNodeType:
+        content = node.AST_string_node_string
+    elif kind == functionNodeType:
+        content = FunctionCall(
+            index=node.AST_function_node_index,
+            argumentCount=node.AST_function_node_numArgs,
+        )
+    elif kind == unknownFunctionNodeType:
+        content = UnknownFunction(
+            name=node.AST_unknown_function_node_string,
+            argumentCount=node.AST_unknown_function_node_numArgs,
+        )
+    elif kind in (referenceNodeType, brokenReferenceNodeType):
+        content = readFormulaReference(node)
+    elif kind == rangeNodeType:
+        content = readFormulaRange(node)
+    return FormulaNode(
+        nodeType=kind,
+        content=cast(NodeContent, content),
+        raw=node.SerializeToString(),
+    )
+
+
+def readFormula(archive: tsce.FormulaArchive) -> Formula:
+    """Return one stored formula as its postfix node array."""
+    return Formula(
+        nodes=tuple(
+            readFormulaNode(node) for node in archive.AST_node_array.AST_node
+        )
+    )
+
+
+def readFormulaTable(
+    index: ArchiveIndex, dataStore: tst.DataStore
+) -> dict[int, Formula]:
+    """Return the table's pooled formulas, keyed as the cell records address them.
+
+    Pooled exactly like strings: one archive serves every cell a formula was
+    dragged into, which is only possible because references are offsets from the
+    cell holding them.
+    """
+    if not dataStore.formula_table.identifier:
+        return {}
+    entries = readDataList(index, dataStore.formula_table, formulaListType)
+    return {
+        key: readFormula(entry.formula)
+        for key, entry in entries.items()
+        if entry.HasField("formula")
+    }
+
+
+def resolveFormula(
+    record: CellRecord, formulas: dict[int, Formula]
+) -> Formula | None:
+    """Return the formula behind a cell, or None when the cell has none.
+
+    A formula that is marked but absent from the table's list is returned as None
+    rather than raised on. The flag and the list are two separate records of the
+    same fact, and a document Numbers opens happily is not one this library should
+    refuse to read.
+    """
+    if not carriesFormula(record):
+        return None
+    if len(record.references) <= formulaKeySlot:
+        return None
+    return formulas.get(record.references[formulaKeySlot])
+
+
 def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
     """Return the table's merged regions, read from the merge store.
 
@@ -263,6 +516,7 @@ def readTable(index: ArchiveIndex, tableInfo: tst.TableInfoArchive) -> Table:
     dataStore = model.base_data_store
     strings = readStringTable(index, dataStore)
     richText = readRichTextTable(index, dataStore)
+    formulas = readFormulaTable(index, dataStore)
 
     # The grid size is declared by the table, never inferred from which cells hold
     # something. Seven of the corpus's tables declare more rows or columns than
@@ -296,6 +550,12 @@ def readTable(index: ArchiveIndex, tableInfo: tst.TableInfoArchive) -> Table:
                     CellReference(row + originOffset, record.column + originOffset)
                 )
                 cell.value = resolveValue(record, strings, richText)
+                # Each cell is given its own Formula even where the archive is
+                # shared, so an edit to one cannot reach another. Frozen, so
+                # sharing would be safe anyway; built per cell so that neither
+                # guarantee depends on the other holding.
+                cell.formula = resolveFormula(record, formulas)
+                cell.errored = record.typeByte == formulaErrorType
     return table
 
 
