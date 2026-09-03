@@ -70,7 +70,7 @@ kind (consistent with the finding that error kinds are not stored) it simply bec
 error cell and un-becomes one.
 
 **So merging is a recalculation event, and a writer that forgets this ships a wrong
-number.** Added 2026-09-02 from #16: writing the merge store alone leaves `L1` holding
+number.** Added 2026-09-02 from PYB-16: writing the merge store alone leaves `L1` holding
 whatever it resolved to before, so a file merged by this library displayed 0 where the
 error belonged and an unmerged one displayed the error where 0 belonged. Numbers does not
 notice on its own, for the same reason it does not notice an edited operand, see

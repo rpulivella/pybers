@@ -16,7 +16,7 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    the branch.
 3. **Put the CHANGELOG entry in the PR, then push.** If the `## Unreleased` list has no
    line for this work, run `/changelog-add` and commit it. Then push (`git push`). The
-   entry is `- [#<N>] <title>` for ticketed work; `/changelog-add` also handles the
+   entry is `- [PYB-<N>] <title>` for ticketed work; `/changelog-add` also handles the
    ticketless case with `[init]` or `[hotfix]`, and a bare bullet is never correct.
 4. Fetch the issue. The title is used **verbatim** in step 5, so read it verbatim:
    - `python3 scripts/ticket.py export-as-source <N> --title` for the title.
@@ -25,9 +25,9 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    `$TMPDIR/pybers-pr-body-<N>.md`, the OS temp directory, which is per-user and cleaned
    by the system. **Never write a PR body inside the repository**, not even into
    `workarea/`; it is transient tool input, not scratch worth keeping. Rules:
-   - **Title**: `[#<N>] <issue title verbatim>`. Do not paraphrase.
-   - **Ticket**: the `Link:` line carries the issue URL, and `Closes #<N>` stays on its
-     own line, that keyword is what closes the issue on merge.
+   - **Title**: `[PYB-<N>] <issue title verbatim>`. Do not paraphrase.
+   - **Ticket**: the body opens with `[PYB-<N>](url)` and ends with `_Closes #<N>_` in
+     italic, the one place a `#` is correct since GitHub parses no other form.
    - **Intro**: 2-3 sentences on what the PR achieves.
    - **Detail your changes**: keep only the checkboxes that apply; remove the rest.
    - **Breaking Changes**: `None` after each heading, or a short list.
@@ -43,7 +43,7 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    before they read the diff.
 7. Create the PR as **draft**:
    ```
-   python3 scripts/pr.py create --title "[#<N>] <title>" --body-file "$TMPDIR/pybers-pr-body-<N>.md"
+   python3 scripts/pr.py create --title "[PYB-<N>] <title>" --body-file "$TMPDIR/pybers-pr-body-<N>.md"
    ```
    Head is the checked-out branch and base is `develop`, both by default. `--dry-run`
    first prints the body without opening anything. Pass the body as a **file**. Never

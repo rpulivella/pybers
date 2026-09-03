@@ -18,8 +18,8 @@ other when reaching for something to test against.
 
 | File | Source fixture | Mutation | Confirmed |
 | --- | --- | --- | --- |
-| `11-value-types-noformats-A1-edited.numbers` | `11-value-types-noformats.numbers` | `A1` set to `Decimal("98765.4321")` | 2026-09-01, re-confirmed 2026-09-02 after #25, Numbers 15.3.1 |
-| `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after #25, Numbers 15.3.1 |
+| `11-value-types-noformats-A1-edited.numbers` | `11-value-types-noformats.numbers` | `A1` set to `Decimal("98765.4321")` | 2026-09-01, re-confirmed 2026-09-02 after PYB-25, Numbers 15.3.1 |
+| `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after PYB-25, Numbers 15.3.1 |
 | `22b-merged-by-pybers.numbers` | `22b-merge-2x2-unmerged.numbers` | five merges added across row 1 | 2026-09-02, Numbers 15.3.1 |
 | `22-unmerged-by-pybers.numbers` | `22-merge-2x2.numbers` | all five merges removed | 2026-09-02, Numbers 15.3.1 |
 
@@ -34,7 +34,7 @@ was opened is not the copy committed here: autosave rewrote it on open, growing 
 1,574 bytes and renaming `Index/ViewState.iwa`, so it was discarded and the untouched
 output was committed in its place.
 
-**Both goldens were regenerated and re-confirmed on 2026-09-02 for #25**, because the
+**Both goldens were regenerated and re-confirmed on 2026-09-02 for PYB-25**, because the
 writer's output changed: it now also marks the edited cells in the calculation engine.
 
 That change came out of what the first multi-sheet confirmation found. Row 11 of
@@ -82,7 +82,7 @@ the change: the merged one displayed 0 where an error belonged and the unmerged 
 displayed the error where 0 belonged. `findings-03-structure.md` had recorded that a
 reference to a covered cell is an error and recovers on unmerge; what nobody had drawn
 from it was that merging is therefore a recalculation event. The fix was the mechanism
-#25 had already built.
+PYB-25 had already built.
 
 **Their stored cell types deliberately differ from the twins.** `L1` is type 2 in
 `22-merge-2x2` and type 8 in `22b`, and these two hold the opposite, because this

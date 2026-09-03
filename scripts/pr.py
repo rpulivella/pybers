@@ -136,6 +136,27 @@ partialSuccessExitCode: int = 3
 # a number and not a valid PR reference, so it can never be mistaken for one.
 noOpenPullRequestMarker: str = "no-open-pull-request"
 
+
+def pullRequestNumber(value: str) -> int:
+    """Parse `PR #38`, `#38`, `38` or the pull request URL."""
+    text = value.strip()
+    if text.lower().startswith("pr"):
+        text = text[2:].strip()
+    elif "/pull/" in text:
+        text = text.rsplit("/pull/", 1)[1]
+    text = text.lstrip("#").strip()
+    if not text.isdigit():
+        raise argparse.ArgumentTypeError(
+            f"{value!r} is not a pull request. Use PR #38, #38, 38, or the URL."
+        )
+    return int(text)
+
+
+def pullRequestRef(number: int) -> str:
+    """Return a pull request reference in the house form, both parts always."""
+    return f"PR #{number}"
+
+
 # What `checks` prints as its verdict. Words rather than color alone, for the
 # reason the marker above exists: the consumer is an agent reading stdout, and it
 # must be able to tell an answer from a command that died before printing one.
@@ -298,7 +319,7 @@ def findOpenPullRequest(
     if not matches:
         return None
     if len(matches) > 1:
-        numbers = ", ".join(f"#{match['number']}" for match in matches)
+        numbers = ", ".join(f"{pullRequestRef(match['number'])}" for match in matches)
         raise RuntimeError(
             f"{len(matches)} open pull requests from {head!r} into {base!r}: "
             f"{numbers}. "
@@ -392,7 +413,7 @@ def printBodyAsRawString(body: str) -> None:
 def printTitleAsRawString(summary: PullRequestSummary) -> None:
     """Write a pull request title to stdout with nothing added but its own newline.
 
-    Deliberately bare. `find` prints `#<N> <title>` for a reader, which is the right
+    Deliberately bare. `find` prints `PR #<N> <title>` for a reader, which is the right
     shape to look at and the wrong one to copy: a title reused verbatim would arrive
     carrying a number it never had.
     """
@@ -421,11 +442,13 @@ def editPullRequest(
     )
 
 
-def markReadyForReview(token: str, nodeId: str) -> None:
-    """Take a pull request out of draft.
+def markReadyForReview(token: str, nodeId: str) -> bool:
+    """Take a pull request out of draft and return whether it is now ready.
 
     REST does not expose this transition at all, so it is the one operation here
     that has to go through GraphQL, which is why the node id is carried around.
+    The mutation already returns `isDraft`, so reading it costs nothing and closes
+    the path where a 200 with no errors reports a promotion that did not happen.
     """
     mutation = """
     mutation($pullRequestId: ID!) {
@@ -434,7 +457,8 @@ def markReadyForReview(token: str, nodeId: str) -> None:
       }
     }
     """
-    ticket.requestGraphql(token, mutation, {"pullRequestId": nodeId})
+    data = ticket.requestGraphql(token, mutation, {"pullRequestId": nodeId})
+    return not data["markPullRequestReadyForReview"]["pullRequest"]["isDraft"]
 
 
 def mergePullRequest(
@@ -455,7 +479,7 @@ def mergePullRequest(
     payload = {"merge_method": method, "commit_title": subject}
     result = ticket.requestJson(url, token, method="PUT", payload=payload)
     if not result or not result.get("merged"):
-        raise RuntimeError(f"GitHub did not merge #{number}: {result}")
+        raise RuntimeError(f"GitHub did not merge {pullRequestRef(number)}: {result}")
     return str(result["sha"])
 
 
@@ -473,7 +497,7 @@ def showPullRequest(summary: PullRequestSummary) -> None:
     state = "draft" if summary["isDraft"] else summary["state"]
     tint = "yellow" if summary["isDraft"] else "green"
     console.print(
-        f"[bold cyan]#{summary['number']}[/] "
+        f"[bold cyan]{pullRequestRef(summary['number'])}[/] "
         f"[bold]{escape(summary['title'])}[/]"
     )
     console.print(f"[dim]{escape(summary['url'])}[/]")
@@ -679,7 +703,7 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         console.print(summary["url"])
         return errorExitCode
 
-    console.print(f"[green]Edited[/] [bold cyan]#{summary['number']}[/]")
+    console.print(f"[green]Edited[/] [bold cyan]{pullRequestRef(summary['number'])}[/]")
     console.print("[dim]verified against the pull request[/]")
     console.print(summary["url"])
     return 0
@@ -691,16 +715,31 @@ def cmdReady(arguments: argparse.Namespace) -> int:
     summary = readPullRequest(token, arguments.number)
 
     if not summary["isDraft"]:
-        console.print(f"[yellow]#{summary['number']} is already out of draft.[/]")
+        console.print(
+            f"[yellow]{pullRequestRef(summary['number'])} is already out of "
+            "draft.[/]"
+        )
         return 0
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
-        console.print(f"would mark [bold cyan]#{summary['number']}[/] ready for review")
+        console.print(
+            f"would mark [bold cyan]{pullRequestRef(summary['number'])}[/] "
+            "ready for review"
+        )
         return 0
 
-    markReadyForReview(token, summary["nodeId"])
-    console.print(f"[green]Ready for review[/] [bold cyan]#{summary['number']}[/]")
+    if not markReadyForReview(token, summary["nodeId"]):
+        console.print(
+            f"[red]{pullRequestRef(summary['number'])} is still a draft after the "
+            "mutation reported success.[/]"
+        )
+        return errorExitCode
+
+    console.print(
+        f"[green]Ready for review[/] "
+        f"[bold cyan]{pullRequestRef(summary['number'])}[/]"
+    )
     console.print(summary["url"])
     return 0
 
@@ -717,14 +756,14 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
 
     if summary["isDraft"]:
         console.print(
-            f"[red]#{summary['number']} is still a draft.[/] "
+            f"[red]{pullRequestRef(summary['number'])} is still a draft.[/] "
             "Run /pr-review-code, which owns the promotion out of draft."
         )
         return errorExitCode
 
     if not checksHavePassed(readCheckRuns(token, summary["headSha"])):
         console.print(
-            f"[red]CI has not passed on #{summary['number']}.[/] "
+            f"[red]CI has not passed on {pullRequestRef(summary['number'])}.[/] "
             f"Run `python3 scripts/pr.py checks {summary['number']}` for which."
         )
         return errorExitCode
@@ -757,7 +796,8 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         )
     except Exception as exc:
         console.print(
-            f"[red]The merge request for #{summary['number']} did not complete "
+            f"[red]The merge request for {pullRequestRef(summary['number'])} "
+            "did not complete "
             "cleanly, and whether it landed is unknown.[/]"
         )
         console.print(f"  [dim]{escape(str(exc))}[/]")
@@ -769,7 +809,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         return partialSuccessExitCode
 
     console.print(
-        f"[green]Merged[/] [bold cyan]#{summary['number']}[/] "
+        f"[green]Merged[/] [bold cyan]{pullRequestRef(summary['number'])}[/] "
         f"by [cyan]{arguments.method}[/] as [dim]{sha[:12]}[/]"
     )
 
@@ -803,7 +843,8 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         console.print("[yellow]The merge succeeded. Only the branch delete failed.[/]")
         console.print(f"  [dim]{escape(str(exc))}[/]")
         console.print(
-            f"[bold]Do not re-run merge[/], #{summary['number']} is already merged. "
+            f"[bold]Do not re-run merge[/], "
+            f"{pullRequestRef(summary['number'])} is already merged. "
             f"Finish by hand:\n  git push origin --delete {summary['head']}"
         )
         return partialSuccessExitCode
@@ -862,7 +903,7 @@ def buildParser() -> argparse.ArgumentParser:
         help="The SOURCE, byte for byte, nothing rendered: the form to edit and send "
         "back to `edit`. Contrast `find`, which renders.",
     )
-    exportParser.add_argument("number", type=int)
+    exportParser.add_argument("number", type=pullRequestNumber)
     # Mutually exclusive and required, because these never compose: each is a whole
     # output, not a modifier on a shared one. Same shape as ticket.py's.
     fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
@@ -877,7 +918,7 @@ def buildParser() -> argparse.ArgumentParser:
     editParser = subparsers.add_parser(
         "edit", help="revise a pull request's title or body"
     )
-    editParser.add_argument("number", type=int)
+    editParser.add_argument("number", type=pullRequestNumber)
     editParser.add_argument("--title", help="replacement title, verbatim")
     editParser.add_argument(
         "--body-file", dest="bodyFile", help="file holding the replacement body"
@@ -888,16 +929,16 @@ def buildParser() -> argparse.ArgumentParser:
     checksParser = subparsers.add_parser(
         "checks", help="report whether every check on a pull request has passed"
     )
-    checksParser.add_argument("number", type=int)
+    checksParser.add_argument("number", type=pullRequestNumber)
     checksParser.set_defaults(handler=cmdChecks)
 
     readyParser = subparsers.add_parser("ready", help="take a draft out of draft")
-    readyParser.add_argument("number", type=int)
+    readyParser.add_argument("number", type=pullRequestNumber)
     readyParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     readyParser.set_defaults(handler=cmdReady)
 
     mergeParser = subparsers.add_parser("merge", help="merge a pull request")
-    mergeParser.add_argument("number", type=int)
+    mergeParser.add_argument("number", type=pullRequestNumber)
     mergeParser.add_argument(
         "--subject",
         required=True,
