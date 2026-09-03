@@ -12,14 +12,14 @@ Add an entry to the `CHANGELOG.md` Unreleased list for the current ticket.
 1. Get the ticket number from `$ARGUMENTS` or the branch name (`<label>/<N>-...`).
 2. **If there is a ticket number**, fetch the **issue title only**:
    `python3 scripts/ticket.py export-as-source <N> --title`. It is copied verbatim into
-   `CHANGELOG.md`, so it must come from `export-as-source`; `show` prefixes `#<N> ` and
+   `CHANGELOG.md`, so it must come from `export-as-source`; `show` prefixes `PYB-<N> ` and
    wraps. **If there is none**, see
    [Entries with no ticket](#entries-with-no-ticket) below and write the summary
    yourself.
 3. Read `CHANGELOG.md`, find the `## Unreleased` header, and insert **at the top of its
    list** (reverse-chronological, newest first) exactly:
    ```
-   - [#<N>] <issue title verbatim>
+   - [PYB-<N>] <issue title verbatim>
    ```
 4. Use the title as-is. Only expand it if it is genuinely ambiguous standing alone.
 5. Write the file and show the user the line that was added.
@@ -44,7 +44,9 @@ ticket title would use: imperative, verb-first, sentence case, no trailing punct
 
 - **One line per ticket**. Never a multi-line entry.
 - **Verbatim**. Do not paraphrase or summarize the title.
-- **Never a bare bullet.** Every line opens with a bracket, `[#<N>]`, `[init]`, or
+- **Never rewrite an existing entry.** Ones written before the `PYB-` form keep their
+  `[#<N>]`, so the file records when the convention changed.
+- **Never a bare bullet.** Every line opens with a bracket, `[PYB-<N>]`, `[init]`, or
   `[hotfix]`.
 - **No headers, no blank lines, no formatting** beyond the bullet.
 - Newest entry goes to the top of the Unreleased list.
