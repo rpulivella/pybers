@@ -355,16 +355,24 @@ def readCheckRuns(token: str, sha: str) -> list[CheckRun]:
 
 
 def checksHavePassed(runs: list[CheckRun]) -> bool:
-    """Return whether every check completed with a conclusion that permits a merge.
+    """Return whether every check completed and at least one actually succeeded.
 
-    An empty list is False, deliberately. No checks means CI has not started or
-    the workflow failed to parse, and reading an absent answer as a green one is
-    the whole failure this guards against.
+    Two conditions rather than one. An empty list is False, because no checks
+    means CI has not started or the workflow failed to parse. `skipped` alone is
+    False for the same reason wearing a different hat: a draft pull request
+    carries nothing but a skipped run, and a commit whose only check was skipped
+    has not been tested. Tolerating skipped is required, since the skipped draft
+    run shares a commit with the real one after promotion; treating it as
+    sufficient would call an untested commit green.
     """
-    return bool(runs) and all(
+    if not runs:
+        return False
+    if not all(
         run["status"] == "completed" and run["conclusion"] in passingConclusions
         for run in runs
-    )
+    ):
+        return False
+    return any(run["conclusion"] == "success" for run in runs)
 
 
 def printBodyAsRawString(body: str) -> None:
@@ -574,8 +582,12 @@ def cmdChecks(arguments: argparse.Namespace) -> int:
     for run in runs:
         if run["status"] != "completed":
             mark = "[yellow]WAIT[/]"
-        elif run["conclusion"] in passingConclusions:
+        elif run["conclusion"] == "success":
             mark = "[green]PASS[/]"
+        elif run["conclusion"] in passingConclusions:
+            # Tolerated, but never a pass on its own. PASS here would contradict
+            # the verdict printed underneath it.
+            mark = "[yellow]SKIP[/]"
         else:
             mark = "[red]FAIL[/]"
         state = run["conclusion"] or run["status"]
