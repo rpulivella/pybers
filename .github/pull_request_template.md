@@ -1,10 +1,9 @@
-<!-- PR title format: [#<N>] Ticket title verbatim. This comment does not render in the PR body. -->
+<!-- PR title format: [PYB-<N>] Ticket title verbatim. This comment does not render in the PR body. -->
 
-## Ticket
-Link: https://github.com/rpulivella/pybers/issues/<N>
-Closes #<N>
+[PYB-<N>](https://github.com/rpulivella/pybers/issues/<N>)
 
-_Describe what this PR achieves in 2-3 sentences. Borrow from the ticket._
+_Describe what this PR achieves in 2-3 sentences. Borrow from the ticket. Nothing goes
+above the line before this one: GitHub already shows the title and the linked issue._
 
 ## Detail your changes
 <!-- Remove any checkbox that does not apply. Do not leave irrelevant unchecked boxes. -->
@@ -38,3 +37,6 @@ None
 ## Screenshot(s) / video(s)
 <!-- If none, write None. -->
 None
+
+<!-- GitHub parses this keyword and no other form. It is what closes the ticket on merge. -->
+_Closes #<N>_
