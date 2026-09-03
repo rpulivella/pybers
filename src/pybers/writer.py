@@ -30,18 +30,38 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/02"
 
+import struct
 import tempfile
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
-from .model import Cell, CellReference, Document, MergeRange, Table
+from .model import (
+    Cell,
+    CellReference,
+    Coordinate,
+    Document,
+    Formula,
+    FormulaNode,
+    FormulaRange,
+    FormulaReference,
+    FunctionCall,
+    MergeRange,
+    Span,
+    Table,
+    UnknownFunction,
+)
+from .model.formula import brokenColumnSentinel, brokenRowSentinel
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
 from .numbersfile.cells import (
     CellRecord,
+    carriesFormula,
+    decodeCellValue,
     emptyOffsetNarrow,
     emptyOffsetWide,
     valueOffset,
@@ -50,8 +70,11 @@ from .numbersfile.decimal128 import Decimal128, encodedLength
 from .numbersfile.types import archiveTypeId, parseArchive
 from .reader import (
     ArchiveIndex,
+    decimalHalfFormat,
     findRoot,
+    formulaKeySlot,
     originOffset,
+    readFormulaTable,
     readMerges,
     readRichTextTable,
     readStringTable,
@@ -79,13 +102,8 @@ wordBits: int = 32
 wordMask: int = 0xFFFFFFFF
 numericTypeBytes: tuple[int, ...] = (2, 10)
 
-# Byte 9 of a record's header is a bitmask, and this bit marks a cell backed by a
-# formula. Established across the corpus on 2026-09-01: in all 74 tables, a table
-# declaring formulas has marked records and a table declaring none has none. The
-# marked count can exceed the declared count, because the formula list is pooled,
-# so a dragged formula and a merge both reuse one entry across several cells.
-formulaFlagOffset: int = 9
-formulaFlagBit: int = 0x02
+# Every trailing reference in a cell record is a little-endian uint32.
+referenceWidth: int = 4
 
 # A record's value is patched in place, leaving the twelve-byte header and the
 # trailing references alone. Those references point at the table's format and
@@ -96,14 +114,6 @@ valueEnd: int = valueOffset + encodedLength
 
 class WriteError(RuntimeError):
     """A document that could not be written back to a package."""
-
-
-def carriesFormula(record: CellRecord) -> bool:
-    """Report whether a cell record is backed by a formula."""
-    return (
-        len(record.raw) > formulaFlagOffset
-        and bool(record.raw[formulaFlagOffset] & formulaFlagBit)
-    )
 
 
 def checkedValue(cell: Cell, record: CellRecord) -> Decimal:
@@ -190,6 +200,249 @@ def rewriteRow(
     return bytes(rebuiltOffsets), bytes(rebuiltBuffer)
 
 
+def encodeCoordinate(coordinate: Coordinate) -> int:
+    """Return one axis as the file stores it, undoing the reader's conversion.
+
+    An absolute axis is a line counted from one in the model and from zero in the
+    file. A relative axis is a distance and means the same in both, so shifting one
+    would move every relative reference by a row and raise nothing.
+    """
+    return (
+        coordinate.value - originOffset if coordinate.absolute else coordinate.value
+    )
+
+
+def encodeSpan(target: object, span: Span) -> None:
+    """Fill one range-tract axis, omitting `range_end` for a span of one line.
+
+    Omitted rather than repeated, because that is how Numbers writes it and a
+    range carrying a redundant end is a difference in a file that had none.
+    """
+    shift = originOffset if span.absolute else 0
+    target.range_begin = span.begin - shift  # type: ignore[attr-defined]
+    if span.end is not None:
+        target.range_end = span.end - shift  # type: ignore[attr-defined]
+
+
+def encodeFormulaNode(
+    node: FormulaNode,
+) -> tsce.ASTNodeArrayArchive.ASTNodeArchive:
+    """Return one node as an archive, patching what was read rather than rebuilding.
+
+    The node message carries 45 fields and this model gives meaning to 16 of them,
+    so a node built from scratch would silently drop everything else it was
+    carrying. Starting from the bytes as read and overwriting only what the model
+    owns is what lets an unrecognized node survive a rewritten formula intact.
+    """
+    archive = tsce.ASTNodeArrayArchive.ASTNodeArchive()
+    if node.raw:
+        archive.ParseFromString(node.raw)
+    # Assigned as an int rather than through the generated enum, because an
+    # unrecognized type has to survive and the enum names only what Apple
+    # declared. The wire form is a varint either way.
+    archive.AST_node_type = cast(
+        "tsce.ASTNodeArrayArchive.ASTNodeType.ValueType", node.nodeType
+    )
+
+    content = node.content
+    if isinstance(content, Decimal):
+        # decimal128 and the float64 copy beside it, because Numbers writes both
+        # and a reader of either has to find the same number.
+        low, high = struct.unpack(
+            decimalHalfFormat, Decimal128(content).asBytes()
+        )
+        archive.AST_number_node_decimal_low = low
+        archive.AST_number_node_decimal_high = high
+        archive.AST_number_node_number = float(content)
+    elif isinstance(content, str):
+        archive.AST_string_node_string = content
+    elif isinstance(content, FunctionCall):
+        archive.AST_function_node_index = content.index
+        archive.AST_function_node_numArgs = content.argumentCount
+    elif isinstance(content, UnknownFunction):
+        archive.AST_unknown_function_node_string = content.name
+        archive.AST_unknown_function_node_numArgs = content.argumentCount
+    elif isinstance(content, FormulaReference):
+        encodeFormulaReference(archive, content)
+    elif isinstance(content, FormulaRange):
+        encodeFormulaRange(archive, content)
+    return archive
+
+
+def encodeFormulaReference(
+    archive: tsce.ASTNodeArrayArchive.ASTNodeArchive, reference: FormulaReference
+) -> None:
+    """Write a single-cell reference, restoring the sentinels for a broken one.
+
+    A broken reference is written back exactly as it was found rather than
+    repaired into a real cell. Numbers records `#REF` as coordinates deliberately
+    pointing nowhere, and quietly turning that into a working reference would
+    change what the document says.
+    """
+    if reference.broken:
+        archive.AST_column.column = brokenColumnSentinel
+        archive.AST_row.row = brokenRowSentinel
+        return
+    if reference.column is None:
+        archive.ClearField("AST_column")
+    else:
+        archive.AST_column.column = encodeCoordinate(reference.column)
+        archive.AST_column.absolute = reference.column.absolute
+    # Absence is how the file expresses a whole column, so an axis the model
+    # dropped is cleared rather than written as zero.
+    if reference.row is None:
+        archive.ClearField("AST_row")
+    else:
+        archive.AST_row.row = encodeCoordinate(reference.row)
+        archive.AST_row.absolute = reference.row.absolute
+
+
+def encodeFormulaRange(
+    archive: tsce.ASTNodeArrayArchive.ASTNodeArchive, extent: FormulaRange
+) -> None:
+    """Write one range tract into the field variant its anchoring belongs in.
+
+    The variant an axis sits in IS its anchoring, so every variant is cleared
+    first. Writing a relative axis without clearing the absolute one would leave a
+    tract claiming both, which the reader resolves by preferring the relative and
+    which Numbers has never been observed to write.
+    """
+    tract = archive.AST_colon_tract
+    for name in ("relative_column", "relative_row",
+                 "absolute_column", "absolute_row"):
+        tract.ClearField(name)
+    if extent.columns is not None:
+        field = (
+            tract.absolute_column if extent.columns.absolute
+            else tract.relative_column
+        )
+        encodeSpan(field.add(), extent.columns)
+    if extent.rows is not None:
+        field = (
+            tract.absolute_row if extent.rows.absolute else tract.relative_row
+        )
+        encodeSpan(field.add(), extent.rows)
+
+
+def encodeFormula(formula: Formula) -> tsce.FormulaArchive:
+    """Return a whole formula as the postfix node array the file stores."""
+    archive = tsce.FormulaArchive()
+    for node in formula:
+        archive.AST_node_array.AST_node.append(encodeFormulaNode(node))
+    return archive
+
+
+@dataclass(slots=True)
+class FormulaPool:
+    """A table's pooled formulas, and the one place a changed one is written.
+
+    Numbers shares one stored archive between every cell a formula was dragged
+    into, so overwriting an entry that more than one cell names would edit all of
+    them at once. That is the same aliasing hazard the frozen model closes on the
+    read side, and it has to be closed again here: a shared entry is split rather
+    than overwritten, leaving the cells that did not change pointing at what they
+    always pointed at.
+    """
+
+    dataList: tst.TableDataList
+    stored: dict[int, Formula]
+    touched: bool = False
+
+    def formulaFor(self, key: int) -> Formula | None:
+        """Return the formula a key names, or None when the table has no such entry."""
+        return self.stored.get(key)
+
+    def replace(self, key: int, formula: Formula) -> int:
+        """Write a changed formula and return the key its cell should now name.
+
+        The same key comes back when the entry served one cell, and a fresh one
+        when it served several.
+        """
+        entries = {entry.key: entry for entry in self.dataList.entries}
+        entry = entries.get(key)
+        if entry is None:
+            raise WriteError(
+                f"A cell names formula {key}, which its table does not store. "
+                "The cell record and the formula list disagree, and guessing "
+                "which is right would corrupt one of them."
+            )
+        self.touched = True
+        if entry.refcount <= 1:
+            entry.formula.CopyFrom(encodeFormula(formula))
+            return key
+        # Shared. Split rather than overwrite, so the other cells keep theirs.
+        entry.refcount -= 1
+        fresh = self.dataList.entries.add()
+        fresh.key = self.dataList.nextListID
+        fresh.refcount = 1
+        fresh.formula.CopyFrom(encodeFormula(formula))
+        self.dataList.nextListID += 1
+        return fresh.key
+
+
+def formulaKeyOffset(record: CellRecord) -> int:
+    """Return where a record keeps its formula key.
+
+    Computed from the value's own width rather than from a constant, because the
+    key sits immediately after the value and a date, a boolean and a number are
+    three different widths. An error cell consumes no value at all, which is why
+    the same arithmetic finds its key at byte 12.
+    """
+    _, width = decodeCellValue(record.typeByte, record.raw[valueOffset:])
+    return valueOffset + width + formulaKeySlot * referenceWidth
+
+
+def patchFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
+    """Point a cell record at a different formula, leaving everything else alone.
+
+    Four bytes in place, because the references after this one address the table's
+    format and style lists and rewriting the record would strip a cell's number
+    format while appearing to succeed.
+    """
+    at = formulaKeyOffset(record)
+    if len(raw) < at + referenceWidth:
+        raise WriteError(
+            f"{record.column} is marked as carrying a formula, but its record is "
+            f"{len(raw)} bytes and the key would sit at {at}."
+        )
+    return raw[:at] + key.to_bytes(referenceWidth, "little") + raw[at + referenceWidth:]
+
+
+def formulaPoolFor(
+    index: ArchiveIndex, store: tst.DataStore
+) -> FormulaPool | None:
+    """Return the table's formula pool, or None when it declares no formulas.
+
+    A table that has never held one carries no list to write into, which is a
+    distinct state from a table whose list is empty and is why this returns None
+    rather than an empty pool.
+    """
+    if not store.formula_table.identifier:
+        return None
+    return FormulaPool(
+        dataList=index.resolve(store.formula_table, tst.TableDataList),
+        stored=readFormulaTable(index, store),
+    )
+
+
+def changedFormula(
+    cell: Cell, record: CellRecord, pool: FormulaPool | None
+) -> Formula | None:
+    """Return the cell's formula when it differs from the stored one, else None.
+
+    Compared against what the pool holds rather than against anything on the
+    record, because the record carries only a key. Comparing the model's formula
+    against that key would make every formula cell look edited on every save, the
+    same trap the string table already sidesteps.
+    """
+    if pool is None or cell.formula is None or not carriesFormula(record):
+        return None
+    if len(record.references) <= formulaKeySlot:
+        return None
+    stored = pool.formulaFor(record.references[formulaKeySlot])
+    return cell.formula if cell.formula != stored else None
+
+
 def applyTableEdits(
     index: ArchiveIndex,
     owners: dict[int, IWAFile],
@@ -216,6 +469,7 @@ def applyTableEdits(
     # key would make every text cell look edited on every save.
     strings = readStringTable(index, store)
     richText = readRichTextTable(index, store)
+    pool = formulaPoolFor(index, store)
     written: list[tuple[int, int]] = []
 
     for entry in store.tiles.tiles:
@@ -239,13 +493,24 @@ def applyTableEdits(
                 cell = table.cells.get(
                     CellReference(row + originOffset, record.column + originOffset)
                 )
-                if cell is None or cell.value == resolveValue(
-                    record, strings, richText
-                ):
+                if cell is None:
                     continue
-                replacements[record.column] = patchRecord(
-                    record, checkedValue(cell, record)
-                )
+                valueChanged = cell.value != resolveValue(record, strings, richText)
+                edited = changedFormula(cell, record, pool)
+                if not valueChanged and edited is None:
+                    continue
+                patched = record.raw
+                # The value first, so that writing over a formula still refuses
+                # here rather than being masked by the formula edit below.
+                if valueChanged:
+                    patched = patchRecord(record, checkedValue(cell, record))
+                if edited is not None and pool is not None:
+                    patched = patchFormulaKey(
+                        patched,
+                        record,
+                        pool.replace(record.references[formulaKeySlot], edited),
+                    )
+                replacements[record.column] = patched
             present = frozenset(
                 record.column
                 for record in decodeRow(
@@ -269,6 +534,12 @@ def applyTableEdits(
             owners[archive.identifier].messageReplace(
                 archive.identifier, 0, tile.SerializeToString()
             )
+
+    if pool is not None and pool.touched:
+        poolId = store.formula_table.identifier
+        owners[poolId].messageReplace(
+            poolId, 0, pool.dataList.SerializeToString()
+        )
     return written
 
 
