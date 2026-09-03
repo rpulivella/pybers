@@ -600,7 +600,9 @@ def cmdChecks(arguments: argparse.Namespace) -> int:
     if not runs:
         console.print(
             f"[yellow]{checksNotPassedMarker}[/] on {commit}: nothing has "
-            "reported. CI has not started, or the workflow failed to parse."
+            "reported yet. A queued run looks identical to no run here, because "
+            "a check suite creates no check run until a job starts, so this is "
+            "as likely to be a busy runner as a workflow that failed to parse."
         )
     else:
         console.print(f"[red]{checksNotPassedMarker}[/] on {commit}")
