@@ -413,7 +413,7 @@ def printBodyAsRawString(body: str) -> None:
 def printTitleAsRawString(summary: PullRequestSummary) -> None:
     """Write a pull request title to stdout with nothing added but its own newline.
 
-    Deliberately bare. `find` prints `#<N> <title>` for a reader, which is the right
+    Deliberately bare. `find` prints `PR #<N> <title>` for a reader, which is the right
     shape to look at and the wrong one to copy: a title reused verbatim would arrive
     carrying a number it never had.
     """
