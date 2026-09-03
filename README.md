@@ -145,6 +145,9 @@ release tagging. Other details:
   The prose gate is the unusual one and worth explaining: it lints **prose**.
   Documentation, docstrings and comments are checked against the project's writing rules
   the way ruff checks code, because this repository treats a wrong comment as a defect.
+- **Tickets are written `PYB-34` and pull requests `PR #38`**, never a bare number and
+  never a bare `#`. The key is declared once in `pyproject.toml` under `[tool.pybers]`,
+  and `scripts/ticket.py` reads it from there.
 - **The house style is camelCase** for functions, variables and parameters, which is the
   opposite of what most Python tooling assumes. This is deliberate. Modules stay
   lowercase and classes stay PascalCase.

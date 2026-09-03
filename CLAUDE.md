@@ -227,6 +227,12 @@ front end while doing so.
 
 ## House style
 
+- **Ticket prefix: `PYB`.** A ticket is written `PYB-34` in prose and a pull request
+  `PR #38`, both parts always, because GitHub numbers issues and pull requests from one
+  counter and a bare `#37` names two things. The key lives in `pyproject.toml` under
+  `[tool.pybers]`; this line restates it and does not own it. Commit subjects keep the
+  bare `[34]`, and `Closes #34` keeps its `#`, since GitHub parses no other form.
+
 The conventions below are deliberate and several of them differ from what a Python
 linter will assume. Follow them as written.
 
