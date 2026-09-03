@@ -286,7 +286,10 @@ linter will assume. Follow them as written.
 `pybers.model` (the dataclass object model, split by feature area) and `pybers.numbersfile`
 (the `.numbers` container and cell reader) both exist and are tested. Run the suite as
 **`.venv/bin/python3 -m pytest`**, that exact spelling, because `.claude/settings.json`
-matches permission strings as text and a grant that never fires reads as coverage.
+matches permission strings as text and a grant that never fires reads as coverage. All
+four gates together are **`.venv/bin/python3 scripts/pr-preflight-check.py`**, which is
+what `.github/workflows/preflight.yml` runs on every pull request, so pytest alone is a
+partial answer.
 
 `pybers.numbersfile` reads a `.numbers` file end to end: zip, IWA frames, a pure-Python
 Snappy decoder with no C dependency, length-prefixed protobuf archives, and cell values

@@ -24,8 +24,9 @@ pr.py        open, inspect, promote and merge pull requests. Exists so that no
 pr-preflight-check.py
              run every gate in one pass and report all of them: pytest, the
              prose gate, ruff and mypy. The deterministic half of
-             `/pr-review-code`, and what #5's CI workflow calls, so the gate
-             list lives here rather than in two places. Live now.
+             `/pr-review-code`, and what `.github/workflows/preflight.yml`
+             calls, so the gate list lives here rather than in two places, and
+             that workflow names no gate of its own. Live now.
 ```
 
 ## Naming

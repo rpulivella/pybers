@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [#5] Run the preflight in CI on every pull request
 - [#3] Author the pull request preflight check script
 - [#29] Bring the README current with the library and its gates
 - [#7] Declare build in the dev extras
