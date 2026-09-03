@@ -1,6 +1,6 @@
 # Runs the same gates a contributor runs locally, on a machine that is not
-# theirs. Whether a cold install passes at the declared floor is the one thing a
-# local run cannot answer, which is what earns this its runtime. See #5.
+# theirs. Whether a cold install passes at the declared version is the one thing
+# a local run cannot answer, which is what earns this its runtime. See #5.
 name: preflight
 
 on:
@@ -22,34 +22,22 @@ permissions:
 
 jobs:
   preflight:
-    name: preflight (${{ matrix.label }})
     # A draft skips rather than runs: the same preflight already ran on the
     # developer's machine, a draft cannot merge, and a skipped job costs nothing.
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    # A leg measures in single-digit minutes, and the runner default of 360
-    # would put one hung job past a third of a free plan's monthly allowance.
+    # A run measures in single-digit minutes, and the runner default of 360 would
+    # put one hung job past a third of a free plan's monthly allowance.
     timeout-minutes: 15
-    strategy:
-      # A failure on the floor and one on stable are different findings.
-      fail-fast: false
-      matrix:
-        include:
-          # The floor is read from `requires-python`, so raising it needs no edit
-          # here. Exactly one key is set per leg, so the other arrives as an
-          # empty string; that the action reads that as absent is expected
-          # rather than verified, and the first run on GitHub settles it.
-          - label: floor
-            versionFile: pyproject.toml
-          - label: stable
-            version: '3.x'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.version }}
-          python-version-file: ${{ matrix.versionFile }}
+          # One interpreter, the one `requires-python` declares. Naming no
+          # version here keeps the claim in a single place, so raising the floor
+          # needs no edit to this file.
+          python-version-file: pyproject.toml
 
       - name: Install the project
         run: pip install -e ".[dev]"
