@@ -8,7 +8,7 @@ same conventions, deliberately kept in sync. It governs `scripts/` (repo tooling
 `src/pybers/` (the library itself) follows the same core conventions but uses dataclasses
 rather than TypedDict for data, and is documented in `CLAUDE.md`.
 
-> Requires Python 3.11+. `rich` is required; `rich_argparse` is optional (the `--help`
+> Requires Python 3.14+. `rich` is required; `rich_argparse` is optional (the `--help`
 > output falls back to plain argparse without it). Per-script extras are noted in each
 > file's docstring.
 
