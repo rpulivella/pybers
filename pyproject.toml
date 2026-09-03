@@ -120,6 +120,13 @@ module = "pybers._generated.*"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
+# `ruff` ships no py.typed marker, because its Python package is a shim around a
+# Rust binary rather than a library. Nothing is being silenced: there are no types
+# to check, and `find_ruff_bin()` returning a path is the whole of its surface.
+module = "ruff.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 # Repository tooling, checked but not held to the library's standard. AC 7 of #4 is
 # why it is checked at all: two calls in `scripts/pr.py` whose arguments did not
 # match the signature sat undiscovered until a real pull request ran one of them,

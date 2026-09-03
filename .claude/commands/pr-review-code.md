@@ -14,22 +14,16 @@ is in `.github/code-review-rubric.md`. Never restate either here.
 
 ## What a review is today
 
-**The pytest suite and the standards gate. Nothing else.** Agent delegation is suspended
+**The four gates the preflight runs, and nothing else.** Agent delegation is suspended
 until #12 decides what replaces it, because this repository is going public and hosting
-agentic review means the diff leaves this machine and every run bills. Step 4 below stands
+agentic review means the diff leaves this machine and every run bills. Step 5 below stands
 as the shape to return to, not as an instruction to follow now.
 
-`scripts/pr-preflight-check.py` does not exist either, so step 2 cannot run. That is #3.
-Run the two gates by hand instead and say in the report that the preflight was unavailable
-rather than passing over it:
+`scripts/pr-preflight-check.py` runs pytest, the prose gate, ruff and mypy in one pass and
+reports all four, so a failing run lists everything to fix rather than the first thing.
 
-```
-.venv/bin/python3 -m pytest
-.venv/bin/python3 scripts/standards-check.py
-```
-
-Both must be clean. A missing preflight is not a green one, and reporting it as a green
-one states a fact nobody has.
+**It does not check the pull request body against its template.** That is a read you
+perform yourself, and the report says so rather than implying the machine did it.
 
 ## Steps
 
@@ -47,12 +41,12 @@ one states a fact nobody has.
    the printed output is the contract here. Do not depend on `$?`.
 2. **Run the preflight and stop if it fails:**
    ```
-   python3 scripts/pr-preflight-check.py --pr <N>
+   .venv/bin/python3 scripts/pr-preflight-check.py
    ```
-   At minimum this runs `pytest` and checks the PR body against its template. Non-zero
-   means **do not review**: report every failing stage and its reason verbatim, invoke no
-   agent, and stop. Do not soften a machine reason into something friendlier. The one
-   exception is a waiver. See below.
+   With the project venv, not the system interpreter, because pytest, ruff and mypy live
+   there. Non-zero means **do not review**: report every failing gate and its reason
+   verbatim, invoke no agent, and stop. Do not soften a machine reason into something
+   friendlier. The one exception is a waiver. See below.
 3. **Move the card, before reviewing anything:**
    ```
    python3 scripts/ticket.py status <ticket> --set "Code Review"

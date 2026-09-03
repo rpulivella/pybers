@@ -54,6 +54,12 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
 
 - ALWAYS `--draft`. Never open a non-draft PR.
 - NEVER add a section that is not in the template.
+- **The finished body must not exceed twice the word count of the template it fills**
+  (`wc -w` on both), because a reviewer needs what changed and what will bite them
+  rather than an account of how it was found.
+- **Never restate what the pull request page already displays**: GitHub lists every
+  commit and its message alongside the body, so re-narrating them as prose or bullets
+  duplicates data that then goes stale against the branch.
 - **NEVER add "Co-Authored-By", "Generated with Claude Code", or any AI attribution in
   the PR body.**
 - Base branch is always `develop`. Do not guess the description, fetch the issue first.
