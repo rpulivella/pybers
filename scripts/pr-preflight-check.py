@@ -18,14 +18,19 @@ return results. Ruff is the exception: its Python package is a shim exporting
 that function and run as a subprocess. Locating it through the package rather
 than trusting PATH is what keeps the exception narrow.
 
-**Scope is what the branch changed, not what the working tree changed.** The
-standards checker defaults to uncommitted files, which is right for a habit run
-before committing and wrong here: a preflight runs after committing, when the
-tree is clean, so that default would examine nothing and pass. A green signal
-with no evidence behind it is worse than no gate.
+**Every gate is repository-wide, so this script asks git nothing.** Ruff checks
+the tree, mypy checks the paths pyproject.toml declares, pytest runs the whole
+suite, and the standards checker is given its own `--all` scope rather than its
+default of whatever git reports as changed. That default serves the habit run
+before a commit and fails here twice over: a preflight runs when the tree is
+clean, so it would examine nothing and pass, and a clone of a single branch has
+no base to diff against. Needing neither is why this runs unchanged in CI on a
+default shallow checkout.
 
 UPDATES
-2026-09-02  Written for #3.
+2026-09-02  Written for #3. Repository-wide from the start; an early
+            branch-scoped draft needed a git base that a shallow CI
+            checkout does not carry.
 """
 from __future__ import annotations
 
@@ -36,7 +41,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/02"
-__usage__ = "python3 scripts/pr-preflight-check.py [--base BRANCH] [--gate NAME ...]"
+__usage__ = "python3 scripts/pr-preflight-check.py [--gate NAME ...]"
 
 import argparse
 import contextlib
@@ -58,16 +63,6 @@ except ImportError:  # rich_argparse is optional, per scripts/README.md
     RichHelpFormatter = argparse.HelpFormatter  # type: ignore[assignment,misc]
 
 console: Console = Console()
-
-# The branch every pull request targets. A repository whose deploy tracks another
-# branch passes --base rather than editing this.
-defaultBase: str = "develop"
-
-# git is the one sanctioned subprocess in this repository's tooling, because there
-# is no Python equivalent worth the dependency. Ruff is the second, for the reason
-# the module docstring gives.
-gitTimeoutSeconds: int = 30
-
 
 @dataclass(frozen=True)
 class GateResult:
@@ -93,90 +88,6 @@ def repositoryRoot() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def changedFiles(base: str) -> list[Path]:
-    """Return the files this branch changed relative to `base`, prose ones only.
-
-    `git diff base...HEAD` is the branch's own contribution rather than every
-    difference between the two, so a `base` that moved ahead does not drag
-    unrelated files in.
-
-    Three questions rather than one, because a branch contributes work that is
-    committed and work that is not. Asking only the first leaves the gate vacuous
-    before the first commit, which is the same hole the checker's own default has
-    after the last one.
-
-    Filtered here rather than left to the standards checker, whose `collectFiles`
-    applies its extension filter to a directory and not to explicit paths.
-    """
-    standards = standardsModule()
-    resolved = resolveBase(base)
-    found: set[Path] = set()
-    for command in (
-        ["git", "diff", "--name-only", f"{resolved}...HEAD"],   # committed here
-        ["git", "diff", "--name-only", "HEAD"],             # not yet committed
-        ["git", "ls-files", "--others", "--exclude-standard"],  # not yet tracked
-    ):
-        for line in gitLines(command, base).split("\n"):
-            candidate = repositoryRoot() / line.strip()
-            if line.strip() and candidate.suffix in standards.checkExtensions \
-                    and candidate.is_file():
-                found.add(candidate)
-    return sorted(found)
-
-
-def resolveBase(base: str) -> str:
-    """Return a ref for `base` that this checkout actually has.
-
-    A clone of one branch carries no local `develop`, which is the shape CI checks
-    out and the shape a contributor gets from `git clone --branch`. Trying the
-    remote-tracking name second costs one command and turns an obscure git error
-    into a working gate.
-
-    Refusing when neither resolves is deliberate. Falling back to "check only what
-    is uncommitted" would leave the gate quietly examining less than it claims to,
-    which is the failure this whole script exists to avoid.
-    """
-    for candidate in (base, f"origin/{base}"):
-        completed = subprocess.run(
-            ["git", "rev-parse", "--verify", "--quiet", candidate],
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=repositoryRoot(),
-            timeout=gitTimeoutSeconds,
-        )
-        if completed.returncode == 0:
-            return candidate
-    raise PreflightError(
-        f"neither {base!r} nor 'origin/{base}' is a ref in this checkout, so the "
-        "files this branch changed cannot be determined. Fetch it first: a "
-        "single-branch or shallow clone does not carry it."
-    )
-
-
-def gitLines(command: list[str], base: str) -> str:
-    """Return one git command's output, or raise naming what could not be asked."""
-    try:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=repositoryRoot(),
-            timeout=gitTimeoutSeconds,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise PreflightError(
-            f"could not ask git what this branch changed: {exc}"
-        ) from exc
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "").strip()
-        raise PreflightError(
-            f"{' '.join(command)} failed against {base!r}: {detail or 'no message'}"
-        )
-    return completed.stdout
-
-
 def standardsModule() -> ModuleType:
     """Return the standards checker as a module.
 
@@ -195,26 +106,34 @@ def runTests() -> GateResult:
 
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
-        code = pytest.main(["-q", str(repositoryRoot() / "tests")])
+        code = pytest.main(["-q", "tests"])
     output = buffer.getvalue().strip()
     lastLine = output.splitlines()[-1] if output else "pytest printed nothing"
     return GateResult("pytest", int(code) == 0, lastLine, output)
 
 
-def runStandards(base: str) -> GateResult:
-    """Check this branch's prose, failing on a FAILURE and never on a WARNING."""
+def runStandards() -> GateResult:
+    """Check every prose file in the repository, failing only on a FAILURE.
+
+    A warning here is a heuristic worth reading and not a defect, so it is
+    reported and never gates.
+    """
     standards = standardsModule()
-    files = changedFiles(base)
-    # The checker records a finding as (level, path, line, message).
     warnings: list[str] = []
+    # The checker records a finding as (level, path, line, message).
     findings: list[tuple[str, Path, int, str]] = []
+    buffer = io.StringIO()
+
+    # Its own --all scope, so this script inherits the checker's skip rules
+    # rather than reimplementing them.
+    scope = argparse.Namespace(paths=[], all=True)
+    files = standards.collectFiles(scope, warnings)
     for path in files:
         standards.checkFile(path, findings)
 
     # Captured rather than swapping the checker's own console: rich resolves
     # `sys.stdout` on every write, so redirecting is enough and nothing reaches
     # into another module's globals.
-    buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
         code = standards.report(findings, files, warnings)
 
@@ -222,7 +141,7 @@ def runStandards(base: str) -> GateResult:
     return GateResult(
         "standards",
         code == 0,
-        f"{len(files)} file(s) changed on this branch, {failures} failure(s)",
+        f"{len(files)} file(s) checked, {failures} failure(s)",
         buffer.getvalue().strip(),
     )
 
@@ -238,7 +157,6 @@ def runRuff() -> GateResult:
             capture_output=True,
             text=True,
             check=False,
-            cwd=repositoryRoot(),
         )
     except OSError as exc:
         raise PreflightError(f"could not run ruff at {binary}: {exc}") from exc
@@ -259,15 +177,15 @@ def runTypes() -> GateResult:
 
 # Every gate, in the order a reader most wants them. Named so that --gate can
 # select one during development without the others' runtime.
-gates: dict[str, Callable[[str], GateResult]] = {
-    "pytest": lambda base: runTests(),
+gates: dict[str, Callable[[], GateResult]] = {
+    "pytest": runTests,
     "standards": runStandards,
-    "ruff": lambda base: runRuff(),
-    "mypy": lambda base: runTypes(),
+    "ruff": runRuff,
+    "mypy": runTypes,
 }
 
 
-def runGates(names: list[str], base: str) -> list[GateResult]:
+def runGates(names: list[str]) -> list[GateResult]:
     """Run each named gate to completion and return every result.
 
     No gate may abort the run, which is the whole point: one pass has to list
@@ -277,7 +195,7 @@ def runGates(names: list[str], base: str) -> list[GateResult]:
     results: list[GateResult] = []
     for name in names:
         try:
-            results.append(gates[name](base))
+            results.append(gates[name]())
         except PreflightError as exc:
             results.append(GateResult(name, False, "could not run", str(exc)))
     return results
@@ -318,11 +236,6 @@ def main() -> int:
         formatter_class=RichHelpFormatter,
     )
     parser.add_argument(
-        "--base",
-        default=defaultBase,
-        help=f"branch this one targets (default: {defaultBase})",
-    )
-    parser.add_argument(
         "--gate",
         action="append",
         choices=sorted(gates),
@@ -330,7 +243,13 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     chosen = arguments.gate or ["pytest", "standards", "ruff", "mypy"]
-    return report(runGates(chosen, arguments.base))
+
+    # Every gate reads configuration relative to the root: mypy and ruff find
+    # pyproject.toml there, and the standards checker resolves its own roots.
+    # Done once here so that running this from anywhere is one guarantee rather
+    # than four separate habits, one of which was already missing.
+    with contextlib.chdir(repositoryRoot()):
+        return report(runGates(chosen))
 
 
 if __name__ == "__main__":
