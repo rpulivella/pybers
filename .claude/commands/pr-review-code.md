@@ -15,7 +15,7 @@ is in `.github/code-review-rubric.md`. Never restate either here.
 ## What a review is today
 
 **The four gates the preflight runs, and nothing else.** Agent delegation is suspended
-until #12 decides what replaces it, because this repository is going public and hosting
+until PYB-12 decides what replaces it, because this repository is going public and hosting
 agentic review means the diff leaves this machine and every run bills. Step 5 below stands
 as the shape to return to, not as an instruction to follow now.
 
@@ -61,7 +61,7 @@ perform yourself, and the report says so rather than implying the machine did it
    python3 scripts/ticket.py show <ticket>
    ```
 5. **Review against the rubric.** Read `.github/code-review-rubric.md` and answer its six
-   questions for this change, yourself. **The delegation below is suspended pending #12**,
+   questions for this change, yourself. **The delegation below is suspended pending PYB-12**,
    and is kept because the selection rule it encodes is the part worth preserving, not
    because it should be run. Do not launch these agents without the user asking.
 
@@ -90,11 +90,11 @@ perform yourself, and the report says so rather than implying the machine did it
 7. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
 8. **Only on green gates with no unresolved finding**, promote it:
-   `python3 scripts/pr.py ready <N>`. Until #3 lands, "green gates" means the two
+   `python3 scripts/pr.py ready <N>`. Until PYB-3 lands, "green gates" means the two
    commands above run clean, and the report says that is what was run.
 
    Promotion is the review's outcome; step 3 is its beginning. What draft should mean
-   once CI exists is unsettled and belongs to #12.
+   once CI exists is unsettled and belongs to PYB-12.
 
 ## Waiving a stage
 
@@ -114,7 +114,7 @@ more than the one stage in question.
 
 - **Never review on a red gate**, unless the failing stage is waived above. A gate that
   does not exist yet is not a green one, and saying so in the report is the whole duty.
-- **Never launch a review agent unless the user asks for one.** See #12.
+- **Never launch a review agent unless the user asks for one.** See PYB-12.
 - **Never edit a body to make a finding go away.** Recording a waiver puts a fact on the
   record; rewriting a description until a gate reads green removes one.
 - **The preflight is repository-wide; the review is diff-wide.** Never narrow the

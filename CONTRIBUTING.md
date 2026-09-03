@@ -59,7 +59,7 @@ A pull request leaves draft when three things are true, and not before:
    whose contents are known independently, and a configuration change earns proof it takes
    effect.
 3. The gates pass. Today that is `.venv/bin/python3 -m pytest` and
-   `scripts/standards-check.py` with zero failures. Ruff and mypy join them once #4 lands,
+   `scripts/standards-check.py` with zero failures. Ruff and mypy join them once PYB-4 lands,
    and this list is meant to grow rather than to stay accurate by omission.
 
 **A draft PR is the right place to be feature complete with tests still being written.**

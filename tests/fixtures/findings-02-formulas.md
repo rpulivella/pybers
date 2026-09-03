@@ -45,7 +45,7 @@ count on Numbers resolving: it survives on screen, and it reaches every formula
 depending on an edited cell, not only a formula the writer wrote itself.
 
 **But a writer can ask for the recalculation, and marking the edited cells is enough.**
-Measured 2026-09-02 for #25. `TSCE.CalculationEngineArchive.refs_to_dirty` points at a
+Measured 2026-09-02 for PYB-25. `TSCE.CalculationEngineArchive.refs_to_dirty` points at a
 `TSCE.ReferencesToDirtyArchive` that every clean document carries and every clean
 document serializes to zero bytes. Populating it with the cells that changed, and
 nothing else, makes Numbers recalculate on open:
