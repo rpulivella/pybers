@@ -442,11 +442,13 @@ def editPullRequest(
     )
 
 
-def markReadyForReview(token: str, nodeId: str) -> None:
-    """Take a pull request out of draft.
+def markReadyForReview(token: str, nodeId: str) -> bool:
+    """Take a pull request out of draft and return whether it is now ready.
 
     REST does not expose this transition at all, so it is the one operation here
     that has to go through GraphQL, which is why the node id is carried around.
+    The mutation already returns `isDraft`, so reading it costs nothing and closes
+    the path where a 200 with no errors reports a promotion that did not happen.
     """
     mutation = """
     mutation($pullRequestId: ID!) {
@@ -455,7 +457,8 @@ def markReadyForReview(token: str, nodeId: str) -> None:
       }
     }
     """
-    ticket.requestGraphql(token, mutation, {"pullRequestId": nodeId})
+    data = ticket.requestGraphql(token, mutation, {"pullRequestId": nodeId})
+    return not data["markPullRequestReadyForReview"]["pullRequest"]["isDraft"]
 
 
 def mergePullRequest(
@@ -726,7 +729,13 @@ def cmdReady(arguments: argparse.Namespace) -> int:
         )
         return 0
 
-    markReadyForReview(token, summary["nodeId"])
+    if not markReadyForReview(token, summary["nodeId"]):
+        console.print(
+            f"[red]{pullRequestRef(summary['number'])} is still a draft after the "
+            "mutation reported success.[/]"
+        )
+        return errorExitCode
+
     console.print(
         f"[green]Ready for review[/] "
         f"[bold cyan]{pullRequestRef(summary['number'])}[/]"
