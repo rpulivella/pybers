@@ -38,7 +38,7 @@ __status__ = "Development"
 __date__ = "2026/08/31"
 
 from pathlib import Path
-from typing import TypeVar, cast
+from typing import cast
 
 from google.protobuf.message import Message
 
@@ -65,11 +65,6 @@ from .numbersfile.types import archiveTypeId, parseArchive
 # model, and a model coordinate never reaches a decoder. A design keeping both in
 # one object is how a reader comes to be off by one in only some places.
 originOffset: int = 1
-
-# Every resolve names the archive class it expects, so the expectation is checked
-# rather than assumed. Bound to Message because only a generated class can be the
-# target of a reference.
-ArchiveT = TypeVar("ArchiveT", bound=Message)
 
 # The registry identifiers this module navigates by. Named rather than written as
 # literals at the point of use, because a bare 6000 in a conditional says nothing.
@@ -120,7 +115,10 @@ class ArchiveIndex:
             )
         return found
 
-    def resolve(
+    # Every resolve names the archive class it expects, so the expectation is
+    # checked rather than assumed, and Message bounds it because only a generated
+    # class can be the target of a reference.
+    def resolve[ArchiveT: Message](
         self, reference: tsp.Reference, expected: type[ArchiveT]
     ) -> ArchiveT:
         """Parse the archive a `TSP.Reference` points at, as the class named.
