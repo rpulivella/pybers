@@ -27,14 +27,18 @@ jobs:
     # developer's machine, a draft cannot merge, and a skipped job costs nothing.
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    # A leg measures in single-digit minutes, and the runner default of 360
+    # would put one hung job past a third of a free plan's monthly allowance.
+    timeout-minutes: 15
     strategy:
       # A failure on the floor and one on stable are different findings.
       fail-fast: false
       matrix:
         include:
           # The floor is read from `requires-python`, so raising it needs no edit
-          # here. Exactly one of these two keys is set per leg, and the unset one
-          # reaches the action as an empty string, which it treats as absent.
+          # here. Exactly one key is set per leg, so the other arrives as an
+          # empty string; that the action reads that as absent is expected
+          # rather than verified, and the first run on GitHub settles it.
           - label: floor
             versionFile: pyproject.toml
           - label: stable
