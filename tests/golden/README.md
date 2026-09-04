@@ -24,6 +24,7 @@ other when reaching for something to test against.
 | `22-unmerged-by-pybers.numbers` | `22-merge-2x2.numbers` | all five merges removed | 2026-09-02, Numbers 15.3.1 |
 | `18-formula-literals-A1-changed.numbers` | `18-formula-literals.numbers` | `A1` changed from `=1+1` to `=1+5` | 2026-09-03, Numbers 15.3.1 |
 | `19-formula-dragged-F2-narrowed.numbers` | `19-formula-dragged.numbers` | `F2` narrowed from `SUM($B$1:$D$1)` to `SUM($B$1:$C$1)`, leaving `F3` on the archive they shared | 2026-09-03, Numbers 15.3.1 |
+| `18-formula-attached-and-detached.numbers` | `18-formula-literals.numbers` | `=1+1` attached to `A2`, which held only the text label; `B1`'s `=2*3` detached | 2026-09-04, Numbers 15.3.1 |
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `applyDocumentEdits` walking sheets and
@@ -134,14 +135,37 @@ cells highlighted and a result of 6. Every other cell is unmoved, including the
 mixed-locking pair `G2` at 3 and `G3` at 2. Had the pooled entry been overwritten
 instead of split, both would read 3 and both formula bars would say `$B$1:$C$1`.
 
+## The attach and detach golden, and the two-register finding
+
+`A2` held the text `1+1` as a label and no formula; it now carries `=1+1` and displays
+**2**. `B1` held `=2*3` and now holds a plain **6** with an empty formula bar.
+
+**This golden took three attempts, and the first two are the reason it exists.** The
+calculation engine keeps its own register of which cells hold formulas, and setting the
+record's formula flag and pooling the archive is necessary but not sufficient.
+
+- Attempt one updated neither register. `A2` stayed as text and Numbers never knew a
+  formula was there.
+- Attempt two updated `cell_dependencies` only. Selecting `A2` then showed
+  `Formula 1+1` in the footer while the cell still displayed `1+1`, which is the most
+  misleading state available: correct to anyone who clicks it, never evaluated.
+- Attempt three updated `tiled_cell_dependencies` as well. The register is stored
+  TWICE, and both copies have to agree.
+
+`B1` also shows why a pass is not a pass. Attempt two rendered `B1` correctly while the
+register still claimed it held a formula, so the detach half looked confirmed while
+leaving the document lying about itself.
+
 ## Confirming one
 
 **Copy it somewhere else first, and open the copy.** Opening a `.numbers` file in
-Numbers rewrites it. Confirmed on 2026-09-01: opening this golden renamed
-`Index/ViewState-913882.iwa` to `Index/ViewState.iwa` and grew the package by 235 bytes,
-because macOS document autosave saved it back with no edit and no prompt. Opening the
-golden itself therefore destroys the very bytes being confirmed, and the file left behind
-is Numbers' output rather than this library's.
+Numbers MAY rewrite it, and whether it does is not predictable. Observed on 2026-09-01:
+opening a golden renamed `Index/ViewState-913882.iwa` to `Index/ViewState.iwa` and grew
+the package by 235 bytes, because macOS document autosave saved it back with no edit and
+no prompt. Observed on 2026-09-04, opening a workarea copy left its modification time
+untouched, so autosave did not fire. **Both happened, and that is exactly why the copy is
+not optional**: a rule that holds only sometimes cannot be relied on in the direction that
+loses the bytes being confirmed.
 
 Then open the copy. It must open with no warning and no repair prompt, the edited cell
 must hold its new value, and every other cell must still match the description beneath it.
