@@ -146,7 +146,14 @@ ignore_missing_imports = true
 #
 # `scripts/` has no `__init__.py`, so mypy names each file by its stem rather than
 # as a package. Matching on `scripts.*` silently matched nothing.
-module = ["pr", "ticket", "standards-check", "protos-extract"]
+module = [
+    "pr",
+    "ticket",
+    "standards-check",
+    "protos-extract",
+    "functions-extract",
+    "numbersapp",
+]
 disallow_untyped_defs = false
 disallow_any_generics = false
 warn_return_any = false
