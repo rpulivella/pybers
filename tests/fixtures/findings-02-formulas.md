@@ -231,13 +231,24 @@ error text for anything else would mean evaluating the formula.
 
 ```
  1  addition            17  number literal      36  cell coordinate
- 4  division            19  string literal      46  broken reference (sentinels)
- 7  comparison          31  unknown function    67  range tract
-16  function call       32  unidentified, follows a call in several files
+ 3  multiplication      19  string literal      46  broken reference (sentinels)
+ 4  division            31  unknown function    67  range tract
+ 6  concatenation       32  unidentified, follows a call in several files
+ 7  comparison
+16  function call
 34/35  a bracketing pair around each argument of a nested call
 ```
 
-Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS**. These are numeric, so a name map is
+**An operator IS its node type, and carries nothing else**, added 2026-09-04 from
+PYB-41 along with types 3 and 6. `1+1` is type 1, `2*3` is type 3, `"a"&"b"` is type 6,
+and none of them holds a field beyond `AST_node_type`, arity being implied. Every
+FUNCTION, by contrast, is type 16 distinguished by a number. So the name map below is
+needed for functions only: operators need at most a node-type-to-symbol table, and that
+one is derivable from these fixtures rather than from Numbers.app.
+
+Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS, 126 = ROUND**. `ROUND(2.5)`
+and `ROUND(2.5,0)` share index 126 with different `numArgs`, so arity is carried on
+the call rather than encoded in the index. These are numeric, so a name map is
 eventually needed and must be derived rather than borrowed, per the schema-ownership
 decision.
 
