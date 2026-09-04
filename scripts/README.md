@@ -15,12 +15,25 @@ rather than TypedDict for data, and is documented in `CLAUDE.md`.
 ## Current scripts
 
 ```
+protos-extract.py
+             dump the iWork protobuf schemas pybers builds on from the Numbers
+             application binary, and diff them against the vendored reference
+             set. Live now.
 ticket.py    file and move tickets on GitHub Issues and the pybers Project board,
              the single sanctioned path, never hand-run the GitHub API around it
              (see the command map below). Live now.
 pr.py        open, inspect, promote and merge pull requests. Exists so that no
              skill needs `gh`, whose identity is an ambient keyring holding
              several accounts at once. Live now.
+functions-extract.py
+             derive the Numbers formula function index map from the application
+             binary and report how it differs from the committed one. Reads the
+             binary, never runs it. Output is committed because `pip install
+             pybers` has no Numbers to read. Live now.
+numbersapp.py
+             locate the Numbers install on this machine and read its identity.
+             Imported by the two extractors rather than duplicated in each; it
+             is not a command and has no CLI. Live now.
 pr-preflight-check.py
              run every gate in one pass and report all of them: pytest, the
              prose gate, ruff and mypy. The deterministic half of
