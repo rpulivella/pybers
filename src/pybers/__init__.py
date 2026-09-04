@@ -56,14 +56,20 @@ from pybers.model import (
     Table,
     TextBox,
     TextRun,
+    UnknownFunctionError,
     columnLetter,
     columnNumber,
+    functionIndexFor,
+    functionNameFor,
     toCellRanges,
     toCellReference,
 )
 from pybers.reader import open
 
 __all__ = [
+    "UnknownFunctionError",
+    "functionIndexFor",
+    "functionNameFor",
     "FormulaUnknownCall",
     "Span",
     "FormulaFunctionCall",

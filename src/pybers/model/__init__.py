@@ -9,6 +9,7 @@ deliberate: it is what makes the round-trip contract testable (build a model, wr
 read it back, assert equality) without needing a real .numbers file for every test.
 
 UPDATES
+2026-09-04  Function names for formula call indices (#44).
 2026-09-02  The document cell iteration (#14).
 2026-09-02  Sheet and table selection (#14).
 2026-09-01  Addressing added as its own feature area (#9): reference, ranges.
@@ -34,6 +35,11 @@ from pybers.model.formula import (
     FormulaUnknownCall,
     Span,
 )
+from pybers.model.functions import (
+    UnknownFunctionError,
+    functionIndexFor,
+    functionNameFor,
+)
 from pybers.model.geometry import Position, Size
 from pybers.model.ranges import CellRange, CellRangeList, RangeAddress, toCellRanges
 from pybers.model.reference import (
@@ -55,6 +61,9 @@ from pybers.model.text import Paragraph, RichText, TextRun
 # defined in the module it lives in is already public there, and a second list
 # repeating it is one more thing to forget.
 __all__ = [
+    "UnknownFunctionError",
+    "functionIndexFor",
+    "functionNameFor",
     "FormulaUnknownCall",
     "Span",
     "FormulaFunctionCall",

@@ -33,6 +33,8 @@ row of `None` means the whole column rather than row zero. The same rule
 `pybers.model.ranges` already follows.
 
 UPDATES
+2026-09-04  Function calls name themselves, for #44. The index stays the
+            stored form, so authoring by name and by index write one archive.
 2026-09-03  Written for #41. Node types, the key slot and the sticky-bits rule
             were all measured against the corpus rather than read off the schema,
             which permits far more than Numbers writes.
@@ -51,6 +53,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from pybers.model.functions import functionIndexFor, functionNameFor
 from pybers.model.ranges import CellRange
 from pybers.model.reference import CellReference
 
@@ -216,15 +219,29 @@ class FormulaRange:
 
 @dataclass(frozen=True, slots=True)
 class FormulaFunctionCall:
-    """A call to one of Apple's built-in functions, named by its own index.
+    """A call to one of Apple's built-in functions, stored as its index.
 
-    The index is numeric in the archive and no name map ships with this library
-    yet, so 168 is SUM and this model says so no further. Deriving that map is
-    its own work.
+    The index is what the archive holds, so `named` is a way of writing one down
+    rather than a second representation. `name` is None for a function the map
+    does not carry, which leaves the call intact rather than refusing it.
     """
 
     index: int
     argumentCount: int
+
+    @property
+    def name(self) -> str | None:
+        """Return the function's name, or None when the map does not carry it."""
+        return functionNameFor(self.index)
+
+    @classmethod
+    def named(cls, name: str, argumentCount: int) -> FormulaFunctionCall:
+        """Build a call by function name, `SUM` or `sum`, rather than by index.
+
+        Raises `UnknownFunctionError` on a name the map does not carry, since an
+        invented index would write a formula calling some other function.
+        """
+        return cls(index=functionIndexFor(name), argumentCount=argumentCount)
 
 
 @dataclass(frozen=True, slots=True)
