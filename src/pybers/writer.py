@@ -37,6 +37,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import cast
 
+from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
+
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
@@ -113,6 +115,12 @@ referenceWidth: int = 4
 # columns 0, 32, 64 and so on to 224, and every tile in the corpus begins at row
 # zero, so the row extent of a tile is not established and is never assumed here.
 dependencyTileColumns: int = 32
+
+# The generated container both copies of that register are held in. Named so the
+# one function updating either can say what it takes.
+type CellRecordList = RepeatedCompositeFieldContainer[
+    tsce.CellRecordExpandedArchive
+]
 
 # Byte 0 of every cell record in the corpus. A created record carries it too.
 storageVersion: int = 5
@@ -397,11 +405,12 @@ class FormulaPool:
         """
         self.touched = True
         for key, stored in self.stored.items():
-            if stored != formula or self.entryFor(key) is None:
+            entry = self.entryFor(key)
+            if stored != formula or entry is None:
                 continue
             if key == previous:
                 return key
-            self.entryFor(key).refcount += 1  # type: ignore[union-attr]
+            entry.refcount += 1
             if previous is not None:
                 self.release(previous)
             return key
@@ -587,22 +596,24 @@ class TableEdits:
 
 
 def rewriteCellRecords(
-    records: object, added: list[tuple[int, int]], removed: list[tuple[int, int]]
+    records: CellRecordList,
+    added: list[tuple[int, int]],
+    removed: list[tuple[int, int]],
 ) -> None:
     """Add and drop entries in one register of formula-bearing cells."""
     dropping = set(removed)
     kept = [
-        record for record in records  # type: ignore[attr-defined]
+        record for record in records
         if (record.row, record.column) not in dropping
     ]
     present = {(record.row, record.column) for record in kept}
-    del records[:]  # type: ignore[attr-defined]
+    del records[:]
     for record in kept:
-        records.add().CopyFrom(record)  # type: ignore[attr-defined]
+        records.add().CopyFrom(record)
     for row, column in added:
         if (row, column) in present:
             continue
-        fresh = records.add()  # type: ignore[attr-defined]
+        fresh = records.add()
         fresh.column = column
         fresh.row = row
         # An empty edge set, which is what every entry in the corpus carries.
