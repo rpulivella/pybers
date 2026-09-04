@@ -51,8 +51,12 @@ from pybers.numbersfile.types import archiveTypeId
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 # TST.TableDataList, so a test can compare the pooled lists of two packages
-# without reaching for the writer's own constants.
+# without reaching for the writer's own constants. TSCE.CalculationEngineArchive
+# and the owner_kind a table's dependency entry carries are named for the same
+# reason.
 dataListTypeId: int = 6005
+calculationEngineTypeId: int = 4000
+tableOwnerKind: int = 1
 
 
 def fixturePath(name: str) -> Path:
@@ -591,3 +595,157 @@ def testTheGoldenFilesHoldWhatTheyClaimTo() -> None:
     # The sibling that shares the original archive keeps its own span, which is
     # the whole point of splitting a pooled entry rather than overwriting it.
     assert narrowed.cell("F3").formula.ranges[0].columns.end == 4
+
+
+# ── AC 6 and AC 7: attaching and detaching a formula ─────────────────────────
+
+
+def formulaCellRegister(path: Path) -> tuple[list[tuple[int, int]], ...]:
+    """Return the engine's two registers of formula-bearing cells, zero-based.
+
+    Both are returned so a test can assert they agree. A stale one renders
+    correctly today and lies about the document.
+    """
+    from pybers._generated import TSCEArchives_pb2 as tsce
+    from pybers.numbersfile.types import parseArchive
+    from pybers.reader import ArchiveIndex
+
+    index = ArchiveIndex(readPackage(path))
+    for archive in list(index.byIdentifier.values()):
+        if archiveTypeId(archive) != calculationEngineTypeId:
+            continue
+        engine = parseArchive(archive)
+        for reference in engine.dependency_tracker.formula_owner_dependencies:
+            owner = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
+            if owner.owner_kind != tableOwnerKind:
+                continue
+            expanded = sorted(
+                (record.row, record.column)
+                for record in owner.cell_dependencies.cell_record
+            )
+            tiled = sorted(
+                (record.row, record.column)
+                for tile in owner.tiled_cell_dependencies.cell_record_tiles
+                for record in index.resolve(
+                    tile, tsce.CellRecordTileArchive
+                ).cell_records
+            )
+            return expanded, tiled
+    return [], []
+
+
+def testAttachingAFormulaToAValueCellRegistersItInBothRegisters(
+    tmp_path: Path,
+) -> None:
+    """AC 6. A cell that held only a value carries a formula afterward.
+
+    The register assertion is the point. A formula whose cell is missing from
+    either register is never evaluated, and Numbers gives no warning: it shows the
+    formula in its formula bar and the old value in the grid.
+    """
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    before = formulaCellRegister(working)
+    assert (1, 0) not in before[0], "A2 holds no formula in the fixture"
+
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    assert table.cell("A2").formula is None
+    table.cell("A2").formula = table.cell("A1").formula
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0].cell("A2")
+    assert after.formula is not None
+    assert [node.content for node in after.formula] == [
+        Decimal(1), Decimal(1), None
+    ]
+    # The label it held is left as the placeholder, which Numbers repairs.
+    assert after.value == "1+1"
+
+    expanded, tiled = formulaCellRegister(working)
+    assert (1, 0) in expanded
+    assert expanded == tiled, "the two registers must agree"
+
+
+def testDetachingAFormulaKeepsTheValueAndDeregistersTheCell(
+    tmp_path: Path,
+) -> None:
+    """AC 7. The formula goes, the result it last computed stays."""
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    assert (0, 1) in formulaCellRegister(working)[0], "B1 holds a formula"
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("B1").formula = None
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0].cell("B1")
+    assert after.formula is None
+    assert after.value == Decimal(6), "the last computed result survives"
+
+    expanded, tiled = formulaCellRegister(working)
+    assert (0, 1) not in expanded, "a stale entry claims a formula that is gone"
+    assert expanded == tiled
+
+
+def testChangingOneCellsFormulaLeavesTheRegisterAlone(tmp_path: Path) -> None:
+    """Guard the guard: only attach and detach may move the register.
+
+    Replacing a formula changes neither which cells hold one nor how many, so a
+    register that grew or shrank here would mean the four-way decision misread a
+    replacement as an attach.
+    """
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    before = formulaCellRegister(working)
+
+    document = pybers.open(working)
+    cell = document.sheets[0].tables[0].cell("A1")
+    nodes = list(cell.formula.nodes)
+    nodes[1] = dataclasses.replace(nodes[1], content=Decimal(9))
+    cell.formula = Formula(nodes=tuple(nodes))
+    document.save()
+
+    assert formulaCellRegister(working) == before
+
+
+def testAttachAndDetachMatchTheirGoldenFile(tmp_path: Path) -> None:
+    """The pair above, against output confirmed in Numbers itself.
+
+    Confirmed 2026-09-04 on the third attempt. The first two produced a file that
+    read back perfectly through pybers and was wrong in Numbers, which is what a
+    golden exists to catch. See `tests/golden/README.md`.
+    """
+    golden = goldenDirectory / "18-formula-attached-and-detached.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A2").formula = table.cell("A1").formula
+    table.cell("B1").formula = None
+    document.save()
+
+    assert dataListBytes(golden) == dataListBytes(working)
+    assert formulaCellRegister(golden) == formulaCellRegister(working)
+
+
+def testTheAttachGoldenHoldsWhatItClaimsTo() -> None:
+    """Guard the guard, against the values confirmed on screen on 2026-09-04."""
+    table = pybers.open(
+        goldenDirectory / "18-formula-attached-and-detached.numbers"
+    ).sheets[0].tables[0]
+
+    assert table.cell("A2").formula is not None, "A2 gained a formula"
+    assert table.cell("B1").formula is None, "B1 lost one"
+    assert table.cell("B1").value == Decimal(6)
+    # Untouched cells keep their own formulas.
+    assert table.cell("C1").formula is not None
+    assert table.cell("G1").value == "ab"
+
+    expanded, tiled = formulaCellRegister(
+        goldenDirectory / "18-formula-attached-and-detached.numbers"
+    )
+    assert (1, 0) in expanded and (0, 1) not in expanded
+    assert expanded == tiled
