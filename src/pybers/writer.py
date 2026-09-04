@@ -431,17 +431,13 @@ def formulaKeyOffset(record: CellRecord) -> int:
 def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     """Return a record that had no formula, now naming one.
 
-    Measured across every cell in the corpus on 2026-09-04: a formula-backed record
-    is the plain record for the same result type with byte 9 bit `0x02` set and ONE
-    more trailing reference, the key, ahead of the others. Type 2 goes `0x30` to
-    `0x32`, type 3 and type 7 both go `0x10` to `0x12`, and byte 8 never moves,
-    being fixed by the result type rather than by the formula.
+    Measured corpus-wide 2026-09-04: a formula-backed record is the plain record for
+    the same result type with byte 9 bit `0x02` set and ONE more trailing reference,
+    the key, ahead of the others. Byte 8 never moves, being fixed by the type.
 
     Derived from matched pairs rather than synthesized, because the rest of byte 9
-    encodes things this library does not model and building a header from scratch
-    would drop them silently. The cached value is left alone: it becomes the
-    placeholder, which Numbers repairs while recalculating even when its type no
-    longer matches what the formula returns.
+    encodes things this library does not model. The cached value stays and becomes
+    the placeholder, which Numbers repairs while recalculating.
     """
     at = formulaKeyOffset(record)
     if len(raw) < at:
@@ -581,23 +577,14 @@ def registerFormulaCells(
 ) -> dict[int, bytes]:
     """Tell the calculation engine which cells hold formulas now, and report a change.
 
-    **This is not optional, and its absence fails silently.** Measured 2026-09-04:
-    a formula attached to a cell with the flag set and the archive pooled correctly
-    is simply never evaluated, because `cell_dependencies` is where Numbers keeps
-    its register of formula-bearing cells and the cell was not in it. The cell reads
-    back perfectly through pybers and shows its old value in Numbers forever.
-    Removing a formula without deregistering leaves the opposite lie, an entry for a
-    cell that no longer has one.
+    **Not optional, and its absence fails silently.** Setting the record flag and
+    pooling the archive leaves a formula that is never evaluated, and the register is
+    stored TWICE so both copies have to agree. Updating only `cell_dependencies`
+    shows the formula in Numbers' formula bar while the cell keeps its old value.
+    See findings-02-formulas.md, which records all three attempts.
 
-    **The register is stored TWICE and both copies have to agree**, the same shape
-    as anchoring on a range. `cell_dependencies` holds it expanded and
-    `tiled_cell_dependencies` holds it again, tiled by column, in archives of its
-    own. Updating only the first was measured on 2026-09-04 to leave Numbers showing
-    the formula in its formula bar while never evaluating it, which is the most
-    misleading outcome available: the cell looks correct to anyone who clicks it.
-
-    Coordinates count from zero here, as everywhere below the model. Returns the
-    archives that changed, since the tiles are not part of the owner entry.
+    Coordinates count from zero here. Returns the archives that changed, since the
+    tiles are not part of the owner entry.
     """
     if not added and not removed:
         return {}
@@ -944,22 +931,14 @@ def applyMerges(
 ) -> frozenset[tuple[int, int]]:
     """Rewrite a table's merge store when its merges differ, and say which cells moved.
 
-    **A merge changes what a formula reference means, so it changes results.** A cell
-    covered by a merge cannot be referenced, so `=J1` is a valid number while `I1:J1`
-    is apart and an invalid reference once it is merged. Measured 2026-09-02 across
-    `22-merge-2x2` and its unmerged twin: the same `L1` is a formula-error cell in
-    one and a plain number in the other. So every position whose merge state changed
-    is returned, for the same dirty-marking that a value edit gets, or the saved file
-    displays the result the reference had before.
+    **A merge changes what a reference means, so it changes results**, which is why
+    every position whose merge state changed is returned for dirty-marking. **The
+    store is emptied rather than removed** when the last merge goes; `merge_owner` is
+    present in both twins. Both measured 2026-09-02 across `22-merge-2x2` and its
+    unmerged twin, recorded in findings-03-structure.md.
 
-    **The store is emptied rather than removed when the last merge goes.** Measured
-    across `22-merge-2x2` and its unmerged twin: the merged table holds five formulas
-    and the unmerged one holds zero, and `merge_owner` is present in both. Deleting
-    it would produce something Numbers does not write.
-
-    Compared against what is stored rather than tracked as merges are added, for the
-    same reason cell edits are: a caller reaches `mergeRanges` directly, so there is
-    no hook, and a comparison cannot go stale the way a dirty flag can.
+    Compared against what is stored rather than tracked as merges are added, since a
+    caller reaches `mergeRanges` directly and a dirty flag would go stale.
     """
     stored = readMerges(model)
     wanted = sorted(str(merge.extent) for merge in table.mergeRanges)
@@ -991,19 +970,11 @@ def requestRecalculation(
 ) -> int:
     """Tell Numbers which cells moved, so it recalculates whatever depends on them.
 
-    **A formula caches its result, and opening the document does not refresh it.**
-    Patching a cell's value bytes leaves the calculation engine with no reason to know
-    a dependency changed, so a document saved without this displays arithmetic that
-    disagrees with its own operands, silently and with no repair prompt.
-
-    Naming the edited cells is enough. Numbers walks its own dependency graph from
-    there, transitively and across tables and sheets, which is why this library never
-    evaluates a formula and never writes a result. Measured 2026-09-02 twice, a broad
-    set naming the dependent formulas and a minimal one naming only the edited cells
-    producing identical output; findings-02-formulas.md records both.
-
-    Everything here is reached only when something actually changed, so a save that
-    edits nothing does no engine work at all.
+    **A formula caches its result and opening the document does not refresh it**, so a
+    save without this displays arithmetic that disagrees with its own operands, with
+    no prompt. Naming the edited cells is enough: Numbers walks its own graph from
+    there, transitively and across sheets, which is why this library never evaluates.
+    Measured 2026-09-02 both broadly and minimally, in findings-02-formulas.md.
     """
     if not written:
         return 0

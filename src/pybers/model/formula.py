@@ -82,10 +82,8 @@ class FormulaError(ValueError):
 class Coordinate:
     """One axis of a reference, and the only thing that knows what its number is.
 
-    `value` is a signed distance from the cell holding the formula when this axis
-    is relative, and a line counted from one when it is absolute. Those two are
-    not interchangeable and nothing outside this class should read `value`
-    without `absolute` beside it, which is why `resolve` exists.
+    `value` is a signed distance when relative and a line counted from one when
+    absolute. The two are not interchangeable, so read it through `resolve`.
     """
 
     value: int
@@ -104,10 +102,9 @@ class Coordinate:
 class Span:
     """One axis of a range: where it begins, where it ends, and whether it is fixed.
 
-    `end` is absent for a span of one line, which is how the file stores it rather
-    than repeating the beginning. Both ends share one `absolute`, because the file
-    keeps a whole axis in either the relative field or the absolute one and has no
-    way to express a range locked at one end only.
+    `end` is absent for a span of one line, as the file stores it. Both ends share
+    one `absolute`: the file keeps an axis in either the relative field or the
+    absolute one, and cannot express a range locked at one end only.
     """
 
     begin: int
@@ -135,10 +132,9 @@ class Span:
 class FormulaReference:
     """A reference to one cell from inside a formula.
 
-    An axis of `None` is unbounded rather than zero, so a row of `None` is the
-    whole column. `tableId` is the 128-bit identity of another table when this
-    reference crosses into one, and Numbers names a table that way rather than by
-    name or position, which is why renaming a table cannot break a formula.
+    An axis of `None` is unbounded rather than zero, so no row means the whole
+    column. `tableId` names another table by identity, never by name or position,
+    which is why renaming a table cannot break a formula pointing into it.
     """
 
     column: Coordinate | None = None
@@ -198,11 +194,9 @@ class FormulaRange:
     def resolve(self, host: CellReference) -> CellRange:
         """Return the rectangle this range covers, for a formula living at `host`.
 
-        The counterpart of `FormulaReference.resolve`, and the point at which a
-        formula's own vocabulary rejoins the addressing the rest of the library
-        uses. An axis this range leaves unbounded stays unbounded in the result,
-        which `CellRange` already represents as absence rather than as a span from
-        the first row to the last.
+        The counterpart of `FormulaReference.resolve`, where a formula's vocabulary
+        rejoins ordinary addressing. An unbounded axis stays unbounded, which
+        `CellRange` represents as absence rather than as a span of every row.
         """
         rows = (
             self.rows.resolve(host.row) if self.rows is not None else (None, None)
@@ -264,11 +258,9 @@ NodeContent = (
 class FormulaNode:
     """One node of a formula, in the postfix order the file stores.
 
-    `raw` is the node's own archive bytes as they were read, kept so that a node
-    this model does not interpret survives being written back exactly. It is
-    excluded from equality because it is provenance rather than content: two
-    nodes meaning the same thing are the same node whether or not one of them came
-    off a disk.
+    `raw` is the node's archive bytes as read, kept so a node this model does not
+    interpret survives a rewrite exactly. Excluded from equality, being provenance
+    rather than content.
     """
 
     nodeType: int
@@ -285,10 +277,9 @@ class FormulaNode:
 class Formula:
     """One cell's formula, as the postfix node array the file stores.
 
-    Frozen for the same reason `Style` is. Numbers shares one stored archive
-    between every cell a formula was dragged into, and a decoder handing the same
-    mutable object to each of them would turn one edit into a silent edit of all
-    of them. A caller changes a formula by putting a new one on the cell.
+    Frozen for the same reason `Style` is: Numbers shares one archive between every
+    cell a formula was dragged into, so a mutable one would turn a single edit into
+    a silent edit of all of them. Replace it on the cell to change it.
     """
 
     nodes: tuple[FormulaNode, ...] = ()

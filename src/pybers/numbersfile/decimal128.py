@@ -122,11 +122,9 @@ class Decimal128:
 
         When both selector bits are set the fields move: the exponent sits at bits
         124-111 and the coefficient gains an implied leading `100`. That form can only
-        express coefficients of 2^113 or more, already past the maximum this format
-        may hold, so a canonical encoder never emits it. It is decoded anyway rather
-        than refused, because a reader that rejects a file over a corner the
-        specification already defines is worse than one that follows it. Per IEEE 754
-        a coefficient beyond the maximum is non-canonical and its value is zero.
+        express coefficients past this format's maximum, so a canonical encoder never
+        emits it. Decoded anyway rather than refused, and per IEEE 754 a coefficient
+        beyond the maximum is non-canonical with a value of zero.
         """
         if len(raw) < encodedLength:
             raise Decimal128Error(
