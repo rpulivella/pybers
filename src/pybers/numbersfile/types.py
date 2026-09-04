@@ -58,6 +58,7 @@ archiveTypes: dict[int, type[Message]] = {
     2001: tswp.StorageArchive,      # rich text, reached from a cell payload
     4000: tsce.CalculationEngineArchive,     # the dependency graph and dirty set
     4008: tsce.FormulaOwnerDependenciesArchive,  # one owner's dependencies
+    4009: tsce.CellRecordTileArchive,       # which cells of a tile hold formulas
     4011: tsce.ReferencesToDirtyArchive,     # cells to recalculate on next open
     6000: tst.TableInfoArchive,     # the drawable that wraps a table
     6001: tst.TableModelArchive,    # the table proper: geometry, stores, merges

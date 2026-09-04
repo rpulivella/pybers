@@ -64,6 +64,8 @@ from .numbersfile.cells import (
     decodeCellValue,
     emptyOffsetNarrow,
     emptyOffsetWide,
+    formulaFlagBit,
+    formulaFlagOffset,
     valueOffset,
 )
 from .numbersfile.decimal128 import Decimal128, encodedLength
@@ -105,6 +107,12 @@ numericTypeBytes: tuple[int, ...] = (2, 10)
 
 # Every trailing reference in a cell record is a little-endian uint32.
 referenceWidth: int = 4
+
+# The calculation engine tiles its register of formula-bearing cells 32 columns
+# wide. Measured 2026-09-04: `40-table-bands` carries eight tiles beginning at
+# columns 0, 32, 64 and so on to 224, and every tile in the corpus begins at row
+# zero, so the row extent of a tile is not established and is never assumed here.
+dependencyTileColumns: int = 32
 
 # A record's value is patched in place, leaving the twelve-byte header and the
 # trailing references alone. Those references point at the table's format and
@@ -353,6 +361,33 @@ class FormulaPool:
         """Return the formula a key names, or None when the table has no such entry."""
         return self.stored.get(key)
 
+    def add(self, formula: Formula) -> int:
+        """Store a formula that no cell named before and return its new key."""
+        self.touched = True
+        fresh = self.dataList.entries.add()
+        fresh.key = self.dataList.nextListID
+        fresh.refcount = 1
+        fresh.formula.CopyFrom(encodeFormula(formula))
+        self.dataList.nextListID += 1
+        return fresh.key
+
+    def release(self, key: int) -> None:
+        """Give up one cell's claim on a stored formula.
+
+        The entry is left in place when others still name it, and emptied rather
+        than deleted when none do: `nextListID` never reuses a key, so a spent entry
+        costs a few bytes and removing one would renumber nothing but would invite a
+        reader to assume keys are dense.
+        """
+        for entry in self.dataList.entries:
+            if entry.key != key:
+                continue
+            self.touched = True
+            entry.refcount = max(0, entry.refcount - 1)
+            if entry.refcount == 0:
+                entry.ClearField("formula")
+            return
+
     def replace(self, key: int, formula: Formula) -> int:
         """Write a changed formula and return the key its cell should now name.
 
@@ -393,6 +428,54 @@ def formulaKeyOffset(record: CellRecord) -> int:
     return valueOffset + width + formulaKeySlot * referenceWidth
 
 
+def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
+    """Return a record that had no formula, now naming one.
+
+    Measured across every cell in the corpus on 2026-09-04: a formula-backed record
+    is the plain record for the same result type with byte 9 bit `0x02` set and ONE
+    more trailing reference, the key, ahead of the others. Type 2 goes `0x30` to
+    `0x32`, type 3 and type 7 both go `0x10` to `0x12`, and byte 8 never moves,
+    being fixed by the result type rather than by the formula.
+
+    Derived from matched pairs rather than synthesized, because the rest of byte 9
+    encodes things this library does not model and building a header from scratch
+    would drop them silently. The cached value is left alone: it becomes the
+    placeholder, which Numbers repairs while recalculating even when its type no
+    longer matches what the formula returns.
+    """
+    at = formulaKeyOffset(record)
+    if len(raw) < at:
+        raise WriteError(
+            f"column {record.column} is {len(raw)} bytes and its formula key would "
+            f"sit at {at}, past the end."
+        )
+    patched = bytearray(raw)
+    patched[formulaFlagOffset] |= formulaFlagBit
+    return (
+        bytes(patched[:at])
+        + key.to_bytes(referenceWidth, "little")
+        + bytes(patched[at:])
+    )
+
+
+def detachFormulaKey(raw: bytes, record: CellRecord) -> bytes:
+    """Return a record with its formula removed, keeping the value it last computed.
+
+    The exact inverse of `attachFormulaKey`. The cached result stays, so the cell
+    becomes an ordinary one holding the number the formula produced, rather than
+    emptying and losing what a reader could see a moment earlier.
+    """
+    at = formulaKeyOffset(record)
+    if len(raw) < at + referenceWidth:
+        raise WriteError(
+            f"column {record.column} is marked as carrying a formula, but its record "
+            f"is {len(raw)} bytes and the key would sit at {at}."
+        )
+    patched = bytearray(raw)
+    patched[formulaFlagOffset] &= ~formulaFlagBit & 0xFF
+    return bytes(patched[:at]) + bytes(patched[at + referenceWidth:])
+
+
 def patchFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     """Point a cell record at a different formula, leaving everything else alone.
 
@@ -426,22 +509,161 @@ def formulaPoolFor(
     )
 
 
-def changedFormula(
-    cell: Cell, record: CellRecord, pool: FormulaPool | None
-) -> Formula | None:
-    """Return the cell's formula when it differs from the stored one, else None.
+def formulaEdit(cell: Cell, record: CellRecord, pool: FormulaPool | None) -> str:
+    """Return which of the four things happened to this cell's formula.
 
-    Compared against what the pool holds rather than against anything on the
+    `attach`, `detach`, `replace`, or `none`. Named rather than returned as a pair
+    of booleans, because the three actions are mutually exclusive and a caller
+    reading `if attaching and not detaching` would be reading a state that cannot
+    occur.
+
+    Compared against what the POOL holds rather than against anything on the
     record, because the record carries only a key. Comparing the model's formula
     against that key would make every formula cell look edited on every save, the
     same trap the string table already sidesteps.
     """
-    if pool is None or cell.formula is None or not carriesFormula(record):
-        return None
-    if len(record.references) <= formulaKeySlot:
-        return None
-    stored = pool.formulaFor(record.references[formulaKeySlot])
-    return cell.formula if cell.formula != stored else None
+    if pool is None:
+        return "none"
+    stored = carriesFormula(record) and len(record.references) > formulaKeySlot
+    if cell.formula is not None and not stored:
+        return "attach"
+    if cell.formula is None and stored:
+        return "detach"
+    if cell.formula is not None and stored:
+        previous = pool.formulaFor(record.references[formulaKeySlot])
+        return "replace" if cell.formula != previous else "none"
+    return "none"
+
+
+@dataclass(frozen=True, slots=True)
+class TableEdits:
+    """What one table's write changed, in the terms the engine has to be told.
+
+    `written` drives the dirty set and says a cell moved. `formulaAdded` and
+    `formulaRemoved` are a different fact: the calculation engine keeps its own
+    register of which cells hold formulas, and a cell that merely changed value
+    does not belong in either list.
+    """
+
+    written: list[tuple[int, int]]
+    formulaAdded: list[tuple[int, int]]
+    formulaRemoved: list[tuple[int, int]]
+
+
+def rewriteCellRecords(
+    records: object, added: list[tuple[int, int]], removed: list[tuple[int, int]]
+) -> None:
+    """Add and drop entries in one register of formula-bearing cells."""
+    dropping = set(removed)
+    kept = [
+        record for record in records  # type: ignore[attr-defined]
+        if (record.row, record.column) not in dropping
+    ]
+    present = {(record.row, record.column) for record in kept}
+    del records[:]  # type: ignore[attr-defined]
+    for record in kept:
+        records.add().CopyFrom(record)  # type: ignore[attr-defined]
+    for row, column in added:
+        if (row, column) in present:
+            continue
+        fresh = records.add()  # type: ignore[attr-defined]
+        fresh.column = column
+        fresh.row = row
+        # An empty edge set, which is what every entry in the corpus carries.
+        fresh.expanded_edges.SetInParent()
+
+
+def registerFormulaCells(
+    index: ArchiveIndex,
+    owner: TableOwner,
+    added: list[tuple[int, int]],
+    removed: list[tuple[int, int]],
+) -> dict[int, bytes]:
+    """Tell the calculation engine which cells hold formulas now, and report a change.
+
+    **This is not optional, and its absence fails silently.** Measured 2026-09-04:
+    a formula attached to a cell with the flag set and the archive pooled correctly
+    is simply never evaluated, because `cell_dependencies` is where Numbers keeps
+    its register of formula-bearing cells and the cell was not in it. The cell reads
+    back perfectly through pybers and shows its old value in Numbers forever.
+    Removing a formula without deregistering leaves the opposite lie, an entry for a
+    cell that no longer has one.
+
+    **The register is stored TWICE and both copies have to agree**, the same shape
+    as anchoring on a range. `cell_dependencies` holds it expanded and
+    `tiled_cell_dependencies` holds it again, tiled by column, in archives of its
+    own. Updating only the first was measured on 2026-09-04 to leave Numbers showing
+    the formula in its formula bar while never evaluating it, which is the most
+    misleading outcome available: the cell looks correct to anyone who clicks it.
+
+    Coordinates count from zero here, as everywhere below the model. Returns the
+    archives that changed, since the tiles are not part of the owner entry.
+    """
+    if not added and not removed:
+        return {}
+    rewriteCellRecords(owner.dependencies.cell_dependencies.cell_record,
+                       added, removed)
+    changed: dict[int, bytes] = {}
+    for reference in owner.dependencies.tiled_cell_dependencies.cell_record_tiles:
+        tile = index.resolve(reference, tsce.CellRecordTileArchive)
+        band = range(
+            tile.tile_column_begin,
+            tile.tile_column_begin + dependencyTileColumns,
+        )
+        inTile = [
+            (row, column) for row, column in added
+            if column in band and row >= tile.tile_row_begin
+        ]
+        outTile = [
+            (row, column) for row, column in removed
+            if column in band and row >= tile.tile_row_begin
+        ]
+        if not inTile and not outTile:
+            continue
+        rewriteCellRecords(tile.cell_records, inTile, outTile)
+        changed[reference.identifier] = tile.SerializeToString()
+
+    placed = {
+        (row, column)
+        for reference in owner.dependencies.tiled_cell_dependencies.cell_record_tiles
+        for row, column in added
+        if column
+        in range(
+            index.resolve(reference, tsce.CellRecordTileArchive).tile_column_begin,
+            index.resolve(reference, tsce.CellRecordTileArchive).tile_column_begin
+            + dependencyTileColumns,
+        )
+    }
+    missing = sorted(set(added) - placed)
+    if missing:
+        raise WriteError(
+            f"No dependency tile covers {missing}, so a formula written there would "
+            "be registered in one of the engine's two registers and not the other. "
+            "Creating a tile has never been measured."
+        )
+    changed[owner.identifier] = owner.dependencies.SerializeToString()
+    return changed
+
+
+def applyFormulaEdit(
+    edit: str, raw: bytes, record: CellRecord, cell: Cell, pool: FormulaPool
+) -> bytes:
+    """Carry out one cell's formula change against the record and the pool together.
+
+    The two always move as a pair: a key written into a record that the pool does
+    not carry names nothing, and an entry the pool holds that no record names is
+    dead weight that `refcount` then lies about.
+    """
+    if edit == "attach":
+        assert cell.formula is not None
+        return attachFormulaKey(raw, record, pool.add(cell.formula))
+    if edit == "detach":
+        pool.release(record.references[formulaKeySlot])
+        return detachFormulaKey(raw, record)
+    assert cell.formula is not None
+    return patchFormulaKey(
+        raw, record, pool.replace(record.references[formulaKeySlot], cell.formula)
+    )
 
 
 def applyTableEdits(
@@ -450,7 +672,7 @@ def applyTableEdits(
     table: Table,
     model: tst.TableModelArchive,
     swallowed: frozenset[tuple[int, int]] = frozenset(),
-) -> list[tuple[int, int]]:
+) -> TableEdits:
     """Write every changed cell of one table back into the tiles it came from.
 
     Returns the stored coordinates it wrote, counted from zero, because the
@@ -472,6 +694,8 @@ def applyTableEdits(
     richText = readRichTextTable(index, store)
     pool = formulaPoolFor(index, store)
     written: list[tuple[int, int]] = []
+    formulaAdded: list[tuple[int, int]] = []
+    formulaRemoved: list[tuple[int, int]] = []
 
     for entry in store.tiles.tiles:
         archive = index.archive(entry.tile.identifier)
@@ -497,20 +721,21 @@ def applyTableEdits(
                 if cell is None:
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
-                edited = changedFormula(cell, record, pool)
-                if not valueChanged and edited is None:
+                edit = formulaEdit(cell, record, pool)
+                if not valueChanged and edit == "none":
                     continue
                 patched = record.raw
-                # The value first, so that writing over a formula still refuses
-                # here rather than being masked by the formula edit below.
+                # The value first, so that writing a value OVER a formula still
+                # refuses here rather than being masked by the formula edit below.
+                # Attaching a formula is a different act and is allowed.
                 if valueChanged:
                     patched = patchRecord(record, checkedValue(cell, record))
-                if edited is not None and pool is not None:
-                    patched = patchFormulaKey(
-                        patched,
-                        record,
-                        pool.replace(record.references[formulaKeySlot], edited),
-                    )
+                if pool is not None and edit != "none":
+                    patched = applyFormulaEdit(edit, patched, record, cell, pool)
+                    if edit == "attach":
+                        formulaAdded.append((row, record.column))
+                    elif edit == "detach":
+                        formulaRemoved.append((row, record.column))
                 replacements[record.column] = patched
             present = frozenset(
                 record.column
@@ -541,7 +766,7 @@ def applyTableEdits(
         owners[poolId].messageReplace(
             poolId, 0, pool.dataList.SerializeToString()
         )
-    return written
+    return TableEdits(written, formulaAdded, formulaRemoved)
 
 
 def buildDirtySet(
@@ -602,11 +827,25 @@ def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
     return engine
 
 
+@dataclass(frozen=True, slots=True)
+class TableOwner:
+    """One table's calculation-engine entry, and the archive holding it.
+
+    The identifier travels with the message because registering a formula cell
+    changes that archive and it has to be written back. Looking it up a second
+    time would mean walking the dependency tracker again to find what this walk
+    already had in hand.
+    """
+
+    identifier: int
+    dependencies: tsce.FormulaOwnerDependenciesArchive
+
+
 def ownerEntryFor(
-    entries: dict[int, tsce.FormulaOwnerDependenciesArchive],
+    entries: dict[int, TableOwner],
     identifier: int,
     name: str,
-) -> tsce.FormulaOwnerDependenciesArchive:
+) -> TableOwner:
     """Return one table's dependency entry, or refuse naming the table."""
     entry = entries.get(identifier)
     if entry is None:
@@ -620,7 +859,7 @@ def ownerEntryFor(
 
 def tableOwnerEntries(
     index: ArchiveIndex, engine: tsce.CalculationEngineArchive
-) -> dict[int, tsce.FormulaOwnerDependenciesArchive]:
+) -> dict[int, TableOwner]:
     """Return each table's dependency entry, keyed by its `TST.TableInfoArchive`.
 
     Read the long way round because there is no short one: a table records neither
@@ -628,14 +867,16 @@ def tableOwnerEntries(
     `owner_kind` is 1 and whose `formula_owner` points back at the table. Measured
     2026-09-02, see findings-02-formulas.md and findings-03-structure.md.
     """
-    entries: dict[int, tsce.FormulaOwnerDependenciesArchive] = {}
+    entries: dict[int, TableOwner] = {}
     for reference in engine.dependency_tracker.formula_owner_dependencies:
         dependencies = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
         if dependencies.owner_kind != tableOwnerKind:
             continue
         if not dependencies.HasField("formula_owner"):
             continue
-        entries[dependencies.formula_owner.identifier] = dependencies
+        entries[dependencies.formula_owner.identifier] = TableOwner(
+            identifier=reference.identifier, dependencies=dependencies
+        )
     return entries
 
 
@@ -644,8 +885,8 @@ def tableOwnerIds(
 ) -> dict[int, int]:
     """Return each table's internal owner id, keyed by its own archive."""
     return {
-        identifier: entry.internal_formula_owner_id
-        for identifier, entry in tableOwnerEntries(index, engine).items()
+        identifier: owner.dependencies.internal_formula_owner_id
+        for identifier, owner in tableOwnerEntries(index, engine).items()
     }
 
 
@@ -862,14 +1103,25 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 for reference in merge.extent
                 if reference != merge.anchor
             )
-            cells = applyTableEdits(index, owners, table, model, swallowed)
-            moved = applyMerges(table, model, entry.formula_owner_uid)
+            edits = applyTableEdits(index, owners, table, model, swallowed)
+            moved = applyMerges(
+                table, model, entry.dependencies.formula_owner_uid
+            )
             if moved or swallowed:
                 owners[modelArchive.identifier].messageReplace(
                     modelArchive.identifier, 0, model.SerializeToString()
                 )
-            if cells or moved:
-                written[tableReference.identifier] = cells + sorted(moved)
+            # The engine's register of formula-bearing cells, which is a separate
+            # fact from a cell having moved and is what makes a newly attached
+            # formula evaluate at all.
+            for identifier, body in registerFormulaCells(
+                index, entry, edits.formulaAdded, edits.formulaRemoved
+            ).items():
+                owners[identifier].messageReplace(identifier, 0, body)
+            if edits.written or moved:
+                written[tableReference.identifier] = (
+                    edits.written + sorted(moved)
+                )
 
     requestRecalculation(index, owners, written)
     return sum(len(cells) for cells in written.values())
