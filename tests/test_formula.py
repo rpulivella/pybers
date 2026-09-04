@@ -41,6 +41,7 @@ from pybers import (
     Formula,
     FormulaRange,
     FunctionCall,
+    Span,
     UnknownFunction,
 )
 from pybers.model.formula import FormulaError
@@ -173,6 +174,59 @@ def testCrossTableReferenceNamesItsTargetByIdentity() -> None:
     # Naming by identity is what makes renaming the target table harmless.
     assert not reference.tableId.isspace()
     assert str(reference.resolve(pybers.CellReference.parse("G11"))) == "A1"
+
+
+def testASpanOfOneLineOmitsItsEndRatherThanRepeatingIt() -> None:
+    """An absent `end` means a span of one, which `last` is what absorbs.
+
+    `SUM(A1:A10)` spans ten rows in one column, so its column axis has no end at
+    all. A caller reading `end` directly would see None and have to know the rule;
+    reading `last` does not.
+    """
+    columns = firstTable("20-formula-shapes").cell("A11").formula.ranges[0].columns
+    assert columns is not None
+    assert columns.end is None, "a one-column span omits its end"
+    assert columns.last == columns.begin
+
+    rows = firstTable("20-formula-shapes").cell("A11").formula.ranges[0].rows
+    assert rows is not None
+    assert rows.end is not None and rows.last == rows.end
+
+
+def testARangeResolvesToAnOrdinaryCellRange() -> None:
+    """A formula's range rejoins the addressing the rest of the library uses.
+
+    The counterpart of resolving a reference to a `CellReference`. `E2` and `E3`
+    share ONE stored archive at refcount 2, so a relative range proving to cover
+    different rectangles in each is the offset rule stated in range vocabulary.
+    """
+    table = firstTable("19-formula-dragged")
+    relativeSecond = table.cell("E2").formula.ranges[0]
+    relativeThird = table.cell("E3").formula.ranges[0]
+    assert relativeSecond == relativeThird, "one archive, shared"
+    assert str(relativeSecond.resolve(pybers.CellReference.parse("E2"))) == "B1:D1"
+    assert str(relativeThird.resolve(pybers.CellReference.parse("E3"))) == "B2:D2"
+
+    # A locked range does not move, and its markers survive into the CellRange.
+    lockedSecond = table.cell("F2").formula.ranges[0]
+    lockedThird = table.cell("F3").formula.ranges[0]
+    for reference, extent in (("F2", lockedSecond), ("F3", lockedThird)):
+        resolved = extent.resolve(pybers.CellReference.parse(reference))
+        assert str(resolved) == "$B$1:$D$1"
+
+
+def testAnUnboundedRangeAxisStaysUnboundedWhenResolved() -> None:
+    """An axis a range leaves out stays out, rather than spanning every row.
+
+    `CellRange` represents a whole column as absence too, so the two agree. No
+    fixture carries an unbounded RANGE, only an unbounded reference, so this is
+    built rather than read.
+    """
+    wholeColumn = FormulaRange(columns=Span(begin=2, absolute=True), rows=None)
+    resolved = wholeColumn.resolve(pybers.CellReference.parse("A5"))
+    assert resolved.rowsUnbounded
+    assert not resolved.colsUnbounded
+    assert str(resolved) == "$B"
 
 
 def testMultiRangeCallCarriesEachRangeSeparately() -> None:

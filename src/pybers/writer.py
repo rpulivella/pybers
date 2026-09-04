@@ -70,6 +70,7 @@ from .numbersfile.decimal128 import Decimal128, encodedLength
 from .numbersfile.types import archiveTypeId, parseArchive
 from .reader import (
     ArchiveIndex,
+    ColonTractAxis,
     decimalHalfFormat,
     findRoot,
     formulaKeySlot,
@@ -212,16 +213,16 @@ def encodeCoordinate(coordinate: Coordinate) -> int:
     )
 
 
-def encodeSpan(target: object, span: Span) -> None:
+def encodeSpan(target: ColonTractAxis, span: Span) -> None:
     """Fill one range-tract axis, omitting `range_end` for a span of one line.
 
     Omitted rather than repeated, because that is how Numbers writes it and a
     range carrying a redundant end is a difference in a file that had none.
     """
     shift = originOffset if span.absolute else 0
-    target.range_begin = span.begin - shift  # type: ignore[attr-defined]
+    target.range_begin = span.begin - shift
     if span.end is not None:
-        target.range_end = span.end - shift  # type: ignore[attr-defined]
+        target.range_end = span.end - shift
 
 
 def encodeFormulaNode(

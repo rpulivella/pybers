@@ -51,7 +51,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from pybers.model.reference import CellReference, columnLetter
+from pybers.model.ranges import CellRange
+from pybers.model.reference import CellReference
 
 # The node types this model gives meaning to. Every other type is carried through
 # untouched: the node message has 45 fields and the corpus uses 16, so a model
@@ -118,6 +119,17 @@ class Span:
         """Return the closing line of this span, which is `begin` when it spans one."""
         return self.begin if self.end is None else self.end
 
+    def resolve(self, host: int) -> tuple[int, int]:
+        """Return the first and last line this axis covers, for a formula at `host`.
+
+        An absolute axis ignores `host`, exactly as `Coordinate.resolve` does. The
+        two are kept apart because a span has an end to carry and a coordinate
+        does not, and folding them would put an unused end on every reference.
+        """
+        if self.absolute:
+            return (self.begin, self.last)
+        return (host + self.begin, host + self.last)
+
 
 @dataclass(frozen=True, slots=True)
 class FormulaReference:
@@ -182,6 +194,30 @@ class FormulaRange:
     def crossTable(self) -> bool:
         """Report whether this range points into a different table."""
         return self.tableId is not None
+
+    def resolve(self, host: CellReference) -> CellRange:
+        """Return the rectangle this range covers, for a formula living at `host`.
+
+        The counterpart of `FormulaReference.resolve`, and the point at which a
+        formula's own vocabulary rejoins the addressing the rest of the library
+        uses. An axis this range leaves unbounded stays unbounded in the result,
+        which `CellRange` already represents as absence rather than as a span from
+        the first row to the last.
+        """
+        rows = (
+            self.rows.resolve(host.row) if self.rows is not None else (None, None)
+        )
+        columns = (
+            self.columns.resolve(host.col)
+            if self.columns is not None
+            else (None, None)
+        )
+        rowLocked = self.rows.absolute if self.rows is not None else False
+        columnLocked = self.columns.absolute if self.columns is not None else False
+        return CellRange.fromAxes(
+            ((rows[0], rowLocked), (rows[1], rowLocked)),
+            ((columns[0], columnLocked), (columns[1], columnLocked)),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,16 +330,3 @@ class Formula:
             for node in self.nodes
         )
 
-
-def describeAxis(coordinate: Coordinate | None, letters: bool) -> str:
-    """Return one axis as a person would write it, for a message or a repr.
-
-    A relative axis has no written form on its own, since it means nothing without
-    the cell holding it, so it is shown as the offset it is.
-    """
-    if coordinate is None:
-        return ""
-    if not coordinate.absolute:
-        return f"{coordinate.value:+d}"
-    line = columnLetter(coordinate.value) if letters else str(coordinate.value)
-    return f"${line}"

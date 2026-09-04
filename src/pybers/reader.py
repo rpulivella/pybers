@@ -125,6 +125,15 @@ formulaKeySlot: int = 0
 # A number literal carries decimal128 as two 64-bit halves rather than as bytes.
 decimalHalfFormat: str = "<QQ"
 
+# The GENERATED message for one axis of a colon tract, not a model type: the
+# model's own is `Span`. Apple declares the relative and absolute forms as two
+# separate messages of identical shape, and which one an axis sits in IS its
+# anchoring, so a decoder takes either and is told which it was handed.
+type ColonTractAxis = (
+    tsce.ASTNodeArrayArchive.ASTColonTractArchive.ASTColonTractRelativeRangeArchive
+    | tsce.ASTNodeArrayArchive.ASTColonTractArchive.ASTColonTractAbsoluteRangeArchive
+)
+
 
 class ReadError(RuntimeError):
     """A `.numbers` document whose structure could not be walked."""
@@ -286,18 +295,14 @@ def readCoordinate(value: int, absolute: bool) -> Coordinate:
     )
 
 
-def readSpan(entry: object, absolute: bool) -> Span:
+def readSpan(entry: ColonTractAxis, absolute: bool) -> Span:
     """Return one axis of a range tract, in the model's counting.
 
     `range_end` is omitted for a span of one line rather than repeating the
     beginning, so its absence is preserved rather than filled in.
     """
-    begin = entry.range_begin  # type: ignore[attr-defined]
-    end = (
-        entry.range_end  # type: ignore[attr-defined]
-        if entry.HasField("range_end")  # type: ignore[attr-defined]
-        else None
-    )
+    begin = entry.range_begin
+    end = entry.range_end if entry.HasField("range_end") else None
     shift = originOffset if absolute else 0
     return Span(
         begin=begin + shift,
