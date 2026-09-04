@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [PYB-41] Read and write formulas as a typed AST
 - [PYB-39] Adopt the PYB-34 and PR #38 reference conventions
 - [#34] Raise the Python floor to 3.14
 - [#36] Refuse a merge when CI has not passed

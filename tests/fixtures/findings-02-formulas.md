@@ -128,6 +128,14 @@ absolute_row    { range_begin: 0 }
 four true for the locked one, so anchoring is expressed twice, in the field variant and in
 the bits.
 
+**That doubling belongs to RANGES only**, measured across the whole corpus on 2026-09-03
+for PYB-41 and stated here because the paragraph above reads as a general rule and is not
+one. A range node carries both records. A single-cell reference carries the `absolute`
+flag on each coordinate and **no sticky bits at all**, 0 of 21 in the corpus. A reader
+that took the bits as authoritative for a single-cell reference would find none and
+report every such reference unlocked, which is a plausible wrong answer rather than an
+error: the formula still resolves, simply to the wrong cell once it is moved.
+
 **Mixed locking is per axis on one reference.** `$B1+C$1` decodes to two coordinate nodes
 and an addition:
 
@@ -223,15 +231,44 @@ error text for anything else would mean evaluating the formula.
 
 ```
  1  addition            17  number literal      36  cell coordinate
- 4  division            19  string literal      46  broken reference (sentinels)
- 7  comparison          31  unknown function    67  range tract
-16  function call       32  unidentified, follows a call in several files
+ 3  multiplication      19  string literal      46  broken reference (sentinels)
+ 4  division            31  unknown function    67  range tract
+ 6  concatenation       32  unidentified, follows a call in several files
+ 7  comparison
+16  function call
 34/35  a bracketing pair around each argument of a nested call
 ```
 
-Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS**. These are numeric, so a name map is
+**An operator IS its node type, and carries nothing else**, added 2026-09-04 from
+PYB-41 along with types 3 and 6. `1+1` is type 1, `2*3` is type 3, `"a"&"b"` is type 6,
+and none of them holds a field beyond `AST_node_type`, arity being implied. Every
+FUNCTION, by contrast, is type 16 distinguished by a number. So the name map below is
+needed for functions only: operators need at most a node-type-to-symbol table, and that
+one is derivable from these fixtures rather than from Numbers.app.
+
+Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS, 126 = ROUND**. `ROUND(2.5)`
+and `ROUND(2.5,0)` share index 126 with different `numArgs`, so arity is carried on
+the call rather than encoded in the index. These are numeric, so a name map is
 eventually needed and must be derived rather than borrowed, per the schema-ownership
 decision.
+
+**Excel's table is not that map, checked 2026-09-03.** The comparison is worth making
+because the two applications interoperate and because Excel's older binary format stores
+formulas the same way Numbers does, as postfix tokens whose calls carry a numeric index.
+Microsoft documents that index table as the `Ftab` in `[MS-XLS]`, and it disagrees
+completely: `SUM` is 4 there against 168 here, `IF` is 1 against 62, and `SUMIF` is 345
+against `SUMIFS` at 231. Excel's numbering follows its own implementation history,
+interleaving Excel 4.0 macro commands such as `ADD.MENU` and `FOPEN` with real functions,
+and reserves `0x00FF` for a user-defined function. Borrowing it would yield plausible
+wrong functions rather than a failure.
+
+Where the two formats DO agree is one level up: both store a formula together with the
+result it last computed. `.xlsx` writes `<f>B7*7</f><v>56</v>`, formula text beside a
+cached value, and Numbers writes a formula key beside a cached value. So interoperation
+happens by translating at the boundary, not by sharing an encoding, which is why the
+tables were free to diverge and why building a Numbers formula out of a string cannot
+work. A string carries no per-axis anchoring, no distinction between an offset and a
+fixed coordinate, and no cross-table identity.
 
 The node message has 45 fields, so exhaustive modeling is neither necessary nor wise.
 Unrecognized nodes should be carried through untouched, a formula is shared state that
