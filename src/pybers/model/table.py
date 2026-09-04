@@ -236,6 +236,26 @@ class Table:
             return None
         return CellRange(firstRow, firstColumn, self.rowCount, self.colCount)
 
+    def formulaFill(self, source: CellAddress, through: RangeAddress) -> int:
+        """Give every cell of a range the formula one cell holds, as dragging does.
+
+        Relative references follow each row and locked ones stay put, with no
+        special cases: the file stores ONE formula and every filled cell points at
+        it. Positions a merge swallowed are skipped. Returns how many were filled.
+        """
+        origin = self.cell(source)
+        if origin.formula is None:
+            raise ReferenceError(
+                f"{toCellReference(source)} holds no formula to fill from."
+            )
+        filled = 0
+        for cell in self.range(through):
+            if cell.reference == origin.reference:
+                continue
+            cell.formula = origin.formula
+            filled += 1
+        return filled
+
     def mergeAdd(self, address: RangeAddress) -> MergeRange:
         """Merge a block of cells into one, anchored at its top-left, and return it.
 
