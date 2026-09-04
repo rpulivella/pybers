@@ -22,11 +22,9 @@ from dataclasses import dataclass
 class Style:
     """One cell or shape's visual formatting, fill, font, and alignment together.
 
-    Frozen and hashable on purpose: the old numbers-parser fork this library replaces
-    shared one mutable Style object by reference across cells, so mutating one cell's
-    style silently corrupted an unrelated cell's formatting at save time. Making Style
-    immutable makes that bug class unrepresentable, a cell (or shape) can only ever swap
-    in a whole new Style, never mutate a shared one out from under another object.
+    Frozen and hashable on purpose. Numbers shares one style archive between many
+    objects, so a mutable one lets an edit to a cell silently restyle unrelated
+    shapes. Immutability makes that unrepresentable: swap in a new Style instead.
     """
 
     bgColor: str | None = None

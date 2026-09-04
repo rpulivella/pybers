@@ -169,15 +169,11 @@ class Sheet:
 
 @dataclass(slots=True)
 class Document:
-    """The root of the pybers object model, matching Apple's own TN.DocumentArchive.
+    """The root of the model, and the single handle: every edit is reached through it.
 
-    Named for the format rather than for the spreadsheet convention: Numbers has no
-    workbook, and calling it one would invent a concept the format does not carry.
-
-    The two private fields hold the archives this document was read from and its
-    origin on disk. Both are excluded from equality and from `repr`, so a Document
-    still reads as an ordinary dataclass to a caller. `pybers.writer` explains why a
-    save needs them.
+    Named for `TN.DocumentArchive` rather than "workbook", which the format has no
+    concept of. The private fields carry the archives this was read from, excluded
+    from equality and `repr`, because `save` mutates those rather than rebuilding.
     """
 
     sheets: list[Sheet] = field(default_factory=list)
@@ -195,32 +191,16 @@ class Document:
         )
 
     def cellsIterate(self) -> Iterator[tuple[Sheet, Table, Cell]]:
-        """Yield every cell this document stores, in one defined order.
+        """Yield every STORED cell with the sheet and table holding it.
 
-        Sheets in document order, tables in sheet order, and cells row by row and
-        left to right within each table. The order is stated here rather than
-        inherited from the dictionary the reader filled, because an iteration
-        driving an edit has to survive a save and a reopen unchanged.
-
-        Measured 2026-09-02: all 81 tiles in the fixture corpus already store their
-        tiles, rows and records in that order, so the sort changes nothing today.
-        It stays because that makes the order a guarantee of this method rather
-        than a property of 44 files that nothing obliges Numbers to preserve.
-
-        Each cell arrives with the table and the sheet holding it, because a cell
-        knows only its own reference and `Table 1` on two sheets is otherwise
-        indistinguishable. A plain tuple rather than a type of its own, since a
-        caller writes `for sheet, table, cell in ...` and there is no fourth thing
-        to carry.
-
-        Only stored cells are yielded. A Numbers table is sparse: an empty cell has
-        no record at all, and a cell covered by a merge has none either, so
-        iterating stored cells and iterating the declared rectangle are two
-        different traversals. `Table.extent` is what turns the second into the
-        first, and it is spelled differently on purpose.
+        Sheets, then tables, then rows left to right. A Numbers table is sparse, so
+        an empty cell and one swallowed by a merge have no record and never appear
+        here; `Table.extent` walks the declared rectangle instead.
         """
         for sheet in self.sheets:
             for table in sheet.tables:
+                # Sorted so the order is this method's guarantee rather than a
+                # property of files Numbers is not obliged to keep writing that way.
                 for reference in sorted(
                     table.cells, key=lambda address: address.asRowColumn()
                 ):
@@ -229,18 +209,9 @@ class Document:
     def save(self, path: Path | str | None = None) -> None:
         """Write this document back to a `.numbers` package, in place by default.
 
-        Nothing is closed and nothing is invalidated. A Document holds no file handle,
-        so saving is repeatable and the object stays usable afterward, which is why
-        there is no `close` and no context manager to pair with `pybers.open`.
-
-        **A formula depending on a cell you changed is recalculated by Numbers when it
-        next opens the file, not by this library.** Saving marks the edited cells in
-        the document's calculation engine, and Numbers walks its own dependency graph
-        from there, so a `SUM` over cells you raised shows the new total. pybers never
-        evaluates a formula and never writes a result, which is why the value stored
-        for such a formula is still the one Numbers last computed. Reading the file
-        back through pybers therefore shows the old result; opening it in Numbers
-        shows the new one.
+        Repeatable, and the object stays usable, so there is no `close`. **pybers never
+        evaluates a formula**: saving marks the edited cells and Numbers recalculates on
+        open, so a dependent formula reads stale here and correct there.
         """
         # Imported here rather than at module scope, because the writer reaches into
         # `pybers.numbersfile` and the model layer must stay importable without it.

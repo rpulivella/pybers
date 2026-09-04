@@ -39,10 +39,10 @@ import pytest
 import pybers
 from pybers import (
     Formula,
+    FormulaFunctionCall,
     FormulaRange,
-    FunctionCall,
+    FormulaUnknownCall,
     Span,
-    UnknownFunction,
 )
 from pybers.model.formula import FormulaError
 from pybers.numbersfile import readPackage
@@ -51,8 +51,13 @@ from pybers.numbersfile.types import archiveTypeId
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 # TST.TableDataList, so a test can compare the pooled lists of two packages
-# without reaching for the writer's own constants.
+# without reaching for the writer's own constants. TSCE.CalculationEngineArchive
+# and the owner_kind a table's dependency entry carries are named for the same
+# reason.
 dataListTypeId: int = 6005
+tableInfoTypeId: int = 6000
+calculationEngineTypeId: int = 4000
+tableOwnerKind: int = 1
 
 
 def fixturePath(name: str) -> Path:
@@ -118,7 +123,7 @@ def testStringLiteralAndFunctionCallCarryTheirOwnContent() -> None:
     summed = firstTable("18-formula-literals").cell("C1").formula
     assert summed is not None
     call = summed.nodes[-1].content
-    assert isinstance(call, FunctionCall)
+    assert isinstance(call, FormulaFunctionCall)
     # 168 is SUM in Apple's own table. Deriving a name map is separate work, so
     # this asserts the number the archive holds and claims nothing more.
     assert (call.index, call.argumentCount) == (168, 3)
@@ -389,7 +394,7 @@ def testUnknownFunctionKeepsItsSpelling() -> None:
     assert formula is not None
     unknown = [
         node.content for node in formula
-        if isinstance(node.content, UnknownFunction)
+        if isinstance(node.content, FormulaUnknownCall)
     ]
     assert len(unknown) == 1
     assert unknown[0].name == "UNKNOWNFUNC"
@@ -432,14 +437,14 @@ def testChangingOneSharedFormulaSplitsThePoolRatherThanEditingBoth(
     table = document.sheets[0].tables[0]
     nodes = list(table.cell("E2").formula.nodes)
     nodes[-1] = dataclasses.replace(
-        nodes[-1], content=FunctionCall(index=169, argumentCount=1)
+        nodes[-1], content=FormulaFunctionCall(index=169, argumentCount=1)
     )
     table.cell("E2").formula = Formula(nodes=tuple(nodes))
     document.save()
 
     after = pybers.open(source).sheets[0].tables[0]
-    assert after.cell("E2").formula.nodes[-1].content == FunctionCall(169, 1)
-    assert after.cell("E3").formula.nodes[-1].content == FunctionCall(168, 1)
+    assert after.cell("E2").formula.nodes[-1].content == FormulaFunctionCall(169, 1)
+    assert after.cell("E3").formula.nodes[-1].content == FormulaFunctionCall(168, 1)
 
 
 def testChangedFormulaMarksItsCellForRecalculation(tmp_path: Path) -> None:
@@ -591,3 +596,301 @@ def testTheGoldenFilesHoldWhatTheyClaimTo() -> None:
     # The sibling that shares the original archive keeps its own span, which is
     # the whole point of splitting a pooled entry rather than overwriting it.
     assert narrowed.cell("F3").formula.ranges[0].columns.end == 4
+
+
+# ── AC 6 and AC 7: attaching and detaching a formula ─────────────────────────
+
+
+def formulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
+    """Return (row, column, formula key) for every formula-backed cell of a table."""
+    from pybers._generated import TSTArchives_pb2 as tst
+    from pybers.numbersfile import carriesFormula, decodeRow
+    from pybers.numbersfile.types import archiveTypeId, parseArchive
+    from pybers.reader import ArchiveIndex
+    from pybers.writer import formulaKeySlot
+
+    index = ArchiveIndex(readPackage(path))
+    found: list[tuple[int, int, int]] = []
+    for archive in list(index.byIdentifier.values()):
+        if archiveTypeId(archive) != tableInfoTypeId:
+            continue
+        model = index.resolve(parseArchive(archive).tableModel,
+                              tst.TableModelArchive)
+        if model.table_name != name:
+            continue
+        store = model.base_data_store
+        for entry in store.tiles.tiles:
+            tile = index.resolve(entry.tile, tst.Tile)
+            for rowInfo in tile.rowInfos:
+                wide = rowInfo.has_wide_offsets or tile.should_use_wide_rows
+                row = entry.tileid * store.tiles.tile_size + rowInfo.tile_row_index
+                for record in decodeRow(rowInfo.cell_offsets,
+                                        rowInfo.cell_storage_buffer, wide):
+                    if carriesFormula(record):
+                        found.append(
+                            (row, record.column, record.references[formulaKeySlot])
+                        )
+    return found
+
+
+def formulaCellRegister(path: Path) -> tuple[list[tuple[int, int]], ...]:
+    """Return the engine's two registers of formula-bearing cells, zero-based.
+
+    Both are returned so a test can assert they agree. A stale one renders
+    correctly today and lies about the document.
+    """
+    from pybers._generated import TSCEArchives_pb2 as tsce
+    from pybers.numbersfile.types import parseArchive
+    from pybers.reader import ArchiveIndex
+
+    index = ArchiveIndex(readPackage(path))
+    for archive in list(index.byIdentifier.values()):
+        if archiveTypeId(archive) != calculationEngineTypeId:
+            continue
+        engine = parseArchive(archive)
+        for reference in engine.dependency_tracker.formula_owner_dependencies:
+            owner = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
+            if owner.owner_kind != tableOwnerKind:
+                continue
+            expanded = sorted(
+                (record.row, record.column)
+                for record in owner.cell_dependencies.cell_record
+            )
+            tiled = sorted(
+                (record.row, record.column)
+                for tile in owner.tiled_cell_dependencies.cell_record_tiles
+                for record in index.resolve(
+                    tile, tsce.CellRecordTileArchive
+                ).cell_records
+            )
+            return expanded, tiled
+    return [], []
+
+
+def testAttachingAFormulaToAValueCellRegistersItInBothRegisters(
+    tmp_path: Path,
+) -> None:
+    """AC 6. A cell that held only a value carries a formula afterward.
+
+    The register assertion is the point. A formula whose cell is missing from
+    either register is never evaluated, and Numbers gives no warning: it shows the
+    formula in its formula bar and the old value in the grid.
+    """
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    before = formulaCellRegister(working)
+    assert (1, 0) not in before[0], "A2 holds no formula in the fixture"
+
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    assert table.cell("A2").formula is None
+    table.cell("A2").formula = table.cell("A1").formula
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0].cell("A2")
+    assert after.formula is not None
+    assert [node.content for node in after.formula] == [
+        Decimal(1), Decimal(1), None
+    ]
+    # The label it held is left as the placeholder, which Numbers repairs.
+    assert after.value == "1+1"
+
+    expanded, tiled = formulaCellRegister(working)
+    assert (1, 0) in expanded
+    assert expanded == tiled, "the two registers must agree"
+
+
+def testDetachingAFormulaKeepsTheValueAndDeregistersTheCell(
+    tmp_path: Path,
+) -> None:
+    """AC 7. The formula goes, the result it last computed stays."""
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    assert (0, 1) in formulaCellRegister(working)[0], "B1 holds a formula"
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("B1").formula = None
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0].cell("B1")
+    assert after.formula is None
+    assert after.value == Decimal(6), "the last computed result survives"
+
+    expanded, tiled = formulaCellRegister(working)
+    assert (0, 1) not in expanded, "a stale entry claims a formula that is gone"
+    assert expanded == tiled
+
+
+def testChangingOneCellsFormulaLeavesTheRegisterAlone(tmp_path: Path) -> None:
+    """Guard the guard: only attach and detach may move the register.
+
+    Replacing a formula changes neither which cells hold one nor how many, so a
+    register that grew or shrank here would mean the four-way decision misread a
+    replacement as an attach.
+    """
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    before = formulaCellRegister(working)
+
+    document = pybers.open(working)
+    cell = document.sheets[0].tables[0].cell("A1")
+    nodes = list(cell.formula.nodes)
+    nodes[1] = dataclasses.replace(nodes[1], content=Decimal(9))
+    cell.formula = Formula(nodes=tuple(nodes))
+    document.save()
+
+    assert formulaCellRegister(working) == before
+
+
+def testAttachAndDetachMatchTheirGoldenFile(tmp_path: Path) -> None:
+    """The pair above, against output confirmed in Numbers itself.
+
+    Confirmed 2026-09-04 on the third attempt. The first two produced a file that
+    read back perfectly through pybers and was wrong in Numbers, which is what a
+    golden exists to catch. See `tests/golden/README.md`.
+    """
+    golden = goldenDirectory / "18-formula-attached-and-detached.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A2").formula = table.cell("A1").formula
+    table.cell("B1").formula = None
+    document.save()
+
+    assert dataListBytes(golden) == dataListBytes(working)
+    assert formulaCellRegister(golden) == formulaCellRegister(working)
+
+
+def testTheAttachGoldenHoldsWhatItClaimsTo() -> None:
+    """Guard the guard, against the values confirmed on screen on 2026-09-04."""
+    table = pybers.open(
+        goldenDirectory / "18-formula-attached-and-detached.numbers"
+    ).sheets[0].tables[0]
+
+    assert table.cell("A2").formula is not None, "A2 gained a formula"
+    assert table.cell("B1").formula is None, "B1 lost one"
+    assert table.cell("B1").value == Decimal(6)
+    # Untouched cells keep their own formulas.
+    assert table.cell("C1").formula is not None
+    assert table.cell("G1").value == "ab"
+
+    expanded, tiled = formulaCellRegister(
+        goldenDirectory / "18-formula-attached-and-detached.numbers"
+    )
+    assert (1, 0) in expanded and (0, 1) not in expanded
+    assert expanded == tiled
+
+
+# ── AC 1, 2, 3 and 5: writing a formula into a cell that had no record ────────
+
+
+def testAFormulaReachesACellWithNoRecordAtAll(tmp_path: Path) -> None:
+    """AC 1 and AC 2. `H1` of 18 is genuinely empty, its own label saying so.
+
+    A record has to be CREATED, which the writer could only patch before. The
+    offset array already carries a slot for every column, so nothing grows.
+    """
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    assert table.cell("H1").value is None and table.cell("H1").formula is None
+    assert table.cell("H2").value == "empty", "the fixture labels it so"
+
+    table.cell("H1").formula = table.cell("C1").formula   # =SUM(1,2,3)
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0].cell("H1")
+    assert after.formula == pybers.open(
+        fixturePath("18-formula-literals")
+    ).sheets[0].tables[0].cell("C1").formula
+    call = after.formula.nodes[-1].content
+    assert isinstance(call, FormulaFunctionCall)
+    # AC 5: the function is named by the numeric index the archive stores.
+    assert (call.index, call.argumentCount) == (168, 3)
+
+    expanded, tiled = formulaCellRegister(working)
+    assert (0, 7) in expanded and expanded == tiled
+
+
+def testACreatedFormulaStoresNoResultOfItsOwn(tmp_path: Path) -> None:
+    """AC 3. pybers evaluates nothing, so a new formula caches nothing.
+
+    The record is type 8, the shape Numbers writes for a formula it could not
+    compute, which is honestly what this is until Numbers recalculates. Confirmed
+    on screen: the cell shows 6 in Numbers and nothing in Quick Look.
+    """
+    working = Path(shutil.copy(fixturePath("18-formula-literals"),
+                               tmp_path / "18.numbers"))
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("H1").formula = table.cell("C1").formula
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0].cell("H1")
+    assert after.value is None, "no result is stored, because none was computed"
+    assert after.errored, "which is the pending state, not a failure"
+
+
+# ── AC 4: one formula, filled ────────────────────────────────────────────────
+
+
+def testFillGivesEveryCellTheSameStoredFormula(tmp_path: Path) -> None:
+    """AC 4. Four cells, ONE entry, and each resolving against its own column.
+
+    This is what dragging does in Numbers, reproduced by doing the same thing
+    rather than by simulating it. An implementation writing a formula per row
+    would pass every other assertion here and fail the refcount.
+    """
+    working = Path(shutil.copy(fixturePath("20-formula-shapes"),
+                               tmp_path / "20.numbers"))
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    assert table.formulaFill("A11", through="A11:D11") == 3
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0]
+    for reference, expected in (("A11", "A1:A10"), ("B11", "B1:B10"),
+                                ("C11", "C1:C10"), ("D11", "D1:D10")):
+        cell = after.cell(reference)
+        assert str(cell.formula.ranges[0].resolve(cell.reference)) == expected
+
+    keys = {
+        key for row, column, key in formulaRecords(working, "Table 1")
+        if row == 10 and column < 4
+    }
+    assert len(keys) == 1, "all four cells name ONE stored formula"
+
+
+def testFillLeavesEveryCellOutsideTheRangeAlone(tmp_path: Path) -> None:
+    """Guard the guard: a fill that reached too far would still pass the above.
+
+    `E11` through `H11` include a cross-table and a cross-sheet reference, which
+    are the ones a careless range walk would take with it.
+    """
+    working = Path(shutil.copy(fixturePath("20-formula-shapes"),
+                               tmp_path / "20.numbers"))
+    before = {
+        reference: cell.formula
+        for reference, cell in
+        pybers.open(working).sheets[0].tables[0].cells.items()
+    }
+    document = pybers.open(working)
+    document.sheets[0].tables[0].formulaFill("A11", through="A11:D11")
+    document.save()
+
+    after = pybers.open(working).sheets[0].tables[0]
+    for name in ("E11", "F11", "G11", "H11"):
+        reference = pybers.CellReference.parse(name)
+        assert after.cells[reference].formula == before[reference], name
+    assert after.cell("G11").formula.references[0].crossTable
+
+
+def testFillRefusesWhenTheSourceHoldsNoFormula() -> None:
+    """A no-op must report accurately rather than filling nothing in silence."""
+    table = firstTable("20-formula-shapes")
+    with pytest.raises(pybers.ReferenceError, match="no formula"):
+        table.formulaFill("A1", through="A1:D1")

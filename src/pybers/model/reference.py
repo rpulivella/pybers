@@ -151,10 +151,9 @@ class CellReference:
     def asUnlocked(self) -> CellReference:
         """Return the same cell with its locking markers dropped.
 
-        `$A$1` and `A1` are one cell written two ways, so anything storing cells by
-        address has to agree on which of the four spellings it files them under.
-        This is that agreement, and it is why a table can be keyed by a reference
-        at all.
+        `$A$1` and `A1` are one cell written two ways, so anything keyed by address must
+        agree on which of the four spellings it files them under. That agreement is why
+        a table can be keyed by a reference at all.
         """
         if not self.rowAbsolute and not self.colAbsolute:
             return self

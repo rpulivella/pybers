@@ -229,10 +229,9 @@ class CellRange:
     ) -> CellRange:
         """Return the rectangle two opposite corners bound, given in either order.
 
-        Each axis is ordered on its own, because the two corners a caller has in
-        hand are as often opposite ones as top-left and bottom-right. Locking
-        travels with the coordinate it was written against. Both other
-        constructors end here, so ordering happens once.
+        Each axis is ordered on its own, since a caller's two corners are as often
+        opposite ones as top-left and bottom-right. Locking travels with the coordinate
+        it was written against, and both other constructors end here.
         """
         low, high = orderAxis(*rows)
         left, right = orderAxis(*cols)

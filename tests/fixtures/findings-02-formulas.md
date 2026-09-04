@@ -198,6 +198,39 @@ not do.
 `SUM(A)` gives `column: -5, absolute: false` and **no row component at all**. Unboundedness
 is expressed by absence rather than by a sentinel or a flag.
 
+### The engine keeps its own register of which cells hold formulas, stored TWICE
+
+From PYB-42, measured 2026-09-04, and found only because a golden was opened in
+Numbers. Setting a cell record's formula flag and pooling the archive is **necessary but
+not sufficient**. `TSCE.FormulaOwnerDependenciesArchive` carries a register of the cells
+that hold formulas, and a cell missing from it is never evaluated.
+
+The register appears twice and both copies have to agree, the same doubling as anchoring
+on a range:
+
+```
+cell_dependencies         CellDependenciesExpandedArchive, on the owner entry
+tiled_cell_dependencies   references to CellRecordTileArchive (type 4009), 32 columns
+                          per tile; every tile in the corpus begins at row 0, so the
+                          row extent is NOT established
+```
+
+Three attempts, and the two failures are the useful part:
+
+1. **Neither register updated.** The cell stays as it was and Numbers never knows a
+   formula is there. Nothing warns.
+2. **Only `cell_dependencies` updated.** Selecting the cell shows the formula in the
+   formula bar while the cell still displays its old value. This is the most misleading
+   state available, because the cell looks correct to anyone who clicks it.
+3. **Both updated.** The formula evaluates.
+
+**Removing a formula has the mirror hazard.** A detach that leaves the entry behind
+renders correctly today while the document claims a formula that no longer exists, so
+the half that looked confirmed was passing by luck.
+
+`40-table-bands` is the only fixture with more than one tile: eight of them, at columns
+0, 32, 64, 96, 128, 160, 192 and 224.
+
 ### Broken references, unknown functions, and what errors do NOT store
 
 From `21-formula-errors`.

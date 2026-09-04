@@ -84,10 +84,8 @@ CellValue = (
 class MergeRange:
     """A rectangular block of cells merged into one, anchored at its top-left cell.
 
-    The extent is a `CellRange` rather than four numbers of its own, so that the
-    question of which cells a merge covers has one answer in the codebase. A merge
-    is always bounded, unlike a range in general, which is checked rather than
-    assumed.
+    A `CellRange` rather than four numbers, so which cells a merge covers has one
+    answer. A merge is always bounded, unlike a range, and that is checked.
     """
 
     extent: CellRange
@@ -112,10 +110,9 @@ class MergeRange:
     def bounds(self) -> tuple[int, int, int, int]:
         """Return the block's corners as (startRow, startCol, endRow, endCol).
 
-        `__post_init__` already rejects an unbounded extent, so these four are
-        always present. Saying so in a return type rather than leaving four
-        `int | None` for every caller to re-check is the point: a merge that cannot
-        be unbounded should not look like one that can.
+        `__post_init__` rejects an unbounded extent, so all four are present. Saying so
+        in the return type spares every caller a re-check: a merge that cannot be
+        unbounded should not look like one that can.
         """
         startRow, startCol = self.extent.startRow, self.extent.startCol
         endRow, endCol = self.extent.endRow, self.extent.endCol
@@ -132,15 +129,9 @@ class MergeRange:
 class Cell:
     """One cell's value, optional formula, and style, at an address.
 
-    `value` on a formula-backed cell is the result Numbers last computed and
-    cached, not something derived from `formula`. Reading a value therefore never
-    evaluates anything, and the two can disagree until Numbers recalculates.
-
-    `errored` says the formula failed and nothing more, because nothing more is
-    stored. The file records that a cell errored, never why: the error list is
-    empty in every fixture, and division by zero is indistinguishable from any
-    other failure. A broken reference is the one exception and is visible through
-    the formula itself.
+    `value` is the result Numbers last cached, never derived from `formula`, so the
+    two disagree until it recalculates. `errored` says a formula failed and no more,
+    because the file records no reason, except a broken reference.
     """
 
     reference: CellReference
@@ -163,12 +154,9 @@ class Table:
     def cell(self, address: CellAddress) -> Cell:
         """Return the cell at an address, creating an empty one on first access.
 
-        A cell absent from the file is empty rather than missing, so reading one
-        inside the grid is not an error and must not shift its neighbors. Two
-        addresses name nothing at all and raise instead: one outside the declared
-        grid, because a Numbers table is a fixed number of rows and columns rather
-        than an endless sheet, and one swallowed by a merge, because a merged region
-        is a single cell reached through its anchor.
+        A cell absent from the file is empty, not missing, so reading one inside
+        the grid is never an error. Two addresses raise: one outside the declared
+        grid, and one swallowed by a merge, reached through its anchor.
         """
         # Unlocked before it is used as a key, because `$A$1` and `A1` compare
         # unequal and are one cell. Without this the same cell files itself under
@@ -196,12 +184,9 @@ class Table:
     def range(self, address: RangeAddress) -> list[Cell]:
         """Return the cells one or more ranges cover, in the order they name them.
 
-        An unbounded range is bounded by this table's own extent, which is the only
-        place that extent is known. A table with nothing in it has no extent, so an
-        unbounded range over one covers nothing.
-
-        Positions swallowed by a merge are skipped, so a range across a merged block
-        yields its anchor once rather than one cell for every position it occupies.
+        An unbounded range is bounded by this table's extent, and an empty table has
+        none, so an unbounded range over one covers nothing. Positions swallowed by a
+        merge are skipped, so a merged block yields its anchor once.
         """
         extent = self.extent
         found: list[Cell] = []
@@ -243,24 +228,40 @@ class Table:
     def extent(self) -> CellRange | None:
         """Return the grid this table declares, or None when it has none.
 
-        Read from the table's own declared size rather than derived from the cells
-        that happen to hold something. A Numbers table is a fixed number of rows and
-        columns, and 7 of the 74 tables in the fixture corpus have a declared size
-        larger than their populated cells reach, so deriving it returns a real
-        rectangle that is smaller than the table.
+        Read from the declared size, never derived from populated cells: 7 of the 74
+        tables in the corpus declare more than their cells reach, so deriving it
+        returns a real rectangle smaller than the table.
         """
         if self.rowCount < 1 or self.colCount < 1:
             return None
         return CellRange(firstRow, firstColumn, self.rowCount, self.colCount)
 
+    def formulaFill(self, source: CellAddress, through: RangeAddress) -> int:
+        """Give every cell of a range the formula one cell holds, as dragging does.
+
+        Relative references follow each row and locked ones stay put, with no
+        special cases: the file stores ONE formula and every filled cell points at
+        it. Positions a merge swallowed are skipped. Returns how many were filled.
+        """
+        origin = self.cell(source)
+        if origin.formula is None:
+            raise ReferenceError(
+                f"{toCellReference(source)} holds no formula to fill from."
+            )
+        filled = 0
+        for cell in self.range(through):
+            if cell.reference == origin.reference:
+                continue
+            cell.formula = origin.formula
+            filled += 1
+        return filled
+
     def mergeAdd(self, address: RangeAddress) -> MergeRange:
         """Merge a block of cells into one, anchored at its top-left, and return it.
 
-        **The covered cells are discarded, permanently, and unmerging does not bring
-        them back.** That is measured rather than chosen: `22-merge-2x2` and its
-        unmerged twin `22b` hold the same 18 cells, so `B1` is absent from the
-        unmerged file too. Leaving them in the model would also write records Numbers
-        never had, since a covered cell has no record in a tile at all.
+        **The covered cells are discarded permanently, and unmerging does not restore
+        them.** Measured, not chosen: `22-merge-2x2` and its unmerged twin hold the
+        same 18 cells. A covered cell has no record in a tile at all.
         """
         extent = self.rangeSingle(address, "merge")
         # A single cell is refused because Numbers cannot produce one: no fixture holds
@@ -291,10 +292,9 @@ class Table:
     def mergeRemove(self, address: CellAddress) -> MergeRange:
         """Unmerge the block occupying a cell, and return the merge that was removed.
 
-        Takes any cell of the block rather than its extent, because two merges can
-        never claim one cell and the caller usually holds an address rather than a
-        rectangle. Every position the merge covered reads as empty afterward: the
-        values were discarded when it was made, and nothing restores them.
+        Takes any cell of the block rather than its extent, since two merges can never
+        claim one cell. Every covered position reads as empty afterward: the values
+        went when the merge was made, and nothing restores them.
         """
         merge = self.mergeCovering(address)
         if merge is None:
@@ -308,11 +308,8 @@ class Table:
     def rangeSingle(self, address: RangeAddress, action: str) -> CellRange:
         """Return the one bounded rectangle an address names, inside this table.
 
-        Split out of `mergeAdd` rather than left inline because it is the whole of
-        what "names a block of this table" means, and reads better named than as
-        twenty lines before the first useful one. An unbounded range is refused rather
-        than bounded by the table, because a block that follows the grid as it grows
-        is not a block.
+        An unbounded range is refused rather than bounded by the table, because a block
+        that follows the grid as it grows is not a block.
         """
         ranges = toCellRanges(address)
         if len(ranges) != 1:
@@ -338,11 +335,9 @@ class Table:
     def mergeCovering(self, address: CellAddress) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
 
-        This is how a covered cell is told from an empty one, and there is no other
-        way: a merged region's covered cells have NO record in the tile at all, so
-        the grid cannot distinguish them. Derived from `mergeRanges` on every call
-        rather than stored on the cell, because a copy of this would go stale the
-        moment a merge changed.
+        The only way to tell a covered cell from an empty one, since covered cells have
+        NO record in the tile. Derived on every call rather than stored, because a copy
+        would go stale the moment a merge changed.
         """
         reference = toCellReference(address)
         for merge in self.mergeRanges:
