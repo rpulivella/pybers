@@ -24,7 +24,9 @@ other when reaching for something to test against.
 | `22-unmerged-by-pybers.numbers` | `22-merge-2x2.numbers` | all five merges removed | 2026-09-02, Numbers 15.3.1 |
 | `18-formula-literals-A1-changed.numbers` | `18-formula-literals.numbers` | `A1` changed from `=1+1` to `=1+5` | 2026-09-03, Numbers 15.3.1 |
 | `19-formula-dragged-F2-narrowed.numbers` | `19-formula-dragged.numbers` | `F2` narrowed from `SUM($B$1:$D$1)` to `SUM($B$1:$C$1)`, leaving `F3` on the archive they shared | 2026-09-03, Numbers 15.3.1 |
-| `18-formula-attached-and-detached.numbers` | `18-formula-literals.numbers` | `=1+1` attached to `A2`, which held only the text label; `B1`'s `=2*3` detached | 2026-09-04, Numbers 15.3.1 |
+| `18-formula-attached-and-detached.numbers` | `18-formula-literals.numbers` | `=1+1` attached to `A2`, which held only the text label; `B1`'s `=2*3` detached | 2026-09-04, Numbers 15.3.1, re-confirmed the same day after the pool began sharing |
+| `18-formula-created-in-empty-cell.numbers` | `18-formula-literals.numbers` | `=SUM(1,2,3)` written into `H1`, which had no cell record at all | 2026-09-04, Numbers 15.3.1, re-confirmed the same day after the pool began sharing |
+| `20-formula-filled-across.numbers` | `20-formula-shapes.numbers` | `A11`'s `SUM(A1:A10)` filled across `A11:D11` | 2026-09-04, Numbers 15.3.1 |
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `applyDocumentEdits` walking sheets and
@@ -155,6 +157,30 @@ record's formula flag and pooling the archive is necessary but not sufficient.
 `B1` also shows why a pass is not a pass. Attempt two rendered `B1` correctly while the
 register still claimed it held a formula, so the detach half looked confirmed while
 leaving the document lying about itself.
+
+## The fill golden, and why two others were regenerated
+
+Added 2026-09-04 for PYB-42's AC 4. `A11` holds `SUM(A1:A10)` and was filled across
+`A11:D11`. Each cell must resolve against its own column, so `B11` reads `SUM(B1:B10)`
+and `D11` reads `SUM(D1:D10)`, **and the file must hold ONE formula rather than four**.
+It does: one entry at refcount 4, with the three entries those cells used before
+released. That is what dragging does in Numbers, reproduced by doing the same thing
+rather than by simulating it.
+
+**Making that true changed the writer, which invalidated two confirmed goldens.** The
+pool now shares an identical formula instead of storing a second copy, so attaching
+`=1+1` to `A2` reuses `A1`'s entry and writing `SUM(1,2,3)` into `H1` reuses `C1`'s.
+Both files became byte-different from the versions confirmed earlier the same day, so
+neither confirmation carried over and both were opened again.
+
+**Read the fill golden through its formula bars, not its numbers.** `B11`, `C11` and
+`D11` all display 0, and 0 is right: columns B, C and D of that table are empty, so
+`SUM(B1:B10)` is genuinely zero. What proves the fill is that selecting each cell shows a
+DIFFERENT range, `SUM(B1:B10)` against `SUM(C1:C10)`, from one stored formula. `D11` is
+worth a look too: it held a text result (`big`) before the fill and holds a number after,
+a third independent confirmation that Numbers repairs a record type it disagrees with.
+Every cell outside the filled range is untouched, including the cross-table `Table 2::A1`
+and cross-sheet `Sheet 2::Table 1::A1` references.
 
 ## Confirming one
 
