@@ -10,6 +10,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under
 
 ## Unreleased
 
+- [PYB-44] Derive the function name map from Numbers.app
 - [PYB-42] Author a formula and fill it down a column
 - [PYB-41] Read and write formulas as a typed AST
 - [PYB-39] Adopt the PYB-34 and PR #38 reference conventions
