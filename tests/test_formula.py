@@ -39,10 +39,10 @@ import pytest
 import pybers
 from pybers import (
     Formula,
+    FormulaFunctionCall,
     FormulaRange,
-    FunctionCall,
+    FormulaUnknownCall,
     Span,
-    UnknownFunction,
 )
 from pybers.model.formula import FormulaError
 from pybers.numbersfile import readPackage
@@ -123,7 +123,7 @@ def testStringLiteralAndFunctionCallCarryTheirOwnContent() -> None:
     summed = firstTable("18-formula-literals").cell("C1").formula
     assert summed is not None
     call = summed.nodes[-1].content
-    assert isinstance(call, FunctionCall)
+    assert isinstance(call, FormulaFunctionCall)
     # 168 is SUM in Apple's own table. Deriving a name map is separate work, so
     # this asserts the number the archive holds and claims nothing more.
     assert (call.index, call.argumentCount) == (168, 3)
@@ -394,7 +394,7 @@ def testUnknownFunctionKeepsItsSpelling() -> None:
     assert formula is not None
     unknown = [
         node.content for node in formula
-        if isinstance(node.content, UnknownFunction)
+        if isinstance(node.content, FormulaUnknownCall)
     ]
     assert len(unknown) == 1
     assert unknown[0].name == "UNKNOWNFUNC"
@@ -437,14 +437,14 @@ def testChangingOneSharedFormulaSplitsThePoolRatherThanEditingBoth(
     table = document.sheets[0].tables[0]
     nodes = list(table.cell("E2").formula.nodes)
     nodes[-1] = dataclasses.replace(
-        nodes[-1], content=FunctionCall(index=169, argumentCount=1)
+        nodes[-1], content=FormulaFunctionCall(index=169, argumentCount=1)
     )
     table.cell("E2").formula = Formula(nodes=tuple(nodes))
     document.save()
 
     after = pybers.open(source).sheets[0].tables[0]
-    assert after.cell("E2").formula.nodes[-1].content == FunctionCall(169, 1)
-    assert after.cell("E3").formula.nodes[-1].content == FunctionCall(168, 1)
+    assert after.cell("E2").formula.nodes[-1].content == FormulaFunctionCall(169, 1)
+    assert after.cell("E3").formula.nodes[-1].content == FormulaFunctionCall(168, 1)
 
 
 def testChangedFormulaMarksItsCellForRecalculation(tmp_path: Path) -> None:
@@ -808,7 +808,7 @@ def testAFormulaReachesACellWithNoRecordAtAll(tmp_path: Path) -> None:
         fixturePath("18-formula-literals")
     ).sheets[0].tables[0].cell("C1").formula
     call = after.formula.nodes[-1].content
-    assert isinstance(call, FunctionCall)
+    assert isinstance(call, FormulaFunctionCall)
     # AC 5: the function is named by the numeric index the archive stores.
     assert (call.index, call.argumentCount) == (168, 3)
 

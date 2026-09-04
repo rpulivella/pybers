@@ -215,7 +215,7 @@ class FormulaRange:
 
 
 @dataclass(frozen=True, slots=True)
-class FunctionCall:
+class FormulaFunctionCall:
     """A call to one of Apple's built-in functions, named by its own index.
 
     The index is numeric in the archive and no name map ships with this library
@@ -228,7 +228,7 @@ class FunctionCall:
 
 
 @dataclass(frozen=True, slots=True)
-class UnknownFunction:
+class FormulaUnknownCall:
     """A function Numbers itself could not resolve, which keeps its spelling.
 
     Numbers preserves the text rather than discarding the formula, so a document
@@ -246,8 +246,8 @@ class UnknownFunction:
 NodeContent = (
     Decimal
     | str
-    | FunctionCall
-    | UnknownFunction
+    | FormulaFunctionCall
+    | FormulaUnknownCall
     | FormulaReference
     | FormulaRange
     | None

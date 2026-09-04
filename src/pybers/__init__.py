@@ -34,10 +34,11 @@ from pybers.model import (
     Document,
     Formula,
     FormulaError,
+    FormulaFunctionCall,
     FormulaNode,
     FormulaRange,
     FormulaReference,
-    FunctionCall,
+    FormulaUnknownCall,
     GraphicalObject,
     Image,
     MergeRange,
@@ -55,7 +56,6 @@ from pybers.model import (
     Table,
     TextBox,
     TextRun,
-    UnknownFunction,
     columnLetter,
     columnNumber,
     toCellRanges,
@@ -64,9 +64,9 @@ from pybers.model import (
 from pybers.reader import open
 
 __all__ = [
-    "UnknownFunction",
+    "FormulaUnknownCall",
     "Span",
-    "FunctionCall",
+    "FormulaFunctionCall",
     "FormulaReference",
     "FormulaRange",
     "FormulaNode",

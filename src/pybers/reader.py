@@ -57,15 +57,15 @@ from .model import (
     Coordinate,
     Document,
     Formula,
+    FormulaFunctionCall,
     FormulaNode,
     FormulaRange,
     FormulaReference,
-    FunctionCall,
+    FormulaUnknownCall,
     MergeRange,
     Sheet,
     Span,
     Table,
-    UnknownFunction,
 )
 from .model.formula import (
     NodeContent,
@@ -407,12 +407,12 @@ def readFormulaNode(
     elif kind == stringNodeType:
         content = node.AST_string_node_string
     elif kind == functionNodeType:
-        content = FunctionCall(
+        content = FormulaFunctionCall(
             index=node.AST_function_node_index,
             argumentCount=node.AST_function_node_numArgs,
         )
     elif kind == unknownFunctionNodeType:
-        content = UnknownFunction(
+        content = FormulaUnknownCall(
             name=node.AST_unknown_function_node_string,
             argumentCount=node.AST_unknown_function_node_numArgs,
         )

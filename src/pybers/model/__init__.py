@@ -27,12 +27,12 @@ from pybers.model.formula import (
     Coordinate,
     Formula,
     FormulaError,
+    FormulaFunctionCall,
     FormulaNode,
     FormulaRange,
     FormulaReference,
-    FunctionCall,
+    FormulaUnknownCall,
     Span,
-    UnknownFunction,
 )
 from pybers.model.geometry import Position, Size
 from pybers.model.ranges import CellRange, CellRangeList, RangeAddress, toCellRanges
@@ -55,9 +55,9 @@ from pybers.model.text import Paragraph, RichText, TextRun
 # defined in the module it lives in is already public there, and a second list
 # repeating it is one more thing to forget.
 __all__ = [
-    "UnknownFunction",
+    "FormulaUnknownCall",
     "Span",
-    "FunctionCall",
+    "FormulaFunctionCall",
     "FormulaReference",
     "FormulaRange",
     "FormulaNode",

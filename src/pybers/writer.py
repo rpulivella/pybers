@@ -49,14 +49,14 @@ from .model import (
     Coordinate,
     Document,
     Formula,
+    FormulaFunctionCall,
     FormulaNode,
     FormulaRange,
     FormulaReference,
-    FunctionCall,
+    FormulaUnknownCall,
     MergeRange,
     Span,
     Table,
-    UnknownFunction,
 )
 from .model.formula import brokenColumnSentinel, brokenRowSentinel
 from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
@@ -287,10 +287,10 @@ def encodeFormulaNode(
         archive.AST_number_node_number = float(content)
     elif isinstance(content, str):
         archive.AST_string_node_string = content
-    elif isinstance(content, FunctionCall):
+    elif isinstance(content, FormulaFunctionCall):
         archive.AST_function_node_index = content.index
         archive.AST_function_node_numArgs = content.argumentCount
-    elif isinstance(content, UnknownFunction):
+    elif isinstance(content, FormulaUnknownCall):
         archive.AST_unknown_function_node_string = content.name
         archive.AST_unknown_function_node_numArgs = content.argumentCount
     elif isinstance(content, FormulaReference):
