@@ -114,6 +114,14 @@ referenceWidth: int = 4
 # zero, so the row extent of a tile is not established and is never assumed here.
 dependencyTileColumns: int = 32
 
+# Byte 0 of every cell record in the corpus. A created record carries it too.
+storageVersion: int = 5
+
+# The type a formula cell takes when no result is stored, which is what Numbers
+# writes for a formula it could not compute and what a formula pybers just wrote
+# genuinely is until Numbers recalculates.
+formulaPendingType: int = 8
+
 # A record's value is patched in place, leaving the twelve-byte header and the
 # trailing references alone. Those references point at the table's format and
 # style lists, so rewriting the whole record would strip a cell's number format
@@ -201,11 +209,17 @@ def rewriteRow(
     rebuiltBuffer = bytearray()
     for column in range(slots):
         record = existing.get(column)
-        if record is None or column in removals:
+        body = replacements.get(column)
+        if body is None and record is not None:
+            body = record.raw
+        # A replacement for a column with no record CREATES one, which is how a
+        # formula reaches a cell that was empty. The offset array already carries a
+        # slot for every column, so nothing grows.
+        if body is None or column in removals:
             rebuiltOffsets += empty.to_bytes(width, "little")
             continue
         rebuiltOffsets += len(rebuiltBuffer).to_bytes(width, "little")
-        rebuiltBuffer += replacements.get(column, record.raw)
+        rebuiltBuffer += body
     return bytes(rebuiltOffsets), bytes(rebuiltBuffer)
 
 
@@ -361,59 +375,69 @@ class FormulaPool:
         """Return the formula a key names, or None when the table has no such entry."""
         return self.stored.get(key)
 
-    def add(self, formula: Formula) -> int:
-        """Store a formula that no cell named before and return its new key."""
+    def entryFor(self, key: int) -> tst.TableDataList.ListEntry | None:
+        """Return one pooled entry by key, or None when the table has no such key."""
+        for entry in self.dataList.entries:
+            if entry.key == key:
+                return entry
+        return None
+
+    def keyFor(self, formula: Formula, previous: int | None = None) -> int:
+        """Return the key a cell should name, sharing an entry when one matches.
+
+        **Sharing is the only path, and that is what makes filling a column correct.**
+        Numbers points every cell a formula was dragged into at ONE archive, so a
+        relative reference resolves against whichever cell holds it and anchoring
+        needs no special cases. Writing an entry per cell passes a naive test and
+        diverges the moment an axis is locked.
+
+        `previous` is the key the cell names now, released when it stops naming it.
+        A shared entry is split rather than overwritten, so the cells that did not
+        change keep what they had.
+        """
         self.touched = True
+        for key, stored in self.stored.items():
+            if stored != formula or self.entryFor(key) is None:
+                continue
+            if key == previous:
+                return key
+            self.entryFor(key).refcount += 1  # type: ignore[union-attr]
+            if previous is not None:
+                self.release(previous)
+            return key
+
+        # Nothing identical is stored. An entry only this cell names may be
+        # rewritten in place; a shared one must not be.
+        existing = self.entryFor(previous) if previous is not None else None
+        if existing is not None and existing.refcount <= 1:
+            existing.formula.CopyFrom(encodeFormula(formula))
+            self.stored[existing.key] = formula
+            return existing.key
+        if previous is not None:
+            self.release(previous)
         fresh = self.dataList.entries.add()
         fresh.key = self.dataList.nextListID
         fresh.refcount = 1
         fresh.formula.CopyFrom(encodeFormula(formula))
         self.dataList.nextListID += 1
+        self.stored[fresh.key] = formula
         return fresh.key
 
     def release(self, key: int) -> None:
         """Give up one cell's claim on a stored formula.
 
-        The entry is left in place when others still name it, and emptied rather
-        than deleted when none do: `nextListID` never reuses a key, so a spent entry
-        costs a few bytes and removing one would renumber nothing but would invite a
-        reader to assume keys are dense.
+        The entry stays when others still name it, and is emptied rather than deleted
+        when none do: `nextListID` never reuses a key, so a spent entry costs a few
+        bytes and removing one would invite a reader to assume keys are dense.
         """
-        for entry in self.dataList.entries:
-            if entry.key != key:
-                continue
-            self.touched = True
-            entry.refcount = max(0, entry.refcount - 1)
-            if entry.refcount == 0:
-                entry.ClearField("formula")
-            return
-
-    def replace(self, key: int, formula: Formula) -> int:
-        """Write a changed formula and return the key its cell should now name.
-
-        The same key comes back when the entry served one cell, and a fresh one
-        when it served several.
-        """
-        entries = {entry.key: entry for entry in self.dataList.entries}
-        entry = entries.get(key)
+        entry = self.entryFor(key)
         if entry is None:
-            raise WriteError(
-                f"A cell names formula {key}, which its table does not store. "
-                "The cell record and the formula list disagree, and guessing "
-                "which is right would corrupt one of them."
-            )
+            return
         self.touched = True
-        if entry.refcount <= 1:
-            entry.formula.CopyFrom(encodeFormula(formula))
-            return key
-        # Shared. Split rather than overwrite, so the other cells keep theirs.
-        entry.refcount -= 1
-        fresh = self.dataList.entries.add()
-        fresh.key = self.dataList.nextListID
-        fresh.refcount = 1
-        fresh.formula.CopyFrom(encodeFormula(formula))
-        self.dataList.nextListID += 1
-        return fresh.key
+        entry.refcount = max(0, entry.refcount - 1)
+        if entry.refcount == 0:
+            entry.ClearField("formula")
+            self.stored.pop(key, None)
 
 
 def formulaKeyOffset(record: CellRecord) -> int:
@@ -426,6 +450,22 @@ def formulaKeyOffset(record: CellRecord) -> int:
     """
     _, width = decodeCellValue(record.typeByte, record.raw[valueOffset:])
     return valueOffset + width + formulaKeySlot * referenceWidth
+
+
+def buildFormulaRecord(key: int) -> bytes:
+    """Return a record for a cell that had none, holding a formula and no result.
+
+    Exactly the shape Numbers writes for a formula whose result it could not
+    compute: type 8, byte 8 clear, byte 9 carrying only the formula bit, and the key
+    as the single trailing reference. Measured on the ten error cells in
+    `21-formula-errors`. That is the honest state for a formula pybers has just
+    written, since pybers never evaluates and Numbers recalculates on open.
+    """
+    header = bytearray(valueOffset)
+    header[0] = storageVersion
+    header[1] = formulaPendingType
+    header[formulaFlagOffset] = formulaFlagBit
+    return bytes(header) + key.to_bytes(referenceWidth, "little")
 
 
 def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
@@ -643,13 +683,15 @@ def applyFormulaEdit(
     """
     if edit == "attach":
         assert cell.formula is not None
-        return attachFormulaKey(raw, record, pool.add(cell.formula))
+        return attachFormulaKey(raw, record, pool.keyFor(cell.formula))
     if edit == "detach":
         pool.release(record.references[formulaKeySlot])
         return detachFormulaKey(raw, record)
     assert cell.formula is not None
     return patchFormulaKey(
-        raw, record, pool.replace(record.references[formulaKeySlot], cell.formula)
+        raw,
+        record,
+        pool.keyFor(cell.formula, record.references[formulaKeySlot]),
     )
 
 
@@ -730,6 +772,23 @@ def applyTableEdits(
                     rowInfo.cell_offsets, rowInfo.cell_storage_buffer, wide
                 )
             )
+            # A cell the model gave a formula to but the file has no record for.
+            # The loop above cannot see these: it walks records, and these have
+            # none. Skipped when a merge swallowed the position, which is an
+            # absence Numbers means rather than one to fill.
+            if pool is not None:
+                for column in range(table.colCount):
+                    if column in present or (row, column) in swallowed:
+                        continue
+                    cell = table.cells.get(
+                        CellReference(row + originOffset, column + originOffset)
+                    )
+                    if cell is None or cell.formula is None:
+                        continue
+                    replacements[column] = buildFormulaRecord(
+                        pool.keyFor(cell.formula)
+                    )
+                    formulaAdded.append((row, column))
             dropped = removals & present
             if not replacements and not dropped:
                 continue
