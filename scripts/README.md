@@ -1,10 +1,20 @@
 # pybers: Scripts
 
-Personal tooling for this repo: the ticket/PR workflow tools and any future build/release
-utilities. Every script is self-contained, runnable from the repo root, and reports
+**The repository harness.** Everything here serves the workflow rather than the library:
+filing and moving tickets, opening and merging pull requests, and running the gates. Each
+one backs a skill, and a skill is the only thing that should be calling one.
+
+**What does NOT belong here is anything that builds pybers itself.** The extractors that
+read Numbers and write `src/pybers/protos/`, `src/pybers/_generated/` and the function
+table live in `tools/`, which has [its own README](../tools/README.md). The split is
+whether a program serves the repository or the library; both are development tooling and
+neither ships in the wheel, but they answer to different readers and change for different
+reasons.
+
+Every script is self-contained, runnable from the repo root, and reports
 through [`rich`](https://github.com/Textualize/rich). This house style mirrors
 the same author's other repositories exactly,
-same conventions, deliberately kept in sync. It governs `scripts/` (repo tooling) only,
+same conventions, deliberately kept in sync. The house rules below govern `tools/` too.
 `src/pybers/` (the library itself) follows the same core conventions but uses dataclasses
 rather than TypedDict for data, and is documented in `CLAUDE.md`.
 
@@ -15,25 +25,12 @@ rather than TypedDict for data, and is documented in `CLAUDE.md`.
 ## Current scripts
 
 ```
-protos-extract.py
-             dump the iWork protobuf schemas pybers builds on from the Numbers
-             application binary, and diff them against the vendored reference
-             set. Live now.
 ticket.py    file and move tickets on GitHub Issues and the pybers Project board,
              the single sanctioned path, never hand-run the GitHub API around it
              (see the command map below). Live now.
 pr.py        open, inspect, promote and merge pull requests. Exists so that no
              skill needs `gh`, whose identity is an ambient keyring holding
              several accounts at once. Live now.
-functions-extract.py
-             derive the Numbers formula function index map from the application
-             binary and report how it differs from the committed one. Reads the
-             binary, never runs it. Output is committed because `pip install
-             pybers` has no Numbers to read. Live now.
-numbersapp.py
-             locate the Numbers install on this machine and read its identity.
-             Imported by the two extractors rather than duplicated in each; it
-             is not a command and has no CLI. Live now.
 pr-preflight-check.py
              run every gate in one pass and report all of them: pytest, the
              prose gate, ruff and mypy. The deterministic half of
