@@ -338,7 +338,8 @@ def testReplacingOneCellsFormulaLeavesItsSiblingAlone() -> None:
 @pytest.mark.parametrize(
     "name",
     ["18-formula-literals", "19-formula-dragged",
-     "20-formula-shapes", "21-formula-errors"],
+     "20-formula-shapes", "21-formula-errors",
+     "46-formula-rare-functions"],
 )
 def testUnchangedRoundTripLeavesEveryPooledListByteIdentical(
     name: str, tmp_path: Path
@@ -357,7 +358,8 @@ def testUnchangedRoundTripLeavesEveryPooledListByteIdentical(
 @pytest.mark.parametrize(
     "name",
     ["18-formula-literals", "19-formula-dragged",
-     "20-formula-shapes", "21-formula-errors"],
+     "20-formula-shapes", "21-formula-errors",
+     "46-formula-rare-functions"],
 )
 def testEveryFormulaSurvivesTheRoundTripThroughTheModel(
     name: str, tmp_path: Path
