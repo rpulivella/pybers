@@ -32,10 +32,14 @@ import pybers
 from pybers import Formula, FormulaFunctionCall, FormulaNode
 from pybers.model.formula import functionNodeType
 from pybers.model.functions import (
+    ArgumentCountError,
     UnknownFunctionError,
+    functionFor,
     functionIndexFor,
+    functionNamed,
     functionNameFor,
-    functionNames,
+    functionsByIndex,
+    functionsByName,
 )
 from pybers.numbersfile import readPackage
 from pybers.numbersfile.types import archiveTypeId
@@ -97,9 +101,9 @@ def extractor() -> ModuleType:
     """
     if str(repositoryRoot) not in sys.path:
         sys.path.insert(0, str(repositoryRoot))
-    if str(repositoryRoot / "scripts") not in sys.path:
-        sys.path.insert(0, str(repositoryRoot / "scripts"))
-    return importlib.import_module("scripts.functions-extract")
+    if str(repositoryRoot / "tools") not in sys.path:
+        sys.path.insert(0, str(repositoryRoot / "tools"))
+    return importlib.import_module("tools.functions-extract")
 
 
 # ── AC 1: a call reports its name ────────────────────────────────────────────
@@ -152,8 +156,8 @@ def testTheOriginalIndicesAreInAlphabeticalOrder() -> None:
     shape that carries the index differently from the other 314.
     """
     within = sorted(
-        (index, name)
-        for index, name in functionNames.items()
+        (index, function.name)
+        for index, function in functionsByIndex.items()
         if index <= originalAlphabeticalCeiling
     )
     assert [name for _index, name in within] == sorted(
@@ -248,33 +252,244 @@ def testTheMapLivesInsideTheInstalledPackage() -> None:
     assert Path(generated.__file__).resolve().is_relative_to(packageRoot)
 
 
-def testTheMapIsPopulatedAndReadOnly() -> None:
-    """A shared map handed out mutable would rename a function for every caller."""
-    assert len(functionNames) > 300
+def testTheTableIsPopulatedAndReadOnly() -> None:
+    """A shared table handed out mutable would rename a function for every caller."""
+    assert len(functionsByIndex) > 300
     with pytest.raises(TypeError):
-        functionNames[1] = "NOPE"  # type: ignore[index]
+        functionsByIndex[1] = "NOPE"  # type: ignore[index]
 
 
-# ── AC 5: regenerating reports what changed ──────────────────────────────────
+# ── AC 6 and 7: a call reports the counts its function accepts ───────────────
+
+
+def testACallReportsTheArgumentCountsItsFunctionAccepts() -> None:
+    """`HYPERLINK` takes one or two, which a caller learns before writing either."""
+    hyperlink = functionNamed("HYPERLINK")
+    assert (hyperlink.minimumArguments, hyperlink.maximumArguments) == (1, 2)
+    assert hyperlink.accepts(1) and hyperlink.accepts(2)
+    assert not hyperlink.accepts(0) and not hyperlink.accepts(3)
+
+
+def testAFunctionTakingNoArgumentsSaysSo() -> None:
+    """`PI` accepts nothing, which a maximum read as a count of declared
+    arguments would have reported as two."""
+    pi = functionNamed("PI")
+    assert (pi.minimumArguments, pi.maximumArguments) == (0, 0)
+    assert pi.accepts(0) and not pi.accepts(1)
+
+
+def testARepeatingGroupMakesTheMaximumAFloor() -> None:
+    """`SUM` declares a maximum of two and accepts eight, because it repeats."""
+    total = functionNamed("SUM")
+    assert total.maximumArguments == 2
+    assert total.unbounded
+    assert total.accepts(8) and total.accepts(3)
+    assert not total.accepts(0)
+
+
+def testAPairedRepeatingGroupIsStillUnbounded() -> None:
+    """`SUMIFS` takes three and then criteria pairs, which is why it has a
+    group of two rather than a limit."""
+    sumifs = functionNamed("SUMIFS")
+    assert sumifs.repeatingGroupSize == 2
+    assert sumifs.accepts(3) and sumifs.accepts(101)
+    assert not sumifs.accepts(2)
+
+
+def testAuthoringByNameRefusesACountTheFunctionRejects() -> None:
+    """The ergonomic path refuses what Numbers would store as an error cell."""
+    with pytest.raises(ArgumentCountError):
+        FormulaFunctionCall.named("ROUND", 1)
+    with pytest.raises(ArgumentCountError):
+        FormulaFunctionCall.named("PI", 1)
+
+
+def testAuthoringByIndexStillWritesWhateverIsAsked() -> None:
+    """The explicit path stays open, so an error cell can be written on purpose.
+
+    `=ROUND(2.5)` is exactly what 18-formula-literals holds, stored by Numbers
+    as an error, so refusing to express it would make that document unwritable.
+    """
+    call = FormulaFunctionCall(index=126, argumentCount=1)
+    assert call.name == "ROUND"
+    assert call.function is not None and not call.function.accepts(1)
+
+
+# ── AC 8: no claim contradicts a document ────────────────────────────────────
+
+
+def testNoValidFormulaInTheCorpusContradictsTheTable() -> None:
+    """Every argument count in every fixture is accepted by the function holding it.
+
+    Errored cells are excluded because Numbers itself rejected them, and the
+    table agreeing that they are errors is the next test rather than this one.
+    """
+    offenders: list[str] = []
+    for path in sorted(fixtureDirectory.glob("*.numbers")):
+        document = pybers.open(path)
+        for sheet in document.sheets:
+            for table in sheet.tables:
+                for cell in table.cells.values():
+                    if cell.formula is None or cell.errored:
+                        continue
+                    for node in cell.formula:
+                        call = node.content
+                        if not isinstance(call, FormulaFunctionCall):
+                            continue
+                        function = call.function
+                        if function is not None and not function.accepts(
+                            call.argumentCount
+                        ):
+                            offenders.append(
+                                f"{path.name} {function.name}"
+                                f"({call.argumentCount})"
+                            )
+    assert offenders == []
+
+
+def testTheTableAgreesWithNumbersAboutAnErroredCall() -> None:
+    """`=ROUND(2.5)` is stored as an error, and the table independently rejects it."""
+    table = firstTable("18-formula-literals")
+    errored = [
+        node.content
+        for cell in table.cells.values()
+        if cell.formula is not None and cell.errored
+        for node in cell.formula
+        if isinstance(node.content, FormulaFunctionCall)
+    ]
+    assert errored, "18-formula-literals carries an errored formula"
+    for call in errored:
+        function = call.function
+        assert function is not None
+        assert not function.accepts(call.argumentCount)
+
+
+# ── AC 9: the functions no authoring method reaches ──────────────────────────
+
+
+def testFunctionsTheAuthoringMethodsNeverReachedAreNamed() -> None:
+    """These 22 came from the class metadata, which the first reading never saw."""
+    for name in ("TRUE", "FALSE", "HYPERLINK", "CURRENCY", "BITLSHIFT", "ISOWEEKNUM"):
+        function = functionNamed(name)
+        assert function.index is not None
+        assert functionFor(function.index) == function
+
+
+# ── AC 11: a name Numbers declares but refuses ───────────────────────────────
+
+
+def testAReservedFunctionIsNamedRatherThanDropped() -> None:
+    """Indices 281 to 284 are declared, spec-less, and refused by Numbers itself.
+
+    46-formula-rare-functions holds all four typed out, and Numbers answers
+    "isn't a valid function name" for each, so carrying them lets a document
+    calling one read as a name instead of a bare number.
+    """
+    for name, index in (("LATITUDE", 281), ("LONGITUDE", 282),
+                        ("BEARING", 283), ("ALTITUDE", 284)):
+        function = functionNamed(name)
+        assert function.index == index
+        assert function.reserved
+        assert functionNameFor(index) == name
+
+
+def testAReservedFunctionAcceptsNoArgumentCountAtAll() -> None:
+    """Reading one names it; authoring one is refused whatever is passed."""
+    altitude = functionNamed("ALTITUDE")
+    assert not any(altitude.accepts(count) for count in range(0, 6))
+    with pytest.raises(ArgumentCountError):
+        FormulaFunctionCall.named("ALTITUDE", 1)
+
+
+def testAnInternalFunctionIsNamedSoASpilledDocumentIsLegible() -> None:
+    """`SPILL` is index 337 and fills every cell a formula spills into.
+
+    Measured in 46-formula-rare-functions, where a MAKEARRAY anchored at C15
+    leaves `SPILL($C$15)` in the three cells it covers. Dropping the internal
+    functions would read every one of those as a bare number.
+    """
+    spill = functionNamed("SPILL")
+    assert spill.index == 337
+    assert str(spill.availability) == "internal"
+    assert not spill.offered
+    assert spill.accepts(1) and not spill.accepts(2)
+    assert functionNameFor(337) == "SPILL"
+
+
+def testAnInternalFunctionIsRefusedByNameAndAllowedByIndex() -> None:
+    """The ergonomic path declines; the explicit one stays open."""
+    with pytest.raises(ArgumentCountError):
+        FormulaFunctionCall.named("SPILL", 1)
+    assert FormulaFunctionCall(index=337, argumentCount=1).name == "SPILL"
+
+
+def testAnOperatorCarriesAFunctionIndexAsWellAsANodeType() -> None:
+    """Operators are node types in every formula the corpus holds, and Numbers
+    also declares an indexed form for each."""
+    multiply = functionNamed("op.Multiply")
+    assert multiply.index == 169
+    assert not multiply.offered
+    assert multiply.minimumArguments == 2
+
+
+# ── Functions the format stores as node types ────────────────────────────────
+
+
+def testLetAndLambdaCarryArgumentCountsAndNoIndex() -> None:
+    """Both are documented functions the archive stores as node types.
+
+    The counts match the signatures Numbers publishes in its own function
+    browser: LET takes up to 126 name and value pairs plus a calculation, and
+    LAMBDA up to 253 parameters plus one.
+    """
+    let = functionNamed("LET")
+    assert (let.index, let.minimumArguments, let.maximumArguments) == (None, 3, 253)
+    assert let.repeatingGroupSize == 2
+
+    lambdaFunction = functionNamed("LAMBDA")
+    assert lambdaFunction.index is None
+    assert (lambdaFunction.minimumArguments, lambdaFunction.maximumArguments) == (
+        1, 254
+    )
+
+
+def testAFunctionWithNoIndexRefusesToProduceOne() -> None:
+    """There is no index to write, and inventing one would call something else."""
+    with pytest.raises(UnknownFunctionError):
+        functionIndexFor("LET")
+    assert "LET" not in {f.name for f in functionsByIndex.values()}
+
+
+# ── AC 5 and 10: regenerating reports what changed ───────────────────────────
 
 
 def testComparisonReportsAnAddedFunction() -> None:
     """A function Numbers gained appears as added rather than silently arriving."""
     module = extractor()
-    comparison = module.compareMaps({1: "ABS", 2: "NEWONE"}, {1: "ABS"})
-    assert comparison.added == ((2, "NEWONE"),)
-    assert comparison.removed == ()
-    assert comparison.renamed == ()
+    before = {"ABS": module.NumbersFunction("ABS", 1, 1, 1, 0)}
+    after = dict(before) | {"NEWONE": module.NumbersFunction("NEWONE", 2, 1, 1, 0)}
+    comparison = module.compareTables(after, before)
+    assert [f.name for f in comparison.added] == ["NEWONE"]
+    assert comparison.removed == () and comparison.changed == ()
     assert comparison.unchangedCount == 1
 
 
-def testComparisonReportsARemovedAndARenamedFunction() -> None:
-    """A withdrawn index and a re-spelled one are different findings."""
+def testComparisonReportsARemovedAndAChangedFunction() -> None:
+    """A withdrawn index and one whose counts moved are different findings."""
     module = extractor()
-    comparison = module.compareMaps({1: "ABS", 3: "NOW"}, {1: "ABS", 2: "GONE",
-                                                           3: "WAS"})
-    assert comparison.removed == ((2, "GONE"),)
-    assert comparison.renamed == ((3, "WAS", "NOW"),)
+    before = {
+        "ABS": module.NumbersFunction("ABS", 1, 1, 1, 0),
+        "GONE": module.NumbersFunction("GONE", 2, 1, 1, 0),
+        "NOW": module.NumbersFunction("NOW", 3, 1, 1, 0),
+    }
+    after = {
+        "ABS": module.NumbersFunction("ABS", 1, 1, 1, 0),
+        "NOW": module.NumbersFunction("NOW", 3, 1, 4, 0),
+    }
+    comparison = module.compareTables(after, before)
+    assert [f.name for f in comparison.removed] == ["GONE"]
+    assert [(w.maximumArguments, n.maximumArguments)
+            for w, n in comparison.changed] == [(1, 4)]
     assert comparison.unchangedCount == 1
 
 
@@ -282,6 +497,32 @@ def testComparisonAgainstItselfIsEmpty() -> None:
     """Regenerating on the same Numbers reports nothing, which is what makes a
     real change visible."""
     module = extractor()
-    comparison = module.compareMaps(dict(functionNames), dict(functionNames))
-    assert (comparison.added, comparison.removed, comparison.renamed) == ((), (), ())
-    assert comparison.unchangedCount == len(functionNames)
+    committed = module.readCommitted(
+        repositoryRoot / "src" / "pybers" / "_generated" / "functions.py"
+    )
+    assert committed is not None
+    comparison = module.compareTables(committed, committed)
+    assert (comparison.added, comparison.removed, comparison.changed) == ((), (), ())
+    assert comparison.unchangedCount == len(committed)
+
+
+def testTheCommittedTableMatchesWhatTheLibraryLoads() -> None:
+    """The generated file and the model read the same table, so a stale
+    regeneration cannot pass unnoticed."""
+    module = extractor()
+    committed = module.readCommitted(
+        repositoryRoot / "src" / "pybers" / "_generated" / "functions.py"
+    )
+    assert committed is not None
+    def fields(function: object) -> tuple[object, ...]:
+        return tuple(
+            getattr(function, attribute)
+            for attribute in ("name", "index", "minimumArguments",
+                              "maximumArguments", "repeatingGroupSize", "reserved")
+        )
+
+    # Compared field by field: the extractor and the model each define their own
+    # NumbersFunction, so two identical rows are never the same type.
+    assert {name: fields(f) for name, f in committed.items()} == {
+        name: fields(f) for name, f in functionsByName.items()
+    }

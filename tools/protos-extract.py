@@ -33,19 +33,19 @@ vendored schemas corroborates both, and any difference is a finding to understan
 rather than a silent divergence.
 
 Usage:
-    python3 scripts/protos-extract.py
-    python3 scripts/protos-extract.py \
+    python3 tools/protos-extract.py
+    python3 tools/protos-extract.py \
         --numbers "/Applications/Numbers Creator Studio.app"
-    python3 scripts/protos-extract.py --protodump ~/.local/share/protodump/protodump.py
-    python3 scripts/protos-extract.py --write
-    python3 scripts/protos-extract.py --write --dry-run
+    python3 tools/protos-extract.py --protodump ~/.local/share/protodump/protodump.py
+    python3 tools/protos-extract.py --write
+    python3 tools/protos-extract.py --write --dry-run
 
 Requires rich. protodump additionally requires protobuf and tqdm, and generating
 Python from the dumped schemas requires protoc on PATH, and the type stubs
 beside it require mypy-protobuf's `protoc-gen-mypy` plugin there too.
 
 UPDATES
-2026-09-04  Locating Numbers moved to scripts/numbersapp.py for #44, so the
+2026-09-04  Locating Numbers moved to tools/lib/numbersapp.py for #44, so the
             function-index extractor searches the same way rather than a second
             way that drifts.
 2026-08-16  Pinned encoding on both subprocess calls. text=True alone decodes with the
@@ -62,7 +62,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/13"
-__usage__ = "python3 scripts/protos-extract.py [options]"
+__usage__ = "python3 tools/protos-extract.py [options]"
 
 import argparse
 import os
@@ -72,7 +72,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from numbersapp import NumbersApplication, locateNumbers
+from lib.numbersapp import NumbersApplication, locateNumbers
 from rich.console import Console
 from rich.markup import escape
 
@@ -144,7 +144,7 @@ def runProtodump(
     """Invoke protodump to write .proto files for one application into a directory.
 
     Run as a subprocess rather than imported, which is the sanctioned exception in
-    scripts/README.md for an external toolchain: protodump exposes only an argv entry
+    tools/README.md for an external toolchain: protodump exposes only an argv entry
     point, so there is no library surface to call, and keeping it behind a process
     boundary keeps a third-party script out of this tool's import graph.
     """

@@ -24,6 +24,7 @@ __status__ = "Development"
 __date__ = "2026/08/12"
 
 from pybers.model import (
+    ArgumentCountError,
     Cell,
     CellAddress,
     CellRange,
@@ -42,6 +43,7 @@ from pybers.model import (
     GraphicalObject,
     Image,
     MergeRange,
+    NumbersFunction,
     Paragraph,
     Position,
     RangeAddress,
@@ -59,7 +61,9 @@ from pybers.model import (
     UnknownFunctionError,
     columnLetter,
     columnNumber,
+    functionFor,
     functionIndexFor,
+    functionNamed,
     functionNameFor,
     toCellRanges,
     toCellReference,
@@ -67,8 +71,12 @@ from pybers.model import (
 from pybers.reader import open
 
 __all__ = [
+    "ArgumentCountError",
+    "NumbersFunction",
     "UnknownFunctionError",
+    "functionFor",
     "functionIndexFor",
+    "functionNamed",
     "functionNameFor",
     "FormulaUnknownCall",
     "Span",

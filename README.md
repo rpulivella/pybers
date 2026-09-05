@@ -122,7 +122,7 @@ Requires Python 3.14 or newer. The only runtime dependency is `protobuf`.
 `src/pybers/_generated/` holds the modules `protoc` compiles from them. Both are
 committed, so `pip install pybers` works on a machine without Numbers present.
 
-`scripts/protos-extract.py` re-runs the extraction against a newer Numbers when Apple
+`tools/protos-extract.py` re-runs the extraction against a newer Numbers when Apple
 ships one. The technique, that Apple compiles the protobuf descriptors into the binary
 where they can be dumped, was learned from numbers-parser's build, and the extractor
 credits it in its docstring.

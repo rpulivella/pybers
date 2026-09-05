@@ -38,7 +38,7 @@ removing the enum rather than an incomplete extraction.
 
 Regeneration needs a local Numbers install and `protodump.py`, so it cannot run on a fresh
 clone or in CI — which is exactly why the output is committed. See
-`scripts/protos-extract.py` for the process, its prerequisites, and the credited
+`tools/protos-extract.py` for the process, its prerequisites, and the credited
 provenance of the extraction technique.
 
 **Do not hand-edit anything in this directory or in `_generated/`.** Both are machine

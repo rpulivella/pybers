@@ -36,8 +36,12 @@ from pybers.model.formula import (
     Span,
 )
 from pybers.model.functions import (
+    ArgumentCountError,
+    NumbersFunction,
     UnknownFunctionError,
+    functionFor,
     functionIndexFor,
+    functionNamed,
     functionNameFor,
 )
 from pybers.model.geometry import Position, Size
@@ -61,8 +65,12 @@ from pybers.model.text import Paragraph, RichText, TextRun
 # defined in the module it lives in is already public there, and a second list
 # repeating it is one more thing to forget.
 __all__ = [
+    "ArgumentCountError",
+    "NumbersFunction",
     "UnknownFunctionError",
+    "functionFor",
     "functionIndexFor",
+    "functionNamed",
     "functionNameFor",
     "FormulaUnknownCall",
     "Span",
