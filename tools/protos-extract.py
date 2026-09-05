@@ -33,18 +33,21 @@ vendored schemas corroborates both, and any difference is a finding to understan
 rather than a silent divergence.
 
 Usage:
-    python3 scripts/protos-extract.py
-    python3 scripts/protos-extract.py \
+    python3 tools/protos-extract.py
+    python3 tools/protos-extract.py \
         --numbers "/Applications/Numbers Creator Studio.app"
-    python3 scripts/protos-extract.py --protodump ~/.local/share/protodump/protodump.py
-    python3 scripts/protos-extract.py --write
-    python3 scripts/protos-extract.py --write --dry-run
+    python3 tools/protos-extract.py --protodump ~/.local/share/protodump/protodump.py
+    python3 tools/protos-extract.py --write
+    python3 tools/protos-extract.py --write --dry-run
 
 Requires rich. protodump additionally requires protobuf and tqdm, and generating
 Python from the dumped schemas requires protoc on PATH, and the type stubs
 beside it require mypy-protobuf's `protoc-gen-mypy` plugin there too.
 
 UPDATES
+2026-09-04  Locating Numbers moved to tools/lib/numbersapp.py for #44, so the
+            function-index extractor searches the same way rather than a second
+            way that drifts.
 2026-08-16  Pinned encoding on both subprocess calls. text=True alone decodes with the
             ambient locale, so a context without LANG mangled the toolchain's own
             diagnostics, which are the text quoted into the RuntimeError, making the
@@ -59,17 +62,17 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/13"
-__usage__ = "python3 scripts/protos-extract.py [options]"
+__usage__ = "python3 tools/protos-extract.py [options]"
 
 import argparse
 import os
-import plistlib
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from lib.numbersapp import NumbersApplication, locateNumbers
 from rich.console import Console
 from rich.markup import escape
 
@@ -99,27 +102,6 @@ referenceSchemaDirectory: Path = (
 # Overridable with --protodump or the PROTODUMP environment variable.
 defaultProtodumpPath: Path = repositoryRoot / "workarea" / "bootstrap" / "protodump.py"
 
-# Numbers is normally here, but the bundle can be renamed on disk, so a missing path
-# triggers a search by bundle contents rather than an immediate failure.
-defaultNumbersPath: Path = Path("/Applications/Numbers.app")
-
-applicationSearchDirectories: tuple[Path, ...] = (
-    Path("/Applications"),
-    Path("/System/Applications"),
-    Path.home() / "Applications",
-)
-
-
-@dataclass(frozen=True)
-class NumbersApplication:
-    """A located Numbers install and the identity read from its bundle."""
-
-    bundlePath: Path
-    executablePath: Path
-    version: str
-    build: str
-    bundleIdentifier: str
-
 
 @dataclass(frozen=True)
 class SchemaComparison:
@@ -131,74 +113,6 @@ class SchemaComparison:
     onlyInReference: tuple[str, ...]
     differingContent: tuple[str, ...]
     identicalCount: int
-
-
-def readBundleIdentity(bundlePath: Path) -> NumbersApplication | None:
-    """Return the identity of a Numbers install, or None when the bundle is not one.
-
-    Matched on the executable name rather than the bundle identifier, because the
-    identifier differs between Apple's macOS and iOS builds and a renamed bundle
-    keeps its executable name while losing its filename.
-    """
-    informationPath = bundlePath / "Contents" / "Info.plist"
-    if not informationPath.is_file():
-        return None
-
-    try:
-        information = plistlib.loads(informationPath.read_bytes())
-    except (plistlib.InvalidFileException, ValueError):
-        return None
-
-    if information.get("CFBundleExecutable") != "Numbers":
-        return None
-
-    executablePath = bundlePath / "Contents" / "MacOS" / "Numbers"
-    if not executablePath.is_file():
-        return None
-
-    return NumbersApplication(
-        bundlePath=bundlePath,
-        executablePath=executablePath,
-        version=str(information.get("CFBundleShortVersionString", "unknown")),
-        build=str(information.get("CFBundleVersion", "unknown")),
-        bundleIdentifier=str(information.get("CFBundleIdentifier", "unknown")),
-    )
-
-
-def locateNumbers(requestedPath: Path | None) -> NumbersApplication:
-    """Find the Numbers install to dump from, searching only if it is not where
-    expected.
-
-    An explicit --numbers path is trusted and its failure is loud. Otherwise the usual
-    location is tried first, then every application bundle is inspected, because the
-    bundle is sometimes renamed on disk and its filename cannot be relied upon.
-    """
-    if requestedPath is not None:
-        located = readBundleIdentity(requestedPath)
-        if located is None:
-            raise RuntimeError(
-                f"{requestedPath} is not a Numbers application bundle. Expected "
-                "Contents/MacOS/Numbers and a matching Info.plist."
-            )
-        return located
-
-    located = readBundleIdentity(defaultNumbersPath)
-    if located is not None:
-        return located
-
-    for directory in applicationSearchDirectories:
-        if not directory.is_dir():
-            continue
-        for candidate in sorted(directory.glob("*.app")):
-            located = readBundleIdentity(candidate)
-            if located is not None:
-                return located
-
-    raise RuntimeError(
-        "Could not find a Numbers install. Searched "
-        f"{', '.join(str(d) for d in applicationSearchDirectories)}. Pass --numbers "
-        "with the bundle path if it lives elsewhere."
-    )
 
 
 def resolveProtodumpPath(requestedPath: Path | None) -> Path:
@@ -230,7 +144,7 @@ def runProtodump(
     """Invoke protodump to write .proto files for one application into a directory.
 
     Run as a subprocess rather than imported, which is the sanctioned exception in
-    scripts/README.md for an external toolchain: protodump exposes only an argv entry
+    tools/README.md for an external toolchain: protodump exposes only an argv entry
     point, so there is no library surface to call, and keeping it behind a process
     boundary keeps a third-party script out of this tool's import graph.
     """

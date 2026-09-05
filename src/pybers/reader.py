@@ -80,7 +80,7 @@ from .model.formula import (
     unknownFunctionNodeType,
 )
 from .numbersfile import Archive, NumbersPackage, carriesFormula, decodeRow, readPackage
-from .numbersfile.cells import CellRecord
+from .numbersfile.cells import CellRecord, formulaKeySlot
 from .numbersfile.decimal128 import Decimal128
 from .numbersfile.types import archiveTypeId, parseArchive
 
@@ -120,7 +120,6 @@ richTextListType: int = 8
 # formula keys and style indices are both small integers and several slots
 # coincide by chance. An error cell consumes no value, so byte 12 is at once its
 # value slot and this slot, which is why one rule covers both.
-formulaKeySlot: int = 0
 
 # A number literal carries decimal128 as two 64-bit halves rather than as bytes.
 decimalHalfFormat: str = "<QQ"
@@ -467,9 +466,10 @@ def resolveFormula(
     """
     if not carriesFormula(record):
         return None
-    if len(record.references) <= formulaKeySlot:
+    slot = formulaKeySlot(record)
+    if len(record.references) <= slot:
         return None
-    return formulas.get(record.references[formulaKeySlot])
+    return formulas.get(record.references[slot])
 
 
 def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:

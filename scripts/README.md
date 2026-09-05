@@ -1,10 +1,20 @@
 # pybers: Scripts
 
-Personal tooling for this repo: the ticket/PR workflow tools and any future build/release
-utilities. Every script is self-contained, runnable from the repo root, and reports
+**The repository harness.** Everything here serves the workflow rather than the library:
+filing and moving tickets, opening and merging pull requests, and running the gates. Each
+one backs a skill, and a skill is the only thing that should be calling one.
+
+**What does NOT belong here is anything that builds pybers itself.** The extractors that
+read Numbers and write `src/pybers/protos/`, `src/pybers/_generated/` and the function
+table live in `tools/`, which has [its own README](../tools/README.md). The split is
+whether a program serves the repository or the library; both are development tooling and
+neither ships in the wheel, but they answer to different readers and change for different
+reasons.
+
+Every script is self-contained, runnable from the repo root, and reports
 through [`rich`](https://github.com/Textualize/rich). This house style mirrors
 the same author's other repositories exactly,
-same conventions, deliberately kept in sync. It governs `scripts/` (repo tooling) only,
+same conventions, deliberately kept in sync. The house rules below govern `tools/` too.
 `src/pybers/` (the library itself) follows the same core conventions but uses dataclasses
 rather than TypedDict for data, and is documented in `CLAUDE.md`.
 

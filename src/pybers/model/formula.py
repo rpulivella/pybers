@@ -33,6 +33,9 @@ row of `None` means the whole column rather than row zero. The same rule
 `pybers.model.ranges` already follows.
 
 UPDATES
+2026-09-04  Function calls name themselves and know their argument counts,
+            for #44. The index stays the stored form, so authoring by name
+            and by index write one archive.
 2026-09-03  Written for #41. Node types, the key slot and the sticky-bits rule
             were all measured against the corpus rather than read off the schema,
             which permits far more than Numbers writes.
@@ -51,6 +54,14 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from pybers.model.functions import (
+    ArgumentCountError,
+    NumbersFunction,
+    functionFor,
+    functionIndexFor,
+    functionNamed,
+    functionNameFor,
+)
 from pybers.model.ranges import CellRange
 from pybers.model.reference import CellReference
 
@@ -66,6 +77,19 @@ unknownFunctionNodeType: int = 31
 referenceNodeType: int = 36
 brokenReferenceNodeType: int = 46
 rangeNodeType: int = 67
+
+# `LET` and `LAMBDA` are functions Numbers documents and offers in its own
+# function browser, and the format stores neither as an indexed call: each gets
+# node types of its own. Measured 2026-09-04 against
+# tests/fixtures/46-formula-rare-functions, from formulas Numbers accepted, a
+# working `LET` and a `LAMBDA` reached through `LAMBDA.APPLY`. Named but not
+# interpreted, so both survive a round trip through `FormulaNode.raw`.
+letNodeTypes: tuple[int, ...] = (52, 54)
+lambdaNodeTypes: tuple[int, ...] = (55, 56, 57)
+
+# Both bind a variable, and Numbers' own authoring class calls the node that
+# names one `letOrLambdaVar`, which is why it belongs to neither alone.
+variableNodeType: int = 53
 
 # A deleted reference is node type 46 carrying coordinates deliberately pointing
 # nowhere. Read as ordinary numbers they name a cell far outside any table and
@@ -216,15 +240,48 @@ class FormulaRange:
 
 @dataclass(frozen=True, slots=True)
 class FormulaFunctionCall:
-    """A call to one of Apple's built-in functions, named by its own index.
+    """A call to one of Apple's built-in functions, stored as its index.
 
-    The index is numeric in the archive and no name map ships with this library
-    yet, so 168 is SUM and this model says so no further. Deriving that map is
-    its own work.
+    The index is what the archive holds, so `named` is a way of writing one down
+    rather than a second representation. `name` is None for a function the map
+    does not carry, which leaves the call intact rather than refusing it.
     """
 
     index: int
     argumentCount: int
+
+    @property
+    def name(self) -> str | None:
+        """Return the function's name, or None when the table does not carry it."""
+        return functionNameFor(self.index)
+
+    @property
+    def function(self) -> NumbersFunction | None:
+        """Return the function this calls, with its argument counts, or None."""
+        return functionFor(self.index)
+
+    @classmethod
+    def named(cls, name: str, argumentCount: int) -> FormulaFunctionCall:
+        """Build a call by function name, `SUM` or `sum`, checking the count.
+
+        Refuses a name Numbers does not offer and a count it does not accept,
+        since either would store as an error cell. Construct with an index to
+        write one anyway.
+        """
+        function = functionNamed(name)
+        if not function.offered:
+            raise ArgumentCountError(
+                f"{function.name} is {function.availability} rather than offered, "
+                "so Numbers does not take it by name. Construct with its index "
+                "if you mean to write one anyway."
+            )
+        if not function.accepts(argumentCount):
+            bound = "any number" if function.unbounded else function.maximumArguments
+            raise ArgumentCountError(
+                f"{function.name} takes {function.minimumArguments} to {bound} "
+                f"arguments, not {argumentCount}."
+            )
+        return cls(index=functionIndexFor(name), argumentCount=argumentCount)
 
 
 @dataclass(frozen=True, slots=True)

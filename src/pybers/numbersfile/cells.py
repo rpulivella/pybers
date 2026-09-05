@@ -159,6 +159,26 @@ def decodeRecord(column: int, record: bytes) -> CellRecord:
     )
 
 
+# Byte 8 bit 0x40 puts exactly one reference ahead of the formula key. Measured
+# 2026-09-04 by refcount reproduction: across every fixture and all 74 formula
+# cells, of every assignment of a slot to each flag shape, exactly one
+# reproduces each pooled formula's own refcount, and it turns on this bit alone.
+# What the preceding reference is has not been established, only that it is
+# there. 46-formula-rare-functions is the only fixture that sets the bit, which
+# is why a constant slot read the whole corpus correctly and read that one wrong.
+precedingReferenceOffset: int = 8
+precedingReferenceBit: int = 0x40
+
+
+def formulaKeySlot(record: CellRecord) -> int:
+    """Return which trailing reference of a record holds its formula key."""
+    carries = (
+        len(record.raw) > precedingReferenceOffset
+        and bool(record.raw[precedingReferenceOffset] & precedingReferenceBit)
+    )
+    return 1 if carries else 0
+
+
 def carriesFormula(record: CellRecord) -> bool:
     """Report whether a cell record is backed by a formula."""
     return (

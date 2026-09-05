@@ -43,6 +43,7 @@ from pybers import (
     FormulaRange,
     FormulaUnknownCall,
     Span,
+    columnLetter,
 )
 from pybers.model.formula import FormulaError
 from pybers.numbersfile import readPackage
@@ -58,6 +59,15 @@ dataListTypeId: int = 6005
 tableInfoTypeId: int = 6000
 calculationEngineTypeId: int = 4000
 tableOwnerKind: int = 1
+
+# Function indices this file names for itself, measured against the fixture that
+# holds them. Kept here rather than read from the function table, so a test of
+# which formula a cell resolves to does not depend on what names that table gives.
+spillIndex: int = 337
+sequenceIndex: int = 338
+makearrayIndex: int = 365
+mapIndex: int = 366
+lambdaApplyIndex: int = 372
 
 
 def fixturePath(name: str) -> Path:
@@ -328,7 +338,8 @@ def testReplacingOneCellsFormulaLeavesItsSiblingAlone() -> None:
 @pytest.mark.parametrize(
     "name",
     ["18-formula-literals", "19-formula-dragged",
-     "20-formula-shapes", "21-formula-errors"],
+     "20-formula-shapes", "21-formula-errors",
+     "46-formula-rare-functions"],
 )
 def testUnchangedRoundTripLeavesEveryPooledListByteIdentical(
     name: str, tmp_path: Path
@@ -347,7 +358,8 @@ def testUnchangedRoundTripLeavesEveryPooledListByteIdentical(
 @pytest.mark.parametrize(
     "name",
     ["18-formula-literals", "19-formula-dragged",
-     "20-formula-shapes", "21-formula-errors"],
+     "20-formula-shapes", "21-formula-errors",
+     "46-formula-rare-functions"],
 )
 def testEveryFormulaSurvivesTheRoundTripThroughTheModel(
     name: str, tmp_path: Path
@@ -398,6 +410,58 @@ def testUnknownFunctionKeepsItsSpelling() -> None:
     ]
     assert len(unknown) == 1
     assert unknown[0].name == "UNKNOWNFUNC"
+
+
+def testAStyledCellStillResolvesToItsOwnFormula() -> None:
+    """A reference ahead of the formula key must not shift what a cell reads as.
+
+    Byte 8 bit 0x40 puts one reference before the key, and 46 is the only
+    fixture that sets it, because its cells carry a text color. Read at a fixed
+    slot every one of its twenty formulas resolved to the same wrong pooled
+    entry, naming every call TEXT, which is a plausible wrong answer rather than
+    an exception.
+    """
+    table = firstTable("46-formula-rare-functions")
+    called = {}
+    for address, cell in table.cells.items():
+        if cell.formula is None:
+            continue
+        for node in cell.formula:
+            call = node.content
+            if isinstance(call, FormulaFunctionCall):
+                called[f"{columnLetter(address.col)}{address.row}"] = call.index
+    # Indices rather than names, so this tests which formula a cell resolves to
+    # and not what the function table happens to call it.
+    assert called["B13"] == lambdaApplyIndex
+    assert called["B14"] == mapIndex
+    assert called["C15"] == makearrayIndex
+    assert called["B17"] == sequenceIndex
+    assert sum(1 for index in called.values() if index == spillIndex) == 5
+
+
+def testEverySpilledCellHoldsSpillOfItsAnchor() -> None:
+    """A spill is ordinary formula cells, not a range recorded somewhere else.
+
+    Each cell a formula spills into holds `SPILL($anchor)` with an absolute
+    reference, which is what lets one pooled archive serve every follower of one
+    anchor. Measured on the MAKEARRAY at C15 and the SEQUENCE at B17.
+    """
+    table = firstTable("46-formula-rare-functions")
+    followers = [
+        cell for cell in table.cells.values()
+        if cell.formula is not None
+        and any(
+            isinstance(node.content, FormulaFunctionCall)
+            and node.content.index == spillIndex
+            for node in cell.formula
+        )
+    ]
+    assert len(followers) == 5
+    for cell in followers:
+        references = cell.formula.references
+        assert len(references) == 1
+        assert references[0].column is not None and references[0].column.absolute
+        assert references[0].row is not None and references[0].row.absolute
 
 
 # ── AC 5: a changed formula writes back ──────────────────────────────────────
@@ -628,7 +692,8 @@ def formulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
                                         rowInfo.cell_storage_buffer, wide):
                     if carriesFormula(record):
                         found.append(
-                            (row, record.column, record.references[formulaKeySlot])
+                            (row, record.column,
+                             record.references[formulaKeySlot(record)])
                         )
     return found
 

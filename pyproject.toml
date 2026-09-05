@@ -18,7 +18,7 @@ dependencies = [
     # modules (6.32.1, from protoc 32.1). That is the version below which this
     # provably cannot work, and it is NOT the floor declared here. The floor is the
     # oldest version the suite has actually been run against, which is higher, and
-    # re-running scripts/protos-extract.py with a newer protoc can only raise the
+    # re-running tools/protos-extract.py with a newer protoc can only raise the
     # mechanical minimum toward it. The development environment and a clean install
     # both run 7.36.1, so one number covers both rather than the manifest allowing
     # a version nobody exercises.
@@ -113,7 +113,7 @@ strict = true
 exclude = ["^src/pybers/_generated/", "^src/pybers/protos/"]
 # Both trees are checked by a bare `mypy`, so nobody has to remember two commands
 # and CI runs one line.
-files = ["src/pybers", "scripts"]
+files = ["src/pybers", "scripts", "tools"]
 
 [[tool.mypy.overrides]]
 # The generated protobuf modules build their classes at import time through the
@@ -146,7 +146,15 @@ ignore_missing_imports = true
 #
 # `scripts/` has no `__init__.py`, so mypy names each file by its stem rather than
 # as a package. Matching on `scripts.*` silently matched nothing.
-module = ["pr", "ticket", "standards-check", "protos-extract"]
+module = [
+    "pr",
+    "ticket",
+    "standards-check",
+    "protos-extract",
+    "functions-extract",
+    "lib.numbersapp",
+    "lib.machoreader",
+]
 disallow_untyped_defs = false
 disallow_any_generics = false
 warn_return_any = false

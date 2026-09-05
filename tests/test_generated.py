@@ -2,7 +2,7 @@
 """\
 The generated protobuf tree: that it is complete, and that its type stubs match it.
 
-`scripts/protos-extract.py` writes `_pb2.py` and `_pb2.pyi` from one protoc call, so
+`tools/protos-extract.py` writes `_pb2.py` and `_pb2.pyi` from one protoc call, so
 they cannot ordinarily drift. This is the guard for when they do: a regeneration run
 without `protoc-gen-mypy` on PATH produces modules with no stubs beside them, and the
 only symptom would be mypy quietly checking nothing where the protobuf surface is.

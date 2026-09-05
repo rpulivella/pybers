@@ -68,6 +68,7 @@ from .numbersfile.cells import (
     emptyOffsetWide,
     formulaFlagBit,
     formulaFlagOffset,
+    formulaKeySlot,
     valueOffset,
 )
 from .numbersfile.decimal128 import Decimal128, encodedLength
@@ -77,7 +78,6 @@ from .reader import (
     ColonTractAxis,
     decimalHalfFormat,
     findRoot,
-    formulaKeySlot,
     originOffset,
     readFormulaTable,
     readMerges,
@@ -458,7 +458,7 @@ def formulaKeyOffset(record: CellRecord) -> int:
     the same arithmetic finds its key at byte 12.
     """
     _, width = decodeCellValue(record.typeByte, record.raw[valueOffset:])
-    return valueOffset + width + formulaKeySlot * referenceWidth
+    return valueOffset + width + formulaKeySlot(record) * referenceWidth
 
 
 def buildFormulaRecord(key: int) -> bytes:
@@ -482,7 +482,8 @@ def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
 
     Measured corpus-wide 2026-09-04: a formula-backed record is the plain record for
     the same result type with byte 9 bit `0x02` set and ONE more trailing reference,
-    the key, ahead of the others. Byte 8 never moves, being fixed by the type.
+    the key, placed at the slot `formulaKeySlot` names rather than always first.
+    Byte 8 never moves, being fixed by the type and by what else the cell carries.
 
     Derived from matched pairs rather than synthesized, because the rest of byte 9
     encodes things this library does not model. The cached value stays and becomes
@@ -569,13 +570,14 @@ def formulaEdit(cell: Cell, record: CellRecord, pool: FormulaPool | None) -> str
     """
     if pool is None:
         return "none"
-    stored = carriesFormula(record) and len(record.references) > formulaKeySlot
+    slot = formulaKeySlot(record)
+    stored = carriesFormula(record) and len(record.references) > slot
     if cell.formula is not None and not stored:
         return "attach"
     if cell.formula is None and stored:
         return "detach"
     if cell.formula is not None and stored:
-        previous = pool.formulaFor(record.references[formulaKeySlot])
+        previous = pool.formulaFor(record.references[slot])
         return "replace" if cell.formula != previous else "none"
     return "none"
 
@@ -696,13 +698,13 @@ def applyFormulaEdit(
         assert cell.formula is not None
         return attachFormulaKey(raw, record, pool.keyFor(cell.formula))
     if edit == "detach":
-        pool.release(record.references[formulaKeySlot])
+        pool.release(record.references[formulaKeySlot(record)])
         return detachFormulaKey(raw, record)
     assert cell.formula is not None
     return patchFormulaKey(
         raw,
         record,
-        pool.keyFor(cell.formula, record.references[formulaKeySlot]),
+        pool.keyFor(cell.formula, record.references[formulaKeySlot(record)]),
     )
 
 
