@@ -482,7 +482,8 @@ def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
 
     Measured corpus-wide 2026-09-04: a formula-backed record is the plain record for
     the same result type with byte 9 bit `0x02` set and ONE more trailing reference,
-    the key, ahead of the others. Byte 8 never moves, being fixed by the type.
+    the key, placed at the slot `formulaKeySlot` names rather than always first.
+    Byte 8 never moves, being fixed by the type and by what else the cell carries.
 
     Derived from matched pairs rather than synthesized, because the rest of byte 9
     encodes things this library does not model. The cached value stays and becomes
