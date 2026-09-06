@@ -43,6 +43,21 @@ def template() -> str:
     return tool().readTemplate()
 
 
+def testAMissingTemplateRefusesRatherThanSkipping(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Passing a body because the authority went missing is a silent yes.
+
+    Deleting the template makes every pull request refuse to open, which is the
+    intended consequence: there is nothing left to check a body against, and a
+    check that disappears with its rule is worse than no check.
+    """
+    module = tool()
+    monkeypatch.setattr(module, "templatePath", tmp_path / "absent.md")
+    with pytest.raises(RuntimeError, match="No pull request template"):
+        module.readTemplate()
+
+
 # ── AC 1 and 3: headings, checked in both directions ─────────────────────────
 
 
