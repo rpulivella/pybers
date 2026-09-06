@@ -15,10 +15,40 @@ reverse-engineered against `11-value-types-noformats`, whose second row labels e
 text, which is the only reason the decode is verifiable rather than plausible.
 
 ```
-cell_offsets           fixed 255 entries, uint16 (uint32 when has_wide_offsets)
-                       0xFFFF means NO CELL, an empty cell has no record at all
+cell_offsets           uint16 always; 0xFFFF means NO CELL, and an empty cell has
+                       no record at all. 255 entries in a table of 255 columns or
+                       fewer, one per column past that. See below.
 cell_storage_buffer    records laid end to end; a record runs to the next live offset
 ```
+
+### A wide table counts its offsets in words, and the width never changes
+
+`has_wide_offsets` does **not** select a `uint32`. Measured 2026-09-06 against
+`45-columns-over-255`, a 300-column table: each row carries 600 bytes of offsets for 300
+cells, which is two bytes each and can be nothing else. Reading them as `uint32` gives 150
+slots for 300 cells and puts every one of them past the end of a 7,200-byte buffer, which
+is what pybers did until #48.
+
+Two things change once a table passes 255 columns, and the offset width is not one of them:
+
+| | 255 columns or fewer | wider |
+| --- | --- | --- |
+| slots | fixed 255, the surplus marked `0xFFFF` | one per column |
+| offset counts | bytes: `0, 24, 48, 72` | four-byte words: `0, 6, 12, 18` |
+
+Scaling by four is lossless because every record is already aligned: all 9,497 offsets in
+the 46 fixtures that predate `45-columns-over-255` are multiples of four. Spending the two
+bits Numbers already had keeps the offset a `uint16` while a row grows toward the
+1000-column limit.
+
+`should_use_wide_rows` is sticky and the array is sized to the table, so a table that once
+exceeded 255 columns keeps the wide form after they are deleted. `TSTables` carries
+`-[TSTTableTileStorage widenTilesForUpgrade]` and `-[TSTTableTile widenAllRowsForUpgrade]`
+and nothing that narrows one back.
+
+Both `TileRowInfo.has_wide_offsets` and `Tile.should_use_wide_rows` are set together in
+every document measured. `pybers.numbersfile.cells.offsetUnitFor` honors either alone,
+since which one is authoritative has not been established.
 
 Record layout, as far as it is needed to read a value:
 

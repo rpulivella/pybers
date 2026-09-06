@@ -835,6 +835,17 @@ question. `43-stroke-dashes` was answered from an unexpected direction, by text 
                         as a hub with four connectors, so a drawable may be
                         referenced by many.
 
+45-columns-over-255     DONE, and it was discovery rather than confirmation. 300
+                        columns by 7 rows, imported from a generated CSV, every
+                        cell naming its own address, four cells cleared from the
+                        last row. Past 255 columns Numbers stops using the fixed
+                        255-slot offsets array and gives a row one slot per
+                        column, counting offsets in FOUR-BYTE WORDS rather than
+                        bytes. The width stays uint16 throughout, so
+                        `has_wide_offsets` does not mean uint32 and reading it
+                        that way put every offset past the end of its buffer.
+                        See findings-01-values.md.
+
 ```
 
 ---

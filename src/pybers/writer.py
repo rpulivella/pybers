@@ -59,16 +59,22 @@ from .model import (
     Table,
 )
 from .model.formula import brokenColumnSentinel, brokenRowSentinel
-from .numbersfile import IWAFile, NumbersPackage, decodeRow, writePackage
+from .numbersfile import (
+    IWAFile,
+    NumbersPackage,
+    decodeRow,
+    offsetUnitFor,
+    writePackage,
+)
 from .numbersfile.cells import (
     CellRecord,
     carriesFormula,
     decodeCellValue,
-    emptyOffsetNarrow,
-    emptyOffsetWide,
+    emptyOffset,
     formulaFlagBit,
     formulaFlagOffset,
     formulaKeySlot,
+    offsetWidth,
     valueOffset,
 )
 from .numbersfile.decimal128 import Decimal128, encodedLength
@@ -193,7 +199,7 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
 def rewriteRow(
     offsets: bytes,
     buffer: bytes,
-    wide: bool,
+    offsetUnit: int,
     replacements: dict[int, bytes],
     removals: frozenset[int] = frozenset(),
 ) -> tuple[bytes, bytes]:
@@ -208,10 +214,10 @@ def rewriteRow(
     takes, which is what a cell swallowed by a merge looks like in the file: no
     record at all rather than an empty one.
     """
-    width = 4 if wide else 2
-    empty = emptyOffsetWide if wide else emptyOffsetNarrow
-    slots = len(offsets) // width
-    existing = {record.column: record for record in decodeRow(offsets, buffer, wide)}
+    slots = len(offsets) // offsetWidth
+    existing = {
+        record.column: record for record in decodeRow(offsets, buffer, offsetUnit)
+    }
 
     rebuiltOffsets = bytearray()
     rebuiltBuffer = bytearray()
@@ -224,9 +230,20 @@ def rewriteRow(
         # formula reaches a cell that was empty. The offset array already carries a
         # slot for every column, so nothing grows.
         if body is None or column in removals:
-            rebuiltOffsets += empty.to_bytes(width, "little")
+            rebuiltOffsets += emptyOffset.to_bytes(offsetWidth, "little")
             continue
-        rebuiltOffsets += len(rebuiltBuffer).to_bytes(width, "little")
+        # A row counting offsets in words can only name a position the unit
+        # divides, so a record of any other length would silently move every
+        # record after it. Refuse rather than write a row that reads back wrong.
+        if len(rebuiltBuffer) % offsetUnit:
+            raise WriteError(
+                f"Column {column} would start at byte {len(rebuiltBuffer)} of the "
+                f"row buffer, which is not a multiple of the {offsetUnit}-byte "
+                "unit this row counts its offsets in."
+            )
+        rebuiltOffsets += (len(rebuiltBuffer) // offsetUnit).to_bytes(
+            offsetWidth, "little"
+        )
         rebuiltBuffer += body
     return bytes(rebuiltOffsets), bytes(rebuiltBuffer)
 
@@ -746,14 +763,16 @@ def applyTableEdits(
         touched = False
 
         for rowInfo in tile.rowInfos:
-            wide = rowInfo.has_wide_offsets or tile.should_use_wide_rows
+            offsetUnit = offsetUnitFor(
+                rowInfo.has_wide_offsets, tile.should_use_wide_rows
+            )
             row = firstRow + rowInfo.tile_row_index
             replacements: dict[int, bytes] = {}
             removals = frozenset(
                 column for (swallowedRow, column) in swallowed if swallowedRow == row
             )
             for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, wide
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, offsetUnit
             ):
                 if (row, record.column) in swallowed:
                     continue
@@ -782,7 +801,7 @@ def applyTableEdits(
             present = frozenset(
                 record.column
                 for record in decodeRow(
-                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, wide
+                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, offsetUnit
                 )
             )
             # A cell the model gave a formula to but the file has no record for.
@@ -808,7 +827,7 @@ def applyTableEdits(
             rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
                 rowInfo.cell_offsets,
                 rowInfo.cell_storage_buffer,
-                wide,
+                offsetUnit,
                 replacements,
                 dropped,
             )

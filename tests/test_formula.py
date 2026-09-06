@@ -668,7 +668,7 @@ def testTheGoldenFilesHoldWhatTheyClaimTo() -> None:
 def formulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
     """Return (row, column, formula key) for every formula-backed cell of a table."""
     from pybers._generated import TSTArchives_pb2 as tst
-    from pybers.numbersfile import carriesFormula, decodeRow
+    from pybers.numbersfile import carriesFormula, decodeRow, offsetUnitFor
     from pybers.numbersfile.types import archiveTypeId, parseArchive
     from pybers.reader import ArchiveIndex
     from pybers.writer import formulaKeySlot
@@ -686,10 +686,12 @@ def formulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
         for entry in store.tiles.tiles:
             tile = index.resolve(entry.tile, tst.Tile)
             for rowInfo in tile.rowInfos:
-                wide = rowInfo.has_wide_offsets or tile.should_use_wide_rows
+                unit = offsetUnitFor(
+                    rowInfo.has_wide_offsets, tile.should_use_wide_rows
+                )
                 row = entry.tileid * store.tiles.tile_size + rowInfo.tile_row_index
                 for record in decodeRow(rowInfo.cell_offsets,
-                                        rowInfo.cell_storage_buffer, wide):
+                                        rowInfo.cell_storage_buffer, unit):
                     if carriesFormula(record):
                         found.append(
                             (row, record.column,

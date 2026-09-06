@@ -79,7 +79,15 @@ from .model.formula import (
     stringNodeType,
     unknownFunctionNodeType,
 )
-from .numbersfile import Archive, NumbersPackage, carriesFormula, decodeRow, readPackage
+from .numbersfile import (
+    Archive,
+    CellDecodeError,
+    NumbersPackage,
+    carriesFormula,
+    decodeRow,
+    offsetUnitFor,
+    readPackage,
+)
 from .numbersfile.cells import CellRecord, formulaKeySlot
 from .numbersfile.decimal128 import Decimal128
 from .numbersfile.types import archiveTypeId, parseArchive
@@ -515,7 +523,9 @@ def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
     return merges
 
 
-def readTable(index: ArchiveIndex, tableInfo: tst.TableInfoArchive) -> Table:
+def readTable(
+    index: ArchiveIndex, tableInfo: tst.TableInfoArchive, source: Path
+) -> Table:
     """Build one `Table` from its `TST.TableInfoArchive`."""
     model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
     dataStore = model.base_data_store
@@ -541,15 +551,24 @@ def readTable(index: ArchiveIndex, tableInfo: tst.TableInfoArchive) -> Table:
         tile = index.resolve(entry.tile, tst.Tile)
         firstRow = entry.tileid * tileSize
         for rowInfo in tile.rowInfos:
-            wide = rowInfo.has_wide_offsets or tile.should_use_wide_rows
-            records = decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, wide
-            )
             # `tile_row_index` is LOCAL to its tile, so a document row is the
             # tile's own id times the tile size plus the local index. Reading it
             # as a document row gives eight different rows on an eight-tile table
             # and raises nothing. See findings-03-structure.md.
             row = firstRow + rowInfo.tile_row_index
+            try:
+                records = decodeRow(
+                    rowInfo.cell_offsets,
+                    rowInfo.cell_storage_buffer,
+                    offsetUnitFor(
+                        rowInfo.has_wide_offsets, tile.should_use_wide_rows
+                    ),
+                )
+            except CellDecodeError as exc:
+                raise ReadError(
+                    f"{source}, table {model.table_name!r}, row "
+                    f"{row + originOffset}: {exc}"
+                ) from exc
             for record in records:
                 cell = table.cell(
                     CellReference(row + originOffset, record.column + originOffset)
@@ -591,7 +610,9 @@ def resolveValue(
     return cast(CellValue, record.value)
 
 
-def readSheet(index: ArchiveIndex, sheetArchive: tn.SheetArchive) -> Sheet:
+def readSheet(
+    index: ArchiveIndex, sheetArchive: tn.SheetArchive, source: Path
+) -> Sheet:
     """Build one `Sheet`, taking its tables in the sheet's own drawable order.
 
     A table is one kind of drawable among several. Shapes, images and text boxes
@@ -603,7 +624,9 @@ def readSheet(index: ArchiveIndex, sheetArchive: tn.SheetArchive) -> Sheet:
         if index.typeOf(reference) != tableInfoTypeId:
             continue
         sheet.tables.append(
-            readTable(index, index.resolve(reference, tst.TableInfoArchive))
+            readTable(
+                index, index.resolve(reference, tst.TableInfoArchive), source
+            )
         )
     return sheet
 
@@ -624,7 +647,7 @@ def open(path: Path | str) -> Document:  # noqa: A001
     document = Document(_package=package, _sourcePath=source)
     for reference in root.sheets:
         document.sheets.append(
-            readSheet(index, index.resolve(reference, tn.SheetArchive))
+            readSheet(index, index.resolve(reference, tn.SheetArchive), source)
         )
     return document
 
