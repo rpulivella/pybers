@@ -63,8 +63,12 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
 
 1. **Persona opener** (human). One sentence: "As a [role] I want [outcome] so that
    [reason]."
-2. **Acceptance criteria** (human · the outcome). Numbered list immediately after the
-   opener. **An AC states an outcome someone can check, never how the code is built.**
+2. **Acceptance criteria** (human · the outcome). An `## Acceptance criteria` heading,
+   then a numbered list, immediately after the opener. **The heading is required**, so
+   that the contract is as findable as the SPEC under it. A ticket filed before
+   2026-09-06 carries the headingless form and keeps it, since reformatting one buys
+   nothing and `/ticket-edit` replaces whole bodies.
+   **An AC states an outcome someone can check, never how the code is built.**
    That someone is whoever uses the thing, and for a repo tool or a skill it is the
    developer, who is still a user. "The writer mutates the archives rather than
    rebuilding them" is a design note wearing an AC's clothes, settling a decision the
