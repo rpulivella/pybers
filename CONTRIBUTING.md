@@ -4,6 +4,13 @@ pybers is built through an agentic harness. This guide is the single source of t
 how change flows into the repository, commits, branches, and release tags. The invisible
 laws of the codebase live in `CLAUDE.md`; this file is only about the git workflow.
 
+## How a ticket is referenced
+
+Tickets are written `PYB-34` in prose and pull requests `PR #38`, never a bare number and
+never a bare `#`. Commit subjects are the exception and keep the bare `[34]`, as does
+`Closes #34`, which GitHub parses in no other form. The key is declared once in
+`pyproject.toml` under `[tool.pybers]`.
+
 ## Commit message format
 
 One scannable line per commit. The shape:
