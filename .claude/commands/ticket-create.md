@@ -1,5 +1,5 @@
 ---
-description: Write and file a new GitHub Issue for pybers in this repo's exact format (opener, ACs, SPEC), then add it to the Project board as Todo or Concept.
+description: Write and file a new GitHub Issue for pybers in this repo's exact format (opener, ACs, constraints), then add it to the Project board as Todo or Concept.
 argument-hint: <description of the ticket>
 ---
 
@@ -81,14 +81,19 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
    Each AC is concrete, testable and individually referenceable ("AC 3 fails because…").
    ACs nest **one level**, an indented ordered list with markers all `1.` since markdown
    counts them. GitHub shows `i.`, `ii.`, so cite `4.ii`. A third level means two tickets.
-3. **SPEC** (agent · read before building). **Usually absent, and never a plan.** When a
-   ticket is written nobody knows yet how it will be built, so anything resembling
-   ordered steps is a guess that gets obeyed anyway. Two or three lines at most, holding
-   only a fact already established that a competent build would otherwise get wrong
-   *without failing*: a format trap the fixtures proved, a decision still open, a
-   constraint that rules out the obvious approach. Anything phrasable as observable
-   belongs in the ACs instead, and a SPEC as long as its ACs is a plan. A missing
-   primitive is still a *separate prerequisite ticket*.
+3. **Constraints** (agent · read before building), under a `## Constraints` heading.
+   **Usually absent, and never a plan.** The acceptance criteria above ARE the
+   specification, which is why this section is not called one: a heading reading
+   `SPEC` invites an author to specify, and specifying is directing the build.
+   When a ticket is written nobody knows yet how it will be built, so anything
+   resembling ordered steps is a guess that gets obeyed anyway. Two or three lines
+   at most, holding only a fact already established that a competent build would
+   otherwise get wrong *without failing*: a format trap the fixtures proved, a
+   decision still open, a constraint that rules out the obvious approach. Anything
+   phrasable as observable belongs in the ACs instead, and a constraints section as
+   long as its ACs is a plan. A missing primitive is still a *separate prerequisite
+   ticket*. A ticket filed before 2026-09-06 carries this section as `## SPEC` and
+   keeps it.
 4. **Out of scope** (optional, OMIT BY DEFAULT).
 5. **Context / notes** (optional, OMIT BY DEFAULT).
 
@@ -106,7 +111,8 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
 ## Hard rules
 
 - **Never use `[ ]` checkbox syntax in the ACs.** Numbered lists only.
-- ACs come before the SPEC; SPEC comes before any optional section.
+- ACs come before the constraints, and the constraints come before any optional
+  section.
 - No "Definition of Done" section, the ACs are that.
 - One label per issue.
 

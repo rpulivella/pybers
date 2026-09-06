@@ -1,5 +1,5 @@
 ---
-description: Begin work on a ticket, fetch it, surface ACs + SPEC, branch, set Status In Progress, and load the acceptance criteria into the task list. No code written.
+description: Begin work on a ticket, fetch it, surface ACs + constraints, branch, set Status In Progress, and load the acceptance criteria into the task list. No code written.
 argument-hint: <issue number, #number, or issue URL>
 ---
 
@@ -14,7 +14,7 @@ acceptance criteria into tasks.
 1. Get the ticket from `$ARGUMENTS`: `PYB-42`, `42`, `#42` or the URL. If missing, ask.
 2. Fetch it: `python3 scripts/ticket.py show <N>`.
 3. Display to the user, exactly as written (do not paraphrase): title + label,
-   acceptance criteria (preserve numbering/nesting), SPEC. Sub-criteria are an
+   acceptance criteria (preserve numbering/nesting), constraints. Sub-criteria are an
    indented list of `1.` markers that GitHub renders `i.`, `ii.`, so cite `4.ii`.
    Tickets filed before 2026-09-02 carry the superseded `4.a` form; cite those as
    written.
@@ -54,7 +54,7 @@ acceptance criteria into tasks.
    ```
 6. **Load the acceptance criteria into the task list** with `TaskCreate`, one task per
    AC, in the ticket's own numbering. The ACs are the contract, so they are the work. The
-   SPEC is read for its constraints and never becomes tasks. Check `TaskList` first so a
+   constraints section is read and never becomes tasks. Check `TaskList` first so a
    resumed session extends the existing list rather than duplicating it. Move exactly one
    task to `in_progress` at a time with `TaskUpdate`, and use `addBlockedBy` for an AC
    that genuinely cannot start yet. If a task wants subtasks, that AC is a ticket in
@@ -62,7 +62,7 @@ acceptance criteria into tasks.
 
 ## Hard rules
 
-- Write no code. Always fetch before acting; never guess ACs or SPEC.
+- Write no code. Always fetch before acting; never guess ACs or constraints.
 - Branch from a current `develop`. Never guess the branch name, and never use the raw
   label as `<type>`; run it through the mapping in step 4.
 - One task `in_progress` at a time.

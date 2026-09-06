@@ -44,7 +44,8 @@ means fetching the current body, changing part of it, and writing the whole thin
    the warning about it outlived it. Corrected here so nobody re-derives a bug that is
    already gone.
 3. Draft the revision. Preserve everything not being changed, **verbatim**, a revision
-   that silently reflows the SPEC or drops a section is a regression, not an edit.
+   that silently reflows the constraints or drops a section is a regression, not an
+   edit.
 4. **Run `/standards` on the revised draft, both passes, and fix what it finds.** `edit`
    replaces the WHOLE body, so an unproofread revision overwrites a clean one.
 5. **Show the user what changes and wait for explicit approval.** This is the same
