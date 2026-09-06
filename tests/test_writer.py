@@ -41,7 +41,13 @@ from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers.model import Document, toCellReference
-from pybers.numbersfile import CellRecord, NumbersPackage, decodeRow, readPackage
+from pybers.numbersfile import (
+    CellRecord,
+    NumbersPackage,
+    decodeRow,
+    offsetUnitFor,
+    readPackage,
+)
 from pybers.numbersfile.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.reader import ArchiveIndex, findRoot, readMerges, tableInfoTypeId
 from pybers.writer import (
@@ -69,11 +75,13 @@ def numericRecords(path: Path) -> list[CellRecord]:
                 tile = tst.Tile()
                 tile.ParseFromString(message.data)
                 for info in tile.rowInfos:
-                    wide = info.has_wide_offsets or tile.should_use_wide_rows
+                    unit = offsetUnitFor(
+                        info.has_wide_offsets, tile.should_use_wide_rows
+                    )
                     records += [
                         record
                         for record in decodeRow(
-                            info.cell_offsets, info.cell_storage_buffer, wide
+                            info.cell_offsets, info.cell_storage_buffer, unit
                         )
                         if record.typeByte in (2, 10)
                     ]
@@ -711,11 +719,13 @@ def rowColumns(path: Path, row: int = 0) -> list[int]:
             store = model.base_data_store
             tile = index.resolve(store.tiles.tiles[0].tile, tst.Tile)
             info = tile.rowInfos[row]
-            wide = info.has_wide_offsets or tile.should_use_wide_rows
+            unit = offsetUnitFor(
+                info.has_wide_offsets, tile.should_use_wide_rows
+            )
             return sorted(
                 record.column
                 for record in decodeRow(
-                    info.cell_offsets, info.cell_storage_buffer, wide
+                    info.cell_offsets, info.cell_storage_buffer, unit
                 )
             )
     return []

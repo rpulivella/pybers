@@ -30,6 +30,7 @@ import pytest
 from pybers.numbersfile import readPackage
 from pybers.numbersfile.cells import (
     decodeRow,
+    offsetUnitFor,
 )
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
@@ -96,7 +97,10 @@ def valueRow(name: str) -> dict[int, object]:
                         records = decodeRow(
                             info.cell_offsets,
                             info.cell_storage_buffer,
-                            info.has_wide_offsets,
+                            offsetUnitFor(
+                                info.has_wide_offsets,
+                                tile.should_use_wide_rows,
+                            ),
                         )
                         if records:
                             return {r.column: r.value for r in records}

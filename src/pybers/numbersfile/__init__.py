@@ -37,6 +37,7 @@ from .cells import (
     decodeCellValue,
     decodeRecord,
     decodeRow,
+    offsetUnitFor,
 )
 from .compression import SnappyError, compressRaw, decompressRaw
 from .container import (
@@ -90,6 +91,7 @@ __all__ = [
     "decompressPayload",
     "decompressRaw",
     "isDocumentMember",
+    "offsetUnitFor",
     "readArchives",
     "readIWAFile",
     "readPackage",

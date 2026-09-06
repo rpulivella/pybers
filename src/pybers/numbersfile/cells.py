@@ -48,11 +48,18 @@ appleEpoch: datetime.datetime = datetime.datetime(
     2001, 1, 1, tzinfo=datetime.UTC
 )
 
-# Offsets are uint16 unless the row says otherwise, and this value marks a column
-# with no cell at all. An empty cell is an ABSENCE of a record, not a record holding
-# nothing, so it never reaches the decoder below.
-emptyOffsetNarrow: int = 0xFFFF
-emptyOffsetWide: int = 0xFFFFFFFF
+# Offsets are uint16 in every row, and this value marks a column with no cell at
+# all. An empty cell is an ABSENCE of a record, not a record holding nothing, so it
+# never reaches the decoder below.
+emptyOffset: int = 0xFFFF
+
+# What an offset COUNTS varies with the row's width. A table of 255 columns or
+# fewer counts bytes; a wider one counts four-byte words, which keeps the offset a
+# uint16 while a row grows to Numbers' 1000-column limit. Lossless because every
+# record is already four-byte aligned: measured 2026-09-06, all 9,497 offsets in
+# the 46 fixtures that predate 45-columns-over-255 are multiples of four.
+offsetUnitByte: int = 1
+offsetUnitWord: int = 4
 
 # The value begins here in every record seen. Bytes 0-11 carry the storage version,
 # the type, a flags bitmask at 6-7, and four bytes whose purpose is not established.
@@ -187,23 +194,43 @@ def carriesFormula(record: CellRecord) -> bool:
     )
 
 
+def offsetUnitFor(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:
+    """Return what one row's offsets count, from the archive's own two flags.
+
+    The parameters carry Apple's spelling because they are Apple's fields:
+    `TileRowInfo.has_wide_offsets` and `Tile.should_use_wide_rows`. Both are set
+    together in every document measured, and either alone is honored.
+    """
+    return offsetUnitWord if hasWideOffsets or tileUsesWideRows else offsetUnitByte
+
+
 def decodeRow(
-    cellOffsets: bytes, storageBuffer: bytes, wideOffsets: bool
+    cellOffsets: bytes, storageBuffer: bytes, offsetUnit: int
 ) -> list[CellRecord]:
     """Decode every populated cell in one row.
 
-    The offsets array has a fixed slot per possible column, most of them marked
+    The offsets array holds one slot per addressable column, most of them marked
     empty. A record runs from its own offset to the next populated one, so the
-    offsets must be walked in column order for the boundaries to be right.
+    offsets must be walked in column order for the boundaries to be right. The
+    slot count is taken from the array itself rather than from a rule, since the
+    two layouts size it differently and both sizes are already written down here.
     """
-    width = 4 if wideOffsets else 2
-    empty = emptyOffsetWide if wideOffsets else emptyOffsetNarrow
-    count = len(cellOffsets) // width
-    unpacked = struct.unpack(
-        f"<{count}{'I' if wideOffsets else 'H'}", cellOffsets[:count * width]
-    )
+    count = len(cellOffsets) // 2
+    unpacked = struct.unpack(f"<{count}H", cellOffsets[:count * 2])
+    populated = [
+        (column, at * offsetUnit)
+        for column, at in enumerate(unpacked)
+        if at != emptyOffset
+    ]
 
-    populated = [(column, at) for column, at in enumerate(unpacked) if at != empty]
+    beyond = [column for column, at in populated if at >= len(storageBuffer)]
+    if beyond:
+        raise CellDecodeError(
+            f"{len(beyond)} of {len(populated)} cell offsets fall outside the "
+            f"{len(storageBuffer)}-byte storage buffer, the first at column "
+            f"{beyond[0]}. Offsets counted in units of {offsetUnit} byte(s)."
+        )
+
     records: list[CellRecord] = []
     for index, (column, at) in enumerate(populated):
         end = (

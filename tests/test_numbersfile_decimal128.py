@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 
 from pybers.numbersfile import readPackage
-from pybers.numbersfile.cells import decodeRow
+from pybers.numbersfile.cells import decodeRow, offsetUnitFor
 from pybers.numbersfile.decimal128 import (
     Decimal128,
     Decimal128Error,
@@ -55,9 +55,11 @@ def everyNumber(path: Path) -> list[tuple[Decimal, bytes]]:
                 tile = tst.Tile()
                 tile.ParseFromString(message.data)
                 for info in tile.rowInfos:
-                    wide = info.has_wide_offsets or tile.should_use_wide_rows
+                    unit = offsetUnitFor(
+                        info.has_wide_offsets, tile.should_use_wide_rows
+                    )
                     for record in decodeRow(
-                        info.cell_offsets, info.cell_storage_buffer, wide
+                        info.cell_offsets, info.cell_storage_buffer, unit
                     ):
                         if isinstance(record.value, Decimal):
                             found.append((record.value, record.raw[12:28]))
