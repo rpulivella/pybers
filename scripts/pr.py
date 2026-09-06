@@ -86,6 +86,7 @@ __date__ = "2026/08/13"
 __usage__ = "python3 scripts/pr.py <command> [options]"
 
 import argparse
+import re
 import sys
 import urllib.parse
 from pathlib import Path
@@ -123,6 +124,16 @@ validMergeMethods: tuple[str, ...] = (
 # and only one of them is a fact this tool holds.
 notFoundExitCode: int = 1
 errorExitCode: int = 2
+
+# The pull request template, and the authority on what a body may look like.
+# Read here because nothing else in this repository reads it: `/pr-draft` tells
+# an author to fill it, and GitHub applies it only to a body typed in the web
+# interface, so a body posted through the API carries what it was given and
+# nothing more.
+templatePath: Path = repositoryRoot / ".github" / "pull_request_template.md"
+
+# A body may run to twice the template's own length, comments excluded from both.
+maximumBodyLengthMultiple: int = 2
 
 # The merge landed and only the cleanup did not. Distinct from both of the above
 # because the recovery is neither "retry" nor "investigate": it is "finish the
@@ -507,6 +518,147 @@ def showPullRequest(summary: PullRequestSummary) -> None:
     )
 
 
+def readTemplate() -> str:
+    """Return the pull request template, refusing when it is absent.
+
+    Missing means the checks below have nothing to compare a body against, and
+    passing one because the authority went missing is the fallback cascade this
+    repository refuses everywhere else.
+    """
+    if not templatePath.is_file():
+        raise RuntimeError(
+            f"No pull request template at {templatePath}. Every body is checked "
+            "against it, so there is nothing left to check against."
+        )
+    return templatePath.read_text(encoding="utf-8")
+
+
+def readHeadings(text: str) -> list[str]:
+    """Return every `##` heading, in order."""
+    return [line.strip() for line in text.splitlines() if line.startswith("## ")]
+
+
+def readBoldRuns(text: str) -> list[str]:
+    """Return every line that is nothing but bold text, which reads as a heading.
+
+    Markdown makes `**Like this**` alone on a line look exactly like a section
+    heading while staying invisible to a `## ` scan, which is how a body grows a
+    section the template never had. The template uses bold inline under Breaking
+    Changes, so only a line that is ENTIRELY bold counts.
+    """
+    return [
+        line.strip()
+        for line in text.splitlines()
+        if re.fullmatch(r"\*\*[^*]+\*\*", line.strip())
+    ]
+
+
+def readCheckboxLabels(text: str) -> list[str]:
+    """Return every checkbox's label, with its ticked state discarded.
+
+    The state is what an author is meant to change and the label is what the
+    template owns, so comparing labels catches a reworded line without
+    complaining about a box legitimately ticked. `NA ` counts as a state,
+    because the template says to mark an inapplicable item that way rather than
+    delete it, which keeps its label under comparison.
+    """
+    labels: list[str] = []
+    for line in text.splitlines():
+        matched = re.match(r"\s*- (?:\[[ xX]\]\s*|NA\s+)(.+?)\s*$", line)
+        if matched:
+            labels.append(matched.group(1))
+    return labels
+
+
+def countProseWords(text: str) -> int:
+    """Return the word count with HTML comments removed.
+
+    The template is largely instructions inside comments, so counting those
+    would raise the ceiling by the size of guidance no body ever publishes.
+    """
+    return len(re.findall(r"\S+", re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)))
+
+
+def bodyFindings(body: str, template: str) -> list[str]:
+    """Return every way a body departs from its template.
+
+    Pure by design: two strings in and complaints out, so the checks are
+    testable without a token, a network or a repository. Headings are compared
+    in BOTH directions, because the template asks for `None` under a heading a
+    body does not need rather than for the heading to go. Checkboxes are
+    compared in ONE, because it asks for the inapplicable ones to be deleted.
+    """
+    findings: list[str] = []
+    templateHeadings = readHeadings(template)
+    headings = readHeadings(body)
+
+    invented = [heading for heading in headings if heading not in templateHeadings]
+    if invented:
+        findings.append(
+            f"{len(invented)} heading(s) the template does not carry: "
+            + ", ".join(invented)
+        )
+    missing = [heading for heading in templateHeadings if heading not in headings]
+    if missing:
+        findings.append(
+            f"{len(missing)} template heading(s) missing: " + ", ".join(missing)
+        )
+    if not invented and not missing and headings != templateHeadings:
+        findings.append(
+            "headings are out of the template's order, expected "
+            f"{templateHeadings} and got {headings}"
+        )
+
+    templateBold = set(readBoldRuns(template))
+    inventedBold = [run for run in readBoldRuns(body) if run not in templateBold]
+    if inventedBold:
+        findings.append(
+            f"{len(inventedBold)} bold line(s) reading as a heading: "
+            + ", ".join(inventedBold)
+        )
+
+    templateLabels = set(readCheckboxLabels(template))
+    reworded = [
+        label for label in readCheckboxLabels(body) if label not in templateLabels
+    ]
+    if reworded:
+        findings.append(
+            f"{len(reworded)} checkbox label(s) the template does not carry: "
+            + ", ".join(reworded)
+        )
+
+    templateWords = countProseWords(template)
+    words = countProseWords(body)
+    ceiling = templateWords * maximumBodyLengthMultiple
+    if words > ceiling:
+        findings.append(
+            f"body is {words} words against a ceiling of {ceiling}, which is "
+            f"{maximumBodyLengthMultiple} times the template's {templateWords}"
+        )
+    return findings
+
+
+def refuseBody(body: str) -> bool:
+    """Print what is wrong with a body and report whether to stop.
+
+    Kept apart from `bodyFindings` so the checks stay logic and the terminal
+    stays here. The sanctioned headings print with the refusal, because an
+    author told which heading is wrong still has to be told which are right.
+    """
+    template = readTemplate()
+    findings = bodyFindings(body, template)
+    if not findings:
+        return False
+
+    console.print("[red]The body does not match the pull request template.[/]")
+    for finding in findings:
+        console.print(f"  {escape(finding)}", highlight=False)
+    console.print("\n[dim]The template's headings, in order:[/]")
+    for heading in readHeadings(template):
+        console.print(f"  {escape(heading)}", highlight=False)
+    return True
+
+
 def cmdCreate(arguments: argparse.Namespace) -> int:
     """Open a draft pull request for the current branch."""
     bodyPath = Path(arguments.bodyFile)
@@ -515,6 +667,8 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
         return errorExitCode
     body, joinedLines = ticket.readBodyFile(bodyPath)
     ticket.reportUnwrapping(joinedLines)
+    if refuseBody(body):
+        return errorExitCode
 
     head = arguments.head or readCurrentBranch()
     if head == arguments.base:
@@ -670,6 +824,8 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
             return errorExitCode
         body, joinedLines = ticket.readBodyFile(bodyPath)
         ticket.reportUnwrapping(joinedLines)
+        if refuseBody(body):
+            return errorExitCode
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
