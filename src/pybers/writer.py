@@ -74,6 +74,7 @@ from .numbersfile.cells import (
     formulaFlagBit,
     formulaFlagOffset,
     formulaKeySlot,
+    offsetWidth,
     valueOffset,
 )
 from .numbersfile.decimal128 import Decimal128, encodedLength
@@ -213,7 +214,7 @@ def rewriteRow(
     takes, which is what a cell swallowed by a merge looks like in the file: no
     record at all rather than an empty one.
     """
-    slots = len(offsets) // 2
+    slots = len(offsets) // offsetWidth
     existing = {
         record.column: record for record in decodeRow(offsets, buffer, offsetUnit)
     }
@@ -229,7 +230,7 @@ def rewriteRow(
         # formula reaches a cell that was empty. The offset array already carries a
         # slot for every column, so nothing grows.
         if body is None or column in removals:
-            rebuiltOffsets += emptyOffset.to_bytes(2, "little")
+            rebuiltOffsets += emptyOffset.to_bytes(offsetWidth, "little")
             continue
         # A row counting offsets in words can only name a position the unit
         # divides, so a record of any other length would silently move every
@@ -240,7 +241,9 @@ def rewriteRow(
                 f"row buffer, which is not a multiple of the {offsetUnit}-byte "
                 "unit this row counts its offsets in."
             )
-        rebuiltOffsets += (len(rebuiltBuffer) // offsetUnit).to_bytes(2, "little")
+        rebuiltOffsets += (len(rebuiltBuffer) // offsetUnit).to_bytes(
+            offsetWidth, "little"
+        )
         rebuiltBuffer += body
     return bytes(rebuiltOffsets), bytes(rebuiltBuffer)
 

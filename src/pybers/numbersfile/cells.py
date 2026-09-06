@@ -48,9 +48,10 @@ appleEpoch: datetime.datetime = datetime.datetime(
     2001, 1, 1, tzinfo=datetime.UTC
 )
 
-# Offsets are uint16 in every row, and this value marks a column with no cell at
-# all. An empty cell is an ABSENCE of a record, not a record holding nothing, so it
-# never reaches the decoder below.
+# Every offset is a uint16 in both layouts, and this value marks a column with no
+# cell at all. An empty cell is an ABSENCE of a record, not a record holding
+# nothing, so it never reaches the decoder below.
+offsetWidth: int = 2
 emptyOffset: int = 0xFFFF
 
 # What an offset COUNTS varies with the row's width. A table of 255 columns or
@@ -215,8 +216,10 @@ def decodeRow(
     slot count is taken from the array itself rather than from a rule, since the
     two layouts size it differently and both sizes are already written down here.
     """
-    count = len(cellOffsets) // 2
-    unpacked = struct.unpack(f"<{count}H", cellOffsets[:count * 2])
+    count = len(cellOffsets) // offsetWidth
+    unpacked = struct.unpack(
+        f"<{count}H", cellOffsets[:count * offsetWidth]
+    )
     populated = [
         (column, at * offsetUnit)
         for column, at in enumerate(unpacked)
