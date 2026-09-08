@@ -29,7 +29,7 @@ other when reaching for something to test against.
 | `20-formula-filled-across.numbers` | `20-formula-shapes.numbers` | `A11`'s `SUM(A1:A10)` filled across `A11:D11` | 2026-09-04, Numbers 15.3.1 |
 | `22c-merged-by-pybers.numbers` | `22c-merge-overpaints.numbers` | `L3:M3` merged, dropping the style-only record `M3` carried | 2026-09-07, Numbers 15.3.1 |
 | `45-merged-by-pybers.numbers` | `45-columns-over-255.numbers` | `KI7:KJ7` merged, rebuilding a 300-column row whose offsets count words | 2026-09-08, Numbers 15.3.1 |
-| `20-formula-authored-as-text.numbers` | `20-formula-shapes.numbers` | three formulas written as TEXT into `Sheet 1 / Table 2`: `B1` a cross-table reference with arithmetic, `C1` a nested lazy call, `D1` an anchored reference concatenated with a string | awaiting confirmation |
+| `20-formula-authored-as-text.numbers` | `20-formula-shapes.numbers` | three formulas written as TEXT into `Sheet 1 / Table 2`: `B1` a cross-table reference with arithmetic, `C1` a nested lazy call, `D1` an anchored reference concatenated with a string | 2026-09-08, Numbers 15.3.1 |
 
 `22c-merged-by-pybers` is the first golden where pybers REMOVED a record rather than
 adding or changing one. A merge Numbers makes leaves nothing at a covered position, but a
@@ -48,13 +48,19 @@ bytes to fall back on. That is what caught the cross-table identity being droppe
 was read with, which a node built from text does not have. `B1` read back as `A11*2+1`,
 pointing at its own table, which is a plausible wrong answer rather than an error.
 
-What to check on screen. `Sheet 1 / Table 2` should read **111** in `B1`, **big** in `C1`
-and **42 units** in `D1`, with `A1` still 42. In the formula bar, `B1` should show a
-reference into `Table 1` on `Sheet 1` rather than into `Table 2` itself. `Sheet 1 / Table 1`
-row 11 should be untouched, still reading 55, 56, 40, big, 110, 110, 42 and 53. Numbers
-recalculates on open because the write named the three cells as dirty, so the values pybers
-stored are absent and Numbers supplies them; Quick Look, which does not recalculate, will
-therefore show the three cells empty. That pair is the point of confirming with both.
+Confirmed 2026-09-08: no repair prompt, `Sheet 1 / Table 2` reads 42, **111**, **big** and
+**42 units**, and the formula bar shows `Table 1::A11 x2+1`, `IF(SUM(A1:A10)>10,"big",
+"small")` and `$A$1&" units"`. `Sheet 1 / Table 1` row 11 is untouched at 55, 56, 40, big,
+110, 110, 42 and 53, and `Sheet 2 / Table 1` still reads 53. Quick Look shows the three
+cells empty, which is the pair working as it should: Numbers recalculated on open because
+the write named those cells as dirty, and Quick Look renders what is stored. The copy that
+was opened is not the copy committed here.
+
+**Numbers writes `Table 1::A11` where pybers writes `Sheet 1::Table 1::A11`.** Numbers
+resolves a bare table name against the sheet the formula sits on; pybers qualifies because
+two tables in this document are named `Table 1` and it has no notion of which sheet is
+being read from. Both parse to the same nodes, and the file is identical either way, so
+this is a difference in what the two choose to display rather than in what is stored.
 
 `45-merged-by-pybers` is the only golden covering a row whose offsets count four-byte
 words rather than bytes. Dropping the record at column 295 moves the three stored after it,
