@@ -18,8 +18,8 @@ There is a simpler reason under all of that: I love writing Python. Taking a `.n
 
 | Layer | State |
 | --- | --- |
-| `pybers.numbersfile` | The persistence layer. **Reads** a `.numbers` package: zip container, IWA frames, a pure-Python Snappy codec with no C dependency, base-128 varints, length-prefixed protobuf archives, IEEE-754 decimal128, and cell values including numbers, text, dates, booleans, durations and currency. **Writes** one back, replaying an untouched member exactly and re-encoding an edited one. |
-| `pybers.model` | The dataclass object model, split by feature area: style, geometry, rich text, floating shapes, tables and cells, sheets and documents. |
+| `pybers._persistence` | The persistence layer, private. **Reads** a `.numbers` package: zip container, IWA frames, a pure-Python Snappy codec with no C dependency, base-128 varints, length-prefixed protobuf archives, IEEE-754 decimal128, and cell values including numbers, text, dates, booleans, durations and currency. **Writes** one back, replaying an untouched member exactly and re-encoding an edited one. |
+| `pybers.addressing`, `pybers.document`, `pybers.formula`, `pybers.table` | The features, each owning its model types and both of its archive halves. `style`, `text`, `geometry` and `drawable` are model-only so far. |
 | The binding between them | `pybers.open(path)` returns a `Document` and `document.save()` writes it back. A cell set to a `Decimal` reaches the tile it came from; writing over a formula, writing text, and changing a cell's type all raise rather than losing anything. |
 | Reaching and walking | `document.sheet(...)` and `sheet.table(...)` take a name or a position counted from one, and both refuse a name no sheet or table carries rather than returning whichever came first. `document.cellsIterate()` yields every cell a document stores, in a stated order, with the table and sheet holding it. |
 | Merging | `table.mergeAdd("A1:B1")` and `table.mergeRemove("A1")`. A merge discards the cells it covers, permanently, because that is what Numbers does. |
@@ -75,7 +75,7 @@ Requires Python 3.14 or newer. The only runtime dependency is `protobuf`.
 
 | Path | What lives here |
 | --- | --- |
-| `src/pybers/` | The library. `model/` is the object model, `numbersfile/` is the container and reader, `protos/` and `_generated/` are the extracted iWork schemas with their type stubs. |
+| `src/pybers/` | The library, laid out by concern. A directory per feature, `_persistence/` and `_engine.py` beneath them, and `protos/` and `_generated/` for the extracted iWork schemas with their type stubs. A leading underscore means a caller has no business there. |
 | `tests/` | The pytest suite, plus `fixtures/`: real `.numbers` files and the findings written from them. |
 | `scripts/` | Repository tooling, including the schema extractor and the writing gate. See `scripts/README.md`. |
 | `.claude/` | Project slash-commands used by the agentic workflow. |

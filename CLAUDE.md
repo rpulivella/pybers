@@ -5,8 +5,31 @@ documents. Built in deep respect for Apple Numbers itself, the goal is for editi
 `.numbers` file programmatically to be as reliable as using Numbers by hand.
 
 Two consumers, both from day one: a library (`import pybers`) and a CLI/TUI on top of
-it. Neither `pybers.model` nor `pybers.numbersfile` may import anything front-end or
-print anything. `pybers.cli` and `pybers.tui` do not exist yet.
+it. Nothing under `src/pybers/` may import anything front-end or print anything, and
+both consumers reach the library through `import pybers` and nothing deeper.
+`pybers.cli` and `pybers.tui` do not exist yet.
+
+## The layout
+
+A feature owns its whole vertical, so adding one adds a directory rather than editing
+four. What more than one feature needs sits below them, and anything a caller has no
+business reaching carries a leading underscore.
+
+```
+pybers/
+  __init__.py     the public surface, and the only import a caller or a CLI needs
+  addressing/     a cell's address and a rectangle of them, used by every feature
+  document/       Document and Sheet, the walk that reads one and the one that saves it
+  formula/        the node model, the function table, the text, and both archive halves
+  table/          Cell, Table and merges, and both archive halves
+  drawable.py     things that float on a sheet   style.py  text.py  geometry.py
+  errors.py       PybersError roots every error this library raises
+  _engine.py      the calculation engine     _persistence/  the container and its index
+  _generated/     protobuf                   protos/        the extracted schemas
+```
+
+A feature with no archive half yet is a module rather than a directory, and becomes a
+directory the day it gains a `_read.py`. That is how `formula` and `table` grew.
 
 Reasoning for settled decisions lives in `docs/decisions.md`. Format measurements live
 in `tests/fixtures/findings-*.md`. **Read the findings index before designing anything**,
@@ -43,12 +66,13 @@ mypy in one pass and reports all four.
   with an explicit invalidation contract.
 - Reuse existing operations. Do not write a second implementation because the caller is
   the reader, the writer, a CLI, or a test.
-- Place code with the feature that owns it. `pybers.numbersfile` is format
+- Place code with the feature that owns it. `_persistence` and `_engine` are
   infrastructure used by more than one feature, never a dumping ground.
-- **No module under `pybers.model` may import `pybers.numbersfile` at module scope.**
-  A function-local import is the only form allowed, and `sheet.py` guards its one type
-  reference behind `TYPE_CHECKING`. `Document` carries archive state as well as model
-  state, excluded from equality and `repr`, so saving mutates what was read.
+- **A feature's model types never import its archive halves at module scope.** A
+  function-local import is the only form allowed, which is how `Document.save` reaches
+  the writer, and `table/cells.py` guards its one type reference behind `TYPE_CHECKING`.
+  `Document` carries archive state as well as model state, excluded from equality and
+  `repr`, so saving mutates what was read.
 
 ## The format decides the design
 
@@ -158,14 +182,15 @@ functions over explanation.
 
 ## Status
 
-`pybers.model` and `pybers.numbersfile` exist and are tested. The reader handles zip,
-IWA frames, pure-Python Snappy, length-prefixed protobuf archives, cell values and
-formulas. The writer writes a package back with one bounded, documented difference in
-the zip envelope, and edits values, merges and formulas.
+Addressing, formulas, tables and documents each exist as a feature and are tested. The
+read half handles zip, IWA frames, pure-Python Snappy, length-prefixed protobuf
+archives, cell values and formulas. The write half writes a package back with one
+bounded, documented difference in the zip envelope, and edits values, merges and
+formulas. A formula round-trips between its nodes and the text Numbers displays.
 
 **The format is mapped; the model binding is not.** Forty-six fixtures under
 `tests/fixtures/` each label their own contents, so a decode is verifiable rather than
-plausible.
+plausible. Styles, rich text and drawables are model stubs with no archive half yet.
 
 Apache-2.0. Hatchling, not setuptools. Dependencies are declared as floors, never pins.
 This is its own repository, on `develop`.

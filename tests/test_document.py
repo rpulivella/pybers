@@ -29,7 +29,12 @@ from pathlib import Path
 import pytest
 
 import pybers
-from pybers.model import CellReference, ReferenceError, columnLetter, columnNumber
+from pybers.addressing import (
+    CellReference,
+    ReferenceError,
+    columnLetter,
+    columnNumber,
+)
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 

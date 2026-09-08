@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Rich text, a run of characters sharing one Style, grouped into paragraphs.
+
+Numbers allows mixed formatting within a single text box or cell (part of a sentence
+bold, part a different color). A plain Cell.value/Style pair cannot express that, so
+richer text content is modeled as a sequence of styled runs instead. This is the
+primitive TextBox uses today; it is also the natural home for intra-cell rich text if
+that is ever needed, not yet wired into Cell.
+
+UPDATES
+2026-09-08  Moved out of `pybers.model` for #58, unchanged.
+2026-08-12  Initial scaffold.
+"""
+
+from __future__ import annotations
+
+__author__ = "Richard P Ulivella"
+__copyright__ = "Copyright 2026 Richard P Ulivella"
+__license__ = "Apache-2.0"
+__version__ = "0.1.0"
+__email__ = "pybers@richardulivella.com"
+__status__ = "Development"
+__date__ = "2026/08/12"
+
+from dataclasses import dataclass, field
+
+from pybers.style import Style
+
+
+@dataclass(frozen=True, slots=True)
+class TextRun:
+    """A contiguous span of characters sharing one Style."""
+
+    text: str
+    style: Style = field(default_factory=Style)
+
+
+@dataclass(frozen=True, slots=True)
+class Paragraph:
+    """One paragraph, a sequence of styled runs plus paragraph-level alignment."""
+
+    runs: tuple[TextRun, ...] = ()
+    alignment: str = "left"
+
+
+@dataclass(frozen=True, slots=True)
+class RichText:
+    """A block of text, the content of a TextBox, made of one or more paragraphs."""
+
+    paragraphs: tuple[Paragraph, ...] = ()

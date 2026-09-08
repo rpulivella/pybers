@@ -23,10 +23,10 @@ __date__ = "2026/09/07"
 from pathlib import Path
 
 from pybers._generated import TSTArchives_pb2 as tst
-from pybers.archives import ArchiveIndex
-from pybers.numbersfile import NumbersPackage, readPackage
-from pybers.numbersfile.cells import decodeRow, offsetUnitFor
-from pybers.numbersfile.types import archiveTypeId, archiveTypes
+from pybers._persistence import NumbersPackage, readPackage
+from pybers._persistence.cells import decodeRow, offsetUnitFor
+from pybers._persistence.index import ArchiveIndex
+from pybers._persistence.types import archiveTypeId, archiveTypes
 
 tableModelType: int = next(
     key for key, value in archiveTypes.items() if value is tst.TableModelArchive

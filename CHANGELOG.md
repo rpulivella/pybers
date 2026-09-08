@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-58] Lay the package out by concern, with the internals private
 - [PYB-45] Round-trip a formula between text and the AST
 - [PYB-53] Exercise an edit inside a table over 255 columns
 - [PYB-54] Read a table with a multi-row merge

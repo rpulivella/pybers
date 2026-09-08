@@ -34,11 +34,12 @@ import pytest
 import pybers
 from conftest import archiveBodies, recordedColumns, recordedRows
 from pybers._generated import TSTArchives_pb2 as tst
-from pybers.archives import ReadError, WriteError, originOffset
-from pybers.model.reference import CellReference
-from pybers.numbersfile import readPackage, writePackage
-from pybers.numbersfile.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
-from pybers.writer import rewriteRow, tileTypeId
+from pybers._persistence import readPackage, writePackage
+from pybers._persistence.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
+from pybers._persistence.index import originOffset
+from pybers.addressing.reference import CellReference
+from pybers.errors import ReadError, WriteError
+from pybers.table._write import rewriteRow, tileTypeId
 
 fixtures: Path = Path(__file__).parent / "fixtures"
 wideFixture: Path = fixtures / "45-columns-over-255.numbers"

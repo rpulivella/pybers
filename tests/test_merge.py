@@ -30,7 +30,8 @@ from pathlib import Path
 import pytest
 
 import pybers
-from pybers.model import MergeRange, ReferenceError, Table
+from pybers.addressing import ReferenceError
+from pybers.table import MergeRange, Table
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
