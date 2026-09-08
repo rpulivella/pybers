@@ -261,7 +261,9 @@ class Table:
 
         **The covered cells are discarded permanently, and unmerging does not restore
         them.** Measured, not chosen: `22-merge-2x2` and its unmerged twin hold the
-        same 18 cells. A covered cell has no record in a tile at all.
+        same 18 cells, and Numbers writes no record at a position its own merge
+        covers. A merge IMPORTED from Excel is the exception and keeps a style-only
+        record at each one, which a save preserves rather than cleans up.
         """
         extent = self.rangeSingle(address, "merge")
         # A single cell is refused because Numbers cannot produce one: no fixture holds
@@ -335,9 +337,9 @@ class Table:
     def mergeCovering(self, address: CellAddress) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
 
-        The only way to tell a covered cell from an empty one, since covered cells have
-        NO record in the tile. Derived on every call rather than stored, because a copy
-        would go stale the moment a merge changed.
+        The only way to tell a covered cell from an empty one, since a covered
+        position holds no value whatever wrote the merge. Derived on every call rather
+        than stored, because a copy would go stale the moment a merge changed.
         """
         reference = toCellReference(address)
         for merge in self.mergeRanges:
