@@ -32,7 +32,8 @@ from pathlib import Path
 import pytest
 
 import pybers
-from pybers.model import Cell, Document, SelectionError, Sheet, Table
+from pybers.document import Document, SelectionError, Sheet
+from pybers.table import Cell, Table
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 

@@ -2,11 +2,10 @@
 """\
 Turn a `.numbers` package into the object model: the read half of the binding.
 
-`pybers._persistence` reads the container and decodes cell records; `pybers.model`
-holds the dataclasses. Neither knows about the other, and this module is what
-joins them. It lives outside `pybers.model` on purpose, so that importing the
-model never drags in the persistence layer. See CLAUDE.md, "Document is the
-handle".
+`pybers._persistence` reads the container and decodes cell records, and each
+feature holds its own dataclasses. Neither knows about the other, and this module
+is what joins them at the document level, handing each table to the feature that
+owns it.
 
 The archive index and the two lookups every reader needs are in
 `pybers.archives`; formulas are in `pybers.readformula` and the calculation
@@ -48,23 +47,20 @@ __date__ = "2026/08/31"
 
 from pathlib import Path
 
-from ._engine import tableIdentities
-from ._generated import TNArchives_pb2 as tn
-from ._generated import TSTArchives_pb2 as tst
-from ._persistence import (
+from .._engine import tableIdentities
+from .._generated import TNArchives_pb2 as tn
+from .._generated import TSTArchives_pb2 as tst
+from .._persistence import (
     readPackage,
 )
-from ._persistence.index import (
+from .._persistence.index import (
     ArchiveIndex,
     findRoot,
     tableInfoTypeId,
 )
-from .errors import ReadError
-from .model import (
-    Document,
-    Sheet,
-)
-from .table._read import readTable
+from ..errors import ReadError
+from ..table._read import readTable
+from .sheets import Document, Sheet
 
 
 def readSheet(

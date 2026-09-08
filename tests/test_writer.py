@@ -55,10 +55,11 @@ from pybers._persistence.index import (
     tableInfoTypeId,
 )
 from pybers._persistence.types import archiveTypeId, archiveTypes, parseArchive
+from pybers.addressing import toCellReference
+from pybers.document import Document
+from pybers.document._write import writeDocument
 from pybers.errors import WriteError
-from pybers.model import Document, toCellReference
 from pybers.table._read import readMerges
-from pybers.writer import writeDocument
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -278,7 +279,7 @@ def test_aFailedSaveLeavesTheExistingFileIntact(
         path.write_bytes(b"half a zip")
         raise OSError("the disk filled up half way through")
 
-    monkeypatch.setattr("pybers.writer.writePackage", explode)
+    monkeypatch.setattr("pybers.document._write.writePackage", explode)
 
     with pytest.raises(OSError, match="disk filled up"):
         document.save()

@@ -23,6 +23,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-09-08  Moved into `pybers.document` for #58, out of `pybers.model`.
 2026-09-08  The identity each table is named by in a formula, for #45.
 2026-09-02  Save states what happens to a dependent formula, for #25.
 2026-09-02  The whole-document cell iteration, for #14.
@@ -243,6 +244,6 @@ class Document:
         """
         # Imported here rather than at module scope, because the writer reaches into
         # `pybers._persistence` and the model layer must stay importable without it.
-        from pybers.writer import writeDocument
+        from pybers.document._write import writeDocument
 
         writeDocument(self, path)

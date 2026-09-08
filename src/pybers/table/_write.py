@@ -16,7 +16,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
-2026-09-08  Split out of `pybers.writer` for #58, taking the merge formula with it.
+2026-09-08  Split out of the writer for #58, taking the merge formula with it.
 """
 from __future__ import annotations
 

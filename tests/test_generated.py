@@ -7,9 +7,9 @@ they cannot ordinarily drift. This is the guard for when they do: a regeneration
 without `protoc-gen-mypy` on PATH produces modules with no stubs beside them, and the
 only symptom would be mypy quietly checking nothing where the protobuf surface is.
 
-That surface is most of `pybers.reader` and `pybers.writer`, and a mistyped field
-there is the failure this format answers with a plausible wrong number rather than an
-error, so losing the check is worth failing a test over.
+That surface is most of what every `_read` and `_write` module does, and a mistyped
+field there is the failure this format answers with a plausible wrong number rather
+than an error, so losing the check is worth failing a test over.
 
 Nothing here needs protoc, which is deliberate: the extraction requires a local
 Numbers.app and will never run in CI, but this check runs everywhere.

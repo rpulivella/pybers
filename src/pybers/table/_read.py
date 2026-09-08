@@ -19,7 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
-2026-09-08  Split out of `pybers.reader` for #58, unchanged.
+2026-09-08  Split out of `pybers.document._read` for #58, unchanged.
 """
 from __future__ import annotations
 

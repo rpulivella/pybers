@@ -16,7 +16,7 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
-2026-09-08  Split out of `pybers.writer` for #45, unchanged.
+2026-09-08  Split out of `pybers.document._write` for #45, unchanged.
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ from .._persistence.cells import (
 from .._persistence.decimal128 import Decimal128
 from .._persistence.index import ArchiveIndex, originOffset
 from ..errors import WriteError
-from ..model import Cell
+from ..table.cells import Cell
 from ._read import ColonTractAxis, decimalHalfFormat, readFormulaTable
 from .nodes import (
     Coordinate,

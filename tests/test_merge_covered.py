@@ -38,7 +38,7 @@ from pybers._persistence import readPackage
 from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypeId
 from pybers.addressing.reference import ReferenceError as CellReferenceError
-from pybers.model import MergeRange, Table
+from pybers.table import MergeRange, Table
 
 fixtures: Path = Path(__file__).parent / "fixtures"
 importedFixture: Path = fixtures / "22e-merge-imported.numbers"
@@ -123,7 +123,7 @@ def testAMergePybersMakesStillClearsItsCoveredPositions(tmp_path: Path) -> None:
 
 def testAMergeAlreadyInTheFileIsNotTreatedAsAdded() -> None:
     """The distinction the writer turns on, checked without writing anything."""
-    from pybers.writer import mergesAdded
+    from pybers.document._write import mergesAdded
 
     index = ArchiveIndex(readPackage(importedFixture))
     document = pybers.open(importedFixture)

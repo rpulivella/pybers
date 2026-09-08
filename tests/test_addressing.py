@@ -25,17 +25,16 @@ from pathlib import Path
 import pytest
 
 import pybers
-from pybers.addressing import reference as referenceModule
-from pybers.model import (
+from pybers.addressing import (
     CellRange,
     CellRangeList,
     CellReference,
-    MergeRange,
     ReferenceError,
-    Table,
     columnLetter,
     columnNumber,
 )
+from pybers.addressing import reference as referenceModule
+from pybers.table import MergeRange, Table
 from pybers.table import cells as tableModule
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"

@@ -2,10 +2,9 @@
 """\
 Write a `Document` back to a `.numbers` package: the write half of the binding.
 
-The mirror of `pybers.reader`, and it lives outside `pybers.model` for the same
-reason that one does, so that importing the model never drags in the persistence
-layer. `Document.save` reaches this module through a function-local import. See
-CLAUDE.md, "Document is the single handle".
+The mirror of `pybers.document._read`. `Document.save` reaches it through a
+function-local import, so that importing the model never drags in the persistence
+layer. See CLAUDE.md, "Document is the single handle".
 
 Formulas are in `pybers.writeformula` and the calculation engine's three registers
 in `pybers.writeengine`. What is left here is the cell records, the tiles they sit
@@ -38,28 +37,28 @@ __date__ = "2026/09/02"
 import tempfile
 from pathlib import Path
 
-from ._engine import (
+from .._engine import (
     calculationEngine,
     ownerEntryFor,
     registerFormulaCells,
     requestRecalculation,
     tableOwnerEntries,
 )
-from ._generated import TNArchives_pb2 as tn
-from ._generated import TSTArchives_pb2 as tst
-from ._persistence import (
+from .._generated import TNArchives_pb2 as tn
+from .._generated import TSTArchives_pb2 as tst
+from .._persistence import (
     NumbersPackage,
     writePackage,
 )
-from ._persistence.index import (
+from .._persistence.index import (
     ArchiveIndex,
     findRoot,
     originOffset,
     tableInfoTypeId,
 )
-from .errors import WriteError
-from .model import Document
-from .table._write import applyMerges, applyTableEdits, mergesAdded
+from ..errors import WriteError
+from ..table._write import applyMerges, applyTableEdits, mergesAdded
+from .sheets import Document
 
 
 def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:

@@ -56,7 +56,7 @@ from pybers.style import Style
 if TYPE_CHECKING:
     # Guarded because `sheet` imports this module, and the link back is a type
     # reference rather than anything this module calls.
-    from pybers.model.sheet import Document
+    from pybers.document.sheets import Document
 
 # IEEE-754 decimal128, which is exactly what Numbers stores a numeric cell as: 34
 # significant digits with this exponent range. Declared here so that any arithmetic a

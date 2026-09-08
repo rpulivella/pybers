@@ -36,7 +36,7 @@ from pybers.errors import PybersError
 
 # Rows and columns count from ONE throughout the model, because that is what
 # Numbers shows and what a caller means by "row 1". The file counts from zero,
-# and the two meet only in `pybers.reader`. Nothing here ever holds a stored
+# and the two meet only in `pybers.document._read`. Nothing here ever holds a stored
 # coordinate.
 firstRow: int = 1
 firstColumn: int = 1

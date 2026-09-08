@@ -17,7 +17,7 @@ package indexed up front, which is why the index is built eagerly and in full.
 UPDATES
 2026-09-08  Moved into the persistence layer for #58. It was `pybers.archives`,
             which put the word back at the top level after PYB-2 had retired it.
-2026-09-08  Split out of `pybers.reader` for #45, unchanged.
+2026-09-08  Split out of `pybers.document._read` for #45, unchanged.
 """
 from __future__ import annotations
 

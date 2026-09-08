@@ -2,8 +2,8 @@
 """\
 One stored formula out of its archive and into the model, node for node.
 
-Split from `pybers.reader` because it is the whole of one feature and none of the
-rest: a formula's node array has nothing to do with tiles, rows or pooled strings.
+Its own module because it is the whole of one feature and none of the rest: a
+formula's node array has nothing to do with tiles, rows or pooled strings.
 
 Two traps, both of which answer with a plausible wrong reference rather than an
 error, which is why each is handled here and not left to a caller:
@@ -16,7 +16,7 @@ error, which is why each is handled here and not left to a caller:
   ordinary numbers they name a cell far outside the table and raise nothing.
 
 UPDATES
-2026-09-08  Split out of `pybers.reader` for #45, unchanged.
+2026-09-08  Split out of `pybers.document._read` for #45, unchanged.
 """
 from __future__ import annotations
 
