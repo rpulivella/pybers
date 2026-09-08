@@ -10,7 +10,7 @@ loads, links or executes anything; a binary is opened read-only and parsed.
 **Pointers stored in data are encoded, not absolute.** Modern Mach-O uses dyld
 chained fixups, so an eight-byte slot in `__DATA` holds the target in its low 36
 bits alongside the chain's own bookkeeping. A raw search for an address
-therefore finds nothing, which is the trap this module exists to hide: read
+therefore finds nothing, which is the failure this module exists to hide: read
 every data pointer through `pointerAt`.
 
 **Method lists come in two shapes.** The older one stores three absolute
