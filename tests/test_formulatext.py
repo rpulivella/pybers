@@ -41,6 +41,8 @@ from pybers import (
     renderFormula,
 )
 from pybers._generated import TSCEArchives_pb2 as tsce
+from pybers._persistence import readPackage
+from pybers._persistence.types import archiveTypeId
 from pybers.model import formulasyntax
 from pybers.model.formula import (
     additionNodeType,
@@ -56,8 +58,6 @@ from pybers.model.formula import (
     thunkingFunctionIndices,
     tokenNodeType,
 )
-from pybers.numbersfile import readPackage
-from pybers.numbersfile.types import archiveTypeId
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -497,6 +497,19 @@ def testTextThatIsNotAFormulaIsRefusedWithTheOffsetThatFailed(
     with pytest.raises(FormulaSyntaxError) as raised:
         parseFormula(text, "A1")
     assert raised.value.position == position
+
+
+def testAnAddressBelowTheOriginRefusesInTheAddressingLayersOwnWords() -> None:
+    """`A0` says it names row zero, rather than that it addresses nothing.
+
+    The reason travels out of `CellRange.parse` intact. Row zero and column zero
+    are the two mistakes a zero-based instinct makes, and the message has to name
+    which one it was rather than summarize both away.
+    """
+    for text, offset in (("=A0", 0), ("=SUM(A0:A5)", 4), ("=A1+B0", 3)):
+        with pytest.raises(FormulaSyntaxError, match="rows count from 1") as raised:
+            parseFormula(text, "B2")
+        assert raised.value.position == offset
 
 
 def testTextNestedDeeperThanTheParserGoesIsRefusedRatherThanCrashing() -> None:

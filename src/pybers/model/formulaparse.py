@@ -306,11 +306,16 @@ class Parser:
         )
 
     def emitAddress(self, token: Token) -> None:
-        """Emit the reference or the range an address names, from where it sits."""
+        """Emit the reference or the range an address names, from where it sits.
+
+        The addressing error travels out with its own words: it already says that
+        `A0` names row zero and that rows count from one, and replacing that with
+        a summary would hide the one thing the writer needs to know.
+        """
         try:
             extent = CellRange.parse(token.text)
         except ReferenceError as exc:
-            raise self.fail(f"{token.text!r} addresses nothing.", token) from exc
+            raise self.fail(str(exc), token) from exc
         tableId = qualifierIdentity(token, self.tables, self.text)
         # A colon is what tells a range from a reference, rather than the shape it
         # covers: Numbers writes a tract for `A1:A1` and a coordinate for `A1`.
