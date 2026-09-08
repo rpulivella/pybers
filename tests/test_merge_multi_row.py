@@ -70,6 +70,12 @@ def firstTable(document: pybers.Document) -> Table:
     return document.sheets[0].tables[0]
 
 
+def testTheFixtureHoldsExactlyTheThreeMergesItWasMadeWith() -> None:
+    """Every other check here looks a merge up, so none of them would see a fourth."""
+    table = firstTable(pybers.open(multiRowFixture))
+    assert len(table.mergeRanges) == len(extents)
+
+
 @pytest.mark.parametrize(("anchor", "extent"), extents)
 def testEachMergeReportsTheExtentNumbersDisplays(anchor: str, extent: str) -> None:
     table = firstTable(pybers.open(multiRowFixture))
