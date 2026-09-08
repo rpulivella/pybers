@@ -499,6 +499,18 @@ def testTextThatIsNotAFormulaIsRefusedWithTheOffsetThatFailed(
     assert raised.value.position == position
 
 
+def testTextNestedDeeperThanTheParserGoesIsRefusedRatherThanCrashing() -> None:
+    """Hostile text fails as a formula error rather than as a `RecursionError`.
+
+    Descent spends about eight interpreter frames per level, so text nested a few
+    hundred deep exhausts the stack. Sixty levels still parse, which is further
+    than a person nests.
+    """
+    assert len(parseFormula("=" + "(" * 60 + "1" + ")" * 60, "A1")) == 1
+    with pytest.raises(FormulaSyntaxError, match="levels deep"):
+        parseFormula("=" + "(" * 400 + "1" + ")" * 400, "A1")
+
+
 def testARefusedFormulaLeavesTheCellExactlyAsItWas() -> None:
     """A failed parse writes nothing, so a cell keeps whatever it held."""
     cell = firstTable("18-formula-literals").cell("A1")

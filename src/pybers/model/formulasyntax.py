@@ -127,6 +127,12 @@ percentPrecedence: int = 7
 # operator's precedence answers "leave it alone".
 atomPrecedence: int = 99
 
+# How deeply one expression may nest before parsing refuses. A guard on this
+# parser's own stack rather than a measurement of Numbers: the descent spends
+# about eight frames per level, so hostile text would otherwise exhaust the
+# interpreter and raise `RecursionError` where a formula error belongs.
+nestingLimit: int = 64
+
 operatorPrecedence: dict[int, int] = {
     equalToNodeType: comparisonPrecedence,
     notEqualToNodeType: comparisonPrecedence,

@@ -80,6 +80,7 @@ from pybers.model.formulasyntax import (
     formulaMarker,
     lambdaName,
     letName,
+    nestingLimit,
     percentSymbol,
     qualifierIdentity,
     rangeFor,
@@ -116,6 +117,7 @@ class Parser:
     bound: dict[str, int] = field(default_factory=dict)
     symbols: int = 0
     position: int = 0
+    depth: int = 0
 
     def peek(self) -> Token:
         """Return the token about to be read, without consuming it."""
@@ -154,8 +156,20 @@ class Parser:
         return Formula(nodes=tuple(self.nodes))
 
     def parseExpression(self) -> None:
-        """Parse one expression, the whole precedence ladder from the bottom."""
+        """Parse one expression, the whole precedence ladder from the bottom.
+
+        Depth is counted here because every nested construct passes through it,
+        and refusing is what keeps hostile text from exhausting the stack and
+        raising `RecursionError` where a formula error belongs.
+        """
+        if self.depth >= nestingLimit:
+            raise self.fail(
+                f"This nests more than {nestingLimit} levels deep, which is "
+                "further than this parser goes."
+            )
+        self.depth += 1
         self.parseComparison()
+        self.depth -= 1
 
     def parseComparison(self) -> None:
         """Parse comparisons, which bind least tightly of everything Numbers has."""
