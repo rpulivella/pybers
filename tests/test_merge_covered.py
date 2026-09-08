@@ -35,8 +35,8 @@ import pybers
 from conftest import archiveBodies, recordedColumns, tableModelType
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
+from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypeId
-from pybers.archives import ArchiveIndex
 from pybers.model import MergeRange, Table
 from pybers.model.reference import ReferenceError as CellReferenceError
 

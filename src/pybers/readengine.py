@@ -24,15 +24,15 @@ from dataclasses import dataclass
 
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
-from ._persistence.types import archiveTypeId, parseArchive
-from .archives import (
+from ._persistence.index import (
     ArchiveIndex,
-    ReadError,
     calculationEngineTypeId,
     tableOwnerKind,
     wordBits,
     wordMask,
 )
+from ._persistence.types import archiveTypeId, parseArchive
+from .errors import ReadError
 
 
 def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:

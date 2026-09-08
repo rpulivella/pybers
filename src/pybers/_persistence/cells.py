@@ -41,6 +41,7 @@ import datetime
 import struct
 from dataclasses import dataclass
 
+from ..errors import PybersError
 from .decimal128 import Decimal128
 
 # Apple counts dates from 2001-01-01 UTC rather than the Unix epoch.
@@ -75,7 +76,7 @@ formulaFlagOffset: int = 9
 formulaFlagBit: int = 0x02
 
 
-class CellDecodeError(RuntimeError):
+class CellDecodeError(PybersError, RuntimeError):
     """A cell record that could not be decoded."""
 
 

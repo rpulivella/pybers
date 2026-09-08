@@ -47,14 +47,14 @@ from pybers._persistence import (
     offsetUnitFor,
     readPackage,
 )
-from pybers._persistence.types import archiveTypeId, archiveTypes, parseArchive
-from pybers.archives import (
+from pybers._persistence.index import (
     ArchiveIndex,
-    WriteError,
     calculationEngineTypeId,
     findRoot,
     tableInfoTypeId,
 )
+from pybers._persistence.types import archiveTypeId, archiveTypes, parseArchive
+from pybers.errors import WriteError
 from pybers.model import Document, toCellReference
 from pybers.reader import readMerges
 from pybers.writeengine import tableOwnerIds

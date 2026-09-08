@@ -26,12 +26,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/01"
 
+from ..errors import PybersError
+
 # A varint carrying more than this many value bits is a misread rather than a large
 # number, since nothing in this format needs a 64-bit length.
 maximumShift: int = 63
 
 
-class VarintError(RuntimeError):
+class VarintError(PybersError, RuntimeError):
     """A varint that could not be read, or a value that cannot be written as one."""
 
 

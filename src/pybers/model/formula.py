@@ -56,6 +56,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from pybers.errors import PybersError
 from pybers.model.functions import (
     ArgumentCountError,
     NumbersFunction,
@@ -155,7 +156,7 @@ brokenColumnSentinel: int = 32767
 brokenRowSentinel: int = 2147483647
 
 
-class FormulaError(ValueError):
+class FormulaError(PybersError, ValueError):
     """A formula that could not be read, or an edit that would corrupt one."""
 
 

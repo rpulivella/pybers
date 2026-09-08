@@ -23,6 +23,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
+from pybers.errors import PybersError, ReadError, WriteError
 from pybers.model import (
     ArgumentCountError,
     Cell,
@@ -89,6 +90,9 @@ __all__ = [
     "FormulaFunctionCall",
     "FormulaReference",
     "FormulaRange",
+    "PybersError",
+    "ReadError",
+    "WriteError",
     "FormulaNode",
     "FormulaError",
     "FormulaSyntaxError",

@@ -43,6 +43,7 @@ from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
+from ..errors import PybersError
 from .iwa import Archive
 
 # typeId to generated class, for every type pybers resolves on a read path.
@@ -69,7 +70,7 @@ archiveTypes: dict[int, type[Message]] = {
 }
 
 
-class ArchiveTypeError(RuntimeError):
+class ArchiveTypeError(PybersError, RuntimeError):
     """An archive whose type is not in the registry, or which failed to parse."""
 
 

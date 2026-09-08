@@ -42,10 +42,11 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/16"
 
+from ..errors import PybersError
 from .varint import readVarint, writeVarint
 
 
-class SnappyError(RuntimeError):
+class SnappyError(PybersError, RuntimeError):
     """A raw Snappy block that could not be decoded."""
 
 

@@ -59,13 +59,13 @@ from ._persistence.cells import (
     valueOffset,
 )
 from ._persistence.decimal128 import Decimal128, encodedLength
-from .archives import (
+from ._persistence.index import (
     ArchiveIndex,
-    WriteError,
     findRoot,
     originOffset,
     tableInfoTypeId,
 )
+from .errors import WriteError
 from .model import Cell, CellReference, Document, MergeRange, Table
 from .readengine import calculationEngine, tableOwnerEntries
 from .reader import readMerges, readRichTextTable, readStringTable, resolveValue

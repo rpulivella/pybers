@@ -37,7 +37,12 @@ from ._generated import TSTArchives_pb2 as tst
 from ._persistence import carriesFormula
 from ._persistence.cells import CellRecord, formulaKeySlot
 from ._persistence.decimal128 import Decimal128
-from .archives import ArchiveIndex, formulaListType, originOffset, readDataList
+from ._persistence.index import (
+    ArchiveIndex,
+    formulaListType,
+    originOffset,
+    readDataList,
+)
 from .model import (
     Coordinate,
     Formula,

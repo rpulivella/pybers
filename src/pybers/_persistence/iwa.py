@@ -44,6 +44,7 @@ __date__ = "2026/08/16"
 from dataclasses import dataclass, field, replace
 
 from .._generated import TSPArchiveMessages_pb2 as archiveMessages
+from ..errors import PybersError
 from .compression import compressRaw, decompressRaw
 from .varint import readVarint, writeVarint
 
@@ -67,7 +68,7 @@ compressedFrameFlag: int = 0x00
 uncompressedChunkLength: int = 65536
 
 
-class IWAError(RuntimeError):
+class IWAError(PybersError, RuntimeError):
     """An IWA member whose framing or archive stream could not be read."""
 
 

@@ -520,7 +520,7 @@ def testChangedFormulaMarksItsCellForRecalculation(tmp_path: Path) -> None:
     is the request having been made.
     """
     from pybers._generated import TSCEArchives_pb2 as tsce
-    from pybers.archives import ArchiveIndex
+    from pybers._persistence.index import ArchiveIndex
 
     def dirtyBytes(path: Path) -> int:
         index = ArchiveIndex(readPackage(path))
@@ -669,8 +669,8 @@ def formulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
     """Return (row, column, formula key) for every formula-backed cell of a table."""
     from pybers._generated import TSTArchives_pb2 as tst
     from pybers._persistence import carriesFormula, decodeRow, offsetUnitFor
+    from pybers._persistence.index import ArchiveIndex
     from pybers._persistence.types import archiveTypeId, parseArchive
-    from pybers.archives import ArchiveIndex
     from pybers.writeformula import formulaKeySlot
 
     index = ArchiveIndex(readPackage(path))
@@ -707,8 +707,8 @@ def formulaCellRegister(path: Path) -> tuple[list[tuple[int, int]], ...]:
     correctly today and lies about the document.
     """
     from pybers._generated import TSCEArchives_pb2 as tsce
+    from pybers._persistence.index import ArchiveIndex
     from pybers._persistence.types import parseArchive
-    from pybers.archives import ArchiveIndex
 
     index = ArchiveIndex(readPackage(path))
     for archive in list(index.byIdentifier.values()):

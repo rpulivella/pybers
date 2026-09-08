@@ -59,9 +59,8 @@ from ._persistence import (
     readPackage,
 )
 from ._persistence.cells import CellRecord
-from .archives import (
+from ._persistence.index import (
     ArchiveIndex,
-    ReadError,
     findRoot,
     originOffset,
     readDataList,
@@ -69,6 +68,7 @@ from .archives import (
     stringListType,
     tableInfoTypeId,
 )
+from .errors import ReadError
 from .model import (
     CellRange,
     CellReference,

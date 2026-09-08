@@ -36,7 +36,8 @@ from conftest import archiveBodies, recordedColumns, recordedRows
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
-from pybers.archives import ReadError, WriteError, originOffset
+from pybers._persistence.index import originOffset
+from pybers.errors import ReadError, WriteError
 from pybers.model.reference import CellReference
 from pybers.writer import rewriteRow, tileTypeId
 

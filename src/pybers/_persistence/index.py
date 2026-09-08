@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """\
-Every archive in a package, addressable, and the lookups both halves share.
+Every archive in a package, addressable by the identifier a reference carries.
 
-`pybers.reader` turns archives into a model and `pybers.writer` turns a model back
-into archives. Both have to resolve a reference, find the one root, and read a
-pooled data list first, and neither owns those, so they live here rather than in
-whichever half happened to need them first.
+Named for the `Index/` directory inside a `.numbers` package, which is where the
+archives this walks actually live. It sits directly above `types`, which maps a
+type identifier to a generated class, and below everything that turns an archive
+into a model or back.
+
+Both halves of the binding need it: each has to resolve a reference, find the one
+root, and read a pooled data list, and neither owns those.
 
 **A reference carries an identifier and nothing else.** There is no hint of which
 member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-09-08  Moved into the persistence layer for #58. It was `pybers.archives`,
+            which put the word back at the top level after PYB-2 had retired it.
 2026-09-08  Split out of `pybers.reader` for #45, unchanged.
 """
 from __future__ import annotations
@@ -26,11 +31,13 @@ __date__ = "2026/09/08"
 
 from google.protobuf.message import Message
 
-from ._generated import TNArchives_pb2 as tn
-from ._generated import TSPMessages_pb2 as tsp
-from ._generated import TSTArchives_pb2 as tst
-from ._persistence import Archive, NumbersPackage
-from ._persistence.types import archiveTypeId, parseArchive
+from .._generated import TNArchives_pb2 as tn
+from .._generated import TSPMessages_pb2 as tsp
+from .._generated import TSTArchives_pb2 as tst
+from ..errors import ReadError
+from .container import NumbersPackage
+from .iwa import Archive
+from .types import archiveTypeId, parseArchive
 
 # The stored format counts rows and columns from zero. The model counts from
 # one, because that is what Numbers shows and what a caller means by "row 1". The
@@ -68,14 +75,6 @@ richTextListType: int = 8
 # formula keys and style indices are both small integers and several slots
 # coincide by chance. An error cell consumes no value, so byte 12 is at once its
 # value slot and this slot, which is why one rule covers both.
-
-
-class ReadError(RuntimeError):
-    """A `.numbers` document whose structure could not be walked."""
-
-
-class WriteError(RuntimeError):
-    """A document that could not be written back to a package."""
 
 
 class ArchiveIndex:
@@ -178,10 +177,4 @@ def readDataList(
     return {entry.key: entry for entry in dataList.entries}
 
 
-__all__ = [
-    "ArchiveIndex",
-    "ReadError",
-    "WriteError",
-    "findRoot",
-    "readDataList",
-]
+__all__ = ["ArchiveIndex", "findRoot", "readDataList"]

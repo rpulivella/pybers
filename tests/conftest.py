@@ -25,8 +25,8 @@ from pathlib import Path
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import NumbersPackage, readPackage
 from pybers._persistence.cells import decodeRow, offsetUnitFor
+from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypeId, archiveTypes
-from pybers.archives import ArchiveIndex
 
 tableModelType: int = next(
     key for key, value in archiveTypes.items() if value is tst.TableModelArchive

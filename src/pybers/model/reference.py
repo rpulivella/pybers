@@ -31,6 +31,8 @@ __date__ = "2026/09/01"
 import re
 from dataclasses import dataclass, field
 
+from pybers.errors import PybersError
+
 # Rows and columns count from ONE throughout the model, because that is what
 # Numbers shows and what a caller means by "row 1". The file counts from zero,
 # and the two meet only in `pybers.reader`. Nothing here ever holds a stored
@@ -52,7 +54,7 @@ tableNameSeparator: str = "::"
 cellPattern: re.Pattern[str] = re.compile(r"^(\$?)([A-Za-z]+)(\$?)([0-9]+)$")
 
 
-class ReferenceError(ValueError):
+class ReferenceError(PybersError, ValueError):
     """An address that is not a valid A1-style reference, range or list."""
 
 

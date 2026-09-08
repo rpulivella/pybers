@@ -45,7 +45,8 @@ from ._persistence.cells import (
     valueOffset,
 )
 from ._persistence.decimal128 import Decimal128
-from .archives import ArchiveIndex, WriteError, originOffset
+from ._persistence.index import ArchiveIndex, originOffset
+from .errors import WriteError
 from .model import (
     Cell,
     Coordinate,

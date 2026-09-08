@@ -38,15 +38,15 @@ from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
 from ._persistence import IWAFile
-from ._persistence.types import archiveTypeId, parseArchive
-from .archives import (
+from ._persistence.index import (
     ArchiveIndex,
-    WriteError,
     calculationEngineTypeId,
     originOffset,
     wordBits,
     wordMask,
 )
+from ._persistence.types import archiveTypeId, parseArchive
+from .errors import WriteError
 from .model import MergeRange
 from .readengine import (
     TableOwner,

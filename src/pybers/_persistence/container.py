@@ -36,6 +36,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..errors import PybersError
 from .iwa import IWAFile, readIWAFile, writeIWAFile
 
 # Members under this prefix, with this suffix, are the document. Everything else
@@ -44,7 +45,7 @@ indexPrefix: str = "Index/"
 iwaSuffix: str = ".iwa"
 
 
-class ContainerError(RuntimeError):
+class ContainerError(PybersError, RuntimeError):
     """A `.numbers` file whose container could not be read or written."""
 
 

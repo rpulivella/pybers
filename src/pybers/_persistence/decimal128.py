@@ -33,6 +33,8 @@ __date__ = "2026/09/01"
 from dataclasses import dataclass
 from decimal import Decimal, IEEEContext
 
+from ..errors import PybersError
+
 # The format's own arithmetic rules, from the standard library rather than restated.
 # `prec` is 34 significant digits, `Emax` 6144 and `Emin` -6143.
 formatRules = IEEEContext(128)
@@ -63,7 +65,7 @@ encodedLength: int = 16
 coefficientBits: int = 113
 
 
-class Decimal128Error(RuntimeError):
+class Decimal128Error(PybersError, RuntimeError):
     """A value that decimal128 cannot represent, or bytes that are not one."""
 
 

@@ -56,6 +56,7 @@ from types import MappingProxyType
 from typing import Final
 
 from pybers._generated.functions import functions as generatedFunctions
+from pybers.errors import PybersError
 
 
 class FunctionAvailability(StrEnum):
@@ -66,11 +67,11 @@ class FunctionAvailability(StrEnum):
     internal = "internal"
 
 
-class UnknownFunctionError(ValueError):
+class UnknownFunctionError(PybersError, ValueError):
     """A function name the table does not carry, named where an index was needed."""
 
 
-class ArgumentCountError(ValueError):
+class ArgumentCountError(PybersError, ValueError):
     """A call whose argument count the function it names does not accept."""
 
 
