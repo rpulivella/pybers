@@ -40,12 +40,13 @@ overpaint and column D are all untouched. The copy that was opened is not the co
 committed here.
 
 `45-merged-by-pybers` is the only golden covering a row whose offsets count four-byte
-words rather than bytes. Dropping one record at column 295 moves every record after it, so
-the write re-emits all 295 remaining offsets in the wide unit. A unit confused for a byte
-would place each of them a quarter of the way along the row, and raise nothing. Confirmed
-2026-09-08: no repair prompt, `KI7:KJ7` renders as one cell holding `r6c295`, `KM7` is
-still the empty slot the fixture was built with, and rows 1 through 6 read `col300` and
-`r5c300` at the far edge. The copy that was opened is not the copy committed here.
+words rather than bytes. Dropping the record at column 295 moves the three stored after it,
+and the write re-emits an offset for every one of the 295 that remain. A unit confused for
+a byte would place each of them a quarter of the way along the row, and raise nothing.
+Confirmed 2026-09-08: no repair prompt, `KI7:KJ7` renders as one cell holding `r6c295`,
+`KM7` is still the empty slot the fixture was built with, and rows 1 through 6 read
+`col300` and `r5c300` at the far edge. The copy that was opened is not the copy committed
+here.
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `applyDocumentEdits` walking sheets and

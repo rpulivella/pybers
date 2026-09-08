@@ -50,6 +50,8 @@ clearedCells: tuple[str, ...] = ("B7", "E7", "DV7", "KM7")
 
 # The edit exercised end to end. It sits past the 255-column boundary and in the
 # one row carrying gaps, so a rebuild that fills an empty slot shows up here.
+# The row and column are stored coordinates, counted from zero, which is why
+# they read one lower than the `KI7` the same cells answer to.
 wideMerge: str = "KI7:KJ7"
 editedRow: int = 6
 wideMergeCovered: int = 295
@@ -193,7 +195,7 @@ def widelyMerged(tmp_path: Path) -> Path:
 def testAMergePastColumnTwoFiftyFiveDropsOnlyTheCoveredRecord(
     widelyMerged: Path,
 ) -> None:
-    """Dropping one record moves all 295 offsets that follow it."""
+    """One record leaves the row, and no slot gains one."""
     before = recordedColumns(wideFixture, editedRow)
     after = recordedColumns(widelyMerged, editedRow)
     assert before - after == {wideMergeCovered}
@@ -246,7 +248,7 @@ def testAFormulaStillCannotReachAColumnPastTwoFiftyFive(tmp_path: Path) -> None:
 
 
 def testAWideRowEditMatchesItsGoldenFile(tmp_path: Path) -> None:
-    """Rebuilding 295 word offsets is checked against Numbers, not against pybers.
+    """The rebuilt word offsets are checked against Numbers, not against pybers.
 
     Every other test here compares pybers with pybers, which can agree with itself
     while both halves are wrong. See `tests/golden/README.md`.
