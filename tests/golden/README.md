@@ -29,6 +29,7 @@ other when reaching for something to test against.
 | `20-formula-filled-across.numbers` | `20-formula-shapes.numbers` | `A11`'s `SUM(A1:A10)` filled across `A11:D11` | 2026-09-04, Numbers 15.3.1 |
 | `22c-merged-by-pybers.numbers` | `22c-merge-overpaints.numbers` | `L3:M3` merged, dropping the style-only record `M3` carried | 2026-09-07, Numbers 15.3.1 |
 | `45-merged-by-pybers.numbers` | `45-columns-over-255.numbers` | `KI7:KJ7` merged, rebuilding a 300-column row whose offsets count words | 2026-09-08, Numbers 15.3.1 |
+| `20-formula-authored-as-text.numbers` | `20-formula-shapes.numbers` | three formulas written as TEXT into `Sheet 1 / Table 2`: `B1` a cross-table reference with arithmetic, `C1` a nested lazy call, `D1` an anchored reference concatenated with a string | awaiting confirmation |
 
 `22c-merged-by-pybers` is the first golden where pybers REMOVED a record rather than
 adding or changing one. A merge Numbers makes leaves nothing at a covered position, but a
@@ -38,6 +39,22 @@ Numbers could say the result still opens. Confirmed 2026-09-07: no repair prompt
 renders as one merged cell keeping row 3's fill, and the other thirteen merges, row 5's
 overpaint and column D are all untouched. The copy that was opened is not the copy
 committed here.
+
+`20-formula-authored-as-text` is the first golden whose formulas were never read from a
+file. Every earlier one copied, changed or moved a node array Numbers had written; these
+three were built from text by `Cell.formulaText`, so nothing about them inherited archive
+bytes to fall back on. That is what caught the cross-table identity being dropped:
+`encodeFormulaReference` wrote the coordinates and left the table id to the bytes each node
+was read with, which a node built from text does not have. `B1` read back as `A11*2+1`,
+pointing at its own table, which is a plausible wrong answer rather than an error.
+
+What to check on screen. `Sheet 1 / Table 2` should read **111** in `B1`, **big** in `C1`
+and **42 units** in `D1`, with `A1` still 42. In the formula bar, `B1` should show a
+reference into `Table 1` on `Sheet 1` rather than into `Table 2` itself. `Sheet 1 / Table 1`
+row 11 should be untouched, still reading 55, 56, 40, big, 110, 110, 42 and 53. Numbers
+recalculates on open because the write named the three cells as dirty, so the values pybers
+stored are absent and Numbers supplies them; Quick Look, which does not recalculate, will
+therefore show the three cells empty. That pair is the point of confirming with both.
 
 `45-merged-by-pybers` is the only golden covering a row whose offsets count four-byte
 words rather than bytes. Dropping the record at column 295 moves the three stored after it,

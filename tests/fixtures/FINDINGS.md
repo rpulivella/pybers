@@ -14,6 +14,7 @@ Split by topic, this file is the index.
 | [findings-04-text.md](findings-04-text.md) | Text storage, style runs, OpenType features, and the typography traps. |
 | [findings-06-styles.md](findings-06-styles.md) | Fills, gradients, and why a color is not three floats. |
 | [findings-07-drawables.md](findings-07-drawables.md) | Text boxes, shapes and images, everything floating on a sheet rather than inside a table. |
+| [findings-08-formula-text.md](findings-08-formula-text.md) | The operator table, which functions bracket their arguments, and the three node kinds where text and nodes are not inverses. |
 | [findings-05-method.md](findings-05-method.md) | How these findings were produced, and the mistakes that produced them slowly. |
 
 ---
