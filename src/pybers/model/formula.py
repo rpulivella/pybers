@@ -33,6 +33,8 @@ row of `None` means the whole column rather than row zero. The same rule
 `pybers.model.ranges` already follows.
 
 UPDATES
+2026-09-08  The operator node types, the thunking functions, and content
+            for the nodes `LET` and `LAMBDA` are stored as, for #45.
 2026-09-04  Function calls name themselves and know their argument counts,
             for #44. The index stays the stored form, so authoring by name
             and by index write one archive.
@@ -68,8 +70,7 @@ from pybers.model.reference import CellReference
 # The node types this model gives meaning to. Every other type is carried through
 # untouched: the node message has 45 fields and the corpus uses 16, so a model
 # claiming to understand the rest would be describing the schema rather than the
-# documents. Operators are deliberately absent, since naming them is cosmetic and
-# a formula rewriter never needs to know that 1 is addition.
+# documents.
 functionNodeType: int = 16
 numberNodeType: int = 17
 stringNodeType: int = 19
@@ -78,18 +79,74 @@ referenceNodeType: int = 36
 brokenReferenceNodeType: int = 46
 rangeNodeType: int = 67
 
+# Every operator Numbers declares, taken from `TSCE.ASTNodeArrayArchive.ASTNodeType`
+# rather than from a spreadsheet grammar, so an operator this library does not know
+# is a node type Apple did not declare. `test_formulatext` asserts the two agree.
+# Reading it the other way round is what left numbers-parser, which took openpyxl's
+# Excel tokenizer, with a precedence table holding no comparison at all.
+additionNodeType: int = 1
+subtractionNodeType: int = 2
+multiplicationNodeType: int = 3
+divisionNodeType: int = 4
+powerNodeType: int = 5
+concatenationNodeType: int = 6
+greaterThanNodeType: int = 7
+greaterThanOrEqualNodeType: int = 8
+lessThanNodeType: int = 9
+lessThanOrEqualNodeType: int = 10
+equalToNodeType: int = 11
+notEqualToNodeType: int = 12
+negationNodeType: int = 13
+plusSignNodeType: int = 14
+percentNodeType: int = 15
+
+# An argument the writer left out, which is what the commas of `DURATION(,,,K1,,)`
+# each stand for.
+emptyArgumentNodeType: int = 22
+
+# A second node for an argument that is not there, which Numbers writes in some
+# positions where it writes type 22 in others. `DURATION(,,,K1,,)` fills its first
+# three with type 22 and its last two with this, and both evaluate to nothing:
+# the arithmetic of the two duration fixtures accounts for K1 and for no other
+# argument. The rule choosing between them is not established, so this is
+# rendered as the omitted argument it behaves as and never written.
+tokenNodeType: int = 23
+
+# The bracketing pair around an argument Numbers evaluates lazily, and the pair
+# around a lambda body. Both carry nothing and neither reaches the text.
+beginThunkNodeType: int = 34
+endThunkNodeType: int = 35
+beginLambdaThunkNodeType: int = 56
+endLambdaThunkNodeType: int = 57
+
+# Whitespace a person typed, kept beside the tokens rather than inside them.
+appendWhitespaceNodeType: int = 32
+prependWhitespaceNodeType: int = 33
+
 # `LET` and `LAMBDA` are functions Numbers documents and offers in its own
 # function browser, and the format stores neither as an indexed call: each gets
 # node types of its own. Measured 2026-09-04 against
 # tests/fixtures/46-formula-rare-functions, from formulas Numbers accepted, a
-# working `LET` and a `LAMBDA` reached through `LAMBDA.APPLY`. Named but not
-# interpreted, so both survive a round trip through `FormulaNode.raw`.
-letNodeTypes: tuple[int, ...] = (52, 54)
-lambdaNodeTypes: tuple[int, ...] = (55, 56, 57)
+# working `LET` and a `LAMBDA` reached through `LAMBDA.APPLY`.
+letBindNodeType: int = 52
+endScopeNodeType: int = 54
+lambdaNodeType: int = 55
+letNodeTypes: tuple[int, ...] = (letBindNodeType, endScopeNodeType)
+lambdaNodeTypes: tuple[int, ...] = (
+    lambdaNodeType, beginLambdaThunkNodeType, endLambdaThunkNodeType
+)
 
 # Both bind a variable, and Numbers' own authoring class calls the node that
 # names one `letOrLambdaVar`, which is why it belongs to neither alone.
 variableNodeType: int = 53
+
+# The four functions whose arguments Numbers wraps in thunks, read from
+# `+[TSCEFunctionSpec functionIndexUsesThunks:]` in Numbers 15.3.1, which compares
+# its argument against exactly these and nothing else. CHOOSE, IF, IFS and SWITCH,
+# and each thunks every argument after its first: measured for IF against
+# tests/fixtures/18-formula-literals, whose `IF(1>0,1,2)` brackets the two branches
+# and leaves the condition bare.
+thunkingFunctionIndices: frozenset[int] = frozenset({19, 62, 313, 336})
 
 # A deleted reference is node type 46 carrying coordinates deliberately pointing
 # nowhere. Read as ordinary numbers they name a cell far outside any table and
@@ -296,6 +353,43 @@ class FormulaUnknownCall:
     argumentCount: int
 
 
+@dataclass(frozen=True, slots=True)
+class FormulaBinding:
+    """The name `LET` gives a value, and the number every use of it carries.
+
+    Numbers writes the spelling once, on the binding, and refers to it afterward by
+    a number counting from one within the formula. Both are kept because the number
+    is what the archive matches on and the spelling is what a person reads.
+    """
+
+    name: str
+    symbol: int
+    continuation: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FormulaVariable:
+    """One use of a name a `LET` or a `LAMBDA` bound, stored as its number alone.
+
+    The spelling lives on the binding rather than here, so renaming a bound value
+    is one edit rather than one per use.
+    """
+
+    symbol: int
+
+
+@dataclass(frozen=True, slots=True)
+class FormulaLambda:
+    """A `LAMBDA`'s parameter names, and the number the first of them takes.
+
+    The names are the archive's own list and the numbering runs on from
+    `firstSymbol`, which is zero when a lambda takes no parameters at all.
+    """
+
+    names: tuple[str, ...] = ()
+    firstSymbol: int = 0
+
+
 # What a node carries. A number literal's content is a Decimal and a string
 # literal's is a str, so neither needs a wrapper class to be told apart from the
 # others. An operator carries nothing, its meaning being its type and its arity
@@ -307,6 +401,9 @@ NodeContent = (
     | FormulaUnknownCall
     | FormulaReference
     | FormulaRange
+    | FormulaBinding
+    | FormulaVariable
+    | FormulaLambda
     | None
 )
 

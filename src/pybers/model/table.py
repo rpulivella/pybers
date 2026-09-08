@@ -6,6 +6,8 @@ here takes a bare row and column pair, so the only way to name a cell is with an
 address that has already been validated.
 
 UPDATES
+2026-09-08  A cell reads and writes its formula as text, and knows the table
+            and the document it sits in so neither has to be passed (#45).
 2026-09-02  Merging and unmerging a block of cells (#16). A merge discards
             the cells it covers, which is measured rather than chosen.
 2026-09-01  Addressing moved out to the reference types (#9). `cellAt(row, col)`
@@ -32,10 +34,14 @@ __status__ = "Development"
 __date__ = "2026/09/02"
 
 import datetime
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Context, Decimal
+from typing import TYPE_CHECKING
 
 from pybers.model.formula import Formula
+from pybers.model.formulaparse import parseFormula
+from pybers.model.formularender import renderFormula
 from pybers.model.ranges import CellRange, RangeAddress, toCellRanges
 from pybers.model.reference import (
     CellAddress,
@@ -46,6 +52,11 @@ from pybers.model.reference import (
     toCellReference,
 )
 from pybers.model.style import Style
+
+if TYPE_CHECKING:
+    # Guarded because `sheet` imports this module, and the link back is a type
+    # reference rather than anything this module calls.
+    from pybers.model.sheet import Document
 
 # IEEE-754 decimal128, which is exactly what Numbers stores a numeric cell as: 34
 # significant digits with this exponent range. Declared here so that any arithmetic a
@@ -139,17 +150,78 @@ class Cell:
     formula: Formula | None = None
     errored: bool = False
     style: Style = field(default_factory=Style)
+    # The table this belongs to, so that reading or writing a formula as text needs
+    # neither the cell's own address nor the names of the other tables passed in.
+    # Excluded from equality and `repr` for the reason `Document._package` is: it is
+    # where this cell sits rather than what it holds.
+    table: Table | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
+
+    @property
+    def formulaText(self) -> str | None:
+        """This cell's formula as Numbers displays it, or None when it holds none.
+
+        Assignable: `cell.formulaText = "=SUM(B1:B5)"` parses against this cell,
+        which is what an unlocked reference is an offset from, so the wrong host
+        cannot be passed. Use `formulaSet` to name an address rather than write it.
+        """
+        if self.formula is None:
+            return None
+        return renderFormula(self.formula, self.reference, tables=self.tableNames)
+
+    @formulaText.setter
+    def formulaText(self, text: str) -> None:
+        """Give this cell the formula a written expression describes."""
+        self.formulaSet(text)
+
+    def formulaSet(
+        self, text: str, **pieces: CellRange | CellReference
+    ) -> Formula:
+        """Give this cell the formula text describes, and return what was stored.
+
+        A keyword argument fills a `{name}` in the text with an address this library
+        already validated, so `formulaSet("=SUM({sales})", sales=extent)` never
+        splices one into a string and parses it back out.
+        """
+        self.formula = parseFormula(
+            text, self.reference, tables=self.tableNames, pieces=pieces
+        )
+        return self.formula
+
+    @property
+    def tableNames(self) -> Mapping[str, str]:
+        """Return the names this cell's document knows its tables by, or nothing.
+
+        Computed from the document each time rather than cached, because a table
+        renamed after a cached copy was taken would write a formula pointing at
+        whichever table now answers to the old name.
+        """
+        document = None if self.table is None else self.table.document
+        return {} if document is None else document.tableIdentities
 
 
 @dataclass(slots=True)
 class Table:
-    """A single table on a sheet, a sparse grid of cells plus its merged regions."""
+    """A single table on a sheet, a sparse grid of cells plus its merged regions.
+
+    `identifier` is what a formula in another table names this one by, and it lives
+    in the calculation engine rather than on the table, which is why a table built
+    by hand has none until a document gives it one.
+    """
 
     name: str
     rowCount: int = 0
     colCount: int = 0
     cells: dict[CellReference, Cell] = field(default_factory=dict)
     mergeRanges: list[MergeRange] = field(default_factory=list)
+    identifier: str = ""
+    # The document this belongs to, so a formula naming another table can be written
+    # as the text Numbers shows without the caller supplying the names. Excluded from
+    # equality and `repr`, the same as `Cell.table`.
+    document: Document | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
 
     def cell(self, address: CellAddress) -> Cell:
         """Return the cell at an address, creating an empty one on first access.
@@ -178,7 +250,7 @@ class Table:
                 f"{merge.anchor}."
             )
         if key not in self.cells:
-            self.cells[key] = Cell(reference=key)
+            self.cells[key] = Cell(reference=key, table=self)
         return self.cells[key]
 
     def range(self, address: RangeAddress) -> list[Cell]:

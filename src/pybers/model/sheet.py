@@ -23,6 +23,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-09-08  The identity each table is named by in a formula, for #45.
 2026-09-02  Save states what happens to a dependent formula, for #25.
 2026-09-02  The whole-document cell iteration, for #14.
 2026-09-02  Reaching a sheet or a table by name or by position, for #14.
@@ -40,11 +41,13 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/02"
 
+from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from pybers.model.reference import tableNameSeparator
 from pybers.model.shapes import GraphicalObject
 from pybers.model.table import Cell, Table
 
@@ -189,6 +192,30 @@ class Document:
         return selected(
             self.sheets, nameOrPosition, "sheet", "this document", foldCase=False
         )
+
+    @property
+    def tableIdentities(self) -> dict[str, str]:
+        """Return the identity of every table, under each name that names it alone.
+
+        A formula naming another table writes `Table 2::A1`, and qualifies it as
+        `Sheet 2::Table 1::A1` when a bare name would be ambiguous. Both spellings
+        appear here for a table whose name is unique, and only the qualified one for
+        a name two tables share, which `20-formula-shapes` is the corpus example of.
+        """
+        qualified: dict[str, str] = {}
+        seen: Counter[str] = Counter(
+            table.name for sheet in self.sheets for table in sheet.tables
+        )
+        for sheet in self.sheets:
+            for table in sheet.tables:
+                if not table.identifier:
+                    continue
+                qualified[f"{sheet.name}{tableNameSeparator}{table.name}"] = (
+                    table.identifier
+                )
+                if seen[table.name] == 1:
+                    qualified[table.name] = table.identifier
+        return qualified
 
     def cellsIterate(self) -> Iterator[tuple[Sheet, Table, Cell]]:
         """Yield every STORED cell with the sheet and table holding it.

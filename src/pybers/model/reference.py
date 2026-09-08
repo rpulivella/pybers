@@ -44,6 +44,11 @@ alphabetSize: int = 26
 
 absoluteMarker: str = "$"
 
+# What separates a table's name from an address inside it, and a sheet's name from
+# a table's. Numbers writes `Table 2::A1` and qualifies it further when a bare table
+# name would be ambiguous.
+tableNameSeparator: str = "::"
+
 cellPattern: re.Pattern[str] = re.compile(r"^(\$?)([A-Za-z]+)(\$?)([0-9]+)$")
 
 

@@ -40,6 +40,13 @@ import pybers
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSTArchives_pb2 as tst
+from pybers.archives import (
+    ArchiveIndex,
+    WriteError,
+    calculationEngineTypeId,
+    findRoot,
+    tableInfoTypeId,
+)
 from pybers.model import Document, toCellReference
 from pybers.numbersfile import (
     CellRecord,
@@ -49,13 +56,9 @@ from pybers.numbersfile import (
     readPackage,
 )
 from pybers.numbersfile.types import archiveTypeId, archiveTypes, parseArchive
-from pybers.reader import ArchiveIndex, findRoot, readMerges, tableInfoTypeId
-from pybers.writer import (
-    WriteError,
-    calculationEngineTypeId,
-    tableOwnerIds,
-    writeDocument,
-)
+from pybers.reader import readMerges
+from pybers.writeengine import tableOwnerIds
+from pybers.writer import writeDocument
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
