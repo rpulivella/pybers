@@ -424,6 +424,45 @@ def testACellReachesAnotherTableWithoutBeingHandedTheNames() -> None:
     assert table.cell("A1").formula.references[0].crossTable
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["Sales", "Q1 2026", "Sales-EU", "Ventas 2026", "\u58f2\u4e0a", "Table.2",
+     "Sales (EU)", "A1", "Rate: gross", "Sales, net", '2026', "SUM"],
+)
+def testATableNamedAnythingNumbersAllowsRoundTripsThroughTheText(
+    name: str,
+) -> None:
+    """A custom name, including one holding a bracket, a comma or only digits.
+
+    Matched against the names the document carries rather than against a rule over
+    characters, which is the only way to know where a name Numbers permits ends.
+    Every fixture is named `Table 1` or `Table 2`, so nothing else here would
+    notice a parser that could read only those.
+    """
+    document = pybers.open(fixturePath("20-formula-shapes"))
+    document.sheet("Sheet 1").table("Table 2").name = name
+    source = document.sheet("Sheet 1").table("Table 1")
+
+    rendered = source.cell("G11").formulaText
+    assert rendered == f"={name}::A1"
+    again = parseFormula("=" + f"{name}::A1", "G11",
+                         tables=document.tableIdentities)
+    assert shape(again) == typed(source.cell("G11").formula)
+
+
+def testATableNameWithOuterSpacesIsRefusedRatherThanMisread() -> None:
+    """The one spelling this cannot read, refused loudly and named as such.
+
+    A formula is tokenized left to right and whitespace between tokens is skipped,
+    so a name whose own first character is a space cannot be told from the gap in
+    front of it. Numbers has never been seen to keep one.
+    """
+    document = pybers.open(fixturePath("20-formula-shapes"))
+    document.sheet("Sheet 1").table("Table 2").name = "  padded  "
+    with pytest.raises(FormulaSyntaxError, match="not a table this document"):
+        parseFormula("=  padded  ::A1", "G11", tables=document.tableIdentities)
+
+
 def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
     """A name naming no table would otherwise be written as a reference to nothing."""
     document = pybers.open(fixturePath("20-formula-shapes"))
