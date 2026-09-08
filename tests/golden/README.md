@@ -28,6 +28,7 @@ other when reaching for something to test against.
 | `18-formula-created-in-empty-cell.numbers` | `18-formula-literals.numbers` | `=SUM(1,2,3)` written into `H1`, which had no cell record at all | 2026-09-04, Numbers 15.3.1, re-confirmed the same day after the pool began sharing |
 | `20-formula-filled-across.numbers` | `20-formula-shapes.numbers` | `A11`'s `SUM(A1:A10)` filled across `A11:D11` | 2026-09-04, Numbers 15.3.1 |
 | `22c-merged-by-pybers.numbers` | `22c-merge-overpaints.numbers` | `L3:M3` merged, dropping the style-only record `M3` carried | 2026-09-07, Numbers 15.3.1 |
+| `45-merged-by-pybers.numbers` | `45-columns-over-255.numbers` | `KI7:KJ7` merged, rebuilding a 300-column row whose offsets count words | 2026-09-08, Numbers 15.3.1 |
 
 `22c-merged-by-pybers` is the first golden where pybers REMOVED a record rather than
 adding or changing one. A merge Numbers makes leaves nothing at a covered position, but a
@@ -37,6 +38,15 @@ Numbers could say the result still opens. Confirmed 2026-09-07: no repair prompt
 renders as one merged cell keeping row 3's fill, and the other thirteen merges, row 5's
 overpaint and column D are all untouched. The copy that was opened is not the copy
 committed here.
+
+`45-merged-by-pybers` is the only golden covering a row whose offsets count four-byte
+words rather than bytes. Dropping the record at column 295 moves the three stored after it,
+and the write re-emits an offset for every one of the 295 that remain. A unit confused for
+a byte would place each of them a quarter of the way along the row, and raise nothing.
+Confirmed 2026-09-08: no repair prompt, `KI7:KJ7` renders as one cell holding `r6c295`,
+`KM7` is still the empty slot the fixture was built with, and rows 1 through 6 read
+`col300` and `r5c300` at the far edge. The copy that was opened is not the copy committed
+here.
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `applyDocumentEdits` walking sheets and

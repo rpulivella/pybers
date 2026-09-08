@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-53] Exercise an edit inside a table over 255 columns
 - [PYB-54] Read a table with a multi-row merge
 - [PYB-49] Read a table whose merged cells carry records
 - [PYB-48] Read a table with more than 255 columns

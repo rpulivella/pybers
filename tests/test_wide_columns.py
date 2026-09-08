@@ -26,24 +26,35 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/06"
 
+import shutil
 from pathlib import Path
 
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import archiveBodies, recordedColumns, recordedRows
 from pybers._generated import TSTArchives_pb2 as tst
+from pybers.model.reference import CellReference
 from pybers.numbersfile import readPackage, writePackage
 from pybers.numbersfile.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
-from pybers.reader import ReadError
+from pybers.reader import ReadError, originOffset
 from pybers.writer import WriteError, rewriteRow, tileTypeId
 
 fixtures: Path = Path(__file__).parent / "fixtures"
 wideFixture: Path = fixtures / "45-columns-over-255.numbers"
 narrowFixture: Path = fixtures / "11-value-types-noformats.numbers"
+goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # The four cells cleared from the last row of the wide fixture.
 clearedCells: tuple[str, ...] = ("B7", "E7", "DV7", "KM7")
+
+# The edit exercised end to end. It sits past the 255-column boundary and in the
+# one row carrying gaps, so a rebuild that fills an empty slot shows up here.
+# The row and column are stored coordinates, counted from zero, which is why
+# they read one lower than the `KI7` the same cells answer to.
+wideMerge: str = "KI7:KJ7"
+editedRow: int = 6
+wideMergeCovered: int = 295
 
 # One synthetic record, the twelve-byte header and nothing after it. Its length
 # is a multiple of four, as every record Numbers writes is.
@@ -164,3 +175,92 @@ def testARecordTheOffsetUnitCannotNameIsRefused() -> None:
             offsetUnitWord,
             {0: alignedRecord + b"\x00\x00"},
         )
+
+
+@pytest.fixture
+def widelyMerged(tmp_path: Path) -> Path:
+    """The wide fixture with one merge past column 255, written and closed.
+
+    A merge is the only edit that reaches `rewriteRow` on this document: every
+    cell is text, so a value write refuses, and a formula attach refuses because
+    no dependency tile covers these columns. Measured 2026-09-08 for #53.
+    """
+    target = Path(shutil.copy(wideFixture, tmp_path / "45-merged.numbers"))
+    document = pybers.open(target)
+    firstTable(document).mergeAdd(wideMerge)
+    document.save()
+    return target
+
+
+def testAMergePastColumnTwoFiftyFiveDropsOnlyTheCoveredRecord(
+    widelyMerged: Path,
+) -> None:
+    """One record leaves the row, and no slot gains one."""
+    before = recordedColumns(wideFixture, editedRow)
+    after = recordedColumns(widelyMerged, editedRow)
+    assert before - after == {wideMergeCovered}
+    assert after - before == set()
+
+
+def testEveryOtherCellInTheEditedRowStillNamesItself(widelyMerged: Path) -> None:
+    """A wrong offset yields a wrong value, not an exception, so read all of them."""
+    table = firstTable(pybers.open(widelyMerged))
+    surviving = {
+        column: table.cell(CellReference(editedRow + originOffset, column)).value
+        for column in range(originOffset, table.colCount + originOffset)
+        if column != wideMergeCovered + originOffset
+    }
+    original = firstTable(pybers.open(wideFixture))
+    assert surviving == {
+        column: original.cell(CellReference(editedRow + originOffset, column)).value
+        for column in surviving
+    }
+
+
+@pytest.mark.parametrize("reference", clearedCells)
+def testAGapInTheEditedRowIsStillAGap(widelyMerged: Path, reference: str) -> None:
+    """An empty slot is an absent record, and a rebuild must not fill one in."""
+    assert firstTable(pybers.open(widelyMerged)).cell(reference).value is None
+
+
+def testTheRowsTheEditDidNotTouchAreUnchanged(widelyMerged: Path) -> None:
+    """An edit to one row rewrites that row and leaves the rest of the tile alone."""
+    before = recordedRows(wideFixture)
+    after = recordedRows(widelyMerged)
+    assert {row: columns for row, columns in before.items() if row != editedRow} == {
+        row: columns for row, columns in after.items() if row != editedRow
+    }
+
+
+def testAFormulaStillCannotReachAColumnPastTwoFiftyFive(tmp_path: Path) -> None:
+    """Refuse rather than leave this document half-edited.
+
+    Registering a formula in one of the engine's two registers and not the other
+    would leave a stale result Numbers never recalculates, so the write refuses
+    instead. Borrowed from `19` because this fixture holds no formula to copy.
+    """
+    borrowed = firstTable(pybers.open(fixtures / "19-formula-dragged.numbers"))
+    target = Path(shutil.copy(wideFixture, tmp_path / "45-formula.numbers"))
+    document = pybers.open(target)
+    firstTable(document).cell("KJ7").formula = borrowed.cell("E2").formula
+    with pytest.raises(WriteError, match="No dependency tile covers"):
+        document.save()
+
+
+def testAWideRowEditMatchesItsGoldenFile(tmp_path: Path) -> None:
+    """The rebuilt word offsets are checked against Numbers, not against pybers.
+
+    Every other test here compares pybers with pybers, which can agree with itself
+    while both halves are wrong. See `tests/golden/README.md`.
+    """
+    golden = goldenDirectory / "45-merged-by-pybers.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    target = Path(shutil.copy(wideFixture, tmp_path / "45.numbers"))
+    document = pybers.open(target)
+    firstTable(document).mergeAdd(wideMerge)
+    document.save()
+
+    assert archiveBodies(readPackage(golden)) == archiveBodies(
+        readPackage(target)
+    ), "the writer no longer produces the wide-row edit Numbers confirmed"
