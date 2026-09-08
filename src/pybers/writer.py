@@ -40,7 +40,15 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
+from ._engine import (
+    calculationEngine,
+    ownerEntryFor,
+    registerFormulaCells,
+    requestRecalculation,
+    tableOwnerEntries,
+)
 from ._generated import TNArchives_pb2 as tn
+from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
 from ._persistence import (
@@ -64,17 +72,12 @@ from ._persistence.index import (
     findRoot,
     originOffset,
     tableInfoTypeId,
+    wordBits,
+    wordMask,
 )
 from .errors import WriteError
 from .model import Cell, CellReference, Document, MergeRange, Table
-from .readengine import calculationEngine, tableOwnerEntries
 from .reader import readMerges, readRichTextTable, readStringTable, resolveValue
-from .writeengine import (
-    ownerEntryFor,
-    registerFormulaCells,
-    requestRecalculation,
-    writeMergeFormula,
-)
 from .writeformula import (
     FormulaPool,
     attachFormulaKey,
@@ -356,6 +359,60 @@ def applyTableEdits(
             poolId, 0, pool.dataList.SerializeToString()
         )
     return TableEdits(written, formulaAdded, formulaRemoved)
+
+
+# A merge is written as `SUM($A$1:$B$1)`, so it carries SUM's index in Apple's
+# own function table. The number is theirs and is not derivable from the schemas.
+sumFunctionIndex: int = 168
+
+
+def writeMergeFormula(
+    store: tst.FormulaStoreArchive, merge: MergeRange, ownerUid: tsp.UUID
+) -> None:
+    """Add one merged region to a table's merge store, as the formula Numbers writes.
+
+    **A merge is stored as a formula, not as a flag on a cell.** Each region is a
+    complete formula shaped like `SUM($A$1:$B$1)`: a colon-tract node carrying the
+    rectangle with all four sticky bits set, then the function node for SUM. Nothing
+    evaluates it; the shape is how a merge is expressed.
+
+    The tract's table identifier is the table's own `formula_owner_uid`, split from
+    two 64-bit halves into four 32-bit words, which is a different spelling of the
+    same value in a different archive. Measured 2026-09-02 against `22-merge-2x2`.
+    """
+    pair = store.formulas.add()
+    pair.formula_index = len(store.formulas) - 1
+
+    node = pair.formula.AST_node_array.AST_node.add()
+    node.AST_node_type = tsce.ASTNodeArrayArchive.COLON_TRACT_NODE
+    identifier = node.AST_cross_table_reference_extra_info.table_id
+    identifier.uuid_w0 = ownerUid.lower & wordMask
+    identifier.uuid_w1 = ownerUid.lower >> wordBits
+    identifier.uuid_w2 = ownerUid.upper & wordMask
+    identifier.uuid_w3 = ownerUid.upper >> wordBits
+    node.AST_sticky_bits.begin_row_is_absolute = True
+    node.AST_sticky_bits.begin_column_is_absolute = True
+    node.AST_sticky_bits.end_row_is_absolute = True
+    node.AST_sticky_bits.end_column_is_absolute = True
+
+    startRow, startCol, endRow, endCol = merge.bounds
+    tract = node.AST_colon_tract
+    columns = tract.absolute_column.add()
+    columns.range_begin = startCol - originOffset
+    rows = tract.absolute_row.add()
+    rows.range_begin = startRow - originOffset
+    # `range_end` is omitted for a span of one rather than repeating the beginning,
+    # which is how Numbers writes its own and how the reader expects to find them.
+    if endCol != startCol:
+        columns.range_end = endCol - originOffset
+    if endRow != startRow:
+        rows.range_end = endRow - originOffset
+    tract.preserve_rectangular = True
+
+    function = pair.formula.AST_node_array.AST_node.add()
+    function.AST_node_type = tsce.ASTNodeArrayArchive.FUNCTION_NODE
+    function.AST_function_node_index = sumFunctionIndex
+    function.AST_function_node_numArgs = 1
 
 
 def mergesAdded(table: Table, model: tst.TableModelArchive) -> list[MergeRange]:

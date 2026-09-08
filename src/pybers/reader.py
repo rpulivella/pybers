@@ -49,6 +49,7 @@ __date__ = "2026/08/31"
 from pathlib import Path
 from typing import cast
 
+from ._engine import tableIdentities
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSTArchives_pb2 as tst
 from ._generated import TSWPArchives_pb2 as tswp
@@ -78,7 +79,6 @@ from .model import (
     Sheet,
     Table,
 )
-from .readengine import tableIdentities
 from .readformula import readFormulaTable, resolveFormula
 
 # Cell record type bytes whose decoded value is a key into a pooled data list

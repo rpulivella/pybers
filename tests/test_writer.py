@@ -37,6 +37,7 @@ from pathlib import Path
 import pytest
 
 import pybers
+from pybers._engine import tableOwnerIds
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSTArchives_pb2 as tst
@@ -57,7 +58,6 @@ from pybers._persistence.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.errors import WriteError
 from pybers.model import Document, toCellReference
 from pybers.reader import readMerges
-from pybers.writeengine import tableOwnerIds
 from pybers.writer import writeDocument
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"

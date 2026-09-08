@@ -1,26 +1,35 @@
 #!/usr/bin/env python3
 """\
-What has to be told to the calculation engine when a document is written back.
+The calculation engine: what it knows that a table does not, and what it is told.
 
-There are three registers, none of them optional, and each one is silent when
-it is wrong.
+A table records neither its internal owner id nor the identity a formula in another
+table names it by. Both live on the engine's dependency entry for it, so finding
+either means walking the tracker rather than reading the table, and reading the
+table the obvious way finds nothing at all.
 
-**The engine keeps its own register of which cells hold a formula, stored TWICE**,
-and a cell missing from either is never evaluated. Updating only the first shows
-the formula in the formula bar beside the cell's old value, which is the most
-misleading state available, because the cell looks correct to anyone who clicks
-it. Measured for PYB-42, and recorded in findings-02-formulas.md.
+Writing back, there are three registers and none of them is optional. Each one is
+silent when it is wrong, which is why they live together rather than beside
+whichever feature trips over one first.
+
+**The register of which cells hold a formula is stored TWICE**, and a cell missing
+from either is never evaluated. Updating only the first shows the formula in the
+formula bar beside the cell's old value, which is the most misleading state
+available, because the cell looks correct to anyone who clicks it. Measured for
+PYB-42, and recorded in findings-02-formulas.md.
 
 **Numbers does not recalculate on open**, so an edited cell has to be named in
-`refs_to_dirty` or its dependents keep showing what they last computed. Naming
-only the cells that changed is enough: Numbers walks its own dependency graph
-from there, across tables and across sheets.
+`refs_to_dirty` or its dependents keep showing what they last computed. Naming only
+the cells that changed is enough: Numbers walks its own dependency graph from
+there, across tables and across sheets.
 
-**A merge is stored as a formula**, shaped like `SUM($A$1:$B$1)` and evaluated by
-nothing. The shape is how a merged region is expressed.
+Private, and named so. Nothing here belongs to the surface `import pybers` offers,
+and nothing here knows a model type: the one thing that did was the merge formula,
+which went to the feature that owns merges.
 
 UPDATES
-2026-09-08  Split out of `pybers.writer` for #45, unchanged.
+2026-09-08  The two halves joined for #58, and the merge formula left for the
+            feature that owns it, which took the last model type out.
+2026-09-08  Split out of the reader and the writer for #45, unchanged.
 """
 from __future__ import annotations
 
@@ -32,26 +41,121 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from dataclasses import dataclass
+
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
-from ._generated import TSTArchives_pb2 as tst
 from ._persistence import IWAFile
 from ._persistence.index import (
     ArchiveIndex,
     calculationEngineTypeId,
-    originOffset,
+    tableOwnerKind,
     wordBits,
     wordMask,
 )
 from ._persistence.types import archiveTypeId, parseArchive
-from .errors import WriteError
-from .model import MergeRange
-from .readengine import (
-    TableOwner,
-    tableOwnerEntries,
-)
+from .errors import ReadError, WriteError
+
+
+def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
+    """Return the document's one calculation engine, or refuse and say why.
+
+    Exactly one archive in a document carries this type, the same way exactly one
+    carries `TN.DocumentArchive`. All 46 fixtures have one, so a document without
+    one is not what this library expects rather than a case to work around.
+    """
+    found = [
+        archive for archive in index.byIdentifier.values()
+        if archiveTypeId(archive) == calculationEngineTypeId
+    ]
+    if len(found) != 1:
+        raise ReadError(
+            f"Expected exactly one TSCE.CalculationEngineArchive, found {len(found)}. "
+            "Without it a table has no identity, and neither a merge nor a "
+            "recalculation request can be written."
+        )
+    engine = parseArchive(found[0])
+    if not isinstance(engine, tsce.CalculationEngineArchive):
+        raise ReadError(
+            f"Archive {found[0].identifier} carries the calculation engine's type "
+            f"but parsed as {type(engine).__name__}."
+        )
+    return engine
+
+
+@dataclass(frozen=True, slots=True)
+class TableOwner:
+    """One table's calculation-engine entry, and the archive holding it.
+
+    The identifier travels with the message because registering a formula cell
+    changes that archive and it has to be written back. Looking it up a second
+    time would mean walking the dependency tracker again to find what this walk
+    already had in hand.
+    """
+
+    identifier: int
+    dependencies: tsce.FormulaOwnerDependenciesArchive
+
+
+def tableOwnerEntries(
+    index: ArchiveIndex, engine: tsce.CalculationEngineArchive
+) -> dict[int, TableOwner]:
+    """Return each table's dependency entry, keyed by its `TST.TableInfoArchive`.
+
+    Read the long way round because there is no short one: a table records neither
+    its internal owner id nor its owner uid. Both live here, on the entry whose
+    `owner_kind` is 1 and whose `formula_owner` points back at the table. Measured
+    2026-09-02, see findings-02-formulas.md and findings-03-structure.md.
+    """
+    entries: dict[int, TableOwner] = {}
+    for reference in engine.dependency_tracker.formula_owner_dependencies:
+        dependencies = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
+        if dependencies.owner_kind != tableOwnerKind:
+            continue
+        if not dependencies.HasField("formula_owner"):
+            continue
+        entries[dependencies.formula_owner.identifier] = TableOwner(
+            identifier=reference.identifier, dependencies=dependencies
+        )
+    return entries
+
+
+def readOwnerUuid(uid: tsp.UUID) -> str:
+    """Return a table's owner uid as the hexadecimal a formula names it by.
+
+    A formula spells the identity as four 32-bit words and the owner entry spells
+    it as two 64-bit halves, low half first. The two are the same value, matched
+    across `20-formula-shapes` on 2026-09-08, and this is the only conversion
+    between them on the read path.
+    """
+    words = (
+        uid.lower & wordMask,
+        uid.lower >> wordBits,
+        uid.upper & wordMask,
+        uid.upper >> wordBits,
+    )
+    return "".join(f"{word:08x}" for word in words)
+
+
+def tableIdentities(index: ArchiveIndex) -> dict[int, str]:
+    """Return each table's formula identity, keyed by its `TST.TableInfoArchive`."""
+    return {
+        identifier: readOwnerUuid(owner.dependencies.formula_owner_uid)
+        for identifier, owner in tableOwnerEntries(
+            index, calculationEngine(index)
+        ).items()
+    }
+
+
+__all__ = [
+    "TableOwner",
+    "calculationEngine",
+    "tableIdentities",
+    "tableOwnerEntries",
+]
+
 
 # A merge is written as `SUM($A$1:$B$1)`, so it carries SUM's index in Apple's own
 # function table. The number is theirs and is not derivable from the schemas.
@@ -216,55 +320,6 @@ def tableOwnerIds(
     }
 
 
-def writeMergeFormula(
-    store: tst.FormulaStoreArchive, merge: MergeRange, ownerUid: tsp.UUID
-) -> None:
-    """Add one merged region to a table's merge store, as the formula Numbers writes.
-
-    **A merge is stored as a formula, not as a flag on a cell.** Each region is a
-    complete formula shaped like `SUM($A$1:$B$1)`: a colon-tract node carrying the
-    rectangle with all four sticky bits set, then the function node for SUM. Nothing
-    evaluates it; the shape is how a merge is expressed.
-
-    The tract's table identifier is the table's own `formula_owner_uid`, split from
-    two 64-bit halves into four 32-bit words, which is a different spelling of the
-    same value in a different archive. Measured 2026-09-02 against `22-merge-2x2`.
-    """
-    pair = store.formulas.add()
-    pair.formula_index = len(store.formulas) - 1
-
-    node = pair.formula.AST_node_array.AST_node.add()
-    node.AST_node_type = tsce.ASTNodeArrayArchive.COLON_TRACT_NODE
-    identifier = node.AST_cross_table_reference_extra_info.table_id
-    identifier.uuid_w0 = ownerUid.lower & wordMask
-    identifier.uuid_w1 = ownerUid.lower >> wordBits
-    identifier.uuid_w2 = ownerUid.upper & wordMask
-    identifier.uuid_w3 = ownerUid.upper >> wordBits
-    node.AST_sticky_bits.begin_row_is_absolute = True
-    node.AST_sticky_bits.begin_column_is_absolute = True
-    node.AST_sticky_bits.end_row_is_absolute = True
-    node.AST_sticky_bits.end_column_is_absolute = True
-
-    startRow, startCol, endRow, endCol = merge.bounds
-    tract = node.AST_colon_tract
-    columns = tract.absolute_column.add()
-    columns.range_begin = startCol - originOffset
-    rows = tract.absolute_row.add()
-    rows.range_begin = startRow - originOffset
-    # `range_end` is omitted for a span of one rather than repeating the beginning,
-    # which is how Numbers writes its own and how the reader expects to find them.
-    if endCol != startCol:
-        columns.range_end = endCol - originOffset
-    if endRow != startRow:
-        rows.range_end = endRow - originOffset
-    tract.preserve_rectangular = True
-
-    function = pair.formula.AST_node_array.AST_node.add()
-    function.AST_node_type = tsce.ASTNodeArrayArchive.FUNCTION_NODE
-    function.AST_function_node_index = sumFunctionIndex
-    function.AST_function_node_numArgs = 1
-
-
 def requestRecalculation(
     index: ArchiveIndex,
     owners: dict[int, IWAFile],
@@ -329,5 +384,4 @@ __all__ = [
     "registerFormulaCells",
     "requestRecalculation",
     "tableOwnerIds",
-    "writeMergeFormula",
 ]
