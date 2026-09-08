@@ -63,7 +63,7 @@ against `02-text-rich`, which resolves to exactly the four runs it was built fro
 `l` italic, `l` in the alternate font with OpenType features, `o` underlined and colored. So
 findings can now state which characters a style covers, not just that the style exists.
 
-**Made so far: 00 through 35, plus 22b.** Text and formatting are done. The cell-value
+**Made so far: 00 through 46, plus 22b, 22c, 22d and 22e.** Text and formatting are done. The cell-value
 encoding is broken open for every type. Formulas are fully mapped. Merges, structural edits,
 tiles, sheets, table geometry, the fill subsystem and the floating objects, text boxes,
 shapes and images, are all understood.
@@ -352,6 +352,17 @@ list above may want revising rather than following.
                         position, while every UNCOVERED empty cell a fill touches
                         gains a type-0 record carrying a style and no value. Read this
                         before assuming a merge in Numbers can leave anything behind.
+22d-merge-multi-row     DONE, and it is the first merge in the corpus taller than
+                        one row: all 35 measured before it were single-row, so the
+                        vertical axis of an extent had never been read at all.
+                        Seven columns by five rows, every cell naming its own
+                        address, merged A2:A3, C2:D3 and F2:F4 over content that
+                        was already there. It confirms the 22c result on the
+                        vertical axis, no covered position holds a record, and it
+                        completes the tab-joining finding: Numbers joins swallowed
+                        content row-major, a TAB between columns and a NEWLINE
+                        between rows. 22d-merge-multi-row.csv is what was imported
+                        to make it, the same shape as 27.
 22e-merge-imported      DONE, and only an import produces it. Converted by Numbers
                         from a generated .xlsx, where the format writes a cell for
                         every position of a merged range and a covered one carries a

@@ -105,6 +105,11 @@ extend-exclude = ["src/pybers/_generated", "src/pybers/protos"]
 #        `Args:` or `Returns:` sections.
 select = ["F", "E", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.isort]
+# `conftest` is this repository's own test helpers, so grouping it with pytest
+# would tell a reader it came from somewhere else.
+known-first-party = ["conftest"]
+
 [tool.mypy]
 # Strict on the library, because it already carries full type hints and the
 # measurement showed strict costing five errors more than default. Loose settings

@@ -31,8 +31,9 @@ from pathlib import Path
 import pytest
 
 import pybers
+from conftest import archiveBodies
 from pybers._generated import TSTArchives_pb2 as tst
-from pybers.numbersfile import NumbersPackage, readPackage, writePackage
+from pybers.numbersfile import readPackage, writePackage
 from pybers.numbersfile.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
 from pybers.reader import ReadError
 from pybers.writer import WriteError, rewriteRow, tileTypeId
@@ -47,15 +48,6 @@ clearedCells: tuple[str, ...] = ("B7", "E7", "DV7", "KM7")
 # One synthetic record, the twelve-byte header and nothing after it. Its length
 # is a multiple of four, as every record Numbers writes is.
 alignedRecord: bytes = bytes(12)
-
-
-def archiveBodies(package: NumbersPackage) -> list[tuple[str, int, bytes]]:
-    """Return every archive body in a package, in the order it stores them."""
-    return [
-        (iwaFile.name, archive.identifier, archive.messages[0].data)
-        for iwaFile in package.iwaFiles
-        for archive in iwaFile.archives
-    ]
 
 
 def firstTable(document: pybers.Document) -> pybers.Table:

@@ -54,6 +54,11 @@ text cell separated by tab characters**:
 1 + 10                    ->   '1\t10'      a STRING, not a number
 ```
 
+`22d` completes the rule on the second axis, measured 2026-09-07. The join is **row-major,
+a tab between columns and a newline between rows**, so a two-by-two merge of cells naming
+themselves produces `'two by two, anchor\td2\nc3\td3'`. Every merge in the corpus was one
+row tall until that fixture, which is why only the tab half was known.
+
 Numbers coerces to text, so merging two numeric cells destroys both numbers. `22b` proves the
 loss is permanent: after unmerging, the tab-joined strings remain and the original values are
 gone. **Anything in pybers that merges cells is performing a destructive operation** and
