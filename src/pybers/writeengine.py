@@ -2,13 +2,14 @@
 """\
 What has to be told to the calculation engine when a document is written back.
 
-Three registers, none of them optional, and each one silent when it is wrong.
+There are three registers, none of them optional, and each one is silent when
+it is wrong.
 
 **The engine keeps its own register of which cells hold a formula, stored TWICE**,
 and a cell missing from either is never evaluated. Updating only the first shows
 the formula in the formula bar beside the cell's old value, which is the most
 misleading state available, because the cell looks correct to anyone who clicks
-it. Measured for PYB-42; see findings-02-formulas.md.
+it. Measured for PYB-42, and recorded in findings-02-formulas.md.
 
 **Numbers does not recalculate on open**, so an edited cell has to be named in
 `refs_to_dirty` or its dependents keep showing what they last computed. Naming

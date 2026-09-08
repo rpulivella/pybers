@@ -108,7 +108,7 @@ of the 77 return the identical node array.** All three exceptions are node type 
 
 Types 32 and 33, `APPEND_WHITESPACE` and `PREPEND_WHITESPACE`, carry the spaces and
 newlines a person typed. `19-formula-dragged` holds `SUM($B$1:$D$3)` with a trailing
-newline node; `46-formula-rare-functions` holds four inside one `MAKEARRAY`. Where each one
+newline node, and `46-formula-rare-functions` holds four inside one `MAKEARRAY`. Where each one
 attaches is not established, because postfix order and text order disagree for an operator:
 the body `r * c` of `MAKEARRAY(2,2,LAMBDA(r,c,r*c))` carries one whitespace node for two
 spaces.
@@ -130,8 +130,8 @@ each, matching `numArgs=6`, with type 22 in some omitted positions and type 23 i
 `LAMBDA()` in `46-formula-rare-functions` writes `23 TOKEN(false)` for its empty body.
 
 **Both are nothing, arithmetically.** `K1` is 102900.000166667, and 102900 minutes is 71
-days 11 hours, which is `L1` exactly; the same number read as hours is 4287 days 12 hours,
-which is `M1` exactly. No other argument contributes.
+days 11 hours, which is `L1` exactly. The same number read as hours is 4287 days and
+12 hours, which is `M1` exactly. No other argument contributes.
 
 The rule choosing between 22 and 23 is not established. Type 23 is therefore rendered as
 the omitted argument it behaves as, and typing that text back produces type 22, which is

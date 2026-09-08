@@ -41,9 +41,9 @@ overpaint and column D are all untouched. The copy that was opened is not the co
 committed here.
 
 `20-formula-authored-as-text` is the first golden whose formulas were never read from a
-file. Every earlier one copied, changed or moved a node array Numbers had written; these
-three were built from text by `Cell.formulaText`, so nothing about them inherited archive
-bytes to fall back on. That is what caught the cross-table identity being dropped:
+file. Every earlier one copied, changed or moved a node array Numbers had written. These
+three were built from text by `Cell.formulaText`, so none of them inherited archive bytes
+to fall back on. That is what caught the cross-table identity being dropped:
 `encodeFormulaReference` wrote the coordinates and left the table id to the bytes each node
 was read with, which a node built from text does not have. `B1` read back as `A11*2+1`,
 pointing at its own table, which is a plausible wrong answer rather than an error.

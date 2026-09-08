@@ -7,8 +7,8 @@ testable: comparing hand-written node arrays stops scaling at about a dozen
 cases, and rendering every formula in a real document and parsing it back does
 not. See tests/fixtures/findings-08-formula-text.md.
 
-A stack, because the file is postfix. Each node takes what it needs off the stack
-and puts one piece back, and a complete formula leaves exactly one.
+It walks a stack, because the file is postfix. Each node takes what it needs off
+that stack and puts one piece back, and a complete formula leaves exactly one.
 
 **Brackets are put in from the tree rather than remembered.** The file records no
 parentheses, so two formulas differing only in where they were bracketed differ

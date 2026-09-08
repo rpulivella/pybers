@@ -9,7 +9,7 @@ whichever half happened to need them first.
 
 **A reference carries an identifier and nothing else.** There is no hint of which
 member of which file holds the target, so resolving one means having the whole
-package indexed up front. That is what makes this a module rather than a helper.
+package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
 2026-09-08  Split out of `pybers.reader` for #45, unchanged.

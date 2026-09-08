@@ -10,10 +10,11 @@ Recursive descent, which puts the nodes out in postfix order by construction:
 each rule parses its operands and then emits its own node, which is the order the
 file holds, so nothing is built as a tree and flattened afterward.
 
-**Numbers takes text this refuses to check.** A one-argument ROUND is stored, and
-shown as an error in the cell, so an argument count is not validated here. A
-function Numbers declares and then refuses the name of is written by its
-spelling, which is what Numbers does with it.
+**An argument count is not checked here, because Numbers does not refuse one
+either.** A one-argument ROUND is stored and shown as an error in the cell, so
+refusing it would decline text Numbers itself takes. A function Numbers declares
+and then will not resolve, `ALTITUDE` among them, is written by its spelling,
+which is also what Numbers writes.
 
 **Thunks are put back rather than typed.** Numbers brackets every argument after
 the first of the four functions that evaluate lazily, and a person types none of
