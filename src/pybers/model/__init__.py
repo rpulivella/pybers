@@ -27,14 +27,20 @@ __date__ = "2026/08/12"
 from pybers.model.formula import (
     Coordinate,
     Formula,
+    FormulaBinding,
     FormulaError,
     FormulaFunctionCall,
+    FormulaLambda,
     FormulaNode,
     FormulaRange,
     FormulaReference,
     FormulaUnknownCall,
+    FormulaVariable,
     Span,
 )
+from pybers.model.formulaparse import parseFormula
+from pybers.model.formularender import renderFormula
+from pybers.model.formulasyntax import FormulaSyntaxError
 from pybers.model.functions import (
     ArgumentCountError,
     NumbersFunction,
@@ -79,7 +85,13 @@ __all__ = [
     "FormulaRange",
     "FormulaNode",
     "FormulaError",
+    "FormulaSyntaxError",
+    "FormulaBinding",
+    "FormulaVariable",
+    "FormulaLambda",
     "Formula",
+    "parseFormula",
+    "renderFormula",
     "Coordinate",
     "Cell",
     "CellAddress",
