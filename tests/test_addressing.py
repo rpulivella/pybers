@@ -36,7 +36,7 @@ from pybers.model import (
     columnLetter,
     columnNumber,
 )
-from pybers.model import table as tableModule
+from pybers.table import cells as tableModule
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 

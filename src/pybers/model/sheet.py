@@ -50,7 +50,7 @@ from typing import TYPE_CHECKING, Protocol
 from pybers.addressing.reference import tableNameSeparator
 from pybers.errors import PybersError
 from pybers.model.shapes import GraphicalObject
-from pybers.model.table import Cell, Table
+from pybers.table.cells import Cell, Table
 
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.

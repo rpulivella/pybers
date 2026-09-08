@@ -57,7 +57,7 @@ from pybers._persistence.index import (
 from pybers._persistence.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.errors import WriteError
 from pybers.model import Document, toCellReference
-from pybers.reader import readMerges
+from pybers.table._read import readMerges
 from pybers.writer import writeDocument
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"

@@ -68,8 +68,8 @@ from pybers.model.geometry import Position, Size
 from pybers.model.shapes import GraphicalObject, Image, Shape, TextBox
 from pybers.model.sheet import Document, SelectionError, Sheet
 from pybers.model.style import Style
-from pybers.model.table import Cell, CellValue, MergeRange, Table
 from pybers.model.text import Paragraph, RichText, TextRun
+from pybers.table.cells import Cell, CellValue, MergeRange, Table
 
 # Re-exported explicitly, which a type checker requires of a package that hands on
 # names it did not define. The leaf modules carry no `__all__` of their own: a name

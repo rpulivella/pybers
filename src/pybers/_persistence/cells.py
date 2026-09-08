@@ -16,7 +16,7 @@ contents are known independently.
 
 Values are returned as `Decimal`, never `float`. Numbers stores them as IEEE-754
 decimal128, so `1234.5` is exact; routing it through a binary float would introduce
-rounding error into a document that never had any. See `pybers.model.table`.
+rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
 2026-08-18  Written. Decodes numbers, currency, text, dates, booleans and durations,

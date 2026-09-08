@@ -39,7 +39,7 @@ from pybers._persistence.cells import offsetUnitByte, offsetUnitFor, offsetUnitW
 from pybers._persistence.index import originOffset
 from pybers.addressing.reference import CellReference
 from pybers.errors import ReadError, WriteError
-from pybers.writer import rewriteRow, tileTypeId
+from pybers.table._write import rewriteRow, tileTypeId
 
 fixtures: Path = Path(__file__).parent / "fixtures"
 wideFixture: Path = fixtures / "45-columns-over-255.numbers"
