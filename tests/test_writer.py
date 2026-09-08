@@ -4,7 +4,7 @@ Writing a document back out, asserted archive by archive against what was read.
 
 The comparison here is deliberately not a byte compare of the two files. The zip
 envelope is known to differ by the local extra fields `zipfile` cannot emit, which
-`test_numbersfile_container` pins exactly, and a byte compare at this level would fail
+`test_persistence_container` pins exactly, and a byte compare at this level would fail
 for that reason on every fixture while saying nothing about the document inside.
 So this module compares the decoded archive stream: same members in the same
 order, same archives in the same order, same messages, same contents.
@@ -40,6 +40,14 @@ import pybers
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSTArchives_pb2 as tst
+from pybers._persistence import (
+    CellRecord,
+    NumbersPackage,
+    decodeRow,
+    offsetUnitFor,
+    readPackage,
+)
+from pybers._persistence.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.archives import (
     ArchiveIndex,
     WriteError,
@@ -48,14 +56,6 @@ from pybers.archives import (
     tableInfoTypeId,
 )
 from pybers.model import Document, toCellReference
-from pybers.numbersfile import (
-    CellRecord,
-    NumbersPackage,
-    decodeRow,
-    offsetUnitFor,
-    readPackage,
-)
-from pybers.numbersfile.types import archiveTypeId, archiveTypes, parseArchive
 from pybers.reader import readMerges
 from pybers.writeengine import tableOwnerIds
 from pybers.writer import writeDocument
@@ -181,7 +181,7 @@ def test_everyFixtureWritesBackWithEveryArchiveUnchanged(
 
     Numbers opening the result cleanly is the other half of AC 1 and is not
     assertable from pytest. It rests on the container round trip, confirmed by hand
-    in Numbers 15.3.1 on 2026-08-16 and pinned by `test_numbersfile_container`, which
+    in Numbers 15.3.1 on 2026-08-16 and pinned by `test_persistence_container`, which
     this path writes through unchanged.
     """
     destination = tmp_path / f"{path.stem}-saved.numbers"

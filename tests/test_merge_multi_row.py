@@ -30,9 +30,9 @@ import pytest
 
 import pybers
 from conftest import archiveBodies, recordedRows
+from pybers._persistence import readPackage
 from pybers.model import Table
 from pybers.model.reference import ReferenceError as CellReferenceError
-from pybers.numbersfile import readPackage
 
 fixtures: Path = Path(__file__).parent / "fixtures"
 multiRowFixture: Path = fixtures / "22d-merge-multi-row.numbers"

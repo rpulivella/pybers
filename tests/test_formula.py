@@ -45,9 +45,9 @@ from pybers import (
     Span,
     columnLetter,
 )
+from pybers._persistence import readPackage
+from pybers._persistence.types import archiveTypeId
 from pybers.model.formula import FormulaError
-from pybers.numbersfile import readPackage
-from pybers.numbersfile.types import archiveTypeId
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -527,7 +527,7 @@ def testChangedFormulaMarksItsCellForRecalculation(tmp_path: Path) -> None:
         for archive in list(index.byIdentifier.values()):
             if archiveTypeId(archive) != 4000:
                 continue
-            from pybers.numbersfile.types import parseArchive
+            from pybers._persistence.types import parseArchive
             engine = parseArchive(archive)
             if not engine.HasField("refs_to_dirty"):
                 continue
@@ -668,9 +668,9 @@ def testTheGoldenFilesHoldWhatTheyClaimTo() -> None:
 def formulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
     """Return (row, column, formula key) for every formula-backed cell of a table."""
     from pybers._generated import TSTArchives_pb2 as tst
+    from pybers._persistence import carriesFormula, decodeRow, offsetUnitFor
+    from pybers._persistence.types import archiveTypeId, parseArchive
     from pybers.archives import ArchiveIndex
-    from pybers.numbersfile import carriesFormula, decodeRow, offsetUnitFor
-    from pybers.numbersfile.types import archiveTypeId, parseArchive
     from pybers.writeformula import formulaKeySlot
 
     index = ArchiveIndex(readPackage(path))
@@ -707,8 +707,8 @@ def formulaCellRegister(path: Path) -> tuple[list[tuple[int, int]], ...]:
     correctly today and lies about the document.
     """
     from pybers._generated import TSCEArchives_pb2 as tsce
+    from pybers._persistence.types import parseArchive
     from pybers.archives import ArchiveIndex
-    from pybers.numbersfile.types import parseArchive
 
     index = ArchiveIndex(readPackage(path))
     for archive in list(index.byIdentifier.values()):

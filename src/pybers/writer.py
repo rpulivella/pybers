@@ -43,6 +43,22 @@ from pathlib import Path
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
+from ._persistence import (
+    IWAFile,
+    NumbersPackage,
+    decodeRow,
+    offsetUnitFor,
+    writePackage,
+)
+from ._persistence.cells import (
+    CellRecord,
+    carriesFormula,
+    emptyOffset,
+    formulaKeySlot,
+    offsetWidth,
+    valueOffset,
+)
+from ._persistence.decimal128 import Decimal128, encodedLength
 from .archives import (
     ArchiveIndex,
     WriteError,
@@ -51,22 +67,6 @@ from .archives import (
     tableInfoTypeId,
 )
 from .model import Cell, CellReference, Document, MergeRange, Table
-from .numbersfile import (
-    IWAFile,
-    NumbersPackage,
-    decodeRow,
-    offsetUnitFor,
-    writePackage,
-)
-from .numbersfile.cells import (
-    CellRecord,
-    carriesFormula,
-    emptyOffset,
-    formulaKeySlot,
-    offsetWidth,
-    valueOffset,
-)
-from .numbersfile.decimal128 import Decimal128, encodedLength
 from .readengine import calculationEngine, tableOwnerEntries
 from .reader import readMerges, readRichTextTable, readStringTable, resolveValue
 from .writeengine import (

@@ -34,6 +34,9 @@ from typing import cast
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
+from ._persistence import carriesFormula
+from ._persistence.cells import CellRecord, formulaKeySlot
+from ._persistence.decimal128 import Decimal128
 from .archives import ArchiveIndex, formulaListType, originOffset, readDataList
 from .model import (
     Coordinate,
@@ -63,9 +66,6 @@ from .model.formula import (
     unknownFunctionNodeType,
     variableNodeType,
 )
-from .numbersfile import carriesFormula
-from .numbersfile.cells import CellRecord, formulaKeySlot
-from .numbersfile.decimal128 import Decimal128
 
 # A number literal carries decimal128 as two 64-bit halves rather than as bytes.
 decimalHalfFormat: str = "<QQ"

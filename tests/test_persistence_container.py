@@ -44,7 +44,7 @@ from pathlib import Path
 
 import pytest
 
-from pybers.numbersfile import (
+from pybers._persistence import (
     IWAError,
     decompressRaw,
     isDocumentMember,

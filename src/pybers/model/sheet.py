@@ -53,7 +53,7 @@ from pybers.model.table import Cell, Table
 
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.
-    from pybers.numbersfile import NumbersPackage
+    from pybers._persistence import NumbersPackage
 
 # Sheets and tables both count from one, matching the rest of the model and matching
 # what Numbers shows. The file counts from zero and the two meet only in the reader.
@@ -241,7 +241,7 @@ class Document:
         open, so a dependent formula reads stale here and correct there.
         """
         # Imported here rather than at module scope, because the writer reaches into
-        # `pybers.numbersfile` and the model layer must stay importable without it.
+        # `pybers._persistence` and the model layer must stay importable without it.
         from pybers.writer import writeDocument
 
         writeDocument(self, path)

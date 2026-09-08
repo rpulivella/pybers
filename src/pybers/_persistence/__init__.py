@@ -2,11 +2,13 @@
 """\
 The persistence layer: reading and writing the `.numbers` file on disk.
 
-Split by feature area, matching `pybers.model`: `compression` decodes raw Snappy
-blocks, `iwa` turns a compressed member into archives of raw protobuf messages,
-and `container` handles the zip that holds them. Everything re-exports through
-here so that `pybers.numbersfile.readPackage` stays stable regardless of which module
-a name lives in.
+Private, and named so: nothing here is part of the surface `import pybers` offers,
+and a caller reaching past the underscore has left the supported API. Split by what
+each part reads: `compression` decodes raw Snappy blocks, `iwa` turns a compressed
+member into archives of raw protobuf messages, and `container` handles the zip that
+holds them. Everything re-exports through here so that
+`pybers._persistence.readPackage` stays stable regardless of which module a name
+lives in.
 
 `compression`, `iwa` and `container` stop at message boundaries on purpose. They
 find every archive and every message body and parse none of them, because mapping
@@ -15,6 +17,7 @@ them owns. `types` is that source of truth, and parsing an archive is the one
 thing it does, which keeps the boundary a module apart rather than absent.
 
 UPDATES
+2026-09-08  Renamed from `pybers.numbersfile` and made private, for #58.
 2026-08-31  Added `types`, and corrected this docstring, which claimed the whole
             layer parses nothing. That was true until `types` arrived and would
             have read as a rule the package was breaking.

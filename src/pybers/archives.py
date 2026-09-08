@@ -29,8 +29,8 @@ from google.protobuf.message import Message
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
-from .numbersfile import Archive, NumbersPackage
-from .numbersfile.types import archiveTypeId, parseArchive
+from ._persistence import Archive, NumbersPackage
+from ._persistence.types import archiveTypeId, parseArchive
 
 # The stored format counts rows and columns from zero. The model counts from
 # one, because that is what Numbers shows and what a caller means by "row 1". The

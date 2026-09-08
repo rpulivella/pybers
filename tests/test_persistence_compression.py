@@ -33,8 +33,8 @@ from pathlib import Path
 
 import pytest
 
-from pybers.numbersfile.compression import compressRaw, decompressRaw
-from pybers.numbersfile.iwa import splitFrames
+from pybers._persistence.compression import compressRaw, decompressRaw
+from pybers._persistence.iwa import splitFrames
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 

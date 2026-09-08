@@ -22,7 +22,7 @@ __date__ = "2026/09/01"
 
 import pytest
 
-from pybers.numbersfile.varint import VarintError, readVarint, writeVarint
+from pybers._persistence.varint import VarintError, readVarint, writeVarint
 
 
 @pytest.mark.parametrize(

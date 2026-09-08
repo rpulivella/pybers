@@ -33,7 +33,7 @@ from pathlib import Path
 import pytest
 
 from pybers._generated import TSPArchiveMessages_pb2 as archiveMessages
-from pybers.numbersfile.iwa import (
+from pybers._persistence.iwa import (
     Archive,
     ArchiveMessage,
     IWAError,
@@ -47,7 +47,7 @@ from pybers.numbersfile.iwa import (
     writeArchives,
     writeIWAFile,
 )
-from pybers.numbersfile.varint import readVarint
+from pybers._persistence.varint import readVarint
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 

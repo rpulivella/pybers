@@ -14,7 +14,7 @@ The encoding is protobuf's own, seven bits of payload per byte with the top bit
 marking continuation, little-endian.
 
 UPDATES
-2026-09-01  Split out of pybers.numbersfile.compression, for #2.
+2026-09-01  Split out of pybers._persistence.compression, for #2.
 """
 from __future__ import annotations
 

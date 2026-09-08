@@ -23,7 +23,7 @@ UPDATES
             verified against fixtures 11 through 14.
 2026-09-03  The formula flag moved here from the writer for #41, so the one
             module documenting the record layout owns all of it.
-2026-09-01  Moved the decimal128 codec out to pybers.numbersfile.decimal128, which
+2026-09-01  Moved the decimal128 codec out to pybers._persistence.decimal128, which
             owns the format's limits and its 16-byte form as a real type. This
             module keeps only Apple's own undocumented cell layout.
 """

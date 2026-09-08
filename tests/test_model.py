@@ -2,7 +2,7 @@
 """Smoke tests for the pybers object model, proving the package installs, imports, and
 that the model's basic equality behavior holds before any real archive I/O exists. Real
 round-trip tests (read a fixture .numbers file, write it back unchanged, assert
-byte-for-byte equality) land once pybers.numbersfile exists, see CLAUDE.md.
+byte-for-byte equality) land once pybers._persistence exists, see CLAUDE.md.
 
 UPDATES
 2026-08-12  Initial scaffold.

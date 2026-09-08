@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
+from ._persistence.types import archiveTypeId, parseArchive
 from .archives import (
     ArchiveIndex,
     ReadError,
@@ -32,7 +33,6 @@ from .archives import (
     wordBits,
     wordMask,
 )
-from .numbersfile.types import archiveTypeId, parseArchive
 
 
 def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:

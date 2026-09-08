@@ -8,7 +8,7 @@ this format produces plausible wrong numbers rather than an exception, so a deco
 only be checked against content established outside itself.
 
 UPDATES
-2026-08-18  Written with pybers.numbersfile.cells.
+2026-08-18  Written with pybers._persistence.cells.
 2026-09-01  Added the encoder and the caller-context regression, for #2.
 """
 from __future__ import annotations
@@ -27,8 +27,8 @@ from pathlib import Path
 
 import pytest
 
-from pybers.numbersfile import readPackage
-from pybers.numbersfile.cells import (
+from pybers._persistence import readPackage
+from pybers._persistence.cells import (
     decodeRow,
     offsetUnitFor,
 )
@@ -186,7 +186,7 @@ def testUnknownTypeIsPreservedRatherThanRejected() -> None:
     hypothetical. A library whose first duty is not to damage documents has to carry
     through what it does not understand.
     """
-    from pybers.numbersfile.cells import decodeRecord
+    from pybers._persistence.cells import decodeRecord
 
     record = bytes([5, 99, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) + b"\x01\x00\x00\x00"
     decoded = decodeRecord(0, record)
@@ -206,7 +206,7 @@ def testRichTextCellConsumesItsPayloadKey() -> None:
 
     Built by hand so it tests the decoder rather than a fixture.
     """
-    from pybers.numbersfile.cells import decodeRecord
+    from pybers._persistence.cells import decodeRecord
 
     record = (
         bytes([5, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])

@@ -2,7 +2,7 @@
 """\
 Turn a `.numbers` package into the object model: the read half of the binding.
 
-`pybers.numbersfile` reads the container and decodes cell records; `pybers.model`
+`pybers._persistence` reads the container and decodes cell records; `pybers.model`
 holds the dataclasses. Neither knows about the other, and this module is what
 joins them. It lives outside `pybers.model` on purpose, so that importing the
 model never drags in the persistence layer. See CLAUDE.md, "Document is the
@@ -52,6 +52,13 @@ from typing import cast
 from ._generated import TNArchives_pb2 as tn
 from ._generated import TSTArchives_pb2 as tst
 from ._generated import TSWPArchives_pb2 as tswp
+from ._persistence import (
+    CellDecodeError,
+    decodeRow,
+    offsetUnitFor,
+    readPackage,
+)
+from ._persistence.cells import CellRecord
 from .archives import (
     ArchiveIndex,
     ReadError,
@@ -71,18 +78,11 @@ from .model import (
     Sheet,
     Table,
 )
-from .numbersfile import (
-    CellDecodeError,
-    decodeRow,
-    offsetUnitFor,
-    readPackage,
-)
-from .numbersfile.cells import CellRecord
 from .readengine import tableIdentities
 from .readformula import readFormulaTable, resolveFormula
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
-# rather than the value itself. See `pybers.numbersfile.cells`.
+# rather than the value itself. See `pybers._persistence.cells`.
 stringKeyType: int = 3
 richTextKeyType: int = 9
 

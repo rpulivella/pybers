@@ -15,7 +15,7 @@ varint preamble states the uncompressed length independently of the tag stream,
 so a decode that drifts is caught rather than returning plausible garbage.
 
 An unmodified frame is still written from the bytes it was read from, see
-`pybers.numbersfile.iwa`, so the encoder here runs only on a frame that was genuinely
+`pybers._persistence.iwa`, so the encoder here runs only on a frame that was genuinely
 rewritten. It emits back-references rather than a stream of literals because the
 difference is large: measured across the 2,811 frames of the fixture corpus on
 2026-09-01, Apple's own encoder reaches 0.183x and an all-literal encoding measures
@@ -29,7 +29,7 @@ UPDATES
 2026-08-16  Written. Validated against all 213 frames of empty-1/2/3.numbers:
             every frame decoded to exactly its declared uncompressed length.
 2026-09-01  Added the encoder for #2, so a rewritten frame can be stored.
-2026-09-01  Varints moved to pybers.numbersfile.varint, which the IWA archive
+2026-09-01  Varints moved to pybers._persistence.varint, which the IWA archive
             stream needs as much as this codec does.
 """
 from __future__ import annotations

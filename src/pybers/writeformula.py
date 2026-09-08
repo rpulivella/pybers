@@ -35,6 +35,16 @@ from typing import cast
 
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSTArchives_pb2 as tst
+from ._persistence.cells import (
+    CellRecord,
+    carriesFormula,
+    decodeCellValue,
+    formulaFlagBit,
+    formulaFlagOffset,
+    formulaKeySlot,
+    valueOffset,
+)
+from ._persistence.decimal128 import Decimal128
 from .archives import ArchiveIndex, WriteError, originOffset
 from .model import (
     Cell,
@@ -54,16 +64,6 @@ from .model.formula import (
     brokenColumnSentinel,
     brokenRowSentinel,
 )
-from .numbersfile.cells import (
-    CellRecord,
-    carriesFormula,
-    decodeCellValue,
-    formulaFlagBit,
-    formulaFlagOffset,
-    formulaKeySlot,
-    valueOffset,
-)
-from .numbersfile.decimal128 import Decimal128
 from .readformula import ColonTractAxis, decimalHalfFormat, readFormulaTable
 
 # Every trailing reference in a cell record is a little-endian uint32.

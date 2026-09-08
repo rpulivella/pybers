@@ -37,6 +37,8 @@ from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPMessages_pb2 as tsp
 from ._generated import TSTArchives_pb2 as tst
+from ._persistence import IWAFile
+from ._persistence.types import archiveTypeId, parseArchive
 from .archives import (
     ArchiveIndex,
     WriteError,
@@ -46,8 +48,6 @@ from .archives import (
     wordMask,
 )
 from .model import MergeRange
-from .numbersfile import IWAFile
-from .numbersfile.types import archiveTypeId, parseArchive
 from .readengine import (
     TableOwner,
     tableOwnerEntries,
