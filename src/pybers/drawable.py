@@ -3,6 +3,8 @@
 grid, text boxes, images, and vector shapes.
 
 UPDATES
+2026-09-08  Renamed from `shapes` and moved out of `pybers.model` for #58,
+            since a text box and an image are drawables and neither is a shape.
 2026-08-12  Initial scaffold.
 """
 
@@ -18,9 +20,9 @@ __date__ = "2026/08/12"
 
 from dataclasses import dataclass, field
 
-from pybers.model.geometry import Position, Size
-from pybers.model.style import Style
-from pybers.model.text import RichText
+from pybers.geometry import Position, Size
+from pybers.style import Style
+from pybers.text import RichText
 
 
 @dataclass(slots=True)

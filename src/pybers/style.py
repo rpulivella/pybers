@@ -2,6 +2,7 @@
 """Appearance, the properties shared by cells, shapes, and text runs.
 
 UPDATES
+2026-09-08  Moved out of `pybers.model` for #58, unchanged.
 2026-08-12  Initial scaffold.
 """
 

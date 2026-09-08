@@ -38,6 +38,7 @@ from pybers.addressing.reference import (
     columnNumber,
     toCellReference,
 )
+from pybers.drawable import GraphicalObject, Image, Shape, TextBox
 from pybers.formula.functions import (
     ArgumentCountError,
     NumbersFunction,
@@ -64,12 +65,11 @@ from pybers.formula.nodes import (
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.formula.syntax import FormulaSyntaxError
-from pybers.model.geometry import Position, Size
-from pybers.model.shapes import GraphicalObject, Image, Shape, TextBox
+from pybers.geometry import Position, Size
 from pybers.model.sheet import Document, SelectionError, Sheet
-from pybers.model.style import Style
-from pybers.model.text import Paragraph, RichText, TextRun
+from pybers.style import Style
 from pybers.table.cells import Cell, CellValue, MergeRange, Table
+from pybers.text import Paragraph, RichText, TextRun
 
 # Re-exported explicitly, which a type checker requires of a package that hands on
 # names it did not define. The leaf modules carry no `__all__` of their own: a name

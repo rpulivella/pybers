@@ -51,7 +51,7 @@ from pybers.addressing.reference import (
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
-from pybers.model.style import Style
+from pybers.style import Style
 
 if TYPE_CHECKING:
     # Guarded because `sheet` imports this module, and the link back is a type

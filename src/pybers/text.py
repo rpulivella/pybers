@@ -8,6 +8,7 @@ primitive TextBox uses today; it is also the natural home for intra-cell rich te
 that is ever needed, not yet wired into Cell.
 
 UPDATES
+2026-09-08  Moved out of `pybers.model` for #58, unchanged.
 2026-08-12  Initial scaffold.
 """
 
@@ -23,7 +24,7 @@ __date__ = "2026/08/12"
 
 from dataclasses import dataclass, field
 
-from pybers.model.style import Style
+from pybers.style import Style
 
 
 @dataclass(frozen=True, slots=True)

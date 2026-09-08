@@ -3,6 +3,7 @@
 as opposed to cells, which are placed by row/column in a table's grid.
 
 UPDATES
+2026-09-08  Moved out of `pybers.model` for #58, unchanged.
 2026-08-12  Initial scaffold.
 """
 
