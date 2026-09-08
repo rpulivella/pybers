@@ -37,6 +37,13 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
+from pybers.addressing.ranges import CellRange
+from pybers.addressing.reference import (
+    CellAddress,
+    CellReference,
+    ReferenceError,
+    toCellReference,
+)
 from pybers.model.formula import (
     Formula,
     FormulaBinding,
@@ -90,13 +97,6 @@ from pybers.model.formulasyntax import (
     unquote,
 )
 from pybers.model.functions import FunctionAvailability, functionsByName
-from pybers.model.ranges import CellRange
-from pybers.model.reference import (
-    CellAddress,
-    CellReference,
-    ReferenceError,
-    toCellReference,
-)
 
 
 @dataclass(slots=True)

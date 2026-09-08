@@ -37,8 +37,8 @@ from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypeId
+from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.model import MergeRange, Table
-from pybers.model.reference import ReferenceError as CellReferenceError
 
 fixtures: Path = Path(__file__).parent / "fixtures"
 importedFixture: Path = fixtures / "22e-merge-imported.numbers"

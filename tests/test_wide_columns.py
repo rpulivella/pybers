@@ -37,8 +37,8 @@ from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
 from pybers._persistence.index import originOffset
+from pybers.addressing.reference import CellReference
 from pybers.errors import ReadError, WriteError
-from pybers.model.reference import CellReference
 from pybers.writer import rewriteRow, tileTypeId
 
 fixtures: Path = Path(__file__).parent / "fixtures"

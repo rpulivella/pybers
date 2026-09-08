@@ -47,8 +47,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from pybers.addressing.reference import tableNameSeparator
 from pybers.errors import PybersError
-from pybers.model.reference import tableNameSeparator
 from pybers.model.shapes import GraphicalObject
 from pybers.model.table import Cell, Table
 

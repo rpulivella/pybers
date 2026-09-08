@@ -30,7 +30,7 @@ single-cell reference therefore finds nothing and reports everything unlocked.
 
 **Unboundedness is absence.** `SUM(A)` stores a column and no row at all, so a
 row of `None` means the whole column rather than row zero. The same rule
-`pybers.model.ranges` already follows.
+`pybers.addressing.ranges` already follows.
 
 UPDATES
 2026-09-08  The operator node types, the thunking functions, and content
@@ -56,6 +56,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from pybers.addressing.ranges import CellRange
+from pybers.addressing.reference import CellReference
 from pybers.errors import PybersError
 from pybers.model.functions import (
     ArgumentCountError,
@@ -65,8 +67,6 @@ from pybers.model.functions import (
     functionNamed,
     functionNameFor,
 )
-from pybers.model.ranges import CellRange
-from pybers.model.reference import CellReference
 
 # The node types this model gives meaning to. Every other type is carried through
 # untouched: the node message has 45 fields and the corpus uses 16, so a model

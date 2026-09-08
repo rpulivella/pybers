@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One cell's address, and the column letter conversion everything else reaches for.
 
-Rectangles live in `pybers.model.ranges`, which imports this module and never the
+Rectangles live in `pybers.addressing.ranges`, which imports this module and never the
 other way around. The split is by what each has to represent: a single cell always
 has a row and a column, and only a range has to express the absence of one.
 
@@ -16,6 +16,7 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
 2026-09-01  Written for #9, replacing the loose reference helpers in `table.py`.
 """
 from __future__ import annotations

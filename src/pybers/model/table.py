@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A table's grid, the cells in it, and the regions merged across it.
 
-Addressing lives in `pybers.model.reference` and `pybers.model.ranges`. Nothing
+Addressing lives in `pybers.addressing`. Nothing
 here takes a bare row and column pair, so the only way to name a cell is with an
 address that has already been validated.
 
@@ -39,11 +39,8 @@ from dataclasses import dataclass, field
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING
 
-from pybers.model.formula import Formula
-from pybers.model.formulaparse import parseFormula
-from pybers.model.formularender import renderFormula
-from pybers.model.ranges import CellRange, RangeAddress, toCellRanges
-from pybers.model.reference import (
+from pybers.addressing.ranges import CellRange, RangeAddress, toCellRanges
+from pybers.addressing.reference import (
     CellAddress,
     CellReference,
     ReferenceError,
@@ -51,6 +48,9 @@ from pybers.model.reference import (
     firstRow,
     toCellReference,
 )
+from pybers.model.formula import Formula
+from pybers.model.formulaparse import parseFormula
+from pybers.model.formularender import renderFormula
 from pybers.model.style import Style
 
 if TYPE_CHECKING:

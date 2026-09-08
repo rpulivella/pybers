@@ -36,6 +36,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from pybers.addressing.ranges import RangeEndpoint, endpointText
+from pybers.addressing.reference import (
+    CellAddress,
+    CellReference,
+    tableNameSeparator,
+    toCellReference,
+)
 from pybers.model.formula import (
     Formula,
     FormulaBinding,
@@ -75,13 +82,6 @@ from pybers.model.formulasyntax import (
     percentSymbol,
     quoted,
     thunkNodeTypes,
-)
-from pybers.model.ranges import RangeEndpoint, endpointText
-from pybers.model.reference import (
-    CellAddress,
-    CellReference,
-    tableNameSeparator,
-    toCellReference,
 )
 
 

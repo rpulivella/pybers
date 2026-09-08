@@ -24,6 +24,20 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
+from pybers.addressing.ranges import (
+    CellRange,
+    CellRangeList,
+    RangeAddress,
+    toCellRanges,
+)
+from pybers.addressing.reference import (
+    CellAddress,
+    CellReference,
+    ReferenceError,
+    columnLetter,
+    columnNumber,
+    toCellReference,
+)
 from pybers.model.formula import (
     Coordinate,
     Formula,
@@ -51,15 +65,6 @@ from pybers.model.functions import (
     functionNameFor,
 )
 from pybers.model.geometry import Position, Size
-from pybers.model.ranges import CellRange, CellRangeList, RangeAddress, toCellRanges
-from pybers.model.reference import (
-    CellAddress,
-    CellReference,
-    ReferenceError,
-    columnLetter,
-    columnNumber,
-    toCellReference,
-)
 from pybers.model.shapes import GraphicalObject, Image, Shape, TextBox
 from pybers.model.sheet import Document, SelectionError, Sheet
 from pybers.model.style import Style

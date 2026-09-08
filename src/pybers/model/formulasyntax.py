@@ -36,6 +36,8 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from pybers.addressing.ranges import CellRange
+from pybers.addressing.reference import CellReference, tableNameSeparator
 from pybers.model.formula import (
     Coordinate,
     FormulaError,
@@ -64,8 +66,6 @@ from pybers.model.formula import (
     prependWhitespaceNodeType,
     subtractionNodeType,
 )
-from pybers.model.ranges import CellRange
-from pybers.model.reference import CellReference, tableNameSeparator
 
 # The equals sign Numbers shows in front of a formula and never stores. Rendered
 # because that is what a person reads in the formula bar, and optional on the way

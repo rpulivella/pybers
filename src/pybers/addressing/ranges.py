@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A rectangle of cells, and a list of rectangles addressed at once.
 
-Split from `pybers.model.reference` because only a range has to represent the
+Split from `pybers.addressing.reference` because only a range has to represent the
 absence of a coordinate. A whole-column reference is a column with no row at all,
 which is how the file stores it too, and no single-cell address may hold that.
 
@@ -11,6 +11,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
 2026-09-01  Written for #9.
 """
 from __future__ import annotations
@@ -27,7 +28,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
-from pybers.model.reference import (
+from pybers.addressing.reference import (
     CellAddress,
     CellReference,
     ReferenceError,

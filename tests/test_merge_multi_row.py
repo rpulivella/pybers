@@ -31,8 +31,8 @@ import pytest
 import pybers
 from conftest import archiveBodies, recordedRows
 from pybers._persistence import readPackage
+from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.model import Table
-from pybers.model.reference import ReferenceError as CellReferenceError
 
 fixtures: Path = Path(__file__).parent / "fixtures"
 multiRowFixture: Path = fixtures / "22d-merge-multi-row.numbers"

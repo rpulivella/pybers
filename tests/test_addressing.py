@@ -25,6 +25,7 @@ from pathlib import Path
 import pytest
 
 import pybers
+from pybers.addressing import reference as referenceModule
 from pybers.model import (
     CellRange,
     CellRangeList,
@@ -35,7 +36,6 @@ from pybers.model import (
     columnLetter,
     columnNumber,
 )
-from pybers.model import reference as referenceModule
 from pybers.model import table as tableModule
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
