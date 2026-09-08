@@ -345,6 +345,22 @@ list above may want revising rather than following.
                         THE PATTERN WORTH REUSING: when a feature cannot be located,
                         make the same file with and without it. Two files differing in
                         one property beat any amount of searching by field name.
+22c-merge-overpaints    DONE, and it is a NEGATIVE result kept on purpose. Four
+                        gestures, in rows 1, 3 and 5: content then merge, style then
+                        merge, a whole-row fill painted over an existing merge, and a
+                        whole-column fill over one. None writes a record at a covered
+                        position, while every UNCOVERED empty cell a fill touches
+                        gains a type-0 record carrying a style and no value. Read this
+                        before assuming a merge in Numbers can leave anything behind.
+22e-merge-imported      DONE, and only an import produces it. Converted by Numbers
+                        from a generated .xlsx, where the format writes a cell for
+                        every position of a merged range and a covered one carries a
+                        style and no value. Numbers keeps each of them, on import and
+                        across every later edit, which is what made a real document
+                        fail to open. A covered cell given both a style and a value in
+                        Excel is DISCARDED, so a covered record never holds one.
+                        22e-merge-imported.py writes the .xlsx beside it, which is
+                        then opened in Numbers and saved, the same shape as 27.
 23-row-inserted         DONE, and it explained an existing bug. Numbers DOES rewrite
                         merge ranges on a structural edit, the originals moved from
                         row 0 to row 1. Inserted rows also INHERIT the merge pattern
