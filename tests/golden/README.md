@@ -27,6 +27,16 @@ other when reaching for something to test against.
 | `18-formula-attached-and-detached.numbers` | `18-formula-literals.numbers` | `=1+1` attached to `A2`, which held only the text label; `B1`'s `=2*3` detached | 2026-09-04, Numbers 15.3.1, re-confirmed the same day after the pool began sharing |
 | `18-formula-created-in-empty-cell.numbers` | `18-formula-literals.numbers` | `=SUM(1,2,3)` written into `H1`, which had no cell record at all | 2026-09-04, Numbers 15.3.1, re-confirmed the same day after the pool began sharing |
 | `20-formula-filled-across.numbers` | `20-formula-shapes.numbers` | `A11`'s `SUM(A1:A10)` filled across `A11:D11` | 2026-09-04, Numbers 15.3.1 |
+| `22c-merged-by-pybers.numbers` | `22c-merge-overpaints.numbers` | `L3:M3` merged, dropping the style-only record `M3` carried | 2026-09-07, Numbers 15.3.1 |
+
+`22c-merged-by-pybers` is the first golden where pybers REMOVED a record rather than
+adding or changing one. A merge Numbers makes leaves nothing at a covered position, but a
+merge imported from Excel leaves a style-only record at each, and pybers clears those when
+it makes a merge of its own. That is a stricter cleanup than Numbers performs, so only
+Numbers could say the result still opens. Confirmed 2026-09-07: no repair prompt, `L3:M3`
+renders as one merged cell keeping row 3's fill, and the other thirteen merges, row 5's
+overpaint and column D are all untouched. The copy that was opened is not the copy
+committed here.
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `applyDocumentEdits` walking sheets and
