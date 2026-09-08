@@ -102,11 +102,11 @@ Two consequences that are easy to get wrong:
   that were read rather than constructing new ones, so that whatever the model does not
   yet represent survives untouched. That state is private, and excluded from equality and
   `repr`, so `Document` still reads as a dataclass to a caller.
-- **No module under `pybers.model` may import `pybers.numbersfile` at module scope.**
+- **A feature's model types never import its archive halves at module scope.**
   Whatever mechanism `Document.save()` uses to reach the writer, a function-local import
   is the only form allowed, and `sheet.py` guards its one type reference behind
   `TYPE_CHECKING`. Stated as a rule about the model's own modules because that is what is
-  enforceable: `import pybers.model` runs `pybers/__init__.py` first, which imports
+  enforceable: importing a feature runs `pybers/__init__.py` first, which imports
   `pybers.reader`, so the persistence layer arrives regardless. The earlier wording said
   the model stays importable without it, which was never true through the ordinary path.
 

@@ -13,7 +13,8 @@ this codebase have built it this way?**
 ---
 
 **Design** — Is the work at the right altitude? Does it belong in the object model
-(`pybers.model`), the persistence layer (`pybers.numbersfile`), or the CLI/TUI layer — and does
+(the feature that owns it), the persistence layer (`pybers._persistence`), or the
+CLI/TUI layer, and does
 it stay there? Building archive-format knowledge into the object model, or vice versa, is
 the same defect seen from opposite sides.
 
