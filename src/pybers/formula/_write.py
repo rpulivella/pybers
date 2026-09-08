@@ -47,7 +47,6 @@ from .._persistence.cells import (
 from .._persistence.decimal128 import Decimal128
 from .._persistence.index import ArchiveIndex, originOffset
 from ..errors import WriteError
-from ..table.cells import Cell
 from ._read import ColonTractAxis, decimalHalfFormat, readFormulaTable
 from .nodes import (
     Coordinate,
@@ -446,7 +445,9 @@ def formulaPoolFor(
     )
 
 
-def formulaEdit(cell: Cell, record: CellRecord, pool: FormulaPool | None) -> str:
+def formulaEdit(
+    formula: Formula | None, record: CellRecord, pool: FormulaPool | None
+) -> str:
     """Return which of the four things happened to this cell's formula.
 
     `attach`, `detach`, `replace`, or `none`. Named rather than returned as a pair
@@ -463,13 +464,13 @@ def formulaEdit(cell: Cell, record: CellRecord, pool: FormulaPool | None) -> str
         return "none"
     slot = formulaKeySlot(record)
     stored = carriesFormula(record) and len(record.references) > slot
-    if cell.formula is not None and not stored:
+    if formula is not None and not stored:
         return "attach"
-    if cell.formula is None and stored:
+    if formula is None and stored:
         return "detach"
-    if cell.formula is not None and stored:
+    if formula is not None and stored:
         previous = pool.formulaFor(record.references[slot])
-        return "replace" if cell.formula != previous else "none"
+        return "replace" if formula != previous else "none"
     return "none"
 
 

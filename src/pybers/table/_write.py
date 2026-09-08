@@ -277,7 +277,7 @@ def applyTableEdits(
                 if cell is None:
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
-                edit = formulaEdit(cell, record, pool)
+                edit = formulaEdit(cell.formula, record, pool)
                 if not valueChanged and edit == "none":
                     continue
                 patched = record.raw

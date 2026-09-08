@@ -35,8 +35,7 @@ from pybers.addressing import (
     toCellRanges,
     toCellReference,
 )
-from pybers.document import Document, SelectionError, Sheet
-from pybers.document._read import open
+from pybers.document import Document, SelectionError, Sheet, open
 from pybers.drawable import GraphicalObject, Image, Shape, TextBox
 from pybers.errors import PybersError, ReadError, WriteError
 from pybers.formula import (
