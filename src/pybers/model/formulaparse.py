@@ -489,7 +489,7 @@ def parseFormula(
         body = body[len(formulaMarker):]
     return Parser(
         text=body,
-        tokens=tokenize(body),
+        tokens=tokenize(body, tuple(tables or ())),
         host=toCellReference(host),
         tables=tables or {},
         pieces=pieces or {},

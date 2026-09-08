@@ -33,7 +33,7 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from pybers.model.formula import (
@@ -231,14 +231,20 @@ def quoted(text: str) -> str:
     return f'"{escaped}"'
 
 
-def tokenize(text: str) -> list[Token]:
+def tokenize(text: str, tables: Sequence[str] = ()) -> list[Token]:
     """Return the tokens of one formula, each carrying the offset it began at.
 
     Addresses are recognized here rather than in the parser, because a qualified
     one carries spaces and a table name cannot be found by looking at one
-    character. What is left ambiguous is deliberate: bare letters are a `name`,
-    and only the parser knows whether `A` is a column or a value `LET` bound.
+    character. `tables` is every name this document answers to, matched literally
+    so that a table called `Sales (EU)` or `2026` is read as its own name rather
+    than as a bracket or a number. What is left ambiguous is deliberate: bare
+    letters are a `name`, and only the parser knows whether `A` is a column or a
+    value `LET` bound.
     """
+    # Longest first, so `Sheet 2::Table 1` is taken whole rather than as a table
+    # called `Sheet 2` that happens to share the prefix.
+    known = sorted(tables, key=len, reverse=True)
     tokens: list[Token] = []
     position = 0
     while position < len(text):
@@ -258,7 +264,7 @@ def tokenize(text: str) -> list[Token]:
             position = match.end()
             continue
         if character in "({" or character.isalnum() or character in "$.#":
-            token = readValueToken(text, position)
+            token = readValueToken(text, position, known)
             if token is not None:
                 tokens.append(token)
                 position += token.width
@@ -297,13 +303,41 @@ def tokenize(text: str) -> list[Token]:
     return tokens
 
 
-def readValueToken(text: str, position: int) -> Token | None:
+def readQualifier(text: str, position: int, known: Sequence[str]) -> str:
+    """Return the `Table 2::` prefix at this offset, matching known names first.
+
+    A name is matched literally when the document supplies one, which is the only
+    way to read `Sales (EU)::A1` or `2026::A1`: no rule over characters can say
+    where a name Numbers permits ends. The pattern is the fallback, so a caller
+    with no names still parses the ordinary spellings and still gets told which
+    table it named.
+    """
+    for name in known:
+        if text.startswith(name + tableNameSeparator, position):
+            return name + tableNameSeparator
+    match = qualifierPattern.match(text, position)
+    return "" if match is None else match.group()
+
+
+def readValueToken(
+    text: str, position: int, known: Sequence[str] = ()
+) -> Token | None:
     """Return the number, address, name or placeholder starting here, or None.
 
     None rather than an error, so the caller can go on to try the operators. The
-    order matters once: a qualifier is looked for before an address, since
-    `Table 2::A1` begins with letters that are themselves a column label.
+    order matters once: a qualifier is looked for before a number or an address,
+    since `2026::A1` begins with digits and `Table 2::A1` with a column label.
     """
+    prefix = readQualifier(text, position, known)
+    if prefix:
+        start = position + len(prefix)
+        address = addressPattern.match(text, start)
+        if address is None:
+            return None
+        return Token(
+            "address", address.group(), position,
+            len(prefix) + len(address.group()), prefix,
+        )
     placeholder = placeholderPattern.match(text, position)
     if placeholder is not None:
         return Token(
@@ -315,11 +349,8 @@ def readValueToken(text: str, position: int) -> Token | None:
     number = numberPattern.match(text, position)
     if number is not None:
         return Token("number", number.group(), position, len(number.group()))
-    qualifier = qualifierPattern.match(text, position)
-    prefix = "" if qualifier is None else qualifier.group()
-    start = position + len(prefix)
-    address = addressPattern.match(text, start)
-    word = identifierPattern.match(text, start)
+    address = addressPattern.match(text, position)
+    word = identifierPattern.match(text, position)
     if address is None and word is None:
         return None
     # A word reaching further than an address is one: `LAMBDA.APPLY` and `my_rate`
@@ -327,16 +358,14 @@ def readValueToken(text: str, position: int) -> Token | None:
     if word is not None and (address is None or len(word.group()) > len(
         address.group()
     )):
-        return Token("name", word.group(), position, len(prefix) + len(
-            word.group()
-        ), prefix)
+        return Token("name", word.group(), position, len(word.group()))
     if address is None:
         return None
     body = address.group()
     # Bare letters are as much a function name or a bound value as a column, and
     # only the parser knows which, so the distinction is left to it.
-    kind = "name" if not prefix and body.isalpha() else "address"
-    return Token(kind, body, position, len(prefix) + len(body), prefix)
+    kind = "name" if body.isalpha() else "address"
+    return Token(kind, body, position, len(body))
 
 
 def qualifierIdentity(
