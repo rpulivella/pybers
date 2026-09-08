@@ -81,6 +81,23 @@ it instead names no table at all, which is a plausible wrong answer rather than 
 So `Table.identifier` is read the long way round, from the engine, exactly as
 `internal_formula_owner_id` already was.
 
+## A table name cannot be found by a rule over characters
+
+Every fixture names its tables `Table 1` and `Table 2`, so nothing in the corpus says what
+a real one looks like. Numbers permits a bracket, a comma, a quote, a colon and a name of
+digits alone, and `Sales (EU)::A1` is a formula it accepts. No character class can say
+where such a name ends: the comma of `Sales, net::A1` is also the comma that separates
+arguments.
+
+So a qualifier is matched against the names the document carries, longest first, and the
+pattern is only the fallback for a caller that supplied none. That reads `2026::A1`, whose
+first token is otherwise a number, and `SUM::A1`, whose first token is otherwise a
+function.
+
+The one spelling this cannot read is a name whose own first character is whitespace, since
+a formula skips the gap between tokens and the two are indistinguishable. Refused by name
+rather than misread, and Numbers has never been seen to keep one.
+
 ## Round tripping is exact for what a person can type, and not otherwise
 
 Every formula in the corpus, 77 across the fixtures, renders to text and parses back. **74
