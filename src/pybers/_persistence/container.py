@@ -16,8 +16,8 @@ the method travels with the member.
 This is the deliberate opposite of how the IWA frame flag is handled one layer
 down. There, an unknown value raises, because handling it would mean shipping an
 untestable decoder. Here, the variation costs one field to carry and nothing to
-support, and carrying it makes the round trip robust to a file this developer has
-not seen yet. Record what varies; refuse what cannot be verified.
+support, and a reader that carries it survives a file this developer has not
+seen yet. Record what varies; refuse what cannot be verified.
 
 UPDATES
 2026-08-16  Written. Round-trips empty-1/2/3.numbers byte for byte.

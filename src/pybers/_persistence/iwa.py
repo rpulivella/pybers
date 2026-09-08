@@ -11,7 +11,7 @@ followed by the message bodies its `message_infos` describe.
 Message bodies are kept as **raw bytes**, deliberately, and are not parsed here.
 Two reasons. Deciding which protobuf class a `type` identifier maps to is a
 separate concern with its own source of truth, and it does not belong in the
-layer that finds message boundaries. More importantly, protobuf re-serialization
+layer that finds message boundaries. The second is that protobuf re-serialization
 is not guaranteed to reproduce the input byte for byte, field ordering and
 varint encoding both have latitude, so a reader that parsed eagerly could not
 promise the round trip this library is built around.
