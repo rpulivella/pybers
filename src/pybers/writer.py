@@ -1017,6 +1017,22 @@ def writeMergeFormula(
     function.AST_function_node_numArgs = 1
 
 
+def mergesAdded(table: Table, model: tst.TableModelArchive) -> list[MergeRange]:
+    """Return the merges the model holds that the stored archive does not.
+
+    Compared against what is stored rather than tracked as merges are added, for
+    the same reason `applyMerges` does it: a caller reaches `mergeRanges`
+    directly, so a flag set at `mergeAdd` would go stale.
+
+    **Call this BEFORE `applyMerges`**, which rewrites the very store it reads.
+    Measured 2026-09-07 on `22c-merge-overpaints`: the same call returns one
+    merge before and none after, so the wrong order leaves every covered position
+    unswallowed and raises nothing.
+    """
+    stored = {str(merge.extent) for merge in readMerges(model)}
+    return [merge for merge in table.mergeRanges if str(merge.extent) not in stored]
+
+
 def applyMerges(
     table: Table, model: tst.TableModelArchive, ownerUid: tsp.UUID
 ) -> frozenset[tuple[int, int]]:
@@ -1157,11 +1173,13 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
             entry = ownerEntryFor(entries, tableReference.identifier, table.name)
 
-            # A cell a merge swallowed has NO record in the file, so its record is
-            # dropped rather than left behind as an empty one Numbers never wrote.
+            # Only a merge being ADDED clears its covered positions. One already
+            # in the file may carry a style-only record at each of them, which an
+            # XLSX import writes and Numbers then keeps forever, and stripping
+            # those would rewrite a document the caller only asked to save.
             swallowed = frozenset(
                 (reference.row - originOffset, reference.col - originOffset)
-                for merge in table.mergeRanges
+                for merge in mergesAdded(table, model)
                 for reference in merge.extent
                 if reference != merge.anchor
             )

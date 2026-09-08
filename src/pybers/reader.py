@@ -570,9 +570,15 @@ def readTable(
                     f"{row + originOffset}: {exc}"
                 ) from exc
             for record in records:
-                cell = table.cell(
-                    CellReference(row + originOffset, record.column + originOffset)
+                reference = CellReference(
+                    row + originOffset, record.column + originOffset
                 )
+                # A merge imported from Excel keeps a style-only record at every
+                # covered position, and the model has no cell there to hold one.
+                # The archive carries it through untouched, so nothing is lost.
+                if not table.addressable(reference):
+                    continue
+                cell = table.cell(reference)
                 cell.value = resolveValue(record, strings, richText)
                 # Each cell is given its own Formula even where the archive is
                 # shared, so an edit to one cannot reach another. Frozen, so
