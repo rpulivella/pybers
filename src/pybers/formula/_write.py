@@ -33,9 +33,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import cast
 
-from ._generated import TSCEArchives_pb2 as tsce
-from ._generated import TSTArchives_pb2 as tst
-from ._persistence.cells import (
+from .._generated import TSCEArchives_pb2 as tsce
+from .._generated import TSTArchives_pb2 as tst
+from .._persistence.cells import (
     CellRecord,
     carriesFormula,
     decodeCellValue,
@@ -44,28 +44,26 @@ from ._persistence.cells import (
     formulaKeySlot,
     valueOffset,
 )
-from ._persistence.decimal128 import Decimal128
-from ._persistence.index import ArchiveIndex, originOffset
-from .errors import WriteError
-from .model import (
-    Cell,
+from .._persistence.decimal128 import Decimal128
+from .._persistence.index import ArchiveIndex, originOffset
+from ..errors import WriteError
+from ..model import Cell
+from ._read import ColonTractAxis, decimalHalfFormat, readFormulaTable
+from .nodes import (
     Coordinate,
     Formula,
+    FormulaBinding,
     FormulaFunctionCall,
+    FormulaLambda,
     FormulaNode,
     FormulaRange,
     FormulaReference,
     FormulaUnknownCall,
-    Span,
-)
-from .model.formula import (
-    FormulaBinding,
-    FormulaLambda,
     FormulaVariable,
+    Span,
     brokenColumnSentinel,
     brokenRowSentinel,
 )
-from .readformula import ColonTractAxis, decimalHalfFormat, readFormulaTable
 
 # Every trailing reference in a cell record is a little-endian uint32.
 referenceWidth: int = 4

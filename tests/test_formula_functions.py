@@ -32,8 +32,7 @@ import pybers
 from pybers import Formula, FormulaFunctionCall, FormulaNode
 from pybers._persistence import readPackage
 from pybers._persistence.types import archiveTypeId
-from pybers.model.formula import functionNodeType
-from pybers.model.functions import (
+from pybers.formula.functions import (
     ArgumentCountError,
     UnknownFunctionError,
     functionFor,
@@ -43,6 +42,7 @@ from pybers.model.functions import (
     functionsByIndex,
     functionsByName,
 )
+from pybers.formula.nodes import functionNodeType
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 repositoryRoot: Path = Path(__file__).resolve().parent.parent

@@ -47,7 +47,7 @@ from pybers import (
 )
 from pybers._persistence import readPackage
 from pybers._persistence.types import archiveTypeId
-from pybers.model.formula import FormulaError
+from pybers.formula.nodes import FormulaError
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -671,7 +671,7 @@ def formulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
     from pybers._persistence import carriesFormula, decodeRow, offsetUnitFor
     from pybers._persistence.index import ArchiveIndex
     from pybers._persistence.types import archiveTypeId, parseArchive
-    from pybers.writeformula import formulaKeySlot
+    from pybers.formula._write import formulaKeySlot
 
     index = ArchiveIndex(readPackage(path))
     found: list[tuple[int, int, int]] = []

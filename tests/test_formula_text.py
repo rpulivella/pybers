@@ -43,8 +43,8 @@ from pybers import (
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._persistence import readPackage
 from pybers._persistence.types import archiveTypeId
-from pybers.model import formulasyntax
-from pybers.model.formula import (
+from pybers.formula import syntax as formulasyntax
+from pybers.formula.nodes import (
     additionNodeType,
     appendWhitespaceNodeType,
     beginThunkNodeType,

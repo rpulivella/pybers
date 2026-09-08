@@ -38,7 +38,7 @@ from dataclasses import dataclass
 
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellReference, tableNameSeparator
-from pybers.model.formula import (
+from pybers.formula.nodes import (
     Coordinate,
     FormulaError,
     FormulaRange,

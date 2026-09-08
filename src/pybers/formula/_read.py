@@ -31,33 +31,31 @@ __date__ = "2026/09/08"
 import struct
 from typing import cast
 
-from ._generated import TSCEArchives_pb2 as tsce
-from ._generated import TSPMessages_pb2 as tsp
-from ._generated import TSTArchives_pb2 as tst
-from ._persistence import carriesFormula
-from ._persistence.cells import CellRecord, formulaKeySlot
-from ._persistence.decimal128 import Decimal128
-from ._persistence.index import (
+from .._generated import TSCEArchives_pb2 as tsce
+from .._generated import TSPMessages_pb2 as tsp
+from .._generated import TSTArchives_pb2 as tst
+from .._persistence import carriesFormula
+from .._persistence.cells import CellRecord, formulaKeySlot
+from .._persistence.decimal128 import Decimal128
+from .._persistence.index import (
     ArchiveIndex,
     formulaListType,
     originOffset,
     readDataList,
 )
-from .model import (
+from .nodes import (
     Coordinate,
     Formula,
+    FormulaBinding,
     FormulaFunctionCall,
+    FormulaLambda,
     FormulaNode,
     FormulaRange,
     FormulaReference,
     FormulaUnknownCall,
-    Span,
-)
-from .model.formula import (
-    FormulaBinding,
-    FormulaLambda,
     FormulaVariable,
     NodeContent,
+    Span,
     brokenColumnSentinel,
     brokenReferenceNodeType,
     brokenRowSentinel,

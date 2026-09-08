@@ -76,9 +76,7 @@ from ._persistence.index import (
     wordMask,
 )
 from .errors import WriteError
-from .model import Cell, CellReference, Document, MergeRange, Table
-from .reader import readMerges, readRichTextTable, readStringTable, resolveValue
-from .writeformula import (
+from .formula._write import (
     FormulaPool,
     attachFormulaKey,
     buildFormulaRecord,
@@ -87,6 +85,8 @@ from .writeformula import (
     formulaPoolFor,
     patchFormulaKey,
 )
+from .model import Cell, CellReference, Document, MergeRange, Table
+from .reader import readMerges, readRichTextTable, readStringTable, resolveValue
 
 # `TST.Tile` and the type bytes a numeric record may carry. 2 is a plain number
 # and 10 is currency, which is the same encoding under a different type.

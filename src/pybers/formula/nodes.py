@@ -59,7 +59,7 @@ from decimal import Decimal
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellReference
 from pybers.errors import PybersError
-from pybers.model.functions import (
+from pybers.formula.functions import (
     ArgumentCountError,
     NumbersFunction,
     functionFor,
@@ -82,7 +82,7 @@ rangeNodeType: int = 67
 
 # Every operator Numbers declares, taken from `TSCE.ASTNodeArrayArchive.ASTNodeType`
 # rather than from a spreadsheet grammar, so an operator this library does not know
-# is a node type Apple did not declare. `test_formulatext` asserts the two agree.
+# is a node type Apple did not declare. `test_formula_text` asserts the two agree.
 # Reading it the other way round is what left numbers-parser, which took openpyxl's
 # Excel tokenizer, with a precedence table holding no comparison at all.
 additionNodeType: int = 1

@@ -2,7 +2,7 @@
 """\
 A stored formula out as the text Numbers displays for it.
 
-The other half of `pybers.model.formulaparse`, and the half that makes it
+The other half of `pybers.formula.parse`, and the half that makes it
 testable: comparing hand-written node arrays stops scaling at about a dozen
 cases, and rendering every formula in a real document and parsing it back does
 not. See tests/fixtures/findings-08-formula-text.md.
@@ -43,7 +43,7 @@ from pybers.addressing.reference import (
     tableNameSeparator,
     toCellReference,
 )
-from pybers.model.formula import (
+from pybers.formula.nodes import (
     Formula,
     FormulaBinding,
     FormulaError,
@@ -69,7 +69,7 @@ from pybers.model.formula import (
     subtractionNodeType,
     tokenNodeType,
 )
-from pybers.model.formulasyntax import (
+from pybers.formula.syntax import (
     argumentSeparator,
     atomPrecedence,
     brokenReferenceText,

@@ -70,6 +70,7 @@ from ._persistence.index import (
     tableInfoTypeId,
 )
 from .errors import ReadError
+from .formula._read import readFormulaTable, resolveFormula
 from .model import (
     CellRange,
     CellReference,
@@ -79,7 +80,6 @@ from .model import (
     Sheet,
     Table,
 )
-from .readformula import readFormulaTable, resolveFormula
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
 # rather than the value itself. See `pybers._persistence.cells`.

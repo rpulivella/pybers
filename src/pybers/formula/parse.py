@@ -44,7 +44,8 @@ from pybers.addressing.reference import (
     ReferenceError,
     toCellReference,
 )
-from pybers.model.formula import (
+from pybers.formula.functions import FunctionAvailability, functionsByName
+from pybers.formula.nodes import (
     Formula,
     FormulaBinding,
     FormulaFunctionCall,
@@ -79,7 +80,7 @@ from pybers.model.formula import (
     unknownFunctionNodeType,
     variableNodeType,
 )
-from pybers.model.formulasyntax import (
+from pybers.formula.syntax import (
     FormulaSyntaxError,
     Token,
     binaryOperators,
@@ -96,7 +97,6 @@ from pybers.model.formulasyntax import (
     unaryOperators,
     unquote,
 )
-from pybers.model.functions import FunctionAvailability, functionsByName
 
 
 @dataclass(slots=True)

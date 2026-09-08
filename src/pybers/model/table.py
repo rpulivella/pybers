@@ -48,9 +48,9 @@ from pybers.addressing.reference import (
     firstRow,
     toCellReference,
 )
-from pybers.model.formula import Formula
-from pybers.model.formulaparse import parseFormula
-from pybers.model.formularender import renderFormula
+from pybers.formula.nodes import Formula
+from pybers.formula.parse import parseFormula
+from pybers.formula.render import renderFormula
 from pybers.model.style import Style
 
 if TYPE_CHECKING:
