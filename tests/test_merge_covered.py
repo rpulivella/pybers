@@ -32,12 +32,12 @@ from pathlib import Path
 import pytest
 
 import pybers
+from conftest import archiveBodies, recordedColumns, tableModelType
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers.model import MergeRange, Table
 from pybers.model.reference import ReferenceError as CellReferenceError
-from pybers.numbersfile import NumbersPackage, readPackage
-from pybers.numbersfile.cells import decodeRow, offsetUnitFor
-from pybers.numbersfile.types import archiveTypeId, archiveTypes
+from pybers.numbersfile import readPackage
+from pybers.numbersfile.types import archiveTypeId
 from pybers.reader import ArchiveIndex
 
 fixtures: Path = Path(__file__).parent / "fixtures"
@@ -49,46 +49,6 @@ goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 # and F1:G1. G1 is absent: Excel gave it a style AND a value, and Numbers
 # discarded it, which is why a covered record never carries one.
 coveredPositions: tuple[str, ...] = ("B1", "D1", "E1")
-
-tableModelType: int = next(
-    key for key, value in archiveTypes.items() if value is tst.TableModelArchive
-)
-
-
-def archiveBodies(package: NumbersPackage) -> list[tuple[str, int, bytes]]:
-    """Return every archive body in a package, in the order it stores them."""
-    return [
-        (iwaFile.name, archive.identifier, archive.messages[0].data)
-        for iwaFile in package.iwaFiles
-        for archive in iwaFile.archives
-    ]
-
-
-def recordedColumns(path: Path, row: int) -> set[int]:
-    """Return the zero-based columns holding a record in one row of one table."""
-    index = ArchiveIndex(readPackage(path))
-    for identifier in index.byIdentifier:
-        archive = index.archive(identifier)
-        if archiveTypeId(archive) != tableModelType:
-            continue
-        model = tst.TableModelArchive()
-        model.ParseFromString(archive.messages[0].data)
-        store = model.base_data_store
-        for entry in store.tiles.tiles:
-            tile = index.resolve(entry.tile, tst.Tile)
-            for info in tile.rowInfos:
-                if entry.tileid * store.tiles.tile_size + info.tile_row_index != row:
-                    continue
-                unit = offsetUnitFor(
-                    info.has_wide_offsets, tile.should_use_wide_rows
-                )
-                return {
-                    record.column
-                    for record in decodeRow(
-                        info.cell_offsets, info.cell_storage_buffer, unit
-                    )
-                }
-    raise AssertionError(f"No table in {path.name} holds row {row}.")
 
 
 def firstTable(document: pybers.Document) -> Table:
