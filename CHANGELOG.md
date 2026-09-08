@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-49] Read a table whose merged cells carry records
 - [PYB-48] Read a table with more than 255 columns
 - [PYB-50] Check a pull request body against its template
 - [PYB-44] Derive the function name map from Numbers.app
