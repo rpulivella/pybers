@@ -61,7 +61,8 @@ mypy in one pass and reports all four.
 - Understand the owning feature and trace the full path before editing: model, reader,
   writer, the archives touched, and the calculation engine.
 - For a nontrivial change, identify the source of truth, the state owner, the
-  invariants, the failure behavior, and the file placement before writing code.
+  invariants, the failure behavior, the file placement, and the call site each of the
+  two consumers writes, before writing code.
 - Keep one authoritative owner for mutable state. Derived state is computed, or cached
   with an explicit invalidation contract.
 - Reuse existing operations. Do not write a second implementation because the caller is
@@ -152,6 +153,10 @@ functions over explanation.
   are identical.
 - **Every mutation earns a golden file**: real fixture in, one mutation, confirmed once
   in real Numbers, then locked in as a permanent regression check.
+- **Each feature earns a scenario test per consumer.** Write the few lines a script
+  author would write, and the few a CLI or TUI would write, then test those. Both
+  consumers exist from day one, so an API reading well from only one of them is
+  unfinished, and a functional test alone never catches it.
 - One test establishes one invariant or regression, with only the setup that makes it
   clear. Descriptive names, and no comments narrating arrange, act and assert.
 - Every bug fix earns a regression test that fails for the original defect.
