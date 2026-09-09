@@ -33,6 +33,8 @@ row of `None` means the whole column rather than row zero. The same rule
 `pybers.addressing.ranges` already follows.
 
 UPDATES
+2026-09-08  A reference and a range follow a target that moved, for #13. A
+            locked axis stays where it is, which is what locking means.
 2026-09-08  The operator node types, the thunking functions, and content
             for the nodes `LET` and `LAMBDA` are stored as, for #45.
 2026-09-04  Function calls name themselves and know their argument counts,
@@ -179,6 +181,17 @@ class Coordinate:
         """
         return self.value if self.absolute else host + self.value
 
+    def shifted(self, delta: int) -> Coordinate:
+        """Return this axis pointing `delta` lines further on, or itself when locked.
+
+        Locking pins an axis to a line, so a retarget leaves it there and `B$1`
+        moved down a row is still `B$1`. Returning `self` unchanged is how a caller
+        separates a move that happened from one with nothing to move.
+        """
+        if self.absolute or delta == 0:
+            return self
+        return Coordinate(self.value + delta, self.absolute)
+
 
 @dataclass(frozen=True, slots=True)
 class Span:
@@ -208,6 +221,21 @@ class Span:
         if self.absolute:
             return (self.begin, self.last)
         return (host + self.begin, host + self.last)
+
+    def shifted(self, delta: int) -> Span:
+        """Return this span `delta` lines further on, both ends together or neither.
+
+        One `absolute` covers both ends, so moving one end alone is unrepresentable
+        here rather than merely discouraged, which is what keeps `C3:C25` a span of
+        23 lines however far it travels.
+        """
+        if self.absolute or delta == 0:
+            return self
+        return Span(
+            self.begin + delta,
+            None if self.end is None else self.end + delta,
+            self.absolute,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +282,22 @@ class FormulaReference:
             colAbsolute=self.column.absolute,
         )
 
+    def shifted(self, *, rows: int = 0, cols: int = 0) -> FormulaReference:
+        """Return this reference pointing `rows` down and `cols` right, or itself.
+
+        A broken reference comes back untouched: Numbers records `#REF` as
+        coordinates deliberately pointing nowhere, and moving them would repair one
+        into a working cell. An unbounded axis names a whole column or row and has
+        no line to move either.
+        """
+        if self.broken:
+            return self
+        column = None if self.column is None else self.column.shifted(cols)
+        row = None if self.row is None else self.row.shifted(rows)
+        if column is self.column and row is self.row:
+            return self
+        return FormulaReference(column, row, self.tableId, self.broken)
+
 
 @dataclass(frozen=True, slots=True)
 class FormulaRange:
@@ -294,6 +338,18 @@ class FormulaRange:
             ((rows[0], rowLocked), (rows[1], rowLocked)),
             ((columns[0], columnLocked), (columns[1], columnLocked)),
         )
+
+    def shifted(self, *, rows: int = 0, cols: int = 0) -> FormulaRange:
+        """Return this range `rows` down and `cols` right, or itself when it cannot.
+
+        Both ends of an axis travel together, since `Span` carries them as one, so
+        a range that moves keeps the block it covers rather than growing.
+        """
+        columns = None if self.columns is None else self.columns.shifted(cols)
+        movedRows = None if self.rows is None else self.rows.shifted(rows)
+        if columns is self.columns and movedRows is self.rows:
+            return self
+        return FormulaRange(columns, movedRows, self.tableId)
 
 
 @dataclass(frozen=True, slots=True)
