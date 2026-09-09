@@ -29,7 +29,8 @@ other when reaching for something to test against.
 | `20-formula-filled-across.numbers` | `20-formula-shapes.numbers` | `A11`'s `SUM(A1:A10)` filled across `A11:D11` | 2026-09-04, Numbers 15.3.1 |
 | `22c-merged-by-pybers.numbers` | `22c-merge-overpaints.numbers` | `L3:M3` merged, dropping the style-only record `M3` carried | 2026-09-07, Numbers 15.3.1 |
 | `45-merged-by-pybers.numbers` | `45-columns-over-255.numbers` | `KI7:KJ7` merged, rebuilding a 300-column row whose offsets count words | 2026-09-08, Numbers 15.3.1 |
-| `20-formula-authored-as-text.numbers` | `20-formula-shapes.numbers` | three formulas written as TEXT into `Sheet 1 / Table 2`: `B1` a cross-table reference with arithmetic, `C1` a nested lazy call, `D1` an anchored reference concatenated with a string | 2026-09-08, Numbers 15.3.1 |
+| `20-formula-authored-as-text.numbers` | `20-formula-shapes.numbers` | three formulas written as TEXT into `Sheet 1 / Table 2`: `B1` a cross-table reference with arithmetic, `C1` a nested lazy call, `D1` an anchored reference concatenated with a string | 2026-09-08, re-confirmed 2026-09-09 after the sticky-bits fix, Numbers 15.3.1 |
+| `20-formula-retargeted.numbers` | `20-formula-shapes.numbers` | eight anchored formulas written into row 10, then every reference into `Sheet 1 / Table 1` moved one row down and seven columns right, leaving the two that point elsewhere untouched | 2026-09-09, Numbers 15.3.1 |
 
 `22c-merged-by-pybers` is the first golden where pybers REMOVED a record rather than
 adding or changing one. A merge Numbers makes leaves nothing at a covered position, but a
@@ -70,6 +71,94 @@ Confirmed 2026-09-08: no repair prompt, `KI7:KJ7` renders as one cell holding `r
 `KM7` is still the empty slot the fixture was built with, and rows 1 through 6 read
 `col300` and `r5c300` at the far edge. The copy that was opened is not the copy committed
 here.
+
+`20-formula-retargeted` is the first golden that rewrote references rather than values,
+merges or whole formulas. Eleven of the seventeen references in the document moved. Six
+did not, and each of the six is a different reason: two point into other tables, and four
+carry a locked axis.
+
+**Row 10 was written for this golden because row 11 carries no anchored reference at
+all.** The fixture's own row 11 is six formulas a person typed, none using a dollar sign,
+so a retarget confirmed against row 11 alone would say nothing about locking. The eight
+formulas below cover every combination of locked and free axis, once for a single cell and
+once for a range, so which axis moved is legible in the result rather than inferred.
+
+| cell | written as | after the retarget | should display | what it settles |
+| --- | --- | --- | --- | --- |
+| `A10` | `=$A$1*10` | `=$A$1*10` | 10 | both axes locked, nothing moves |
+| `B10` | `=$A$3*2` | `=$A$3*2` | 6 | both axes locked, beside `C10` and `D10` |
+| `C10` | `=A$3*2` | `=H$3*2` | 0 | free column moved, locked row did not |
+| `D10` | `=$A3*2` | `=$A4*2` | 8 | locked column did not move, free row did |
+| `E10` | `=SUM($A$1:$A$5)` | `=SUM($A$1:$A$5)` | 15 | a range locked on both axes |
+| `F10` | `=SUM(A$1:A$5)` | `=SUM(H$1:H$5)` | 0 | a range whose columns move and whose rows do not |
+| `G10` | `=SUM($A1:$A5)` | `=SUM($A2:$A6)` | 20 | a range whose rows move, both ends together |
+| `H10` | `=$A$4` | `=$A$4` | 4 | locked, and it lands inside the ranges row 11 now covers |
+
+`C10` and `D10` are the pair that matters most. They differ by one dollar sign, they
+must disagree after the move, and an implementation that moved a locked axis would change
+exactly one of them while the other three still passed.
+
+Row 11 is the fixture's own six formulas plus the two cross-table ones. Column A holds 1
+through 10, and column H is empty except for `H10`, which is now 4, `H11`, which holds 53
+from its own cross-sheet formula, and `H12`, which holds the label text describing row 11.
+So row 11 should read **57, 58, 53, small, an error, 57, 42 and 53**, where the fixture
+read 55, 56, 40, big, 110, 110, 42 and 53. `SUM` ignores text, which is why `H12` leaves
+`A11` and `F11` at 57 rather than failing them.
+
+Quick Look should show the OLD numbers in row 11, and row 10 empty except for `A10` at 10.
+Everything pybers wrote is a formula with no result, since this library evaluates nothing,
+so the two views disagreeing is the pair working rather than a fault.
+
+**The first 2026-09-09 confirmation of this file found a defect, and the file was rebuilt.**
+All sixteen values matched, and every single-cell reference showed the dollar signs it
+should: `$A$1`, `H$3`, `$A4`, `$A$4`. The three ranges did not. `E10`, `F10` and `G10`
+displayed as `SUM(A1:A5)`, `SUM(H1:H5)` and `SUM(A2:A6)` where pybers renders
+`$A$1:$A$5`, `H$1:H$5` and `$A2:$A6`.
+
+That was first written up here as a Numbers display convention, which was wrong.
+
+**A range records its anchoring twice, and Numbers believes the second copy.** The tract
+field variant carries it, and an `ASTStickyBits` message beside the tract repeats it. All
+9 ranges in the corpus carry those bits and none is without them. pybers patches the bytes
+a node was read with, so a range read from a file kept its bits and a range built from
+text had none at all, and absent bits read as unanchored. The tract said absolute, the
+bits said relative, and Numbers showed what the bits said.
+
+The single-cell references were unaffected, which is why nothing caught this earlier: a
+single-cell reference carries anchoring only on its coordinates and never carries sticky
+bits, measured across all 21 in the corpus. The first anchored range pybers ever authored
+is the one written for this golden.
+
+`encodeStickyBits` now writes them from the same `Span.absolute` the tract comes from, so
+the two cannot disagree.
+
+**Confirmed 2026-09-09 after the fix, and the before and after settle it.** The same three
+cells that displayed as `SUM(A1:A5)` and `SUM(H1:H5)` now display as `SUM($A$1:$A$5)` and
+`SUM(H$1:H$5)`, from files whose tracts never changed. Nothing but the sticky bits moved
+between the two runs, so the bits are what Numbers reads. Row 10 reads 10, 6, 0, 8, 15, 0,
+20 and 4, row 11 reads 57, 58, 53, small, an error, 57, 42 and 53, and Quick Look holds
+row 11 at the fixture's old 55, 56, 40, big, 110, 110, 42 and 53. Thirteen views were
+read: eight formula bars, the grid, the sheet list and Quick Look. `G10` was the one
+anchored cell not photographed. The copy that was opened is not the copy committed here.
+
+`20-formula-authored-as-text` was regenerated for the same reason and re-confirmed the
+same day: `Sheet 1 / Table 2` reads 42, 111, big and 42 units, `C1` shows
+`IF(SUM(A1:A10)>10,"big","small")` with column A highlighted, and `Table 1` row 11 is
+untouched at 55, 56, 40, big, 110, 110, 42 and 53. Its `C1` holds a relative range, whose
+missing bits happened to read correctly as relative, so the 2026-09-08 confirmation was
+sound and only its bytes changed.
+
+**`E11` evaluating to an error is the retarget being obeyed, not a fault.** `=A11*2`
+became `=H12*2`, and `H12` is text, so multiplying it by two fails in Numbers as it would
+anywhere. A reference landing somewhere awkward is what a caller asked for when they moved
+it. Refusing would mean knowing the target grid, and refusing partway through a walk is
+what leaves a document half retargeted.
+
+**An earlier confirmation of this golden was discarded rather than kept.** The expectation
+written here before it said `E11` would read zero, which assumed column H was empty below
+row 11 without reading row 12. The file was correct and the prediction was not, and a
+golden checked against a wrong expectation confirms nothing, so the file was remade from
+the fixture and every number above was derived from the cells it depends on.
 
 The multi-sheet golden exists because every other golden and every other edit test
 covers one table on one sheet, which left `applyDocumentEdits` walking sheets and

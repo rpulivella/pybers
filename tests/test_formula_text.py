@@ -30,6 +30,7 @@ from pathlib import Path
 import pytest
 
 import pybers
+from conftest import dataListBytes
 from pybers import (
     CellRange,
     CellReference,
@@ -41,8 +42,6 @@ from pybers import (
     renderFormula,
 )
 from pybers._generated import TSCEArchives_pb2 as tsce
-from pybers._persistence import readPackage
-from pybers._persistence.types import archiveTypeId
 from pybers.formula import syntax as formulasyntax
 from pybers.formula.nodes import (
     additionNodeType,
@@ -61,10 +60,6 @@ from pybers.formula.nodes import (
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
-# TST.TableDataList, so a golden can be compared at its pooled lists rather than
-# through the model, which would agree with itself while both halves were wrong.
-dataListTypeId: int = 6005
-
 # The three formulas in the corpus carrying node type 23, whose placement rule is
 # not established. Their text round trips and their node array does not, which is
 # named here so a fourth appearing is a failure rather than a silent widening.
@@ -82,17 +77,6 @@ def fixturePath(name: str) -> Path:
     if not path.is_file():
         pytest.skip(f"Fixture {path.name} is not present.")
     return path
-
-
-def dataListBytes(path: Path) -> dict[int, bytes]:
-    """Return every pooled data list in a package, keyed by archive identifier."""
-    package = readPackage(path)
-    return {
-        archive.identifier: b"".join(message.data for message in archive.messages)
-        for iwaFile in package.iwaFiles
-        for archive in iwaFile.archives
-        if archiveTypeId(archive) == dataListTypeId
-    }
 
 
 def firstTable(name: str) -> pybers.Table:
@@ -744,3 +728,76 @@ def testTheAuthoredGoldenHoldsWhatItClaimsTo() -> None:
     assert all(
         table.cell(address).value is None for address, _ in authoredFormulas
     )
+
+
+# ── A range records its anchoring twice, found while building #13's golden ───
+
+
+def stickyBitsFor(text: str, host: str) -> tsce.ASTNodeArrayArchive.ASTStickyBits:
+    """Return the sticky bits an authored formula's one range node is written with."""
+    from pybers.formula._write import encodeFormulaNode
+
+    formula = parseFormula(text, CellReference.parse(host))
+    node = next(
+        node for node in formula.nodes
+        if isinstance(node.content, pybers.FormulaRange)
+    )
+    return encodeFormulaNode(node).AST_sticky_bits
+
+
+def testEveryRangeNumbersWroteCarriesStickyBits() -> None:
+    """The measurement the writer rests on: 9 of 9 in the corpus, none without."""
+    seen = [
+        archiveNode.HasField("AST_sticky_bits")
+        for path in sorted(fixtureDirectory.glob("*.numbers"))
+        for archiveNode in stickyBitsSurvey(path)
+    ]
+    assert seen and all(seen)
+
+
+def stickyBitsSurvey(path: Path) -> list[tsce.ASTNodeArrayArchive.ASTNodeArchive]:
+    """Return the decoded archive of every range node one fixture stores."""
+    found = []
+    for sheet in pybers.open(path).sheets:
+        for table in sheet.tables:
+            for cell in table.cells.values():
+                if cell.formula is None:
+                    continue
+                for node in cell.formula.nodes:
+                    if not isinstance(node.content, pybers.FormulaRange):
+                        continue
+                    archive = tsce.ASTNodeArrayArchive.ASTNodeArchive()
+                    archive.ParseFromString(node.raw)
+                    found.append(archive)
+    return found
+
+
+def testAnAuthoredAnchoredRangeWritesTheAnchoringTwice() -> None:
+    """Numbers reads the sticky bits, so a tract alone displays as unanchored.
+
+    Found on 2026-09-09 building #13's golden: `SUM($A$1:$A$5)` was written with an
+    absolute tract and no bits, and Numbers showed it as `SUM(A1:A5)`.
+    """
+    bits = stickyBitsFor("=SUM($A$1:$A$5)", "E10")
+    assert bits.begin_column_is_absolute
+    assert bits.end_column_is_absolute
+    assert bits.begin_row_is_absolute
+    assert bits.end_row_is_absolute
+
+
+def testAnAuthoredRangeRecordsEachAxisSeparately() -> None:
+    """One axis locked and the other free, both ways round, since a span shares one."""
+    columnsOnly = stickyBitsFor("=SUM($A1:$A5)", "G10")
+    assert columnsOnly.begin_column_is_absolute
+    assert not columnsOnly.begin_row_is_absolute
+
+    rowsOnly = stickyBitsFor("=SUM(A$1:A$5)", "F10")
+    assert not rowsOnly.begin_column_is_absolute
+    assert rowsOnly.begin_row_is_absolute
+
+
+def testAnAuthoredRelativeRangeWritesBitsThatSaySo() -> None:
+    """Absent bits read as relative, so the correct answer still has to be written."""
+    bits = stickyBitsFor("=SUM(A1:A10)", "A11")
+    assert not bits.begin_column_is_absolute
+    assert not bits.end_row_is_absolute

@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-09-08  ReferenceLocation re-exported (#13).
 2026-09-02  SelectionError re-exported (#14).
 2026-08-12  Initial scaffold.
 """
@@ -35,7 +36,13 @@ from pybers.addressing import (
     toCellRanges,
     toCellReference,
 )
-from pybers.document import Document, SelectionError, Sheet, open
+from pybers.document import (
+    Document,
+    ReferenceLocation,
+    SelectionError,
+    Sheet,
+    open,
+)
 from pybers.drawable import GraphicalObject, Image, Shape, TextBox
 from pybers.errors import PybersError, ReadError, WriteError
 from pybers.formula import (
@@ -121,4 +128,5 @@ __all__ = [
     "TextBox",
     "TextRun",
     "Document",
+    "ReferenceLocation",
 ]

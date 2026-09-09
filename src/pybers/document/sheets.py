@@ -23,6 +23,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-09-08  Every reference in the document walked in one call, and a table
+            reached by the identity a formula names it by, for #13.
 2026-09-08  Moved into `pybers.document` for #58, out of `pybers.model`.
 2026-09-08  The identity each table is named by in a formula, for #45.
 2026-09-02  Save states what happens to a dependent formula, for #25.
@@ -56,6 +58,7 @@ from pybers.table.cells import Cell, Table
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.
     from pybers._persistence import NumbersPackage
+    from pybers.document.references import ReferenceLocation
 
 # Sheets and tables both count from one, matching the rest of the model and matching
 # what Numbers shows. The file counts from zero and the two meet only in the reader.
@@ -219,6 +222,23 @@ class Document:
                     qualified[table.name] = table.identifier
         return qualified
 
+    def tableFor(self, identity: str) -> Table:
+        """Return the table a formula names by identity, or raise saying which.
+
+        The reverse of `tableIdentities`, and the reason renaming a table cannot
+        break a formula pointing into it: the archive stores this, never the name.
+        """
+        # Imported inside for the reason `save` is: `references` builds on this
+        # module, so reaching it from here at module scope would close a cycle.
+        from pybers.document.references import tablesByIdentity
+
+        table = tablesByIdentity(self).get(identity)
+        if table is None:
+            raise SelectionError(
+                f"No table in this document carries the identity {identity!r}."
+            )
+        return table
+
     def cellsIterate(self) -> Iterator[tuple[Sheet, Table, Cell]]:
         """Yield every STORED cell with the sheet and table holding it.
 
@@ -234,6 +254,17 @@ class Document:
                     table.cells, key=lambda address: address.asRowColumn()
                 ):
                     yield (sheet, table, table.cells[reference])
+
+    def referencesIterate(self) -> Iterator[ReferenceLocation]:
+        """Yield every reference and range in every formula, as a movable location.
+
+        Cells in `cellsIterate` order, then nodes in the order the formula stores
+        them. A location is a view of one reference, so shifting one writes through to
+        the cell holding it.
+        """
+        from pybers.document.references import referencesIterate
+
+        yield from referencesIterate(self)
 
     def save(self, path: Path | str | None = None) -> None:
         """Write this document back to a `.numbers` package, in place by default.
