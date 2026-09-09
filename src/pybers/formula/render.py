@@ -20,6 +20,8 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-09-08  `addressText` and `shortestNames` exported for #13, so that one
+            reference can be shown without rendering the formula around it.
 2026-09-08  Written for #45.
 """
 from __future__ import annotations
@@ -364,16 +366,24 @@ def renderFormula(
     there and one archive shows differently in each cell it was dragged into.
     `tables` names the tables a formula reaches into, from `Document.tableIdentities`.
     """
-    # The shortest name a table answers to, so a formula reads `Table 2::A1` where
-    # that is unambiguous and qualifies further only where it has to.
+    return Renderer(
+        formula=formula, host=toCellReference(host), names=shortestNames(tables)
+    ).render()
+
+
+def shortestNames(tables: Mapping[str, str] | None) -> dict[str, str]:
+    """Return the shortest name each table identity answers to, keyed by identity.
+
+    The inverse of `Document.tableIdentities`, which carries both `Table 2` and
+    `Sheet 1::Table 2` for the same table, so that a formula reads `Table 2::A1`
+    where that is unambiguous and qualifies further only where it has to.
+    """
     names: dict[str, str] = {}
     for name, identity in sorted(
         (tables or {}).items(), key=lambda pair: (len(pair[0]), pair[0])
     ):
         names.setdefault(identity, name)
-    return Renderer(
-        formula=formula, host=toCellReference(host), names=names
-    ).render()
+    return names
 
 
-__all__ = ["renderFormula"]
+__all__ = ["addressText", "renderFormula", "shortestNames"]

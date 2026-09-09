@@ -32,6 +32,7 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 from pybers.document._read import open
+from pybers.document.references import ReferenceLocation
 from pybers.document.sheets import Document, SelectionError, Sheet
 
-__all__ = ["Document", "SelectionError", "Sheet", "open"]
+__all__ = ["Document", "ReferenceLocation", "SelectionError", "Sheet", "open"]
