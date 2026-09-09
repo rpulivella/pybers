@@ -256,6 +256,9 @@ def encodeStickyBits(
     from text carried none until 2026-09-09, so `SUM($A$1:$A$5)` was written with
     an absolute tract and displayed by Numbers as `SUM(A1:A5)`. Both ends of an
     axis share one flag because `Span` cannot express a range locked at one end.
+
+    An axis the range leaves unbounded is written as not absolute, which is an
+    assumption rather than a measurement: no range in the corpus omits an axis.
     """
     columns = extent.columns.absolute if extent.columns is not None else False
     rows = extent.rows.absolute if extent.rows is not None else False
