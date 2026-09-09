@@ -173,6 +173,19 @@ def testTableForRaisesNamingAnIdentityTheDocumentDoesNotHold() -> None:
         shapes().tableFor("ff" * 16)
 
 
+def testTheWalkRefusesAReferenceIntoATableTheDocumentDoesNotHold() -> None:
+    """AC 1. Skipping it would report fewer references than the document makes.
+
+    The refusal lives in the walk rather than in `tableFor`, and the two are
+    separate branches, so a test of one says nothing about the other.
+    """
+    document = shapes()
+    document.sheet("Sheet 1").table("Table 2").identifier = "ff" * 16
+
+    with pytest.raises(pybers.SelectionError, match="reaches into table"):
+        list(document.referencesIterate())
+
+
 def testACellReferenceNeverNamesATable() -> None:
     """AC 1.ii. Addressing stays table-local: four fields, none of them a table."""
     assert [field.name for field in dataclasses.fields(CellReference)] == [
