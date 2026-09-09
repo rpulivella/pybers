@@ -7,6 +7,8 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-09-08  `dataListBytes` gathered here for #13, so that two golden
+            tests compare pooled lists through one reader.
 2026-09-07  Written for #54, holding what test_merge_covered and
             test_wide_columns had each defined for themselves.
 """
@@ -31,6 +33,21 @@ from pybers._persistence.types import archiveTypeId, archiveTypes
 tableModelType: int = next(
     key for key, value in archiveTypes.items() if value is tst.TableModelArchive
 )
+
+# TST.TableDataList, so a golden can be compared at its pooled lists rather than
+# through the model, which would agree with itself while both halves were wrong.
+dataListTypeId: int = 6005
+
+
+def dataListBytes(path: Path) -> dict[int, bytes]:
+    """Return every pooled data list in a package, keyed by archive identifier."""
+    package = readPackage(path)
+    return {
+        archive.identifier: b"".join(message.data for message in archive.messages)
+        for iwaFile in package.iwaFiles
+        for archive in iwaFile.archives
+        if archiveTypeId(archive) == dataListTypeId
+    }
 
 
 def archiveBodies(package: NumbersPackage) -> list[tuple[str, int, bytes]]:

@@ -243,6 +243,27 @@ def encodeFormulaRange(
             tract.absolute_row if extent.rows.absolute else tract.relative_row
         )
         encodeSpan(field.add(), extent.rows)
+    encodeStickyBits(archive, extent)
+
+
+def encodeStickyBits(
+    archive: tsce.ASTNodeArrayArchive.ASTNodeArchive, extent: FormulaRange
+) -> None:
+    """Restate a range's anchoring beside its tract, which is what Numbers reads.
+
+    **A range records its anchoring twice and Numbers believes this copy.** Every
+    one of the 9 ranges in the corpus carries these bits, and a range pybers built
+    from text carried none until 2026-09-09, so `SUM($A$1:$A$5)` was written with
+    an absolute tract and displayed by Numbers as `SUM(A1:A5)`. Both ends of an
+    axis share one flag because `Span` cannot express a range locked at one end.
+    """
+    columns = extent.columns.absolute if extent.columns is not None else False
+    rows = extent.rows.absolute if extent.rows is not None else False
+    bits = archive.AST_sticky_bits
+    bits.begin_column_is_absolute = columns
+    bits.end_column_is_absolute = columns
+    bits.begin_row_is_absolute = rows
+    bits.end_row_is_absolute = rows
 
 
 def encodeFormula(formula: Formula) -> tsce.FormulaArchive:
