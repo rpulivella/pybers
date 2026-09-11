@@ -84,6 +84,10 @@ means fetching the current body, changing part of it, and writing the whole thin
 - **Inserting an AC mid-list renumbers everything after it**, which surprises people:
   markdown numbers an ordered list sequentially regardless of the literal digits written.
   Harmless before work starts. After it starts, that *is* the renumbering forbidden above.
+- **Comments cite ACs by number, and renumbering silently redirects them.** An edit
+  cannot damage a comment's content, so this matters only when the numbering moves.
+  Read `ticket.py show <N> --comments` first when it will, and reword any citation
+  the move breaks.
 - **A dropped AC is struck through, never deleted.** Wrap it in `~~` and leave it where
   it is: `4. ~~The old requirement.~~` A deleted AC leaves every existing reference
   pointing at nothing, or worse, at whatever slid into its place.

@@ -12,7 +12,10 @@ acceptance criteria into tasks.
 ## Steps
 
 1. Get the ticket from `$ARGUMENTS`: `PYB-42`, `42`, `#42` or the URL. If missing, ask.
-2. Fetch it: `python3 scripts/ticket.py show <N>`.
+2. Fetch it: `python3 scripts/ticket.py show <N> --comments`. **Always the flag.**
+   A ticket carries in its comments what the body cannot: why it was closed, what a
+   review found, what a previous attempt settled. Starting without reading them
+   repeats work already done.
 3. Display to the user, exactly as written (do not paraphrase): title + label,
    acceptance criteria (preserve numbering/nesting), constraints. Sub-criteria are an
    indented list of `1.` markers that GitHub renders `i.`, `ii.`, so cite `4.ii`.
