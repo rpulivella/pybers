@@ -231,24 +231,44 @@ def testADecoratedDocumentRoundTripsWithEveryArchiveUnchanged(
     assert archiveBodies(readPackage(working)) == before
 
 
-# ── #66, which shares this cause: a reference that resolves nowhere ──────────
+# ── An invariant #66 made worth asserting, though 47 does not exercise it ────
 
 
-def testNoReferenceInTheCorpusResolvesBeforeTheFirstColumn() -> None:
-    """Reading the wrong key resolved a formula against the wrong host.
+def testEveryReferenceInTheCorpusResolvesOnTheGrid() -> None:
+    """No reference or range resolves to a line before the first, corpus-wide.
 
-    `B1` of `Decorated` read as `=A-2*A-1`, a column two places before the first,
-    which is the shape #66 was filed for. A reference is an offset from the cell
-    holding it, so attributing a formula to the wrong cell moves every reference
-    in it.
+    Attributing a formula to the wrong cell moves every reference in it, since a
+    reference is an offset from the cell holding it. That is what #66 was filed
+    for, and the shape it takes is an axis resolving at or before zero.
+
+    **This does not regress #66 and 47 does not exercise it.** There the wrong key
+    is unresolvable, so the formula vanishes rather than resolving somewhere
+    impossible, and the assertion below passes on the unfixed reader. It is kept
+    as a corpus-wide invariant, which is the part worth having permanently, and
+    #66's own symptom was measured against a document that cannot be committed.
     """
+    checked = 0
     for path in sorted(fixtureDirectory.glob("*.numbers")):
         for _, _, cell in pybers.open(path).cellsIterate():
             if cell.formula is None:
                 continue
+            host = cell.reference
             for reference in cell.formula.references:
-                if reference.broken or reference.column is None:
+                if reference.broken:
                     continue
-                assert reference.column.resolve(cell.reference.col) >= 1, (
-                    f"{path.name} {cell.reference}"
-                )
+                for axis, line in (
+                    ("column", reference.column and reference.column.resolve(host.col)),
+                    ("row", reference.row and reference.row.resolve(host.row)),
+                ):
+                    if line is not None:
+                        assert line >= 1, f"{path.name} {host} {axis}"
+                        checked += 1
+            for extent in cell.formula.ranges:
+                for axis, span in (
+                    ("columns", extent.columns and extent.columns.resolve(host.col)),
+                    ("rows", extent.rows and extent.rows.resolve(host.row)),
+                ):
+                    if span is not None:
+                        assert min(span) >= 1, f"{path.name} {host} {axis}"
+                        checked += 1
+    assert checked > 100
