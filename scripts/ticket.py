@@ -249,10 +249,11 @@ listOpener = re.compile(r"^([-*+] |\d+[.)] |\d+\.[a-z] )")
 # each is a statement rather than part of a paragraph.
 standaloneLines: tuple[str, ...] = ("Link:", "Closes ")
 
-# Every separator `str.splitlines` breaks on, longest first so `\r\n` is never read
-# as a bare `\r` followed by content. Named because splitting on them and rejoining
-# with `\n` rewrites a line ending the author chose, and inside a fenced code block
-# that is their code rather than their formatting.
+# Every separator `str.splitlines` breaks on, verified against it rather than listed
+# from memory. `\r\n` comes first because a line ending in one also ends in `\n`, so
+# the shorter match would strand a `\r` on the content for `strip` to delete. Named
+# because splitting on these and rejoining with `\n` rewrites a line ending the author
+# chose, and inside a fenced code block that is their code rather than their formatting.
 lineSeparators: tuple[str, ...] = (
     "\r\n", "\n", "\r", "\v", "\f", "\x1c", "\x1d", "\x1e",
     "\x85", "\u2028", "\u2029",
