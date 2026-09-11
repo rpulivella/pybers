@@ -61,12 +61,20 @@ the author's other repositories.
 |---|---|
 | `create` | `/ticket-create` |
 | `edit` | `/ticket-edit` |
-| `show` | `/ticket-startwork`, `/pr-draft`, `/ticket-edit`, **rendered, for reading only** |
+| `show` | `/ticket-startwork` (always `--comments`), `/pr-draft`, `/ticket-edit`, **rendered, for reading only** |
 | `export-as-source` | `/ticket-edit` (`--body` and `--title`), `/changelog-add` and `/pr-draft` (`--title`), **byte-exact, for round-tripping** |
 | `start` | `/ticket-startwork` |
 | `status` | `/ticket-startwork`, the move to `Code Review`, and the move back to `Concept` when a spec proves inadequate |
 | `close` | `/ticket-startwork`, `--reason not-planned` on abandonment. **Not on delivery**: the Project's own `Pull request merged` workflow sets Status to Done server-side when the PR lands, so closing a delivered ticket by hand only restates what already happened |
 | `list` | `/release-tag`, reconciling shipped tickets against `CHANGELOG.md`. Also the everyday manual command for reading the board. |
+| `comment` | Closing a ticket the board's own workflow cannot explain, and recording what a session settled. A body carries what a Status change cannot |
+| `comment-export` | Revising a filed comment, **byte-exact, for round-tripping**. The rendered form is `show --comments` |
+| `comment-edit` | Correcting a filed comment in place, keeping its id and its position in the thread |
+| `comment-delete` | Removing one. **Permanent, GitHub keeps no copy**, so it prints the body first and takes `--dry-run` |
+
+A comment id is scoped to the REPOSITORY rather than to the issue it sits on, which is
+why every command above that reaches one takes the id alone. Passing a ticket number
+beside it would imply a check that is not happening.
 
 Pull requests are **not** here: `ticket.py` owns Issues and the Project board only.
 They live in `pr.py`, which shares this tool's auth rather than duplicating it.
@@ -82,6 +90,11 @@ They live in `pr.py`, which shares this tool's auth rather than duplicating it.
 | `ready` | `/pr-review-code`, the only sanctioned promotion out of draft |
 | `checks` | `/pr-review-code`, which reports the state without gating on it. `merge` calls the same helpers itself and refuses anything but passed, so the guard cannot be skipped by skipping a skill |
 | `merge` | `/pr-merge`, the only skill that runs it. `--subject` required, `merge` by default and `squash` by exception |
+| `comment` | Recording on the pull request what a review found, rather than leaving it in a session nobody can read later |
+| `comment-list` | **Rendered, for reading only**, with the id each comment is reached by. A command of its own where `ticket.py` uses `show --comments`, because `pr.py` has no `show` to hang a flag on |
+| `comment-export` | Revising a filed comment, **byte-exact, for round-tripping** |
+| `comment-edit` | Replacing a review's own summary on a re-run, which costs neither the first run's record nor the comment's place in the thread |
+| `comment-delete` | Removing one. **Permanent**, prints the body first and takes `--dry-run` |
 
 `--base` defaults to `develop`. A web-facing repository whose deploy tracks another branch
 passes `--base` instead of editing the default.
