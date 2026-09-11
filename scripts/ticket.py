@@ -1120,22 +1120,26 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def verifyCommentBody(token: str, comment: CommentSummary, sent: str) -> int:
-    """Read one comment back and check it against what was sent.
+def verifyCommentBody(token: str, comment: CommentSummary, sent: str) -> bool:
+    """Read one comment back and report whether it matches what was sent.
 
     The same duty `edit` performs on a ticket body, and for the same reason: a
     write that did not land should fail loudly rather than report success.
+
+    Returns a bool rather than an exit code because `pr.py` shares this and the
+    two tools number their failures differently: 1 there means no open pull
+    request, so returning it from here would report the wrong thing.
     """
     if readComment(token, comment["id"])["body"] == sent:
         console.print("[dim]verified against the filed comment[/]")
         console.print(comment["url"])
-        return 0
+        return True
     console.print(
         "[red]The comment did not land cleanly:[/] what GitHub holds differs from "
         "what was sent."
     )
     console.print(comment["url"])
-    return 1
+    return False
 
 
 def cmdComment(arguments: argparse.Namespace) -> int:
@@ -1156,7 +1160,7 @@ def cmdComment(arguments: argparse.Namespace) -> int:
         f"[green]Commented on[/] [bold cyan]{ticketRef(arguments.number)}[/] "
         f"as comment [bold cyan]{comment['id']}[/]"
     )
-    return verifyCommentBody(token, comment, body)
+    return 0 if verifyCommentBody(token, comment, body) else 1
 
 
 def cmdCommentExport(arguments: argparse.Namespace) -> int:
@@ -1185,7 +1189,7 @@ def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     comment = updateComment(token, arguments.commentId, body)
     reportUnwrapping(joined)
     console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
-    return verifyCommentBody(token, comment, body)
+    return 0 if verifyCommentBody(token, comment, body) else 1
 
 
 def cmdCommentDelete(arguments: argparse.Namespace) -> int:

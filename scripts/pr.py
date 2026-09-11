@@ -804,22 +804,6 @@ def cmdExportAsSource(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def verifyCommentBody(
-    token: str, comment: ticket.CommentSummary, sent: str
-) -> int:
-    """Read one comment back and check it against what was sent."""
-    if ticket.readComment(token, comment["id"])["body"] == sent:
-        console.print("[dim]verified against the filed comment[/]")
-        console.print(comment["url"])
-        return 0
-    console.print(
-        "[red]The comment did not land cleanly:[/] what GitHub holds differs from "
-        "what was sent."
-    )
-    console.print(comment["url"])
-    return 1
-
-
 def cmdComment(arguments: argparse.Namespace) -> int:
     """Add one comment to a pull request."""
     bodyPath = Path(arguments.bodyFile)
@@ -840,7 +824,7 @@ def cmdComment(arguments: argparse.Namespace) -> int:
         f"[green]Commented on[/] [bold cyan]{pullRequestRef(arguments.number)}[/] "
         f"as comment [bold cyan]{comment['id']}[/]"
     )
-    return verifyCommentBody(token, comment, body)
+    return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
 
 
 def cmdCommentList(arguments: argparse.Namespace) -> int:
@@ -884,7 +868,7 @@ def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     comment = ticket.updateComment(token, arguments.commentId, body)
     ticket.reportUnwrapping(joined)
     console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
-    return verifyCommentBody(token, comment, body)
+    return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
 
 
 def cmdCommentDelete(arguments: argparse.Namespace) -> int:
