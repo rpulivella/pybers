@@ -302,6 +302,7 @@ class BodyChanges:
 
     text: str
     joined: int
+    trimmed: int
 
 
 def unwrapParagraphs(body: str) -> BodyChanges:
@@ -325,17 +326,25 @@ def unwrapParagraphs(body: str) -> BodyChanges:
     out: list[str] = []
     paragraph: list[str] = []
     paragraphEnding = ""
+    paragraphTrims = 0
     joined = 0
+    trimmed = 0
     inFence = False
     inCode = False
     inList = False
 
     def flush() -> None:
-        nonlocal joined
+        # A joined paragraph already reports the whitespace it destroyed, so only a
+        # paragraph of one line has a trim left to report on its own.
+        nonlocal joined, trimmed, paragraphTrims
         if paragraph:
-            joined += len(paragraph) - 1
+            if len(paragraph) > 1:
+                joined += len(paragraph) - 1
+            else:
+                trimmed += paragraphTrims
             out.append(" ".join(paragraph) + paragraphEnding)
             paragraph.clear()
+        paragraphTrims = 0
 
     for line in lines:
         ending = lineEnding(line)
@@ -376,7 +385,10 @@ def unwrapParagraphs(body: str) -> BodyChanges:
             # A list item opens a paragraph of its own, so its wrapped continuation
             # joins the item rather than becoming a stray line outside the list.
             flush()
-            paragraph.append(content.rstrip())
+            item = content.rstrip()
+            if item != content:
+                paragraphTrims += 1
+            paragraph.append(item)
             paragraphEnding = ending
             inList = True
             continue
@@ -389,11 +401,13 @@ def unwrapParagraphs(body: str) -> BodyChanges:
             out.append(line)
             continue
 
+        if stripped != content:
+            paragraphTrims += 1
         paragraph.append(stripped)
         paragraphEnding = ending
     flush()
 
-    return BodyChanges(text="".join(out), joined=joined)
+    return BodyChanges(text="".join(out), joined=joined, trimmed=trimmed)
 
 
 def readBodyFile(path: Path) -> BodyChanges:
@@ -411,11 +425,16 @@ def readBodyFile(path: Path) -> BodyChanges:
 
 
 def reportUnwrapping(changes: BodyChanges) -> None:
-    """Say what was joined, so the normalization is never a silent rewrite."""
+    """Say what was changed, so the normalization is never a silent rewrite."""
     if changes.joined:
         console.print(
             f"[dim]unwrapped {changes.joined} hard-wrapped line(s); GitHub renders a "
             f"newline inside a paragraph as a line break[/]"
+        )
+    if changes.trimmed:
+        console.print(
+            f"[dim]trimmed the indent or the trailing spaces from "
+            f"{changes.trimmed} line(s)[/]"
         )
 
 

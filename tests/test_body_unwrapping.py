@@ -17,8 +17,8 @@ credential, which makes them the one piece of that tooling worth pinning before
 PYB-11 decides what testing repo scripts should look like.
 
 UPDATES
-2026-09-11  Indentation decided before the line is stripped, for #74.
-2026-09-11  `BodyChanges` in place of a tuple, for #74.
+2026-09-11  Indentation, the trim report, and `BodyChanges` in place of a tuple,
+            for #74.
 2026-09-11  Written for #72.
 """
 from __future__ import annotations
@@ -81,6 +81,34 @@ def testAnIndentedLineCannotInterruptAParagraph() -> None:
     assert changes.joined == 1
 
 
+# ── PYB-74 AC 2: whitespace removed on its own is reported ───────────────────
+
+
+def testRemovingATrailingHardBreakMarkerIsReported() -> None:
+    """AC 2.i. The change no count could previously describe."""
+    changes = ticket.unwrapParagraphs("Only line with a break  \n")
+
+    assert changes.text == "Only line with a break\n"
+    assert changes.joined == 0
+    assert changes.trimmed == 1
+
+
+def testRemovingTheIndentOfASingleLineParagraphIsReported() -> None:
+    """AC 2. Leading whitespace is a change to the author's text like any other."""
+    changes = ticket.unwrapParagraphs("   just indented\n")
+
+    assert changes.text == "just indented\n"
+    assert changes.trimmed == 1
+
+
+def testAJoinedParagraphDoesNotAlsoReportATrim() -> None:
+    """AC 2. The join already reports the whitespace it destroyed, so once is enough."""
+    changes = ticket.unwrapParagraphs("- an item that was\n  wrapped by an editor\n")
+
+    assert changes.joined == 1
+    assert changes.trimmed == 0
+
+
 # ── PYB-74 AC 3: what survives today still survives ──────────────────────────
 
 
@@ -99,6 +127,7 @@ def testTheConstructsThatSurvivedBeforeStillDo(label: str, body: str) -> None:
 
     assert changes.text == body, label
     assert changes.joined == 0, label
+    assert changes.trimmed == 0, label
 
 
 def testADeeplyIndentedListContinuationStillJoins() -> None:
@@ -191,6 +220,7 @@ def testABodyNeedingNothingReportsNothing(label: str, body: str) -> None:
 
     assert changes.text == body, label
     assert changes.joined == 0, label
+    assert changes.trimmed == 0, label
 
 
 # ── The layer above: reading the draft off disk ──────────────────────────────
