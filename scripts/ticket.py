@@ -249,6 +249,27 @@ listOpener = re.compile(r"^([-*+] |\d+[.)] |\d+\.[a-z] )")
 # each is a statement rather than part of a paragraph.
 standaloneLines: tuple[str, ...] = ("Link:", "Closes ")
 
+# Every separator `str.splitlines` breaks on, verified against it rather than listed
+# from memory. `\r\n` comes first because a line ending in one also ends in `\n`, so
+# the shorter match would strand a `\r` on the content for `strip` to delete. Named
+# because splitting on these and rejoining with `\n` rewrites a line ending the author
+# chose, and inside a fenced code block that is their code rather than their formatting.
+lineSeparators: tuple[str, ...] = (
+    "\r\n", "\n", "\r", "\v", "\f", "\x1c", "\x1d", "\x1e",
+    "\x85", "\u2028", "\u2029",
+)
+
+
+def lineEnding(line: str) -> str:
+    """Return the separator one line from `splitlines(keepends=True)` carries.
+
+    The empty string for the last line of a body that does not end in one.
+    """
+    for separator in lineSeparators:
+        if line.endswith(separator):
+            return separator
+    return ""
+
 
 def unwrapParagraphs(body: str) -> tuple[str, int]:
     """Join every hard-wrapped paragraph onto one line, and say how many were joined.
@@ -267,9 +288,10 @@ def unwrapParagraphs(body: str) -> tuple[str, int]:
     them. Returning the count keeps the transformation visible: a caller reports it
     rather than rewriting the author's text in silence.
     """
-    lines = body.splitlines()
+    lines = body.splitlines(keepends=True)
     out: list[str] = []
     paragraph: list[str] = []
+    paragraphEnding = ""
     joined = 0
     inFence = False
 
@@ -277,11 +299,13 @@ def unwrapParagraphs(body: str) -> tuple[str, int]:
         nonlocal joined
         if paragraph:
             joined += len(paragraph) - 1
-            out.append(" ".join(paragraph))
+            out.append(" ".join(paragraph) + paragraphEnding)
             paragraph.clear()
 
     for line in lines:
-        stripped = line.strip()
+        ending = lineEnding(line)
+        content = line[: len(line) - len(ending)]
+        stripped = content.strip()
 
         if stripped.startswith(("```", "~~~")):
             flush()
@@ -301,7 +325,8 @@ def unwrapParagraphs(body: str) -> tuple[str, int]:
             # A list item opens a paragraph of its own, so its wrapped continuation
             # joins the item rather than becoming a stray line outside the list.
             flush()
-            paragraph.append(line.rstrip())
+            paragraph.append(content.rstrip())
+            paragraphEnding = ending
             continue
 
         if blockOpener.match(stripped):
@@ -310,9 +335,10 @@ def unwrapParagraphs(body: str) -> tuple[str, int]:
             continue
 
         paragraph.append(stripped)
+        paragraphEnding = ending
     flush()
 
-    return "\n".join(out) + ("\n" if body.endswith("\n") else ""), joined
+    return "".join(out), joined
 
 
 def readBodyFile(path: Path) -> tuple[str, int]:
@@ -320,8 +346,13 @@ def readBodyFile(path: Path) -> tuple[str, int]:
 
     Every body this tool posts is destined for GitHub and nowhere else, so it is
     normalized on the way out rather than left to whoever drafted it to remember.
+
+    **Read with `newline=""`, which turns universal newlines OFF.** The default
+    translates `\r\n` and a bare `\r` to `\n` before any of this code sees the
+    text, so a carriage return inside a fenced code block was gone before
+    `unwrapParagraphs` could preserve it, and nothing reported the change.
     """
-    return unwrapParagraphs(path.read_text(encoding="utf-8"))
+    return unwrapParagraphs(path.read_text(encoding="utf-8", newline=""))
 
 
 def reportUnwrapping(joined: int) -> None:

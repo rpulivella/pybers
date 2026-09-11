@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-72] Report every change made to a body on its way to GitHub
 - [PYB-70] Comment on a ticket or a pull request from the command line
 - [PYB-65] Fix a save deleting every formula the reader could not read
 - [PYB-13] Follow and rewrite cross-table and cross-sheet references
