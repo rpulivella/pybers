@@ -19,6 +19,9 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-09-10  The formula key's position is computed from the attributes a
+            cell carries, for #65. Reading a fixed slot lost 416 formulas in
+            one real document. See findings-09-cell-records.md.
 2026-08-18  Written. Decodes numbers, currency, text, dates, booleans and durations,
             verified against fixtures 11 through 14.
 2026-09-03  The formula flag moved here from the writer for #41, so the one
@@ -168,24 +171,32 @@ def decodeRecord(column: int, record: bytes) -> CellRecord:
     )
 
 
-# Byte 8 bit 0x40 puts exactly one reference ahead of the formula key. Measured
-# 2026-09-04 by refcount reproduction: across every fixture and all 74 formula
-# cells, of every assignment of a slot to each flag shape, exactly one
-# reproduces each pooled formula's own refcount, and it turns on this bit alone.
-# What the preceding reference is has not been established, only that it is
-# there. 46-formula-rare-functions is the only fixture that sets the bit, which
-# is why a constant slot read the whole corpus correctly and read that one wrong.
-precedingReferenceOffset: int = 8
-precedingReferenceBit: int = 0x40
+# Which bits put a reference AHEAD of the formula key, so its position moves as a
+# cell gains attributes. Byte 8 carries three and byte 9 one, and each is worth a
+# single slot. Identified from the fixtures that label themselves: 0x20 is a cell
+# fill (28-style-fills reads "No fill" without it and every filled cell with it),
+# 0x40 is an explicit horizontal alignment (30-style-align reads "h: auto" without
+# it and "h: left" with it), and 0x80 is conditional highlighting. A comment adds a
+# reference BEHIND the key, which is why one does not move it.
+precedingByteEightBits: int = 0xE0
+precedingByteNineBit: int = 0x01
+byteEightOffset: int = 8
+
+# The rule this replaced counted 0x40 alone, fitted to a corpus where one fixture
+# set it. Validated by refcount reproduction across 22 formula pools: the old rule
+# reproduced 11 and this reproduces all 22. Reading one slot short finds a key the
+# pool does not hold, which drops the formula, and a key it does hold by accident,
+# which reports the wrong one. See 47-formula-cell-attributes, where six of eight
+# formulas were lost and a seventh was wrong.
 
 
 def formulaKeySlot(record: CellRecord) -> int:
     """Return which trailing reference of a record holds its formula key."""
-    carries = (
-        len(record.raw) > precedingReferenceOffset
-        and bool(record.raw[precedingReferenceOffset] & precedingReferenceBit)
-    )
-    return 1 if carries else 0
+    if len(record.raw) <= formulaFlagOffset:
+        return 0
+    preceding = record.raw[byteEightOffset] & precedingByteEightBits
+    alsoPreceding = record.raw[formulaFlagOffset] & precedingByteNineBit
+    return preceding.bit_count() + alsoPreceding
 
 
 def carriesFormula(record: CellRecord) -> bool:
