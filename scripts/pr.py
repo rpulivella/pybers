@@ -804,6 +804,90 @@ def cmdExportAsSource(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def cmdComment(arguments: argparse.Namespace) -> int:
+    """Add one comment to a pull request."""
+    bodyPath = Path(arguments.bodyFile)
+    if not bodyPath.is_file():
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
+        return errorExitCode
+    body, joined = ticket.readBodyFile(bodyPath)
+    if arguments.dryRun:
+        console.print(
+            f"[yellow]Dry run[/] comment on {pullRequestRef(arguments.number)}:"
+        )
+        console.print(body, markup=False, highlight=False)
+        return 0
+    token = ticket.resolveToken()
+    comment = ticket.postComment(token, arguments.number, body)
+    ticket.reportUnwrapping(joined)
+    console.print(
+        f"[green]Commented on[/] [bold cyan]{pullRequestRef(arguments.number)}[/] "
+        f"as comment [bold cyan]{comment['id']}[/]"
+    )
+    return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
+
+
+def cmdCommentList(arguments: argparse.Namespace) -> int:
+    """Print every comment on a pull request, rendered, with each one's id.
+
+    A command of its own here where `ticket.py` puts the same thing behind
+    `show --comments`, because `pr.py` has no `show`: it reads by branch through
+    `find` and by number through `export-as-source`, and neither is a renderer a
+    flag could hang on. Adding one for symmetry would cost more than the asymmetry.
+    """
+    ticket.showComments(
+        ticket.readComments(ticket.resolveToken(), arguments.number)
+    )
+    return 0
+
+
+def cmdCommentExport(arguments: argparse.Namespace) -> int:
+    """Emit one comment's body verbatim, for a caller that will send it back."""
+    ticket.printCommentAsRawString(
+        ticket.readComment(ticket.resolveToken(), arguments.commentId)
+    )
+    return 0
+
+
+def cmdCommentEdit(arguments: argparse.Namespace) -> int:
+    """Replace one comment's body, keeping its id and its place in the thread.
+
+    What a re-running review needs: replacing its own summary costs neither the
+    record that the first run happened nor the comment's position in the thread.
+    """
+    bodyPath = Path(arguments.bodyFile)
+    if not bodyPath.is_file():
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
+        return errorExitCode
+    body, joined = ticket.readBodyFile(bodyPath)
+    if arguments.dryRun:
+        console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
+        console.print(body, markup=False, highlight=False)
+        return 0
+    token = ticket.resolveToken()
+    comment = ticket.updateComment(token, arguments.commentId, body)
+    ticket.reportUnwrapping(joined)
+    console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
+    return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
+
+
+def cmdCommentDelete(arguments: argparse.Namespace) -> int:
+    """Remove one comment, after printing what is about to be lost."""
+    token = ticket.resolveToken()
+    comment = ticket.readComment(token, arguments.commentId)
+    console.print(
+        f"[yellow]GitHub keeps no copy of a deleted comment.[/] About to remove "
+        f"comment [bold cyan]{comment['id']}[/] by {escape(comment['author'])}:"
+    )
+    console.print(comment["body"], markup=False, highlight=False)
+    if arguments.dryRun:
+        console.print("[yellow]Dry run: nothing was removed.[/]")
+        return 0
+    ticket.deleteComment(token, arguments.commentId)
+    console.print("[green]Deleted.[/]")
+    return 0
+
+
 def cmdEdit(arguments: argparse.Namespace) -> int:
     """Revise an open pull request's title or body.
 
@@ -1081,6 +1165,49 @@ def buildParser() -> argparse.ArgumentParser:
     )
     editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     editParser.set_defaults(handler=cmdEdit)
+
+    commentParser = subparsers.add_parser(
+        "comment", help="add a comment to a pull request"
+    )
+    commentParser.add_argument("number", type=pullRequestNumber)
+    commentParser.add_argument(
+        "--body-file", dest="bodyFile", required=True,
+        help="drafted comment body, a file so lists and code fences survive",
+    )
+    commentParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentParser.set_defaults(handler=cmdComment)
+
+    commentListParser = subparsers.add_parser(
+        "comment-list",
+        help="RENDERED for reading: every comment on a pull request, with its id.",
+    )
+    commentListParser.add_argument("number", type=pullRequestNumber)
+    commentListParser.set_defaults(handler=cmdCommentList)
+
+    commentExportParser = subparsers.add_parser(
+        "comment-export",
+        help="The SOURCE of one comment, byte for byte: the form to revise and "
+        "send back to `comment-edit`.",
+    )
+    commentExportParser.add_argument("commentId", type=int)
+    commentExportParser.set_defaults(handler=cmdCommentExport)
+
+    commentEditParser = subparsers.add_parser(
+        "comment-edit", help="replace a comment's body in place"
+    )
+    commentEditParser.add_argument("commentId", type=int)
+    commentEditParser.add_argument(
+        "--body-file", dest="bodyFile", required=True, help="revised comment body"
+    )
+    commentEditParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentEditParser.set_defaults(handler=cmdCommentEdit)
+
+    commentDeleteParser = subparsers.add_parser(
+        "comment-delete", help="delete a comment (permanent, no GitHub undo)"
+    )
+    commentDeleteParser.add_argument("commentId", type=int)
+    commentDeleteParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentDeleteParser.set_defaults(handler=cmdCommentDelete)
 
     checksParser = subparsers.add_parser(
         "checks", help="report whether every check on a pull request has passed"
