@@ -665,8 +665,9 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    body, joinedLines = ticket.readBodyFile(bodyPath)
-    ticket.reportUnwrapping(joinedLines)
+    changes = ticket.readBodyFile(bodyPath)
+    body = changes.text
+    ticket.reportUnwrapping(changes)
     if refuseBody(body):
         return errorExitCode
 
@@ -810,7 +811,8 @@ def cmdComment(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    body, joined = ticket.readBodyFile(bodyPath)
+    changes = ticket.readBodyFile(bodyPath)
+    body = changes.text
     if arguments.dryRun:
         console.print(
             f"[yellow]Dry run[/] comment on {pullRequestRef(arguments.number)}:"
@@ -819,7 +821,7 @@ def cmdComment(arguments: argparse.Namespace) -> int:
         return 0
     token = ticket.resolveToken()
     comment = ticket.postComment(token, arguments.number, body)
-    ticket.reportUnwrapping(joined)
+    ticket.reportUnwrapping(changes)
     console.print(
         f"[green]Commented on[/] [bold cyan]{pullRequestRef(arguments.number)}[/] "
         f"as comment [bold cyan]{comment['id']}[/]"
@@ -859,14 +861,15 @@ def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    body, joined = ticket.readBodyFile(bodyPath)
+    changes = ticket.readBodyFile(bodyPath)
+    body = changes.text
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
         console.print(body, markup=False, highlight=False)
         return 0
     token = ticket.resolveToken()
     comment = ticket.updateComment(token, arguments.commentId, body)
-    ticket.reportUnwrapping(joined)
+    ticket.reportUnwrapping(changes)
     console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
     return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
 
@@ -906,8 +909,9 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return errorExitCode
-        body, joinedLines = ticket.readBodyFile(bodyPath)
-        ticket.reportUnwrapping(joinedLines)
+        changes = ticket.readBodyFile(bodyPath)
+        body = changes.text
+        ticket.reportUnwrapping(changes)
         if refuseBody(body):
             return errorExitCode
 

@@ -96,6 +96,7 @@ import sys
 import tomllib
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -271,7 +272,19 @@ def lineEnding(line: str) -> str:
     return ""
 
 
-def unwrapParagraphs(body: str) -> tuple[str, int]:
+@dataclass(frozen=True, slots=True)
+class BodyChanges:
+    """A drafted body as it will be posted, and every change made on the way there.
+
+    A dataclass rather than a `TypedDict` like its neighbors, which each mirror a
+    GitHub payload. This is computed here and never parsed from one.
+    """
+
+    text: str
+    joined: int
+
+
+def unwrapParagraphs(body: str) -> BodyChanges:
     """Join every hard-wrapped paragraph onto one line, and say how many were joined.
 
     **GitHub renders an issue, pull request or comment body with GFM hard line breaks
@@ -338,10 +351,10 @@ def unwrapParagraphs(body: str) -> tuple[str, int]:
         paragraphEnding = ending
     flush()
 
-    return "".join(out), joined
+    return BodyChanges(text="".join(out), joined=joined)
 
 
-def readBodyFile(path: Path) -> tuple[str, int]:
+def readBodyFile(path: Path) -> BodyChanges:
     """Read a drafted body and unwrap it, because it is bound for GitHub.
 
     Every body this tool posts is destined for GitHub and nowhere else, so it is
@@ -355,11 +368,11 @@ def readBodyFile(path: Path) -> tuple[str, int]:
     return unwrapParagraphs(path.read_text(encoding="utf-8", newline=""))
 
 
-def reportUnwrapping(joined: int) -> None:
-    """Say what was joined, so the normalization is never a silent rewrite."""
-    if joined:
+def reportUnwrapping(changes: BodyChanges) -> None:
+    """Say what was changed, so the normalization is never a silent rewrite."""
+    if changes.joined:
         console.print(
-            f"[dim]unwrapped {joined} hard-wrapped line(s); GitHub renders a "
+            f"[dim]unwrapped {changes.joined} hard-wrapped line(s); GitHub renders a "
             f"newline inside a paragraph as a line break[/]"
         )
 
@@ -977,8 +990,9 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
-    body, joinedLines = readBodyFile(bodyPath)
-    reportUnwrapping(joinedLines)
+    changes = readBodyFile(bodyPath)
+    body = changes.text
+    reportUnwrapping(changes)
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was filed.[/]")
@@ -1090,8 +1104,9 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return 1
-        body, joinedLines = readBodyFile(bodyPath)
-        reportUnwrapping(joinedLines)
+        changes = readBodyFile(bodyPath)
+        body = changes.text
+        reportUnwrapping(changes)
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
@@ -1179,14 +1194,15 @@ def cmdComment(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
-    body, joined = readBodyFile(bodyPath)
+    changes = readBodyFile(bodyPath)
+    body = changes.text
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] comment on {ticketRef(arguments.number)}:")
         console.print(body, markup=False, highlight=False)
         return 0
     token = resolveToken()
     comment = postComment(token, arguments.number, body)
-    reportUnwrapping(joined)
+    reportUnwrapping(changes)
     console.print(
         f"[green]Commented on[/] [bold cyan]{ticketRef(arguments.number)}[/] "
         f"as comment [bold cyan]{comment['id']}[/]"
@@ -1211,14 +1227,15 @@ def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
-    body, joined = readBodyFile(bodyPath)
+    changes = readBodyFile(bodyPath)
+    body = changes.text
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
         console.print(body, markup=False, highlight=False)
         return 0
     token = resolveToken()
     comment = updateComment(token, arguments.commentId, body)
-    reportUnwrapping(joined)
+    reportUnwrapping(changes)
     console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
     return 0 if verifyCommentBody(token, comment, body) else 1
 
