@@ -822,7 +822,11 @@ def verifyCommentBody(
 
 def cmdComment(arguments: argparse.Namespace) -> int:
     """Add one comment to a pull request."""
-    body, joined = ticket.readBodyFile(Path(arguments.bodyFile))
+    bodyPath = Path(arguments.bodyFile)
+    if not bodyPath.is_file():
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
+        return errorExitCode
+    body, joined = ticket.readBodyFile(bodyPath)
     if arguments.dryRun:
         console.print(
             f"[yellow]Dry run[/] comment on {pullRequestRef(arguments.number)}:"
@@ -867,7 +871,11 @@ def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     What a re-running review needs: replacing its own summary costs neither the
     record that the first run happened nor the comment's position in the thread.
     """
-    body, joined = ticket.readBodyFile(Path(arguments.bodyFile))
+    bodyPath = Path(arguments.bodyFile)
+    if not bodyPath.is_file():
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
+        return errorExitCode
+    body, joined = ticket.readBodyFile(bodyPath)
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
         console.print(body, markup=False, highlight=False)

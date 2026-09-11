@@ -1140,7 +1140,11 @@ def verifyCommentBody(token: str, comment: CommentSummary, sent: str) -> int:
 
 def cmdComment(arguments: argparse.Namespace) -> int:
     """Add one comment to a ticket."""
-    body, joined = readBodyFile(Path(arguments.bodyFile))
+    bodyPath = Path(arguments.bodyFile)
+    if not bodyPath.is_file():
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
+        return 1
+    body, joined = readBodyFile(bodyPath)
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] comment on {ticketRef(arguments.number)}:")
         console.print(body, markup=False, highlight=False)
@@ -1168,7 +1172,11 @@ def cmdCommentExport(arguments: argparse.Namespace) -> int:
 
 def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     """Replace one comment's body, keeping its id and its place in the thread."""
-    body, joined = readBodyFile(Path(arguments.bodyFile))
+    bodyPath = Path(arguments.bodyFile)
+    if not bodyPath.is_file():
+        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
+        return 1
+    body, joined = readBodyFile(bodyPath)
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
         console.print(body, markup=False, highlight=False)
