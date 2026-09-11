@@ -345,8 +345,13 @@ def readBodyFile(path: Path) -> tuple[str, int]:
 
     Every body this tool posts is destined for GitHub and nowhere else, so it is
     normalized on the way out rather than left to whoever drafted it to remember.
+
+    **Read with `newline=""`, which turns universal newlines OFF.** The default
+    translates `\r\n` and a bare `\r` to `\n` before any of this code sees the
+    text, so a carriage return inside a fenced code block was gone before
+    `unwrapParagraphs` could preserve it, and nothing reported the change.
     """
-    return unwrapParagraphs(path.read_text(encoding="utf-8"))
+    return unwrapParagraphs(path.read_text(encoding="utf-8", newline=""))
 
 
 def reportUnwrapping(joined: int) -> None:
