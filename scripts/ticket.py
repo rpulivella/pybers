@@ -189,6 +189,16 @@ class TicketSummary(TypedDict):
     blocking: list[tuple[int, str]]
 
 
+class CommentSummary(TypedDict):
+    """One comment on a filed issue or pull request, as a caller needs to see it."""
+
+    id: int
+    author: str
+    createdAt: str
+    body: str
+    url: str
+
+
 class BoardCoordinates(TypedDict):
     """The identifiers required to move an item on the Project board."""
 
@@ -757,6 +767,104 @@ def assignTicket(token: str, number: int, assignee: str) -> None:
     requestJson(url, token, method="POST", payload={"assignees": [assignee]})
 
 
+def summarizeComment(raw: dict[str, Any]) -> CommentSummary:
+    """Narrow GitHub's comment payload to the fields a caller actually uses."""
+    return CommentSummary(
+        id=raw["id"],
+        author=(raw.get("user") or {}).get("login", "unknown"),
+        createdAt=raw["created_at"],
+        body=raw.get("body") or "",
+        url=raw["html_url"],
+    )
+
+
+def readComments(token: str, number: int) -> list[CommentSummary]:
+    """Every comment on one issue or pull request, oldest first as GitHub orders."""
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}"
+        f"/issues/{number}/comments?per_page=100"
+    )
+    return [summarizeComment(raw) for raw in requestJson(url, token)]
+
+
+def readComment(token: str, commentId: int) -> CommentSummary:
+    """Return one comment by its own id.
+
+    **GitHub scopes a comment id to the repository, not to the issue it sits on**,
+    so this takes no issue number. Accepting one would imply a check that is not
+    happening: a mismatched pair would be ignored rather than refused.
+    """
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}"
+        f"/issues/comments/{commentId}"
+    )
+    return summarizeComment(requestJson(url, token))
+
+
+def postComment(token: str, number: int, body: str) -> CommentSummary:
+    """Add one comment to an issue or a pull request, which are one endpoint here."""
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}"
+        f"/issues/{number}/comments"
+    )
+    return summarizeComment(
+        requestJson(url, token, method="POST", payload={"body": body})
+    )
+
+
+def updateComment(token: str, commentId: int, body: str) -> CommentSummary:
+    """Replace one comment's body in place, keeping its id and its place in the thread.
+
+    Editing rather than deleting and re-posting is what lets a review that runs
+    twice correct itself without losing the record that the first run happened.
+    """
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}"
+        f"/issues/comments/{commentId}"
+    )
+    return summarizeComment(
+        requestJson(url, token, method="PATCH", payload={"body": body})
+    )
+
+
+def deleteComment(token: str, commentId: int) -> None:
+    """Remove one comment. GitHub keeps no copy, so the caller warns before calling."""
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}"
+        f"/issues/comments/{commentId}"
+    )
+    requestJson(url, token, method="DELETE")
+
+
+def printCommentAsRawString(comment: CommentSummary) -> None:
+    """Write one comment's body to stdout byte for byte, for revising and sending back.
+
+    Same contract and same reason as `printBodyAsRawString`: rich hard-wraps,
+    expands tabs and reads square brackets as markup, so anything that passes
+    through it is unusable for round-tripping.
+    """
+    sys.stdout.write(comment["body"])
+
+
+def showComments(comments: list[CommentSummary]) -> None:
+    """Print comments for a human reader, never for round-tripping.
+
+    The id is printed because it is what `comment-edit` and `comment-delete` take,
+    and it appears nowhere in GitHub's own interface without hunting for it.
+    """
+    if not comments:
+        console.print("[dim]no comments[/]")
+        return
+    for comment in comments:
+        console.print(
+            f"[bold cyan]{comment['id']}[/] "
+            f"[bold]{escape(comment['author'])}[/] "
+            f"[dim]{comment['createdAt']}[/]"
+        )
+        console.print(comment["body"], markup=False, highlight=False)
+        console.print(f"[dim]{comment['url']}[/]\n")
+
+
 def printBodyAsRawString(summary: TicketSummary) -> None:
     """Write a ticket body to stdout byte for byte, so it can be edited and sent back.
 
@@ -880,8 +988,11 @@ def cmdShow(arguments: argparse.Namespace) -> int:
     free to change its formatting at any time, which is exactly why its output must
     never be sent back, use `export-as-source` for that.
     """
-    summary = readTicket(resolveToken(), arguments.number)
-    showTicket(summary)
+    token = resolveToken()
+    showTicket(readTicket(token, arguments.number))
+    if arguments.comments:
+        console.print()
+        showComments(readComments(token, arguments.number))
     return 0
 
 
@@ -1006,6 +1117,87 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
     )
     console.print("[dim]verified against the filed ticket[/]")
     console.print(summary["url"])
+    return 0
+
+
+def verifyCommentBody(token: str, comment: CommentSummary, sent: str) -> int:
+    """Read one comment back and check it against what was sent.
+
+    The same duty `edit` performs on a ticket body, and for the same reason: a
+    write that did not land should fail loudly rather than report success.
+    """
+    if readComment(token, comment["id"])["body"] == sent:
+        console.print("[dim]verified against the filed comment[/]")
+        console.print(comment["url"])
+        return 0
+    console.print(
+        "[red]The comment did not land cleanly:[/] what GitHub holds differs from "
+        "what was sent."
+    )
+    console.print(comment["url"])
+    return 1
+
+
+def cmdComment(arguments: argparse.Namespace) -> int:
+    """Add one comment to a ticket."""
+    body, joined = readBodyFile(Path(arguments.bodyFile))
+    if arguments.dryRun:
+        console.print(f"[yellow]Dry run[/] comment on {ticketRef(arguments.number)}:")
+        console.print(body, markup=False, highlight=False)
+        return 0
+    token = resolveToken()
+    comment = postComment(token, arguments.number, body)
+    reportUnwrapping(joined)
+    console.print(
+        f"[green]Commented on[/] [bold cyan]{ticketRef(arguments.number)}[/] "
+        f"as comment [bold cyan]{comment['id']}[/]"
+    )
+    return verifyCommentBody(token, comment, body)
+
+
+def cmdCommentExport(arguments: argparse.Namespace) -> int:
+    """Emit one comment's body verbatim, for a caller that will send it back.
+
+    Separate from `comment-list` for the reason `export-as-source` is separate from
+    `show`: displaying and round-tripping are different actions with incompatible
+    contracts.
+    """
+    printCommentAsRawString(readComment(resolveToken(), arguments.commentId))
+    return 0
+
+
+def cmdCommentEdit(arguments: argparse.Namespace) -> int:
+    """Replace one comment's body, keeping its id and its place in the thread."""
+    body, joined = readBodyFile(Path(arguments.bodyFile))
+    if arguments.dryRun:
+        console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
+        console.print(body, markup=False, highlight=False)
+        return 0
+    token = resolveToken()
+    comment = updateComment(token, arguments.commentId, body)
+    reportUnwrapping(joined)
+    console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
+    return verifyCommentBody(token, comment, body)
+
+
+def cmdCommentDelete(arguments: argparse.Namespace) -> int:
+    """Remove one comment, after printing what is about to be lost.
+
+    GitHub keeps no copy and offers no undo, so the body is shown first. A
+    `--dry-run` shows it without removing anything.
+    """
+    token = resolveToken()
+    comment = readComment(token, arguments.commentId)
+    console.print(
+        f"[yellow]GitHub keeps no copy of a deleted comment.[/] About to remove "
+        f"comment [bold cyan]{comment['id']}[/] by {escape(comment['author'])}:"
+    )
+    console.print(comment["body"], markup=False, highlight=False)
+    if arguments.dryRun:
+        console.print("[yellow]Dry run: nothing was removed.[/]")
+        return 0
+    deleteComment(token, arguments.commentId)
+    console.print("[green]Deleted.[/]")
     return 0
 
 
@@ -1261,6 +1453,10 @@ def buildParser() -> argparse.ArgumentParser:
         "Never copy from it.",
     )
     showParser.add_argument("number", type=ticketNumber)
+    showParser.add_argument(
+        "--comments", action="store_true",
+        help="also print the ticket's comments, with the id each is reached by",
+    )
     showParser.set_defaults(handler=cmdShow)
 
     exportParser = subparsers.add_parser(
@@ -1297,6 +1493,42 @@ def buildParser() -> argparse.ArgumentParser:
     )
     editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     editParser.set_defaults(handler=cmdEdit)
+
+    commentParser = subparsers.add_parser(
+        "comment", help="add a comment to a ticket"
+    )
+    commentParser.add_argument("number", type=ticketNumber)
+    commentParser.add_argument(
+        "--body-file", dest="bodyFile", required=True,
+        help="drafted comment body, a file so lists and code fences survive",
+    )
+    commentParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentParser.set_defaults(handler=cmdComment)
+
+    commentExportParser = subparsers.add_parser(
+        "comment-export",
+        help="The SOURCE of one comment, byte for byte: the form to revise and "
+        "send back to `comment-edit`.",
+    )
+    commentExportParser.add_argument("commentId", type=int)
+    commentExportParser.set_defaults(handler=cmdCommentExport)
+
+    commentEditParser = subparsers.add_parser(
+        "comment-edit", help="replace a comment's body in place"
+    )
+    commentEditParser.add_argument("commentId", type=int)
+    commentEditParser.add_argument(
+        "--body-file", dest="bodyFile", required=True, help="revised comment body"
+    )
+    commentEditParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentEditParser.set_defaults(handler=cmdCommentEdit)
+
+    commentDeleteParser = subparsers.add_parser(
+        "comment-delete", help="delete a comment (permanent, no GitHub undo)"
+    )
+    commentDeleteParser.add_argument("commentId", type=int)
+    commentDeleteParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentDeleteParser.set_defaults(handler=cmdCommentDelete)
 
     closeParser = subparsers.add_parser(
         "close", help="close a ticket and set Status to Done"
