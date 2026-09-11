@@ -272,6 +272,26 @@ def lineEnding(line: str) -> str:
     return ""
 
 
+# CommonMark makes four columns of indentation a code block needing no fence, a tab
+# advancing to the next stop. A construct identified by its indentation is invisible
+# to a pattern matched against the stripped line, which is how a pasted block arrived
+# at GitHub as a sentence. See #74.
+codeIndent: int = 4
+
+
+def leadingWidth(content: str) -> int:
+    """Return how many columns a line is indented before its first other character."""
+    width = 0
+    for character in content:
+        if character == " ":
+            width += 1
+        elif character == "\t":
+            width += codeIndent - (width % codeIndent)
+        else:
+            break
+    return width
+
+
 @dataclass(frozen=True, slots=True)
 class BodyChanges:
     """A drafted body as it will be posted, and every change made on the way there.
@@ -307,6 +327,8 @@ def unwrapParagraphs(body: str) -> BodyChanges:
     paragraphEnding = ""
     joined = 0
     inFence = False
+    inCode = False
+    inList = False
 
     def flush() -> None:
         nonlocal joined
@@ -319,13 +341,29 @@ def unwrapParagraphs(body: str) -> BodyChanges:
         ending = lineEnding(line)
         content = line[: len(line) - len(ending)]
         stripped = content.strip()
+        indent = leadingWidth(content)
 
         if stripped.startswith(("```", "~~~")):
             flush()
             inFence = not inFence
+            inList = False
             out.append(line)
             continue
         if inFence:
+            out.append(line)
+            continue
+
+        if inCode:
+            # A blank line belongs to the block; a non-blank one inside the margin
+            # closes it and is then dispatched normally below.
+            if not stripped or indent >= codeIndent:
+                out.append(line)
+                continue
+            inCode = False
+        elif stripped and indent >= codeIndent and not inList and not paragraph:
+            # Indented code cannot interrupt a paragraph, and inside a list the same
+            # indentation is a continuation rather than a block.
+            inCode = True
             out.append(line)
             continue
 
@@ -340,7 +378,11 @@ def unwrapParagraphs(body: str) -> BodyChanges:
             flush()
             paragraph.append(content.rstrip())
             paragraphEnding = ending
+            inList = True
             continue
+
+        if indent == 0:
+            inList = False
 
         if blockOpener.match(stripped):
             flush()
@@ -369,7 +411,7 @@ def readBodyFile(path: Path) -> BodyChanges:
 
 
 def reportUnwrapping(changes: BodyChanges) -> None:
-    """Say what was changed, so the normalization is never a silent rewrite."""
+    """Say what was joined, so the normalization is never a silent rewrite."""
     if changes.joined:
         console.print(
             f"[dim]unwrapped {changes.joined} hard-wrapped line(s); GitHub renders a "

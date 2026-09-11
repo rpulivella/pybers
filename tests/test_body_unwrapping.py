@@ -7,9 +7,9 @@ so a newline inside a paragraph becomes a `<br>`. `unwrapParagraphs` joins those
 paragraphs and reports what it changed, so the caller can say so rather than
 rewriting an author's text in silence.
 
-**The line ending is the author's, not the tool's.** Inside a fenced code block a
-carriage return is the author's code rather than their formatting, and `splitlines`
-followed by a `"\n".join` converts every one of them with nothing reported.
+**The line ending is the author's, not the tool's**, and so is the indentation. A
+carriage return inside a fenced code block is the author's code rather than their
+formatting, and four columns of indent is what makes a block code at all.
 
 The first tests under `tests/` covering `scripts/`, which has none. Written narrowly
 on purpose: these functions are pure over a string, needing no network and no
@@ -17,6 +17,7 @@ credential, which makes them the one piece of that tooling worth pinning before
 PYB-11 decides what testing repo scripts should look like.
 
 UPDATES
+2026-09-11  Indentation decided before the line is stripped, for #74.
 2026-09-11  `BodyChanges` in place of a tuple, for #74.
 2026-09-11  Written for #72.
 """
@@ -40,6 +41,77 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import ticket  # noqa: E402
+
+# ── PYB-74 AC 1: indentation is what makes a block code ──────────────────────
+
+
+def testAnIndentedCodeBlockKeepsItsIndentAndItsLines() -> None:
+    """AC 1.i and 1.ii. Four columns is a code block with no fence anywhere."""
+    body = "Before:\n\n    def f():\n        return 1\n\nAfter.\n"
+
+    changes = ticket.unwrapParagraphs(body)
+
+    assert changes.text == body
+    assert changes.joined == 0
+
+
+def testATabIndentedCodeBlockSurvives() -> None:
+    """AC 1.i. A tab advances to the next four-column stop, so one tab is enough."""
+    body = "Before:\n\n\tdef f():\n\t\treturn 1\n\nAfter.\n"
+
+    changes = ticket.unwrapParagraphs(body)
+
+    assert changes.text == body
+
+
+def testABlankLineInsideACodeBlockBelongsToIt() -> None:
+    """AC 1.ii. A blank line does not end a block that keeps going after it."""
+    body = "Before:\n\n    first\n\n    second\n\nAfter.\n"
+
+    changes = ticket.unwrapParagraphs(body)
+
+    assert changes.text == body
+
+
+def testAnIndentedLineCannotInterruptAParagraph() -> None:
+    """Indented code cannot open mid-paragraph, so an open paragraph wins."""
+    changes = ticket.unwrapParagraphs("a paragraph\n    still the paragraph\n")
+
+    assert changes.text == "a paragraph still the paragraph\n"
+    assert changes.joined == 1
+
+
+# ── PYB-74 AC 3: what survives today still survives ──────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("label", "body"),
+    [
+        ("a fenced block", "```python\ndef f():\n    pass\n```\n"),
+        ("a nested list item", "- outer\n  - inner\n"),
+        ("a table", "| a | b |\n| --- | --- |\n| 1 | 2 |\n"),
+        ("a block quote", "# Title\n\n> quoted\n"),
+    ],
+)
+def testTheConstructsThatSurvivedBeforeStillDo(label: str, body: str) -> None:
+    """AC 3. Four constructs, preserved for four different reasons."""
+    changes = ticket.unwrapParagraphs(body)
+
+    assert changes.text == body, label
+    assert changes.joined == 0, label
+
+
+def testADeeplyIndentedListContinuationStillJoins() -> None:
+    """AC 3. Six columns under a sub-criterion is a continuation, not a code block."""
+    changes = ticket.unwrapParagraphs(
+        "1. outer\n   1. inner criterion that was\n      wrapped by an editor\n"
+    )
+
+    assert changes.text == (
+        "1. outer\n   1. inner criterion that was wrapped by an editor\n"
+    )
+    assert changes.joined == 1
+
 
 # ── PYB-72 AC 1.i: the endings an author chose survive ───────────────────────
 
