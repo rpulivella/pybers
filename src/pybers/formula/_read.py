@@ -16,6 +16,8 @@ error, which is why each is handled here and not left to a caller:
   ordinary numbers they name a cell far outside the table and raise nothing.
 
 UPDATES
+2026-09-10  A key the pool does not hold is refused rather than read as no
+            formula at all, for #65, because a save then removed it.
 2026-09-08  Split out of `pybers.document._read` for #45, unchanged.
 """
 from __future__ import annotations
@@ -43,6 +45,7 @@ from .._persistence.index import (
     originOffset,
     readDataList,
 )
+from ..errors import ReadError
 from .nodes import (
     Coordinate,
     Formula,
@@ -289,17 +292,28 @@ def resolveFormula(
 ) -> Formula | None:
     """Return the formula behind a cell, or None when the cell has none.
 
-    A formula that is marked but absent from the table's list is returned as None
-    rather than raised on. The flag and the list are two separate records of the
-    same fact, and a document Numbers opens happily is not one this library should
-    refuse to read.
+    **A record naming a formula the pool does not hold is refused, not dropped.**
+    Returning None there left the cell looking as though it never held one, and a
+    save then removed the formula from the file: six of the eight in
+    47-formula-cell-attributes, and 416 across one real document. Refusing to read
+    is recoverable and silently deleting a person's work is not.
     """
     if not carriesFormula(record):
         return None
     slot = formulaKeySlot(record)
     if len(record.references) <= slot:
-        return None
-    return formulas.get(record.references[slot])
+        raise ReadError(
+            f"The cell record at column {record.column} names a formula at "
+            f"trailing reference {slot} and carries only {len(record.references)}."
+        )
+    key = record.references[slot]
+    if key not in formulas:
+        raise ReadError(
+            f"The cell record at column {record.column} names formula {key}, "
+            f"which its table's pool does not hold. The pool holds "
+            f"{sorted(formulas) or 'nothing'}."
+        )
+    return formulas[key]
 
 
 __all__ = ["readFormula", "readFormulaTable", "resolveFormula"]

@@ -873,14 +873,35 @@ question. `43-stroke-dashes` was answered from an unexpected direction, by text 
                         that way put every offset past the end of its buffer.
                         See findings-01-values.md.
 
+47-formula-cell-attributes
+                        DONE, and it was built to reproduce a defect rather than
+                        to survey. A formula cell that ALSO carries a
+                        style, a number format, conditional highlighting and a
+                        comment. Every fixture above puts those on plain cells
+                        and formulas on plain cells, never both on one cell, so
+                        the formula key is always the record's first trailing
+                        reference. In a real document it is the third or the
+                        fifth, and reading it from a fixed position deleted 416
+                        formulas on save. Byte 8 bits 0x20, 0x40 and 0x80 and
+                        byte 9 bit 0x01 each put one reference ahead of it;
+                        0x80 is the conditional-highlighting reference, and a
+                        comment adds one BEHIND the key rather than ahead. Six of
+                        the eight formulas in `Decorated` were lost on a save and
+                        a seventh read as a different formula. See
+                        findings-09-cell-records.md.
+
 ```
 
 ---
 
 ## Highest value first
 
-**Nothing is outstanding.** The corpus is complete and every fixture that could reshape the
-object model has been made and read.
+**Nothing is outstanding**, and `47-formula-cell-attributes` is why that sentence now
+carries a caveat. It was the first gap a real document found rather than a survey did: the
+corpus covered each cell attribute on its own and formulas on their own, and covering both
+never covers them stacked on one cell. Forty-six fixtures agreed with each other about a
+record shape none of them contained. Completeness here means every shape SEEN, which is a
+weaker claim than it reads as.
 
 Verified exhaustively for `32`, `43` and `44`: every archive in each file was enumerated and
 walked from the document roots, and the only ones never reached are stale
