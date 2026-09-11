@@ -173,7 +173,8 @@ def decodeRecord(column: int, record: bytes) -> CellRecord:
 
 # Which bits put a reference AHEAD of the formula key, so its position moves as a
 # cell gains attributes. Byte 8 carries three and byte 9 one, and each is worth a
-# single slot. Identified from the fixtures that label themselves: 0x20 is a cell
+# single slot, counted rather than added, so widening either mask stays correct.
+# Identified from the fixtures that label themselves: 0x20 is a cell
 # fill (28-style-fills reads "No fill" without it and every filled cell with it),
 # 0x40 is an explicit horizontal alignment (30-style-align reads "h: auto" without
 # it and "h: left" with it), and 0x80 is conditional highlighting. A comment adds a
@@ -196,7 +197,7 @@ def formulaKeySlot(record: CellRecord) -> int:
         return 0
     preceding = record.raw[byteEightOffset] & precedingByteEightBits
     alsoPreceding = record.raw[formulaFlagOffset] & precedingByteNineBit
-    return preceding.bit_count() + alsoPreceding
+    return preceding.bit_count() + alsoPreceding.bit_count()
 
 
 def carriesFormula(record: CellRecord) -> bool:
