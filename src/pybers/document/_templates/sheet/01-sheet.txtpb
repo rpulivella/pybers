@@ -1,0 +1,60 @@
+#| component: Document
+#| identifier: 908822
+#| message_infos {
+#|   type: 2
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   object_references: 903871
+#|   object_references: 908823
+#|   object_references: 908827
+#|   object_references: 908828
+#|   object_references: 908829
+#|   object_references: 908824
+#|   object_references: 908825
+#|   object_references: 908826
+#| }
+name: ""
+in_portrait_page_orientation: true
+show_page_numbers: false
+is_autofit_on: false
+content_scale: 1.0
+page_order: PageOrderTopToBottom
+print_margins {
+  top: 72.0
+  left: 54.0
+  bottom: 72.0
+  right: 54.0
+}
+using_start_page_number: true
+start_page_number: 1
+page_header_inset: 18.0
+page_footer_inset: 18.0
+userDefinedGuideStorage {
+  identifier: 908823
+}
+headers {
+  identifier: 908827
+}
+headers {
+  identifier: 908828
+}
+headers {
+  identifier: 908829
+}
+footers {
+  identifier: 908824
+}
+footers {
+  identifier: 908825
+}
+footers {
+  identifier: 908826
+}
+uses_single_header_footer: false
+layout_direction: PageLayoutDirectionLeftToRight
+style {
+  identifier: 903871
+}
+print_backgrounds: true
+should_print_comments: false

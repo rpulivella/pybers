@@ -1,0 +1,52 @@
+#| component: Document
+#| identifier: 908824
+#| message_infos {
+#|   type: 2001
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   object_references: 903900
+#|   object_references: 903872
+#| }
+kind: HEADER
+style_sheet {
+  identifier: 905039
+}
+table_para_style {
+  entries {
+    character_index: 0
+    object {
+      identifier: 903900
+    }
+  }
+}
+table_para_data {
+  entries {
+    character_index: 0
+    first: 0
+    second: 0
+  }
+}
+table_list_style {
+  entries {
+    character_index: 0
+    object {
+      identifier: 903872
+    }
+  }
+}
+in_document: true
+table_para_starts {
+  entries {
+    character_index: 0
+    first: 0
+    second: 0
+  }
+}
+table_para_bidi {
+  entries {
+    character_index: 0
+    first: 0
+    second: 0
+  }
+}

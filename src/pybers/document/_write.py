@@ -23,6 +23,8 @@ UPDATES
 2026-09-02  Edited cells are marked for recalculation, for #25.
 2026-09-02  Merges are written back to the merge store, for #16.
 2026-09-08  Formulas and the engine moved to modules of their own, for #45.
+2026-09-14  A sheet the model gained is created before anything else is written,
+            for PYB-63.
 """
 from __future__ import annotations
 
@@ -48,6 +50,7 @@ from .._generated import TNArchives_pb2 as tn
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import (
     NumbersPackage,
+    PackageRegistry,
     writePackage,
 )
 from .._persistence.index import (
@@ -58,6 +61,7 @@ from .._persistence.index import (
 )
 from ..errors import WriteError
 from ..table._write import applyMerges, applyTableEdits, mergesAdded
+from ._create import sheetsCreate
 from .sheets import Document
 
 
@@ -68,6 +72,8 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     A caller assigns to `Cell.value` directly, so there is no hook to record a
     change, and a comparison cannot go stale the way a dirty flag can.
     """
+    registry = PackageRegistry(package)
+    sheetsCreate(document, package, registry)
     index = ArchiveIndex(package)
     owners = {
         archive.identifier: iwaFile
@@ -78,16 +84,8 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     written: dict[int, list[tuple[int, int]]] = {}
     entries = tableOwnerEntries(index, calculationEngine(index))
 
-    # Both pairings are checked rather than zipped loosely. A plain `zip` stops at
-    # the shorter side, so a model holding fewer sheets than the document does would
-    # write some of them and skip the rest in silence, which is the failure this
-    # format specializes in. Neither count can legitimately differ: the model was
-    # built from these archives.
-    if len(document.sheets) != len(root.sheets):
-        raise WriteError(
-            f"This document holds {len(root.sheets)} sheets and the model holds "
-            f"{len(document.sheets)}. Adding or removing a sheet is not supported."
-        )
+    # Strict, because `sheetsCreate` has made the two lists one list, and a plain
+    # `zip` would stop at the shorter side in silence if that ever stopped holding.
     for sheet, reference in zip(document.sheets, root.sheets, strict=True):
         sheetArchive = index.resolve(reference, tn.SheetArchive)
         tableReferences = [
@@ -137,6 +135,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 )
 
     requestRecalculation(index, owners, written)
+    registry.save()
     return sum(len(cells) for cells in written.values())
 
 

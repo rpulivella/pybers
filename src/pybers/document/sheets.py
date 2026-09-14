@@ -23,6 +23,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-09-14  A sheet is added, and knows the archive it was read from, for PYB-63.
 2026-09-08  Every reference in the document walked in one call, and a table
             reached by the identity a formula names it by, for #13.
 2026-09-08  Moved into `pybers.document` for #58, out of `pybers.model`.
@@ -162,6 +163,9 @@ class Sheet:
     name: str
     tables: list[Table] = field(default_factory=list)
     graphicalObjects: list[GraphicalObject] = field(default_factory=list)
+    # The archive this sheet was read from or saved as, and None until it has one.
+    # Excluded from equality and `repr` for the reason `Document._package` is.
+    _identifier: int | None = field(default=None, repr=False, compare=False)
 
     def table(self, nameOrPosition: str | int) -> Table:
         """Return one of this sheet's tables by its name or by its position.
@@ -221,6 +225,32 @@ class Document:
                 if seen[table.name] == 1:
                     qualified[table.name] = table.identifier
         return qualified
+
+    def sheetAdd(self, name: str, position: int | None = None) -> Sheet:
+        """Add an empty sheet, last or at a position counted from one, and return it.
+
+        Numbers enforces nothing about sheet names, so a duplicate is accepted. The
+        sheet reaches the file when the document is saved.
+        """
+        if not isinstance(name, str) or not name:
+            raise SelectionError(
+                f"A sheet is added under a name, and {name!r} is none."
+            )
+        last = len(self.sheets) + firstPosition
+        if position is None:
+            position = last
+        if (
+            not isinstance(position, int)
+            or isinstance(position, bool)
+            or not firstPosition <= position <= last
+        ):
+            raise SelectionError(
+                f"A sheet is added at a position from {firstPosition} to {last}, and "
+                f"{position!r} is not one."
+            )
+        sheet = Sheet(name=name)
+        self.sheets.insert(position - firstPosition, sheet)
+        return sheet
 
     def tableFor(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.
