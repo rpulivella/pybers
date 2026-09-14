@@ -16,6 +16,9 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-14  A row the file stores nothing for is created rather than the
+            formula being dropped, for #78. The walk over `rowInfos` never
+            saw it, and the save reported success.
 2026-09-08  Split out of the writer for #58, taking the merge formula with it.
 """
 from __future__ import annotations
@@ -128,6 +131,62 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
     return (
         record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
     )
+
+
+def rowsNeedingStorage(
+    table: Table, firstRow: int, tileSize: int, present: frozenset[int]
+) -> list[int]:
+    """Return the rows of this tile holding a formula the file stores no row for.
+
+    Numbers writes a `TileRowInfo` only for a row that holds something, so a table
+    declaring ten rows can carry one. A formula written into any of the other nine
+    was dropped by the walk over `rowInfos`, and the save reported success.
+    """
+    wanted = set()
+    for reference, cell in table.cells.items():
+        row = reference.row - originOffset
+        if cell.formula is None or row in present:
+            continue
+        if firstRow <= row < firstRow + tileSize:
+            wanted.add(row)
+    return sorted(wanted)
+
+
+def rowStorageCreate(tile: tst.Tile, tileRowIndex: int) -> tst.TileRowInfo:
+    """Add an empty row to a tile, shaped like the rows already in it.
+
+    The offset array's length is copied from a sibling rather than computed: a
+    narrow row carries a fixed 255 slots whatever the column count, and the one
+    wide row measured carries one slot per column, so a rule fitted to that single
+    sample would be a guess. A tile holding no row to copy is refused by the caller.
+
+    `numrows` is corrected because Numbers keeps it accurate, and `numCells`,
+    `maxRow` and `maxColumn` are left alone because Numbers writes zero in all
+    three on tiles full of data.
+    """
+    sibling = tile.rowInfos[0]
+    empty = emptyOffset.to_bytes(offsetWidth, "little") * (
+        len(sibling.cell_offsets) // offsetWidth
+    )
+    created = tst.TileRowInfo()
+    created.tile_row_index = tileRowIndex
+    created.cell_count = 0
+    created.cell_storage_buffer_pre_bnc = b""
+    created.cell_offsets_pre_bnc = empty
+    created.storage_version = sibling.storage_version
+    created.cell_storage_buffer = b""
+    created.cell_offsets = empty
+    if sibling.has_wide_offsets:
+        created.has_wide_offsets = True
+
+    at = len(tile.rowInfos)
+    for position, existing in enumerate(tile.rowInfos):
+        if existing.tile_row_index > tileRowIndex:
+            at = position
+            break
+    tile.rowInfos.insert(at, created)
+    tile.numrows = len(tile.rowInfos)
+    return created
 
 
 def rewriteRow(
@@ -251,11 +310,55 @@ def applyTableEdits(
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
 
+    # A row belongs to the tile covering its index, and a tile that holds nothing
+    # may be absent. No table in the 46 fixtures has such a gap, so this refuses
+    # rather than guessing what an absent tile should be built from, and refusing
+    # is what keeps the formula from being dropped in silence.
+    if pool is not None:
+        # Compared by tile rather than by row: a table at Numbers' million-row
+        # limit spans 3907 tiles, so naming every row covered would build a
+        # million-element set on every save to answer a question this answers in
+        # one division.
+        coveredTiles = frozenset(entry.tileid for entry in store.tiles.tiles)
+        uncovered = [
+            reference
+            for reference, held in table.cells.items()
+            if held.formula is not None
+            and (reference.row - originOffset) // tileSize not in coveredTiles
+        ]
+        if uncovered:
+            first = min(uncovered, key=lambda reference: (reference.row, reference.col))
+            raise WriteError(
+                f"Row {first.row} of {table.name!r} holds a formula and no tile "
+                f"covers it. The table declares {model.number_of_rows} rows and "
+                f"stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
+            )
+
     for entry in store.tiles.tiles:
         archive = index.archive(entry.tile.identifier)
         tile = index.resolve(entry.tile, tst.Tile)
         firstRow = entry.tileid * tileSize
         touched = False
+
+        # Rows the file stores nothing for, materialized before the walk below,
+        # which only ever sees a row that already has storage. Doing it here rather
+        # than inside the walk keeps `rowInfos` from being mutated while iterated.
+        createdRows: set[int] = set()
+        if pool is not None:
+            stored = frozenset(
+                firstRow + rowInfo.tile_row_index for rowInfo in tile.rowInfos
+            )
+            for missing in rowsNeedingStorage(table, firstRow, tileSize, stored):
+                if not tile.rowInfos:
+                    raise WriteError(
+                        f"Row {missing + originOffset} of {table.name!r} holds a "
+                        "formula and its tile stores no row to take the shape of. "
+                        "Writing into an empty tile is not supported, and the "
+                        "formula would be lost without this refusal."
+                    )
+                rowStorageCreate(tile, missing - firstRow)
+                createdRows.add(missing)
+                touched = True
 
         for rowInfo in tile.rowInfos:
             offsetUnit = offsetUnitFor(
@@ -326,6 +429,17 @@ def applyTableEdits(
                 replacements,
                 dropped,
             )
+            # Corrected only on a row this save created. An edited row carries the
+            # count Numbers wrote and this library has never maintained it, so
+            # fixing those here would rewrite every golden to no measured benefit.
+            if row in createdRows:
+                rowInfo.cell_count = sum(
+                    1 for column in range(len(rowInfo.cell_offsets) // offsetWidth)
+                    if int.from_bytes(
+                        rowInfo.cell_offsets[column * offsetWidth:][:offsetWidth],
+                        "little",
+                    ) != emptyOffset
+                )
             written.extend((row, column) for column in replacements)
             touched = True
 

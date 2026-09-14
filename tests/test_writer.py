@@ -17,6 +17,7 @@ be parsed at all, so a byte difference on one is reported as a difference rather
 than assumed to be a harmless re-encoding.
 
 UPDATES
+2026-09-14  A formula written into a row with no storage, for #78.
 2026-09-01  Written for #2, AC 1: the unchanged round trip.
 2026-09-01  Numeric edits, for #2 AC 2, 3, 4 and 6.
 """
@@ -923,3 +924,134 @@ def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     table = pybers.open(working).sheets[0].tables[0]
     assert table.cell("A1").value == Decimal("222.22")
     assert table.cell("B1").value == Decimal("777")
+
+
+def tileOf(path: Path, tableName: str) -> tst.Tile:
+    """Return the one tile of a named table, for asserting on row storage."""
+    from pybers._persistence.index import ArchiveIndex
+    from pybers.document._read import findRoot
+    from pybers.document._write import tableInfoTypeId
+
+    index = ArchiveIndex(readPackage(path))
+    for reference in findRoot(index).sheets:
+        sheetArchive = index.resolve(reference, tn.SheetArchive)
+        for drawable in sheetArchive.drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if model.table_name == tableName:
+                return index.resolve(
+                    model.base_data_store.tiles.tiles[0].tile, tst.Tile
+                )
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+
+# ── PYB-78: a row the file stores nothing for ────────────────────────────────
+
+# `Sheet 1 / Table 2` of `20-formula-shapes` declares ten rows and stores one, so
+# every row but the first had no `TileRowInfo` to write into. Row 1 is included to
+# prove the fix did not disturb the case that already worked.
+unstoredRowCells: tuple[str, ...] = ("B1", "A2", "A3", "E10")
+
+# The golden's four, spread across three rows the file stored nothing for.
+createdRowFormulas: tuple[tuple[str, str], ...] = (
+    ("A3", "=1+1"),
+    ("C3", "=2*3"),
+    ("B7", "=SUM(A1:A2)"),
+    ("E10", "=A1*2"),
+)
+
+
+@pytest.mark.parametrize("address", unstoredRowCells)
+def test_aFormulaWrittenIntoAnUnstoredRowSurvivesTheSave(
+    address: str, tmp_path: Path
+) -> None:
+    """The save reported success and dropped the formula, raising nothing.
+
+    The write path walked the tile's `rowInfos`, so a row with none was never
+    visited, and a table declaring ten rows can store one. Same class as PYB-65.
+    """
+    working = Path(
+        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+                    tmp_path / "20.numbers")
+    )
+    document = pybers.open(working)
+    document.sheet("Sheet 1").table("Table 2").cell(address).formulaText = "=1+1"
+    document.save()
+
+    reopened = pybers.open(working).sheet("Sheet 1").table("Table 2")
+    assert reopened.cell(address).formulaText == "=1+1"
+
+
+def test_aRowThisSaveCreatedCountsItsOwnCellsAndKeepsRowOrder(
+    tmp_path: Path,
+) -> None:
+    """Numbers keeps `numrows` accurate and writes zero in `numCells`, so only the
+    first is corrected here. Row order matters because the reader trusts it."""
+    working = Path(
+        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+                    tmp_path / "20.numbers")
+    )
+    document = pybers.open(working)
+    table = document.sheet("Sheet 1").table("Table 2")
+    table.cell("A3").formulaText = "=1+1"
+    table.cell("C3").formulaText = "=2*3"
+    table.cell("B7").formulaText = "=SUM(A1:A2)"
+    document.save()
+
+    tile = tileOf(working, "Table 2")
+    assert tile.numrows == len(tile.rowInfos)
+    assert [row.tile_row_index for row in tile.rowInfos] == [0, 2, 6]
+    assert [row.cell_count for row in tile.rowInfos] == [1, 2, 1]
+
+
+def test_aFormulaAlreadyInAStoredRowStillWritesUnchanged(tmp_path: Path) -> None:
+    """No row is created where one exists, so an ordinary edit is untouched."""
+    working = Path(
+        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+                    tmp_path / "20.numbers")
+    )
+    before = len(tileOf(working, "Table 2").rowInfos)
+    document = pybers.open(working)
+    document.sheet("Sheet 1").table("Table 2").cell("A1").value = Decimal("7")
+    document.save()
+
+    assert len(tileOf(working, "Table 2").rowInfos) == before
+
+
+def test_formulasInCreatedRowsMatchTheirGoldenFile(tmp_path: Path) -> None:
+    """The only test Numbers itself confirmed, and the first to build a tile row.
+
+    See `tests/golden/README.md` for the confirmation state of this file.
+    """
+    golden = goldenDirectory / "20-formula-rows-created.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = Path(
+        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+                    tmp_path / "20.numbers")
+    )
+    document = pybers.open(working)
+    table = document.sheet("Sheet 1").table("Table 2")
+    for address, text in createdRowFormulas:
+        table.cell(address).formulaText = text
+    document.save()
+
+    assert tileOf(golden, "Table 2").SerializeToString() == tileOf(
+        working, "Table 2"
+    ).SerializeToString(), "the writer no longer produces the confirmed tile"
+
+
+def test_theCreatedRowGoldenHoldsWhatItClaimsTo() -> None:
+    """Guard the guard: an unedited copy in its place would pass silently."""
+    golden = goldenDirectory / "20-formula-rows-created.numbers"
+    if not golden.is_file():
+        pytest.skip(f"{golden.name} is not present yet")
+    table = pybers.open(golden).sheet("Sheet 1").table("Table 2")
+    for address, text in createdRowFormulas:
+        assert table.cell(address).formulaText == text
+    assert [row.tile_row_index for row in tileOf(golden, "Table 2").rowInfos] == [
+        0, 2, 6, 9
+    ]
