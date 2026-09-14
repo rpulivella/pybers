@@ -310,6 +310,27 @@ def applyTableEdits(
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
 
+    # A row belongs to the tile covering its index, and a tile that holds nothing
+    # may be absent. No table in the 46 fixtures has such a gap, so this refuses
+    # rather than guessing what an absent tile should be built from, and refusing
+    # is what keeps the formula from being dropped in silence.
+    if pool is not None:
+        covered = frozenset(
+            row
+            for entry in store.tiles.tiles
+            for row in range(entry.tileid * tileSize, (entry.tileid + 1) * tileSize)
+        )
+        for reference, held in sorted(
+            table.cells.items(), key=lambda pair: (pair[0].row, pair[0].col)
+        ):
+            if held.formula is None or reference.row - originOffset in covered:
+                continue
+            raise WriteError(
+                f"Row {reference.row} of {table.name!r} holds a formula and no "
+                f"tile covers it. The table declares {model.number_of_rows} rows "
+                f"and stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
+            )
+
     for entry in store.tiles.tiles:
         archive = index.archive(entry.tile.identifier)
         tile = index.resolve(entry.tile, tst.Tile)
