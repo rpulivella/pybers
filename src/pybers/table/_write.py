@@ -16,6 +16,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-14  A table's pooled strings can be written, for #61.
 2026-09-14  A row the file stores nothing for is created rather than the
             formula being dropped, for #78. The walk over `rowInfos` never
             saw it, and the save reported success.
@@ -130,6 +131,91 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
         )
     return (
         record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
+    )
+
+
+@dataclass
+class StringPool:
+    """A table's pooled strings, and the one place a written one is added.
+
+    The counterpart of `FormulaPool` and shaped like it on purpose. Numbers points
+    every cell holding the same text at ONE entry and keeps a refcount, so writing
+    an entry per cell diverges from what Numbers itself writes the moment the same
+    label appears twice.
+
+    A shared entry is never overwritten. Changing the text of one cell that shares
+    an entry with six others must not rewrite all seven, which is the same aliasing
+    hazard the frozen model closes on the read side.
+    """
+
+    dataList: tst.TableDataList
+    stored: dict[int, str]
+    touched: bool = False
+
+    def entryFor(self, key: int) -> tst.TableDataList.ListEntry | None:
+        """Return one pooled entry by key, or None when the table has no such key."""
+        for entry in self.dataList.entries:
+            if entry.key == key:
+                return entry
+        return None
+
+    def keyFor(self, text: str, previous: int | None = None) -> int:
+        """Return the key a cell should name, sharing an entry when one matches.
+
+        `previous` is the key the cell names now, released when it stops naming it.
+        """
+        self.touched = True
+        for key, stored in self.stored.items():
+            entry = self.entryFor(key)
+            if stored != text or entry is None:
+                continue
+            if key == previous:
+                return key
+            entry.refcount += 1
+            if previous is not None:
+                self.release(previous)
+            return key
+
+        existing = self.entryFor(previous) if previous is not None else None
+        if existing is not None and existing.refcount <= 1:
+            existing.string = text
+            self.stored[existing.key] = text
+            return existing.key
+        if previous is not None:
+            self.release(previous)
+        fresh = self.dataList.entries.add()
+        fresh.key = self.dataList.nextListID
+        fresh.refcount = 1
+        fresh.string = text
+        self.dataList.nextListID += 1
+        self.stored[fresh.key] = text
+        return fresh.key
+
+    def release(self, key: int) -> None:
+        """Give up one cell's claim on a stored string.
+
+        Emptied rather than deleted when nothing names it, because `nextListID`
+        never reuses a key and a removed entry would invite a reader to assume the
+        keys are dense.
+        """
+        entry = self.entryFor(key)
+        if entry is None:
+            return
+        self.touched = True
+        entry.refcount = max(0, entry.refcount - 1)
+
+
+def stringPoolFor(index: ArchiveIndex, store: tst.DataStore) -> StringPool | None:
+    """Return the table's string pool, or None when it carries no string list.
+
+    A table that has never held text carries no list to write into, which is a
+    different state from one whose list is empty.
+    """
+    if not store.stringTable.identifier:
+        return None
+    return StringPool(
+        dataList=index.resolve(store.stringTable, tst.TableDataList),
+        stored=readStringTable(index, store),
     )
 
 
