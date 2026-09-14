@@ -16,6 +16,8 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-09-13  An address past the far end of either axis is refused, for #67.
+            `Ledger` read as column 144,936,576 and raised nothing.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
 2026-09-01  Written for #9, replacing the loose reference helpers in `table.py`.
 """
@@ -40,6 +42,16 @@ from pybers.errors import PybersError
 # coordinate.
 firstRow: int = 1
 firstColumn: int = 1
+
+# The far end of each axis, so a label nothing could have addressed is refused
+# instead of becoming a coordinate. `LEDGER` is a valid base-26 label and reads as
+# column 144,936,576, which a formula then stored as an offset with nothing
+# raising. The column figure is this repository's own, measured for the
+# over-255-column work and stated in findings-01-values.md. The row figure is
+# Apple's published one and is not measured here, so a fixture disproving it
+# changes this line.
+lastColumn: int = 1000
+lastRow: int = 1000000
 
 # Twenty-six letters with no zero digit, which is why neither conversion below is
 # an ordinary base conversion.
@@ -77,12 +89,23 @@ def columnLetter(col: int) -> str:
 
 
 def columnNumber(letters: str) -> int:
-    """Return the column number for a letter label, A to 1 and AA to 27."""
+    """Return the column number for a letter label, A to 1 and AA to 27.
+
+    Refuses a label past the last column a table can hold. Every letter is a valid
+    base-26 digit, so `LEDGER` converts to 144,936,576 and reads as a column rather
+    than as the word it is. A formula then stored that as an offset and nothing
+    raised, which is the failure this whole library is built to avoid.
+    """
     if not letters or not letters.isascii() or not letters.isalpha():
         raise ReferenceError(f"{letters!r} is not a column label.")
     col = 0
     for letter in letters.upper():
         col = col * alphabetSize + (ord(letter) - ord("A") + 1)
+    if col > lastColumn:
+        raise ReferenceError(
+            f"{letters!r} is column {col}, past column {lastColumn}, which is the "
+            "last column a Numbers table can hold."
+        )
     return col
 
 
@@ -105,10 +128,12 @@ class CellReference:
     colAbsolute: bool = field(default=False, kw_only=True)
 
     def __post_init__(self) -> None:
-        """Reject a coordinate below one at construction rather than at use.
+        """Reject a coordinate outside a real table at construction rather than at use.
 
         The zero-based instinct then fails once, here, instead of in every method
-        that takes an address.
+        that takes an address. The far end is checked for the same reason and was
+        not: `=Ledger` parsed to column 144,936,576 and raised nothing, because six
+        letters are a valid base-26 label.
         """
         if self.row < firstRow:
             raise ReferenceError(
@@ -118,6 +143,16 @@ class CellReference:
             raise ReferenceError(
                 f"Column {self.col} is before column {firstColumn}. "
                 "Columns count from one."
+            )
+        if self.row > lastRow:
+            raise ReferenceError(
+                f"Row {self.row} is past row {lastRow}, which is the last row a "
+                "Numbers table can hold."
+            )
+        if self.col > lastColumn:
+            raise ReferenceError(
+                f"Column {self.col} is past column {lastColumn}, which is the last "
+                "column a Numbers table can hold."
             )
 
     @classmethod

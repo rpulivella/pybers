@@ -11,6 +11,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-09-13  A range endpoint past the last row is refused, for #67.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
 2026-09-01  Written for #9.
 """
@@ -38,6 +39,7 @@ from pybers.addressing.reference import (
     columnNumber,
     firstColumn,
     firstRow,
+    lastRow,
     markerFor,
     toCellReference,
 )
@@ -104,6 +106,11 @@ def parseEndpoint(text: str, whole: str) -> RangeEndpoint:
     if endpoint.row is not None and endpoint.row < firstRow:
         raise ReferenceError(
             f"{whole!r} names row {endpoint.row}, and rows count from {firstRow}."
+        )
+    if endpoint.row is not None and endpoint.row > lastRow:
+        raise ReferenceError(
+            f"{whole!r} names row {endpoint.row}, past row {lastRow}, "
+            "which is the last row a Numbers table can hold."
         )
     return endpoint
 

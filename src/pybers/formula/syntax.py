@@ -335,11 +335,10 @@ def readQualifier(text: str, position: int, known: Sequence[str]) -> str:
     failed to reparse on it. A caller supplying no names keeps the guess whole,
     since `Table 1-1::A1` is a real name and nothing else can resolve it.
 
-    This widens what is accepted, deliberately. `Ledger-Two::A1` against a document
-    holding `Two` and no `Ledger-Two` was refused before and is now read as
-    arithmetic against `Two`, which is the only reading the document supports. The
-    cost is the message when nothing resolves at all, which names the fragment the
-    scan reached last rather than the whole prefix that was typed.
+    What this exposes is caught one layer down. `Ledger-Two::A1` now reads `Ledger`
+    on its own, and six letters are a valid base-26 column label, so it would have
+    become column 144,936,576. `columnNumber` refuses that, and the refusal names
+    the impossible column rather than a table nobody typed.
     """
     for name in known:
         if text.startswith(name + tableNameSeparator, position):

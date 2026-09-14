@@ -7,6 +7,7 @@ conversion or a dropped locking marker both produce a real address that names th
 wrong cell. Parsing what each type emits and comparing is what catches that.
 
 UPDATES
+2026-09-13  The far end of both axes, found reviewing #67.
 2026-09-01  Written for #9.
 """
 from __future__ import annotations
@@ -376,3 +377,45 @@ def test_thereIsOneConversionBetweenAColumnLetterAndAColumnNumber() -> None:
     assert pybers.columnNumber is referenceModule.columnNumber
     for name in ("columnLetter", "columnNumber", "parseReference"):
         assert name not in vars(tableModule)
+
+
+# ── PYB-67: an address outside a real table is refused, not converted ────────
+
+
+@pytest.mark.parametrize(
+    ("letters", "column"),
+    [("A", 1), ("ZZ", 702), ("AAA", 703), ("ALL", 1000)],
+)
+def test_aColumnLabelInsideTheLimitStillConverts(letters: str, column: int) -> None:
+    """The last column a table can hold is `ALL`, and it is not the one refused."""
+    assert columnNumber(letters) == column
+
+
+@pytest.mark.parametrize("letters", ["ALM", "AMJ", "Ledger", "ZZZZ"])
+def test_aColumnLabelPastTheLimitIsRefusedRatherThanConverted(letters: str) -> None:
+    """Every letter is a valid base-26 digit, so a word converts without complaint.
+
+    `Ledger` read as column 144,936,576, which a formula then stored as an offset
+    with nothing raising. Found reviewing #67.
+    """
+    with pytest.raises(ReferenceError, match="past column"):
+        columnNumber(letters)
+
+
+def test_anAddressPastEitherLimitIsRefusedAtConstruction() -> None:
+    """The far end is checked where the near end already was, on both axes."""
+    with pytest.raises(ReferenceError, match="past column"):
+        CellReference(1, 1001)
+    with pytest.raises(ReferenceError, match="past row"):
+        CellReference(1000001, 1)
+
+
+def test_theLastAddressATableCanHoldIsStillAccepted() -> None:
+    """The bound is inclusive, so the corner cell is an address and not an error."""
+    assert CellReference(1000000, 1000).asReference() == "ALL1000000"
+
+
+def test_aRangeEndpointPastTheRowLimitIsRefusedNamingWhatWasWritten() -> None:
+    """The range parser reports the whole range, as it already does for row zero."""
+    with pytest.raises(ReferenceError, match="past row"):
+        CellRange.parse("A1:A99999999999")
