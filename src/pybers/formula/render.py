@@ -10,16 +10,19 @@ not. See tests/fixtures/findings-08-formula-text.md.
 It walks a stack, because the file is postfix. Each node takes what it needs off
 that stack and puts one piece back, and a complete formula leaves exactly one.
 
-**Brackets are put in from the tree rather than remembered.** The file records no
-parentheses, so two formulas differing only in where they were bracketed differ
-only in the order of their nodes, and what goes out has to bracket exactly what
-the tree demands.
+**Brackets come from two places, and both are needed.** Apple's list node records
+the bracket an author typed, including the 193 distinct formulas whose brackets
+precedence already implied. It does not record every bracket: one formula in the
+corpus needs one that associativity alone forces and carries no node for it, so
+the tree still has to supply what the nodes do not.
 
 **What a person cannot type is dropped.** The whitespace nodes record where a
 person pressed the space bar, which retyping the formula in Numbers drops too, and
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-09-11  A bracket the author typed is written back, for #67. The claim that
+            the file records no parentheses was false; node type 25 is one.
 2026-09-08  `addressText` and `shortestNames` exported for #13, so that one
             reference can be shown without rendering the formula around it.
 2026-09-08  Written for #45.
@@ -50,6 +53,7 @@ from pybers.formula.nodes import (
     FormulaBinding,
     FormulaError,
     FormulaFunctionCall,
+    FormulaGroup,
     FormulaLambda,
     FormulaNode,
     FormulaRange,
@@ -248,6 +252,9 @@ class Renderer:
                 Rendered(addressText(node, self.host, self.names))
             )
             return
+        if isinstance(content, FormulaGroup):
+            self.stepGroup(content)
+            return
         if isinstance(content, FormulaFunctionCall):
             self.stepCall(content)
             return
@@ -276,6 +283,22 @@ class Renderer:
             f"Node type {kind} has no written form. A formula holding one can be "
             "read and written back, and cannot be rendered as text."
         )
+
+    def stepGroup(self, group: FormulaGroup) -> None:
+        """Bracket the piece on top of the stack, as the author bracketed it.
+
+        The result scores as an atom, so an operator enclosing it adds no second
+        pair. Refuses a wider list: every one of the 4364 measured encloses one
+        value, and rendering a wider one as a bracket would state something the
+        corpus does not support.
+        """
+        if group.argumentCount != 1:
+            raise FormulaError(
+                f"This list node encloses {group.argumentCount} values, and every "
+                "one measured encloses a single value. A formula holding it can "
+                "be read and written back, and cannot be rendered as text."
+            )
+        self.stack.append(Rendered(f"({self.pop(1)[0].text})"))
 
     def stepCall(self, call: FormulaFunctionCall) -> None:
         """Write one indexed call, refusing an index nothing names."""
