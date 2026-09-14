@@ -16,6 +16,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-09-14  `TableRows` and `TableRow`, the grid walked row by row, for PYB-62.
 2026-09-08  Made a package of its own for #58, gathering the model and both
             archive halves out of `pybers.model`, `reader` and `writer`.
 """
@@ -30,5 +31,6 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 from pybers.table.cells import Cell, CellValue, MergeRange, Table
+from pybers.table.rows import TableRow, TableRows
 
-__all__ = ["Cell", "CellValue", "MergeRange", "Table"]
+__all__ = ["Cell", "CellValue", "MergeRange", "Table", "TableRow", "TableRows"]

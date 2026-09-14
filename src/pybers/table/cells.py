@@ -2,10 +2,13 @@
 """A table's grid, the cells in it, and the regions merged across it.
 
 Addressing lives in `pybers.addressing`. Nothing
-here takes a bare row and column pair, so the only way to name a cell is with an
-address that has already been validated.
+here takes a bare row and column pair: a cell is named by an address, or by `row=`
+and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-14  A table walks its declared grid, a cell is reached by row and column,
+            and a cell says which merge it anchors (PYB-62). A merge drops the
+            locking markers it was written with, which had discarded its anchor.
 2026-09-08  A cell reads and writes its formula as text, and knows the table
             and the document it sits in so neither has to be passed (#45).
 2026-09-02  Merging and unmerging a block of cells (#16). A merge discards
@@ -34,7 +37,7 @@ __status__ = "Development"
 __date__ = "2026/09/02"
 
 import datetime
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING
@@ -52,6 +55,7 @@ from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.style import Style
+from pybers.table.rows import TableRows
 
 if TYPE_CHECKING:
     # Guarded because `sheet` imports this module, and the link back is a type
@@ -91,6 +95,33 @@ CellValue = (
 )
 
 
+def toCellReferenceNamed(
+    address: CellAddress | None, row: int | None, col: int | None
+) -> CellReference:
+    """Return the cell an address names, or the one `row=` and `col=` name together.
+
+    Refuses both forms at once and a lone axis. A `bool` is refused as a coordinate
+    because Python counts `True` as 1, which no caller writing `row=True` meant.
+    """
+    if address is not None:
+        if row is not None or col is not None:
+            raise ReferenceError(
+                f"A cell is named by {address} or by row and col, and both were given."
+            )
+        return toCellReference(address)
+    if (
+        isinstance(row, int)
+        and isinstance(col, int)
+        and not isinstance(row, bool)
+        and not isinstance(col, bool)
+    ):
+        return CellReference(row, col)
+    raise ReferenceError(
+        "A cell is named by an address such as 'E3', or by row= and col= together "
+        f"as numbers, and was given row={row!r}, col={col!r}."
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class MergeRange:
     """A rectangular block of cells merged into one, anchored at its top-left cell.
@@ -102,12 +133,18 @@ class MergeRange:
     extent: CellRange
 
     def __post_init__(self) -> None:
-        """Reject an unbounded extent, which no merged region can have."""
-        if self.extent.rowsUnbounded or self.extent.colsUnbounded:
+        """Reject an unbounded extent, and drop the locking markers of a bounded one."""
+        extent = self.extent
+        if extent.rowsUnbounded or extent.colsUnbounded:
             raise ReferenceError(
-                f"A merge covers a fixed block of cells, and {self.extent} is "
-                "unbounded."
+                f"A merge covers a fixed block of cells, and {extent} is unbounded."
             )
+        # A marked anchor never equals the unlocked key `Table.cell` files a cell under.
+        object.__setattr__(
+            self,
+            "extent",
+            CellRange(extent.startRow, extent.startCol, extent.endRow, extent.endCol),
+        )
 
     @property
     def anchor(self) -> CellReference:
@@ -200,6 +237,16 @@ class Cell:
         document = None if self.table is None else self.table.document
         return {} if document is None else document.tableIdentities
 
+    @property
+    def mergeAnchored(self) -> MergeRange | None:
+        """Return the merge this cell anchors, or None when it anchors none."""
+        if self.table is None:
+            return None
+        merge = self.table.mergeCovering(self.reference)
+        if merge is None or merge.anchor != self.reference.asUnlocked():
+            return None
+        return merge
+
 
 @dataclass(slots=True)
 class Table:
@@ -223,8 +270,14 @@ class Table:
         default=None, repr=False, compare=False, kw_only=True
     )
 
-    def cell(self, address: CellAddress) -> Cell:
-        """Return the cell at an address, creating an empty one on first access.
+    def cell(
+        self,
+        address: CellAddress | None = None,
+        *,
+        row: int | None = None,
+        col: int | None = None,
+    ) -> Cell:
+        """Return the cell at an address or at `row=` and `col=`, creating it if absent.
 
         A cell absent from the file is empty, not missing, so reading one inside
         the grid is never an error. Two addresses raise: one outside the declared
@@ -233,7 +286,7 @@ class Table:
         # Unlocked before it is used as a key, because `$A$1` and `A1` compare
         # unequal and are one cell. Without this the same cell files itself under
         # four spellings and a write through one is invisible to the other three.
-        key = toCellReference(address).asUnlocked()
+        key = toCellReferenceNamed(address, row, col).asUnlocked()
         extent = self.extent
         if extent is None or not extent.covers(key):
             raise ReferenceError(
@@ -252,6 +305,24 @@ class Table:
         if key not in self.cells:
             self.cells[key] = Cell(reference=key, table=self)
         return self.cells[key]
+
+    @property
+    def rows(self) -> TableRows:
+        """Return the declared grid row by row, creating no cell until one is reached.
+
+        A merged block is in its anchor's row once. A table with no grid has no rows.
+        """
+        last = self.rowCount if self.extent is not None else firstRow - 1
+        return TableRows(self, range(firstRow, last + 1))
+
+    def gridIterate(self) -> Iterator[Cell]:
+        """Yield each cell of the declared grid once, row by row, a merge at its anchor.
+
+        Every cell yielded is kept, so a write through one reaches the file. Unlike
+        `Document.cellsIterate`, an empty cell is yielded too.
+        """
+        for row in self.rows:
+            yield from row
 
     def range(self, address: RangeAddress) -> list[Cell]:
         """Return the cells one or more ranges cover, in the order they name them.

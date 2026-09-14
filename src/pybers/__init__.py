@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-09-14  TableRow and TableRows re-exported (PYB-62).
 2026-09-08  ReferenceLocation re-exported (#13).
 2026-09-02  SelectionError re-exported (#14).
 2026-08-12  Initial scaffold.
@@ -72,7 +73,7 @@ from pybers.formula import (
 )
 from pybers.geometry import Position, Size
 from pybers.style import Style
-from pybers.table import Cell, CellValue, MergeRange, Table
+from pybers.table import Cell, CellValue, MergeRange, Table, TableRow, TableRows
 from pybers.text import Paragraph, RichText, TextRun
 
 __all__ = [
@@ -127,6 +128,8 @@ __all__ = [
     "Size",
     "Style",
     "Table",
+    "TableRow",
+    "TableRows",
     "TextBox",
     "TextRun",
     "Document",
