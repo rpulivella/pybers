@@ -131,35 +131,37 @@ why the `0xE0` mask `findings-09` uses for the formula key slot is correct here 
 
 ### Which list each reference-bearing bit points into
 
-Measured for PYB-61 across the corpus, counting only records where no two slots hold the
-same key, since a small key is a plausible entry in several lists at once and would
-otherwise agree with all of them.
+Measured for PYB-61 across the corpus. A bit is named by the `format_type` its key
+resolves to, since a format entry states its own kind and a small key is otherwise a
+plausible entry in several lists at once.
 
-| bit | list | agreement |
+| bit | what its reference is | evidence |
 | --- | --- | --- |
-| byte 8 `0x20` | `styleTable` | 349 of 349 |
-| byte 8 `0x40` | `styleTable` | 395 of 395 |
-| byte 9 `0x02` | `formula_table` | 63 of 63 |
-| byte 9 `0x20` | `format_table` | 4064 of 4064 |
-| byte 9 `0x40` | `format_table` | 33 of 33 |
-| byte 9 `0x80` | `format_table` | 19 of 19 |
-| byte 10 `0x02` | `format_table` | 5033 of 5033 |
+| byte 8 `0x20` | a `styleTable` key | 349 of 349 unambiguous |
+| byte 8 `0x40` | a `styleTable` key | 395 of 395 unambiguous |
+| byte 9 `0x02` | a `formula_table` key | 63 of 63 unambiguous |
+| byte 9 `0x20` | the **number** format | 6105 name `256`, the rest `258`, `259`, `269`, `270` |
+| byte 9 `0x40` | the **currency** format | 34 of 34 name `257` and nothing else |
+| byte 9 `0x80` | the **date** format | 24 of 24 name `261` and nothing else |
+| byte 10 `0x01` | the **duration** format | 19 of 19 name `268` and nothing else |
+| byte 10 `0x02` | the **text** format | 5427 of 5427 name `260` and nothing else |
 
-Byte 9's `0x02` agreeing with `formula_table` is the same bit
+**The slots are per format kind, not per cell.** A cell carries the slot its display
+needs, which is why a number and a string of the same table put their format reference
+in different places and why bytes 9 and 10 differ between them. Byte 9 `0x02` landing on
+`formula_table` is the bit
 [findings-09-cell-records.md](findings-09-cell-records.md) identified as the formula
-flag, arrived at from the other direction.
+flag, reached from the other direction.
 
-**Byte 9 bit `0x10` is set on almost every record and is not settled.** Read as a
-`format_table` key it names the format the cell's own type would use: 6082 of 6118
-numbers name `256`, 9 of 10 dates name `261`, 12 of 13 durations name `261`, 8 of 9
-currency cells name `257`. For a string it usually names nothing in that list, 113 of
-5371, so the bit either carries something else for text or a text cell's format sits in
-byte 10's `0x02` instead. Both readings fit and the corpus does not separate them.
+The format types themselves: `256` number, `257` currency, `258` percent, `260` text,
+`261` date, `263` checkbox, `267` star rating, `268` duration. A text format entry
+carries nothing but its `format_type`, so one can be created where a table has none.
 
-**Telling the format-bearing bits apart also needs a fixture built for it.** A plain
-number sets byte 9 `0x10` and `0x20` and carries the same key in both slots, so nothing
-here says whether one of them is the format and the other is something that happens to
-share its key.
+**Byte 9 bit `0x10` is set on nearly every record and is not settled.** Its key resolves
+to the number format on 6082 of 6118 number cells and to nothing in `format_table` on
+5311 records, most of them text. Since byte 9 `0x20` is already the number format and a
+plain number puts the same key in both slots, the corpus cannot say what this one is. It
+is the last slot unnamed.
 
 ### What this settles for writing
 
