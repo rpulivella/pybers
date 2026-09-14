@@ -119,6 +119,16 @@ def testWalkingRowByRowYieldsWhatTheWholeWalkYields() -> None:
     assert [cell for row in table.rows for cell in row] == list(table.gridIterate())
 
 
+def testARowTakenBeforeAMergeHoldsWhatTheMergeLeft() -> None:
+    table = Table("Later", rowCount=2, colCount=3)
+    row = table.rows[0]
+
+    table.mergeAdd("A1:B2")
+
+    assert addresses(row) == ["A1", "C1"]
+    assert len(row) == 2
+
+
 def testRowsAndSlicesCompareByWhatTheyName() -> None:
     table = merged()
 
