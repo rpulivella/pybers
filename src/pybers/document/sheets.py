@@ -244,7 +244,7 @@ class Document:
 
         Sheets, then tables, then rows left to right. A Numbers table is sparse, so
         an empty cell and one swallowed by a merge have no record and never appear
-        here; `Table.extent` walks the declared rectangle instead.
+        here; `Table.gridIterate` walks the declared grid instead.
         """
         for sheet in self.sheets:
             for table in sheet.tables:

@@ -34,7 +34,7 @@ __status__ = "Development"
 __date__ = "2026/09/02"
 
 import datetime
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING
@@ -52,6 +52,7 @@ from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.style import Style
+from pybers.table.rows import TableRows
 
 if TYPE_CHECKING:
     # Guarded because `sheet` imports this module, and the link back is a type
@@ -292,6 +293,24 @@ class Table:
         if key not in self.cells:
             self.cells[key] = Cell(reference=key, table=self)
         return self.cells[key]
+
+    @property
+    def rows(self) -> TableRows:
+        """Return the declared grid row by row, creating no cell until one is reached.
+
+        A merged block is in its anchor's row once. A table with no grid has no rows.
+        """
+        last = self.rowCount if self.extent is not None else firstRow - 1
+        return TableRows(self, range(firstRow, last + 1))
+
+    def gridIterate(self) -> Iterator[Cell]:
+        """Yield each cell of the declared grid once, row by row, a merge at its anchor.
+
+        Every cell yielded is kept, so a write through one reaches the file. Unlike
+        `Document.cellsIterate`, an empty cell is yielded too.
+        """
+        for row in self.rows:
+            yield from row
 
     def range(self, address: RangeAddress) -> list[Cell]:
         """Return the cells one or more ranges cover, in the order they name them.
