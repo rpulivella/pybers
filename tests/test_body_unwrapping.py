@@ -17,6 +17,7 @@ credential, which makes them the one piece of that tooling worth pinning before
 PYB-11 decides what testing repo scripts should look like.
 
 UPDATES
+2026-09-14  A bold label opening a line is its own block, found on PR #77.
 2026-09-11  Indentation, the trim report, and `BodyChanges` in place of a tuple,
             for #74.
 2026-09-11  Written for #72.
@@ -275,4 +276,37 @@ def testAWrappedListItemJoinsIntoItsOwnItem() -> None:
     )
 
     assert changes.text == "- an item that was wrapped by an editor\n- a second item\n"
+    assert changes.joined == 1
+
+
+# ── A bold label is a heading in prose clothing ──────────────────────────────
+
+
+def testConsecutiveBoldLabelsEachKeepTheirOwnLine() -> None:
+    """The pull request template puts three under Breaking Changes, and they joined.
+
+    Found on PR #77, whose three labels reached GitHub as one run-on paragraph and
+    had to be separated by hand.
+    """
+    body = (
+        "**CI / automation / build**: None\n"
+        "**Object model**: additive\n"
+        "**Archive round-trip**: unchanged\n"
+    )
+
+    changes = ticket.unwrapParagraphs(body)
+
+    assert changes.text == body
+    assert changes.joined == 0
+
+
+def testABoldRunInsideASentenceIsStillProseAndStillJoins() -> None:
+    """Only a label opening its own line is a block, so wrapping is unaffected."""
+    changes = ticket.unwrapParagraphs(
+        "a wrapped line mentioning **this**: and\ncontinuing on a second line\n"
+    )
+
+    assert changes.text == (
+        "a wrapped line mentioning **this**: and continuing on a second line\n"
+    )
     assert changes.joined == 1

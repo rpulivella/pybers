@@ -38,6 +38,7 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-14  A bold label keeps its own line, found on PR #77.
 2026-08-27  Set projectNumber to the real board (3), and corrected the 404 story, which
             had been carried in from an early revision of the upstream notes and was
             wrong. A later revision corrected it and the upstream tooling carries that
@@ -233,7 +234,13 @@ class GitHubHttpError(RuntimeError):
 # A markdown block opens only when a space follows its marker, so `**bold**:` is
 # ordinary prose rather than a bullet. Getting this wrong splits a bolded paragraph
 # across two lines, which is the exact defect this whole mechanism exists to stop.
-blockOpener = re.compile(r"^(#{1,6} |> |\||```|~~~|:{3})")
+#
+# A LABEL is the exception, and it earned its place on PR #77: a line that is only
+# `**Something**:` and its value is a heading in prose clothing, and the pull
+# request template puts three of them on consecutive lines under Breaking Changes.
+# Joining those gave one run-on paragraph. Matched only when the bold run opens the
+# line, so `see **this**: here` inside a sentence is still prose.
+blockOpener = re.compile(r"^(#{1,6} |> |\||```|~~~|:{3}|\*\*[^*]+\*\*:)")
 
 # A list item is the one block whose wrapped continuation belongs to it rather than
 # standing alone, so it is matched separately from the openers above.
