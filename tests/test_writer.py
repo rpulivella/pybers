@@ -1081,3 +1081,163 @@ def test_theCreatedRowGoldenHoldsWhatItClaimsTo() -> None:
         0, 2, 6, 9
     ]
 
+
+def stringEntries(path: Path, tableName: str) -> dict[int, object]:
+    """Return one table's pooled string list, keyed as cell records address it."""
+    from pybers._persistence.index import (
+        ArchiveIndex,
+        readDataList,
+        stringListType,
+    )
+    from pybers.document._read import findRoot
+    from pybers.document._write import tableInfoTypeId
+
+    index = ArchiveIndex(readPackage(path))
+    for reference in findRoot(index).sheets:
+        sheetArchive = index.resolve(reference, tn.SheetArchive)
+        for drawable in sheetArchive.drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if model.table_name == tableName:
+                return readDataList(
+                    index, model.base_data_store.stringTable, stringListType
+                )
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+def recordAt(path: Path, address: str) -> CellRecord:
+    """Return the raw cell record at an address in the first table of a document."""
+    from pybers._persistence.index import ArchiveIndex
+    from pybers.addressing import toCellReference
+    from pybers.document._read import findRoot
+    from pybers.document._write import tableInfoTypeId
+
+    wanted = toCellReference(address)
+    index = ArchiveIndex(readPackage(path))
+    for reference in findRoot(index).sheets:
+        for drawable in index.resolve(reference, tn.SheetArchive).drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            store = model.base_data_store
+            for entry in store.tiles.tiles:
+                tile = index.resolve(entry.tile, tst.Tile)
+                for rowInfo in tile.rowInfos:
+                    if rowInfo.tile_row_index != wanted.row - 1:
+                        continue
+                    unit = offsetUnitFor(
+                        rowInfo.has_wide_offsets, tile.should_use_wide_rows
+                    )
+                    for record in decodeRow(
+                        rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+                    ):
+                        if record.column == wanted.col - 1:
+                            return record
+            break
+    raise AssertionError(f"{address} has no record in {path.name}")
+
+
+
+# ── PYB-61: text, pooling, and a cell that changes type ──────────────────────
+
+# The golden's five, chosen to cover one criterion each.
+retypedCells: tuple[tuple[str, object], ...] = (
+    ("A1", "text over a number"),
+    ("B1", "text over a number"),
+    ("F1", "text over a control"),
+    ("A2", Decimal("98765.4321")),
+    ("J1", "into an empty cell"),
+)
+
+
+def test_theSameTextInTwoCellsIsPooledOnceWithACount(tmp_path: Path) -> None:
+    """AC 4. Numbers points both cells at one entry and counts them, so this must."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A1").value = "shared label"
+    table.cell("B1").value = "shared label"
+    document.save()
+
+    entries = stringEntries(working, table.name)
+    matching = [entry for entry in entries.values() if entry.string == "shared label"]
+    assert len(matching) == 1, "one entry, not one per cell"
+    assert matching[0].refcount == 2
+
+
+def test_changingOneCellSharingAnEntryLeavesTheOtherAlone(tmp_path: Path) -> None:
+    """A shared entry is split rather than overwritten, as the formula pool does."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A1").value = "shared"
+    table.cell("B1").value = "shared"
+    document.save()
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = "changed"
+    document.save()
+
+    reopened = pybers.open(working).sheets[0].tables[0]
+    assert reopened.cell("A1").value == "changed"
+    assert reopened.cell("B1").value == "shared", "the cell that did not change"
+
+
+def test_aTypeChangeKeepsEveryTrailingReference(tmp_path: Path) -> None:
+    """AC 5, asserted on the bytes rather than on what reads back.
+
+    `F1` is a star rating, so its references describe a control. The count follows
+    from `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, and keeping
+    the references keeps the count, which is why bytes 9 and 10 are never rewritten.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = recordAt(working, "F1")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("F1").value = "now text"
+    document.save()
+    after = recordAt(working, "F1")
+
+    assert after.typeByte == 3, "the cell became text"
+    assert after.references == before.references, "every reference survived"
+    assert after.raw[9] == before.raw[9] and after.raw[10] == before.raw[10]
+    assert after.raw[8] & 0xE0 == before.raw[8] & 0xE0, "the attribute bits held"
+    assert after.raw[8] & 0x0F == 0x08, "byte 8's low nibble names a pooled key"
+
+
+def test_writingTheFirstTextIntoATableWithNoneIsRefused(tmp_path: Path) -> None:
+    """A new record copies its references from a sibling, and there is none.
+
+    Those references are keys into this table's own lists. Measured across the 41
+    tables holding a plain string record, they never vary inside a table and do
+    differ between tables, so there is nothing to derive them from.
+    """
+    working = workingCopy("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    document.sheet("Sheet 1").table("Table 2").cell("B1").value = "first text"
+
+    with pytest.raises(WriteError, match="no example of"):
+        document.save()
+
+
+def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
+    tmp_path: Path,
+) -> None:
+    """A record created for an empty cell borrows a shape, not a claim on the pool.
+
+    Found by the golden on 2026-09-14. Writing `J1`, which had no record, changed
+    `I1` from `Item 1` to the new text, because the template's pooled key was read
+    as `J1`'s previous claim and the entry was then rewritten in place.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    before = table.cell("I1").value
+    table.cell("J1").value = "into an empty cell"
+    document.save()
+
+    reopened = pybers.open(working).sheets[0].tables[0]
+    assert reopened.cell("J1").value == "into an empty cell"
+    assert reopened.cell("I1").value == before, "the cell the shape came from"
