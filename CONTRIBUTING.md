@@ -41,7 +41,7 @@ A pull request leaves draft when three things are true, and not before:
 
 1. Every acceptance criterion the ticket carries is met.
 2. Test coverage appropriate to the ticket exists and passes. What is appropriate is a judgment the ticket's own criteria settle: a decoder earns assertions against a fixture whose contents are known independently, and a configuration change earns proof it takes effect.
-3. The gates pass. Today that is `.venv/bin/python3 -m pytest` and `scripts/standards-check.py` with zero failures. Ruff and mypy join them once PYB-4 lands, and this list is meant to grow rather than to stay accurate by omission.
+3. The gates pass. All four of them, which `scripts/pr-preflight-check.py` runs in one pass and reports together, so a failing run lists everything to fix rather than the first thing: pytest, the prose gate, ruff and mypy. This list is meant to grow rather than to stay accurate by omission.
 
 **A draft PR is the right place to be feature complete with tests still being written.** Opening one early is encouraged, because the diff is easier to follow as it grows than as one arrival. Marking it ready for review is the assertion that all three hold.
 
@@ -67,7 +67,10 @@ release/v<version>-Final    # shipped PyPI release
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-pytest
+.venv/bin/python3 -m pytest                       # the suite, that exact spelling
+.venv/bin/python3 scripts/pr-preflight-check.py   # all four gates, what CI runs
 ```
+
+pytest alone is a partial answer. The preflight runs pytest, the prose gate, ruff and mypy in one pass and reports all four.
 
 Every commit leaves the test suite green. No exceptions.
