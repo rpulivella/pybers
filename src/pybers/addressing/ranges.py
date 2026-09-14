@@ -39,6 +39,7 @@ from pybers.addressing.reference import (
     columnNumber,
     firstColumn,
     firstRow,
+    lastColumn,
     lastRow,
     markerFor,
     toCellReference,
@@ -154,10 +155,15 @@ class CellRange:
     endColAbsolute: bool = field(default=False, kw_only=True)
 
     def __post_init__(self) -> None:
-        """Reject a rectangle that is half-unbounded, inverted, or below one."""
-        for axis, origin, low, high in (
-            ("Row", firstRow, self.startRow, self.endRow),
-            ("Column", firstColumn, self.startCol, self.endCol),
+        """Reject a rectangle half-unbounded, inverted, or off either end.
+
+        The far end is checked here as well as in `parseEndpoint`, because
+        `fromAxes` builds a range without going through the text, which is the
+        path `FormulaRange.resolve` takes.
+        """
+        for axis, origin, limit, low, high in (
+            ("Row", firstRow, lastRow, self.startRow, self.endRow),
+            ("Column", firstColumn, lastColumn, self.startCol, self.endCol),
         ):
             if (low is None) != (high is None):
                 raise ReferenceError(
@@ -170,6 +176,11 @@ class CellRange:
                 raise ReferenceError(
                     f"{axis} {low} is before {axis.lower()} {origin}, which is "
                     "where a table starts."
+                )
+            if high > limit:
+                raise ReferenceError(
+                    f"{axis} {high} is past {axis.lower()} {limit}, which is where "
+                    "a table ends."
                 )
             if low > high:
                 raise ReferenceError(f"{axis} bounds run backward, {low} to {high}.")

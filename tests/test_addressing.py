@@ -35,6 +35,12 @@ from pybers.addressing import (
     columnNumber,
 )
 from pybers.addressing import reference as referenceModule
+from pybers.addressing.reference import (
+    firstColumn,
+    firstRow,
+    lastColumn,
+    lastRow,
+)
 from pybers.table import MergeRange, Table
 from pybers.table import cells as tableModule
 
@@ -419,3 +425,31 @@ def test_aRangeEndpointPastTheRowLimitIsRefusedNamingWhatWasWritten() -> None:
     """The range parser reports the whole range, as it already does for row zero."""
     with pytest.raises(ReferenceError, match="past row"):
         CellRange.parse("A1:A99999999999")
+
+
+def test_theTwoColumnConversionsAgreeOnWhichColumnsExist() -> None:
+    """A bound on one and not the other leaves them disagreeing above it.
+
+    `columnLetter(1001)` produced `ALM`, which `columnNumber` then refused, so the
+    pair stopped being inverses exactly where the bound was added.
+    """
+    with pytest.raises(ReferenceError, match="past column"):
+        columnLetter(lastColumn + 1)
+    assert all(
+        columnNumber(columnLetter(col)) == col
+        for col in range(firstColumn, lastColumn + 1)
+    )
+
+
+def test_aRangeBuiltFromAxesIsBoundedLikeOneParsedFromText() -> None:
+    """`fromAxes` skips the text, and it is the path `FormulaRange.resolve` takes."""
+    with pytest.raises(ReferenceError, match="past row"):
+        CellRange.fromAxes(
+            ((firstRow, False), (lastRow + 1, False)),
+            ((firstColumn, False), (firstColumn, False)),
+        )
+    with pytest.raises(ReferenceError, match="past column"):
+        CellRange.fromAxes(
+            ((firstRow, False), (firstRow, False)),
+            ((firstColumn, False), (lastColumn + 1, False)),
+        )

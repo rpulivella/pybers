@@ -75,11 +75,18 @@ def columnLetter(col: int) -> str:
     """Return the letter label for a column number, 1 to A and 27 to AA.
 
     The only public conversion in this direction, so a base-26 correction lands in
-    one place rather than in each caller that grew its own.
+    one place rather than in each caller that grew its own. Bounded at both ends
+    like `columnNumber`, so the two agree on which columns exist and stay inverses
+    over every number either accepts.
     """
     if col < firstColumn:
         raise ReferenceError(
             f"Column {col} is before column {firstColumn}. Columns count from one."
+        )
+    if col > lastColumn:
+        raise ReferenceError(
+            f"Column {col} is past column {lastColumn}, which is the last column a "
+            "Numbers table can hold."
         )
     letters = ""
     while col > 0:
