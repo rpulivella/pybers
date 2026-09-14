@@ -88,6 +88,59 @@ The table below is what has been *measured*, with the enum names attached where 
 | 9 | `automaticCellType` | not seen |
 | 10 | *(named by neither enum)* | **decoded, currency.** Value is decimal128 at bytes 12-27, identical to a plain number |
 
+## How many trailing references a record carries, and what byte 8 says about its value
+
+Measured for PYB-61 across every record in the corpus, 11,760 of them spanning all nine
+cell types. Writing text over a number moves every trailing reference, because a
+decimal128 value is sixteen bytes and a pooled string key is four, so the count and the
+placement both have to be right before a type can change.
+
+### The count
+
+```
+references = popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)
+```
+
+**No exceptions in 11,760 records.** Bytes 9 and 10 are a bitfield of which optional
+references a record carries, each set bit contributing exactly one.
+
+This answers the question [findings-09-cell-records.md](findings-09-cell-records.md) left
+open, which recorded that bytes 8 and 9 do not fully determine the count and that at least
+one more gate lived somewhere else. **Byte 10 is that gate.** Grouping every record by
+byte 8 and byte 9 alone leaves 2 of 41 shapes ambiguous; adding byte 10 leaves 0 of 43.
+
+### Byte 8's low nibble names the value
+
+One value per cell type, with no exceptions:
+
+```
+0   no inline value          0 empty, 8 formula error, 9 rich text
+1   decimal128, 16 bytes     2 number, 10 currency
+2   a double, 8 bytes        6 boolean, 7 duration
+4   a date double, 8 bytes   5 date
+8   a pooled key, 4 bytes    3 string
+```
+
+They behave as one bit per width rather than as an enum, which is what makes
+`byte8 & 0xE0` the right mask for the references above.
+
+**Bit `0x10` belongs to the value, not to the references.** It is set on every rich-text
+record, whose four-byte payload key the low nibble does not describe. Counting it as a
+reference misses exactly the five rich-text shapes and over-counts each by one, which is
+why the `0xE0` mask `findings-09` uses for the formula key slot is correct here as well.
+
+### What the references are is still not established
+
+The count is now exact and the meanings are not. `findings-09` identifies only what
+`0x80` contributes. Naming the rest takes a fixture built to separate the per-table lists,
+since a key of 5 is a plausible entry in more than one of them at once.
+
+**Within one table the plainest string record's references never vary**, measured across
+the 41 tables holding one: the pair is `(5, 1)` or `(5, 3)` depending on the table and
+identical everywhere inside it. So a record created for a cell that had none can take its
+references from a sibling of the same type rather than deriving them, which is how
+PYB-78 shaped a new tile row.
+
 ## Currency is a distinct cell type, but not a distinct value encoding
 
 Measured across `12-number-currency`, which carries nine currency variants beside a plain
