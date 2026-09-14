@@ -11,6 +11,7 @@ Node arrays are asserted as `(nodeType, content)` pairs, because `FormulaNode`
 excludes its archive bytes from equality and a parsed node has none to carry.
 
 UPDATES
+2026-09-11  Brackets, which are a node rather than a derivation, for #67.
 2026-09-08  Written for #45.
 """
 from __future__ import annotations
@@ -261,9 +262,9 @@ def testTheOperatorTableIsTheOneNumbersDeclares() -> None:
     ("text", "expected"),
     [
         ("=1+2*3", "1 2 3 * +"),
-        ("=(1+2)*3", "1 2 + 3 *"),
+        ("=(1+2)*3", "1 2 + () 3 *"),
         ("=1-2-3", "1 2 - 3 -"),
-        ("=1-(2-3)", "1 2 3 - -"),
+        ("=1-(2-3)", "1 2 3 - () -"),
         ("=2^3^2", "2 3 2 ^ ^"),
         ("=-2^2", "2 2 ^ neg"),
         ("=1&2=3", "1 2 & 3 ="),
@@ -275,11 +276,12 @@ def testPrecedenceFollowsNumbersRatherThanTheOrderWritten(
 ) -> None:
     """Arithmetic binds tighter than comparison, and brackets override both.
 
-    Written as the postfix the file holds, since that IS the tree: `1+2*3` and
-    `(1+2)*3` differ in node order and in nothing else.
+    Written as the postfix the file holds, since that IS the tree. A bracket is
+    a node of its own, so `1+2*3` and `(1+2)*3` differ in node order and in one
+    node, which is how Numbers itself stores the pair.
     """
     symbols = {1: "+", 2: "-", 3: "*", 4: "/", 5: "^", 6: "&", 11: "=", 9: "<",
-               13: "neg"}
+               13: "neg", 25: "()"}
     produced = " ".join(
         symbols.get(node.nodeType, str(node.content))
         for node in parseFormula(text, "A1")
@@ -501,9 +503,9 @@ def testTextNestedDeeperThanTheParserGoesIsRefusedRatherThanCrashing() -> None:
 
     Descent spends about eight interpreter frames per level, so text nested a few
     hundred deep exhausts the stack. Sixty levels still parse, which is further
-    than a person nests.
+    than a person nests, and each one stores a bracket node beside the literal.
     """
-    assert len(parseFormula("=" + "(" * 60 + "1" + ")" * 60, "A1")) == 1
+    assert len(parseFormula("=" + "(" * 60 + "1" + ")" * 60, "A1")) == 61
     with pytest.raises(FormulaSyntaxError, match="levels deep"):
         parseFormula("=" + "(" * 400 + "1" + ")" * 400, "A1")
 
