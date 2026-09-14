@@ -20,6 +20,8 @@ conversion here takes that cell. Passing the wrong one is not an error, it is a
 wrong answer.
 
 UPDATES
+2026-09-13  A guessed table name no longer eats the operator in front of
+            it, for #67. It cost 1469 formulas in one document.
 2026-09-08  Written for #45.
 """
 from __future__ import annotations
@@ -111,6 +113,13 @@ percentSymbol: str = "%"
 operatorSymbols: dict[int, str] = {
     nodeType: symbol for symbol, nodeType in binaryOperators.items()
 }
+
+# Every character that begins an operator, so a guessed table name can be told
+# from a scan that ran through one. `%` is here too, being as much an operator as
+# the binary ones.
+operatorSpellings: frozenset[str] = frozenset(
+    {symbol[0] for symbol in binaryOperators} | {percentSymbol}
+)
 
 # Binding strength, higher first, as Numbers evaluates: arithmetic binds tighter
 # than concatenation, which binds tighter than comparison, and a prefix minus
@@ -317,12 +326,24 @@ def readQualifier(text: str, position: int, known: Sequence[str]) -> str:
     where a name Numbers permits ends. The pattern is the fallback, so a caller
     with no names still parses the ordinary spellings and still gets told which
     table it named.
+
+    **A guessed prefix carrying an operator is refused when the document named its
+    tables**, because the pattern stops only at a comma, a bracket or a quote, so
+    `1-Assumptions::Table 1::$B$3` otherwise reads as a table called
+    `1-Assumptions::Table 1`. With the real names in hand a guess crossing an
+    operator is a mis-scan rather than a name, and 1469 formulas in one document
+    failed to reparse on it. A caller supplying no names keeps the guess whole,
+    since `Table 1-1::A1` is a real name and nothing else can resolve it.
     """
     for name in known:
         if text.startswith(name + tableNameSeparator, position):
             return name + tableNameSeparator
     match = qualifierPattern.match(text, position)
-    return "" if match is None else match.group()
+    if match is None:
+        return ""
+    if known and any(symbol in match.group() for symbol in operatorSpellings):
+        return ""
+    return match.group()
 
 
 def readValueToken(
