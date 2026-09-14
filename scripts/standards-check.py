@@ -55,6 +55,7 @@ line of this script, eg:
 /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-14  `.github` and `tools` are in the default scope.
 2026-09-01  Fixed a hole in the banned-phrase check that had been open since the
             list was written: every separator was a literal space, so a phrase a
             line wrap fell inside matched nothing at all. This repository wraps
@@ -162,7 +163,12 @@ generatedOnly: tuple[str, ...] = (
     ".git/",
 )
 
-allRoots: tuple[str, ...] = ("src", "tests", "scripts", "docs", ".claude")
+# `.github` and `tools` were absent, so the pull request template and the code
+# review rubric, which a contributor reads before anything else, had never been
+# checked by the gate that states the rules they follow.
+allRoots: tuple[str, ...] = (
+    "src", "tests", "scripts", "docs", ".claude", ".github", "tools",
+)
 checkExtensions: tuple[str, ...] = (".py", ".md")
 
 # Files that DOCUMENT the banned language rather than commit it. They state the
