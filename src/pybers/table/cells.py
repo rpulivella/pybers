@@ -6,6 +6,9 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-14  A table walks its declared grid, a cell is reached by row and column,
+            and a cell says which merge it anchors (PYB-62). A merge drops the
+            locking markers it was written with, which had discarded its anchor.
 2026-09-08  A cell reads and writes its formula as text, and knows the table
             and the document it sits in so neither has to be passed (#45).
 2026-09-02  Merging and unmerging a block of cells (#16). A merge discards
@@ -234,6 +237,16 @@ class Cell:
         """
         document = None if self.table is None else self.table.document
         return {} if document is None else document.tableIdentities
+
+    @property
+    def mergeAnchored(self) -> MergeRange | None:
+        """Return the merge this cell anchors, or None when it anchors none."""
+        if self.table is None:
+            return None
+        merge = self.table.mergeCovering(self.reference)
+        if merge is None or merge.anchor != self.reference.asUnlocked():
+            return None
+        return merge
 
 
 @dataclass(slots=True)
