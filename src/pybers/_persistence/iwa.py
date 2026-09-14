@@ -126,12 +126,18 @@ class IWAFile:
     originalBytes: bytes = b""
     modified: bool = False
 
-    def messageReplace(self, identifier: int, index: int, data: bytes) -> None:
+    def messageReplace(
+        self,
+        identifier: int,
+        index: int,
+        data: bytes,
+        references: list[int] | None = None,
+    ) -> None:
         """Swap the body of one message of one archive, and mark the member rewritten.
 
-        The only sanctioned way to change an IWA member. `Archive` is frozen, so the
-        replacement is a new archive put in the old one's place, which also means a
-        caller holding the previous one sees no surprise mutation.
+        The only sanctioned way to change an IWA member. `references` replaces the
+        message's strong object references, which a body gaining one has to declare.
+        `Archive` is frozen, so the replacement is a new archive in the old one's place.
         """
         for position, archive in enumerate(self.archives):
             if archive.identifier != identifier:
@@ -144,7 +150,16 @@ class IWAFile:
                 )
             messages = list(archive.messages)
             messages[index] = replace(messages[index], data=data)
-            self.archives[position] = replace(archive, messages=tuple(messages))
+            infoBytes = archive.infoBytes
+            if references is not None:
+                info = archiveMessages.ArchiveInfo()
+                info.ParseFromString(infoBytes)
+                del info.message_infos[index].object_references[:]
+                info.message_infos[index].object_references.extend(references)
+                infoBytes = info.SerializeToString()
+            self.archives[position] = replace(
+                archive, messages=tuple(messages), infoBytes=infoBytes
+            )
             self.modified = True
             return
         raise IWAError(f"{self.name} holds no archive with identifier {identifier}.")

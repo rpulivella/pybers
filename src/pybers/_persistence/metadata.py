@@ -91,11 +91,13 @@ class PackageRegistry:
             for held in iwaFile.archives
         }
         self.gained: set[int] = set()
+        self.changed = False
 
     def identifierAllocate(self) -> int:
         """Return an object identifier no archive in this package has used."""
         highest = max(self.metadata.last_object_identifier, *self.componentOf)
         self.metadata.last_object_identifier = highest + 1
+        self.changed = True
         return self.metadata.last_object_identifier
 
     def componentMember(self, identifier: int) -> IWAFile:
@@ -135,6 +137,7 @@ class PackageRegistry:
         self.componentMember(componentId).archiveAdd(archive)
         self.componentOf[archive.identifier] = componentId
         self.gained.add(componentId)
+        self.changed = True
 
     def weakReferenceAdd(self, componentId: int, target: int) -> None:
         """Record a weak reference from a component to an object in another."""
@@ -145,6 +148,7 @@ class PackageRegistry:
         entry = self.components[componentId].object_uuid_map_entries.add()
         entry.identifier = objectId
         entry.uuid.CopyFrom(uuid)
+        self.changed = True
 
     def strongReferencesDerive(self, componentId: int) -> set[tuple[int, int]]:
         """Return the external references a component's archives make, as stored.
@@ -195,9 +199,16 @@ class PackageRegistry:
             reference.object_identifier = pair[1]
         if weak:
             reference.is_weak = True
+        self.changed = True
 
     def save(self) -> None:
-        """Register what every gained component references, and write the registry."""
+        """Register what every gained component references, and write the registry.
+
+        Writes nothing when nothing was registered, so an unchanged document still
+        writes back byte for byte.
+        """
+        if not self.changed:
+            return
         for componentId in sorted(self.gained):
             for pair in sorted(self.strongReferencesDerive(componentId)):
                 self.referencePairRecord(componentId, pair, weak=False)
