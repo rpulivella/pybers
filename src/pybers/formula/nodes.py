@@ -33,6 +33,8 @@ row of `None` means the whole column rather than row zero. The same rule
 `pybers.addressing.ranges` already follows.
 
 UPDATES
+2026-09-11  Apple's list node is a bracket the author typed, for #67. It
+            enclosed one value in all 4364 instances measured.
 2026-09-08  A reference and a range follow a target that moved, for #13. A
             locked axis stays where it is, which is what locking means.
 2026-09-08  The operator node types, the thunking functions, and content
@@ -102,6 +104,14 @@ notEqualToNodeType: int = 12
 negationNodeType: int = 13
 plusSignNodeType: int = 14
 percentNodeType: int = 15
+
+# A bracketed sub-expression, which Apple declares as `LIST_NODE` and gives one
+# field, `AST_list_node_numArgs`. That field is 1 in all 4364 instances across six
+# real documents, and a list of one is a bracket. It is the author's own bracket
+# rather than one derived from precedence: 193 of the 379 distinct formulas
+# carrying one enclose what precedence already bound. See
+# tests/fixtures/findings-08-formula-text.md.
+listNodeType: int = 25
 
 # An argument the writer left out, which is what the commas of `DURATION(,,,K1,,)`
 # each stand for.
@@ -447,6 +457,18 @@ class FormulaLambda:
     firstSymbol: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class FormulaGroup:
+    """A bracketed sub-expression, and how many values its brackets enclose.
+
+    `argumentCount` is 1 in every instance measured, which is what makes Apple's
+    list node a bracket. It is carried rather than assumed so that a wider one is
+    refused by the renderer instead of written out as something it is not.
+    """
+
+    argumentCount: int = 1
+
+
 # What a node carries. A number literal's content is a Decimal and a string
 # literal's is a str, so neither needs a wrapper class to be told apart from the
 # others. An operator carries nothing, its meaning being its type and its arity
@@ -455,6 +477,7 @@ NodeContent = (
     Decimal
     | str
     | FormulaFunctionCall
+    | FormulaGroup
     | FormulaUnknownCall
     | FormulaReference
     | FormulaRange
