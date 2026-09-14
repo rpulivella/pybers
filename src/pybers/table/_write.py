@@ -315,20 +315,23 @@ def applyTableEdits(
     # rather than guessing what an absent tile should be built from, and refusing
     # is what keeps the formula from being dropped in silence.
     if pool is not None:
-        covered = frozenset(
-            row
-            for entry in store.tiles.tiles
-            for row in range(entry.tileid * tileSize, (entry.tileid + 1) * tileSize)
-        )
-        for reference, held in sorted(
-            table.cells.items(), key=lambda pair: (pair[0].row, pair[0].col)
-        ):
-            if held.formula is None or reference.row - originOffset in covered:
-                continue
+        # Compared by tile rather than by row: a table at Numbers' million-row
+        # limit spans 3907 tiles, so naming every row covered would build a
+        # million-element set on every save to answer a question this answers in
+        # one division.
+        coveredTiles = frozenset(entry.tileid for entry in store.tiles.tiles)
+        uncovered = [
+            reference
+            for reference, held in table.cells.items()
+            if held.formula is not None
+            and (reference.row - originOffset) // tileSize not in coveredTiles
+        ]
+        if uncovered:
+            first = min(uncovered, key=lambda reference: (reference.row, reference.col))
             raise WriteError(
-                f"Row {reference.row} of {table.name!r} holds a formula and no "
-                f"tile covers it. The table declares {model.number_of_rows} rows "
-                f"and stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
+                f"Row {first.row} of {table.name!r} holds a formula and no tile "
+                f"covers it. The table declares {model.number_of_rows} rows and "
+                f"stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
             )
 
     for entry in store.tiles.tiles:
