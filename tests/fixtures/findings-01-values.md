@@ -88,6 +88,109 @@ The table below is what has been *measured*, with the enum names attached where 
 | 9 | `automaticCellType` | not seen |
 | 10 | *(named by neither enum)* | **decoded, currency.** Value is decimal128 at bytes 12-27, identical to a plain number |
 
+## How many trailing references a record carries, and what byte 8 says about its value
+
+Measured for PYB-61 across every record in the corpus, 11,760 of them spanning all nine
+cell types. Writing text over a number moves every trailing reference, because a
+decimal128 value is sixteen bytes and a pooled string key is four, so the count and the
+placement both have to be right before a type can change.
+
+### The count
+
+```
+references = popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)
+```
+
+**No exceptions in 11,760 records.** Bytes 9 and 10 are a bitfield of which optional
+references a record carries, each set bit contributing exactly one.
+
+This answers the question [findings-09-cell-records.md](findings-09-cell-records.md) left
+open, which recorded that bytes 8 and 9 do not fully determine the count and that at least
+one more gate lived somewhere else. **Byte 10 is that gate.** Grouping every record by
+byte 8 and byte 9 alone leaves 2 of 41 shapes ambiguous; adding byte 10 leaves 0 of 43.
+
+### Byte 8's low nibble names the value
+
+One value per cell type, with no exceptions:
+
+```
+0   no inline value          0 empty, 8 formula error, 9 rich text
+1   decimal128, 16 bytes     2 number, 10 currency
+2   a double, 8 bytes        6 boolean, 7 duration
+4   a date double, 8 bytes   5 date
+8   a pooled key, 4 bytes    3 string
+```
+
+They behave as one bit per width rather than as an enum, which is what makes
+`byte8 & 0xE0` the right mask for the references above.
+
+**Bit `0x10` belongs to the value, not to the references.** It is set on every rich-text
+record, whose four-byte payload key the low nibble does not describe. Counting it as a
+reference misses exactly the five rich-text shapes and over-counts each by one, which is
+why the `0xE0` mask `findings-09` uses for the formula key slot is correct here as well.
+
+### Which list each reference-bearing bit points into
+
+Measured for PYB-61 across the corpus. A bit is named by the `format_type` its key
+resolves to, since a format entry states its own kind and a small key is otherwise a
+plausible entry in several lists at once.
+
+| bit | what its reference is | evidence |
+| --- | --- | --- |
+| byte 8 `0x20` | a `styleTable` key | 349 of 349 unambiguous |
+| byte 8 `0x40` | a `styleTable` key | 395 of 395 unambiguous |
+| byte 9 `0x02` | a `formula_table` key | 63 of 63 unambiguous |
+| byte 9 `0x20` | the **number** format | 6105 name `256`, the rest `258`, `259`, `269`, `270` |
+| byte 9 `0x40` | the **currency** format | 34 of 34 name `257` and nothing else |
+| byte 9 `0x80` | the **date** format | 24 of 24 name `261` and nothing else |
+| byte 10 `0x01` | the **duration** format | 19 of 19 name `268` and nothing else |
+| byte 10 `0x02` | the **text** format | 5427 of 5427 name `260` and nothing else |
+
+**The slots are per format kind, not per cell.** A cell carries the slot its display
+needs, which is why a number and a string of the same table put their format reference
+in different places and why bytes 9 and 10 differ between them. Byte 9 `0x02` landing on
+`formula_table` is the bit
+[findings-09-cell-records.md](findings-09-cell-records.md) identified as the formula
+flag, reached from the other direction.
+
+The format types themselves: `256` number, `257` currency, `258` percent, `260` text,
+`261` date, `263` checkbox, `267` star rating, `268` duration. A text format entry
+carries nothing but its `format_type`, so one can be created where a table has none.
+
+**Byte 9 bit `0x10` is the format the cell currently displays with**, as against the
+per-kind slots above, which remember one format per kind so that switching a cell back
+restores what it had. Named on 2026-09-14 by a golden rather than by the corpus, which
+could not separate it: two text cells with identical slots read differently in Numbers,
+`Text` where this named the text format and `Automatic` where it still named the number
+format the cell had been. A plain number puts the same key in this slot and in byte 9
+`0x20`, which is why counting alone never told them apart.
+
+**Byte 6 bit `0x80` marks a format a person chose** rather than one Numbers decided.
+4515 text records leave it clear against 108 that set it, and the Data Format inspector
+reads `Automatic` without it and `Text` with it. Typing text into Numbers leaves it
+clear, which is why writing a string leaves it clear here.
+
+Setting it is a deliberate act with one purpose: forcing a number to render as text, or
+stopping a formula from evaluating so its own text shows. That is a capability of its
+own rather than a side effect of writing a string, and nothing in this library offers it
+yet.
+
+**Byte 9 bit `0x04` is the control a cell presents as**, a `control_cell_spec_table` key.
+`11-value-types-noformats` settles it: its checkbox, star rating, slider, stepper and
+pop-up menu carry keys 1 to 5 in the order that table lists them, and every plain cell
+carries no such slot. A control describes the value it was built for, so it does not
+survive that value being replaced. Leaving one in place makes Numbers render a sentence
+as a star rating.
+
+### What this settles for writing
+
+A record whose type changes keeps its references and therefore keeps the count, so bytes
+9 and 10 are never rewritten and the slots keep their meanings. What that leaves is a
+text cell naming the format its number had, which Numbers accepts: confirmed in Numbers
+15.3.1 on 2026-09-14, where a cell converted from a number displays as text with a Data
+Format of Automatic, and one converted from a star-rating control displays as plain text
+with no control.
+
 ## Currency is a distinct cell type, but not a distinct value encoding
 
 Measured across `12-number-currency`, which carries nine currency variants beside a plain

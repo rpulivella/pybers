@@ -73,11 +73,12 @@ reference, and those two are the two cells with comments.
 
 ## What is still unknown
 
-**Bytes 8 and 9 do not fully determine how many trailing references a record carries.** The
-two commented cells above share their flag bytes with eighteen others and carry one more
-reference than they do, so at least one more gate lives somewhere else. It sits behind the
-formula key in every record measured, so it does not affect the rule, and it is recorded
-here rather than guessed at.
+~~**Bytes 8 and 9 do not fully determine how many trailing references a record carries.**
+The two commented cells above share their flag bytes with eighteen others and carry one
+more reference than they do, so at least one more gate lives somewhere else.~~ **Answered
+for PYB-61 on 2026-09-14: the gate is byte 10.** The count is
+`popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, with no exceptions in
+11,760 records. See [findings-01-values.md](findings-01-values.md).
 
 The reference each preceding bit contributes is identified only for `0x80`. The values
 `0x20` and `0x40` contribute are plausible keys in more than one per-table list at once, so

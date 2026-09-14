@@ -17,6 +17,7 @@ be parsed at all, so a byte difference on one is reported as a difference rather
 than assumed to be a harmless re-encoding.
 
 UPDATES
+2026-09-14  Text, pooling and a cell that changes type, for #61.
 2026-09-14  A formula written into a row with no storage, for #78.
 2026-09-01  Written for #2, AC 1: the unchanged round trip.
 2026-09-01  Numeric edits, for #2 AC 2, 3, 4 and 6.
@@ -61,6 +62,7 @@ from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
 from pybers.table._read import readMerges
+from pybers.table._write import referenceSlots
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -475,19 +477,43 @@ def test_aRefusedSaveLeavesTheFileExactlyAsItWas(tmp_path: Path) -> None:
     assert working.read_bytes() == before
 
 
-def test_writingTextIsRefusedRatherThanDropped(tmp_path: Path) -> None:
-    """Text needs the table's pooled string list, which this version does not write."""
+def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
+    """What the refusal here used to guard, now that the string list is written.
+
+    Superseded for #61. The refusal was correct while text could not be pooled, and
+    the test is rewritten rather than deleted so the boundary that moved is visible.
+    """
     working = workingCopy("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = "not a number"
+    document.save()
+
+    assert pybers.open(working).sheets[0].tables[0].cell("A1").value == "not a number"
+
+
+def test_writingSomethingNeitherTextNorANumberIsStillRefused(
+    tmp_path: Path,
+) -> None:
+    """The refusal that remains, since a date or a boolean has no write path yet."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = [1, 2]
 
     with pytest.raises(WriteError, match="only a Decimal"):
         document.save()
 
 
-def test_changingACellsTypeIsRefused(tmp_path: Path) -> None:
-    """A number written over a date needs a new record, not a patched one."""
+def test_changingATypeThisLibraryCannotMeasureIsStillRefused(
+    tmp_path: Path,
+) -> None:
+    """Text and numbers convert now; a date does not, and says so rather than guessing.
+
+    Narrowed for #61. A date's value is a double and its references sit in slots
+    this library has not identified, so retyping one would place them wrong and
+    raise nothing.
+    """
     working = workingCopy("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
@@ -498,7 +524,7 @@ def test_changingACellsTypeIsRefused(tmp_path: Path) -> None:
     )
     dateCell.value = Decimal("1")
 
-    with pytest.raises(WriteError, match="Changing a cell's type"):
+    with pytest.raises(WriteError, match="Only a number, a currency amount and text"):
         document.save()
 
 
@@ -926,6 +952,33 @@ def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     assert table.cell("B1").value == Decimal("777")
 
 
+def formatEntries(path: Path, tableName: str | None) -> list[tuple[int, int | None]]:
+    """Return one table's format list as key and kind, for asserting on references."""
+    from pybers._persistence.index import ArchiveIndex
+    from pybers.document._read import findRoot
+    from pybers.document._write import tableInfoTypeId
+
+    index = ArchiveIndex(readPackage(path))
+    for reference in findRoot(index).sheets:
+        for drawable in index.resolve(reference, tn.SheetArchive).drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if tableName is not None and model.table_name != tableName:
+                continue
+            dataList = index.resolve(
+                model.base_data_store.format_table, tst.TableDataList
+            )
+            return [
+                (entry.key,
+                 entry.format.format_type if entry.HasField("format") else None)
+                for entry in dataList.entries
+            ]
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+
 def tileOf(path: Path, tableName: str) -> tst.Tile:
     """Return the one tile of a named table, for asserting on row storage."""
     from pybers._persistence.index import ArchiveIndex
@@ -1055,3 +1108,258 @@ def test_theCreatedRowGoldenHoldsWhatItClaimsTo() -> None:
     assert [row.tile_row_index for row in tileOf(golden, "Table 2").rowInfos] == [
         0, 2, 6, 9
     ]
+
+
+def stringEntries(path: Path, tableName: str) -> dict[int, object]:
+    """Return one table's pooled string list, keyed as cell records address it."""
+    from pybers._persistence.index import (
+        ArchiveIndex,
+        readDataList,
+        stringListType,
+    )
+    from pybers.document._read import findRoot
+    from pybers.document._write import tableInfoTypeId
+
+    index = ArchiveIndex(readPackage(path))
+    for reference in findRoot(index).sheets:
+        sheetArchive = index.resolve(reference, tn.SheetArchive)
+        for drawable in sheetArchive.drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if model.table_name == tableName:
+                return readDataList(
+                    index, model.base_data_store.stringTable, stringListType
+                )
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+def recordAt(
+    path: Path, address: str, table: str | None = None
+) -> CellRecord:
+    """Return the raw cell record at an address, in the first table or a named one."""
+    from pybers._persistence.index import ArchiveIndex
+    from pybers.addressing import toCellReference
+    from pybers.document._read import findRoot
+    from pybers.document._write import tableInfoTypeId
+
+    wanted = toCellReference(address)
+    index = ArchiveIndex(readPackage(path))
+    for reference in findRoot(index).sheets:
+        for drawable in index.resolve(reference, tn.SheetArchive).drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if table is not None and model.table_name != table:
+                continue
+            store = model.base_data_store
+            for entry in store.tiles.tiles:
+                tile = index.resolve(entry.tile, tst.Tile)
+                for rowInfo in tile.rowInfos:
+                    if rowInfo.tile_row_index != wanted.row - 1:
+                        continue
+                    unit = offsetUnitFor(
+                        rowInfo.has_wide_offsets, tile.should_use_wide_rows
+                    )
+                    for record in decodeRow(
+                        rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+                    ):
+                        if record.column == wanted.col - 1:
+                            return record
+            break
+    raise AssertionError(f"{address} has no record in {path.name}")
+
+
+
+# ── PYB-61: text, pooling, and a cell that changes type ──────────────────────
+
+# The golden's five, chosen to cover one criterion each.
+retypedCells: tuple[tuple[str, object], ...] = (
+    ("A1", "text over a number"),
+    ("B1", "text over a number"),
+    ("F1", "text over a control"),
+    ("A2", Decimal("98765.4321")),
+    ("J1", "into an empty cell"),
+)
+
+
+def test_theSameTextInTwoCellsIsPooledOnceWithACount(tmp_path: Path) -> None:
+    """AC 4. Numbers points both cells at one entry and counts them, so this must."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A1").value = "shared label"
+    table.cell("B1").value = "shared label"
+    document.save()
+
+    entries = stringEntries(working, table.name)
+    matching = [entry for entry in entries.values() if entry.string == "shared label"]
+    assert len(matching) == 1, "one entry, not one per cell"
+    assert matching[0].refcount == 2
+
+
+def test_changingOneCellSharingAnEntryLeavesTheOtherAlone(tmp_path: Path) -> None:
+    """A shared entry is split rather than overwritten, as the formula pool does."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A1").value = "shared"
+    table.cell("B1").value = "shared"
+    document.save()
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = "changed"
+    document.save()
+
+    reopened = pybers.open(working).sheets[0].tables[0]
+    assert reopened.cell("A1").value == "changed"
+    assert reopened.cell("B1").value == "shared", "the cell that did not change"
+
+
+def test_aTypeChangeMovesTheFormatIntoTheSlotItsKindUses(tmp_path: Path) -> None:
+    """AC 5, asserted on the bytes rather than on what reads back.
+
+    A format reference sits in the slot its kind uses, so a cell becoming text moves
+    its format out of byte 9's `0x20` and into byte 10's `0x02`, naming a text format
+    rather than the number format it displayed with. One bit leaves and one arrives,
+    so the count the reference rule derives is unchanged. See findings-01-values.md.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = recordAt(working, "A1")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = "now text"
+    document.save()
+    after = recordAt(working, "A1")
+
+    assert after.typeByte == 3, "the cell became text"
+    assert after.raw[8] & 0x0F == 0x08, "byte 8's low nibble names a pooled key"
+    assert before.raw[9] & 0x20 and not after.raw[9] & 0x20, "the number slot cleared"
+    assert not before.raw[10] & 0x02 and after.raw[10] & 0x02, "the text slot set"
+    assert len(after.references) == len(before.references), "the count is unchanged"
+
+
+def test_aTypeChangeDropsTheControlTheOldValueWoreTypeChange(tmp_path: Path) -> None:
+    """`F1` is a star rating, and a star rating on text renders text as stars.
+
+    Found by the golden on 2026-09-14, which showed the Data Format still reading
+    Star Rating on a cell holding a sentence. A control describes the value it was
+    built for, so it does not survive that value being replaced.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = recordAt(working, "F1")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("F1").value = "now text"
+    document.save()
+    after = recordAt(working, "F1")
+
+    assert before.raw[9] & 0x04, "the fixture cell wears a control"
+    assert not after.raw[9] & 0x04, "and the cell that became text does not"
+    assert after.raw[8] & 0xE0 == before.raw[8] & 0xE0, "the style bits held"
+
+
+def test_aRecordShapedFromASiblingDoesNotInheritItsControl(tmp_path: Path) -> None:
+    """`J1` had no record and took its shape from `I1`, a pop-up menu.
+
+    The golden showed `J1` offering `I1`'s three menu items while holding a
+    sentence. A shape is borrowed; a control is not.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("J1").value = "into an empty cell"
+    document.save()
+
+    assert not recordAt(working, "J1").raw[9] & 0x04, "no control was inherited"
+    assert recordAt(working, "I1").raw[9] & 0x04, "and the sibling kept its own"
+
+
+@pytest.mark.parametrize("address", ["B1", "A3", "E10"])
+def test_theFirstTextInATableOfNumbersIsWritten(
+    address: str, tmp_path: Path
+) -> None:
+    """`Table 2` holds one number and no text, so there is no string record to copy.
+
+    A number record shapes it instead and the type change carries the references
+    across, which is the conversion AC 2 already performs. `A3` and `E10` also sit
+    in rows the file stores nothing for, so this crosses PYB-78's path as well.
+    """
+    working = workingCopy("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    table = document.sheet("Sheet 1").table("Table 2")
+    table.cell(address).value = "first text in this table"
+    document.save()
+
+    reopened = pybers.open(working).sheet("Sheet 1").table("Table 2")
+    assert reopened.cell(address).value == "first text in this table"
+    assert reopened.cell("A1").value == Decimal("42"), "the shape's own cell"
+
+
+def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
+    tmp_path: Path,
+) -> None:
+    """A record created for an empty cell borrows a shape, not a claim on the pool.
+
+    Found by the golden on 2026-09-14. Writing `J1`, which had no record, changed
+    `I1` from `Item 1` to the new text, because the template's pooled key was read
+    as `J1`'s previous claim and the entry was then rewritten in place.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    before = table.cell("I1").value
+    table.cell("J1").value = "into an empty cell"
+    document.save()
+
+    reopened = pybers.open(working).sheets[0].tables[0]
+    assert reopened.cell("J1").value == "into an empty cell"
+    assert reopened.cell("I1").value == before, "the cell the shape came from"
+
+
+def test_aTypeChangeMovesTheFormatTheCellDisplaysWith(tmp_path: Path) -> None:
+    """Byte 9 `0x10` is the format in effect, and it follows the new kind.
+
+    Named on 2026-09-14 from the golden. Two text cells with identical slots read
+    differently in the inspector, Text where this slot named the text format and
+    Automatic where it still named the number format the cell had been.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = "now text"
+    document.save()
+
+    record = recordAt(working, "A1")
+    slots = referenceSlots(record.raw)
+    keys = dict(zip(slots, record.references, strict=True))
+    assert keys[(9, 0x10)] == keys[(10, 0x02)], (
+        "the format in effect is the text format the kind slot names"
+    )
+
+
+def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
+    """`ArchiveIndex.resolve` parses afresh, so a second copy takes the edits with it.
+
+    Found reviewing #61. The entry was added to a throwaway, the key came back real,
+    and the cells named a format the table did not hold. Numbers accepted the golden
+    anyway, which is why only the bytes catch this.
+    """
+    working = workingCopy("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    document.sheet("Sheet 1").table("Table 2").cell("B1").value = "first text"
+    document.save()
+
+    entries = formatEntries(working, "Table 2")
+    assert 260 in {kind for _, kind in entries}, "the text format reached the file"
+    named = recordAt(working, "B1", table="Table 2").references
+    assert set(named) <= {key for key, _ in entries}, "no cell names a missing format"
+
+
+def test_aPlainNumericEditLeavesTheFormatListAlone(tmp_path: Path) -> None:
+    """Looking a format up bumps a refcount, so it happens only where a retype does."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = formatEntries(working, None)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("7")
+    document.save()
+
+    assert formatEntries(working, None) == before

@@ -16,6 +16,9 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-14  Text is written and pooled, and a cell changes between text and
+            a number, for #61. A format sits in the slot its kind uses, so a
+            type change moves it, drops the control, and keeps the style.
 2026-09-14  A row the file stores nothing for is created rather than the
             formula being dropped, for #78. The walk over `rowInfos` never
             saw it, and the save reported success.
@@ -31,6 +34,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -83,36 +87,112 @@ numericTypeBytes: tuple[int, ...] = (2, 10)
 # while appearing to succeed.
 valueEnd: int = valueOffset + encodedLength
 
+# A pooled string cell holds a four-byte key where a number holds sixteen bytes of
+# decimal128, so changing between them moves every trailing reference.
+stringTypeByte: int = 3
+stringKeyWidth: int = 4
 
-def checkedValue(cell: Cell, record: CellRecord) -> Decimal:
-    """Return the Decimal to write, or refuse and say exactly what is unsupported.
+# Every trailing reference is a little-endian uint32.
+referenceWidth: int = 4
 
-    Three refusals, and every one of them replaces a silent loss. Writing over a
-    formula would discard it while leaving a document whose displayed number and
-    stored formula disagree until Numbers recalculates. Writing a non-numeric value
-    needs the table's pooled string list, which this ticket does not touch. Changing
-    a cell's type needs a new record rather than a patched one.
+# Byte 8's LOW nibble names what the value is, one value per type with no
+# exception in 11,760 records: 1 is decimal128, 8 is a pooled string key. Its high
+# bits are the attribute mask, and the reference count is
+# `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, which is what makes
+# a format slot moving cost nothing: one bit leaves and one arrives. See
+# findings-01-values.md.
+valueKindMask: int = 0x0F
+numberValueKind: int = 0x01
+stringValueKind: int = 0x08
+valueKindOffset: int = 8
+typeByteOffset: int = 1
+
+
+def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
+    """Refuse to write a value over a cell a formula backs, and say why.
+
+    The one refusal that stays. Overwriting would discard the formula and leave the
+    document's displayed number and its stored formula disagreeing until Numbers
+    recalculated, which is a silent loss wearing the shape of a success.
     """
     if carriesFormula(record):
         raise WriteError(
             f"{cell.reference} is backed by a formula, so writing a value would "
-            "discard it. Formula writing is not supported yet, and overwriting one "
-            "silently would leave the cell's formula and its displayed value "
-            "disagreeing until Numbers recalculated."
+            "discard it. Replace the formula instead, or clear it first."
         )
-    if not isinstance(cell.value, Decimal):
-        raise WriteError(
-            f"{cell.reference} was set to {type(cell.value).__name__}, and only a "
-            "Decimal can be written so far. Text needs the table's pooled string "
-            "list, which this version does not write."
+
+
+def writtenRecord(
+    cell: Cell,
+    record: CellRecord,
+    pool: StringPool | None,
+    *,
+    borrowed: bool = False,
+    formatFor: Callable[[int], int | None] = lambda formatType: None,
+) -> bytes:
+    """Return this cell's record carrying its new value, changing type when it must.
+
+    Four paths. Text over text and a number over a number patch the value in place,
+    leaving the header and every trailing reference alone. Text over a number and a
+    number over text go through `retypedRecord`, because the value widths differ by
+    twelve bytes and everything behind them moves.
+
+    **`borrowed` says the record belongs to another cell** and is here only for its
+    shape. Without it, the template's pooled key is read as this cell's previous
+    claim, and a pool entry nothing else names is then rewritten in place: writing
+    into an empty `J1` changed `I1` from `Item 1` to the new text, with nothing
+    raised. Found by the golden on 2026-09-14.
+    """
+    refuseFormulaOverwrite(cell, record)
+    value = cell.value
+
+    if isinstance(value, str):
+        if pool is None:
+            raise WriteError(
+                f"{cell.reference} was set to text and its table carries no string "
+                "list to pool it in. A table that has never held text has none."
+            )
+        previous = (
+            record.value
+            if record.typeByte == stringTypeByte and not borrowed
+            else None
         )
-    if record.typeByte not in numericTypeBytes:
-        raise WriteError(
-            f"{cell.reference} holds a value of type {record.typeByte} and a "
-            "Decimal was written into it. Changing a cell's type is not supported "
-            "yet, because it needs a new record rather than a patched one."
+        key = pool.keyFor(value, previous if isinstance(previous, int) else None)
+        encoded = key.to_bytes(stringKeyWidth, "little")
+        if record.typeByte == stringTypeByte:
+            patched = (
+                record.raw[:valueOffset] + encoded
+                + record.raw[valueOffset + stringKeyWidth:]
+            )
+            # A borrowed shape hands over its references, and a control is not one
+            # to hand over: writing into an empty cell gave it the pop-up menu of
+            # the cell whose shape it took. Found by the golden on 2026-09-14.
+            return withoutControl(patched) if borrowed else patched
+        return retypedRecord(
+            record, stringTypeByte, encoded,
+            formatKey=formatFor(textFormatType),
         )
-    return cell.value
+
+    if isinstance(value, Decimal):
+        if record.typeByte == stringTypeByte:
+            if pool is not None and not borrowed and isinstance(record.value, int):
+                pool.release(record.value)
+            return retypedRecord(
+                record, numericTypeBytes[0], Decimal128(value).asBytes(),
+                formatKey=formatFor(numberFormatType),
+            )
+        if record.typeByte not in numericTypeBytes:
+            raise WriteError(
+                f"{cell.reference} holds a value of type {record.typeByte} and a "
+                "Decimal was written into it. Only a number, a currency amount and "
+                "text can be written over so far."
+            )
+        return patchRecord(record, value)
+
+    raise WriteError(
+        f"{cell.reference} was set to {type(value).__name__}, and only a Decimal "
+        "or a str can be written so far."
+    )
 
 
 def patchRecord(record: CellRecord, value: Decimal) -> bytes:
@@ -133,6 +213,291 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
     )
 
 
+@dataclass
+class StringPool:
+    """A table's pooled strings, and the one place a written one is added.
+
+    The counterpart of `FormulaPool` and shaped like it on purpose. Numbers points
+    every cell holding the same text at ONE entry and keeps a refcount, so writing
+    an entry per cell diverges from what Numbers itself writes the moment the same
+    label appears twice.
+
+    A shared entry is never overwritten. Changing the text of one cell that shares
+    an entry with six others must not rewrite all seven, which is the same aliasing
+    hazard the frozen model closes on the read side.
+    """
+
+    dataList: tst.TableDataList
+    stored: dict[int, str]
+    touched: bool = False
+
+    def entryFor(self, key: int) -> tst.TableDataList.ListEntry | None:
+        """Return one pooled entry by key, or None when the table has no such key."""
+        for entry in self.dataList.entries:
+            if entry.key == key:
+                return entry
+        return None
+
+    def keyFor(self, text: str, previous: int | None = None) -> int:
+        """Return the key a cell should name, sharing an entry when one matches.
+
+        `previous` is the key the cell names now, released when it stops naming it.
+        """
+        self.touched = True
+        for key, stored in self.stored.items():
+            entry = self.entryFor(key)
+            if stored != text or entry is None:
+                continue
+            if key == previous:
+                return key
+            entry.refcount += 1
+            if previous is not None:
+                self.release(previous)
+            return key
+
+        existing = self.entryFor(previous) if previous is not None else None
+        if existing is not None and existing.refcount <= 1:
+            existing.string = text
+            self.stored[existing.key] = text
+            return existing.key
+        if previous is not None:
+            self.release(previous)
+        fresh = self.dataList.entries.add()
+        fresh.key = self.dataList.nextListID
+        fresh.refcount = 1
+        fresh.string = text
+        self.dataList.nextListID += 1
+        self.stored[fresh.key] = text
+        return fresh.key
+
+    def release(self, key: int) -> None:
+        """Give up one cell's claim on a stored string.
+
+        Emptied rather than deleted when nothing names it, because `nextListID`
+        never reuses a key and a removed entry would invite a reader to assume the
+        keys are dense.
+        """
+        entry = self.entryFor(key)
+        if entry is None:
+            return
+        self.touched = True
+        entry.refcount = max(0, entry.refcount - 1)
+
+
+def stringPoolFor(index: ArchiveIndex, store: tst.DataStore) -> StringPool | None:
+    """Return the table's string pool, or None when it carries no string list.
+
+    A table that has never held text carries no list to write into, which is a
+    different state from one whose list is empty.
+    """
+    if not store.stringTable.identifier:
+        return None
+    return StringPool(
+        dataList=index.resolve(store.stringTable, tst.TableDataList),
+        stored=readStringTable(index, store),
+    )
+
+
+# Which bit carries which format reference, measured across the corpus: a slot is
+# per format KIND rather than per cell, which is why a number and a string in one
+# table put their format in different places. See findings-01-values.md.
+numberFormatSlot: tuple[int, int] = (9, 0x20)
+currencyFormatSlot: tuple[int, int] = (9, 0x40)
+dateFormatSlot: tuple[int, int] = (9, 0x80)
+durationFormatSlot: tuple[int, int] = (10, 0x01)
+textFormatSlot: tuple[int, int] = (10, 0x02)
+
+# The control a cell presents as, a `control_cell_spec_table` key. Measured against
+# 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
+# the table lists them and whose plain cells carry no such slot. A control describes
+# the value it was built for, so it does not survive that value being replaced: a
+# star rating left on a cell that became text makes Numbers present text as stars.
+controlSlot: tuple[int, int] = (9, 0x04)
+
+# The format a cell currently displays with, as against the per-kind slots above,
+# which remember one format per kind so switching back restores what was there.
+# Set on nearly every record. Named on 2026-09-14 from the golden: two text cells
+# with identical slots read differently in the inspector, Text where this named the
+# text format and Automatic where it still named the number format.
+effectiveFormatSlot: tuple[int, int] = (9, 0x10)
+
+# Byte 6's high bit marks a format a person chose rather than one Numbers decided.
+# 108 text records carry it against 4515 that do not, and the Data Format inspector
+# reads `Text` with it and `Automatic` without, which is what typing into Numbers
+# produces. Measured 2026-09-14 from a golden that inherited one.
+chosenFormatBit: int = 0x80
+
+# A format entry states its own kind. `260` carries nothing else, so a text format
+# can be created for a table that has never held any.
+numberFormatType: int = 256
+textFormatType: int = 260
+
+# Every bit that contributes one trailing reference, in the order the references
+# appear. Byte 8's low nibble names the value and carries none.
+slotOrder: tuple[tuple[int, int], ...] = (
+    *((8, bit) for bit in (0x20, 0x40, 0x80)),
+    *((9, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
+    *((10, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
+)
+
+
+def referenceSlots(raw: bytes) -> list[tuple[int, int]]:
+    """Return the slots this record's trailing references fill, in their order."""
+    return [(at, bit) for at, bit in slotOrder if raw[at] & bit]
+
+
+def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
+    """Return a key naming a format of this kind, creating one when there is none.
+
+    A `260` entry carries nothing but its kind, so creating one states no more than
+    the corpus does.
+
+    **Takes the resolved list rather than resolving one.** `ArchiveIndex.resolve`
+    parses the archive afresh on every call, so a function that resolved its own
+    copy would add an entry to a throwaway: the key came back real, the entry never
+    reached the file, and cells named a format the table did not hold. Found
+    reviewing #61, in a golden Numbers had already accepted.
+    """
+    for entry in dataList.entries:
+        if entry.HasField("format") and entry.format.format_type == formatType:
+            entry.refcount += 1
+            return int(entry.key)
+    fresh = dataList.entries.add()
+    fresh.key = dataList.nextListID
+    fresh.refcount = 1
+    fresh.format.format_type = formatType
+    dataList.nextListID += 1
+    return int(fresh.key)
+
+
+def templateRecord(
+    index: ArchiveIndex, store: tst.DataStore, typeByte: int
+) -> CellRecord | None:
+    """Return a record to shape a new one from, preferring the type being written.
+
+    A record created for a cell that had none has to choose every header byte and
+    every trailing reference. Those references are keys into this table's own lists,
+    so they are copied from a sibling rather than derived. The same reasoning shaped
+    a new tile row for PYB-78.
+
+    **A record of the other type will do**, which is what lets the first text reach a
+    table holding only numbers. Retyping places the references for the kind being
+    written, so what is borrowed is the style and the shape rather than anything the
+    old value chose. The preference is the type being written, then the other one it
+    can be converted from.
+    """
+    found: dict[int, CellRecord] = {}
+    for entry in store.tiles.tiles:
+        tile = index.resolve(entry.tile, tst.Tile)
+        for rowInfo in tile.rowInfos:
+            unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            for record in decodeRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+            ):
+                if carriesFormula(record):
+                    continue
+                found.setdefault(record.typeByte, record)
+                if typeByte in found:
+                    return found[typeByte]
+    for candidate in (typeByte, stringTypeByte, *numericTypeBytes):
+        if candidate in found:
+            return found[candidate]
+    return None
+
+
+def stringValueWidth(record: CellRecord) -> int:
+    """Return how many bytes this record's value occupies, for a type being changed."""
+    if record.typeByte == stringTypeByte:
+        return stringKeyWidth
+    if record.typeByte in numericTypeBytes:
+        return encodedLength
+    raise WriteError(
+        f"A record of type {record.typeByte} holds a value this library cannot "
+        "measure, so the references behind it cannot be placed."
+    )
+
+
+def withoutControl(raw: bytes) -> bytes:
+    """Return one record with its control and its chosen format dropped.
+
+    A control describes the cell it was built for, so a record shaped from a sibling
+    must not present as that sibling's pop-up menu or star rating.
+
+    Byte 6's `0x80` goes with it. It marks a format a person chose rather than let
+    Numbers decide, 108 records against 4515 that leave it clear, and typing text
+    into Numbers leaves it clear. A borrowed shape is not a borrowed decision.
+    """
+    raw = bytes(raw[:6]) + bytes([raw[6] & ~chosenFormatBit]) + bytes(raw[7:])
+    at, bit = controlSlot
+    if not raw[at] & bit:
+        return raw
+    slots = referenceSlots(raw)
+    start = len(raw) - len(slots) * referenceWidth
+    kept = [
+        raw[start + index * referenceWidth:start + (index + 1) * referenceWidth]
+        for index, slot in enumerate(slots) if slot != controlSlot
+    ]
+    header = bytearray(raw[:start])
+    header[at] &= ~bit
+    return bytes(header) + b"".join(kept)
+
+
+def retypedRecord(
+    record: CellRecord,
+    typeByte: int,
+    value: bytes,
+    *,
+    formatKey: int | None,
+) -> bytes:
+    """Return one record holding a different kind of value, its format slot moved.
+
+    A format reference sits in the slot its KIND uses, so a cell becoming text moves
+    its format from byte 9's `0x20` to byte 10's `0x02` and names a text format
+    rather than keeping the number format it displayed with. One bit leaves and one
+    arrives, so the count the reference rule derives is unchanged.
+
+    Every other reference keeps its slot and its value, which is what carries a
+    cell's style across. `formatKey` is None when the table has no format list, and
+    the old slot is then dropped without a replacement.
+    """
+    width = stringValueWidth(record)
+    if len(record.raw) < valueOffset + width:
+        raise WriteError(
+            f"The record for column {record.column + originOffset} is "
+            f"{len(record.raw)} bytes, too short to hold the value it declares."
+        )
+    toText = typeByte == stringTypeByte
+    leaving = numberFormatSlot if toText else textFormatSlot
+    arriving = textFormatSlot if toText else numberFormatSlot
+
+    slots = referenceSlots(record.raw)
+    carried = {
+        slot: reference
+        for slot, reference in zip(slots, record.references, strict=True)
+        if slot not in (leaving, controlSlot)
+    }
+    if formatKey is not None:
+        carried[arriving] = formatKey
+        # The cell now displays as its new kind, so what it displays WITH follows.
+        if effectiveFormatSlot in carried:
+            carried[effectiveFormatSlot] = formatKey
+
+    header = bytearray(record.raw[:valueOffset])
+    header[typeByteOffset] = typeByte
+    kind = stringValueKind if toText else numberValueKind
+    header[valueKindOffset] = (header[valueKindOffset] & ~valueKindMask) | kind
+    for at, bit in (leaving, arriving, controlSlot):
+        header[at] &= ~bit
+    for at, bit in carried:
+        header[at] |= bit
+
+    tail = b"".join(
+        carried[slot].to_bytes(referenceWidth, "little")
+        for slot in slotOrder if slot in carried
+    )
+    return bytes(header) + value + tail
+
+
 def rowsNeedingStorage(
     table: Table, firstRow: int, tileSize: int, present: frozenset[int]
 ) -> list[int]:
@@ -145,7 +510,7 @@ def rowsNeedingStorage(
     wanted = set()
     for reference, cell in table.cells.items():
         row = reference.row - originOffset
-        if cell.formula is None or row in present:
+        if (cell.formula is None and cell.value is None) or row in present:
             continue
         if firstRow <= row < firstRow + tileSize:
             wanted.add(row)
@@ -306,6 +671,22 @@ def applyTableEdits(
     strings = readStringTable(index, store)
     richText = readRichTextTable(index, store)
     pool = formulaPoolFor(index, store)
+    textPool = stringPoolFor(index, store)
+    # Resolved ONCE, because resolving parses afresh and a second copy would take
+    # the edits with it. Touched only when a retype actually asks for a format.
+    formatList = (
+        index.resolve(store.format_table, tst.TableDataList)
+        if store.format_table.identifier else None
+    )
+    formatKeys: dict[int, int] = {}
+
+    def formatFor(formatType: int) -> int | None:
+        """Return the key naming a format of this kind, caching the lookup."""
+        if formatList is None:
+            return None
+        if formatType not in formatKeys:
+            formatKeys[formatType] = formatKeyFor(formatList, formatType)
+        return formatKeys[formatType]
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
@@ -388,7 +769,9 @@ def applyTableEdits(
                 # refuses here rather than being masked by the formula edit below.
                 # Attaching a formula is a different act and is allowed.
                 if valueChanged:
-                    patched = patchRecord(record, checkedValue(cell, record))
+                    patched = writtenRecord(
+                        cell, record, textPool, formatFor=formatFor
+                    )
                 if pool is not None and edit != "none":
                     patched = applyFormulaEdit(edit, patched, record, cell, pool)
                     if edit == "attach":
@@ -413,12 +796,33 @@ def applyTableEdits(
                     cell = table.cells.get(
                         CellReference(row + originOffset, column + originOffset)
                     )
-                    if cell is None or cell.formula is None:
+                    if cell is None:
                         continue
-                    replacements[column] = buildFormulaRecord(
-                        pool.keyFor(cell.formula)
+                    if cell.formula is not None:
+                        replacements[column] = buildFormulaRecord(
+                            pool.keyFor(cell.formula)
+                        )
+                        formulaAdded.append((row, column))
+                        continue
+                    if cell.value is None:
+                        continue
+                    # A value needs a record shaped like one this table already
+                    # holds, since its trailing references are keys into the
+                    # table's own lists rather than anything derivable.
+                    wanted = (
+                        stringTypeByte if isinstance(cell.value, str)
+                        else numericTypeBytes[0]
                     )
-                    formulaAdded.append((row, column))
+                    shape = templateRecord(index, store, wanted)
+                    if shape is None:
+                        raise WriteError(
+                            f"{cell.reference} needs a record this table has no "
+                            f"example of: nothing in {table.name!r} holds a value "
+                            f"of type {wanted} to take the references from."
+                        )
+                    replacements[column] = writtenRecord(
+                        cell, shape, textPool, borrowed=True, formatFor=formatFor
+                    )
             dropped = removals & present
             if not replacements and not dropped:
                 continue
@@ -447,6 +851,18 @@ def applyTableEdits(
             owners[archive.identifier].messageReplace(
                 archive.identifier, 0, tile.SerializeToString()
             )
+
+    if formatList is not None and formatKeys:
+        formatId = store.format_table.identifier
+        owners[formatId].messageReplace(
+            formatId, 0, formatList.SerializeToString()
+        )
+
+    if textPool is not None and textPool.touched:
+        textId = store.stringTable.identifier
+        owners[textId].messageReplace(
+            textId, 0, textPool.dataList.SerializeToString()
+        )
 
     if pool is not None and pool.touched:
         poolId = store.formula_table.identifier
