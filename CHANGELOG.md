@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-78] Fix an edit into a row the table does not store being lost
 - [hotfix] Name the four gates CONTRIBUTING claims
 - [hotfix] Print a ticket title rich would otherwise eat
 - [hotfix] Keep a bold label on its own line on the way to GitHub
