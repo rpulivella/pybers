@@ -504,6 +504,40 @@ def testAHyphenatedTableNameIsStillGuessedWholeWhenNoNamesAreSupplied() -> None:
     assert [token.qualifier for token in qualified] == ["Table 1-1::"]
 
 
+def testAnOperatorInAnUnknownTableNameIsReadAsArithmetic() -> None:
+    """The widening the #67 tokenizer fix brings, locked deliberately.
+
+    `Ledger-Two::A1` against a document holding `Two` and no `Ledger-Two` was
+    refused before and is now arithmetic against `Two`, which is the only reading
+    the document supports. Locked here so a later narrowing is a decision rather
+    than an accident.
+
+    `LEDGER` becomes a column reference far outside any table, which it does on
+    `develop` as well for `=Ledger` alone, so it is not this change's doing and is
+    deliberately not asserted here.
+    """
+    document = pybers.open(fixturePath("20-formula-shapes"))
+    document.sheet("Sheet 2").table("Table 1").name = "Two"
+    names = document.tableIdentities
+
+    formula = parseFormula("=Ledger-Two::A1", "B5", tables=names)
+
+    assert renderFormula(formula, "B5", tables=names) == "=LEDGER-Two::A1"
+    assert any(reference.crossTable for reference in formula.references)
+
+
+def testAnOperatorInAUnresolvableTableNameIsStillRefused() -> None:
+    """Nothing resolves, so nothing is written, which is the part that matters.
+
+    The message names the fragment the scan reached last rather than the whole
+    prefix typed. Recorded because it is a real cost of the fix, and because a
+    refusal is what keeps a wrong reference out of the file.
+    """
+    document = pybers.open(fixturePath("20-formula-shapes"))
+    with pytest.raises(FormulaSyntaxError, match="not a table this document"):
+        parseFormula("=Ledger-Nope::A1", "B5", tables=document.tableIdentities)
+
+
 def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
     """A name naming no table would otherwise be written as a reference to nothing."""
     document = pybers.open(fixturePath("20-formula-shapes"))
