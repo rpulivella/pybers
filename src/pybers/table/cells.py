@@ -2,8 +2,8 @@
 """A table's grid, the cells in it, and the regions merged across it.
 
 Addressing lives in `pybers.addressing`. Nothing
-here takes a bare row and column pair, so the only way to name a cell is with an
-address that has already been validated.
+here takes a bare row and column pair: a cell is named by an address, or by `row=`
+and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
 2026-09-08  A cell reads and writes its formula as text, and knows the table
@@ -89,6 +89,33 @@ CellValue = (
     | datetime.timedelta
     | None
 )
+
+
+def toCellReferenceNamed(
+    address: CellAddress | None, row: int | None, col: int | None
+) -> CellReference:
+    """Return the cell an address names, or the one `row=` and `col=` name together.
+
+    Refuses both forms at once and a lone axis. A `bool` is refused as a coordinate
+    because Python counts `True` as 1, which no caller writing `row=True` meant.
+    """
+    if address is not None:
+        if row is not None or col is not None:
+            raise ReferenceError(
+                f"A cell is named by {address} or by row and col, and both were given."
+            )
+        return toCellReference(address)
+    if (
+        isinstance(row, int)
+        and isinstance(col, int)
+        and not isinstance(row, bool)
+        and not isinstance(col, bool)
+    ):
+        return CellReference(row, col)
+    raise ReferenceError(
+        "A cell is named by an address such as 'E3', or by row= and col= together "
+        f"as numbers, and was given row={row!r}, col={col!r}."
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,8 +257,14 @@ class Table:
         default=None, repr=False, compare=False, kw_only=True
     )
 
-    def cell(self, address: CellAddress) -> Cell:
-        """Return the cell at an address, creating an empty one on first access.
+    def cell(
+        self,
+        address: CellAddress | None = None,
+        *,
+        row: int | None = None,
+        col: int | None = None,
+    ) -> Cell:
+        """Return the cell at an address or at `row=` and `col=`, creating it if absent.
 
         A cell absent from the file is empty, not missing, so reading one inside
         the grid is never an error. Two addresses raise: one outside the declared
@@ -240,7 +273,7 @@ class Table:
         # Unlocked before it is used as a key, because `$A$1` and `A1` compare
         # unequal and are one cell. Without this the same cell files itself under
         # four spellings and a write through one is invisible to the other three.
-        key = toCellReference(address).asUnlocked()
+        key = toCellReferenceNamed(address, row, col).asUnlocked()
         extent = self.extent
         if extent is None or not extent.covers(key):
             raise ReferenceError(

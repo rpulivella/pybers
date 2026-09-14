@@ -238,11 +238,13 @@ def test_aListKeepsAnOrderThatIsNotSorted() -> None:
 
 def test_aTableTakesAnAddressAndNotARowAndColumnPair() -> None:
     """The retired path is gone rather than deprecated: `cellAt` does not exist,
-    and `cell` takes one address, so a bare pair is a type error at the call site
-    before it is anything at runtime."""
+    and `cell` takes one address or its axes by name (PYB-62), so a bare pair is a
+    type error at the call site before it is anything at runtime."""
     assert not hasattr(Table, "cellAt")
-    parameters = list(inspect.signature(Table.cell).parameters)
-    assert parameters == ["self", "address"]
+    parameters = inspect.signature(Table.cell).parameters
+    assert list(parameters) == ["self", "address", "row", "col"]
+    assert parameters["row"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameters["col"].kind is inspect.Parameter.KEYWORD_ONLY
 
 
 def test_aTableAcceptsBothFormsOfAnAddress() -> None:
