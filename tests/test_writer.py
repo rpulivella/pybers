@@ -62,6 +62,7 @@ from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
 from pybers.table._read import readMerges
+from pybers.table._write import referenceSlots
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -1186,12 +1187,34 @@ def test_changingOneCellSharingAnEntryLeavesTheOtherAlone(tmp_path: Path) -> Non
     assert reopened.cell("B1").value == "shared", "the cell that did not change"
 
 
-def test_aTypeChangeKeepsEveryTrailingReference(tmp_path: Path) -> None:
+def test_aTypeChangeMovesTheFormatIntoTheSlotItsKindUses(tmp_path: Path) -> None:
     """AC 5, asserted on the bytes rather than on what reads back.
 
-    `F1` is a star rating, so its references describe a control. The count follows
-    from `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, and keeping
-    the references keeps the count, which is why bytes 9 and 10 are never rewritten.
+    A format reference sits in the slot its kind uses, so a cell becoming text moves
+    its format out of byte 9's `0x20` and into byte 10's `0x02`, naming a text format
+    rather than the number format it displayed with. One bit leaves and one arrives,
+    so the count the reference rule derives is unchanged. See findings-01-values.md.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = recordAt(working, "A1")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = "now text"
+    document.save()
+    after = recordAt(working, "A1")
+
+    assert after.typeByte == 3, "the cell became text"
+    assert after.raw[8] & 0x0F == 0x08, "byte 8's low nibble names a pooled key"
+    assert before.raw[9] & 0x20 and not after.raw[9] & 0x20, "the number slot cleared"
+    assert not before.raw[10] & 0x02 and after.raw[10] & 0x02, "the text slot set"
+    assert len(after.references) == len(before.references), "the count is unchanged"
+
+
+def test_aTypeChangeDropsTheControlTheOldValueWoreTypeChange(tmp_path: Path) -> None:
+    """`F1` is a star rating, and a star rating on text renders text as stars.
+
+    Found by the golden on 2026-09-14, which showed the Data Format still reading
+    Star Rating on a cell holding a sentence. A control describes the value it was
+    built for, so it does not survive that value being replaced.
     """
     working = workingCopy("11-value-types-noformats", tmp_path)
     before = recordAt(working, "F1")
@@ -1200,26 +1223,45 @@ def test_aTypeChangeKeepsEveryTrailingReference(tmp_path: Path) -> None:
     document.save()
     after = recordAt(working, "F1")
 
-    assert after.typeByte == 3, "the cell became text"
-    assert after.references == before.references, "every reference survived"
-    assert after.raw[9] == before.raw[9] and after.raw[10] == before.raw[10]
-    assert after.raw[8] & 0xE0 == before.raw[8] & 0xE0, "the attribute bits held"
-    assert after.raw[8] & 0x0F == 0x08, "byte 8's low nibble names a pooled key"
+    assert before.raw[9] & 0x04, "the fixture cell wears a control"
+    assert not after.raw[9] & 0x04, "and the cell that became text does not"
+    assert after.raw[8] & 0xE0 == before.raw[8] & 0xE0, "the style bits held"
 
 
-def test_writingTheFirstTextIntoATableWithNoneIsRefused(tmp_path: Path) -> None:
-    """A new record copies its references from a sibling, and there is none.
+def test_aRecordShapedFromASiblingDoesNotInheritItsControl(tmp_path: Path) -> None:
+    """`J1` had no record and took its shape from `I1`, a pop-up menu.
 
-    Those references are keys into this table's own lists. Measured across the 41
-    tables holding a plain string record, they never vary inside a table and do
-    differ between tables, so there is nothing to derive them from.
+    The golden showed `J1` offering `I1`'s three menu items while holding a
+    sentence. A shape is borrowed; a control is not.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("J1").value = "into an empty cell"
+    document.save()
+
+    assert not recordAt(working, "J1").raw[9] & 0x04, "no control was inherited"
+    assert recordAt(working, "I1").raw[9] & 0x04, "and the sibling kept its own"
+
+
+@pytest.mark.parametrize("address", ["B1", "A3", "E10"])
+def test_theFirstTextInATableOfNumbersIsWritten(
+    address: str, tmp_path: Path
+) -> None:
+    """`Table 2` holds one number and no text, so there is no string record to copy.
+
+    A number record shapes it instead and the type change carries the references
+    across, which is the conversion AC 2 already performs. `A3` and `E10` also sit
+    in rows the file stores nothing for, so this crosses PYB-78's path as well.
     """
     working = workingCopy("20-formula-shapes", tmp_path)
     document = pybers.open(working)
-    document.sheet("Sheet 1").table("Table 2").cell("B1").value = "first text"
+    table = document.sheet("Sheet 1").table("Table 2")
+    table.cell(address).value = "first text in this table"
+    document.save()
 
-    with pytest.raises(WriteError, match="no example of"):
-        document.save()
+    reopened = pybers.open(working).sheet("Sheet 1").table("Table 2")
+    assert reopened.cell(address).value == "first text in this table"
+    assert reopened.cell("A1").value == Decimal("42"), "the shape's own cell"
 
 
 def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
@@ -1241,3 +1283,23 @@ def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
     reopened = pybers.open(working).sheets[0].tables[0]
     assert reopened.cell("J1").value == "into an empty cell"
     assert reopened.cell("I1").value == before, "the cell the shape came from"
+
+
+def test_aTypeChangeMovesTheFormatTheCellDisplaysWith(tmp_path: Path) -> None:
+    """Byte 9 `0x10` is the format in effect, and it follows the new kind.
+
+    Named on 2026-09-14 from the golden. Two text cells with identical slots read
+    differently in the inspector, Text where this slot named the text format and
+    Automatic where it still named the number format the cell had been.
+    """
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = "now text"
+    document.save()
+
+    record = recordAt(working, "A1")
+    slots = referenceSlots(record.raw)
+    keys = dict(zip(slots, record.references, strict=True))
+    assert keys[(9, 0x10)] == keys[(10, 0x02)], (
+        "the format in effect is the text format the kind slot names"
+    )

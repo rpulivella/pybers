@@ -157,11 +157,30 @@ The format types themselves: `256` number, `257` currency, `258` percent, `260` 
 `261` date, `263` checkbox, `267` star rating, `268` duration. A text format entry
 carries nothing but its `format_type`, so one can be created where a table has none.
 
-**Byte 9 bit `0x10` is set on nearly every record and is not settled.** Its key resolves
-to the number format on 6082 of 6118 number cells and to nothing in `format_table` on
-5311 records, most of them text. Since byte 9 `0x20` is already the number format and a
-plain number puts the same key in both slots, the corpus cannot say what this one is. It
-is the last slot unnamed.
+**Byte 9 bit `0x10` is the format the cell currently displays with**, as against the
+per-kind slots above, which remember one format per kind so that switching a cell back
+restores what it had. Named on 2026-09-14 by a golden rather than by the corpus, which
+could not separate it: two text cells with identical slots read differently in Numbers,
+`Text` where this named the text format and `Automatic` where it still named the number
+format the cell had been. A plain number puts the same key in this slot and in byte 9
+`0x20`, which is why counting alone never told them apart.
+
+**Byte 6 bit `0x80` marks a format a person chose** rather than one Numbers decided.
+4515 text records leave it clear against 108 that set it, and the Data Format inspector
+reads `Automatic` without it and `Text` with it. Typing text into Numbers leaves it
+clear, which is why writing a string leaves it clear here.
+
+Setting it is a deliberate act with one purpose: forcing a number to render as text, or
+stopping a formula from evaluating so its own text shows. That is a capability of its
+own rather than a side effect of writing a string, and nothing in this library offers it
+yet.
+
+**Byte 9 bit `0x04` is the control a cell presents as**, a `control_cell_spec_table` key.
+`11-value-types-noformats` settles it: its checkbox, star rating, slider, stepper and
+pop-up menu carry keys 1 to 5 in the order that table lists them, and every plain cell
+carries no such slot. A control describes the value it was built for, so it does not
+survive that value being replaced. Leaving one in place makes Numbers render a sentence
+as a star rating.
 
 ### What this settles for writing
 
