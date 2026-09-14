@@ -129,17 +129,46 @@ record, whose four-byte payload key the low nibble does not describe. Counting i
 reference misses exactly the five rich-text shapes and over-counts each by one, which is
 why the `0xE0` mask `findings-09` uses for the formula key slot is correct here as well.
 
-### What the references are is still not established
+### Which list each reference-bearing bit points into
 
-The count is now exact and the meanings are not. `findings-09` identifies only what
-`0x80` contributes. Naming the rest takes a fixture built to separate the per-table lists,
-since a key of 5 is a plausible entry in more than one of them at once.
+Measured for PYB-61 across the corpus, counting only records where no two slots hold the
+same key, since a small key is a plausible entry in several lists at once and would
+otherwise agree with all of them.
 
-**Within one table the plainest string record's references never vary**, measured across
-the 41 tables holding one: the pair is `(5, 1)` or `(5, 3)` depending on the table and
-identical everywhere inside it. So a record created for a cell that had none can take its
-references from a sibling of the same type rather than deriving them, which is how
-PYB-78 shaped a new tile row.
+| bit | list | agreement |
+| --- | --- | --- |
+| byte 8 `0x20` | `styleTable` | 349 of 349 |
+| byte 8 `0x40` | `styleTable` | 395 of 395 |
+| byte 9 `0x02` | `formula_table` | 63 of 63 |
+| byte 9 `0x20` | `format_table` | 4064 of 4064 |
+| byte 9 `0x40` | `format_table` | 33 of 33 |
+| byte 9 `0x80` | `format_table` | 19 of 19 |
+| byte 10 `0x02` | `format_table` | 5033 of 5033 |
+
+Byte 9's `0x02` agreeing with `formula_table` is the same bit
+[findings-09-cell-records.md](findings-09-cell-records.md) identified as the formula
+flag, arrived at from the other direction.
+
+**Byte 9 bit `0x10` is set on almost every record and is not settled.** Read as a
+`format_table` key it names the format the cell's own type would use: 6082 of 6118
+numbers name `256`, 9 of 10 dates name `261`, 12 of 13 durations name `261`, 8 of 9
+currency cells name `257`. For a string it usually names nothing in that list, 113 of
+5371, so the bit either carries something else for text or a text cell's format sits in
+byte 10's `0x02` instead. Both readings fit and the corpus does not separate them.
+
+**Telling the format-bearing bits apart also needs a fixture built for it.** A plain
+number sets byte 9 `0x10` and `0x20` and carries the same key in both slots, so nothing
+here says whether one of them is the format and the other is something that happens to
+share its key.
+
+### What this settles for writing
+
+A record whose type changes keeps its references and therefore keeps the count, so bytes
+9 and 10 are never rewritten and the slots keep their meanings. What that leaves is a
+text cell naming the format its number had, which Numbers accepts: confirmed in Numbers
+15.3.1 on 2026-09-14, where a cell converted from a number displays as text with a Data
+Format of Automatic, and one converted from a star-rating control displays as plain text
+with no control.
 
 ## Currency is a distinct cell type, but not a distinct value encoding
 
