@@ -21,6 +21,7 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-09-14  The package metadata, which registers a created archive, for PYB-63.
 2026-09-02  The three TSCE types the write path needs to request a recalculation,
             for #25.
 2026-08-31  Written for the document read path: root, sheets, tables, tiles,
@@ -40,6 +41,7 @@ from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSCEArchives_pb2 as tsce
+from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
@@ -67,6 +69,7 @@ archiveTypes: dict[int, type[Message]] = {
     6004: tst.CellStyleArchive,     # a cell's resolved appearance
     6005: tst.TableDataList,        # the pooled strings, styles and formulas
     6218: tst.RichTextPayloadArchive,
+    11006: tspArchive.PackageMetadata,  # every component and its external references
 }
 
 

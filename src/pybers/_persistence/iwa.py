@@ -26,6 +26,7 @@ archives. Those two paths are chosen by `IWAFile.modified`, which only
 as though it had never happened.
 
 UPDATES
+2026-09-14  An archive can be created and added to a member, for PYB-63.
 2026-08-16  Written. Verified against empty-1/2/3.numbers: every archive stream
             ends exactly on the final byte of its payload.
 2026-09-01  Added the write path for #2: archive stream, framing, and the
@@ -148,6 +149,47 @@ class IWAFile:
             return
         raise IWAError(f"{self.name} holds no archive with identifier {identifier}.")
 
+    def archiveAdd(self, archive: Archive) -> None:
+        """Append an archive this member did not hold, and mark the member rewritten.
+
+        Appended rather than placed, because Numbers itself appends: an inserted
+        table's archives follow every existing one in `CalculationEngine.iwa`.
+        """
+        if any(held.identifier == archive.identifier for held in self.archives):
+            raise IWAError(
+                f"{self.name} already holds archive {archive.identifier}, and two "
+                "archives cannot share an identifier."
+            )
+        self.archives.append(archive)
+        self.modified = True
+
+
+def archiveCreate(
+    info: archiveMessages.ArchiveInfo, bodies: list[bytes]
+) -> Archive:
+    """Return a new archive from its `ArchiveInfo` and one body per message.
+
+    The info comes from the caller whole, because its field infos and object
+    references record which references are weak, and no schema says so.
+    """
+    if len(info.message_infos) != len(bodies):
+        raise IWAError(
+            f"Archive {info.identifier} declares {len(info.message_infos)} messages "
+            f"and was given {len(bodies)} bodies."
+        )
+    for declared, body in zip(info.message_infos, bodies, strict=True):
+        declared.length = len(body)
+    return Archive(
+        identifier=info.identifier,
+        messages=tuple(
+            ArchiveMessage(
+                typeId=declared.type, version=tuple(declared.version), data=body
+            )
+            for declared, body in zip(info.message_infos, bodies, strict=True)
+        ),
+        infoBytes=info.SerializeToString(),
+    )
+
 
 def splitFrames(data: bytes) -> list[bytes]:
     """Split an IWA member into its raw compressed frames.
@@ -264,7 +306,8 @@ def writeArchiveInfo(archive: Archive) -> bytes:
     if not archive.infoBytes:
         raise IWAError(
             f"Archive {archive.identifier} carries no ArchiveInfo, so it cannot be "
-            "written back. Only an archive that was read from a file can be."
+            "written. Only an archive read from a file or built by `archiveCreate` "
+            "carries one."
         )
     info = archiveMessages.ArchiveInfo()
     info.ParseFromString(archive.infoBytes)
@@ -335,8 +378,7 @@ def writeIWAFile(iwaFile: IWAFile) -> bytes:
         if not iwaFile.originalBytes:
             raise IWAError(
                 f"{iwaFile.name} has neither original bytes nor any recorded edit, "
-                "so there is nothing to write. A member built from scratch is not "
-                "supported yet."
+                "so there is nothing to write."
             )
         return iwaFile.originalBytes
     return compressPayload(writeArchives(iwaFile.archives))

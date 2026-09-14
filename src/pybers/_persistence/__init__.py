@@ -17,6 +17,7 @@ them owns. `types` is that source of truth, and parsing an archive is the one
 thing it does, which keeps the boundary a module apart rather than absent.
 
 UPDATES
+2026-09-14  `metadata`, the registry a created archive is placed through, for PYB-63.
 2026-09-08  Renamed from `pybers.numbersfile` and made private, for #58.
 2026-08-31  Added `types`, and corrected this docstring, which claimed the whole
             layer parses nothing. That was true until `types` arrived and would
@@ -59,6 +60,7 @@ from .iwa import (
     ArchiveMessage,
     IWAError,
     IWAFile,
+    archiveCreate,
     compressPayload,
     decompressPayload,
     readArchives,
@@ -68,11 +70,16 @@ from .iwa import (
     writeArchives,
     writeIWAFile,
 )
+from .metadata import MetadataError, PackageRegistry, memberNameFor
 from .varint import VarintError, readVarint, writeVarint
 
 __all__ = [
     "carriesFormula",
     "Archive",
+    "archiveCreate",
+    "MetadataError",
+    "PackageRegistry",
+    "memberNameFor",
     "ArchiveMessage",
     "CellDecodeError",
     "CellRecord",
