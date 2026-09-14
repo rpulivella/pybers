@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [hotfix] Move the review rubric out of .github
 - [PYB-61] Write text into a cell, and change what a cell holds
 - [PYB-78] Fix an edit into a row the table does not store being lost
 - [hotfix] Name the four gates CONTRIBUTING claims
