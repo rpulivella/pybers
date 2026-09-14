@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-67] Render node type 25, Apple's list node, as formula text
 - [PYB-74] Fix an indented code block reaching GitHub as prose
 - [PYB-72] Report every change made to a body on its way to GitHub
 - [PYB-70] Comment on a ticket or a pull request from the command line
