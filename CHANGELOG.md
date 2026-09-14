@@ -6,6 +6,10 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [hotfix] Name the four gates CONTRIBUTING claims
+- [hotfix] Print a ticket title rich would otherwise eat
+- [hotfix] Keep a bold label on its own line on the way to GitHub
+- [hotfix] Check the prose in .github and tools
 - [PYB-67] Render node type 25, Apple's list node, as formula text
 - [PYB-74] Fix an indented code block reaching GitHub as prose
 - [PYB-72] Report every change made to a body on its way to GitHub
