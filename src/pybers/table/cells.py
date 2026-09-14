@@ -102,12 +102,19 @@ class MergeRange:
     extent: CellRange
 
     def __post_init__(self) -> None:
-        """Reject an unbounded extent, which no merged region can have."""
-        if self.extent.rowsUnbounded or self.extent.colsUnbounded:
+        """Reject an unbounded extent, and drop the locking markers of a bounded one."""
+        extent = self.extent
+        if extent.rowsUnbounded or extent.colsUnbounded:
             raise ReferenceError(
-                f"A merge covers a fixed block of cells, and {self.extent} is "
-                "unbounded."
+                f"A merge covers a fixed block of cells, and {extent} is unbounded."
             )
+        # `$A$1:B2` kept its markers, so its anchor never equaled the unlocked key
+        # `Table.cell` files under, and merging discarded the anchor's own value.
+        object.__setattr__(
+            self,
+            "extent",
+            CellRange(extent.startRow, extent.startCol, extent.endRow, extent.endCol),
+        )
 
     @property
     def anchor(self) -> CellReference:
