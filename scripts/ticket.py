@@ -38,7 +38,8 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
-2026-09-14  A bold label keeps its own line, found on PR #77.
+2026-09-14  A bold label keeps its own line, and a title carrying square
+            brackets prints as filed rather than being eaten by rich.
 2026-08-27  Set projectNumber to the real board (3), and corrected the 404 story, which
             had been carried in from an early revision of the upstream notes and was
             wrong. A later revision corrected it and the upstream tooling carries that
@@ -1150,10 +1151,10 @@ def cmdStart(arguments: argparse.Namespace) -> int:
 
     console.print(
         f"[green]Started[/] [bold cyan]{ticketRef(summary['number'])}[/] "
-        f"{summary['title']}"
+        f"{escape(summary['title'])}"
     )
     console.print(
-        f"assigned to [green]{arguments.assignee}[/], "
+        f"assigned to [green]{escape(arguments.assignee)}[/], "
         "Status [cyan]In Progress[/]"
     )
     return 0
@@ -1493,9 +1494,12 @@ def cmdList(arguments: argparse.Namespace) -> int:
         )
     )
     for statusName, number, title, labelText in rows:
+        # Escaped because rich reads square brackets as style tags, so a title
+        # carrying `[hotfix]` printed without the word. `[PYB-99]` survives and
+        # `[hotfix]` does not, so one example never reveals it.
         console.print(
-            f"[cyan]{statusName:<12}[/] [bold]{ticketRef(number):<8}[/] {title}  "
-            f"[magenta]{labelText}[/]"
+            f"[cyan]{statusName:<12}[/] [bold]{ticketRef(number):<8}[/] "
+            f"{escape(title)}  [magenta]{escape(labelText)}[/]"
         )
     return 0
 
