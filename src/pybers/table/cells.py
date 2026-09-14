@@ -139,8 +139,7 @@ class MergeRange:
             raise ReferenceError(
                 f"A merge covers a fixed block of cells, and {extent} is unbounded."
             )
-        # `$A$1:B2` kept its markers, so its anchor never equaled the unlocked key
-        # `Table.cell` files under, and merging discarded the anchor's own value.
+        # A marked anchor never equals the unlocked key `Table.cell` files a cell under.
         object.__setattr__(
             self,
             "extent",
