@@ -10,7 +10,7 @@ pull request out of draft**. `/pr-draft` opens every PR as a draft and forbids a
 state, so draft-versus-ready stays a real signal.
 
 This skill carries **process only**. The laws are in `CLAUDE.md`, and the review mindset
-is in `.github/code-review-rubric.md`. Never restate either here.
+is in `docs/code-review-rubric.md`. Never restate either here.
 
 ## What a review is today
 
@@ -60,7 +60,7 @@ perform yourself, and the report says so rather than implying the machine did it
    git diff develop...HEAD
    python3 scripts/ticket.py show <ticket>
    ```
-5. **Review against the rubric.** Read `.github/code-review-rubric.md` and answer its six
+5. **Review against the rubric.** Read `docs/code-review-rubric.md` and answer its six
    questions for this change, yourself. **The delegation below is suspended pending PYB-12**,
    and is kept because the selection rule it encodes is the part worth preserving, not
    because it should be run. Do not launch these agents without the user asking.

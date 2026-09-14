@@ -47,6 +47,8 @@ A pull request leaves draft when three things are true, and not before:
 
 The board mirrors this: `Code Review` means an open, non-draft pull request. A branch whose tests are still being written stays `In Progress` even though the feature works.
 
+The standard a review is held to is [docs/code-review-rubric.md](docs/code-review-rubric.md), six questions asked of the change rather than of the repository around it.
+
 ## Release tagging
 
 Releases are annotated tags on `develop`. There are no release branches.
