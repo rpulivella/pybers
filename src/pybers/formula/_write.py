@@ -16,6 +16,8 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-09-11  A bracket is written back as the list node it was read from,
+            for #67.
 2026-09-08  Split out of `pybers.document._write` for #45, unchanged.
 """
 from __future__ import annotations
@@ -53,6 +55,7 @@ from .nodes import (
     Formula,
     FormulaBinding,
     FormulaFunctionCall,
+    FormulaGroup,
     FormulaLambda,
     FormulaNode,
     FormulaRange,
@@ -139,6 +142,8 @@ def encodeFormulaNode(
     elif isinstance(content, FormulaFunctionCall):
         archive.AST_function_node_index = content.index
         archive.AST_function_node_numArgs = content.argumentCount
+    elif isinstance(content, FormulaGroup):
+        archive.AST_list_node_numArgs = content.argumentCount
     elif isinstance(content, FormulaUnknownCall):
         archive.AST_unknown_function_node_string = content.name
         archive.AST_unknown_function_node_numArgs = content.argumentCount

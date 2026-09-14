@@ -11,6 +11,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-09-13  A range endpoint past the last row is refused, for #67.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
 2026-09-01  Written for #9.
 """
@@ -38,6 +39,8 @@ from pybers.addressing.reference import (
     columnNumber,
     firstColumn,
     firstRow,
+    lastColumn,
+    lastRow,
     markerFor,
     toCellReference,
 )
@@ -105,6 +108,11 @@ def parseEndpoint(text: str, whole: str) -> RangeEndpoint:
         raise ReferenceError(
             f"{whole!r} names row {endpoint.row}, and rows count from {firstRow}."
         )
+    if endpoint.row is not None and endpoint.row > lastRow:
+        raise ReferenceError(
+            f"{whole!r} names row {endpoint.row}, past row {lastRow}, "
+            "which is the last row a Numbers table can hold."
+        )
     return endpoint
 
 
@@ -147,10 +155,15 @@ class CellRange:
     endColAbsolute: bool = field(default=False, kw_only=True)
 
     def __post_init__(self) -> None:
-        """Reject a rectangle that is half-unbounded, inverted, or below one."""
-        for axis, origin, low, high in (
-            ("Row", firstRow, self.startRow, self.endRow),
-            ("Column", firstColumn, self.startCol, self.endCol),
+        """Reject a rectangle half-unbounded, inverted, or off either end.
+
+        The far end is checked here as well as in `parseEndpoint`, because
+        `fromAxes` builds a range without going through the text, which is the
+        path `FormulaRange.resolve` takes.
+        """
+        for axis, origin, limit, low, high in (
+            ("Row", firstRow, lastRow, self.startRow, self.endRow),
+            ("Column", firstColumn, lastColumn, self.startCol, self.endCol),
         ):
             if (low is None) != (high is None):
                 raise ReferenceError(
@@ -163,6 +176,11 @@ class CellRange:
                 raise ReferenceError(
                     f"{axis} {low} is before {axis.lower()} {origin}, which is "
                     "where a table starts."
+                )
+            if high > limit:
+                raise ReferenceError(
+                    f"{axis} {high} is past {axis.lower()} {limit}, which is where "
+                    "a table ends."
                 )
             if low > high:
                 raise ReferenceError(f"{axis} bounds run backward, {low} to {high}.")

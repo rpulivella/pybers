@@ -21,6 +21,7 @@ the first of the four functions that evaluate lazily, and a person types none of
 that. See `thunkingFunctionIndices`.
 
 UPDATES
+2026-09-11  A bracket becomes the node Numbers stores for one, for #67.
 2026-09-08  Written for #45.
 """
 from __future__ import annotations
@@ -49,6 +50,7 @@ from pybers.formula.nodes import (
     Formula,
     FormulaBinding,
     FormulaFunctionCall,
+    FormulaGroup,
     FormulaLambda,
     FormulaNode,
     FormulaReference,
@@ -68,6 +70,7 @@ from pybers.formula.nodes import (
     functionNodeType,
     lambdaNodeType,
     letBindNodeType,
+    listNodeType,
     multiplicationNodeType,
     numberNodeType,
     percentNodeType,
@@ -261,6 +264,9 @@ class Parser:
             self.parseExpression()
             if self.accept("close") is None:
                 raise self.fail("This bracket is opened and never closed.", token)
+            # Recorded rather than discarded, because Numbers records it: a bracket
+            # precedence does not need survives a round trip through Numbers itself.
+            self.emit(listNodeType, FormulaGroup())
             return
         if token.kind in ("name", "address"):
             self.parseNamed(token)

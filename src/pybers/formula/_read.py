@@ -16,6 +16,7 @@ error, which is why each is handled here and not left to a caller:
   ordinary numbers they name a cell far outside the table and raise nothing.
 
 UPDATES
+2026-09-11  The list node's one field is read, for #67.
 2026-09-10  A key the pool does not hold is refused rather than read as no
             formula at all, for #65, because a save then removed it.
 2026-09-08  Split out of `pybers.document._read` for #45, unchanged.
@@ -51,6 +52,7 @@ from .nodes import (
     Formula,
     FormulaBinding,
     FormulaFunctionCall,
+    FormulaGroup,
     FormulaLambda,
     FormulaNode,
     FormulaRange,
@@ -65,6 +67,7 @@ from .nodes import (
     functionNodeType,
     lambdaNodeType,
     letBindNodeType,
+    listNodeType,
     numberNodeType,
     rangeNodeType,
     referenceNodeType,
@@ -235,6 +238,8 @@ def readFormulaNode(
             name=node.AST_unknown_function_node_string,
             argumentCount=node.AST_unknown_function_node_numArgs,
         )
+    elif kind == listNodeType:
+        content = FormulaGroup(argumentCount=node.AST_list_node_numArgs)
     elif kind in (referenceNodeType, brokenReferenceNodeType):
         content = readFormulaReference(node)
     elif kind == rangeNodeType:

@@ -11,6 +11,7 @@ Node arrays are asserted as `(nodeType, content)` pairs, because `FormulaNode`
 excludes its archive bytes from equality and a parsed node has none to carry.
 
 UPDATES
+2026-09-11  Brackets, which are a node rather than a derivation, for #67.
 2026-09-08  Written for #45.
 """
 from __future__ import annotations
@@ -36,6 +37,8 @@ from pybers import (
     CellReference,
     Formula,
     FormulaFunctionCall,
+    FormulaGroup,
+    FormulaNode,
     FormulaSyntaxError,
     FormulaUnknownCall,
     parseFormula,
@@ -47,9 +50,11 @@ from pybers.formula.nodes import (
     additionNodeType,
     appendWhitespaceNodeType,
     beginThunkNodeType,
+    divisionNodeType,
     endThunkNodeType,
     functionNodeType,
     greaterThanNodeType,
+    listNodeType,
     numberNodeType,
     prependWhitespaceNodeType,
     rangeNodeType,
@@ -261,9 +266,9 @@ def testTheOperatorTableIsTheOneNumbersDeclares() -> None:
     ("text", "expected"),
     [
         ("=1+2*3", "1 2 3 * +"),
-        ("=(1+2)*3", "1 2 + 3 *"),
+        ("=(1+2)*3", "1 2 + () 3 *"),
         ("=1-2-3", "1 2 - 3 -"),
-        ("=1-(2-3)", "1 2 3 - -"),
+        ("=1-(2-3)", "1 2 3 - () -"),
         ("=2^3^2", "2 3 2 ^ ^"),
         ("=-2^2", "2 2 ^ neg"),
         ("=1&2=3", "1 2 & 3 ="),
@@ -275,11 +280,12 @@ def testPrecedenceFollowsNumbersRatherThanTheOrderWritten(
 ) -> None:
     """Arithmetic binds tighter than comparison, and brackets override both.
 
-    Written as the postfix the file holds, since that IS the tree: `1+2*3` and
-    `(1+2)*3` differ in node order and in nothing else.
+    Written as the postfix the file holds, since that IS the tree. A bracket is
+    a node of its own, so `1+2*3` and `(1+2)*3` differ in node order and in one
+    node, which is how Numbers itself stores the pair.
     """
     symbols = {1: "+", 2: "-", 3: "*", 4: "/", 5: "^", 6: "&", 11: "=", 9: "<",
-               13: "neg"}
+               13: "neg", 25: "()"}
     produced = " ".join(
         symbols.get(node.nodeType, str(node.content))
         for node in parseFormula(text, "A1")
@@ -447,6 +453,74 @@ def testATableNameWithOuterSpacesIsRefusedRatherThanMisread() -> None:
         parseFormula("=  padded  ::A1", "G11", tables=document.tableIdentities)
 
 
+@pytest.mark.parametrize(
+    ("text", "label"),
+    [
+        ("=1-Table 2::A1", "a number before it"),
+        ("=$A$1-Table 2::A1", "an anchored reference before it"),
+        ("=2*Table 2::A1", "a multiplication before it"),
+        ("=Table 2::A1&Table 2::A1", "one on each side of a concatenation"),
+    ],
+)
+def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
+    text: str, label: str
+) -> None:
+    """The qualifier pattern stops at a comma, a bracket or a quote and nothing else.
+
+    So `1-Table 2::A1` read as a table called `1-Table 2`, and 1469 formulas in one
+    real document failed to reparse on it. Found while measuring #67.
+    """
+    document = pybers.open(fixturePath("20-formula-shapes"))
+    formula = parseFormula(text, "A1", tables=document.tableIdentities)
+
+    assert any(
+        reference.crossTable for reference in formula.references
+    ), label
+
+
+def testAHyphenatedTableNameStillResolvesWhenTheDocumentNamesIt() -> None:
+    """The names are authoritative, so one carrying an operator is matched literally."""
+    document = pybers.open(fixturePath("20-formula-shapes"))
+    document.sheet("Sheet 2").table("Table 1").name = "Table 1-1"
+
+    formula = parseFormula(
+        "=Table 1-1::A1", "A1", tables=document.tableIdentities
+    )
+
+    assert formula.references[0].crossTable
+
+
+def testAHyphenatedTableNameIsStillGuessedWholeWhenNoNamesAreSupplied() -> None:
+    """A caller with no names keeps the guess, since nothing else can resolve it.
+
+    Asserted against the tokenizer rather than through `parseFormula`, which needs
+    the document's names to turn a prefix into a table identity and refuses without
+    them. The guess is what the refusal is built on.
+    """
+    qualified = [
+        token for token in formulasyntax.tokenize("Table 1-1::A1") if token.qualifier
+    ]
+
+    assert [token.qualifier for token in qualified] == ["Table 1-1::"]
+
+
+@pytest.mark.parametrize("text", ["=Ledger-Two::A1", "=Ledger-Nope::A1"])
+def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> None:
+    """Where the refusal moved to once a guessed table name stopped eating operators.
+
+    `Ledger` is now read on its own rather than as part of a table name, and six
+    letters are a valid base-26 label, so it would have become column 144,936,576.
+    The bound catches it and names the column, which is the thing actually wrong.
+    Both spellings are covered, one where the tail is a real table and one where
+    nothing resolves at all.
+    """
+    document = pybers.open(fixturePath("20-formula-shapes"))
+    document.sheet("Sheet 2").table("Table 1").name = "Two"
+
+    with pytest.raises(FormulaSyntaxError, match="past column 1000"):
+        parseFormula(text, "B5", tables=document.tableIdentities)
+
+
 def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
     """A name naming no table would otherwise be written as a reference to nothing."""
     document = pybers.open(fixturePath("20-formula-shapes"))
@@ -501,9 +575,9 @@ def testTextNestedDeeperThanTheParserGoesIsRefusedRatherThanCrashing() -> None:
 
     Descent spends about eight interpreter frames per level, so text nested a few
     hundred deep exhausts the stack. Sixty levels still parse, which is further
-    than a person nests.
+    than a person nests, and each one stores a bracket node beside the literal.
     """
-    assert len(parseFormula("=" + "(" * 60 + "1" + ")" * 60, "A1")) == 1
+    assert len(parseFormula("=" + "(" * 60 + "1" + ")" * 60, "A1")) == 61
     with pytest.raises(FormulaSyntaxError, match="levels deep"):
         parseFormula("=" + "(" * 400 + "1" + ")" * 400, "A1")
 
@@ -801,3 +875,156 @@ def testAnAuthoredRelativeRangeWritesBitsThatSaySo() -> None:
     bits = stickyBitsFor("=SUM(A1:A10)", "A11")
     assert not bits.begin_column_is_absolute
     assert not bits.end_row_is_absolute
+
+
+# ── PYB-67: Apple's list node is a bracket the author typed ──────────────────
+
+# The node array Numbers itself wrote for `=22+(3/12)`, taken from a real
+# document. Asserted by type rather than described, because it is the evidence
+# that a bracket is stored rather than derived.
+numbersBracketedNodeTypes: tuple[int, ...] = (
+    numberNodeType, numberNodeType, numberNodeType,
+    divisionNodeType, listNodeType, additionNodeType,
+)
+
+
+def testTheListNodeConstantIsTheOneNumbersDeclares() -> None:
+    """Read off Apple's own enum, so a renumbering fails here rather than silently."""
+    declared = tsce.ASTNodeArrayArchive.ASTNodeType.items()
+    assert ("LIST_NODE", listNodeType) in declared
+
+
+def testABracketedSubExpressionRendersWithItsBracket() -> None:
+    """AC 1, against the node array a real document holds for `=22+(3/12)`."""
+    formula = parseFormula("=22+(3/12)", "B3")
+
+    assert tuple(node.nodeType for node in formula) == numbersBracketedNodeTypes
+    assert renderFormula(formula, "B3") == "=22+(3/12)"
+
+
+def testABracketPrecedenceDoesNotNeedIsKeptRatherThanDropped() -> None:
+    """The measurement this ticket turned on: 193 formulas bracket what binds anyway.
+
+    Rendering from the tree alone would write `=22+3/12`, which is the same number
+    and not the formula the author wrote.
+    """
+    stored = Formula(nodes=tuple(
+        FormulaNode(nodeType=kind, content=content) for kind, content in (
+            (numberNodeType, Decimal("22")),
+            (numberNodeType, Decimal("3")),
+            (numberNodeType, Decimal("12")),
+            (divisionNodeType, None),
+            (listNodeType, FormulaGroup()),
+            (additionNodeType, None),
+        )
+    ))
+
+    assert renderFormula(stored, "B3") == "=22+(3/12)"
+
+
+def testABracketTheTreeNeedsIsWrittenWithNoListNodeToRecordIt() -> None:
+    """The one corpus formula needing a bracket that Apple stored none for.
+
+    `F22/(C22/1000)`, whose stored result matches the bracketed reading and not the
+    left-associative one. Rendering from the list nodes alone would write
+    `=F22/C22/1000`, a different number.
+    """
+    stored = parseFormula("=F22/(C22/1000)", "H22")
+    withoutTheNode = Formula(nodes=tuple(
+        node for node in stored if node.nodeType != listNodeType
+    ))
+
+    assert renderFormula(withoutTheNode, "H22") == "=F22/(C22/1000)"
+
+
+def testAListNodeEnclosingMoreThanOneValueIsRefusedRatherThanGuessedAt() -> None:
+    """Every one of the 4364 measured encloses a single value, so a wider one is new."""
+    stored = Formula(nodes=(
+        FormulaNode(nodeType=numberNodeType, content=Decimal("1")),
+        FormulaNode(nodeType=numberNodeType, content=Decimal("2")),
+        FormulaNode(nodeType=listNodeType, content=FormulaGroup(argumentCount=2)),
+    ))
+
+    with pytest.raises(pybers.FormulaError, match="encloses 2 values"):
+        renderFormula(stored, "A1")
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["=22+(3/12)", "=(1+2)*3", "=(5)", "=1-(2-3)", "=(2799+(6899*2)+4500)*1.05",
+     "=$D2*(1-$E2)"],
+)
+def testBracketedTextParsesBackToTheNodesItRenderedFrom(text: str) -> None:
+    """AC 2. Both directions, so a bracket is neither invented nor lost."""
+    formula = parseFormula(text, "B3")
+
+    assert renderFormula(formula, "B3") == text
+    assert shape(parseFormula(renderFormula(formula, "B3"), "B3")) == shape(formula)
+
+
+def testAnEnclosedBracketIsNotBracketedTwice() -> None:
+    """A group renders as an atom, so the operator around it adds no second pair."""
+    assert renderFormula(parseFormula("=((1+2))*3", "A1"), "A1") == "=((1+2))*3"
+
+
+def testAListNodeCarriesItsOwnCountThroughTheArchive() -> None:
+    """The write half: the one field Apple gives the node is the one written back."""
+    from pybers.formula._write import encodeFormulaNode
+
+    archive = encodeFormulaNode(
+        FormulaNode(nodeType=listNodeType, content=FormulaGroup())
+    )
+
+    assert archive.AST_node_type == listNodeType
+    assert archive.AST_list_node_numArgs == 1
+
+
+# ── PYB-67: the golden, which is the only test Numbers itself confirmed ──────
+
+# One bracket per open question: redundant, required by precedence, around an
+# atom (a shape the corpus never shows), and required by associativity alone
+# (the shape Numbers recorded no node for).
+bracketedFormulas: tuple[tuple[str, str], ...] = (
+    ("B1", "=22+(3/12)"),
+    ("C1", "=(1+2)*3"),
+    ("D1", "=(5)"),
+    ("E1", "=1-(2-3)"),
+)
+
+
+def authorBrackets(working: Path) -> None:
+    """Write the golden's four bracketed formulas into `20-formula-shapes`."""
+    document = pybers.open(working)
+    table = document.sheet("Sheet 1").table("Table 2")
+    for address, text in bracketedFormulas:
+        table.cell(address).formulaText = text
+    document.save()
+
+
+def testBracketedFormulasMatchTheirGoldenFile(tmp_path: Path) -> None:
+    """Four brackets written into a real file, against output Numbers accepted.
+
+    See `tests/golden/README.md` for the confirmation state of this file.
+    """
+    golden = goldenDirectory / "20-formula-brackets.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = Path(shutil.copy(fixturePath("20-formula-shapes"),
+                               tmp_path / "20.numbers"))
+    authorBrackets(working)
+    assert dataListBytes(golden) == dataListBytes(working), (
+        "the writer no longer produces the confirmed bracket nodes"
+    )
+
+
+def testTheBracketGoldenHoldsWhatItClaimsTo() -> None:
+    """Guard the guard: an unedited copy in its place would pass silently."""
+    golden = goldenDirectory / "20-formula-brackets.numbers"
+    if not golden.is_file():
+        pytest.skip(f"{golden.name} is not present yet")
+    table = pybers.open(golden).sheet("Sheet 1").table("Table 2")
+    for address, text in bracketedFormulas:
+        assert table.cell(address).formulaText == text
+        formula = table.cell(address).formula
+        assert formula is not None
+        assert any(node.nodeType == listNodeType for node in formula), address

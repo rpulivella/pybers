@@ -1,7 +1,8 @@
 # Formula text
 
 What Numbers displays for a formula it stores as nodes, what typing one back produces, and
-the three node kinds where the two are not inverses. Measured for PYB-45.
+the four node kinds where the two are not inverses. Measured for PYB-45, with the bracket
+node added for PYB-67.
 
 Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 
@@ -98,11 +99,78 @@ The one spelling this cannot read is a name whose own first character is whitesp
 a formula skips the gap between tokens and the two are indistinguishable. Refused by name
 rather than misread, and Numbers has never been seen to keep one.
 
+## Node type 25 is a bracket, and it is the one the author typed
+
+`TSCE.ASTNodeArrayArchive.ASTNodeType` names 25 `LIST_NODE` and gives it one field,
+`AST_list_node_numArgs`. The name describes what the schema permits rather than what
+Numbers writes. Measured for PYB-67 across six real documents, since the 46 fixtures
+carry none at all.
+
+**Every instance encloses exactly one value.** All 4364 serialize to the identical four
+bytes, `08196801`, which is the node type and `numArgs = 1`. A list of one is a bracket.
+None opens a formula, and every one follows an addition, a subtraction, a multiplication
+or a division.
+
+**It is arithmetically a bracket, not decoration.** In one document a cell stores
+`$D2*(1-$E2)` with a type 25 after the subtraction. D2 is 2868.18 and E2 is 0.60, and the
+stored result is 1147.2720, which is the bracketed reading. Without the bracket the same
+nodes give 2867.58.
+
+### It records the bracket, and it does not record every bracket
+
+Counted by distinct formula rather than by cell, because a formula pooled across a dragged
+column would otherwise count many times:
+
+| operand of an operator | carries a type 25 | formulas |
+| --- | --- | --- |
+| binds looser, so the text needs a bracket | yes | 185 |
+| binds looser, so the text needs a bracket | no | 0 |
+| binds at least as tightly, so no bracket is needed | yes | 193 |
+| binds at least as tightly, so no bracket is needed | no | 516 |
+| equal precedence, right of a minus or a divide | no | 1 |
+
+A bracket precedence requires is recorded every time, 185 out of 185. A further 193
+formulas record a bracket nothing requires, which is what preserving what a person typed
+looks like: `22+(3/12)` is stored with its bracket and displayed with it, confirmed in
+Numbers 15.3.1 on 2026-09-11.
+
+**The last row is the exception that shapes the design.** One formula, `F22/(C22/1000)`,
+needs a bracket that no node records. Its stored result is 1233.33 for F22 of 18500 and
+C22 of 15000, which is the bracketed reading. The left-associative reading gives
+0.001233.
+So a renderer taking brackets only from the nodes writes a different number, and one
+taking them only from the tree drops 193 formulas' brackets. **Both sources are needed.**
+
+That exception is one formula dragged into three cells, which is one authoring event and
+not three observations. It is too thin to carry a rule, so no rule was fitted to it: the
+parser writes a type 25 for every bracket it reads.
+
+### Where this leaves the round trip
+
+A fourth kind of node whose text round trips and whose node array normalizes, alongside
+whitespace and type 23. Rendering and reparsing every formula in the six documents leaves
+the text identical in all 6386 that render, and the node shape identical in 6383. The
+three that differ are that one formula, dragged into three cells, which gains the type 25
+Numbers did not store. Nothing is lost and nothing changes meaning.
+
+### What is not established
+
+- **Whether Numbers ever writes `numArgs` above 1.** Nothing measured does, so the
+  renderer refuses a wider one rather than writing a bracket around a single value.
+- ~~**What Numbers does with a bracket around one value**, such as `(5)`.~~ Settled
+  2026-09-13 in Numbers 15.3.1 against `tests/golden/20-formula-brackets.numbers`, which
+  no formula in six documents demonstrates: `=(5)` displays as `(5)` and evaluates to 5,
+  and `=1-(2-3)` keeps a bracket Numbers stores no node for and evaluates to 2. Writing
+  a list node for every bracket read is therefore safe.
+- **Which bit of a cell record, if any, relates to this.** Nothing here touches the record
+  layout, because a formula is pooled and the bracket lives inside it.
+
 ## Round tripping is exact for what a person can type, and not otherwise
 
 Every formula in the corpus, 77 across the fixtures, renders to text and parses back. **74
 of the 77 return the identical node array.** All three exceptions are node type 23, and all
-77 return identical TEXT, which is the property a caller can rely on.
+77 return identical TEXT, which is the property a caller can rely on. The bracket node
+above is the fourth kind, measured outside the fixtures because none of them carries one.
 
 ### Whitespace is a node, and it cannot be recovered from the text
 
