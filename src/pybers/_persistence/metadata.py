@@ -139,6 +139,47 @@ class PackageRegistry:
         self.gained.add(componentId)
         self.changed = True
 
+    def componentNamed(self, preferredLocator: str) -> int:
+        """Return the one component a preferred locator names, or refuse."""
+        found = [
+            identifier for identifier, component in self.components.items()
+            if component.preferred_locator == preferredLocator
+        ]
+        if len(found) != 1:
+            raise MetadataError(
+                f"Expected one component named {preferredLocator!r}, found "
+                f"{len(found)}."
+            )
+        return found[0]
+
+    def archiveReplace(
+        self, identifier: int, body: bytes, references: list[int] | None = None
+    ) -> None:
+        """Replace an existing archive's body, and its strong references if given.
+
+        The component holding it is re-derived on `save`, since a body gaining a
+        reference into another component has to be registered there.
+        """
+        componentId = self.componentOf.get(identifier)
+        if componentId is None:
+            raise MetadataError(f"Archive {identifier} belongs to no component.")
+        member = self.componentMember(componentId)
+        member.messageReplace(identifier, 0, body, references)
+        self.gained.add(componentId)
+        self.changed = True
+
+    def strongReferencesOf(self, identifier: int) -> list[int]:
+        """Return the strong references an existing archive declares."""
+        componentId = self.componentOf.get(identifier)
+        if componentId is None:
+            raise MetadataError(f"Archive {identifier} belongs to no component.")
+        for archive in self.componentMember(componentId).archives:
+            if archive.identifier == identifier:
+                info = tspArchive.ArchiveInfo()
+                info.ParseFromString(archive.infoBytes)
+                return list(info.message_infos[0].object_references)
+        raise MetadataError(f"No member holds archive {identifier}.")
+
     def weakReferenceAdd(self, componentId: int, target: int) -> None:
         """Record a weak reference from a component to an object in another."""
         self.referenceRecord(componentId, target, weak=True)

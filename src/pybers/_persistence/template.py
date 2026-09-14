@@ -42,6 +42,7 @@ from .types import archiveTypes
 templateSuffix: str = ".txtpb"
 headerMarker: str = "#| "
 componentKey: str = "component: "
+newComponentPrefix: str = "new "
 referenceTypeName: str = "TSP.Reference"
 
 
@@ -157,13 +158,18 @@ class TemplateCopies:
     def place(
         self, registry: PackageRegistry, components: Mapping[str, int]
     ) -> None:
-        """Create every copy as an archive in the component its template names."""
+        """Create every copy as an archive in the component its template names.
+
+        A template naming `new <locator>` is the root of a component of its own,
+        created here in a member of its own.
+        """
         for copy in self.copies.values():
-            componentId = components.get(copy.template.component)
-            if componentId is None:
+            component = copy.template.component
+            componentId = components.get(component)
+            if componentId is None and not component.startswith(newComponentPrefix):
                 raise TemplateError(
                     f"The {copy.template.role!r} template belongs in "
-                    f"{copy.template.component!r}, which was not provided."
+                    f"{component!r}, which was not provided."
                 )
             info = tspArchive.ArchiveInfo()
             info.CopyFrom(copy.template.info)
@@ -175,9 +181,11 @@ class TemplateCopies:
                 ]
                 del message.object_references[:]
                 message.object_references.extend(remapped)
-            registry.archiveAdd(
-                componentId, archiveCreate(info, [copy.body.SerializeToString()])
-            )
+            archive = archiveCreate(info, [copy.body.SerializeToString()])
+            if componentId is None:
+                registry.componentAdd(archive, component[len(newComponentPrefix):])
+            else:
+                registry.archiveAdd(componentId, archive)
 
 
 def templatesCopy(
