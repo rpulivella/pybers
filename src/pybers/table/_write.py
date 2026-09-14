@@ -17,8 +17,8 @@ one.
 
 UPDATES
 2026-09-14  Text is written and pooled, and a cell changes between text and
-            a number, for #61. Byte 8's low nibble names the value kind, so a
-            type change leaves the references and bytes 9 and 10 alone.
+            a number, for #61. A format sits in the slot its kind uses, so a
+            type change moves it, drops the control, and keeps the style.
 2026-09-14  A row the file stores nothing for is created rather than the
             formula being dropped, for #78. The walk over `rowInfos` never
             saw it, and the save reported success.
@@ -34,6 +34,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -97,9 +98,9 @@ referenceWidth: int = 4
 # Byte 8's LOW nibble names what the value is, one value per type with no
 # exception in 11,760 records: 1 is decimal128, 8 is a pooled string key. Its high
 # bits are the attribute mask, and the reference count is
-# `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`. Keeping the
-# references means keeping that count, so a type change touches the low nibble
-# alone. See findings-01-values.md.
+# `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, which is what makes
+# a format slot moving cost nothing: one bit leaves and one arrives. See
+# findings-01-values.md.
 valueKindMask: int = 0x0F
 numberValueKind: int = 0x01
 stringValueKind: int = 0x08
@@ -127,15 +128,14 @@ def writtenRecord(
     pool: StringPool | None,
     *,
     borrowed: bool = False,
-    textFormat: int | None = None,
-    numberFormat: int | None = None,
+    formatFor: Callable[[int], int | None] = lambda formatType: None,
 ) -> bytes:
     """Return this cell's record carrying its new value, changing type when it must.
 
     Four paths. Text over text and a number over a number patch the value in place,
     leaving the header and every trailing reference alone. Text over a number and a
-    number over text rewrite the type byte and byte 8's low nibble as well, because
-    the value widths differ by twelve bytes and everything behind them moves.
+    number over text go through `retypedRecord`, because the value widths differ by
+    twelve bytes and everything behind them moves.
 
     **`borrowed` says the record belongs to another cell** and is here only for its
     shape. Without it, the template's pooled key is read as this cell's previous
@@ -169,7 +169,8 @@ def writtenRecord(
             # the cell whose shape it took. Found by the golden on 2026-09-14.
             return withoutControl(patched) if borrowed else patched
         return retypedRecord(
-            record, stringTypeByte, encoded, formatKey=textFormat
+            record, stringTypeByte, encoded,
+            formatKey=formatFor(textFormatType),
         )
 
     if isinstance(value, Decimal):
@@ -178,7 +179,7 @@ def writtenRecord(
                 pool.release(record.value)
             return retypedRecord(
                 record, numericTypeBytes[0], Decimal128(value).asBytes(),
-                formatKey=numberFormat,
+                formatKey=formatFor(numberFormatType),
             )
         if record.typeByte not in numericTypeBytes:
             raise WriteError(
@@ -345,17 +346,18 @@ def referenceSlots(raw: bytes) -> list[tuple[int, int]]:
     return [(at, bit) for at, bit in slotOrder if raw[at] & bit]
 
 
-def formatKeyFor(
-    index: ArchiveIndex, store: tst.DataStore, formatType: int
-) -> int | None:
+def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
     """Return a key naming a format of this kind, creating one when there is none.
 
     A `260` entry carries nothing but its kind, so creating one states no more than
-    the corpus does. Returns None when the table carries no format list at all.
+    the corpus does.
+
+    **Takes the resolved list rather than resolving one.** `ArchiveIndex.resolve`
+    parses the archive afresh on every call, so a function that resolved its own
+    copy would add an entry to a throwaway: the key came back real, the entry never
+    reached the file, and cells named a format the table did not hold. Found
+    reviewing #61, in a golden Numbers had already accepted.
     """
-    if not store.format_table.identifier:
-        return None
-    dataList = index.resolve(store.format_table, tst.TableDataList)
     for entry in dataList.entries:
         if entry.HasField("format") and entry.format.format_type == formatType:
             entry.refcount += 1
@@ -379,10 +381,10 @@ def templateRecord(
     a new tile row for PYB-78.
 
     **A record of the other type will do**, which is what lets the first text reach a
-    table holding only numbers. Retyping carries the references across unchanged, and
-    the golden confirmed in Numbers that a cell which became text displays as text
-    while still naming the number format it was written over. So the preference is
-    the type being written, then the other one it can be converted from.
+    table holding only numbers. Retyping places the references for the kind being
+    written, so what is borrowed is the style and the shape rather than anything the
+    old value chose. The preference is the type being written, then the other one it
+    can be converted from.
     """
     found: dict[int, CellRecord] = {}
     for entry in store.tiles.tiles:
@@ -670,13 +672,20 @@ def applyTableEdits(
     richText = readRichTextTable(index, store)
     pool = formulaPoolFor(index, store)
     textPool = stringPoolFor(index, store)
-    # Resolved once, and created only if a retype actually asks for one.
-    formatKeys: dict[int, int | None] = {}
+    # Resolved ONCE, because resolving parses afresh and a second copy would take
+    # the edits with it. Touched only when a retype actually asks for a format.
+    formatList = (
+        index.resolve(store.format_table, tst.TableDataList)
+        if store.format_table.identifier else None
+    )
+    formatKeys: dict[int, int] = {}
 
     def formatFor(formatType: int) -> int | None:
         """Return the key naming a format of this kind, caching the lookup."""
+        if formatList is None:
+            return None
         if formatType not in formatKeys:
-            formatKeys[formatType] = formatKeyFor(index, store, formatType)
+            formatKeys[formatType] = formatKeyFor(formatList, formatType)
         return formatKeys[formatType]
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
@@ -761,9 +770,7 @@ def applyTableEdits(
                 # Attaching a formula is a different act and is allowed.
                 if valueChanged:
                     patched = writtenRecord(
-                        cell, record, textPool,
-                        textFormat=formatFor(textFormatType),
-                        numberFormat=formatFor(numberFormatType),
+                        cell, record, textPool, formatFor=formatFor
                     )
                 if pool is not None and edit != "none":
                     patched = applyFormulaEdit(edit, patched, record, cell, pool)
@@ -814,9 +821,7 @@ def applyTableEdits(
                             f"of type {wanted} to take the references from."
                         )
                     replacements[column] = writtenRecord(
-                        cell, shape, textPool, borrowed=True,
-                        textFormat=formatFor(textFormatType),
-                        numberFormat=formatFor(numberFormatType),
+                        cell, shape, textPool, borrowed=True, formatFor=formatFor
                     )
             dropped = removals & present
             if not replacements and not dropped:
@@ -847,11 +852,10 @@ def applyTableEdits(
                 archive.identifier, 0, tile.SerializeToString()
             )
 
-    if any(key is not None for key in formatKeys.values()):
+    if formatList is not None and formatKeys:
         formatId = store.format_table.identifier
         owners[formatId].messageReplace(
-            formatId, 0,
-            index.resolve(store.format_table, tst.TableDataList).SerializeToString(),
+            formatId, 0, formatList.SerializeToString()
         )
 
     if textPool is not None and textPool.touched:

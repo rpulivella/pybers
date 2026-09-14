@@ -952,6 +952,33 @@ def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     assert table.cell("B1").value == Decimal("777")
 
 
+def formatEntries(path: Path, tableName: str | None) -> list[tuple[int, int | None]]:
+    """Return one table's format list as key and kind, for asserting on references."""
+    from pybers._persistence.index import ArchiveIndex
+    from pybers.document._read import findRoot
+    from pybers.document._write import tableInfoTypeId
+
+    index = ArchiveIndex(readPackage(path))
+    for reference in findRoot(index).sheets:
+        for drawable in index.resolve(reference, tn.SheetArchive).drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if tableName is not None and model.table_name != tableName:
+                continue
+            dataList = index.resolve(
+                model.base_data_store.format_table, tst.TableDataList
+            )
+            return [
+                (entry.key,
+                 entry.format.format_type if entry.HasField("format") else None)
+                for entry in dataList.entries
+            ]
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+
 def tileOf(path: Path, tableName: str) -> tst.Tile:
     """Return the one tile of a named table, for asserting on row storage."""
     from pybers._persistence.index import ArchiveIndex
@@ -1108,8 +1135,10 @@ def stringEntries(path: Path, tableName: str) -> dict[int, object]:
     raise AssertionError(f"{tableName!r} is not in {path.name}")
 
 
-def recordAt(path: Path, address: str) -> CellRecord:
-    """Return the raw cell record at an address in the first table of a document."""
+def recordAt(
+    path: Path, address: str, table: str | None = None
+) -> CellRecord:
+    """Return the raw cell record at an address, in the first table or a named one."""
     from pybers._persistence.index import ArchiveIndex
     from pybers.addressing import toCellReference
     from pybers.document._read import findRoot
@@ -1123,6 +1152,8 @@ def recordAt(path: Path, address: str) -> CellRecord:
                 continue
             info = index.resolve(drawable, tst.TableInfoArchive)
             model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if table is not None and model.table_name != table:
+                continue
             store = model.base_data_store
             for entry in store.tiles.tiles:
                 tile = index.resolve(entry.tile, tst.Tile)
@@ -1303,3 +1334,32 @@ def test_aTypeChangeMovesTheFormatTheCellDisplaysWith(tmp_path: Path) -> None:
     assert keys[(9, 0x10)] == keys[(10, 0x02)], (
         "the format in effect is the text format the kind slot names"
     )
+
+
+def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
+    """`ArchiveIndex.resolve` parses afresh, so a second copy takes the edits with it.
+
+    Found reviewing #61. The entry was added to a throwaway, the key came back real,
+    and the cells named a format the table did not hold. Numbers accepted the golden
+    anyway, which is why only the bytes catch this.
+    """
+    working = workingCopy("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    document.sheet("Sheet 1").table("Table 2").cell("B1").value = "first text"
+    document.save()
+
+    entries = formatEntries(working, "Table 2")
+    assert 260 in {kind for _, kind in entries}, "the text format reached the file"
+    named = recordAt(working, "B1", table="Table 2").references
+    assert set(named) <= {key for key, _ in entries}, "no cell names a missing format"
+
+
+def test_aPlainNumericEditLeavesTheFormatListAlone(tmp_path: Path) -> None:
+    """Looking a format up bumps a refcount, so it happens only where a retype does."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = formatEntries(working, None)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("7")
+    document.save()
+
+    assert formatEntries(working, None) == before
