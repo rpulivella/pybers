@@ -38,7 +38,6 @@ from pybers.table import Table
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
-documentMember: str = "Index/Document.iwa"
 metadataMember: str = "Index/Metadata.iwa"
 
 
@@ -254,17 +253,19 @@ def testAFormulaReadingAcrossSheetsStillNamesTheSameTable(tmp_path: Path) -> Non
 # ── Refused, and refused before anything is written ──────────────────────────
 
 
-def testANewSheetHoldingATableIsRefusedAndWritesNothing(tmp_path: Path) -> None:
+def testARefusedSaveUndoesTheSheetsItHadCreated(tmp_path: Path) -> None:
     document = shapes()
     package = document._package
     assert package is not None
     before = archiveBodies(package)
-    document.sheetAdd("With a table").tables.append(Table("Table 1"))
+    added = document.sheetAdd("With an empty table")
+    added.tables.append(Table("No grid"))
 
-    with pytest.raises(WriteError, match="not supported yet"):
+    with pytest.raises(WriteError, match="at least one of each"):
         document.save(tmp_path / "refused.numbers")
 
     assert archiveBodies(package) == before
+    assert added._identifier is None
     assert not (tmp_path / "refused.numbers").exists()
 
 

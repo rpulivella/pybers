@@ -1,0 +1,14 @@
+#| component: CalculationEngine
+#| identifier: 907633
+#| message_infos {
+#|   type: 4004
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+uuid {
+  uuid_w0: 1536709678
+  uuid_w1: 2017563915
+  uuid_w2: 393124489
+  uuid_w3: 690484005
+}

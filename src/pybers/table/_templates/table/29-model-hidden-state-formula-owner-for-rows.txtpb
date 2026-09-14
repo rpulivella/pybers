@@ -1,0 +1,15 @@
+#| component: CalculationEngine
+#| identifier: 907640
+#| message_infos {
+#|   type: 6204
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+owner_id {
+  uuid_w0: 1536709676
+  uuid_w1: 2017563915
+  uuid_w2: 393124489
+  uuid_w3: 690484005
+}
+needs_to_update_filter_set_for_import: false

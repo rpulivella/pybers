@@ -37,6 +37,7 @@ __status__ = "Development"
 __date__ = "2026/09/02"
 
 import datetime
+import uuid
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from decimal import Context, Decimal
@@ -54,6 +55,7 @@ from pybers.addressing.reference import (
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
+from pybers.geometry import Position
 from pybers.style import Style
 from pybers.table.rows import TableRows
 
@@ -93,6 +95,17 @@ CellValue = (
     | datetime.timedelta
     | None
 )
+
+
+# A new table's owner identity leaves its low byte clear, because Numbers derives each
+# of a table's owners by adding the owner's kind to it, and the kinds reach 35.
+ownerBaseMask: int = ~0xFF
+
+
+def ownerIdentityFresh() -> str:
+    """Return a fresh table identity, spelled as a formula spells it, low word first."""
+    value = uuid.uuid4().int & ownerBaseMask
+    return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
 
 
 def toCellReferenceNamed(
@@ -263,6 +276,15 @@ class Table:
     cells: dict[CellReference, Cell] = field(default_factory=dict)
     mergeRanges: list[MergeRange] = field(default_factory=list)
     identifier: str = ""
+    # The archive this table was read from or saved as, and None until it has one.
+    _identifier: int | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
+    # Where a table added to a sheet puts its top-left corner when it is created. Read
+    # only then, so it is not a table's position and says nothing about one read.
+    _origin: Position | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
     # The document this belongs to, so a formula naming another table can be written
     # as the text Numbers shows without the caller supplying the names. Excluded from
     # equality and `repr`, the same as `Cell.table`.

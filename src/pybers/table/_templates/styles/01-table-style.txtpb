@@ -1,0 +1,24 @@
+#| component: DocumentStylesheet
+#| identifier: 908990
+#| message_infos {
+#|   type: 6003
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   object_references: 904074
+#| }
+super {
+  parent {
+    identifier: 904074
+  }
+  is_variation: true
+  stylesheet {
+    identifier: 905039
+  }
+}
+override_count: 3
+table_properties {
+  v_strokes_visible: false
+  h_strokes_visible: false
+  table_border_visible: false
+}

@@ -1,0 +1,50 @@
+#| component: CalculationEngine
+#| identifier: 907634
+#| message_infos {
+#|   type: 6267
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+sorted_column_uids {
+  lower: 512375675199578162
+  upper: 7880402869596583355
+}
+sorted_column_uids {
+  lower: 12773929340522086358
+  upper: 14477843584225792955
+}
+sorted_column_uids {
+  lower: 10767268736980820105
+  upper: 14848452969831452817
+}
+sorted_column_uids {
+  lower: 17873727057839962182
+  upper: 16780640991694988361
+}
+column_index_for_uid: 2
+column_index_for_uid: 3
+column_index_for_uid: 1
+column_index_for_uid: 0
+column_uid_for_index: 3
+column_uid_for_index: 2
+column_uid_for_index: 0
+column_uid_for_index: 1
+sorted_row_uids {
+  lower: 10725961069704562626
+  upper: 10858575295856673062
+}
+sorted_row_uids {
+  lower: 13552776391747621598
+  upper: 17392336419585767381
+}
+sorted_row_uids {
+  lower: 9105440324239433782
+  upper: 17962518765113432244
+}
+row_index_for_uid: 1
+row_index_for_uid: 0
+row_index_for_uid: 2
+row_uid_for_index: 1
+row_uid_for_index: 0
+row_uid_for_index: 2

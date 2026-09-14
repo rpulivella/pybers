@@ -1,0 +1,11 @@
+#| component: CalculationEngine
+#| identifier: 907635
+#| message_infos {
+#|   type: 6305
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+max_order: 2
+column_count: 4
+row_count: 3

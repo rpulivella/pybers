@@ -1,0 +1,10 @@
+#| component: new Tables/DataList
+#| identifier: 907556
+#| message_infos {
+#|   type: 6005
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+listType: FORMULA
+nextListID: 1

@@ -1,0 +1,138 @@
+#| component: CalculationEngine
+#| identifier: 907545
+#| message_infos {
+#|   type: 6000
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   field_infos {
+#|     path {
+#|       path: 10
+#|     }
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 8
+#|     }
+#|     type: Message
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 7
+#|     }
+#|     type: Message
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 5
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 6
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 4
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 1
+#|       path: 12
+#|     }
+#|     unknown_field_rule: IgnoreAndPreserve
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 1
+#|       path: 13
+#|     }
+#|     unknown_field_rule: IgnoreAndPreserve
+#|   }
+#|   object_references: 907546
+#|   object_references: 907547
+#|   object_references: 907548
+#|   object_references: 907628
+#|   object_references: 907629
+#| }
+super {
+  geometry {
+    position {
+      x: 0.0
+      y: 0.0
+    }
+    size {
+      width: 494.0
+      height: 233.0
+    }
+    flags: 3
+    angle: 0.0
+  }
+  parent {
+    identifier: 904532
+  }
+  exterior_text_wrap {
+    type: 4
+    direction: 2
+    fit_type: 1
+    margin: 12.0
+    alpha_threshold: 0.5
+    is_html_wrap: false
+  }
+  locked: false
+  aspect_ratio_locked: false
+  title {
+    identifier: 907547
+  }
+  caption {
+    identifier: 907546
+  }
+  title_hidden: false
+  caption_hidden: false
+}
+tableModel {
+  identifier: 907548
+}
+summary_model {
+  identifier: 907628
+}
+category_order {
+  identifier: 907629
+}
+group_by_uuid {
+  lower: 8665371034051433520
+  upper: 2965606220279224969
+}
+hidden_states_uuid {
+  lower: 8665371034051433516
+  upper: 2965606220279224969
+}
+formula_coord_space: 0
+layout_engine {
+  width_height_cache {
+    rows_fitting_entries {
+      fitting_index: 0
+      fitting_size: 19.720001
+    }
+    rows_fitting_entries {
+      fitting_index: 0
+      fitting_size: 19.720001
+    }
+    rows_fitting_entries {
+      fitting_index: 0
+      fitting_size: 19.720001
+    }
+    columns_count: 4
+  }
+}

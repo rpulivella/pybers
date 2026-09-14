@@ -83,14 +83,14 @@ def readSheet(
     for reference in sheetArchive.drawable_infos:
         if index.typeOf(reference) != tableInfoTypeId:
             continue
-        sheet.tables.append(
-            readTable(
-                index,
-                index.resolve(reference, tst.TableInfoArchive),
-                source,
-                identities.get(reference.identifier, ""),
-            )
+        table = readTable(
+            index,
+            index.resolve(reference, tst.TableInfoArchive),
+            source,
+            identities.get(reference.identifier, ""),
         )
+        table._identifier = reference.identifier
+        sheet.tables.append(table)
     return sheet
 
 
@@ -116,6 +116,7 @@ def open(path: Path | str) -> Document:  # noqa: A001
     # Linked after the sheets are in, so a cell can name another table without the
     # caller passing the names, and so `Table.document` is never half a document.
     for sheet in document.sheets:
+        sheet.document = document
         for table in sheet.tables:
             table.document = document
     return document

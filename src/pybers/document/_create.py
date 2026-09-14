@@ -94,27 +94,6 @@ def sheetBindings(index: ArchiveIndex, root: tn.DocumentArchive) -> dict[int, in
     }
 
 
-def archiveReplace(
-    package: NumbersPackage,
-    identifier: int,
-    body: bytes,
-    references: list[int],
-) -> None:
-    """Replace one existing archive's body and its strong references."""
-    for iwaFile in package.iwaFiles:
-        if any(held.identifier == identifier for held in iwaFile.archives):
-            iwaFile.messageReplace(identifier, 0, body, references)
-            return
-    raise WriteError(f"No member holds archive {identifier}.")
-
-
-def strongReferences(index: ArchiveIndex, identifier: int) -> list[int]:
-    """Return the strong references an existing archive declares."""
-    info = tspArchive.ArchiveInfo()
-    info.ParseFromString(index.archive(identifier).infoBytes)
-    return list(info.message_infos[0].object_references)
-
-
 def sheetCreate(
     index: ArchiveIndex,
     registry: PackageRegistry,
@@ -156,8 +135,8 @@ def sheetsCreate(
 ) -> None:
     """Create every sheet the model gained, and list each where the model has it.
 
-    Refused before anything is written: a sheet removed or moved, which is not
-    supported, and a created sheet holding tables, which is not supported yet.
+    A sheet removed or moved is refused before anything is written, since neither
+    is supported. The tables a created sheet holds are created afterward.
     """
     index = ArchiveIndex(package)
     root = findRoot(index)
@@ -174,12 +153,6 @@ def sheetsCreate(
     created = [sheet for sheet in document.sheets if sheet._identifier is None]
     if not created:
         return
-    for sheet in created:
-        if sheet.tables:
-            raise WriteError(
-                f"{sheet.name!r} is a new sheet holding {len(sheet.tables)} tables. "
-                "Adding a table is not supported yet."
-            )
     templates = templatesRead(sheetTemplateDirectory)
     bindings = sheetBindings(index, root)
     sidebar = index.resolve(root.sidebar_order, tsk.TreeNode)
@@ -210,17 +183,16 @@ def sheetsCreate(
         identifier for identifier, archive in index.byIdentifier.items()
         if archive.messages and archive.messages[0].typeId == documentTypeId
     )
-    rootReferences = strongReferences(index, rootIdentifier)
+    rootReferences = registry.strongReferencesOf(rootIdentifier)
     rootReferences.extend(
         identifier for identifier in order if identifier not in rootReferences
     )
-    archiveReplace(package, rootIdentifier, root.SerializeToString(), rootReferences)
+    registry.archiveReplace(rootIdentifier, root.SerializeToString(), rootReferences)
 
     del sidebar.children[:]
     for identifier in order:
         sidebar.children.add(identifier=nodeFor[identifier])
-    archiveReplace(
-        package,
+    registry.archiveReplace(
         root.sidebar_order.identifier,
         sidebar.SerializeToString(),
         [nodeFor[identifier] for identifier in order],

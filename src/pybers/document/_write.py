@@ -23,8 +23,8 @@ UPDATES
 2026-09-02  Edited cells are marked for recalculation, for #25.
 2026-09-02  Merges are written back to the merge store, for #16.
 2026-09-08  Formulas and the engine moved to modules of their own, for #45.
-2026-09-14  A sheet the model gained is created before anything else is written,
-            for PYB-63.
+2026-09-14  A sheet or table the model gained is created before anything else is
+            written, for PYB-63.
 """
 from __future__ import annotations
 
@@ -60,9 +60,11 @@ from .._persistence.index import (
     tableInfoTypeId,
 )
 from ..errors import WriteError
+from ..table._create import tablesCreate
 from ..table._write import applyMerges, applyTableEdits, mergesAdded
+from ..table.cells import Table
 from ._create import sheetsCreate
-from .sheets import Document
+from .sheets import Document, Sheet
 
 
 def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
@@ -74,6 +76,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     """
     registry = PackageRegistry(package)
     sheetsCreate(document, package, registry)
+    tablesCreate(document, package, registry)
     index = ArchiveIndex(package)
     owners = {
         archive.identifier: iwaFile
@@ -182,6 +185,15 @@ def writeAtomically(package: NumbersPackage, target: Path) -> None:
         raise
 
 
+def identifiable(document: Document) -> list[Sheet | Table]:
+    """Return every sheet and table, each of which records the archive it has."""
+    items: list[Sheet | Table] = []
+    for sheet in document.sheets:
+        items.append(sheet)
+        items.extend(sheet.tables)
+    return items
+
+
 def writeDocument(document: Document, path: Path | str | None = None) -> None:
     """Write a document back to a `.numbers` package.
 
@@ -196,8 +208,22 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
             "a document from `pybers.open` can be saved; building one from scratch "
             "is not supported yet."
         )
-    applyDocumentEdits(document, package)
-    writeAtomically(package, targetFor(document, path))
+    # Created sheets and tables change both the package and the model's identifiers,
+    # so a save that fails part way undoes both rather than leaving a retry to
+    # create them twice.
+    snapshot = package.snapshot()
+    identified = {
+        id(item) for item in identifiable(document) if item._identifier is not None
+    }
+    try:
+        applyDocumentEdits(document, package)
+        writeAtomically(package, targetFor(document, path))
+    except Exception:
+        package.restore(snapshot)
+        for item in identifiable(document):
+            if id(item) not in identified:
+                item._identifier = None
+        raise
 
 
 # `Document.save` reaches `writeDocument` and nothing else, and no other module in

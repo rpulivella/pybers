@@ -1,0 +1,20 @@
+#| component: new Tables/Tile
+#| identifier: 907521
+#| message_infos {
+#|   type: 6002
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   field_infos {
+#|     path {
+#|       path: 7
+#|     }
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#| }
+maxColumn: 0
+maxRow: 0
+numCells: 0
+numrows: 0
+storage_version: 5
+last_saved_in_BNC: true
