@@ -33,5 +33,8 @@ dataclasses (not TypedDict), docstring-with-why on every function. Would someone
 the file notice where this change starts?
 
 **Naming and comments**. Do names say what a thing is, and do comments say *why* rather
-than *what*? Bytes in uncompiled code are the cheapest thing we have. Name things so they
-can be read in twenty-four months.
+than *what*? Do names follow the project convention of leading with the common word for a
+module or feature, so a family sorts together in a list? Are scientific and geometric
+values unambiguous? `x` and `y` say nothing, `mercatorX` and `mercatorY` say where they
+live, and `cieX1931` beats `cieX` because it names the observer. Bytes in uncompiled code
+are the cheapest thing we have. Name things so they can be read in twenty-four months.
