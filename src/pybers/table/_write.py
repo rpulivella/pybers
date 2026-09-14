@@ -16,7 +16,9 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
-2026-09-14  A table's pooled strings can be written, for #61.
+2026-09-14  Text is written and pooled, and a cell changes between text and
+            a number, for #61. Byte 8's low nibble names the value kind, so a
+            type change leaves the references and bytes 9 and 10 alone.
 2026-09-14  A row the file stores nothing for is created rather than the
             formula being dropped, for #78. The walk over `rowInfos` never
             saw it, and the save reported success.
@@ -84,36 +86,100 @@ numericTypeBytes: tuple[int, ...] = (2, 10)
 # while appearing to succeed.
 valueEnd: int = valueOffset + encodedLength
 
+# A pooled string cell holds a four-byte key where a number holds sixteen bytes of
+# decimal128, so changing between them moves every trailing reference.
+stringTypeByte: int = 3
+stringKeyWidth: int = 4
 
-def checkedValue(cell: Cell, record: CellRecord) -> Decimal:
-    """Return the Decimal to write, or refuse and say exactly what is unsupported.
+# Byte 8's LOW nibble names what the value is, one value per type with no
+# exception in 11,760 records: 1 is decimal128, 8 is a pooled string key. Its high
+# bits are the attribute mask, and the reference count is
+# `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`. Keeping the
+# references means keeping that count, so a type change touches the low nibble
+# alone. See findings-01-values.md.
+valueKindMask: int = 0x0F
+numberValueKind: int = 0x01
+stringValueKind: int = 0x08
+valueKindOffset: int = 8
+typeByteOffset: int = 1
 
-    Three refusals, and every one of them replaces a silent loss. Writing over a
-    formula would discard it while leaving a document whose displayed number and
-    stored formula disagree until Numbers recalculates. Writing a non-numeric value
-    needs the table's pooled string list, which this ticket does not touch. Changing
-    a cell's type needs a new record rather than a patched one.
+
+def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
+    """Refuse to write a value over a cell a formula backs, and say why.
+
+    The one refusal that stays. Overwriting would discard the formula and leave the
+    document's displayed number and its stored formula disagreeing until Numbers
+    recalculated, which is a silent loss wearing the shape of a success.
     """
     if carriesFormula(record):
         raise WriteError(
             f"{cell.reference} is backed by a formula, so writing a value would "
-            "discard it. Formula writing is not supported yet, and overwriting one "
-            "silently would leave the cell's formula and its displayed value "
-            "disagreeing until Numbers recalculated."
+            "discard it. Replace the formula instead, or clear it first."
         )
-    if not isinstance(cell.value, Decimal):
-        raise WriteError(
-            f"{cell.reference} was set to {type(cell.value).__name__}, and only a "
-            "Decimal can be written so far. Text needs the table's pooled string "
-            "list, which this version does not write."
+
+
+def writtenRecord(
+    cell: Cell,
+    record: CellRecord,
+    pool: StringPool | None,
+    *,
+    borrowed: bool = False,
+) -> bytes:
+    """Return this cell's record carrying its new value, changing type when it must.
+
+    Four paths. Text over text and a number over a number patch the value in place,
+    leaving the header and every trailing reference alone. Text over a number and a
+    number over text rewrite the type byte and byte 8's low nibble as well, because
+    the value widths differ by twelve bytes and everything behind them moves.
+
+    **`borrowed` says the record belongs to another cell** and is here only for its
+    shape. Without it, the template's pooled key is read as this cell's previous
+    claim, and a pool entry nothing else names is then rewritten in place: writing
+    into an empty `J1` changed `I1` from `Item 1` to the new text, with nothing
+    raised. Found by the golden on 2026-09-14.
+    """
+    refuseFormulaOverwrite(cell, record)
+    value = cell.value
+
+    if isinstance(value, str):
+        if pool is None:
+            raise WriteError(
+                f"{cell.reference} was set to text and its table carries no string "
+                "list to pool it in. A table that has never held text has none."
+            )
+        previous = (
+            record.value
+            if record.typeByte == stringTypeByte and not borrowed
+            else None
         )
-    if record.typeByte not in numericTypeBytes:
-        raise WriteError(
-            f"{cell.reference} holds a value of type {record.typeByte} and a "
-            "Decimal was written into it. Changing a cell's type is not supported "
-            "yet, because it needs a new record rather than a patched one."
-        )
-    return cell.value
+        key = pool.keyFor(value, previous if isinstance(previous, int) else None)
+        encoded = key.to_bytes(stringKeyWidth, "little")
+        if record.typeByte == stringTypeByte:
+            return (
+                record.raw[:valueOffset] + encoded
+                + record.raw[valueOffset + stringKeyWidth:]
+            )
+        return retypedRecord(record, stringTypeByte, encoded)
+
+    if isinstance(value, Decimal):
+        if record.typeByte == stringTypeByte:
+            if pool is not None and not borrowed and isinstance(record.value, int):
+                pool.release(record.value)
+            return retypedRecord(
+                record, numericTypeBytes[0], Decimal128(value).asBytes()
+            )
+        if record.typeByte not in numericTypeBytes:
+            raise WriteError(
+                f"{cell.reference} holds a value of type {record.typeByte} and a "
+                "Decimal was written into it. Only a number, a currency amount and "
+                "text can be written over so far."
+            )
+        return patchRecord(record, value)
+
+    raise WriteError(
+        f"{cell.reference} was set to {type(value).__name__}, and only a Decimal "
+        "or a str can be written so far."
+    )
 
 
 def patchRecord(record: CellRecord, value: Decimal) -> bytes:
@@ -219,6 +285,65 @@ def stringPoolFor(index: ArchiveIndex, store: tst.DataStore) -> StringPool | Non
     )
 
 
+def templateRecord(
+    index: ArchiveIndex, store: tst.DataStore, typeByte: int
+) -> CellRecord | None:
+    """Return any record of this type in the table, to shape a new one from.
+
+    A record created for a cell that had none has to choose every header byte and
+    every trailing reference. Those references are keys into this table's own lists,
+    and measured across the 41 tables holding a plain string record they never vary
+    inside a table while differing between tables, so they are copied from a sibling
+    rather than derived. The same reasoning shaped a new tile row for PYB-78.
+    """
+    for entry in store.tiles.tiles:
+        tile = index.resolve(entry.tile, tst.Tile)
+        for rowInfo in tile.rowInfos:
+            unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            for record in decodeRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+            ):
+                if record.typeByte == typeByte and not carriesFormula(record):
+                    return record
+    return None
+
+
+def stringValueWidth(record: CellRecord) -> int:
+    """Return how many bytes this record's value occupies, for a type being changed."""
+    if record.typeByte == stringTypeByte:
+        return stringKeyWidth
+    if record.typeByte in numericTypeBytes:
+        return encodedLength
+    raise WriteError(
+        f"A record of type {record.typeByte} holds a value this library cannot "
+        "measure, so the references behind it cannot be placed."
+    )
+
+
+def retypedRecord(record: CellRecord, typeByte: int, value: bytes) -> bytes:
+    """Return one record holding a different kind of value, references intact.
+
+    Only the type byte, byte 8's low nibble and the value itself move. The
+    references keep their order and their count, so the rule that derives the count
+    from bytes 8, 9 and 10 still holds without touching bytes 9 or 10.
+
+    What each reference MEANS is not established, so a number's format reference
+    stays on a cell that became text rather than being dropped. That is what AC 5
+    asks for, and the golden is what says Numbers accepts it.
+    """
+    width = stringValueWidth(record)
+    if len(record.raw) < valueOffset + width:
+        raise WriteError(
+            f"The record for column {record.column + originOffset} is "
+            f"{len(record.raw)} bytes, too short to hold the value it declares."
+        )
+    kind = numberValueKind if typeByte in numericTypeBytes else stringValueKind
+    header = bytearray(record.raw[:valueOffset])
+    header[typeByteOffset] = typeByte
+    header[valueKindOffset] = (header[valueKindOffset] & ~valueKindMask) | kind
+    return bytes(header) + value + record.raw[valueOffset + width:]
+
+
 def rowsNeedingStorage(
     table: Table, firstRow: int, tileSize: int, present: frozenset[int]
 ) -> list[int]:
@@ -231,7 +356,7 @@ def rowsNeedingStorage(
     wanted = set()
     for reference, cell in table.cells.items():
         row = reference.row - originOffset
-        if cell.formula is None or row in present:
+        if (cell.formula is None and cell.value is None) or row in present:
             continue
         if firstRow <= row < firstRow + tileSize:
             wanted.add(row)
@@ -392,6 +517,7 @@ def applyTableEdits(
     strings = readStringTable(index, store)
     richText = readRichTextTable(index, store)
     pool = formulaPoolFor(index, store)
+    textPool = stringPoolFor(index, store)
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
@@ -474,7 +600,7 @@ def applyTableEdits(
                 # refuses here rather than being masked by the formula edit below.
                 # Attaching a formula is a different act and is allowed.
                 if valueChanged:
-                    patched = patchRecord(record, checkedValue(cell, record))
+                    patched = writtenRecord(cell, record, textPool)
                 if pool is not None and edit != "none":
                     patched = applyFormulaEdit(edit, patched, record, cell, pool)
                     if edit == "attach":
@@ -499,12 +625,33 @@ def applyTableEdits(
                     cell = table.cells.get(
                         CellReference(row + originOffset, column + originOffset)
                     )
-                    if cell is None or cell.formula is None:
+                    if cell is None:
                         continue
-                    replacements[column] = buildFormulaRecord(
-                        pool.keyFor(cell.formula)
+                    if cell.formula is not None:
+                        replacements[column] = buildFormulaRecord(
+                            pool.keyFor(cell.formula)
+                        )
+                        formulaAdded.append((row, column))
+                        continue
+                    if cell.value is None:
+                        continue
+                    # A value needs a record shaped like one this table already
+                    # holds, since its trailing references are keys into the
+                    # table's own lists rather than anything derivable.
+                    wanted = (
+                        stringTypeByte if isinstance(cell.value, str)
+                        else numericTypeBytes[0]
                     )
-                    formulaAdded.append((row, column))
+                    shape = templateRecord(index, store, wanted)
+                    if shape is None:
+                        raise WriteError(
+                            f"{cell.reference} needs a record this table has no "
+                            f"example of: nothing in {table.name!r} holds a value "
+                            f"of type {wanted} to take the references from."
+                        )
+                    replacements[column] = writtenRecord(
+                        cell, shape, textPool, borrowed=True
+                    )
             dropped = removals & present
             if not replacements and not dropped:
                 continue
@@ -533,6 +680,12 @@ def applyTableEdits(
             owners[archive.identifier].messageReplace(
                 archive.identifier, 0, tile.SerializeToString()
             )
+
+    if textPool is not None and textPool.touched:
+        textId = store.stringTable.identifier
+        owners[textId].messageReplace(
+            textId, 0, textPool.dataList.SerializeToString()
+        )
 
     if pool is not None and pool.touched:
         poolId = store.formula_table.identifier

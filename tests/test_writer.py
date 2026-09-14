@@ -17,6 +17,7 @@ be parsed at all, so a byte difference on one is reported as a difference rather
 than assumed to be a harmless re-encoding.
 
 UPDATES
+2026-09-14  Text, pooling and a cell that changes type, for #61.
 2026-09-14  A formula written into a row with no storage, for #78.
 2026-09-01  Written for #2, AC 1: the unchanged round trip.
 2026-09-01  Numeric edits, for #2 AC 2, 3, 4 and 6.
@@ -475,19 +476,43 @@ def test_aRefusedSaveLeavesTheFileExactlyAsItWas(tmp_path: Path) -> None:
     assert working.read_bytes() == before
 
 
-def test_writingTextIsRefusedRatherThanDropped(tmp_path: Path) -> None:
-    """Text needs the table's pooled string list, which this version does not write."""
+def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
+    """What the refusal here used to guard, now that the string list is written.
+
+    Superseded for #61. The refusal was correct while text could not be pooled, and
+    the test is rewritten rather than deleted so the boundary that moved is visible.
+    """
     working = workingCopy("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = "not a number"
+    document.save()
+
+    assert pybers.open(working).sheets[0].tables[0].cell("A1").value == "not a number"
+
+
+def test_writingSomethingNeitherTextNorANumberIsStillRefused(
+    tmp_path: Path,
+) -> None:
+    """The refusal that remains, since a date or a boolean has no write path yet."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = [1, 2]
 
     with pytest.raises(WriteError, match="only a Decimal"):
         document.save()
 
 
-def test_changingACellsTypeIsRefused(tmp_path: Path) -> None:
-    """A number written over a date needs a new record, not a patched one."""
+def test_changingATypeThisLibraryCannotMeasureIsStillRefused(
+    tmp_path: Path,
+) -> None:
+    """Text and numbers convert now; a date does not, and says so rather than guessing.
+
+    Narrowed for #61. A date's value is a double and its references sit in slots
+    this library has not identified, so retyping one would place them wrong and
+    raise nothing.
+    """
     working = workingCopy("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
@@ -498,7 +523,7 @@ def test_changingACellsTypeIsRefused(tmp_path: Path) -> None:
     )
     dateCell.value = Decimal("1")
 
-    with pytest.raises(WriteError, match="Changing a cell's type"):
+    with pytest.raises(WriteError, match="Only a number, a currency amount and text"):
         document.save()
 
 
@@ -1055,3 +1080,4 @@ def test_theCreatedRowGoldenHoldsWhatItClaimsTo() -> None:
     assert [row.tile_row_index for row in tileOf(golden, "Table 2").rowInfos] == [
         0, 2, 6, 9
     ]
+
