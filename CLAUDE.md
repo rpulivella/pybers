@@ -9,6 +9,9 @@ it. Nothing under `src/pybers/` may import anything front-end or print anything,
 both consumers reach the library through `import pybers` and nothing deeper.
 `pybers.cli` and `pybers.tui` do not exist yet.
 
+Apache-2.0. Hatchling, not setuptools. Dependencies are declared as floors, never pins.
+This is its own repository, on `develop`.
+
 ## The layout
 
 A feature owns its whole vertical, so adding one adds a directory rather than editing
@@ -122,6 +125,10 @@ about the format is measured against a fixture that labels its own contents.
   `cellFormatNumberApply`. Sorting then groups everything acting on a row together. The
   subject is as specific as the method. Module-level functions keep verb-first names,
   which is why the entry point is `pybers.open`.
+- **Type names lead with the base noun**, so a family sorts together and builds on its
+  atom: `Table`, `TableRow`, `TableRows`, never `RowOfTable`. A scientific or geometric
+  value names what it is measured against: `mercatorX` rather than `x`, `cieX1931`
+  rather than `cieX`.
 - **Dataclasses, never `TypedDict`.** Frozen where immutability keeps a defect out.
 - Full type hints, modern syntax (`list[str]`, `X | None`), never `typing.List`.
 - `pathlib.Path` exclusively, f-strings exclusively.
@@ -184,18 +191,3 @@ functions over explanation.
 - Stage a complete package outside the destination and install it atomically. Unique
   temporary paths, cleaned on success and on failure alike.
 - Never write into a `.numbers` file the user may have open.
-
-## Status
-
-Addressing, formulas, tables and documents each exist as a feature and are tested. The
-read half handles zip, IWA frames, pure-Python Snappy, length-prefixed protobuf
-archives, cell values and formulas. The write half writes a package back with one
-bounded, documented difference in the zip envelope, and edits values, merges and
-formulas. A formula round-trips between its nodes and the text Numbers displays.
-
-**The format is mapped; the model binding is not.** Forty-six fixtures under
-`tests/fixtures/` each label their own contents, so a decode is verifiable rather than
-plausible. Styles, rich text and drawables are model stubs with no archive half yet.
-
-Apache-2.0. Hatchling, not setuptools. Dependencies are declared as floors, never pins.
-This is its own repository, on `develop`.
