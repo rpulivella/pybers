@@ -1355,7 +1355,7 @@ def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
 
 
 def test_aPlainNumericEditLeavesTheFormatListAlone(tmp_path: Path) -> None:
-    """Looking a format up bumps a refcount, so it happens only where a retype does."""
+    """The format list is rewritten only where a written record moved a count."""
     working = workingCopy("11-value-types-noformats", tmp_path)
     before = formatEntries(working, None)
     document = pybers.open(working)
