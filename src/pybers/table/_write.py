@@ -16,6 +16,12 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
+            written record moves the counts its format slots changed, and a
+            borrowed shape keeps only the format slot of its own kind. Byte 9
+            `0x10` stores the kind a cell displays with rather than a key. A
+            format nothing names is removed, and a merge releases the formats
+            of the records it removes.
 2026-09-14  Text is written and pooled, and a cell changes between text and
             a number, for #61. A format sits in the slot its kind uses, so a
             type change moves it, drops the control, and keeps the style.
@@ -34,6 +40,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
@@ -144,6 +151,8 @@ def writtenRecord(
     raised. Found by the golden on 2026-09-14.
     """
     refuseFormulaOverwrite(cell, record)
+    if borrowed:
+        record = decodeRecord(record.column, borrowedShape(record))
     value = cell.value
 
     if isinstance(value, str):
@@ -160,14 +169,10 @@ def writtenRecord(
         key = pool.keyFor(value, previous if isinstance(previous, int) else None)
         encoded = key.to_bytes(stringKeyWidth, "little")
         if record.typeByte == stringTypeByte:
-            patched = (
+            return (
                 record.raw[:valueOffset] + encoded
                 + record.raw[valueOffset + stringKeyWidth:]
             )
-            # A borrowed shape hands over its references, and a control is not one
-            # to hand over: writing into an empty cell gave it the pop-up menu of
-            # the cell whose shape it took. Found by the golden on 2026-09-14.
-            return withoutControl(patched) if borrowed else patched
         return retypedRecord(
             record, stringTypeByte, encoded,
             formatKey=formatFor(textFormatType),
@@ -306,6 +311,15 @@ currencyFormatSlot: tuple[int, int] = (9, 0x40)
 dateFormatSlot: tuple[int, int] = (9, 0x80)
 durationFormatSlot: tuple[int, int] = (10, 0x01)
 textFormatSlot: tuple[int, int] = (10, 0x02)
+checkboxFormatSlot: tuple[int, int] = (10, 0x04)
+
+# A format's refcount is how often its key sits in these slots, which reproduces
+# every format list in the fixtures. The order is Numbers' own: a kind is its
+# position here counted from 1, which is what `displayedKindSlot` stores.
+countedFormatSlots: tuple[tuple[int, int], ...] = (
+    numberFormatSlot, currencyFormatSlot, dateFormatSlot,
+    durationFormatSlot, textFormatSlot, checkboxFormatSlot,
+)
 
 # The control a cell presents as, a `control_cell_spec_table` key. Measured against
 # 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
@@ -314,12 +328,16 @@ textFormatSlot: tuple[int, int] = (10, 0x02)
 # star rating left on a cell that became text makes Numbers present text as stars.
 controlSlot: tuple[int, int] = (9, 0x04)
 
-# The format a cell currently displays with, as against the per-kind slots above,
-# which remember one format per kind so switching back restores what was there.
-# Set on nearly every record. Named on 2026-09-14 from the golden: two text cells
-# with identical slots read differently in the inspector, Text where this named the
-# text format and Automatic where it still named the number format.
-effectiveFormatSlot: tuple[int, int] = (9, 0x10)
+# Which per-kind slot a cell displays with, as a kind rather than a key: 1 number
+# through 6 checkbox. In all 11,581 records the fixtures carry, it names a kind slot
+# the record holds, and no refcount counts it. Read as a format key until
+# `54-format-star-rating` stored 5 where no list holds a key 5.
+displayedKindSlot: tuple[int, int] = (9, 0x10)
+
+
+def kindOf(slot: tuple[int, int]) -> int:
+    """Return the kind `displayedKindSlot` stores for one per-kind format slot."""
+    return countedFormatSlots.index(slot) + 1
 
 # Byte 6's high bit marks a format a person chose rather than one Numbers decided.
 # 108 text records carry it against 4515 that do not, and the Data Format inspector
@@ -338,8 +356,8 @@ automaticDecimalPlaces: int = 253
 automaticNegativeStyle: int = 0
 
 # The plain number `42` in `20-formula-shapes`, Numbers' own record for an unstyled
-# number: a twelve-byte header, the decimal128 value, then its format and effective
-# format keys, which a created record replaces with keys into its own table.
+# number: a twelve-byte header, the decimal128 value, then the kind it displays with
+# and its number format key, which a created record replaces with its table's own.
 plainNumberRecord: bytes = bytes.fromhex(
     "0502000000000000013000002a0000000000000000000000000040300100000001000000"
 )
@@ -366,7 +384,8 @@ def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
     """Return a key naming a format of this kind, creating one when there is none.
 
     A `260` entry carries nothing but its kind, so creating one states no more than
-    the corpus does.
+    the corpus does. Counts nothing: `formatReferencesMove` counts the record that
+    names the key, so looking a format up once for many cells counts every cell.
 
     **Takes the resolved list rather than resolving one.** `ArchiveIndex.resolve`
     parses the archive afresh on every call, so a function that resolved its own
@@ -376,11 +395,10 @@ def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
     """
     for entry in dataList.entries:
         if entry.HasField("format") and entry.format.format_type == formatType:
-            entry.refcount += 1
             return int(entry.key)
     fresh = dataList.entries.add()
     fresh.key = dataList.nextListID
-    fresh.refcount = 1
+    fresh.refcount = 0
     fresh.format.format_type = formatType
     if formatType == numberFormatType:
         fresh.format.decimal_places = automaticDecimalPlaces
@@ -388,6 +406,72 @@ def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
         fresh.format.show_thousands_separator = False
     dataList.nextListID += 1
     return int(fresh.key)
+
+
+def formatClaims(raw: bytes) -> Counter[int]:
+    """Return how often one record names each format, counted as refcounts count."""
+    references = decodeRecord(0, raw).references
+    return Counter(
+        key
+        for slot, key in zip(referenceSlots(raw), references, strict=True)
+        if slot in countedFormatSlots
+    )
+
+
+def formatReferencesMove(
+    dataList: tst.TableDataList, before: bytes | None, after: bytes | None, where: str
+) -> set[int]:
+    """Move refcounts from the formats a record named to those it names now.
+
+    `before` is None for a record no cell owned, and `after` for one being removed.
+    Only a slot that changed moves a count, so an entry no written record touches
+    keeps the count Numbers wrote even where that count disagrees with its cells.
+    Returns the keys whose counts moved.
+    """
+    change = formatClaims(after) if after is not None else Counter()
+    change.subtract(formatClaims(before) if before is not None else Counter())
+    entries = {int(entry.key): entry for entry in dataList.entries}
+    moved: set[int] = set()
+    for key, delta in change.items():
+        if not delta:
+            continue
+        entry = entries.get(key)
+        if entry is None:
+            if delta < 0:
+                continue
+            raise WriteError(
+                f"{where} would name format {key}, which its table's format list "
+                "does not hold."
+            )
+        entry.refcount = max(0, entry.refcount + delta)
+        moved.add(key)
+    return moved
+
+
+def removeSpentFormats(
+    dataList: tst.TableDataList, moved: set[int], tiles: list[tst.Tile]
+) -> None:
+    """Remove each format this save released to 0 that no record still names.
+
+    Numbers removes such an entry on save and never reuses its key, measured in
+    `54c-format-star-rating-cleared`. A count Numbers wrote can already undercount
+    its cells, so the records are read rather than the count trusted: removing an
+    entry a cell still names would leave that cell naming nothing.
+    """
+    spent = {
+        int(entry.key) for entry in dataList.entries
+        if entry.key in moved and entry.refcount == 0
+    }
+    for tile in tiles if spent else ():
+        for rowInfo in tile.rowInfos:
+            unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            for record in decodeRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+            ):
+                spent -= formatClaims(record.raw).keys()
+    for position in reversed(range(len(dataList.entries))):
+        if dataList.entries[position].key in spent:
+            del dataList.entries[position]
 
 
 def templateRecord(
@@ -430,9 +514,9 @@ def recordFresh(
 ) -> CellRecord:
     """Return Numbers' plain-number record for a table holding no record to copy.
 
-    A number keeps the record's format keys, so they are replaced with this table's
-    own. Text is retyped from it, which replaces both keys itself, so asking for a
-    number format there would leave an entry nothing names.
+    A number keeps the record's format key, so it is replaced with this table's own.
+    Text is retyped from it, which replaces the key itself, so asking for a number
+    format there would leave an entry nothing names.
     """
     key = 0
     if typeByte in numericTypeBytes:
@@ -443,7 +527,10 @@ def recordFresh(
                 "would name a format nothing holds."
             )
         key = found
-    references = key.to_bytes(referenceWidth, "little") * 2
+    references = (
+        kindOf(numberFormatSlot).to_bytes(referenceWidth, "little")
+        + key.to_bytes(referenceWidth, "little")
+    )
     return decodeRecord(column, plainNumberRecord[:-2 * referenceWidth] + references)
 
 
@@ -459,28 +546,32 @@ def stringValueWidth(record: CellRecord) -> int:
     )
 
 
-def withoutControl(raw: bytes) -> bytes:
-    """Return one record with its control and its chosen format dropped.
+def borrowedShape(record: CellRecord) -> bytes:
+    """Return a sibling's record reduced to what a new cell may take from it.
 
-    A control describes the cell it was built for, so a record shaped from a sibling
-    must not present as that sibling's pop-up menu or star rating.
+    A control describes the cell it was built for: writing into an empty cell gave
+    it the pop-up menu of the cell whose shape it took. Found by the golden on
+    2026-09-14. Byte 6's `0x80` goes too, marking a format a person chose, 108
+    records against 4515 that leave it clear.
 
-    Byte 6's `0x80` goes with it. It marks a format a person chose rather than let
-    Numbers decide, 108 records against 4515 that leave it clear, and typing text
-    into Numbers leaves it clear. A borrowed shape is not a borrowed decision.
+    So does every format slot but the one the record's own kind uses. A remembered
+    date or duration format is the sibling's, and naming it would claim a count in
+    a slot this library does not maintain. A borrowed shape is not a borrowed
+    decision.
     """
+    raw = record.raw
     raw = bytes(raw[:6]) + bytes([raw[6] & ~chosenFormatBit]) + bytes(raw[7:])
-    at, bit = controlSlot
-    if not raw[at] & bit:
-        return raw
+    own = textFormatSlot if record.typeByte == stringTypeByte else numberFormatSlot
+    dropped = {controlSlot, *countedFormatSlots} - {own}
     slots = referenceSlots(raw)
     start = len(raw) - len(slots) * referenceWidth
     kept = [
         raw[start + index * referenceWidth:start + (index + 1) * referenceWidth]
-        for index, slot in enumerate(slots) if slot != controlSlot
+        for index, slot in enumerate(slots) if slot not in dropped
     ]
     header = bytearray(raw[:start])
-    header[at] &= ~bit
+    for at, bit in dropped:
+        header[at] &= ~bit
     return bytes(header) + b"".join(kept)
 
 
@@ -520,9 +611,9 @@ def retypedRecord(
     }
     if formatKey is not None:
         carried[arriving] = formatKey
-        # The cell now displays as its new kind, so what it displays WITH follows.
-        if effectiveFormatSlot in carried:
-            carried[effectiveFormatSlot] = formatKey
+        # The cell now displays as its new kind, so the kind it displays with follows.
+        if displayedKindSlot in carried:
+            carried[displayedKindSlot] = kindOf(arriving)
 
     header = bytearray(record.raw[:valueOffset])
     header[typeByteOffset] = typeByte
@@ -720,12 +811,14 @@ def applyTableEdits(
     pool = formulaPoolFor(index, store)
     textPool = stringPoolFor(index, store)
     # Resolved ONCE, because resolving parses afresh and a second copy would take
-    # the edits with it. Touched only when a retype actually asks for a format.
+    # the edits with it. Rewritten only when a written record moved a count.
     formatList = (
         index.resolve(store.format_table, tst.TableDataList)
         if store.format_table.identifier else None
     )
     formatKeys: dict[int, int] = {}
+    formatsMoved: set[int] = set()
+    tiles: list[tst.Tile] = []
 
     def formatFor(formatType: int) -> int | None:
         """Return the key naming a format of this kind, caching the lookup."""
@@ -734,6 +827,16 @@ def applyTableEdits(
         if formatType not in formatKeys:
             formatKeys[formatType] = formatKeyFor(formatList, formatType)
         return formatKeys[formatType]
+
+    def formatsCount(
+        before: bytes | None, after: bytes | None, where: CellReference
+    ) -> None:
+        """Move the format refcounts one written or removed record changed."""
+        if formatList is not None:
+            formatsMoved.update(
+                formatReferencesMove(formatList, before, after, str(where))
+            )
+
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
@@ -765,6 +868,7 @@ def applyTableEdits(
     for entry in store.tiles.tiles:
         archive = index.archive(entry.tile.identifier)
         tile = index.resolve(entry.tile, tst.Tile)
+        tiles.append(tile)
         firstRow = entry.tileid * tileSize
         touched = False
 
@@ -800,11 +904,13 @@ def applyTableEdits(
             for record in decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, offsetUnit
             ):
-                if (row, record.column) in swallowed:
-                    continue
-                cell = table.cells.get(
-                    CellReference(row + originOffset, record.column + originOffset)
+                reference = CellReference(
+                    row + originOffset, record.column + originOffset
                 )
+                if (row, record.column) in swallowed:
+                    formatsCount(record.raw, None, reference)
+                    continue
+                cell = table.cells.get(reference)
                 if cell is None:
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
@@ -819,6 +925,7 @@ def applyTableEdits(
                     patched = writtenRecord(
                         cell, record, textPool, formatFor=formatFor
                     )
+                    formatsCount(record.raw, patched, reference)
                 if pool is not None and edit != "none":
                     patched = applyFormulaEdit(edit, patched, record, cell, pool)
                     if edit == "attach":
@@ -840,9 +947,8 @@ def applyTableEdits(
                 for column in range(table.colCount):
                     if column in present or (row, column) in swallowed:
                         continue
-                    cell = table.cells.get(
-                        CellReference(row + originOffset, column + originOffset)
-                    )
+                    reference = CellReference(row + originOffset, column + originOffset)
+                    cell = table.cells.get(reference)
                     if cell is None:
                         continue
                     if cell.formula is not None:
@@ -866,6 +972,7 @@ def applyTableEdits(
                     replacements[column] = writtenRecord(
                         cell, shape, textPool, borrowed=True, formatFor=formatFor
                     )
+                    formatsCount(None, replacements[column], reference)
             dropped = removals & present
             if not replacements and not dropped:
                 continue
@@ -895,7 +1002,8 @@ def applyTableEdits(
                 archive.identifier, 0, tile.SerializeToString()
             )
 
-    if formatList is not None and formatKeys:
+    if formatList is not None and formatsMoved:
+        removeSpentFormats(formatList, formatsMoved, tiles)
         formatId = store.format_table.identifier
         owners[formatId].messageReplace(
             formatId, 0, formatList.SerializeToString()
