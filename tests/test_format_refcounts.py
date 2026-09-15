@@ -8,7 +8,7 @@ asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
-            and spent formats for its AC 9.
+            spent formats and merges for its AC 9 and 10.
 """
 from __future__ import annotations
 
@@ -404,10 +404,11 @@ def test_aNumberInACreatedTableDisplaysAsANumberWhateverItsFormatKey(
         "11-text-written-and-retyped",
         "20-first-text-in-a-table",
         "20-tables-added",
+        "45-merged-by-pybers",
     ],
 )
 def test_aGoldenThatWroteCellsDisplaysKindsAndCountsCells(name: str) -> None:
-    """AC 5, 8 and 9, read from the goldens themselves rather than regenerated."""
+    """AC 5, 8, 9 and 10, read from the goldens themselves rather than regenerated."""
     golden = goldenDirectory / f"{name}.numbers"
     for index, model in tableModels(golden):
         for record in tableRecords(index, model):
@@ -461,3 +462,17 @@ def test_aFormatACellStillNamesIsKeptWhenItsCountSaysOtherwise(
     after, claims = formatLedger(working, "Table 1")
     assert claims[textKey] > 0, "other labels still name the text format"
     assert after[textKey] == 0, "kept, because removing it would orphan them"
+
+
+def test_aMergeReleasesTheFormatsOfTheRecordsItRemoves(tmp_path: Path) -> None:
+    """AC 10. `KJ7` holds text, and merging `KI7:KJ7` removes its record."""
+    working = workingCopy("45-columns-over-255", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].mergeAdd("KI7:KJ7")
+    document.save()
+
+    for index, model in tableModels(working):
+        formats = index.resolve(model.base_data_store.format_table, tst.TableDataList)
+        declared = {int(entry.key): int(entry.refcount) for entry in formats.entries}
+        claims = cellClaims(index, model)
+        assert declared == {key: claims[key] for key in declared}, model.table_name

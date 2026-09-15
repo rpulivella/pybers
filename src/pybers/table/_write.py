@@ -20,7 +20,8 @@ UPDATES
             written record moves the counts its format slots changed, and a
             borrowed shape keeps only the format slot of its own kind. Byte 9
             `0x10` stores the kind a cell displays with rather than a key. A
-            format nothing names is removed.
+            format nothing names is removed, and a merge releases the formats
+            of the records it removes.
 2026-09-14  Text is written and pooled, and a cell changes between text and
             a number, for #61. A format sits in the slot its kind uses, so a
             type change moves it, drops the control, and keeps the style.
@@ -907,6 +908,7 @@ def applyTableEdits(
                     row + originOffset, record.column + originOffset
                 )
                 if (row, record.column) in swallowed:
+                    formatsCount(record.raw, None, reference)
                     continue
                 cell = table.cells.get(reference)
                 if cell is None:
