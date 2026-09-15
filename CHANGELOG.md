@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-63] Add a sheet to a document and a table to a sheet
 - [PYB-62] Walk a table's grid, and reach a cell by row and column
 - [hotfix] Move the review rubric out of .github
 - [PYB-61] Write text into a cell, and change what a cell holds
