@@ -145,6 +145,7 @@ plausible entry in several lists at once.
 | byte 9 `0x80` | the **date** format | 24 of 24 name `261` and nothing else |
 | byte 10 `0x01` | the **duration** format | 19 of 19 name `268` and nothing else |
 | byte 10 `0x02` | the **text** format | 5427 of 5427 name `260` and nothing else |
+| byte 10 `0x04` | the **checkbox** format | the one checkbox in `11-value-types-noformats` names `263`; found by the refcounts below |
 
 **The slots are per format kind, not per cell.** A cell carries the slot its display
 needs, which is why a number and a string of the same table put their format reference
@@ -164,6 +165,15 @@ could not separate it: two text cells with identical slots read differently in N
 `Text` where this named the text format and `Automatic` where it still named the number
 format the cell had been. A plain number puts the same key in this slot and in byte 9
 `0x20`, which is why counting alone never told them apart.
+
+**Superseded 2026-09-15: byte 9 `0x10` holds a kind, not a key.** The paragraph above
+reads it as a format key, and it is not one. Its value is the position of a per-kind
+slot, counted from 1 in slot order: 1 number, 2 currency, 3 date, 4 duration, 5 text,
+6 checkbox. In all 11,581 records the fixtures carry, it names a kind slot the record
+holds. `54-format-star-rating` settles it, because its text cell stores 5 there and no
+data list in that table holds a key 5. The reading above survived because
+`11-value-types-noformats` keys its number format 1 and its text format 5, the same
+numbers as the kinds. `Text` and `Automatic` in the inspector were 5 and 1.
 
 **Byte 6 bit `0x80` marks a format a person chose** rather than one Numbers decided.
 4515 text records leave it clear against 108 that set it, and the Data Format inspector
@@ -190,6 +200,60 @@ text cell naming the format its number had, which Numbers accepts: confirmed in 
 15.3.1 on 2026-09-14, where a cell converted from a number displays as text with a Data
 Format of Automatic, and one converted from a star-rating control displays as plain text
 with no control.
+
+### What a format's refcount counts
+
+Measured 2026-09-15 for PYB-89 across all 89 tables in the fixtures that carry a format
+list. **A format entry's `refcount` is the number of times its key appears in the six
+per-kind slots**: number, currency, date, duration, text and checkbox. Each occurrence
+counts once, so a cell naming one format in two kind slots would count twice. That rule
+reproduces every declared refcount in every table.
+
+**Byte 9 `0x10` is not counted**, and cannot be: it holds a kind rather than a key, as
+recorded above. Counting it as a key breaks 22 of the 89 tables.
+
+`54-format-star-rating` and `54b-format-star-rating-released` agree with the rule. `54`
+counts its star-rating format twice, once for `A1` and once for the text label below
+it, which remembers the format in its number slot.
+
+An earlier audit, recorded in PYB-89, concluded that `11-value-types-noformats` and
+`12-number-currency` disagree with their cells around dates, checkboxes and currency.
+Under this rule neither does. That audit read fewer slots than Numbers counts.
+
+What pybers does with it: a written record moves counts by the difference between the
+format slots it held and those it holds now, so an entry no written record names keeps
+the count Numbers wrote, even one that disagrees with its cells. A shape borrowed from a
+sibling holds no claim before the write, and it keeps only its own kind's format slot.
+
+### What Numbers does with a format nothing names
+
+**Numbers removes it on save.** Measured 2026-09-15 against
+`54c-format-star-rating-cleared`, made from `54` by Clear All on `A1:A2`, which were the
+only two cells naming the star-rating format. Key 2 is absent from the saved format list,
+and `nextListID` stays at 3.
+
+The rest of the fixtures agree. None of their 4,899 data-list entries has a refcount of
+0, and nine format lists skip keys below `nextListID`, for example `18-formula-literals`
+holding keys 1 and 5 with `nextListID` 9.
+
+Its string list is not as simple. The label typed into `B1` after the clear sits at key
+1 with `nextListID` still 2, the key the cleared `A2` label held. Whether Numbers reused
+the key or rewrote the entry in place cannot be told from the saved file.
+
+`54b-format-star-rating-released` measures it for two other lists in the same table.
+Setting `A1`'s Data Format from Star Rating to Text dropped its control, and the control
+entry, whose count reached 0, is gone. Relabeling `A2` did the same to its old string.
+Both lists keep their `nextListID`, so neither key is reused.
+
+The format count did not reach 0 in that fixture, because Numbers kept the star rating in
+`A1`'s number slot and counted it there. Changing to Text also converted the value to the
+string `****` and set byte 6's chosen-format bit. pybers drops the slot a retype leaves,
+which is what releases the count, and Numbers accepted that in
+`11-text-written-and-retyped`.
+
+pybers keeps an entry whose count reaches 0, as its string and formula pools do.
+`11-text-written-and-retyped` carries one: the star-rating format, after `F1` became
+text.
 
 ## Currency is a distinct cell type, but not a distinct value encoding
 
