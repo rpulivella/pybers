@@ -9,8 +9,8 @@ asking the model, which would agree with itself while both halves were wrong.
 UPDATES
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
             spent formats and merges for its AC 9 and 10. Strings and styles
-            a merge removes, and spent strings, for PYB-92, with rich text
-            for its AC 5.
+            a merge removes, and spent strings, for PYB-92, with formulas and
+            rich text for its AC 5.
 """
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from test_formula_nodes import formulaCellRegister
 from test_writer import archiveDifferences, recordAt, retypedCells, workingCopy
 
 import pybers
@@ -672,6 +673,22 @@ def poolsAgreeWithCells(path: Path) -> list[str]:
     return disagreeing
 
 
+def test_aMergeReleasesTheFormulaOfACellItCoversAndDeregistersIt(
+    tmp_path: Path,
+) -> None:
+    """PYB-92 AC 5.i. `B1` holds `=2*3`, and merging `A1:B1` removes its record."""
+    working = workingCopy("18-formula-literals", tmp_path)
+    assert (0, 1) in formulaCellRegister(working)[0], "B1 holds a formula"
+    document = pybers.open(working)
+    document.sheets[0].tables[0].mergeAdd("A1:B1")
+    document.save()
+
+    expanded, tiled = formulaCellRegister(working)
+    assert (0, 1) not in expanded, "a covered cell is no longer a formula cell"
+    assert expanded == tiled
+    assert poolsAgreeWithCells(working) == []
+
+
 def test_aMergeReleasesTheRichTextOfACellItCovers(tmp_path: Path) -> None:
     """PYB-92 AC 5.ii. `C2` and `D2` are both rich text, and `D2` is covered."""
     working = workingCopy("30-style-align", tmp_path)
@@ -680,3 +697,19 @@ def test_aMergeReleasesTheRichTextOfACellItCovers(tmp_path: Path) -> None:
     document.save()
 
     assert poolsAgreeWithCells(working) == []
+
+
+def test_theMergedOverFormulaGoldenIsWhatTheWriterProduces(tmp_path: Path) -> None:
+    """PYB-92 AC 5.i, against the file Numbers opened, and its counts read directly."""
+    golden = goldenDirectory / "18-merged-over-a-formula.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = workingCopy("18-formula-literals", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].mergeAdd("A1:B1")
+    document.save()
+
+    differences = archiveDifferences(readPackage(golden), readPackage(working))
+    assert not differences, "\n  ".join(differences)
+    assert poolsAgreeWithCells(golden) == []
+    assert (0, 1) not in formulaCellRegister(golden)[0]

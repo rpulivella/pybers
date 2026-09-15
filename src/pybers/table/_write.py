@@ -16,8 +16,9 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
-2026-09-15  A merge releases the rich text, strings and styles of the records it
-            removes, and a string nothing names is removed, for PYB-92.
+2026-09-15  A merge releases the formulas, rich text, strings and styles of the
+            records it removes, and a string nothing names is removed, for
+            PYB-92.
 2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
             written record moves the counts its format slots changed, and a
             borrowed shape keeps only the format slot of its own kind. Byte 9
@@ -984,6 +985,9 @@ def applyTableEdits(
                         richTextMoved |= entriesRelease(
                             richTextList, richTextClaims(record)
                         )
+                    if pool is not None and carriesFormula(record):
+                        pool.release(record.references[formulaKeySlot(record)])
+                        formulaRemoved.append((row, record.column))
                     continue
                 cell = table.cells.get(reference)
                 if cell is None:
