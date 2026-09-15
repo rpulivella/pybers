@@ -46,6 +46,7 @@ from .._persistence import NumbersPackage, archiveCreate
 from .._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
 from .._persistence.metadata import PackageRegistry
 from .._persistence.template import (
+    ArchiveCopy,
     ArchiveTemplate,
     TemplateCopies,
     templatesCopy,
@@ -84,6 +85,7 @@ halfMask: int = (1 << halfBits) - 1
 wordBits: int = 32
 wordMask: int = (1 << wordBits) - 1
 
+ownerTypeId: int = 4008
 paragraphStyleTypeId: int = 2022
 treeNodeTypeId: int = 205
 treeNodeVersion: tuple[int, ...] = (1, 0, 5)
@@ -211,16 +213,22 @@ def uidsAssign(uidMap: tst.ColumnRowUIDMapArchive, rows: int, cols: int) -> None
         uidForIndex.extend(rank[position] for position in range(count))
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class DocumentStyles:
-    """The theme's first table style network, and the reset styles made from it."""
+    """The theme's first table style preset, its network, and its stylesheet."""
 
     preset: int
     network: tst.TableStyleNetworkArchive
     stylesheet: int
-    tableStyle: int = 0
-    cellStyle: int = 0
-    textStyle: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class ResetStyles:
+    """The three styles every text, cell and table slot of a created table names."""
+
+    tableStyle: int
+    cellStyle: int
+    textStyle: int
 
 
 def themeFor(index: ArchiveIndex) -> tuple[int, tn.ThemeArchive]:
@@ -263,7 +271,7 @@ def namedStyleFind(index: ArchiveIndex, stylesheetId: int) -> int | None:
 
 def resetStylesCreate(
     index: ArchiveIndex, registry: PackageRegistry, styles: DocumentStyles
-) -> None:
+) -> ResetStyles:
     """Create the reset's two variations, and `pybers-base` unless it exists."""
     network = styles.network
     bodyText = index.resolve(network.body_text_style, tswp.ParagraphStyleArchive)
@@ -301,11 +309,11 @@ def resetStylesCreate(
         stylesheet.identifier_to_style_map.add(
             identifier=key, style=tsp.Reference(identifier=textCopy.identifier)
         )
-        styles.textStyle = textCopy.identifier
-    else:
-        styles.textStyle = existing
-    styles.tableStyle = copies["table-style"].identifier
-    styles.cellStyle = copies["cell-style"].identifier
+    reset = ResetStyles(
+        tableStyle=copies["table-style"].identifier,
+        cellStyle=copies["cell-style"].identifier,
+        textStyle=copies["text-style"].identifier if existing is None else existing,
+    )
 
     componentId = registry.componentOf[styles.stylesheet]
     copies.place(registry, {"DocumentStylesheet": componentId})
@@ -314,8 +322,8 @@ def resetStylesCreate(
         stylesheet.styles.add(identifier=identifier)
         registry.objectUuidAdd(componentId, identifier, uuidFresh())
     for parent, child in (
-        (network.table_style.identifier, styles.tableStyle),
-        (network.body_cell_style.identifier, styles.cellStyle),
+        (network.table_style.identifier, reset.tableStyle),
+        (network.body_cell_style.identifier, reset.cellStyle),
     ):
         entry = next(
             (
@@ -339,10 +347,11 @@ def resetStylesCreate(
     if existing is None:
         themeId, theme = themeFor(index)
         presets = theme.super.Extensions[tswp.ThemePresetsArchive.extension]
-        presets.paragraph_style_presets.add(identifier=styles.textStyle)
+        presets.paragraph_style_presets.add(identifier=reset.textStyle)
         themeReferences = registry.strongReferencesOf(themeId)
-        themeReferences.append(styles.textStyle)
+        themeReferences.append(reset.textStyle)
         registry.archiveReplace(themeId, theme.SerializeToString(), themeReferences)
+    return reset
 
 
 def uuidFresh() -> tsp.UUID:
@@ -353,7 +362,7 @@ def uuidFresh() -> tsp.UUID:
 
 
 def styleBindings(
-    template: ArchiveTemplate, styles: DocumentStyles
+    template: ArchiveTemplate, styles: DocumentStyles, reset: ResetStyles
 ) -> dict[int, int]:
     """Bind every style the table model template names to what the reset puts there.
 
@@ -368,13 +377,13 @@ def styleBindings(
         if not template.body.HasField(name):
             continue
         if name == "table_style":
-            target = styles.tableStyle
+            target = reset.tableStyle
         elif name in ("table_name_style", "table_name_shape_style"):
             target = getattr(styles.network, name).identifier
         elif name.endswith("_text_style"):
-            target = styles.textStyle
+            target = reset.textStyle
         else:
-            target = styles.cellStyle
+            target = reset.cellStyle
         source = getattr(template.body, name).identifier
         if bindings.setdefault(source, target) != target:
             raise WriteError(
@@ -469,18 +478,22 @@ def tableCreate(
     sheetId: int,
     origin: Position,
     styles: DocumentStyles,
+    reset: ResetStyles,
     state: EngineState,
 ) -> int:
     """Create one table's archives and engine entries, and return its info archive."""
     modelTemplate = next(template for template in templates if template.role == "model")
     bindings = {templateSheet: sheetId, templatePreset: styles.preset}
-    bindings.update(styleBindings(modelTemplate, styles))
+    bindings.update(styleBindings(modelTemplate, styles, reset))
+    if not table.identifier:
+        table.identifier = ownerIdentityFresh()
     copies = templatesCopy(registry, templates, bindings)
 
     base = identityValue(table.identifier)
     renewal = UuidRenewal(base=base)
     owners = [
-        copy for role, copy in copies.copies.items() if role.startswith("owner-kind-")
+        copy for copy in copies.copies.values()
+        if copy.template.info.message_infos[0].type == ownerTypeId
     ]
     registered = [
         entry.internal_owner_id
@@ -489,9 +502,7 @@ def tableCreate(
     nextOwnerId = 1 + max(registered, default=0)
     ownerIds: dict[int, int] = {}
     for copy in owners:
-        body = copy.body
-        if not isinstance(body, tsce.FormulaOwnerDependenciesArchive):
-            continue
+        body = ownerBody(copy)
         ownerIds[body.internal_formula_owner_id] = nextOwnerId
         nextOwnerId += 1
     for copy in copies.copies.values():
@@ -507,9 +518,7 @@ def tableCreate(
 
     tracker = state.engine.dependency_tracker
     for copy in owners:
-        body = copy.body
-        if not isinstance(body, tsce.FormulaOwnerDependenciesArchive):
-            continue
+        body = ownerBody(copy)
         tracker.formula_owner_dependencies.add(identifier=copy.identifier)
         entry = tracker.owner_id_map.map_entry.add(
             internal_owner_id=body.internal_formula_owner_id
@@ -518,6 +527,15 @@ def tableCreate(
     tracker.number_of_formulas += formulasPerTable
     headerSlotAdd(state, base)
     return copies["table-info"].identifier
+
+
+def ownerBody(copy: ArchiveCopy) -> tsce.FormulaOwnerDependenciesArchive:
+    """Return an owner template's message, refusing a template of another type."""
+    if not isinstance(copy.body, tsce.FormulaOwnerDependenciesArchive):
+        raise WriteError(
+            f"The {copy.template.role!r} template is not a formula owner."
+        )
+    return copy.body
 
 
 def tableShape(copies: TemplateCopies, table: Table, origin: Position) -> None:
@@ -621,7 +639,13 @@ def tablesPending(
                 f"The tables of {sheet.name!r} are not the document's tables in the "
                 "document's order. Removing or reordering a table is not supported."
             )
-        created = [table for table in sheet.tables if table._identifier is None]
+        created = sheet.tables[len(kept):]
+        if any(table._identifier is not None for table in created):
+            raise WriteError(
+                f"A new table on {sheet.name!r} sits before a table already in the "
+                "document. A created table is placed after the existing ones, so it "
+                "has to be added after them."
+            )
         for table in created:
             if table.extent is None:
                 raise WriteError(
@@ -629,8 +653,6 @@ def tablesPending(
                     f"by {table.colCount} columns, and a table holds at least one of "
                     "each."
                 )
-            if not table.identifier:
-                table.identifier = ownerIdentityFresh()
         if created:
             pending.append((sheet, sheetArchive, created))
     return pending
@@ -645,7 +667,7 @@ def tablesCreate(
     if not pending:
         return
     styles = documentStyles(index)
-    resetStylesCreate(index, registry, styles)
+    reset = resetStylesCreate(index, registry, styles)
     state = engineState(index, registry)
     templates = templatesRead(templateDirectory / "table")
     for sheet, sheetArchive, created in pending:
@@ -666,7 +688,7 @@ def tablesCreate(
                 origin = Position(0.0, top)
                 top += table.rowCount * resetRowHeight + tableGap
             identifier = tableCreate(
-                registry, templates, table, sheetId, origin, styles, state
+                registry, templates, table, sheetId, origin, styles, reset, state
             )
             table._identifier = identifier
             tableIds.append(identifier)

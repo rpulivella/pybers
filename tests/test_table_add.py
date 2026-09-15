@@ -38,6 +38,7 @@ from pybers._persistence import PackageRegistry, readPackage
 from pybers._persistence.index import ArchiveIndex
 from pybers.document import Document, SelectionError
 from pybers.errors import WriteError
+from pybers.table import Table
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
@@ -422,6 +423,33 @@ def testSavingTwiceCreatesTheTableOnce(tmp_path: Path) -> None:
         table.name for table in pybers.open(tmp_path / "second.numbers").sheet(1).tables
     ]
     assert names == ["Table 1", "Table 2", "Once"]
+
+
+def testANewTableBeforeAnExistingOneIsRefusedAndWritesNothing(
+    tmp_path: Path,
+) -> None:
+    """Pairing is by position, so a table ahead of an old one would take its cells."""
+    document = shapes()
+    package = document._package
+    assert package is not None
+    before = archiveBodies(package)
+    document.sheet(1).tables.insert(0, Table("Ahead", rowCount=1, colCount=1))
+
+    with pytest.raises(WriteError, match="sits before a table already"):
+        document.save(tmp_path / "ahead.numbers")
+
+    assert archiveBodies(package) == before
+
+
+def testATableBuiltByHandAndAppendedIsCreated(tmp_path: Path) -> None:
+    document = shapes()
+    document.sheet(2).tables.append(Table("By hand", rowCount=2, colCount=2))
+
+    document.save(tmp_path / "hand.numbers")
+
+    reopened = pybers.open(tmp_path / "hand.numbers").sheet(2).table("By hand")
+    assert (reopened.rowCount, reopened.colCount) == (2, 2)
+    assert len(reopened.identifier) == 32
 
 
 def testRemovingATableIsRefused(tmp_path: Path) -> None:
