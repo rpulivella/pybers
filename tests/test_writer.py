@@ -62,7 +62,7 @@ from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
 from pybers.table._read import readMerges
-from pybers.table._write import referenceSlots
+from pybers.table._write import formatClaims
 
 fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
@@ -1316,26 +1316,6 @@ def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
     assert reopened.cell("I1").value == before, "the cell the shape came from"
 
 
-def test_aTypeChangeMovesTheFormatTheCellDisplaysWith(tmp_path: Path) -> None:
-    """Byte 9 `0x10` is the format in effect, and it follows the new kind.
-
-    Named on 2026-09-14 from the golden. Two text cells with identical slots read
-    differently in the inspector, Text where this slot named the text format and
-    Automatic where it still named the number format the cell had been.
-    """
-    working = workingCopy("11-value-types-noformats", tmp_path)
-    document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = "now text"
-    document.save()
-
-    record = recordAt(working, "A1")
-    slots = referenceSlots(record.raw)
-    keys = dict(zip(slots, record.references, strict=True))
-    assert keys[(9, 0x10)] == keys[(10, 0x02)], (
-        "the format in effect is the text format the kind slot names"
-    )
-
-
 def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
     """`ArchiveIndex.resolve` parses afresh, so a second copy takes the edits with it.
 
@@ -1350,7 +1330,7 @@ def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
 
     entries = formatEntries(working, "Table 2")
     assert 260 in {kind for _, kind in entries}, "the text format reached the file"
-    named = recordAt(working, "B1", table="Table 2").references
+    named = formatClaims(recordAt(working, "B1", table="Table 2").raw)
     assert set(named) <= {key for key, _ in entries}, "no cell names a missing format"
 
 

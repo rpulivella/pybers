@@ -18,7 +18,8 @@ one.
 UPDATES
 2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
             written record moves the counts its format slots changed, and a
-            borrowed shape keeps only the format slot of its own kind.
+            borrowed shape keeps only the format slot of its own kind. Byte 9
+            `0x10` stores the kind a cell displays with rather than a key.
 2026-09-14  Text is written and pooled, and a cell changes between text and
             a number, for #61. A format sits in the slot its kind uses, so a
             type change moves it, drops the control, and keeps the style.
@@ -311,8 +312,8 @@ textFormatSlot: tuple[int, int] = (10, 0x02)
 checkboxFormatSlot: tuple[int, int] = (10, 0x04)
 
 # A format's refcount is how often its key sits in these slots, which reproduces
-# every format list in the fixtures. Adding the effective slot below breaks 22 of
-# the 89 tables. See findings-01-values.md.
+# every format list in the fixtures. The order is Numbers' own: a kind is its
+# position here counted from 1, which is what `displayedKindSlot` stores.
 countedFormatSlots: tuple[tuple[int, int], ...] = (
     numberFormatSlot, currencyFormatSlot, dateFormatSlot,
     durationFormatSlot, textFormatSlot, checkboxFormatSlot,
@@ -325,12 +326,16 @@ countedFormatSlots: tuple[tuple[int, int], ...] = (
 # star rating left on a cell that became text makes Numbers present text as stars.
 controlSlot: tuple[int, int] = (9, 0x04)
 
-# The format a cell currently displays with, as against the per-kind slots above,
-# which remember one format per kind so switching back restores what was there.
-# Set on nearly every record. Named on 2026-09-14 from the golden: two text cells
-# with identical slots read differently in the inspector, Text where this named the
-# text format and Automatic where it still named the number format.
-effectiveFormatSlot: tuple[int, int] = (9, 0x10)
+# Which per-kind slot a cell displays with, as a kind rather than a key: 1 number
+# through 6 checkbox. In all 11,581 records the fixtures carry, it names a kind slot
+# the record holds, and no refcount counts it. Read as a format key until
+# `54-format-star-rating` stored 5 where no list holds a key 5.
+displayedKindSlot: tuple[int, int] = (9, 0x10)
+
+
+def kindOf(slot: tuple[int, int]) -> int:
+    """Return the kind `displayedKindSlot` stores for one per-kind format slot."""
+    return countedFormatSlots.index(slot) + 1
 
 # Byte 6's high bit marks a format a person chose rather than one Numbers decided.
 # 108 text records carry it against 4515 that do not, and the Data Format inspector
@@ -349,8 +354,8 @@ automaticDecimalPlaces: int = 253
 automaticNegativeStyle: int = 0
 
 # The plain number `42` in `20-formula-shapes`, Numbers' own record for an unstyled
-# number: a twelve-byte header, the decimal128 value, then its format and effective
-# format keys, which a created record replaces with keys into its own table.
+# number: a twelve-byte header, the decimal128 value, then the kind it displays with
+# and its number format key, which a created record replaces with its table's own.
 plainNumberRecord: bytes = bytes.fromhex(
     "0502000000000000013000002a0000000000000000000000000040300100000001000000"
 )
@@ -480,9 +485,9 @@ def recordFresh(
 ) -> CellRecord:
     """Return Numbers' plain-number record for a table holding no record to copy.
 
-    A number keeps the record's format keys, so they are replaced with this table's
-    own. Text is retyped from it, which replaces both keys itself, so asking for a
-    number format there would leave an entry nothing names.
+    A number keeps the record's format key, so it is replaced with this table's own.
+    Text is retyped from it, which replaces the key itself, so asking for a number
+    format there would leave an entry nothing names.
     """
     key = 0
     if typeByte in numericTypeBytes:
@@ -493,7 +498,10 @@ def recordFresh(
                 "would name a format nothing holds."
             )
         key = found
-    references = key.to_bytes(referenceWidth, "little") * 2
+    references = (
+        kindOf(numberFormatSlot).to_bytes(referenceWidth, "little")
+        + key.to_bytes(referenceWidth, "little")
+    )
     return decodeRecord(column, plainNumberRecord[:-2 * referenceWidth] + references)
 
 
@@ -574,9 +582,9 @@ def retypedRecord(
     }
     if formatKey is not None:
         carried[arriving] = formatKey
-        # The cell now displays as its new kind, so what it displays WITH follows.
-        if effectiveFormatSlot in carried:
-            carried[effectiveFormatSlot] = formatKey
+        # The cell now displays as its new kind, so the kind it displays with follows.
+        if displayedKindSlot in carried:
+            carried[displayedKindSlot] = kindOf(arriving)
 
     header = bytearray(record.raw[:valueOffset])
     header[typeByteOffset] = typeByte

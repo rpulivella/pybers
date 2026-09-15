@@ -7,7 +7,7 @@ compares what the file declares with what its cells actually reference rather th
 asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
-2026-09-15  Written for PYB-89.
+2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7.
 """
 from __future__ import annotations
 
@@ -36,7 +36,8 @@ from pybers._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
 from pybers.errors import WriteError
 from pybers.table._write import (
     borrowedShape,
-    effectiveFormatSlot,
+    countedFormatSlots,
+    displayedKindSlot,
     formatClaims,
     referenceSlots,
     textFormatSlot,
@@ -81,19 +82,22 @@ def tableRecords(
     return records
 
 
-def cellClaims(
-    index: ArchiveIndex, model: tst.TableModelArchive, extra: frozenset = frozenset()
-) -> Counter[int]:
-    """Return how often this table's cells name each format, `extra` slots included."""
+def cellClaims(index: ArchiveIndex, model: tst.TableModelArchive) -> Counter[int]:
+    """Return how often this table's cells name each format."""
     counted: Counter[int] = Counter()
     for record in tableRecords(index, model):
         counted.update(formatClaims(record.raw))
-        slots = referenceSlots(record.raw)
-        counted.update(
-            key for slot, key in zip(slots, record.references, strict=True)
-            if slot in extra
-        )
     return counted
+
+
+def displayedKind(record: CellRecord) -> tuple[int | None, set[int]]:
+    """Return the kind a record displays with, and the kinds of the slots it holds."""
+    named = dict(zip(referenceSlots(record.raw), record.references, strict=True))
+    held = {
+        position + 1 for position, slot in enumerate(countedFormatSlots)
+        if slot in named
+    }
+    return named.get(displayedKindSlot), held
 
 
 def formatLedger(path: Path, tableName: str) -> tuple[dict[int, int], Counter[int]]:
@@ -143,13 +147,8 @@ def formatListForge(
 
 
 def test_theCountedSlotsReproduceEveryFormatRefcountNumbersWrote() -> None:
-    """The measurement the counting rests on, run over every table in the fixtures.
-
-    Counting the effective slot as well breaks tables the kind slots reproduce,
-    which is what makes agreement here evidence rather than coincidence.
-    """
+    """The measurement the counting rests on, run over every table in the fixtures."""
     checked = 0
-    broken = 0
     for path in sorted(fixtureDirectory.glob("*.numbers")):
         for index, model in tableModels(path):
             if not model.base_data_store.format_table.identifier:
@@ -164,11 +163,26 @@ def test_theCountedSlotsReproduceEveryFormatRefcountNumbersWrote() -> None:
             assert {key: counted[key] for key in declared} == declared, (
                 f"{path.name} / {model.table_name}"
             )
-            withEffective = cellClaims(index, model, frozenset({effectiveFormatSlot}))
-            broken += {key: withEffective[key] for key in declared} != declared
             checked += 1
     assert checked >= 89
-    assert broken >= 22
+
+
+def test_everyRecordNumbersWroteDisplaysAKindItHolds() -> None:
+    """AC 7's measurement: byte 9 `0x10` is a position among the slots a record holds.
+
+    `11-value-types-noformats` keys its number and text formats 1 and 5, the same
+    numbers as their kinds, so only a file keyed otherwise tells a kind from a key.
+    """
+    checked = 0
+    for path in sorted(fixtureDirectory.glob("*.numbers")):
+        for index, model in tableModels(path):
+            for record in tableRecords(index, model):
+                kind, held = displayedKind(record)
+                if kind is None:
+                    continue
+                assert kind in held, f"{path.name} / {model.table_name} {record.column}"
+                checked += 1
+    assert checked >= 11581
 
 
 def test_textWrittenIntoSeveralCellsCountsEachOne(tmp_path: Path) -> None:
@@ -311,7 +325,7 @@ def test_aBorrowedShapeKeepsOnlyTheFormatSlotOfItsOwnKind() -> None:
 
     kept = set(referenceSlots(shaped.raw))
     assert len(referenceSlots(record.raw)) == 5, "the fixture cell remembers formats"
-    assert kept == {textFormatSlot, effectiveFormatSlot}
+    assert kept == {textFormatSlot, displayedKindSlot}
     assert not shaped.raw[6] & 0x80, "a chosen format is not borrowed either"
     assert shaped.value == record.value
 
@@ -335,3 +349,48 @@ def test_theRetypedGoldenCountsEveryFormatByItsCells(tmp_path: Path) -> None:
     )
     declared, claims = formatLedger(golden, "Table 1")
     assert declared == {key: claims[key] for key in declared}
+
+
+@pytest.mark.parametrize(
+    ("address", "value", "kind"),
+    [("A1", "now text", 5), ("J1", "into an empty cell", 5), ("A2", Decimal("5"), 1)],
+)
+def test_aWrittenCellDisplaysTheKindItsValueIs(
+    address: str, value: str | Decimal, kind: int, tmp_path: Path
+) -> None:
+    """AC 7. A retype, a borrowed shape, and text becoming a number."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell(address).value = value
+    document.save()
+
+    assert displayedKind(recordAt(working, address)) == (kind, {kind})
+
+
+def test_theFirstTextInATableDisplaysAsTextWhateverItsFormatKey(tmp_path: Path) -> None:
+    """AC 7. `Table 2` keys its created text format 2, which is the currency kind."""
+    working = workingCopy("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    document.sheet("Sheet 1").table("Table 2").cell("B1").value = "first text"
+    document.save()
+
+    assert formatKeyOfType(working, "Table 2", textFormatType) == 2
+    kind, held = displayedKind(recordAt(working, "B1", table="Table 2"))
+    assert (kind, held) == (5, {5})
+
+
+def test_aNumberInACreatedTableDisplaysAsANumberWhateverItsFormatKey(
+    tmp_path: Path,
+) -> None:
+    """AC 7. `Output` keys its number format 2 once text claimed key 1 first."""
+    working = workingCopy("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    table = document.sheetAdd("Fresh").tableAdd("Output", rows=2, cols=2)
+    table.cell("A1").value = "label"
+    table.cell("B2").value = Decimal("12.5")
+    document.save()
+
+    numberKey = formatKeyOfType(working, "Output", numberFormatType)
+    kind, held = displayedKind(recordAt(working, "B2", table="Output"))
+    assert numberKey != 1, "the key differs from the kind, or this proves nothing"
+    assert (kind, held) == (1, {1})
