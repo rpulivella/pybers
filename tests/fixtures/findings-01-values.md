@@ -260,6 +260,14 @@ text.
 still name it, so the table's records are read before an entry goes, and one still named
 stays. The string and formula pools still keep theirs, which PYB-92 takes up for strings.
 
+**Superseded 2026-09-15 for PYB-92: the string pool removes a spent entry too**, by the
+same rule and with the same guard, once the save ends, so text written later in that save
+can still share it. A merge now also releases the strings, styles, formulas and rich text
+of the records it removes, and reports each removed formula to the calculation engine. A string's refcount is how many text records name it, and a style's is how often
+its key sits in byte 8 `0x20` and `0x40`, and a rich-text entry's is how many rich-text
+records name it; all three reproduce every list in the fixtures. The
+formula pool still empties rather than removes, since no fixture has measured one at 0.
+
 ## Currency is a distinct cell type, but not a distinct value encoding
 
 Measured across `12-number-currency`, which carries nine currency variants beside a plain

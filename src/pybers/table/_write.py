@@ -16,6 +16,9 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-15  A merge releases the formulas, rich text, strings and styles of the
+            records it removes, and a string nothing names is removed, for
+            PYB-92.
 2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
             written record moves the counts its format slots changed, and a
             borrowed shape keeps only the format slot of its own kind. Byte 9
@@ -41,8 +44,8 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 from collections import Counter
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from .._generated import TSCEArchives_pb2 as tsce
@@ -235,6 +238,7 @@ class StringPool:
     dataList: tst.TableDataList
     stored: dict[int, str]
     touched: bool = False
+    released: set[int] = field(default_factory=set)
 
     def entryFor(self, key: int) -> tst.TableDataList.ListEntry | None:
         """Return one pooled entry by key, or None when the table has no such key."""
@@ -278,15 +282,15 @@ class StringPool:
     def release(self, key: int) -> None:
         """Give up one cell's claim on a stored string.
 
-        Emptied rather than deleted when nothing names it, because `nextListID`
-        never reuses a key and a removed entry would invite a reader to assume the
-        keys are dense.
+        An entry released to 0 stays until the save ends, so text written later in
+        the same save can still share it. `removeSpentEntries` decides then.
         """
         entry = self.entryFor(key)
         if entry is None:
             return
         self.touched = True
         entry.refcount = max(0, entry.refcount - 1)
+        self.released.add(key)
 
 
 def stringPoolFor(index: ArchiveIndex, store: tst.DataStore) -> StringPool | None:
@@ -448,30 +452,83 @@ def formatReferencesMove(
     return moved
 
 
-def removeSpentFormats(
-    dataList: tst.TableDataList, moved: set[int], tiles: list[tst.Tile]
-) -> None:
-    """Remove each format this save released to 0 that no record still names.
+def removeSpentEntries(
+    dataList: tst.TableDataList,
+    released: set[int],
+    tiles: list[tst.Tile],
+    claims: Callable[[CellRecord], Iterable[int]],
+) -> set[int]:
+    """Remove each entry this save released to 0 that no record still names.
 
-    Numbers removes such an entry on save and never reuses its key, measured in
-    `54c-format-star-rating-cleared`. A count Numbers wrote can already undercount
-    its cells, so the records are read rather than the count trusted: removing an
-    entry a cell still names would leave that cell naming nothing.
+    Numbers removes such an entry on save and never reuses its key, measured for a
+    format in `54c-format-star-rating-cleared` and a string in `54b`. A count
+    Numbers wrote can already undercount its cells, so the records are read rather
+    than the count trusted: removing an entry a cell still names would orphan it.
+    Returns the keys removed.
     """
     spent = {
         int(entry.key) for entry in dataList.entries
-        if entry.key in moved and entry.refcount == 0
+        if entry.key in released and entry.refcount == 0
     }
-    for tile in tiles if spent else ():
+    if not spent:
+        return spent
+    for tile in tiles:
         for rowInfo in tile.rowInfos:
             unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
             for record in decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
             ):
-                spent -= formatClaims(record.raw).keys()
+                spent.difference_update(claims(record))
     for position in reversed(range(len(dataList.entries))):
         if dataList.entries[position].key in spent:
             del dataList.entries[position]
+    return spent
+
+
+def stringClaims(record: CellRecord) -> Iterable[int]:
+    """Return the pooled string key a text record names, if it is one."""
+    if record.typeByte == stringTypeByte and isinstance(record.value, int):
+        return (record.value,)
+    return ()
+
+
+# A style's refcount is how often its key sits in these two slots, which reproduces
+# every style list in the fixtures, measured 2026-09-15 for PYB-92.
+countedStyleSlots: tuple[tuple[int, int], ...] = ((8, 0x20), (8, 0x40))
+
+
+def styleClaims(record: CellRecord) -> Iterable[int]:
+    """Return the style keys a record names, once per counted slot."""
+    return [
+        key
+        for slot, key in zip(
+            referenceSlots(record.raw), record.references, strict=True
+        )
+        if slot in countedStyleSlots
+    ]
+
+
+# A rich-text cell names its payload by key, and an entry's refcount is how many such
+# records name it, which reproduces all 16 rich-text lists in the fixtures.
+richTextTypeByte: int = 9
+
+
+def richTextClaims(record: CellRecord) -> Iterable[int]:
+    """Return the rich-text key a rich-text record names, if it is one."""
+    if record.typeByte == richTextTypeByte and isinstance(record.value, int):
+        return (record.value,)
+    return ()
+
+
+def entriesRelease(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
+    """Release one reference per key given, and say whether any count moved."""
+    named = Counter(keys)
+    moved = False
+    for entry in dataList.entries:
+        if entry.key in named:
+            entry.refcount = max(0, entry.refcount - named[entry.key])
+            moved = True
+    return moved
 
 
 def templateRecord(
@@ -819,6 +876,16 @@ def applyTableEdits(
     formatKeys: dict[int, int] = {}
     formatsMoved: set[int] = set()
     tiles: list[tst.Tile] = []
+    styleList = (
+        index.resolve(store.styleTable, tst.TableDataList)
+        if store.styleTable.identifier else None
+    )
+    stylesMoved = False
+    richTextList = (
+        index.resolve(store.rich_text_table, tst.TableDataList)
+        if store.HasField("rich_text_table") else None
+    )
+    richTextMoved = False
 
     def formatFor(formatType: int) -> int | None:
         """Return the key naming a format of this kind, caching the lookup."""
@@ -909,6 +976,18 @@ def applyTableEdits(
                 )
                 if (row, record.column) in swallowed:
                     formatsCount(record.raw, None, reference)
+                    if textPool is not None:
+                        for key in stringClaims(record):
+                            textPool.release(key)
+                    if styleList is not None:
+                        stylesMoved |= entriesRelease(styleList, styleClaims(record))
+                    if richTextList is not None:
+                        richTextMoved |= entriesRelease(
+                            richTextList, richTextClaims(record)
+                        )
+                    if pool is not None and carriesFormula(record):
+                        pool.release(record.references[formulaKeySlot(record)])
+                        formulaRemoved.append((row, record.column))
                     continue
                 cell = table.cells.get(reference)
                 if cell is None:
@@ -1003,13 +1082,32 @@ def applyTableEdits(
             )
 
     if formatList is not None and formatsMoved:
-        removeSpentFormats(formatList, formatsMoved, tiles)
+        removeSpentEntries(
+            formatList, formatsMoved, tiles,
+            lambda record: formatClaims(record.raw).keys(),
+        )
         formatId = store.format_table.identifier
         owners[formatId].messageReplace(
             formatId, 0, formatList.SerializeToString()
         )
 
+    if styleList is not None and stylesMoved:
+        styleId = store.styleTable.identifier
+        owners[styleId].messageReplace(
+            styleId, 0, styleList.SerializeToString()
+        )
+
+    if richTextList is not None and richTextMoved:
+        richTextId = store.rich_text_table.identifier
+        owners[richTextId].messageReplace(
+            richTextId, 0, richTextList.SerializeToString()
+        )
+
     if textPool is not None and textPool.touched:
+        for key in removeSpentEntries(
+            textPool.dataList, textPool.released, tiles, stringClaims
+        ):
+            textPool.stored.pop(key, None)
         textId = store.stringTable.identifier
         owners[textId].messageReplace(
             textId, 0, textPool.dataList.SerializeToString()

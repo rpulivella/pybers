@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-92] Release the strings and styles a merge removes
 - [PYB-89] Fix format refcounts drifting from the cells that name them
 - [hotfix] Give known issues a section in the PR template
 - [PYB-63] Add a sheet to a document and a table to a sheet
