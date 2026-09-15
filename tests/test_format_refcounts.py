@@ -25,7 +25,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from test_writer import recordAt, workingCopy
+from test_writer import archiveDifferences, recordAt, retypedCells, workingCopy
 
 import pybers
 from pybers._generated import TNArchives_pb2 as tn
@@ -314,3 +314,24 @@ def test_aBorrowedShapeKeepsOnlyTheFormatSlotOfItsOwnKind() -> None:
     assert kept == {textFormatSlot, effectiveFormatSlot}
     assert not shaped.raw[6] & 0x80, "a chosen format is not borrowed either"
     assert shaped.value == record.value
+
+
+def test_theRetypedGoldenCountsEveryFormatByItsCells(tmp_path: Path) -> None:
+    """AC 5. The golden is reproduced, and every count it stores matches its cells."""
+    golden = goldenDirectory / "11-text-written-and-retyped.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    for address, value in retypedCells:
+        table.cell(address).value = value
+    document.save()
+
+    differences = archiveDifferences(readPackage(golden), readPackage(working))
+    assert not differences, (
+        "the writer no longer produces the confirmed output:\n  "
+        + "\n  ".join(differences)
+    )
+    declared, claims = formatLedger(golden, "Table 1")
+    assert declared == {key: claims[key] for key in declared}
