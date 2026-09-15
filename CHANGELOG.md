@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [hotfix] Give known issues a section in the PR template
 - [PYB-63] Add a sheet to a document and a table to a sheet
 - [PYB-62] Walk a table's grid, and reach a cell by row and column
 - [hotfix] Move the review rubric out of .github
