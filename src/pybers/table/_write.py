@@ -19,7 +19,8 @@ UPDATES
 2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
             written record moves the counts its format slots changed, and a
             borrowed shape keeps only the format slot of its own kind. Byte 9
-            `0x10` stores the kind a cell displays with rather than a key.
+            `0x10` stores the kind a cell displays with rather than a key. A
+            format nothing names is removed.
 2026-09-14  Text is written and pooled, and a cell changes between text and
             a number, for #61. A format sits in the slot its kind uses, so a
             type change moves it, drops the control, and keeps the style.
@@ -417,18 +418,19 @@ def formatClaims(raw: bytes) -> Counter[int]:
 
 
 def formatReferencesMove(
-    dataList: tst.TableDataList, before: bytes | None, after: bytes, where: str
-) -> bool:
+    dataList: tst.TableDataList, before: bytes | None, after: bytes | None, where: str
+) -> set[int]:
     """Move refcounts from the formats a record named to those it names now.
 
-    `before` is None for a record no cell owned. Only a slot that changed moves a
-    count, so an entry no written record touches keeps the count Numbers wrote even
-    where that count disagrees with its cells. Returns whether any count moved.
+    `before` is None for a record no cell owned, and `after` for one being removed.
+    Only a slot that changed moves a count, so an entry no written record touches
+    keeps the count Numbers wrote even where that count disagrees with its cells.
+    Returns the keys whose counts moved.
     """
-    change = formatClaims(after)
+    change = formatClaims(after) if after is not None else Counter()
     change.subtract(formatClaims(before) if before is not None else Counter())
     entries = {int(entry.key): entry for entry in dataList.entries}
-    moved = False
+    moved: set[int] = set()
     for key, delta in change.items():
         if not delta:
             continue
@@ -441,8 +443,34 @@ def formatReferencesMove(
                 "does not hold."
             )
         entry.refcount = max(0, entry.refcount + delta)
-        moved = True
+        moved.add(key)
     return moved
+
+
+def removeSpentFormats(
+    dataList: tst.TableDataList, moved: set[int], tiles: list[tst.Tile]
+) -> None:
+    """Remove each format this save released to 0 that no record still names.
+
+    Numbers removes such an entry on save and never reuses its key, measured in
+    `54c-format-star-rating-cleared`. A count Numbers wrote can already undercount
+    its cells, so the records are read rather than the count trusted: removing an
+    entry a cell still names would leave that cell naming nothing.
+    """
+    spent = {
+        int(entry.key) for entry in dataList.entries
+        if entry.key in moved and entry.refcount == 0
+    }
+    for tile in tiles if spent else ():
+        for rowInfo in tile.rowInfos:
+            unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            for record in decodeRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+            ):
+                spent -= formatClaims(record.raw).keys()
+    for position in reversed(range(len(dataList.entries))):
+        if dataList.entries[position].key in spent:
+            del dataList.entries[position]
 
 
 def templateRecord(
@@ -788,7 +816,8 @@ def applyTableEdits(
         if store.format_table.identifier else None
     )
     formatKeys: dict[int, int] = {}
-    formatsMoved = False
+    formatsMoved: set[int] = set()
+    tiles: list[tst.Tile] = []
 
     def formatFor(formatType: int) -> int | None:
         """Return the key naming a format of this kind, caching the lookup."""
@@ -798,13 +827,14 @@ def applyTableEdits(
             formatKeys[formatType] = formatKeyFor(formatList, formatType)
         return formatKeys[formatType]
 
-    def formatsCount(before: bytes | None, after: bytes, cell: Cell) -> None:
-        """Move the format refcounts one written record changed."""
-        nonlocal formatsMoved
-        if formatList is not None and formatReferencesMove(
-            formatList, before, after, str(cell.reference)
-        ):
-            formatsMoved = True
+    def formatsCount(
+        before: bytes | None, after: bytes | None, where: CellReference
+    ) -> None:
+        """Move the format refcounts one written or removed record changed."""
+        if formatList is not None:
+            formatsMoved.update(
+                formatReferencesMove(formatList, before, after, str(where))
+            )
 
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
@@ -837,6 +867,7 @@ def applyTableEdits(
     for entry in store.tiles.tiles:
         archive = index.archive(entry.tile.identifier)
         tile = index.resolve(entry.tile, tst.Tile)
+        tiles.append(tile)
         firstRow = entry.tileid * tileSize
         touched = False
 
@@ -872,11 +903,12 @@ def applyTableEdits(
             for record in decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, offsetUnit
             ):
+                reference = CellReference(
+                    row + originOffset, record.column + originOffset
+                )
                 if (row, record.column) in swallowed:
                     continue
-                cell = table.cells.get(
-                    CellReference(row + originOffset, record.column + originOffset)
-                )
+                cell = table.cells.get(reference)
                 if cell is None:
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
@@ -891,7 +923,7 @@ def applyTableEdits(
                     patched = writtenRecord(
                         cell, record, textPool, formatFor=formatFor
                     )
-                    formatsCount(record.raw, patched, cell)
+                    formatsCount(record.raw, patched, reference)
                 if pool is not None and edit != "none":
                     patched = applyFormulaEdit(edit, patched, record, cell, pool)
                     if edit == "attach":
@@ -913,9 +945,8 @@ def applyTableEdits(
                 for column in range(table.colCount):
                     if column in present or (row, column) in swallowed:
                         continue
-                    cell = table.cells.get(
-                        CellReference(row + originOffset, column + originOffset)
-                    )
+                    reference = CellReference(row + originOffset, column + originOffset)
+                    cell = table.cells.get(reference)
                     if cell is None:
                         continue
                     if cell.formula is not None:
@@ -939,7 +970,7 @@ def applyTableEdits(
                     replacements[column] = writtenRecord(
                         cell, shape, textPool, borrowed=True, formatFor=formatFor
                     )
-                    formatsCount(None, replacements[column], cell)
+                    formatsCount(None, replacements[column], reference)
             dropped = removals & present
             if not replacements and not dropped:
                 continue
@@ -970,6 +1001,7 @@ def applyTableEdits(
             )
 
     if formatList is not None and formatsMoved:
+        removeSpentFormats(formatList, formatsMoved, tiles)
         formatId = store.format_table.identifier
         owners[formatId].messageReplace(
             formatId, 0, formatList.SerializeToString()

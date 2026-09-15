@@ -255,6 +255,11 @@ pybers keeps an entry whose count reaches 0, as its string and formula pools do.
 `11-text-written-and-retyped` carries one: the star-rating format, after `F1` became
 text.
 
+**Superseded 2026-09-15 for PYB-89: pybers now removes it**, as Numbers does, and leaves
+`nextListID` alone. An entry whose count Numbers wrote too low can reach 0 while cells
+still name it, so the table's records are read before an entry goes, and one still named
+stays. The string and formula pools still keep theirs, which PYB-92 takes up for strings.
+
 ## Currency is a distinct cell type, but not a distinct value encoding
 
 Measured across `12-number-currency`, which carries nine currency variants beside a plain

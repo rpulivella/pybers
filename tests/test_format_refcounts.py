@@ -7,7 +7,8 @@ compares what the file declares with what its cells actually reference rather th
 asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
-2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7.
+2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
+            and spent formats for its AC 9.
 """
 from __future__ import annotations
 
@@ -247,7 +248,8 @@ def test_aNumberBecomingTextReleasesItsNumberFormat(tmp_path: Path) -> None:
 
     after, _ = formatLedger(working, "Table 1")
     assert after[numberKey] == before[numberKey] - 1
-    assert (before[starKey], after[starKey]) == (1, 0)
+    assert before[starKey] == 1
+    assert starKey not in after, "released to 0, so removed as Numbers removes it"
 
 
 def test_textBecomingANumberReleasesTheTextFormat(tmp_path: Path) -> None:
@@ -398,10 +400,14 @@ def test_aNumberInACreatedTableDisplaysAsANumberWhateverItsFormatKey(
 
 @pytest.mark.parametrize(
     "name",
-    ["11-text-written-and-retyped", "20-first-text-in-a-table", "20-tables-added"],
+    [
+        "11-text-written-and-retyped",
+        "20-first-text-in-a-table",
+        "20-tables-added",
+    ],
 )
-def test_aGoldenThatWroteTextDisplaysKindsAndCountsCells(name: str) -> None:
-    """AC 5 and AC 8, read from the goldens themselves rather than regenerated."""
+def test_aGoldenThatWroteCellsDisplaysKindsAndCountsCells(name: str) -> None:
+    """AC 5, 8 and 9, read from the goldens themselves rather than regenerated."""
     golden = goldenDirectory / f"{name}.numbers"
     for index, model in tableModels(golden):
         for record in tableRecords(index, model):
@@ -411,3 +417,47 @@ def test_aGoldenThatWroteTextDisplaysKindsAndCountsCells(name: str) -> None:
         declared = {int(entry.key): int(entry.refcount) for entry in formats.entries}
         claims = cellClaims(index, model)
         assert declared == {key: claims[key] for key in declared}, model.table_name
+
+
+def formatListNext(path: Path, tableName: str) -> int:
+    """Return the key one table's format list would give its next entry."""
+    for index, model in tableModels(path):
+        if model.table_name == tableName:
+            formats = index.resolve(
+                model.base_data_store.format_table, tst.TableDataList
+            )
+            return int(formats.nextListID)
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+def test_aSpentFormatKeepsItsKeyRetired(tmp_path: Path) -> None:
+    """AC 9. `54c` shows Numbers removing the entry and leaving `nextListID` alone."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = formatListNext(working, "Table 1")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("F1").value = "was a star rating"
+    document.save()
+
+    assert formatListNext(working, "Table 1") == before
+
+
+def test_aFormatACellStillNamesIsKeptWhenItsCountSaysOtherwise(
+    tmp_path: Path,
+) -> None:
+    """AC 9 against AC 4. An undercounted format released to 0 still has cells."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    textKey = formatKeyOfType(working, "Table 1", textFormatType)
+
+    def textCountForge(formats: tst.TableDataList) -> None:
+        for entry in formats.entries:
+            if entry.key == textKey:
+                entry.refcount = 1
+
+    formatListForge(working, "Table 1", textCountForge)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A2").value = Decimal("5")
+    document.save()
+
+    after, claims = formatLedger(working, "Table 1")
+    assert claims[textKey] > 0, "other labels still name the text format"
+    assert after[textKey] == 0, "kept, because removing it would orphan them"
