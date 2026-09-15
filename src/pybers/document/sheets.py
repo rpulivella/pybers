@@ -23,6 +23,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-09-14  A sheet or a table is added, and each knows the archive it was read
+            from, for PYB-63.
 2026-09-08  Every reference in the document walked in one call, and a table
             reached by the identity a formula names it by, for #13.
 2026-09-08  Moved into `pybers.document` for #58, out of `pybers.model`.
@@ -50,10 +52,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from pybers.addressing.reference import tableNameSeparator
+from pybers.addressing.reference import lastColumn, lastRow, tableNameSeparator
 from pybers.drawable import GraphicalObject
 from pybers.errors import PybersError
-from pybers.table.cells import Cell, Table
+from pybers.geometry import Position
+from pybers.table.cells import Cell, Table, ownerIdentityFresh
 
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.
@@ -162,6 +165,13 @@ class Sheet:
     name: str
     tables: list[Table] = field(default_factory=list)
     graphicalObjects: list[GraphicalObject] = field(default_factory=list)
+    # The archive this sheet was read from or saved as, and None until it has one.
+    # Excluded from equality and `repr` for the reason `Document._package` is.
+    _identifier: int | None = field(default=None, repr=False, compare=False)
+    # The document holding this sheet, which a table added to it is linked to.
+    document: Document | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
 
     def table(self, nameOrPosition: str | int) -> Table:
         """Return one of this sheet's tables by its name or by its position.
@@ -173,6 +183,50 @@ class Sheet:
         return selected(
             self.tables, nameOrPosition, "table", repr(self.name), foldCase=True
         )
+
+    def tableAdd(
+        self, name: str, rows: int, cols: int, position: Position | None = None
+    ) -> Table:
+        """Add an empty table of a size, its top-left corner at a point, and return it.
+
+        With no position it lands below the tables already on the sheet. A name the
+        sheet carries, ignoring case, takes the first free `-1`, `-2` suffix.
+        """
+        if not isinstance(name, str) or not name:
+            raise SelectionError(
+                f"A table is added under a name, and {name!r} is none."
+            )
+        for axis, count, limit in (("rows", rows, lastRow), ("cols", cols, lastColumn)):
+            if (
+                not isinstance(count, int)
+                or isinstance(count, bool)
+                or not firstPosition <= count <= limit
+            ):
+                raise SelectionError(
+                    f"A table holds from {firstPosition} to {limit} {axis}, and "
+                    f"{count!r} is not a count in that range."
+                )
+        if position is not None and not isinstance(position, Position):
+            raise SelectionError(
+                f"A table is placed at a `pybers.Position`, and {position!r} is "
+                "not one."
+            )
+        taken = {table.name.casefold() for table in self.tables}
+        unique = name
+        suffix = 0
+        while unique.casefold() in taken:
+            suffix += 1
+            unique = f"{name}-{suffix}"
+        table = Table(
+            name=unique,
+            rowCount=rows,
+            colCount=cols,
+            identifier=ownerIdentityFresh(),
+            document=self.document,
+            _origin=position,
+        )
+        self.tables.append(table)
+        return table
 
 
 @dataclass(slots=True)
@@ -221,6 +275,32 @@ class Document:
                 if seen[table.name] == 1:
                     qualified[table.name] = table.identifier
         return qualified
+
+    def sheetAdd(self, name: str, position: int | None = None) -> Sheet:
+        """Add an empty sheet, last or at a position counted from one, and return it.
+
+        Numbers enforces nothing about sheet names, so a duplicate is accepted. The
+        sheet reaches the file when the document is saved.
+        """
+        if not isinstance(name, str) or not name:
+            raise SelectionError(
+                f"A sheet is added under a name, and {name!r} is none."
+            )
+        last = len(self.sheets) + firstPosition
+        if position is None:
+            position = last
+        if (
+            not isinstance(position, int)
+            or isinstance(position, bool)
+            or not firstPosition <= position <= last
+        ):
+            raise SelectionError(
+                f"A sheet is added at a position from {firstPosition} to {last}, and "
+                f"{position!r} is not one."
+            )
+        sheet = Sheet(name=name, document=self)
+        self.sheets.insert(position - firstPosition, sheet)
+        return sheet
 
     def tableFor(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.

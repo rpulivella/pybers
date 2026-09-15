@@ -1,0 +1,129 @@
+#| component: DocumentStylesheet
+#| identifier: 911653
+#| message_infos {
+#|   type: 2022
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   field_infos {
+#|     path {
+#|       path: 11
+#|       path: 43
+#|     }
+#|     unknown_field_rule: IgnoreAndPreserve
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 11
+#|       path: 47
+#|     }
+#|     unknown_field_rule: IgnoreAndPreserve
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 11
+#|       path: 46
+#|     }
+#|     type: Message
+#|     unknown_field_rule: IgnoreAndPreserve
+#|   }
+#|   object_references: 903872
+#| }
+super {
+  name: "pybers-base"
+  style_identifier: "text-0-paragraphstyle"
+  stylesheet {
+    identifier: 905039
+  }
+}
+override_count: 57
+char_properties {
+  bold: false
+  italic: false
+  font_size: 11.0
+  font_name: "AvenirNext-Regular"
+  font_color {
+    model: rgb
+    r: 0.0
+    g: 0.0
+    b: 0.0
+    a: 1.0
+    rgbspace: srgb
+    headroom: 1.0
+  }
+  language_null: true
+  superscript: kNoScript
+  underline: kNoUnderline
+  strikethru: kNoStrikethru
+  capitalization: kNoCaps
+  baseline_shift: 0.0
+  kerning: 0.0
+  ligatures: kStandardLigatures
+  shadow_null: true
+  strikethru_color_null: true
+  strikethru_width: 1.0
+  background_color_null: true
+  tracking: 0.0
+  underline_color_null: true
+  underline_width: 1.0
+  word_strikethru: false
+  word_underline: false
+  font_features_null: true
+  writing_direction: kWritingDirectionNatural
+  emphasis_marks_null: true
+  compatibility_font_name_null: true
+  is_named_point_size: false
+  capitalization_uses_linguistics: false
+  tsd_stroke_null: true
+  tsd_fill {
+    color {
+      model: rgb
+      r: 0.0
+      g: 0.0
+      b: 0.0
+      a: 1.0
+      rgbspace: srgb
+      headroom: 1.0
+    }
+  }
+  tsd_fill_should_fill_text_container: false
+}
+para_properties {
+  alignment: TATvalue4
+  decimal_tab: "."
+  default_tab_stops: 36.0
+  fill_null: true
+  first_line_indent: 0.0
+  hyphenate: true
+  keep_lines_together: false
+  keep_with_next: false
+  left_indent: 0.0
+  line_spacing {
+    mode: kExactLineSpacing
+    amount: 15.5
+  }
+  page_break_before: false
+  deprecated_borders: PBTvalue0
+  historical_rule_offset {
+    x: 0.0
+    y: 0.0
+  }
+  rule_width: 1.0
+  right_indent: 0.0
+  space_after: 0.0
+  space_before: 0.0
+  tabs {
+  }
+  widow_control: true
+  outline_level: 4294967295
+  outline_style: OSTvalue0
+  stroke_null: true
+  list_style {
+    identifier: 903872
+  }
+  following_style_null: true
+  show_in_bookmarks_list: true
+  show_in_toc_navigator: false
+  border_positions: 0
+  rounded_corners: false
+}

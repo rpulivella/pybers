@@ -1,0 +1,126 @@
+#| component: CalculationEngine
+#| identifier: 907628
+#| message_infos {
+#|   type: 6316
+#|   version: 3
+#|   version: 2
+#|   version: 10
+#|   object_references: 907551
+#|   object_references: 907641
+#|   object_references: 907642
+#|   object_references: 907552
+#|   object_references: 907553
+#|   object_references: 907556
+#|   object_references: 907558
+#|   object_references: 907559
+#|   object_references: 907560
+#|   object_references: 907561
+#|   object_references: 907554
+#|   object_references: 907562
+#|   object_references: 907643
+#|   object_references: 907557
+#|   object_references: 907555
+#|   object_references: 907644
+#|   object_references: 907645
+#| }
+table_info {
+  identifier: 907545
+}
+data_store {
+  rowHeaders {
+    bucketHashFunction: 1
+    buckets {
+      identifier: 907642
+    }
+  }
+  columnHeaders {
+    identifier: 907641
+  }
+  tiles {
+    tiles {
+      tileid: 0
+      tile {
+        identifier: 907551
+      }
+    }
+    tile_size: 256
+  }
+  stringTable {
+    identifier: 907552
+  }
+  styleTable {
+    identifier: 907553
+  }
+  formula_table {
+    identifier: 907556
+  }
+  nextRowStripID: 1
+  nextColumnStripID: 0
+  rowTileTree {
+    nodes {
+      key: 0
+      value: 0
+    }
+  }
+  columnTileTree {
+  }
+  format_table_pre_bnc {
+    identifier: 907562
+  }
+  formulaErrorTable {
+    identifier: 907558
+  }
+  storage_version_pre_bnc: 4
+  multipleChoiceListFormatTable {
+    identifier: 907643
+  }
+  rich_text_table {
+    identifier: 907559
+  }
+  conditionalstyletable {
+    identifier: 907554
+  }
+  commentStorageTable {
+    identifier: 907560
+  }
+  importWarningSetTable {
+    identifier: 907561
+  }
+  control_cell_spec_table {
+    identifier: 907557
+  }
+  format_table {
+    identifier: 907555
+  }
+}
+column_row_uids {
+  identifier: 907644
+}
+aggregate_formula_owner_uuid {
+  lower: 8665371034051433521
+  upper: 2965606220279224969
+}
+summary_cell_vendor {
+  identifier: 907645
+}
+category_column_width: 50.0
+summary_row_height_list: 0.0
+summary_row_height_list: 0.0
+summary_row_height_list: 0.0
+summary_row_height_list: 0.0
+summary_row_height_list: 0.0
+summary_row_height_list: 0.0
+label_row_height_list: 0.0
+label_row_height_list: 0.0
+label_row_height_list: 0.0
+label_row_height_list: 0.0
+label_row_height_list: 0.0
+label_row_height_list: 0.0
+label_row_visibility_list: 0
+label_row_visibility_list: 0
+label_row_visibility_list: 0
+label_row_visibility_list: 0
+label_row_visibility_list: 0
+label_row_visibility_list: 0
+group_sort_order {
+}

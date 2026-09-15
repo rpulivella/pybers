@@ -1,0 +1,11 @@
+#| component: new Tables/DataList
+#| identifier: 907555
+#| message_infos {
+#|   type: 6005
+#|   version: 3
+#|   version: 2
+#|   version: 10
+#| }
+listType: FORMAT
+nextListID: 1
+is_new_for_bnc: true

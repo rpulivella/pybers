@@ -1,0 +1,9 @@
+#| component: new Tables/HeaderStorageBucket
+#| identifier: 907642
+#| message_infos {
+#|   type: 6006
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+bucketHashFunction: 1

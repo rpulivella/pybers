@@ -21,6 +21,8 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-09-14  The package metadata, the sidebar tree, and every type a created
+            sheet, table or reset style holds, for PYB-63.
 2026-09-02  The three TSCE types the write path needs to request a recalculation,
             for #25.
 2026-08-31  Written for the document read path: root, sheets, tables, tiles,
@@ -40,8 +42,12 @@ from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSCEArchives_pb2 as tsce
+from .._generated import TSDArchives_pb2 as tsd
+from .._generated import TSKArchives_pb2 as tsk
+from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
+from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
 from ..errors import PybersError
 from .iwa import Archive
@@ -55,18 +61,40 @@ from .iwa import Archive
 archiveTypes: dict[int, type[Message]] = {
     1: tn.DocumentArchive,          # the root: holds the ordered sheet list
     2: tn.SheetArchive,             # a tab: its name and its ordered drawables
+    205: tsk.TreeNode,              # one entry in the sidebar's sheet and table tree
     401: tss.StylesheetArchive,     # the shared style registry
-    2001: tswp.StorageArchive,      # rich text, reached from a cell payload
+    2001: tswp.StorageArchive,      # rich text, and a sheet's headers and footers
+    2022: tswp.ParagraphStyleArchive,  # a named text style, or a variation of one
+    3047: tsd.GuideStorageArchive,  # a sheet's user-defined alignment guides
+    3097: tsd.StandinCaptionArchive,  # the empty title or caption slot of a drawable
     4000: tsce.CalculationEngineArchive,     # the dependency graph and dirty set
+    4004: tsce.TrackedReferenceStoreArchive,  # the references a sort rule tracks
     4008: tsce.FormulaOwnerDependenciesArchive,  # one owner's dependencies
     4009: tsce.CellRecordTileArchive,       # which cells of a tile hold formulas
     4011: tsce.ReferencesToDirtyArchive,     # cells to recalculate on next open
     6000: tst.TableInfoArchive,     # the drawable that wraps a table
     6001: tst.TableModelArchive,    # the table proper: geometry, stores, merges
     6002: tst.Tile,                 # one block of rows and their cell records
+    6003: tst.TableStyleArchive,    # a table's strokes, banding and border
     6004: tst.CellStyleArchive,     # a cell's resolved appearance
     6005: tst.TableDataList,        # the pooled strings, styles and formulas
+    6006: tst.HeaderStorageBucket,  # per-row and per-column sizes of a data store
+    6008: tstStyles.TableStylePresetArchive,  # one table style in the theme
+    6204: tst.HiddenStateFormulaOwnerArchive,  # the formula owner of hidden rows
     6218: tst.RichTextPayloadArchive,
+    6220: tst.FilterSetArchive,     # the filters a table's rows can be hidden by
+    6247: tst.TableStyleNetworkArchive,  # the styles a table style preset names
+    6267: tst.ColumnRowUIDMapArchive,  # row and column UIDs, and their order
+    6305: tst.StrokeSidecarArchive,  # the table's stroke layers
+    6316: tst.SummaryModelArchive,  # the summary rows categories and pivots add
+    6317: tst.SummaryCellVendorArchive,
+    6318: tst.CategoryOrderArchive,
+    6372: tst.CategoryOwnerRefArchive,
+    6373: tst.GroupByArchive,       # how a table's rows are grouped into categories
+    6366: tst.HeaderNameMgrArchive,  # each table's slot for natural-language names
+    6383: tst.GroupByArchive.GroupNodeArchive,
+    12009: tn.ThemeArchive,         # the theme and its style presets
+    11006: tspArchive.PackageMetadata,  # every component and its external references
 }
 
 

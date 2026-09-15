@@ -1,0 +1,72 @@
+#| component: CalculationEngine
+#| identifier: 907647
+#| message_infos {
+#|   type: 6373
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   field_infos {
+#|     path {
+#|       path: 17
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 18
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   object_references: 907648
+#| }
+group_by_uid {
+  lower: 8665371034051433520
+  upper: 2965606220279224969
+}
+group_node_root {
+  group_uid {
+    lower: 1
+    upper: 0
+  }
+  format_manager {
+  }
+}
+is_enabled: false
+indirect_agg_type_change_formula {
+  column: 0
+  row: 0
+}
+grouping_columns_formula {
+  column: 1
+  row: 0
+}
+aggs_in_group_root_formula {
+  column: 3
+  row: 0
+}
+grouping_column_headers_formula {
+  column: 2
+  row: 0
+}
+column_order_changed_formula {
+  column: 4
+  row: 0
+}
+row_order_changed_formula {
+  column: 5
+  row: 0
+}
+row_order_changed_ignoring_recalc_formula {
+  column: 6
+  row: 0
+}
+owner_index: 8
+hidden_states_changed_formula {
+  column: 7
+  row: 0
+}
+group_node_root_ref {
+  identifier: 907648
+}

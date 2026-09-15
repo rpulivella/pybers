@@ -1,0 +1,22 @@
+#| component: DocumentStylesheet
+#| identifier: 909643
+#| message_infos {
+#|   type: 6004
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#|   object_references: 904075
+#| }
+super {
+  parent {
+    identifier: 904075
+  }
+  is_variation: true
+  stylesheet {
+    identifier: 905039
+  }
+}
+override_count: 1
+cell_properties {
+  text_wrap: false
+}

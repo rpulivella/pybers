@@ -34,6 +34,8 @@ UPDATES
             measured against the corpus, not read off the schema.
 2026-09-08  Formulas, the engine and the index moved to modules of their own
             for #45, and a table carries the identity formulas name it by.
+2026-09-14  A sheet carries the identifier of the archive it was read from,
+            for PYB-63.
 """
 from __future__ import annotations
 
@@ -49,6 +51,7 @@ from pathlib import Path
 
 from .._engine import tableIdentities
 from .._generated import TNArchives_pb2 as tn
+from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import (
     readPackage,
@@ -65,7 +68,7 @@ from .sheets import Document, Sheet
 
 def readSheet(
     index: ArchiveIndex,
-    sheetArchive: tn.SheetArchive,
+    identifier: int,
     source: Path,
     identities: dict[int, str],
 ) -> Sheet:
@@ -75,18 +78,19 @@ def readSheet(
     share the list and belong to other tickets, so they are skipped by type here
     rather than parsed.
     """
-    sheet = Sheet(name=sheetArchive.name)
+    sheetArchive = index.resolve(tsp.Reference(identifier=identifier), tn.SheetArchive)
+    sheet = Sheet(name=sheetArchive.name, _identifier=identifier)
     for reference in sheetArchive.drawable_infos:
         if index.typeOf(reference) != tableInfoTypeId:
             continue
-        sheet.tables.append(
-            readTable(
-                index,
-                index.resolve(reference, tst.TableInfoArchive),
-                source,
-                identities.get(reference.identifier, ""),
-            )
+        table = readTable(
+            index,
+            index.resolve(reference, tst.TableInfoArchive),
+            source,
+            identities.get(reference.identifier, ""),
         )
+        table._identifier = reference.identifier
+        sheet.tables.append(table)
     return sheet
 
 
@@ -107,16 +111,12 @@ def open(path: Path | str) -> Document:  # noqa: A001
     identities = tableIdentities(index)
     for reference in root.sheets:
         document.sheets.append(
-            readSheet(
-                index,
-                index.resolve(reference, tn.SheetArchive),
-                source,
-                identities,
-            )
+            readSheet(index, reference.identifier, source, identities)
         )
     # Linked after the sheets are in, so a cell can name another table without the
     # caller passing the names, and so `Table.document` is never half a document.
     for sheet in document.sheets:
+        sheet.document = document
         for table in sheet.tables:
             table.document = document
     return document

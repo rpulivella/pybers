@@ -41,7 +41,7 @@ from decimal import Decimal
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import IWAFile, decodeRow, offsetUnitFor
+from .._persistence import IWAFile, decodeRecord, decodeRow, offsetUnitFor
 from .._persistence.cells import (
     CellRecord,
     carriesFormula,
@@ -332,6 +332,22 @@ chosenFormatBit: int = 0x80
 numberFormatType: int = 256
 textFormatType: int = 260
 
+# Numbers' automatic number format, identical in `11-value-types-noformats` and
+# `20-formula-shapes`: a `256` entry is never written bare, as a `260` one is.
+automaticDecimalPlaces: int = 253
+automaticNegativeStyle: int = 0
+
+# The plain number `42` in `20-formula-shapes`, Numbers' own record for an unstyled
+# number: a twelve-byte header, the decimal128 value, then its format and effective
+# format keys, which a created record replaces with keys into its own table.
+plainNumberRecord: bytes = bytes.fromhex(
+    "0502000000000000013000002a0000000000000000000000000040300100000001000000"
+)
+
+# A first row written into an empty tile carries 255 narrow offset slots, measured in
+# `01-text-plain`, `11-value-types-noformats` and `18-formula-literals` alike.
+narrowRowSlots: int = 255
+
 # Every bit that contributes one trailing reference, in the order the references
 # appear. Byte 8's low nibble names the value and carries none.
 slotOrder: tuple[tuple[int, int], ...] = (
@@ -366,6 +382,10 @@ def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
     fresh.key = dataList.nextListID
     fresh.refcount = 1
     fresh.format.format_type = formatType
+    if formatType == numberFormatType:
+        fresh.format.decimal_places = automaticDecimalPlaces
+        fresh.format.negative_style = automaticNegativeStyle
+        fresh.format.show_thousands_separator = False
     dataList.nextListID += 1
     return int(fresh.key)
 
@@ -403,6 +423,28 @@ def templateRecord(
         if candidate in found:
             return found[candidate]
     return None
+
+
+def recordFresh(
+    column: int, typeByte: int, formatFor: Callable[[int], int | None]
+) -> CellRecord:
+    """Return Numbers' plain-number record for a table holding no record to copy.
+
+    A number keeps the record's format keys, so they are replaced with this table's
+    own. Text is retyped from it, which replaces both keys itself, so asking for a
+    number format there would leave an entry nothing names.
+    """
+    key = 0
+    if typeByte in numericTypeBytes:
+        found = formatFor(numberFormatType)
+        if found is None:
+            raise WriteError(
+                "This table carries no format list, so a number written into it "
+                "would name a format nothing holds."
+            )
+        key = found
+    references = key.to_bytes(referenceWidth, "little") * 2
+    return decodeRecord(column, plainNumberRecord[:-2 * referenceWidth] + references)
 
 
 def stringValueWidth(record: CellRecord) -> int:
@@ -523,25 +565,30 @@ def rowStorageCreate(tile: tst.Tile, tileRowIndex: int) -> tst.TileRowInfo:
     The offset array's length is copied from a sibling rather than computed: a
     narrow row carries a fixed 255 slots whatever the column count, and the one
     wide row measured carries one slot per column, so a rule fitted to that single
-    sample would be a guess. A tile holding no row to copy is refused by the caller.
+    sample would be a guess. A tile holding no row takes the narrow shape Numbers
+    writes for a first row, which the caller allows only where 255 slots suffice.
 
     `numrows` is corrected because Numbers keeps it accurate, and `numCells`,
     `maxRow` and `maxColumn` are left alone because Numbers writes zero in all
     three on tiles full of data.
     """
-    sibling = tile.rowInfos[0]
-    empty = emptyOffset.to_bytes(offsetWidth, "little") * (
-        len(sibling.cell_offsets) // offsetWidth
+    sibling = tile.rowInfos[0] if tile.rowInfos else None
+    slots = (
+        len(sibling.cell_offsets) // offsetWidth if sibling is not None
+        else narrowRowSlots
     )
+    empty = emptyOffset.to_bytes(offsetWidth, "little") * slots
     created = tst.TileRowInfo()
     created.tile_row_index = tileRowIndex
     created.cell_count = 0
     created.cell_storage_buffer_pre_bnc = b""
     created.cell_offsets_pre_bnc = empty
-    created.storage_version = sibling.storage_version
+    created.storage_version = (
+        sibling.storage_version if sibling is not None else tile.storage_version
+    )
     created.cell_storage_buffer = b""
     created.cell_offsets = empty
-    if sibling.has_wide_offsets:
+    if sibling is not None and sibling.has_wide_offsets:
         created.has_wide_offsets = True
 
     at = len(tile.rowInfos)
@@ -730,12 +777,12 @@ def applyTableEdits(
                 firstRow + rowInfo.tile_row_index for rowInfo in tile.rowInfos
             )
             for missing in rowsNeedingStorage(table, firstRow, tileSize, stored):
-                if not tile.rowInfos:
+                if not tile.rowInfos and table.colCount > narrowRowSlots:
                     raise WriteError(
-                        f"Row {missing + originOffset} of {table.name!r} holds a "
-                        "formula and its tile stores no row to take the shape of. "
-                        "Writing into an empty tile is not supported, and the "
-                        "formula would be lost without this refusal."
+                        f"Row {missing + originOffset} of {table.name!r} is the first "
+                        f"row of an empty tile in a table of {table.colCount} columns. "
+                        "Numbers' first row for more than 255 columns has not been "
+                        "measured, so it is not written."
                     )
                 rowStorageCreate(tile, missing - firstRow)
                 createdRows.add(missing)
@@ -815,11 +862,7 @@ def applyTableEdits(
                     )
                     shape = templateRecord(index, store, wanted)
                     if shape is None:
-                        raise WriteError(
-                            f"{cell.reference} needs a record this table has no "
-                            f"example of: nothing in {table.name!r} holds a value "
-                            f"of type {wanted} to take the references from."
-                        )
+                        shape = recordFresh(column, wanted, formatFor)
                     replacements[column] = writtenRecord(
                         cell, shape, textPool, borrowed=True, formatFor=formatFor
                     )

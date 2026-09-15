@@ -1,0 +1,12 @@
+#| component: CalculationEngine
+#| identifier: 907638
+#| message_infos {
+#|   type: 6220
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+type: FilterSetArchiveTypeAll
+is_enabled: false
+needs_formula_rewrite_for_import: false
+filter_offsets: 0

@@ -1,0 +1,117 @@
+#| component: CalculationEngine
+#| identifier: 907590
+#| message_infos {
+#|   type: 4008
+#|   version: 3
+#|   version: 2
+#|   version: 10
+#|   object_references: 907624
+#| }
+formula_owner_uid {
+  lower: 8665371034051433520
+  upper: 2965606220279224969
+}
+internal_formula_owner_id: 44
+owner_kind: 8
+cell_dependencies {
+  cell_record {
+    column: 0
+    row: 0
+    expanded_edges {
+      edge_without_owner_rows: 0
+      edge_without_owner_columns: 2
+    }
+  }
+  cell_record {
+    column: 1
+    row: 0
+    expanded_edges {
+    }
+  }
+  cell_record {
+    column: 2
+    row: 0
+    expanded_edges {
+    }
+  }
+  cell_record {
+    column: 3
+    row: 0
+    expanded_edges {
+    }
+  }
+  cell_record {
+    column: 7
+    row: 0
+    expanded_edges {
+      edge_with_owner_rows: 0
+      edge_with_owner_columns: 11
+      internal_owner_id_for_edge: 42
+    }
+  }
+}
+range_dependencies {
+}
+volatile_dependencies {
+  volatile_time_cells {
+  }
+  volatile_random_cells {
+  }
+  volatile_locale_cells {
+  }
+  volatile_sheet_table_name_cells {
+  }
+  volatile_remote_data_cells {
+  }
+  volatile_geometry_cell_refs {
+  }
+}
+spanning_column_dependencies {
+  total_range_for_table {
+    top_left_column: 32767
+    top_left_row: 2147483647
+    bottom_right_column: 32767
+    bottom_right_row: 2147483647
+  }
+  body_range_for_table {
+    top_left_column: 32767
+    top_left_row: 2147483647
+    bottom_right_column: 32767
+    bottom_right_row: 2147483647
+  }
+}
+spanning_row_dependencies {
+  total_range_for_table {
+    top_left_column: 32767
+    top_left_row: 2147483647
+    bottom_right_column: 32767
+    bottom_right_row: 2147483647
+  }
+  body_range_for_table {
+    top_left_column: 32767
+    top_left_row: 2147483647
+    bottom_right_column: 32767
+    bottom_right_row: 2147483647
+  }
+}
+whole_owner_dependencies {
+  dependent_cells {
+  }
+}
+cell_errors {
+}
+base_owner_uid {
+  lower: 8665371034051433512
+  upper: 2965606220279224969
+}
+tiled_cell_dependencies {
+  cell_record_tiles {
+    identifier: 907624
+  }
+}
+uuid_references {
+}
+tiled_range_dependencies {
+}
+spill_range_sizes {
+}

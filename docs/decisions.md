@@ -112,6 +112,33 @@ Two consequences that are easy to get wrong:
 
 ---
 
+## A created sheet or table starts from the pybers reset, decided 2026-09-14
+
+A spreadsheet built by a program serves a different purpose from one built in the
+interface, so pybers does not start from Numbers' own new sheet or table. It starts from a
+reset, in the sense of a CSS reset: every value stated, nothing inherited from a theme by
+accident. The measurements behind it are in `tests/fixtures/findings-10-creation.md`.
+
+A created **sheet** prints 1:1, with autofit off and a content scale of 1.0, because
+printing at true size is Numbers' strongest use. Its margins are 1 in at top and bottom and
+0.75 in at left and right, and its headers and footers are empty, with no page number. Its
+background is the theme's sheet style, which fills white: a sheet without a fill was the
+intent, and Numbers cannot make one, so pybers does not write one either.
+
+A created **table** has no gridlines and no border, no header rows, columns or footer, and
+no title or caption. Its text is Avenir Next Regular at 11 pt on exactly 15.5 pt, a face
+every Mac and iPad carries, with wrapping off so written output never reflows a row. Cells
+keep Numbers' 4 pt padding, rows are 24 pt, one exact line plus the padding with half a
+point to spare, and columns are 72 pt, exactly 1 in, so a table's printed width is simple
+arithmetic.
+
+The text style is a named paragraph style, `pybers-base`, created once per document and
+found again by name, so a Numbers user restyles every pybers table by editing one style.
+The name leads with `pybers` so later styles sort beside it, and carries no leading `.` or
+`_`, since Numbers hides neither.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

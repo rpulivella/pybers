@@ -1,0 +1,586 @@
+#| component: CalculationEngine
+#| identifier: 907548
+#| message_infos {
+#|   type: 6001
+#|   version: 3
+#|   version: 2
+#|   version: 10
+#|   field_infos {
+#|     path {
+#|       path: 86
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 85
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 82
+#|     }
+#|     type: Message
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 70
+#|     }
+#|     type: Message
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|     object_references: 907637
+#|     object_references: 907638
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 80
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 79
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 78
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 77
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 76
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 75
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 74
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 73
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 72
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 71
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 69
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 68
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 67
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 66
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 65
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 64
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 63
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 62
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 61
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 60
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 4
+#|       path: 22
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 4
+#|       path: 21
+#|     }
+#|     type: ObjectReference
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   field_infos {
+#|     path {
+#|       path: 81
+#|     }
+#|     type: Message
+#|     unknown_field_rule: IgnoreAndPreserveUntilModified
+#|   }
+#|   object_references: 907521
+#|   object_references: 907630
+#|   object_references: 907631
+#|   object_references: 907522
+#|   object_references: 907523
+#|   object_references: 907526
+#|   object_references: 907528
+#|   object_references: 907529
+#|   object_references: 907530
+#|   object_references: 907531
+#|   object_references: 907524
+#|   object_references: 907532
+#|   object_references: 907632
+#|   object_references: 907527
+#|   object_references: 907525
+#|   object_references: 904074
+#|   object_references: 904076
+#|   object_references: 904077
+#|   object_references: 904078
+#|   object_references: 904075
+#|   object_references: 903891
+#|   object_references: 903892
+#|   object_references: 904079
+#|   object_references: 904080
+#|   object_references: 904081
+#|   object_references: 904082
+#|   object_references: 904083
+#|   object_references: 904084
+#|   object_references: 904085
+#|   object_references: 904086
+#|   object_references: 904087
+#|   object_references: 904088
+#|   object_references: 904089
+#|   object_references: 904090
+#|   object_references: 904091
+#|   object_references: 904092
+#|   object_references: 904093
+#|   object_references: 904094
+#|   object_references: 904095
+#|   object_references: 904096
+#|   object_references: 904097
+#|   object_references: 904098
+#|   object_references: 907633
+#|   object_references: 907634
+#|   object_references: 907635
+#|   object_references: 907636
+#|   object_references: 907637
+#|   object_references: 907638
+#|   object_references: 907639
+#|   object_references: 907640
+#| }
+table_id: "2854985B-0B95-4178-899A-6E1725F32729"
+table_style {
+  identifier: 904074
+}
+base_data_store {
+  rowHeaders {
+    bucketHashFunction: 1
+    buckets {
+      identifier: 907631
+    }
+  }
+  columnHeaders {
+    identifier: 907630
+  }
+  tiles {
+    tiles {
+      tileid: 0
+      tile {
+        identifier: 907521
+      }
+    }
+    tile_size: 256
+  }
+  stringTable {
+    identifier: 907522
+  }
+  styleTable {
+    identifier: 907523
+  }
+  formula_table {
+    identifier: 907526
+  }
+  nextRowStripID: 1
+  nextColumnStripID: 0
+  rowTileTree {
+    nodes {
+      key: 0
+      value: 0
+    }
+  }
+  columnTileTree {
+  }
+  format_table_pre_bnc {
+    identifier: 907532
+  }
+  formulaErrorTable {
+    identifier: 907528
+  }
+  storage_version_pre_bnc: 4
+  multipleChoiceListFormatTable {
+    identifier: 907632
+  }
+  rich_text_table {
+    identifier: 907529
+  }
+  conditionalstyletable {
+    identifier: 907524
+  }
+  commentStorageTable {
+    identifier: 907530
+  }
+  importWarningSetTable {
+    identifier: 907531
+  }
+  control_cell_spec_table {
+    identifier: 907527
+  }
+  format_table {
+    identifier: 907525
+  }
+}
+number_of_rows: 3
+number_of_columns: 4
+table_name: "Table 1"
+header_rows_frozen: true
+header_columns_frozen: true
+default_row_height: 19.929931640625
+default_column_width: 98.0
+body_cell_style {
+  identifier: 904075
+}
+header_row_style {
+  identifier: 904076
+}
+header_column_style {
+  identifier: 904077
+}
+footer_row_style {
+  identifier: 904078
+}
+body_text_style {
+  identifier: 903892
+}
+header_row_text_style {
+  identifier: 903891
+}
+header_column_text_style {
+  identifier: 903891
+}
+footer_row_text_style {
+  identifier: 903891
+}
+repeating_header_rows_enabled: true
+table_name_style {
+  identifier: 904094
+}
+style_apply_clears_all: false
+repeating_header_columns_enabled: true
+table_name_height: 0.0
+hidden_state_formula_owner_for_columns {
+  identifier: 907639
+}
+hidden_state_formula_owner_for_rows {
+  identifier: 907640
+}
+table_name_shape_style {
+  identifier: 904095
+}
+conditional_style_formula_owner_id {
+  uuid_w0: 1536709675
+  uuid_w1: 2017563915
+  uuid_w2: 393124489
+  uuid_w3: 690484005
+}
+sort_order {
+  type: entire_table
+}
+sort_rule_reference_tracker {
+  reference_tracker {
+    identifier: 907633
+  }
+}
+base_column_row_uids {
+  identifier: 907634
+}
+merge_owner {
+  owner_id {
+    uuid_w0: 1536709677
+    uuid_w1: 2017563915
+    uuid_w2: 393124489
+    uuid_w3: 690484005
+  }
+  formula_store {
+    next_formula_index: 0
+  }
+}
+table_style_preset {
+  identifier: 904099
+}
+stroke_sidecar {
+  identifier: 907635
+}
+category_level_1_style {
+  identifier: 904079
+}
+category_level_2_style {
+  identifier: 904080
+}
+category_level_3_style {
+  identifier: 904081
+}
+category_level_4_style {
+  identifier: 904082
+}
+category_level_5_style {
+  identifier: 904083
+}
+category_level_1_text_style {
+  identifier: 903891
+}
+category_level_2_text_style {
+  identifier: 903891
+}
+category_level_3_text_style {
+  identifier: 903891
+}
+category_level_4_text_style {
+  identifier: 903891
+}
+category_level_5_text_style {
+  identifier: 903891
+}
+hidden_states_owner {
+  owner_uid {
+    lower: 8665371034051433516
+    upper: 2965606220279224969
+  }
+  hidden_states {
+    hidden_states_uid {
+      lower: 8665371034051433516
+      upper: 2965606220279224969
+    }
+    column_hidden_state_extent {
+      hidden_state_extent_uid {
+        lower: 8665371034051433523
+        upper: 2965606220279224969
+      }
+      row_or_column_direction: ColumnDirection
+      needs_to_update_filter_set_for_import: false
+      filter_set {
+        identifier: 907637
+      }
+    }
+    row_hidden_state_extent {
+      hidden_state_extent_uid {
+        lower: 8665371034051433516
+        upper: 2965606220279224969
+      }
+      row_or_column_direction: RowDirection
+      needs_to_update_filter_set_for_import: false
+      filter_set {
+        identifier: 907638
+      }
+    }
+  }
+}
+label_level_1_style {
+  identifier: 904084
+}
+label_level_2_style {
+  identifier: 904085
+}
+label_level_3_style {
+  identifier: 904086
+}
+label_level_4_style {
+  identifier: 904087
+}
+label_level_5_style {
+  identifier: 904088
+}
+label_level_1_text_style {
+  identifier: 904089
+}
+label_level_2_text_style {
+  identifier: 904090
+}
+label_level_3_text_style {
+  identifier: 904091
+}
+label_level_4_text_style {
+  identifier: 904092
+}
+label_level_5_text_style {
+  identifier: 904093
+}
+category_owner_deprecated {
+  owner_uid {
+    lower: 0
+    upper: 0
+  }
+  group_by {
+    group_by_uid {
+      lower: 8665371034051433520
+      upper: 2965606220279224969
+    }
+    group_node_root {
+      group_uid {
+        lower: 1
+        upper: 0
+      }
+      format_manager {
+      }
+    }
+    is_enabled: false
+    indirect_agg_type_change_formula {
+      column: 0
+      row: 0
+    }
+    grouping_columns_formula {
+      column: 1
+      row: 0
+    }
+    aggs_in_group_root_formula {
+      column: 3
+      row: 0
+    }
+    grouping_column_headers_formula {
+      column: 2
+      row: 0
+    }
+    column_order_changed_formula {
+      column: 4
+      row: 0
+    }
+    row_order_changed_formula {
+      column: 5
+      row: 0
+    }
+    row_order_changed_ignoring_recalc_formula {
+      column: 6
+      row: 0
+    }
+    owner_index: 8
+    hidden_states_changed_formula {
+      column: 7
+      row: 0
+    }
+  }
+}
+pencil_annotation_owner {
+  owner_id {
+    uuid_w0: 1536709682
+    uuid_w1: 2017563915
+    uuid_w2: 393124489
+    uuid_w3: 690484005
+  }
+  formula_store {
+    next_formula_index: 0
+  }
+}
+haunted_owner {
+  owner_uid {
+    lower: 8665371034051433547
+    upper: 2965606220279224969
+  }
+}
+category_owner {
+  identifier: 907636
+}
+pivot_body_summary_row_style {
+  identifier: 904096
+}
+pivot_body_summary_column_style {
+  identifier: 904097
+}
+pivot_header_column_summary_style {
+  identifier: 904098
+}
+spill_owner {
+  owner_uid {
+    lower: 8665371034051433524
+    upper: 2965606220279224969
+  }
+}

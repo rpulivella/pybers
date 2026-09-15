@@ -20,6 +20,8 @@ support, and a reader that carries it survives a file this developer has not
 seen yet. Record what varies; refuse what cannot be verified.
 
 UPDATES
+2026-09-14  A package can gain an IWA member, and be restored after a failed
+            save, for PYB-63.
 2026-08-16  Written. Round-trips empty-1/2/3.numbers byte for byte.
 """
 from __future__ import annotations
@@ -33,11 +35,11 @@ __status__ = "Development"
 __date__ = "2026/08/16"
 
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from ..errors import PybersError
-from .iwa import IWAFile, readIWAFile, writeIWAFile
+from .iwa import Archive, IWAFile, readIWAFile, writeIWAFile
 
 # Members under this prefix, with this suffix, are the document. Everything else
 # is carried through as opaque payload.
@@ -85,6 +87,15 @@ class StoredMember:
     data: bytes
 
 
+@dataclass(frozen=True)
+class PackageSnapshot:
+    """The member lists and archive lists of a package at one moment."""
+
+    iwaFiles: list[IWAFile]
+    members: list[MemberInfo]
+    states: list[tuple[IWAFile, list[Archive], bool]]
+
+
 @dataclass
 class NumbersPackage:
     """One `.numbers` document: its IWA members, its other files, and their order.
@@ -106,6 +117,52 @@ class NumbersPackage:
             if candidate.name == name:
                 return candidate
         raise ContainerError(f"No IWA member named {name!r} in this document.")
+
+    def snapshot(self) -> PackageSnapshot:
+        """Return what `restore` needs to undo every change made after this call.
+
+        Cheap, because an archive is immutable: only the lists holding them are copied.
+        """
+        return PackageSnapshot(
+            iwaFiles=list(self.iwaFiles),
+            members=list(self.members),
+            states=[
+                (iwaFile, list(iwaFile.archives), iwaFile.modified)
+                for iwaFile in self.iwaFiles
+            ],
+        )
+
+    def restore(self, snapshot: PackageSnapshot) -> None:
+        """Return this package to the state a snapshot recorded."""
+        self.iwaFiles[:] = snapshot.iwaFiles
+        self.members[:] = snapshot.members
+        for iwaFile, archives, modified in snapshot.states:
+            iwaFile.archives[:] = archives
+            iwaFile.modified = modified
+
+    def iwaFileAdd(self, name: str) -> IWAFile:
+        """Create an empty IWA member, listed after the last one the zip holds.
+
+        Its zip header is copied from that last member, so a new member carries the
+        same system, version and timestamp fields as the ones Numbers wrote.
+        """
+        if not isDocumentMember(name):
+            raise ContainerError(f"{name!r} is not an IWA member name.")
+        if any(member.name == name for member in self.members):
+            raise ContainerError(f"This document already holds a member {name!r}.")
+        positions = [
+            position for position, member in enumerate(self.members)
+            if isDocumentMember(member.name)
+        ]
+        if not positions:
+            raise ContainerError(
+                "This document holds no IWA member to copy a zip header from."
+            )
+        last = positions[-1]
+        self.members.insert(last + 1, replace(self.members[last], name=name))
+        created = IWAFile(name=name, modified=True)
+        self.iwaFiles.append(created)
+        return created
 
 
 def isDocumentMember(name: str) -> bool:

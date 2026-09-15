@@ -1,0 +1,46 @@
+#| component: CalculationEngine
+#| identifier: 907624
+#| message_infos {
+#|   type: 4009
+#|   version: 1
+#|   version: 0
+#|   version: 5
+#| }
+internal_owner_id: 44
+tile_column_begin: 0
+tile_row_begin: 0
+cell_records {
+  column: 0
+  row: 0
+  expanded_edges {
+    edge_without_owner_rows: 0
+    edge_without_owner_columns: 2
+  }
+}
+cell_records {
+  column: 1
+  row: 0
+  expanded_edges {
+  }
+}
+cell_records {
+  column: 2
+  row: 0
+  expanded_edges {
+  }
+}
+cell_records {
+  column: 3
+  row: 0
+  expanded_edges {
+  }
+}
+cell_records {
+  column: 7
+  row: 0
+  expanded_edges {
+    edge_with_owner_rows: 0
+    edge_with_owner_columns: 11
+    internal_owner_id_for_edge: 42
+  }
+}
