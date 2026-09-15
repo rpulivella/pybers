@@ -16,7 +16,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
-2026-09-15  A string nothing names is removed, for PYB-92.
+2026-09-15  A merge releases the strings and styles of the records it removes,
+            and a string nothing names is removed, for PYB-92.
 2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
             written record moves the counts its format slots changed, and a
             borrowed shape keeps only the format slot of its own kind. Byte 9
@@ -490,6 +491,28 @@ def stringClaims(record: CellRecord) -> Iterable[int]:
     return ()
 
 
+# A style's refcount is how often its key sits in these two slots, which reproduces
+# every style list in the fixtures, measured 2026-09-15 for PYB-92.
+countedStyleSlots: tuple[tuple[int, int], ...] = ((8, 0x20), (8, 0x40))
+
+
+def styleReferencesRelease(dataList: tst.TableDataList, raw: bytes) -> bool:
+    """Release the styles one removed record names, and say whether any count moved."""
+    named = Counter(
+        key
+        for slot, key in zip(
+            referenceSlots(raw), decodeRecord(0, raw).references, strict=True
+        )
+        if slot in countedStyleSlots
+    )
+    moved = False
+    for entry in dataList.entries:
+        if entry.key in named:
+            entry.refcount = max(0, entry.refcount - named[entry.key])
+            moved = True
+    return moved
+
+
 def templateRecord(
     index: ArchiveIndex, store: tst.DataStore, typeByte: int
 ) -> CellRecord | None:
@@ -835,6 +858,11 @@ def applyTableEdits(
     formatKeys: dict[int, int] = {}
     formatsMoved: set[int] = set()
     tiles: list[tst.Tile] = []
+    styleList = (
+        index.resolve(store.styleTable, tst.TableDataList)
+        if store.styleTable.identifier else None
+    )
+    stylesMoved = False
 
     def formatFor(formatType: int) -> int | None:
         """Return the key naming a format of this kind, caching the lookup."""
@@ -925,6 +953,11 @@ def applyTableEdits(
                 )
                 if (row, record.column) in swallowed:
                     formatsCount(record.raw, None, reference)
+                    if textPool is not None:
+                        for key in stringClaims(record):
+                            textPool.release(key)
+                    if styleList is not None:
+                        stylesMoved |= styleReferencesRelease(styleList, record.raw)
                     continue
                 cell = table.cells.get(reference)
                 if cell is None:
@@ -1026,6 +1059,12 @@ def applyTableEdits(
         formatId = store.format_table.identifier
         owners[formatId].messageReplace(
             formatId, 0, formatList.SerializeToString()
+        )
+
+    if styleList is not None and stylesMoved:
+        styleId = store.styleTable.identifier
+        owners[styleId].messageReplace(
+            styleId, 0, styleList.SerializeToString()
         )
 
     if textPool is not None and textPool.touched:

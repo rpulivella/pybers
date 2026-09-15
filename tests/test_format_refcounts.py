@@ -8,8 +8,8 @@ asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
-            spent formats and merges for its AC 9 and 10. Spent strings for
-            PYB-92.
+            spent formats and merges for its AC 9 and 10. Strings and styles
+            a merge removes, and spent strings, for PYB-92.
 """
 from __future__ import annotations
 
@@ -39,9 +39,11 @@ from pybers.errors import WriteError
 from pybers.table._write import (
     borrowedShape,
     countedFormatSlots,
+    countedStyleSlots,
     displayedKindSlot,
     formatClaims,
     referenceSlots,
+    stringClaims,
     textFormatSlot,
 )
 
@@ -409,10 +411,11 @@ def test_aNumberInACreatedTableDisplaysAsANumberWhateverItsFormatKey(
         "20-first-text-in-a-table",
         "20-tables-added",
         "45-merged-by-pybers",
+        "22c-merged-by-pybers",
     ],
 )
 def test_aGoldenThatWroteCellsDisplaysKindsAndCountsCells(name: str) -> None:
-    """AC 5, 8, 9 and 10, read from the goldens themselves rather than regenerated."""
+    """PYB-89 and PYB-92, read from the goldens themselves rather than regenerated."""
     golden = goldenDirectory / f"{name}.numbers"
     for index, model in tableModels(golden):
         for record in tableRecords(index, model):
@@ -422,6 +425,7 @@ def test_aGoldenThatWroteCellsDisplaysKindsAndCountsCells(name: str) -> None:
         declared = {int(entry.key): int(entry.refcount) for entry in formats.entries}
         claims = cellClaims(index, model)
         assert declared == {key: claims[key] for key in declared}, model.table_name
+        assert listsAgreeWithCells(index, model) == [], model.table_name
 
 
 def formatListNext(path: Path, tableName: str) -> int:
@@ -482,6 +486,41 @@ def test_aMergeReleasesTheFormatsOfTheRecordsItRemoves(tmp_path: Path) -> None:
         assert declared == {key: claims[key] for key in declared}, model.table_name
 
 
+def pooledCounts(
+    index: ArchiveIndex, model: tst.TableModelArchive
+) -> tuple[Counter[int], Counter[int]]:
+    """Return how often this table's cells name each string and each style."""
+    strings: Counter[int] = Counter()
+    styles: Counter[int] = Counter()
+    for record in tableRecords(index, model):
+        strings.update(stringClaims(record))
+        styles.update(
+            key
+            for slot, key in zip(
+                referenceSlots(record.raw), record.references, strict=True
+            )
+            if slot in countedStyleSlots
+        )
+    return strings, styles
+
+
+def listsAgreeWithCells(index: ArchiveIndex, model: tst.TableModelArchive) -> list[str]:
+    """Return each string or style list whose refcounts differ from its cells."""
+    strings, styles = pooledCounts(index, model)
+    store = model.base_data_store
+    disagreeing = []
+    for name, reference, counted in (
+        ("string", store.stringTable, strings),
+        ("style", store.styleTable, styles),
+    ):
+        if not reference.identifier:
+            continue
+        entries = index.resolve(reference, tst.TableDataList).entries
+        if any(entry.refcount != counted[entry.key] for entry in entries):
+            disagreeing.append(name)
+    return disagreeing
+
+
 def listNext(path: Path, tableName: str, listName: str) -> int:
     """Return the key one of a table's data lists would give its next entry."""
     for index, model in tableModels(path):
@@ -503,6 +542,46 @@ def stringEntries(path: Path, tableName: str) -> dict[int, tuple[str, int]]:
                 for entry in entries
             }
     raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+def test_theCountedStringsAndStylesReproduceEveryListNumbersWrote() -> None:
+    """PYB-92's measurement: strings by text record, styles by byte 8 slots."""
+    checked = 0
+    for path in sorted(fixtureDirectory.glob("*.numbers")):
+        for index, model in tableModels(path):
+            assert listsAgreeWithCells(index, model) == [], (
+                f"{path.name} / {model.table_name}"
+            )
+            checked += 1
+    assert checked >= 92
+
+
+def test_aMergeReleasesTheStringOfTheTextRecordItRemoves(tmp_path: Path) -> None:
+    """PYB-92 AC 1. `KJ7` holds the only `r6c296`, so its entry goes with it."""
+    working = workingCopy("45-columns-over-255", tmp_path)
+    before = stringEntries(working, "45-row-offsets-32bit")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].mergeAdd("KI7:KJ7")
+    document.save()
+
+    after = stringEntries(working, "45-row-offsets-32bit")
+    assert ("r6c296", 1) in before.values()
+    assert "r6c296" not in {text for text, _ in after.values()}
+    for index, model in tableModels(working):
+        assert listsAgreeWithCells(index, model) == []
+
+
+def test_aMergeReleasesTheStylesOfTheRecordItRemoves(tmp_path: Path) -> None:
+    """PYB-92 AC 2. `M3` is a style-only record an imported merge left behind."""
+    working = workingCopy("22c-merge-overpaints", tmp_path)
+    before = recordAt(working, "M3")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].mergeAdd("L3:M3")
+    document.save()
+
+    assert {slot for slot in referenceSlots(before.raw)} >= set(countedStyleSlots)
+    for index, model in tableModels(working):
+        assert listsAgreeWithCells(index, model) == []
 
 
 def test_aStringNothingNamesIsRemovedWithItsKeyRetired(tmp_path: Path) -> None:
