@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-A format entry's refcount against the cells that name it, before and after a save.
+A pooled entry's refcount against the cells that name it, before and after a save.
 
 Counts are read from the format list and from the cell records separately, so a test
 compares what the file declares with what its cells actually reference rather than
@@ -8,7 +8,8 @@ asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
-            spent formats and merges for its AC 9 and 10.
+            spent formats and merges for its AC 9 and 10. Spent strings for
+            PYB-92.
 """
 from __future__ import annotations
 
@@ -124,16 +125,19 @@ def formatKeyOfType(path: Path, tableName: str, formatType: int) -> int:
     raise AssertionError(f"{tableName!r} in {path.name} holds no {formatType} format")
 
 
-def formatListForge(
-    path: Path, tableName: str, change: Callable[[tst.TableDataList], None]
+def dataListForge(
+    path: Path,
+    tableName: str,
+    change: Callable[[tst.TableDataList], None],
+    listName: str = "format_table",
 ) -> None:
-    """Rewrite one table's format list in a working copy, as a disagreeing file."""
+    """Rewrite one of a table's data lists in a working copy, as a disagreeing file."""
     package = readPackage(path)
     index = ArchiveIndex(package)
     for _, model in tableModels(path):
         if model.table_name != tableName:
             continue
-        reference = model.base_data_store.format_table
+        reference = getattr(model.base_data_store, listName)
         formats = index.resolve(reference, tst.TableDataList)
         change(formats)
         owner = next(
@@ -277,7 +281,7 @@ def test_aFormatNoWrittenCellNamesKeepsTheCountItHad(tmp_path: Path) -> None:
             if entry.key == dateKey:
                 entry.refcount = 9
 
-    formatListForge(working, "Table 1", dateCountForge)
+    dataListForge(working, "Table 1", dateCountForge)
     before, _ = formatLedger(working, "Table 1")
     document = pybers.open(working)
     table = document.sheets[0].tables[0]
@@ -306,7 +310,7 @@ def test_aCellNamingAFormatItsTableDoesNotHoldIsRefused(tmp_path: Path) -> None:
         del formats.entries[:]
         formats.entries.extend(kept)
 
-    formatListForge(working, "Table 1", textFormatRemove)
+    dataListForge(working, "Table 1", textFormatRemove)
     unchanged = working.read_bytes()
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("J1").value = "into an empty cell"
@@ -454,7 +458,7 @@ def test_aFormatACellStillNamesIsKeptWhenItsCountSaysOtherwise(
             if entry.key == textKey:
                 entry.refcount = 1
 
-    formatListForge(working, "Table 1", textCountForge)
+    dataListForge(working, "Table 1", textCountForge)
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A2").value = Decimal("5")
     document.save()
@@ -476,3 +480,83 @@ def test_aMergeReleasesTheFormatsOfTheRecordsItRemoves(tmp_path: Path) -> None:
         declared = {int(entry.key): int(entry.refcount) for entry in formats.entries}
         claims = cellClaims(index, model)
         assert declared == {key: claims[key] for key in declared}, model.table_name
+
+
+def listNext(path: Path, tableName: str, listName: str) -> int:
+    """Return the key one of a table's data lists would give its next entry."""
+    for index, model in tableModels(path):
+        if model.table_name == tableName:
+            reference = getattr(model.base_data_store, listName)
+            return int(index.resolve(reference, tst.TableDataList).nextListID)
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+def stringEntries(path: Path, tableName: str) -> dict[int, tuple[str, int]]:
+    """Return one table's pooled strings as key to text and refcount."""
+    for index, model in tableModels(path):
+        if model.table_name == tableName:
+            entries = index.resolve(
+                model.base_data_store.stringTable, tst.TableDataList
+            ).entries
+            return {
+                int(entry.key): (entry.string, int(entry.refcount))
+                for entry in entries
+            }
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+def test_aStringNothingNamesIsRemovedWithItsKeyRetired(tmp_path: Path) -> None:
+    """PYB-92 AC 3. `A2` is the only cell labeled `plain number 1234.5`."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    before = listNext(working, "Table 1", "stringTable")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A2").value = Decimal("5")
+    document.save()
+
+    texts = {text for text, _ in stringEntries(working, "Table 1").values()}
+    assert "plain number 1234.5" not in texts
+    assert listNext(working, "Table 1", "stringTable") == before
+
+
+def test_aStringACellStillNamesIsKeptWhenItsCountSaysOtherwise(
+    tmp_path: Path,
+) -> None:
+    """PYB-92 AC 3 against a count Numbers wrote too low: the entry stays."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A1").value = "shared"
+    table.cell("B1").value = "shared"
+    document.save()
+    key = next(
+        key for key, (text, _) in stringEntries(working, "Table 1").items()
+        if text == "shared"
+    )
+
+    def sharedCountForge(strings: tst.TableDataList) -> None:
+        for entry in strings.entries:
+            if entry.key == key:
+                entry.refcount = 1
+
+    dataListForge(working, "Table 1", sharedCountForge, "stringTable")
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("A1").value = Decimal("5")
+    document.save()
+
+    assert stringEntries(working, "Table 1")[key] == ("shared", 0)
+
+
+def test_textWrittenLaterInTheSaveSharesAStringReleasedEarlier(tmp_path: Path) -> None:
+    """PYB-92 AC 3. A release is final only when the save ends, not when it happens."""
+    working = workingCopy("11-value-types-noformats", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A2").value = Decimal("5")
+    table.cell("J1").value = "plain number 1234.5"
+    document.save()
+
+    matching = [
+        count for text, count in stringEntries(working, "Table 1").values()
+        if text == "plain number 1234.5"
+    ]
+    assert matching == [1]
