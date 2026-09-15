@@ -14,6 +14,11 @@ above the line before this one: GitHub already shows the title and the linked is
 - [ ] No change to the on-disk archive round-trip contract
 - [ ] Archive round-trip behavior changed (new golden-file test attached)
 
+## Known issues
+<!-- Write None, or one bullet per issue: a few words and the ticket tracking it, such as
+     "- Created tables undercount format refcounts, PYB-89". Bullets only, no prose. -->
+None
+
 ## Preconditions / setup for testing
 <!-- If nothing special, write None. Otherwise number the steps. -->
 None
