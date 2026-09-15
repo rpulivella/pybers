@@ -9,7 +9,8 @@ asking the model, which would agree with itself while both halves were wrong.
 UPDATES
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
             spent formats and merges for its AC 9 and 10. Strings and styles
-            a merge removes, and spent strings, for PYB-92.
+            a merge removes, and spent strings, for PYB-92, with rich text
+            for its AC 5.
 """
 from __future__ import annotations
 
@@ -33,7 +34,12 @@ import pybers
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import CellRecord, decodeRecord, readPackage, writePackage
-from pybers._persistence.cells import decodeRow, offsetUnitFor
+from pybers._persistence.cells import (
+    carriesFormula,
+    decodeRow,
+    formulaKeySlot,
+    offsetUnitFor,
+)
 from pybers._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
 from pybers.errors import WriteError
 from pybers.table._write import (
@@ -43,6 +49,7 @@ from pybers.table._write import (
     displayedKindSlot,
     formatClaims,
     referenceSlots,
+    richTextClaims,
     stringClaims,
     textFormatSlot,
 )
@@ -639,3 +646,37 @@ def test_textWrittenLaterInTheSaveSharesAStringReleasedEarlier(tmp_path: Path) -
         if text == "plain number 1234.5"
     ]
     assert matching == [1]
+
+
+def poolsAgreeWithCells(path: Path) -> list[str]:
+    """Return each formula or rich-text list whose refcounts differ from its cells."""
+    disagreeing = []
+    for index, model in tableModels(path):
+        store = model.base_data_store
+        records = tableRecords(index, model)
+        formulas = Counter(
+            record.references[formulaKeySlot(record)]
+            for record in records if carriesFormula(record)
+        )
+        richText = Counter(key for record in records for key in richTextClaims(record))
+        for name, present, reference, counted in (
+            ("formula", store.formula_table.identifier, store.formula_table, formulas),
+            ("rich text", store.HasField("rich_text_table"), store.rich_text_table,
+             richText),
+        ):
+            if not present:
+                continue
+            entries = index.resolve(reference, tst.TableDataList).entries
+            if any(entry.refcount != counted[entry.key] for entry in entries):
+                disagreeing.append(f"{model.table_name} {name}")
+    return disagreeing
+
+
+def test_aMergeReleasesTheRichTextOfACellItCovers(tmp_path: Path) -> None:
+    """PYB-92 AC 5.ii. `C2` and `D2` are both rich text, and `D2` is covered."""
+    working = workingCopy("30-style-align", tmp_path)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].mergeAdd("C2:D2")
+    document.save()
+
+    assert poolsAgreeWithCells(working) == []

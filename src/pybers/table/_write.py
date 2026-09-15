@@ -16,8 +16,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
-2026-09-15  A merge releases the strings and styles of the records it removes,
-            and a string nothing names is removed, for PYB-92.
+2026-09-15  A merge releases the rich text, strings and styles of the records it
+            removes, and a string nothing names is removed, for PYB-92.
 2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
             written record moves the counts its format slots changed, and a
             borrowed shape keeps only the format slot of its own kind. Byte 9
@@ -496,15 +496,32 @@ def stringClaims(record: CellRecord) -> Iterable[int]:
 countedStyleSlots: tuple[tuple[int, int], ...] = ((8, 0x20), (8, 0x40))
 
 
-def styleReferencesRelease(dataList: tst.TableDataList, raw: bytes) -> bool:
-    """Release the styles one removed record names, and say whether any count moved."""
-    named = Counter(
+def styleClaims(record: CellRecord) -> Iterable[int]:
+    """Return the style keys a record names, once per counted slot."""
+    return [
         key
         for slot, key in zip(
-            referenceSlots(raw), decodeRecord(0, raw).references, strict=True
+            referenceSlots(record.raw), record.references, strict=True
         )
         if slot in countedStyleSlots
-    )
+    ]
+
+
+# A rich-text cell names its payload by key, and an entry's refcount is how many such
+# records name it, which reproduces all 16 rich-text lists in the fixtures.
+richTextTypeByte: int = 9
+
+
+def richTextClaims(record: CellRecord) -> Iterable[int]:
+    """Return the rich-text key a rich-text record names, if it is one."""
+    if record.typeByte == richTextTypeByte and isinstance(record.value, int):
+        return (record.value,)
+    return ()
+
+
+def entriesRelease(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
+    """Release one reference per key given, and say whether any count moved."""
+    named = Counter(keys)
     moved = False
     for entry in dataList.entries:
         if entry.key in named:
@@ -863,6 +880,11 @@ def applyTableEdits(
         if store.styleTable.identifier else None
     )
     stylesMoved = False
+    richTextList = (
+        index.resolve(store.rich_text_table, tst.TableDataList)
+        if store.HasField("rich_text_table") else None
+    )
+    richTextMoved = False
 
     def formatFor(formatType: int) -> int | None:
         """Return the key naming a format of this kind, caching the lookup."""
@@ -957,7 +979,11 @@ def applyTableEdits(
                         for key in stringClaims(record):
                             textPool.release(key)
                     if styleList is not None:
-                        stylesMoved |= styleReferencesRelease(styleList, record.raw)
+                        stylesMoved |= entriesRelease(styleList, styleClaims(record))
+                    if richTextList is not None:
+                        richTextMoved |= entriesRelease(
+                            richTextList, richTextClaims(record)
+                        )
                     continue
                 cell = table.cells.get(reference)
                 if cell is None:
@@ -1065,6 +1091,12 @@ def applyTableEdits(
         styleId = store.styleTable.identifier
         owners[styleId].messageReplace(
             styleId, 0, styleList.SerializeToString()
+        )
+
+    if richTextList is not None and richTextMoved:
+        richTextId = store.rich_text_table.identifier
+        owners[richTextId].messageReplace(
+            richTextId, 0, richTextList.SerializeToString()
         )
 
     if textPool is not None and textPool.touched:
