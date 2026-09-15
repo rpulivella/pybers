@@ -394,3 +394,20 @@ def test_aNumberInACreatedTableDisplaysAsANumberWhateverItsFormatKey(
     kind, held = displayedKind(recordAt(working, "B2", table="Output"))
     assert numberKey != 1, "the key differs from the kind, or this proves nothing"
     assert (kind, held) == (1, {1})
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["11-text-written-and-retyped", "20-first-text-in-a-table", "20-tables-added"],
+)
+def test_aGoldenThatWroteTextDisplaysKindsAndCountsCells(name: str) -> None:
+    """AC 5 and AC 8, read from the goldens themselves rather than regenerated."""
+    golden = goldenDirectory / f"{name}.numbers"
+    for index, model in tableModels(golden):
+        for record in tableRecords(index, model):
+            kind, held = displayedKind(record)
+            assert kind is None or kind in held, f"{model.table_name} {record.column}"
+        formats = index.resolve(model.base_data_store.format_table, tst.TableDataList)
+        declared = {int(entry.key): int(entry.refcount) for entry in formats.entries}
+        claims = cellClaims(index, model)
+        assert declared == {key: claims[key] for key in declared}, model.table_name
