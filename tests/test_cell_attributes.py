@@ -34,7 +34,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import allDocuments, archiveBodies, documentPath
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.cells import (
@@ -47,7 +47,6 @@ from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypeId, archiveTypes
 from pybers.formula._read import resolveFormula
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 fixtureName: str = "47-formula-cell-attributes"
 
 tableModelType: int = next(
@@ -73,14 +72,6 @@ decoratedSlots: dict[str, int] = {
     "B1": 2, "B2": 4, "B3": 2, "B4": 2,
     "B5": 2, "B6": 2, "B7": 2, "B8": 2,
 }
-
-
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
 
 
 def formulaTables(path: Path) -> list[tuple[str, dict[int, int], list[CellRecord]]]:
@@ -139,7 +130,7 @@ def recordsOf(path: Path, name: str) -> list[CellRecord]:
 
 def testEveryFormulaInADecoratedTableReads() -> None:
     """AC 1. Six of these eight read as no formula at all before the fix."""
-    table = pybers.open(fixturePath(fixtureName)).sheet(1).table("Decorated")
+    table = pybers.open(documentPath(fixtureName)).sheet(1).table("Decorated")
 
     assert {
         address: table.cell(address).formulaText for address in decoratedFormulas
@@ -148,7 +139,7 @@ def testEveryFormulaInADecoratedTableReads() -> None:
 
 def testAPlainTableIsUnaffected() -> None:
     """AC 1. The control: a cell carrying nothing keeps its key at the front."""
-    table = pybers.open(fixturePath(fixtureName)).sheet(1).table("Plain")
+    table = pybers.open(documentPath(fixtureName)).sheet(1).table("Plain")
 
     assert table.cell("B1").formulaText == "=SUM(A1:A5)"
     assert table.cell("B2").formulaText == "=A1*A2"
@@ -160,7 +151,7 @@ def testTheKeyMovesAsACellGainsAttributes() -> None:
     `Plain` puts the key first, `Decorated` puts it third, and the one cell with
     conditional highlighting puts it fifth.
     """
-    path = fixturePath(fixtureName)
+    path = documentPath(fixtureName)
 
     assert {formulaKeySlot(r) for r in recordsOf(path, "Plain")} == {0}
     assert sorted(
@@ -177,7 +168,7 @@ def testTheSlotRuleReproducesEveryPooledRefcount() -> None:
     that a formula merely appears.
     """
     checked = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         for table, refcounts, records in formulaTables(path):
             if not refcounts:
                 continue
@@ -211,7 +202,7 @@ def testAFormulaKeyThePoolDoesNotHoldIsRefused() -> None:
 
 def testANoOpSaveDetachesNothing(tmp_path: Path) -> None:
     """AC 2. Six formulas were removed from this file by opening and saving it."""
-    working = Path(shutil.copy(fixturePath(fixtureName), tmp_path / "47.numbers"))
+    working = Path(shutil.copy(documentPath(fixtureName), tmp_path / "47.numbers"))
     pybers.open(working).save()
 
     table = pybers.open(working).sheet(1).table("Decorated")
@@ -224,7 +215,7 @@ def testADecoratedDocumentRoundTripsWithEveryArchiveUnchanged(
     tmp_path: Path,
 ) -> None:
     """AC 3. The base contract, on the one fixture that used to fail it."""
-    working = Path(shutil.copy(fixturePath(fixtureName), tmp_path / "47.numbers"))
+    working = Path(shutil.copy(documentPath(fixtureName), tmp_path / "47.numbers"))
     before = archiveBodies(readPackage(working))
     pybers.open(working).save()
 
@@ -248,7 +239,7 @@ def testEveryReferenceInTheCorpusResolvesOnTheGrid() -> None:
     #66's own symptom was measured against a document that cannot be committed.
     """
     checked = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         for _, _, cell in pybers.open(path).cellsIterate():
             if cell.formula is None:
                 continue

@@ -39,6 +39,7 @@ from pathlib import Path
 import pytest
 
 import pybers
+from conftest import allDocuments, documentPath
 from pybers._engine import tableOwnerIds
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
@@ -63,10 +64,6 @@ from pybers.document._write import writeDocument
 from pybers.errors import WriteError
 from pybers.table._read import readMerges
 from pybers.table._write import formatClaims
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
 
 
 def numericRecords(path: Path) -> list[CellRecord]:
@@ -174,10 +171,10 @@ def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[st
 
 def test_thereIsACorpusToWriteAtAll() -> None:
     """Guard the parametrization: an empty glob would make every case vacuous."""
-    assert len(allFixtures) >= 40
+    assert len(allDocuments) >= 62
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyFixtureWritesBackWithEveryArchiveUnchanged(
     path: Path, tmp_path: Path
 ) -> None:
@@ -198,7 +195,7 @@ def test_everyFixtureWritesBackWithEveryArchiveUnchanged(
     )
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_aSavedFixtureReadsBackAsTheSameDocument(path: Path, tmp_path: Path) -> None:
     """The model is equal across the round trip, which the archive check cannot see.
 
@@ -215,19 +212,19 @@ def test_aSavedFixtureReadsBackAsTheSameDocument(path: Path, tmp_path: Path) -> 
 def test_savingWithNoPathWritesBackWhereTheDocumentCameFrom(tmp_path: Path) -> None:
     """`doc.save()` is in place, which is what makes the common edit a two-liner."""
     working = tmp_path / "in-place.numbers"
-    shutil.copy(fixtureDirectory / "00-baseline.numbers", working)
+    shutil.copy(documentPath("00-baseline"), working)
 
     document = pybers.open(working)
     document.save()
 
     assert not archiveDifferences(
-        readPackage(fixtureDirectory / "00-baseline.numbers"), readPackage(working)
+        readPackage(documentPath("00-baseline")), readPackage(working)
     )
 
 
 def test_savingIsRepeatableAndLeavesTheDocumentUsable(tmp_path: Path) -> None:
     """There is no close and no invalidation, so a second save is an ordinary call."""
-    document = pybers.open(fixtureDirectory / "00-baseline.numbers")
+    document = pybers.open(documentPath("00-baseline"))
     first = tmp_path / "first.numbers"
     second = tmp_path / "second.numbers"
 
@@ -248,7 +245,7 @@ def test_savingADocumentThatWasNeverReadIsRefused() -> None:
 
 def test_savingInPlaceWithNoSourcePathIsRefused() -> None:
     """The package is present but the origin is not, so in place has no meaning."""
-    document = pybers.open(fixtureDirectory / "00-baseline.numbers")
+    document = pybers.open(documentPath("00-baseline"))
     document._sourcePath = None
 
     with pytest.raises(WriteError, match="nowhere to save"):
@@ -257,7 +254,7 @@ def test_savingInPlaceWithNoSourcePathIsRefused() -> None:
 
 def test_savingIntoAMissingDirectoryIsRefused(tmp_path: Path) -> None:
     """Named rather than left to an OSError from deep inside `zipfile`."""
-    document = pybers.open(fixtureDirectory / "00-baseline.numbers")
+    document = pybers.open(documentPath("00-baseline"))
 
     with pytest.raises(WriteError, match="is not a directory"):
         document.save(tmp_path / "no-such-folder" / "out.numbers")
@@ -273,7 +270,7 @@ def test_aFailedSaveLeavesTheExistingFileIntact(
     used to be.
     """
     working = tmp_path / "precious.numbers"
-    shutil.copy(fixtureDirectory / "00-baseline.numbers", working)
+    shutil.copy(documentPath("00-baseline"), working)
     before = working.read_bytes()
 
     document = pybers.open(working)
@@ -296,7 +293,7 @@ def test_aFailedSaveLeavesTheExistingFileIntact(
 
 def test_writeDocumentIsTheSameCallAsSave(tmp_path: Path) -> None:
     """The function and the method are one path, so neither can drift from the other."""
-    document = pybers.open(fixtureDirectory / "00-baseline.numbers")
+    document = pybers.open(documentPath("00-baseline"))
     viaFunction = tmp_path / "function.numbers"
     viaMethod = tmp_path / "method.numbers"
 
@@ -311,7 +308,7 @@ def test_writeDocumentIsTheSameCallAsSave(tmp_path: Path) -> None:
 def workingCopy(name: str, tmp_path: Path) -> Path:
     """Copy a fixture somewhere writable, since a save lands in place by default."""
     working = tmp_path / f"{name}-edited.numbers"
-    shutil.copy(fixtureDirectory / f"{name}.numbers", working)
+    shutil.copy(documentPath(name), working)
     return working
 
 
@@ -367,7 +364,7 @@ def test_oneEditChangesOnlyItsTileAndTheDirtySet(tmp_path: Path) -> None:
     controls are stored as formulas too.
     """
     working = workingCopy("11-value-types-noformats", tmp_path)
-    source = fixtureDirectory / "11-value-types-noformats.numbers"
+    source = documentPath("11-value-types-noformats")
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("4242.42")
@@ -391,7 +388,7 @@ def test_aSaveThatChangesNothingWritesNoDirtySet(tmp_path: Path) -> None:
     empty archive Numbers wrote.
     """
     working = workingCopy("20-formula-shapes", tmp_path)
-    source = fixtureDirectory / "20-formula-shapes.numbers"
+    source = documentPath("20-formula-shapes")
 
     pybers.open(working).save()
 
@@ -423,7 +420,7 @@ def test_aCellsNumberFormatSurvivesAnEdit(tmp_path: Path) -> None:
     Asserted through the archive rather than the model, because pybers does not read
     number formats yet and so cannot see the loss from the model side.
     """
-    source = fixtureDirectory / "12-number-currency.numbers"
+    source = documentPath("12-number-currency")
     working = workingCopy("12-number-currency", tmp_path)
 
     document = pybers.open(working)
@@ -683,7 +680,7 @@ def test_theGoldenAsksNumbersToRecalculateTheCellsThatMoved() -> None:
     }
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
     """The guards in `requestRecalculation` rest on this, so it is asserted.
 
@@ -842,14 +839,14 @@ def test_aMergeWrittenHereMatchesTheOneNumbersWrote(tmp_path: Path) -> None:
     document.save()
 
     assert storedMerges(working) == storedMerges(
-        fixtureDirectory / "22-merge-2x2.numbers"
+        documentPath("22-merge-2x2")
     )
 
 
 def test_savingATableWhoseMergesDidNotChangeRewritesNothing(tmp_path: Path) -> None:
     """The store is compared, not rewritten, so an untouched save stays identical."""
     working = workingCopy("22-merge-2x2", tmp_path)
-    source = fixtureDirectory / "22-merge-2x2.numbers"
+    source = documentPath("22-merge-2x2")
 
     pybers.open(working).save()
 
@@ -978,7 +975,6 @@ def formatEntries(path: Path, tableName: str | None) -> list[tuple[int, int | No
     raise AssertionError(f"{tableName!r} is not in {path.name}")
 
 
-
 def tileOf(path: Path, tableName: str) -> tst.Tile:
     """Return the one tile of a named table, for asserting on row storage."""
     from pybers._persistence.index import ArchiveIndex
@@ -998,7 +994,6 @@ def tileOf(path: Path, tableName: str) -> tst.Tile:
                     model.base_data_store.tiles.tiles[0].tile, tst.Tile
                 )
     raise AssertionError(f"{tableName!r} is not in {path.name}")
-
 
 
 # ── PYB-78: a row the file stores nothing for ────────────────────────────────
@@ -1027,7 +1022,7 @@ def test_aFormulaWrittenIntoAnUnstoredRowSurvivesTheSave(
     visited, and a table declaring ten rows can store one. Same class as PYB-65.
     """
     working = Path(
-        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+        shutil.copy(documentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
     document = pybers.open(working)
@@ -1044,7 +1039,7 @@ def test_aRowThisSaveCreatedCountsItsOwnCellsAndKeepsRowOrder(
     """Numbers keeps `numrows` accurate and writes zero in `numCells`, so only the
     first is corrected here. Row order matters because the reader trusts it."""
     working = Path(
-        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+        shutil.copy(documentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
     document = pybers.open(working)
@@ -1063,7 +1058,7 @@ def test_aRowThisSaveCreatedCountsItsOwnCellsAndKeepsRowOrder(
 def test_aFormulaAlreadyInAStoredRowStillWritesUnchanged(tmp_path: Path) -> None:
     """No row is created where one exists, so an ordinary edit is untouched."""
     working = Path(
-        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+        shutil.copy(documentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
     before = len(tileOf(working, "Table 2").rowInfos)
@@ -1083,7 +1078,7 @@ def test_formulasInCreatedRowsMatchTheirGoldenFile(tmp_path: Path) -> None:
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
     working = Path(
-        shutil.copy(fixtureDirectory / "20-formula-shapes.numbers",
+        shutil.copy(documentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
     document = pybers.open(working)
@@ -1170,7 +1165,6 @@ def recordAt(
                             return record
             break
     raise AssertionError(f"{address} has no record in {path.name}")
-
 
 
 # ── PYB-61: text, pooling, and a cell that changes type ──────────────────────

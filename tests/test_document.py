@@ -10,6 +10,8 @@ plausible wrong number rather than an exception, so a test that compares the rea
 against itself proves nothing.
 
 UPDATES
+2026-09-16  A document found in neither directory, or in both, fails for
+            PYB-90 rather than skipping.
 2026-08-31  Written for #1.
 """
 from __future__ import annotations
@@ -28,7 +30,9 @@ from pathlib import Path
 
 import pytest
 
+import conftest
 import pybers
+from conftest import allDocuments, documentPath
 from pybers.addressing import (
     CellReference,
     ReferenceError,
@@ -36,14 +40,10 @@ from pybers.addressing import (
     columnNumber,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
-
 
 def fixture(name: str):
     """Open one fixture by its stem."""
-    return pybers.open(fixtureDirectory / f"{name}.numbers")
+    return pybers.open(documentPath(name))
 
 
 def onlyTable(name: str):
@@ -56,10 +56,30 @@ def onlyTable(name: str):
 
 def test_thereIsACorpusToReadAtAll() -> None:
     """Guard the parametrization: an empty glob would make every case vacuous."""
-    assert len(allFixtures) >= 40
+    assert len(allDocuments) >= 62
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+def test_aDocumentInNeitherDirectoryFailsRatherThanSkipping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(conftest, "documentDirectories", (tmp_path,))
+    with pytest.raises(AssertionError, match="in 0 document directories"):
+        documentPath("00-baseline")
+
+
+def test_aDocumentInBothDirectoriesFails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    origins, measurements = tmp_path / "fixtures", tmp_path / "measurements"
+    for directory in (origins, measurements):
+        directory.mkdir()
+        (directory / "00-baseline.numbers").write_bytes(b"")
+    monkeypatch.setattr(conftest, "documentDirectories", (origins, measurements))
+    with pytest.raises(AssertionError, match="in 2 document directories"):
+        documentPath("00-baseline")
+
+
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyFixtureOpensWithoutRaising(path: Path) -> None:
     document = pybers.open(path)
     assert document.sheets, f"{path.name} produced no sheets"
@@ -249,7 +269,7 @@ def test_aCoveredCellIsNotAddressableAndLeavesNoRecord() -> None:
 
 # ── AC 8: the whole corpus reads, and the traps stay caught ──────────────────
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyCellOfEveryTableReads(path: Path) -> None:
     document = pybers.open(path)
     for sheet in document.sheets:

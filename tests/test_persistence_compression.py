@@ -33,12 +33,9 @@ from pathlib import Path
 
 import pytest
 
+from conftest import allDocuments
 from pybers._persistence.compression import compressRaw, decompressRaw
 from pybers._persistence.iwa import splitFrames
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
 
 
 def everyFrameOf(path: Path) -> list[bytes]:
@@ -95,7 +92,7 @@ def test_matchesReachingBackPastTheShortCopyWindowSurvive() -> None:
     assert decompressRaw(compressRaw(doubled)) == doubled
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyFrameOfEveryFixtureReEncodesToItself(path: Path) -> None:
     """The sweep: real protobuf payloads, encoded by us, decoded by us."""
     payloads = everyFrameOf(path)
@@ -118,7 +115,7 @@ def test_theEncoderKeepsEmittingBackReferences() -> None:
     """
     original = 0
     encoded = 0
-    for path in allFixtures:
+    for path in allDocuments:
         for payload in everyFrameOf(path):
             original += len(payload)
             encoded += len(compressRaw(payload))

@@ -31,7 +31,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import dataListBytes
+from conftest import allDocuments, dataListBytes, documentPath
 from pybers import (
     CellRange,
     CellReference,
@@ -63,8 +63,6 @@ from pybers.formula.nodes import (
     tokenNodeType,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
 # The three formulas in the corpus carrying node type 23, whose placement rule is
 # not established. Their text round trips and their node array does not, which is
 # named here so a fourth appearing is a failure rather than a silent widening.
@@ -76,17 +74,9 @@ textOnlyRoundTrip: frozenset[tuple[str, str]] = frozenset({
 })
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
-
-
 def firstTable(name: str) -> pybers.Table:
     """Return the first table of a fixture, which is where these formulas live."""
-    return pybers.open(fixturePath(name)).sheets[0].tables[0]
+    return pybers.open(documentPath(name)).sheets[0].tables[0]
 
 
 def shape(formula: Formula) -> list[tuple[int, object]]:
@@ -110,7 +100,7 @@ def typed(formula: Formula) -> list[tuple[int, object]]:
 def formulasInCorpus() -> list[tuple[str, str, Formula, CellReference, dict[str, str]]]:
     """Return every formula in every fixture, with what rendering one needs."""
     found = []
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         document = pybers.open(path)
         names = document.tableIdentities
         for sheet in document.sheets:
@@ -395,7 +385,7 @@ def testAReferenceIntoAnotherTableCarriesThatTablesIdentity() -> None:
     reference, the second of which has to qualify because two tables are named
     `Table 1`.
     """
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     table = document.sheets[0].tables[0]
     assert table.cell("G11").formulaText == "=Table 2::A1"
     assert table.cell("H11").formulaText == "=Sheet 2::Table 1::A1"
@@ -407,7 +397,7 @@ def testAReferenceIntoAnotherTableCarriesThatTablesIdentity() -> None:
 
 def testACellReachesAnotherTableWithoutBeingHandedTheNames() -> None:
     """The ergonomic half of the above: a cell knows the document it sits in."""
-    table = pybers.open(fixturePath("20-formula-shapes")).sheets[0].tables[0]
+    table = pybers.open(documentPath("20-formula-shapes")).sheets[0].tables[0]
     table.cell("A1").formulaText = "=Table 2::A1*2"
     assert table.cell("A1").formulaText == "=Table 2::A1*2"
     assert table.cell("A1").formula is not None
@@ -429,7 +419,7 @@ def testATableNamedAnythingNumbersAllowsRoundTripsThroughTheText(
     Every fixture is named `Table 1` or `Table 2`, so nothing else here would
     notice a parser that could read only those.
     """
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     document.sheet("Sheet 1").table("Table 2").name = name
     source = document.sheet("Sheet 1").table("Table 1")
 
@@ -447,7 +437,7 @@ def testATableNameWithOuterSpacesIsRefusedRatherThanMisread() -> None:
     so a name whose own first character is a space cannot be told from the gap in
     front of it. Numbers has never been seen to keep one.
     """
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     document.sheet("Sheet 1").table("Table 2").name = "  padded  "
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
         parseFormula("=  padded  ::A1", "G11", tables=document.tableIdentities)
@@ -470,7 +460,7 @@ def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
     So `1-Table 2::A1` read as a table called `1-Table 2`, and 1469 formulas in one
     real document failed to reparse on it. Found while measuring #67.
     """
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     formula = parseFormula(text, "A1", tables=document.tableIdentities)
 
     assert any(
@@ -480,7 +470,7 @@ def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
 
 def testAHyphenatedTableNameStillResolvesWhenTheDocumentNamesIt() -> None:
     """The names are authoritative, so one carrying an operator is matched literally."""
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     document.sheet("Sheet 2").table("Table 1").name = "Table 1-1"
 
     formula = parseFormula(
@@ -514,7 +504,7 @@ def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> No
     Both spellings are covered, one where the tail is a real table and one where
     nothing resolves at all.
     """
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     document.sheet("Sheet 2").table("Table 1").name = "Two"
 
     with pytest.raises(FormulaSyntaxError, match="past column 1000"):
@@ -523,7 +513,7 @@ def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> No
 
 def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
     """A name naming no table would otherwise be written as a reference to nothing."""
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
         parseFormula(
             "=Ledger::A1", "A1", tables=document.tableIdentities
@@ -772,7 +762,7 @@ def testFormulasAuthoredAsTextMatchTheirGoldenFile(tmp_path: Path) -> None:
     golden = goldenDirectory / "20-formula-authored-as-text.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    working = Path(shutil.copy(fixturePath("20-formula-shapes"),
+    working = Path(shutil.copy(documentPath("20-formula-shapes"),
                                tmp_path / "20.numbers"))
     authorFormulas(working)
     assert dataListBytes(golden) == dataListBytes(working), (
@@ -823,7 +813,7 @@ def testEveryRangeNumbersWroteCarriesStickyBits() -> None:
     """The measurement the writer rests on: 9 of 9 in the corpus, none without."""
     seen = [
         archiveNode.HasField("AST_sticky_bits")
-        for path in sorted(fixtureDirectory.glob("*.numbers"))
+        for path in allDocuments
         for archiveNode in stickyBitsSurvey(path)
     ]
     assert seen and all(seen)
@@ -1009,7 +999,7 @@ def testBracketedFormulasMatchTheirGoldenFile(tmp_path: Path) -> None:
     golden = goldenDirectory / "20-formula-brackets.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    working = Path(shutil.copy(fixturePath("20-formula-shapes"),
+    working = Path(shutil.copy(documentPath("20-formula-shapes"),
                                tmp_path / "20.numbers"))
     authorBrackets(working)
     assert dataListBytes(golden) == dataListBytes(working), (

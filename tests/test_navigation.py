@@ -32,15 +32,14 @@ from pathlib import Path
 import pytest
 
 import pybers
+from conftest import allDocuments, documentPath
 from pybers.document import Document, SelectionError, Sheet
 from pybers.table import Cell, Table
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 
 def fixture(name: str) -> Document:
     """Open one fixture by its stem."""
-    return pybers.open(fixtureDirectory / f"{name}.numbers")
+    return pybers.open(documentPath(name))
 
 
 # ── AC 1: a sheet and a table by name or by position ─────────────────────────
@@ -261,7 +260,7 @@ def test_aDocumentWithNoTablesYieldsNothing() -> None:
 
 
 @pytest.mark.parametrize(
-    "path", sorted(fixtureDirectory.glob("*.numbers")), ids=lambda path: path.stem
+    "path", allDocuments, ids=lambda path: path.stem
 )
 def test_everyFixtureYieldsEveryCellItStores(path: Path) -> None:
     """Totality: across the corpus every stored cell is yielded exactly once."""
@@ -286,7 +285,7 @@ def test_theIterationDrivesAnEditThatSurvivesAReopen(tmp_path: Path) -> None:
     anything about the iteration.
     """
     target = tmp_path / "20-formula-shapes.numbers"
-    shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", target)
+    shutil.copy(documentPath("20-formula-shapes"), target)
     document = pybers.open(target)
 
     countBySheet: dict[str, int] = {}

@@ -32,7 +32,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, recordedColumns, recordedRows
+from conftest import archiveBodies, documentPath, recordedColumns, recordedRows
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
@@ -41,9 +41,8 @@ from pybers.addressing.reference import CellReference
 from pybers.errors import ReadError, WriteError
 from pybers.table._write import rewriteRow, tileTypeId
 
-fixtures: Path = Path(__file__).parent / "fixtures"
-wideFixture: Path = fixtures / "45-columns-over-255.numbers"
-narrowFixture: Path = fixtures / "11-value-types-noformats.numbers"
+wideFixture: Path = documentPath("45-columns-over-255")
+narrowFixture: Path = documentPath("11-value-types-noformats")
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # The four cells cleared from the last row of the wide fixture.
@@ -240,7 +239,7 @@ def testAFormulaStillCannotReachAColumnPastTwoFiftyFive(tmp_path: Path) -> None:
     would leave a stale result Numbers never recalculates, so the write refuses
     instead. Borrowed from `19` because this fixture holds no formula to copy.
     """
-    borrowed = firstTable(pybers.open(fixtures / "19-formula-dragged.numbers"))
+    borrowed = firstTable(pybers.open(documentPath("19-formula-dragged")))
     target = Path(shutil.copy(wideFixture, tmp_path / "45-formula.numbers"))
     document = pybers.open(target)
     firstTable(document).cell("KJ7").formula = borrowed.cell("E2").formula

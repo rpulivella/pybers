@@ -7,6 +7,8 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-09-16  `allDocuments` and `documentPath` gathered here for PYB-90, so a
+            test finds a document without knowing whether it is an origin.
 2026-09-08  `dataListBytes` gathered here for #13, so that two golden
             tests compare pooled lists through one reader.
 2026-09-07  Written for #54, holding what test_merge_covered and
@@ -29,6 +31,31 @@ from pybers._persistence import NumbersPackage, readPackage
 from pybers._persistence.cells import decodeRow, offsetUnitFor
 from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypeId, archiveTypes
+
+testsDirectory: Path = Path(__file__).resolve().parent
+
+# Origin and measurement differ in provenance only, so no test cares which holds a stem.
+documentDirectories: tuple[Path, ...] = (
+    testsDirectory / "fixtures",
+    testsDirectory / "measurements",
+)
+
+allDocuments: list[Path] = sorted(
+    (path for directory in documentDirectories for path in directory.glob("*.numbers")),
+    key=lambda path: path.name,
+)
+
+
+def documentPath(stem: str) -> Path:
+    """Return the one document named `stem`, failing rather than skipping."""
+    found = [
+        directory / f"{stem}.numbers"
+        for directory in documentDirectories
+        if (directory / f"{stem}.numbers").is_file()
+    ]
+    assert len(found) == 1, f"{stem}.numbers is in {len(found)} document directories"
+    return found[0]
+
 
 tableModelType: int = next(
     key for key, value in archiveTypes.items() if value is tst.TableModelArchive

@@ -23,31 +23,19 @@ __date__ = "2026/08/18"
 
 import datetime
 from decimal import Decimal
-from pathlib import Path
 
-import pytest
-
+from conftest import documentPath
 from pybers._persistence import readPackage
 from pybers._persistence.cells import (
     decodeRow,
     offsetUnitFor,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
 # TST.Tile and TST.TableModelArchive. Named here rather than imported because
 # these identifiers are ours, read from the archive, and do not come from a
 # generated constant.
 tileTypeId: int = 6002
 tableModelTypeId: int = 6001
-
-
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
 
 
 def valueRow(name: str) -> dict[int, object]:
@@ -65,7 +53,7 @@ def valueRow(name: str) -> dict[int, object]:
     """
     from pybers._generated import TSTArchives_pb2 as tst
 
-    package = readPackage(fixturePath(name))
+    package = readPackage(documentPath(name))
     tiles = {
         archive.identifier: message.data
         for iwaFile in package.iwaFiles

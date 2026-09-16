@@ -25,21 +25,19 @@ __status__ = "Development"
 __date__ = "2026/09/02"
 
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
 import pybers
+from conftest import documentPath
 from pybers.addressing import ReferenceError
 from pybers.table import MergeRange, Table
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 
 def unmergedTable() -> Table:
     """Return `22b`'s table, the unmerged twin, as a starting point."""
     return pybers.open(
-        fixtureDirectory / "22b-merge-2x2-unmerged.numbers"
+        documentPath("22b-merge-2x2-unmerged")
     ).sheet(1).table(1)
 
 
@@ -220,7 +218,7 @@ def test_theTwinFixturesAgreeOnWhatAMergeDiscarded() -> None:
     revisiting before the code does.
     """
     merged = pybers.open(
-        fixtureDirectory / "22-merge-2x2.numbers"
+        documentPath("22-merge-2x2")
     ).sheet(1).table(1)
     unmerged = unmergedTable()
 

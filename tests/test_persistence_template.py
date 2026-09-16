@@ -23,6 +23,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import documentPath
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._persistence import PackageRegistry, readPackage
 from pybers._persistence.template import (
@@ -39,8 +40,6 @@ from pybers.document._create import (
     templateStylesheet,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
 documentBindings: dict[int, int] = {
     templateSheetStyle: templateSheetStyle,
     templateStylesheet: templateStylesheet,
@@ -51,7 +50,7 @@ documentBindings: dict[int, int] = {
 
 def registry() -> PackageRegistry:
     """Return the registry of `49-sheet-inserted`, the sheet templates' source."""
-    return PackageRegistry(readPackage(fixtureDirectory / "49-sheet-inserted.numbers"))
+    return PackageRegistry(readPackage(documentPath("49-sheet-inserted")))
 
 
 def testTheSheetTemplatesReadAsOneSheetAndItsSevenParts() -> None:

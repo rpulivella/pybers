@@ -32,6 +32,7 @@ from test_formula_nodes import formulaCellRegister
 from test_writer import archiveDifferences, recordAt, retypedCells, workingCopy
 
 import pybers
+from conftest import allDocuments, documentPath
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import CellRecord, decodeRecord, readPackage, writePackage
@@ -55,7 +56,6 @@ from pybers.table._write import (
     textFormatSlot,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 numberFormatType: int = 256
@@ -164,7 +164,7 @@ def dataListForge(
 def test_theCountedSlotsReproduceEveryFormatRefcountNumbersWrote() -> None:
     """The measurement the counting rests on, run over every table in the fixtures."""
     checked = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         for index, model in tableModels(path):
             if not model.base_data_store.format_table.identifier:
                 continue
@@ -189,7 +189,7 @@ def test_everyRecordNumbersWroteDisplaysAKindItHolds() -> None:
     numbers as their kinds, so only a file keyed otherwise tells a kind from a key.
     """
     checked = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         for index, model in tableModels(path):
             for record in tableRecords(index, model):
                 kind, held = displayedKind(record)
@@ -336,7 +336,7 @@ def test_aBorrowedShapeKeepsOnlyTheFormatSlotOfItsOwnKind() -> None:
     Those three belong to the cell they were chosen for, and a new cell naming them
     would claim counts in slots this library does not maintain.
     """
-    record = recordAt(fixtureDirectory / "15-number-duration-formats.numbers", "N2")
+    record = recordAt(documentPath("15-number-duration-formats"), "N2")
     shaped = decodeRecord(record.column, borrowedShape(record))
 
     kept = set(referenceSlots(shaped.raw))
@@ -555,7 +555,7 @@ def stringEntries(path: Path, tableName: str) -> dict[int, tuple[str, int]]:
 def test_theCountedStringsAndStylesReproduceEveryListNumbersWrote() -> None:
     """PYB-92's measurement: strings by text record, styles by byte 8 slots."""
     checked = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         for index, model in tableModels(path):
             assert listsAgreeWithCells(index, model) == [], (
                 f"{path.name} / {model.table_name}"

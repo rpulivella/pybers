@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import archiveBodies
+from conftest import allDocuments, archiveBodies, documentPath
 from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.container import ContainerError
@@ -35,17 +35,13 @@ from pybers._persistence.metadata import (
     memberNameFor,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
-
 tileTypeId: int = 6002
 documentComponent: int = 1
 
 
 def registry(name: str = "00-baseline") -> PackageRegistry:
     """Return the registry of a freshly read fixture."""
-    return PackageRegistry(readPackage(fixtureDirectory / f"{name}.numbers"))
+    return PackageRegistry(readPackage(documentPath(name)))
 
 
 def infoFor(identifier: int, references: list[int]) -> tspArchive.ArchiveInfo:
@@ -57,7 +53,7 @@ def infoFor(identifier: int, references: list[int]) -> tspArchive.ArchiveInfo:
     return info
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testEveryStrongExternalReferenceIsWhatTheArchivesReference(path: Path) -> None:
     found = PackageRegistry(readPackage(path))
 
@@ -70,7 +66,7 @@ def testEveryStrongExternalReferenceIsWhatTheArchivesReference(path: Path) -> No
         assert found.strongReferencesDerive(identifier) == stored, component.locator
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testEveryArchiveOutsideTheRegistryBelongsToAComponent(path: Path) -> None:
     package = readPackage(path)
     found = PackageRegistry(package)
@@ -119,7 +115,7 @@ def testACreatedComponentSurvivesBeingWrittenAndRead(tmp_path: Path) -> None:
 
 
 def testCreatingAComponentLeavesEveryOtherArchiveUnchanged(tmp_path: Path) -> None:
-    source = fixtureDirectory / "00-baseline.numbers"
+    source = documentPath("00-baseline")
     found = registry()
     root = archiveCreate(infoFor(found.identifierAllocate(), []), [b""])
 
@@ -203,7 +199,7 @@ def testAnArchiveIdentifierAlreadyHeldIsRefused() -> None:
 
 
 def testAMemberNameAlreadyTakenIsRefused() -> None:
-    package = readPackage(fixtureDirectory / "00-baseline.numbers")
+    package = readPackage(documentPath("00-baseline"))
 
     with pytest.raises(ContainerError, match="already holds"):
         package.iwaFileAdd(memberNameFor("Document"))

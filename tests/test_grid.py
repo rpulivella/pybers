@@ -27,17 +27,15 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import archiveBodies, documentPath
 from pybers._persistence import readPackage
 from pybers.addressing import ReferenceError
 from pybers.table import Cell, Table
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
 
 def fixtureTable(name: str, table: str | int = 1) -> Table:
     """Return one table from the first sheet of a fixture."""
-    return pybers.open(fixtureDirectory / f"{name}.numbers").sheet(1).table(table)
+    return pybers.open(documentPath(name)).sheet(1).table(table)
 
 
 def merged() -> Table:
@@ -183,7 +181,7 @@ def testAWholeWalkStoresEveryCellOfTheGrid() -> None:
 
 
 def testAWalkChangesNothingInTheSavedFile(tmp_path: Path) -> None:
-    source = fixtureDirectory / "20-formula-shapes.numbers"
+    source = documentPath("20-formula-shapes")
     untouched, walked = tmp_path / "untouched.numbers", tmp_path / "walked.numbers"
     pybers.open(source).save(untouched)
     document = pybers.open(source)
@@ -279,7 +277,7 @@ def testEveryCellAWalkYieldsIsTheCellTheTableReturns() -> None:
 
 def testAWriteThroughAWalkReachesTheFile(tmp_path: Path) -> None:
     working = tmp_path / "walked.numbers"
-    shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", working)
+    shutil.copy(documentPath("20-formula-shapes"), working)
     document = pybers.open(working)
 
     last = list(document.sheet(1).table("Table 2").gridIterate())[-1]
@@ -292,7 +290,7 @@ def testAWriteThroughAWalkReachesTheFile(tmp_path: Path) -> None:
 
 def testAWriteThroughARowReachesTheFile(tmp_path: Path) -> None:
     working = tmp_path / "rows.numbers"
-    shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", working)
+    shutil.copy(documentPath("20-formula-shapes"), working)
     document = pybers.open(working)
 
     document.sheet(1).table("Table 2").rows[4][2].value = "through a row"
@@ -365,7 +363,7 @@ def testAMergeIsTheSameBlockHoweverItIsLocked() -> None:
 def testAScriptFillsEveryEmptyCellInALoop(tmp_path: Path) -> None:
     """The `import pybers` consumer: a batch over a grid, no address built as text."""
     working = tmp_path / "filled.numbers"
-    shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", working)
+    shutil.copy(documentPath("20-formula-shapes"), working)
     document = pybers.open(working)
 
     table = document.sheet(1).table("Table 2")

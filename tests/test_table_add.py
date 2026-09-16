@@ -27,7 +27,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import archiveBodies, documentPath
 from pybers._engine import calculationEngine
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
@@ -40,7 +40,6 @@ from pybers.document import Document, SelectionError
 from pybers.errors import WriteError
 from pybers.table import Table
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 metadataMember: str = "Index/Metadata.iwa"
@@ -49,7 +48,7 @@ ownerKinds: frozenset[int] = frozenset({1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 35})
 
 def shapes() -> Document:
     """Return `20-formula-shapes`, whose formulas read across tables and sheets."""
-    return pybers.open(fixtureDirectory / "20-formula-shapes.numbers")
+    return pybers.open(documentPath("20-formula-shapes"))
 
 
 def withTables(document: Document) -> Document:
@@ -186,7 +185,7 @@ def testFormulasReadingAcrossTablesStillNameTheSameTables(tmp_path: Path) -> Non
 
 def testOnlyTheArchivesThatRegisterATableAreRewritten(tmp_path: Path) -> None:
     """Every member but the four that list sheets, owners and styles is untouched."""
-    source = readPackage(fixtureDirectory / "20-formula-shapes.numbers")
+    source = readPackage(documentPath("20-formula-shapes"))
     written = readPackage(savedWithTables(tmp_path))
     registering = {
         metadataMember,

@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import allDocuments
 from pybers._persistence import readPackage
 from pybers._persistence.cells import decodeRow, offsetUnitFor
 from pybers._persistence.decimal128 import (
@@ -36,8 +37,6 @@ from pybers._persistence.decimal128 import (
     maximumBiasedExponent,
     maximumSignificantDigits,
 )
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 tileTypeId: int = 6002
 
@@ -183,7 +182,7 @@ def test_everyCorpusValueReEncodesToWhatNumbersWrote() -> None:
     which could agree with itself while both halves were wrong.
     """
     examined = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         for value, raw in everyNumber(path):
             examined += 1
             assert Decimal128(value).asBytes() == raw, (

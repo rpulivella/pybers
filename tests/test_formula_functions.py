@@ -29,6 +29,7 @@ from types import ModuleType
 import pytest
 
 import pybers
+from conftest import allDocuments, documentPath
 from pybers import Formula, FormulaFunctionCall, FormulaNode
 from pybers._persistence import readPackage
 from pybers._persistence.types import archiveTypeId
@@ -44,7 +45,6 @@ from pybers.formula.functions import (
 )
 from pybers.formula.nodes import functionNodeType
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 
 # TSCE.FormulaArchive, the pooled formula list. Named here rather than imported
@@ -57,17 +57,9 @@ formulaListTypeId: int = 6005
 originalAlphabeticalCeiling: int = 167
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
-
-
 def firstTable(name: str) -> pybers.Table:
     """Return the first table of a fixture, which is where these formulas live."""
-    return pybers.open(fixturePath(name)).sheets[0].tables[0]
+    return pybers.open(documentPath(name)).sheets[0].tables[0]
 
 
 def calls(table: pybers.Table) -> list[FormulaFunctionCall]:
@@ -187,7 +179,7 @@ def testUnknownNameRefusesRatherThanInventingAnIndex() -> None:
 
 def testUnknownIndexRoundTripsThroughTheFileUnchanged(tmp_path: Path) -> None:
     """A call the map cannot name is written and read back with its index intact."""
-    source = shutil.copy(fixturePath("18-formula-literals"), tmp_path / "18.numbers")
+    source = shutil.copy(documentPath("18-formula-literals"), tmp_path / "18.numbers")
     document = pybers.open(source)
     cell = document.sheets[0].tables[0].cell("D1")
     nodes = list(cell.formula.nodes)
@@ -219,7 +211,7 @@ def testAuthoringByNameWritesTheSameArchiveAsAuthoringByIndex(
     """The same edit made both ways produces byte-identical formula archives."""
 
     def write(target: Path, call: FormulaFunctionCall) -> dict[int, bytes]:
-        source = shutil.copy(fixturePath("18-formula-literals"), target)
+        source = shutil.copy(documentPath("18-formula-literals"), target)
         document = pybers.open(source)
         cell = document.sheets[0].tables[0].cell("A1")
         cell.formula = Formula(
@@ -325,7 +317,7 @@ def testNoValidFormulaInTheCorpusContradictsTheTable() -> None:
     table agreeing that they are errors is the next test rather than this one.
     """
     offenders: list[str] = []
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         document = pybers.open(path)
         for sheet in document.sheets:
             for table in sheet.tables:

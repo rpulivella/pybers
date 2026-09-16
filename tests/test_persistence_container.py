@@ -7,12 +7,12 @@ changes, and get the input byte for byte. Everything above this layer depends on
 that holding, so it is the first test worth having and the one worth breaking the
 build.
 
-The fixtures are this project's own, under `tests/fixtures/`, and three of the
-forty-five are exercised here. They are chosen to span the shapes the container has
-to survive rather than to be representative: the empty baseline, a document carrying
-floating objects and embedded image assets, and the 2001-row table that forces
-multi-tile storage and the largest members. A failure therefore says something about
-which shape broke.
+The documents are this project's own, under `tests/fixtures/` and
+`tests/measurements/`, and three of them are exercised here. They are chosen to
+span the shapes the container has to survive rather than to be representative:
+the empty baseline, a document carrying floating objects and embedded image
+assets, and the 2001-row table that forces multi-tile storage and the largest
+members. A failure therefore says something about which shape broke.
 
 A missing fixture now FAILS rather than skips. These are first-party files committed
 to this repository, so an absent one is a defect, and a skip would let the round-trip
@@ -44,6 +44,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import documentPath
 from pybers._persistence import (
     IWAError,
     decompressRaw,
@@ -52,8 +53,6 @@ from pybers._persistence import (
     splitFrames,
     writePackage,
 )
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 # Three fixtures spanning the shapes the container has to survive, chosen so a
 # failure says something about WHICH shape broke rather than only that one did:
@@ -66,23 +65,10 @@ fixtureNames: tuple[str, ...] = ("00-baseline", "35-image", "27-big-table")
 localExtraFieldLength: int = 20
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, failing when it is absent.
-
-    These are first-party fixtures committed to this repository, so a missing one
-    is a defect rather than an absent optional dependency. It used to skip, because
-    the fixtures were then a third-party checkout that might not be present; that
-    is no longer true and a skip here would hide the round-trip contract failing.
-    """
-    path = fixtureDirectory / f"{name}.numbers"
-    assert path.is_file(), f"Fixture {path} is missing from the corpus."
-    return path
-
-
 @pytest.mark.parametrize("name", fixtureNames)
 def testReadsEveryIWAMember(name: str) -> None:
     """Every Index/*.iwa member parses into at least one archive."""
-    package = readPackage(fixturePath(name))
+    package = readPackage(documentPath(name))
 
     assert package.iwaFiles, "No IWA members were read."
     assert len(package.members) == len(package.iwaFiles) + len(
@@ -122,7 +108,7 @@ def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(
     test exists to keep the divergence bounded and named, so that a *different*
     difference appearing later is a failure rather than a shrug.
     """
-    source = fixturePath(name)
+    source = documentPath(name)
     destination = tmp_path / f"{name}-roundtrip.numbers"
     writePackage(readPackage(source), destination)
 
@@ -157,7 +143,7 @@ def testRoundTripPreservesEveryMemberExactly(name: str, tmp_path: Path) -> None:
     headers. What it does not cover is the local-header extra field, which is the
     only thing standing between this and the byte-identical test above.
     """
-    source = fixturePath(name)
+    source = documentPath(name)
     destination = tmp_path / f"{name}-roundtrip.numbers"
     writePackage(readPackage(source), destination)
 
@@ -199,10 +185,10 @@ def testDecompressedFrameMatchesItsDeclaredLength() -> None:
     the tag stream that produces it, so agreement is real evidence rather than a
     tautology.
     """
-    package = readPackage(fixturePath("00-baseline"))
+    package = readPackage(documentPath("00-baseline"))
     frameCount = 0
 
-    with zipfile.ZipFile(fixturePath("00-baseline")) as archive:
+    with zipfile.ZipFile(documentPath("00-baseline")) as archive:
         for iwaFile in package.iwaFiles:
             for frame in splitFrames(archive.read(iwaFile.name)):
                 decompressRaw(frame)  # raises on any length mismatch
@@ -218,7 +204,7 @@ def testMultiFrameMemberIsExercised() -> None:
     than covered, and a reader that only ever saw single-frame members could be
     wrong about concatenation without anything noticing.
     """
-    with zipfile.ZipFile(fixturePath("00-baseline")) as archive:
+    with zipfile.ZipFile(documentPath("00-baseline")) as archive:
         counts = [
             len(splitFrames(archive.read(name)))
             for name in archive.namelist()

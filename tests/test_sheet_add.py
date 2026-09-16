@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import archiveBodies, documentPath
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSKArchives_pb2 as tsk
 from pybers._generated import TSWPArchives_pb2 as tswp
@@ -35,7 +35,6 @@ from pybers.document import Document, SelectionError
 from pybers.errors import WriteError
 from pybers.table import Table
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 metadataMember: str = "Index/Metadata.iwa"
@@ -43,7 +42,7 @@ metadataMember: str = "Index/Metadata.iwa"
 
 def shapes() -> Document:
     """Return `20-formula-shapes`, two sheets and a formula reading across them."""
-    return pybers.open(fixtureDirectory / "20-formula-shapes.numbers")
+    return pybers.open(documentPath("20-formula-shapes"))
 
 
 def savedWithSheets(tmp_path: Path) -> Path:
@@ -222,7 +221,7 @@ def testAnAddedSheetFollowsTheRegistryRules(tmp_path: Path) -> None:
 def testAddingASheetRewritesOnlyTheRootTheSidebarAndTheRegistry(
     tmp_path: Path,
 ) -> None:
-    source = readPackage(fixtureDirectory / "20-formula-shapes.numbers")
+    source = readPackage(documentPath("20-formula-shapes"))
     written = readPackage(savedWithSheets(tmp_path))
     index = ArchiveIndex(source)
     root = findRoot(index)

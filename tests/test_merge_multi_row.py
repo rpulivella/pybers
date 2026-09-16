@@ -29,13 +29,12 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, recordedRows
+from conftest import archiveBodies, documentPath, recordedRows
 from pybers._persistence import readPackage
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.table import Table
 
-fixtures: Path = Path(__file__).parent / "fixtures"
-multiRowFixture: Path = fixtures / "22d-merge-multi-row.numbers"
+multiRowFixture: Path = documentPath("22d-merge-multi-row")
 
 # The extent of each merge, against the anchor that carries it.
 extents: tuple[tuple[str, str], ...] = (

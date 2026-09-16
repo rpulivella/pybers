@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import allDocuments, documentPath
 from pybers._generated import TSPArchiveMessages_pb2 as archiveMessages
 from pybers._persistence.iwa import (
     Archive,
@@ -49,10 +50,6 @@ from pybers._persistence.iwa import (
 )
 from pybers._persistence.varint import readVarint
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
-
 
 def everyMemberOf(path: Path) -> list[tuple[str, bytes]]:
     """Return every IWA member of a fixture as its name and its raw bytes."""
@@ -66,13 +63,13 @@ def everyMemberOf(path: Path) -> list[tuple[str, bytes]]:
 
 def oneMember(name: str = "00-baseline") -> IWAFile:
     """Read the first IWA member of a fixture, for the single-member cases."""
-    memberName, data = everyMemberOf(fixtureDirectory / f"{name}.numbers")[0]
+    memberName, data = everyMemberOf(documentPath(name))[0]
     return readIWAFile(memberName, data)
 
 
 # ── The sweep: an archive stream rebuilds exactly ────────────────────────────
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyArchiveStreamReSerializesByteIdentically(path: Path) -> None:
     """`writeArchives` is the exact inverse of `readArchives`, on real data."""
     members = everyMemberOf(path)
@@ -84,7 +81,7 @@ def test_everyArchiveStreamReSerializesByteIdentically(path: Path) -> None:
         )
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_framingSurvivesTheCompressor(path: Path) -> None:
     """A payload framed and re-read gives back exactly what went in."""
     for name, data in everyMemberOf(path):
@@ -173,7 +170,7 @@ def test_unmodeledArchiveInfoFieldsSurviveARewrite() -> None:
     without any error.
     """
     member, carrier = None, None
-    for path in allFixtures:
+    for path in allDocuments:
         for name, data in everyMemberOf(path):
             candidate = readIWAFile(name, data)
             for archive in candidate.archives:

@@ -31,12 +31,11 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, dataListBytes
+from conftest import archiveBodies, dataListBytes, documentPath
 from pybers import CellReference, Table
 from pybers._persistence import readPackage
 from pybers.formula.nodes import FormulaRange, FormulaReference, Span
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # What `20-formula-shapes` reads as before anything moves, which is also what the
@@ -93,22 +92,14 @@ retargetedText: dict[str, str] = {
 }
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
-
-
 def shapes() -> pybers.Document:
     """Return `20-formula-shapes`, the three-table two-sheet fixture."""
-    return pybers.open(fixturePath("20-formula-shapes"))
+    return pybers.open(documentPath("20-formula-shapes"))
 
 
 def workingCopy(name: str, into: Path) -> Path:
     """Return a writable copy of a fixture, so a save never touches the corpus."""
-    return Path(shutil.copy(fixturePath(name), into / f"{name}.numbers"))
+    return Path(shutil.copy(documentPath(name), into / f"{name}.numbers"))
 
 
 def formulaTexts(table: Table) -> dict[str, str]:
@@ -330,7 +321,7 @@ def testALockedAxisDoesNotMove() -> None:
 
 def testABrokenReferenceStaysBroken() -> None:
     """AC 4.ii. Numbers records `#REF` as coordinates pointing nowhere on purpose."""
-    document = pybers.open(fixturePath("21-formula-errors"))
+    document = pybers.open(documentPath("21-formula-errors"))
     location = locationAt(document, "C1")
 
     assert location.broken
@@ -524,7 +515,7 @@ def testAScriptRetargetsOneTableInThreeLines() -> None:
     The assertion is the shape as much as the count. A `target` that could be
     absent, or a shift needing the node index, would each add a branch here.
     """
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(documentPath("20-formula-shapes"))
     sales = document.sheet("Sheet 1").table("Table 1")
     moved = sum(
         location.shift(rows=1, cols=7)
@@ -553,7 +544,7 @@ def testACliListsEveryReferenceWithWhereItIsAndWhereItPoints() -> None:
 
 def testACliReportsBrokenReferencesAndTheirCount() -> None:
     """The `pybers references check` consumer, whose exit code is that count."""
-    document = pybers.open(fixturePath("21-formula-errors"))
+    document = pybers.open(documentPath("21-formula-errors"))
     broken = [location for location in document.referencesIterate() if location.broken]
 
     assert [str(location.cell.reference) for location in broken] == ["C1"]

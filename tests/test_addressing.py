@@ -26,6 +26,7 @@ from pathlib import Path
 import pytest
 
 import pybers
+from conftest import allDocuments
 from pybers.addressing import (
     CellRange,
     CellRangeList,
@@ -43,10 +44,6 @@ from pybers.addressing.reference import (
 )
 from pybers.table import MergeRange, Table
 from pybers.table import cells as tableModule
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
 
 # Either side of every base-26 boundary this library can reach, plus the two the
 # conversion is most likely to get wrong: Z to AA, and ZZ to AAA.
@@ -91,7 +88,7 @@ def test_theBase26BoundaryIsWhereItIsClaimedToBe() -> None:
     assert columnNumber("AA") == 27
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyReferenceInTheCorpusSurvivesTheRoundTrip(path: Path) -> None:
     """Every cell in every fixture re-parses to the reference it came from."""
     document = pybers.open(path)

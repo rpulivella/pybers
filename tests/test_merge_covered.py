@@ -11,7 +11,7 @@ had no cell to put them in, and refused to open at all.
 `22e-merge-imported` is that document, converted from a generated workbook.
 `22c-merge-overpaints` is the control: four gestures in Numbers itself, none of
 which produces a covered record. Both measured 2026-09-07; see
-tests/fixtures/README.md.
+docs/findings/findings-03-structure.md.
 
 UPDATES
 2026-09-07  Written for #49.
@@ -32,7 +32,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, recordedColumns, tableModelType
+from conftest import archiveBodies, documentPath, recordedColumns, tableModelType
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.index import ArchiveIndex
@@ -40,9 +40,8 @@ from pybers._persistence.types import archiveTypeId
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.table import MergeRange, Table
 
-fixtures: Path = Path(__file__).parent / "fixtures"
-importedFixture: Path = fixtures / "22e-merge-imported.numbers"
-overpaintFixture: Path = fixtures / "22c-merge-overpaints.numbers"
+importedFixture: Path = documentPath("22e-merge-imported")
+overpaintFixture: Path = documentPath("22c-merge-overpaints")
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # The covered positions of the imported fixture's three merges, A1:B1, C1:E1

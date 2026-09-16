@@ -29,7 +29,7 @@ import pytest
 from google.protobuf import text_format
 
 import pybers
-from conftest import archiveBodies
+from conftest import archiveBodies, documentPath
 from pybers._engine import calculationEngine, tableOwnerEntries
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
@@ -40,13 +40,12 @@ from pybers.document import Document
 from pybers.errors import WriteError
 from pybers.formula.nodes import FormulaReference
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 
 def shapes() -> Document:
     """Return `20-formula-shapes`, whose formulas read across tables and sheets."""
-    return pybers.open(fixtureDirectory / "20-formula-shapes.numbers")
+    return pybers.open(documentPath("20-formula-shapes"))
 
 
 def withFormulas(document: Document) -> Document:
@@ -123,7 +122,7 @@ def testATableWithNoFormulaGainsNoTile(tmp_path: Path) -> None:
 
 def testTheTileMatchesTheOneNumbersCreatedApartFromEdges(tmp_path: Path) -> None:
     """Replay `55` on `48`; edges stay empty until the golden shows they matter."""
-    document = pybers.open(fixtureDirectory / "48-table-inserted.numbers")
+    document = pybers.open(documentPath("48-table-inserted"))
     table = document.sheet(1).table(1)
     table.cell("A1").value = Decimal("2")
     table.cell("B1").formulaText = "=A1*3"
@@ -142,7 +141,7 @@ def testTheTileMatchesTheOneNumbersCreatedApartFromEdges(tmp_path: Path) -> None
         ]
 
     assert shape(tmp_path / "replayed.numbers") == shape(
-        fixtureDirectory / "55-table-inserted-formula.numbers"
+        documentPath("55-table-inserted-formula")
     )
 
 
@@ -247,7 +246,7 @@ def registers(path: Path, sheet: str, table: str) -> list[str]:
 
 def testRewritingNumbersOwnFormulasReproducesItsRegisters(tmp_path: Path) -> None:
     """Strip the eight formulas of `20-formula-shapes` and write them back."""
-    source = fixtureDirectory / "20-formula-shapes.numbers"
+    source = documentPath("20-formula-shapes")
     references = ("A11", "B11", "C11", "D11", "E11", "F11", "G11", "H11")
     kept = {
         reference: pybers.open(source).sheet("Sheet 1").table("Table 1")
@@ -413,7 +412,7 @@ def testExistingTablesAndTheirFormulasReadBackUnchanged(tmp_path: Path) -> None:
 
 
 def testMergesElsewhereReadBackUnchanged(tmp_path: Path) -> None:
-    source = fixtureDirectory / "22-merge-2x2.numbers"
+    source = documentPath("22-merge-2x2")
     document = pybers.open(source)
     added = document.sheet(1).tableAdd("Calc", rows=1, cols=2)
     added.cell("A1").value = Decimal("3")
@@ -427,7 +426,7 @@ def testMergesElsewhereReadBackUnchanged(tmp_path: Path) -> None:
 
 
 def testOnlyTheArchivesThatRegisterAreRewritten(tmp_path: Path) -> None:
-    source = readPackage(fixtureDirectory / "20-formula-shapes.numbers")
+    source = readPackage(documentPath("20-formula-shapes"))
     written = readPackage(savedWithFormulas(tmp_path))
     registering = {
         "Index/Metadata.iwa",
