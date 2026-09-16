@@ -373,7 +373,7 @@ from decimal import Decimal
 from pathlib import Path
 import pybers
 
-source = Path("tests/fixtures/11-value-types-noformats.numbers")
+source = Path("tests/measurements/11-value-types-noformats.numbers")
 golden = Path("tests/golden/11-value-types-noformats-A1-edited.numbers")
 shutil.copy(source, golden)
 document = pybers.open(golden)

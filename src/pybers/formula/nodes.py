@@ -110,7 +110,7 @@ percentNodeType: int = 15
 # real documents, and a list of one is a bracket. It is the author's own bracket
 # rather than one derived from precedence: 193 of the 379 distinct formulas
 # carrying one enclose what precedence already bound. See
-# tests/fixtures/findings-08-formula-text.md.
+# docs/findings/findings-08-formula-text.md.
 listNodeType: int = 25
 
 # An argument the writer left out, which is what the commas of `DURATION(,,,K1,,)`
@@ -139,7 +139,7 @@ prependWhitespaceNodeType: int = 33
 # `LET` and `LAMBDA` are functions Numbers documents and offers in its own
 # function browser, and the format stores neither as an indexed call: each gets
 # node types of its own. Measured 2026-09-04 against
-# tests/fixtures/46-formula-rare-functions, from formulas Numbers accepted, a
+# tests/measurements/46-formula-rare-functions, from formulas Numbers accepted, a
 # working `LET` and a `LAMBDA` reached through `LAMBDA.APPLY`.
 letBindNodeType: int = 52
 endScopeNodeType: int = 54
@@ -157,7 +157,7 @@ variableNodeType: int = 53
 # `+[TSCEFunctionSpec functionIndexUsesThunks:]` in Numbers 15.3.1, which compares
 # its argument against exactly these and nothing else. CHOOSE, IF, IFS and SWITCH,
 # and each thunks every argument after its first: measured for IF against
-# tests/fixtures/18-formula-literals, whose `IF(1>0,1,2)` brackets the two branches
+# tests/measurements/18-formula-literals, whose `IF(1>0,1,2)` brackets the two branches
 # and leaves the condition bare.
 thunkingFunctionIndices: frozenset[int] = frozenset({19, 62, 313, 336})
 

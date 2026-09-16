@@ -4,9 +4,10 @@ Cell values: the one part of the format the protobuf schemas do not describe.
 
 A table's rows live in `TST.Tile`, but the cells inside a row do not. They sit in an
 opaque `cell_storage_buffer` indexed by a `cell_offsets` array, in a layout Apple
-never published. Everything here was reverse-engineered against the fixtures under
-tests/fixtures/, each of which carries a row of text labels describing its own
-contents, which is what makes a decode verifiable rather than merely plausible.
+never published. Everything here was reverse-engineered against the documents under
+tests/fixtures/ and tests/measurements/, each of which carries a row of text labels
+describing its own contents, which is what makes a decode verifiable rather than
+merely plausible.
 
 The failure mode to keep in mind while reading this module: a wrong offset in this
 format yields **wrong numbers, not an exception**. Every field is a fixed-width

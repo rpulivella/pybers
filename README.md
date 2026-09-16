@@ -40,11 +40,11 @@ costs.mergeAdd("A1:C1")
 document.save()
 ```
 
-Every one of the 46 fixtures reads and writes back with each of its archives unchanged. Four saved files have been opened in Numbers 15.3.1 and confirmed on screen, covering a numeric edit, an edit across two sheets, a merge and an unmerge. Those live in `tests/golden/`, and the reasoning for keeping them is in its README.
+Every document under `tests/fixtures/` and `tests/measurements/` reads and writes back with each of its archives unchanged. Four saved files have been opened in Numbers 15.3.1 and confirmed on screen, covering a numeric edit, an edit across two sheets, a merge and an unmerge. Those live in `tests/golden/`, and the reasoning for keeping them is in its README.
 
 ## The format, and why there are so many fixtures
 
-46 real `.numbers` files live under `tests/fixtures/`, each one labeling its own contents so that a decode can be verified rather than merely believed. What they established is written up in [`tests/fixtures/FINDINGS.md`](tests/fixtures/FINDINGS.md), split by topic. **Read that before designing anything against this format**, because several findings invalidate the obvious approach.
+Real `.numbers` files, each labeling its own contents so that a decode can be verified rather than merely believed, live in two places. `tests/fixtures/` holds the origins, and `tests/measurements/` holds documents made from an origin by one change. Each directory's README catalogs its files. What they established is written up in [`docs/findings/FINDINGS.md`](docs/findings/FINDINGS.md), split by topic. **Read that before designing anything against this format**, because several findings invalidate the obvious approach.
 
 The format's characteristic failure is that a wrong offset yields wrong numbers rather than an error, which is why this project is built on real files rather than on assumptions. Seven findings changed what the library had to be:
 
@@ -74,7 +74,8 @@ Requires Python 3.14 or newer. The only runtime dependency is `protobuf`.
 | Path | What lives here |
 | --- | --- |
 | `src/pybers/` | The library, laid out by concern. A directory per feature, `_persistence/` and `_engine.py` beneath them, and `protos/` and `_generated/` for the extracted iWork schemas with their type stubs. A leading underscore means a caller has no business there. |
-| `tests/` | The pytest suite, plus `fixtures/`: real `.numbers` files and the findings written from them. |
+| `tests/` | The pytest suite, plus `fixtures/` (origins), `measurements/` (one change from an origin) and `golden/` (files pybers wrote, confirmed in Numbers). |
+| `docs/` | Settled decisions, and `findings/`, what the real files established about the format. |
 | `scripts/` | Repository tooling, including the schema extractor and the writing gate. See `scripts/README.md`. |
 | `.claude/` | Project slash-commands used by the agentic workflow. |
 | `workarea/` | Ephemeral scratch. Git-ignored apart from its README. |

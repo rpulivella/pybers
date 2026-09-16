@@ -31,7 +31,7 @@ all of them; only an offered one may be written by name.
                and every cell a formula spills into holds `SPILL($anchor)`, so
                dropping these would read a spilled document as a bare number.
 
-Measured against `tests/fixtures/46-formula-rare-functions`, where Numbers
+Measured against `tests/measurements/46-formula-rare-functions`, where Numbers
 answers "isn't a valid function name" for each reserved one and where a
 `MAKEARRAY` spill fills three cells with `SPILL`.
 
