@@ -5,7 +5,7 @@ Writing a document back out, asserted archive by archive against what was read.
 The comparison here is deliberately not a byte compare of the two files. The zip
 envelope is known to differ by the local extra fields `zipfile` cannot emit, which
 `test_persistence_container` pins exactly, and a byte compare at this level would fail
-for that reason on every fixture while saying nothing about the document inside.
+for that reason on every document while saying nothing about the document inside.
 So this module compares the decoded archive stream: same members in the same
 order, same archives in the same order, same messages, same contents.
 
@@ -39,7 +39,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import allDocuments, documentPath
+from conftest import allDocuments, findDocumentPath
 from pybers._engine import tableOwnerIds
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
@@ -66,7 +66,7 @@ from pybers.table._read import readMerges
 from pybers.table._write import formatClaims
 
 
-def numericRecords(path: Path) -> list[CellRecord]:
+def readNumericRecords(path: Path) -> list[CellRecord]:
     """Every numeric cell record in a file, in tile order, for archive-level checks."""
     from pybers._generated import TSTArchives_pb2 as tst
 
@@ -92,7 +92,7 @@ def numericRecords(path: Path) -> list[CellRecord]:
     return records
 
 
-def messagesAreEquivalent(typeId: int, before: bytes, after: bytes) -> bool:
+def checkMessagesEquivalent(typeId: int, before: bytes, after: bytes) -> bool:
     """Report whether two message bodies of the same type carry the same fields.
 
     Identical bytes settle it without parsing anything, which is the case for every
@@ -113,7 +113,7 @@ def messagesAreEquivalent(typeId: int, before: bytes, after: bytes) -> bool:
     return first == second
 
 
-def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[str]:
+def listArchiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[str]:
     """Return every way two packages differ at the archive level, as readable lines.
 
     A list rather than a bare boolean, because a round trip that breaks needs to say
@@ -155,7 +155,7 @@ def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[st
             for index, (beforeMessage, afterMessage) in enumerate(
                 zip(beforeArchive.messages, afterArchive.messages, strict=True)
             ):
-                if not messagesAreEquivalent(
+                if not checkMessagesEquivalent(
                     beforeMessage.typeId, beforeMessage.data, afterMessage.data
                 ):
                     differences.append(
@@ -169,13 +169,13 @@ def archiveDifferences(before: NumbersPackage, after: NumbersPackage) -> list[st
 
 # ── AC 1: an unchanged document writes back unchanged ────────────────────────
 
-def test_thereIsACorpusToWriteAtAll() -> None:
+def test_thereAreDocumentsToWriteAtAll() -> None:
     """Guard the parametrization: an empty glob would make every case vacuous."""
     assert len(allDocuments) >= 62
 
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
-def test_everyFixtureWritesBackWithEveryArchiveUnchanged(
+def test_everyDocumentWritesBackWithEveryArchiveUnchanged(
     path: Path, tmp_path: Path
 ) -> None:
     """AC 1 and AC 1.b: open, save with no edit, and every archive is equivalent.
@@ -188,7 +188,7 @@ def test_everyFixtureWritesBackWithEveryArchiveUnchanged(
     destination = tmp_path / f"{path.stem}-saved.numbers"
     pybers.open(path).save(destination)
 
-    differences = archiveDifferences(readPackage(path), readPackage(destination))
+    differences = listArchiveDifferences(readPackage(path), readPackage(destination))
     assert not differences, (
         f"{path.name} did not survive an unchanged save:\n  "
         + "\n  ".join(differences)
@@ -196,7 +196,7 @@ def test_everyFixtureWritesBackWithEveryArchiveUnchanged(
 
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
-def test_aSavedFixtureReadsBackAsTheSameDocument(path: Path, tmp_path: Path) -> None:
+def test_aSavedDocumentReadsBackAsTheSameDocument(path: Path, tmp_path: Path) -> None:
     """The model is equal across the round trip, which the archive check cannot see.
 
     Both fields holding archive state are excluded from equality, so this compares
@@ -212,19 +212,19 @@ def test_aSavedFixtureReadsBackAsTheSameDocument(path: Path, tmp_path: Path) -> 
 def test_savingWithNoPathWritesBackWhereTheDocumentCameFrom(tmp_path: Path) -> None:
     """`doc.save()` is in place, which is what makes the common edit a two-liner."""
     working = tmp_path / "in-place.numbers"
-    shutil.copy(documentPath("00-baseline"), working)
+    shutil.copy(findDocumentPath("00-baseline"), working)
 
     document = pybers.open(working)
     document.save()
 
-    assert not archiveDifferences(
-        readPackage(documentPath("00-baseline")), readPackage(working)
+    assert not listArchiveDifferences(
+        readPackage(findDocumentPath("00-baseline")), readPackage(working)
     )
 
 
 def test_savingIsRepeatableAndLeavesTheDocumentUsable(tmp_path: Path) -> None:
     """There is no close and no invalidation, so a second save is an ordinary call."""
-    document = pybers.open(documentPath("00-baseline"))
+    document = pybers.open(findDocumentPath("00-baseline"))
     first = tmp_path / "first.numbers"
     second = tmp_path / "second.numbers"
 
@@ -232,7 +232,7 @@ def test_savingIsRepeatableAndLeavesTheDocumentUsable(tmp_path: Path) -> None:
     document.save(second)
 
     assert document.sheets, "the document stopped being usable after saving"
-    assert not archiveDifferences(readPackage(first), readPackage(second))
+    assert not listArchiveDifferences(readPackage(first), readPackage(second))
 
 
 # ── Refusals: a save that cannot be correct raises rather than guessing ──────
@@ -245,7 +245,7 @@ def test_savingADocumentThatWasNeverReadIsRefused() -> None:
 
 def test_savingInPlaceWithNoSourcePathIsRefused() -> None:
     """The package is present but the origin is not, so in place has no meaning."""
-    document = pybers.open(documentPath("00-baseline"))
+    document = pybers.open(findDocumentPath("00-baseline"))
     document._sourcePath = None
 
     with pytest.raises(WriteError, match="nowhere to save"):
@@ -254,7 +254,7 @@ def test_savingInPlaceWithNoSourcePathIsRefused() -> None:
 
 def test_savingIntoAMissingDirectoryIsRefused(tmp_path: Path) -> None:
     """Named rather than left to an OSError from deep inside `zipfile`."""
-    document = pybers.open(documentPath("00-baseline"))
+    document = pybers.open(findDocumentPath("00-baseline"))
 
     with pytest.raises(WriteError, match="is not a directory"):
         document.save(tmp_path / "no-such-folder" / "out.numbers")
@@ -270,16 +270,16 @@ def test_aFailedSaveLeavesTheExistingFileIntact(
     used to be.
     """
     working = tmp_path / "precious.numbers"
-    shutil.copy(documentPath("00-baseline"), working)
+    shutil.copy(findDocumentPath("00-baseline"), working)
     before = working.read_bytes()
 
     document = pybers.open(working)
 
-    def explode(package: NumbersPackage, path: Path) -> None:
+    def failWritePackage(package: NumbersPackage, path: Path) -> None:
         path.write_bytes(b"half a zip")
         raise OSError("the disk filled up half way through")
 
-    monkeypatch.setattr("pybers.document._write.writePackage", explode)
+    monkeypatch.setattr("pybers.document._write.writePackage", failWritePackage)
 
     with pytest.raises(OSError, match="disk filled up"):
         document.save()
@@ -293,7 +293,7 @@ def test_aFailedSaveLeavesTheExistingFileIntact(
 
 def test_writeDocumentIsTheSameCallAsSave(tmp_path: Path) -> None:
     """The function and the method are one path, so neither can drift from the other."""
-    document = pybers.open(documentPath("00-baseline"))
+    document = pybers.open(findDocumentPath("00-baseline"))
     viaFunction = tmp_path / "function.numbers"
     viaMethod = tmp_path / "method.numbers"
 
@@ -305,16 +305,16 @@ def test_writeDocumentIsTheSameCallAsSave(tmp_path: Path) -> None:
 
 # ── AC 2, 3 and 4: a numeric edit reaches its cell and touches nothing else ──
 
-def workingCopy(name: str, tmp_path: Path) -> Path:
-    """Copy a fixture somewhere writable, since a save lands in place by default."""
+def copyDocument(name: str, tmp_path: Path) -> Path:
+    """Copy a document somewhere writable, since a save lands in place by default."""
     working = tmp_path / f"{name}-edited.numbers"
-    shutil.copy(documentPath(name), working)
+    shutil.copy(findDocumentPath(name), working)
     return working
 
 
 def test_aDecimalWrittenToACellIsThereWhenTheFileIsReopened(tmp_path: Path) -> None:
     """AC 2 and AC 3 together, which is the pair a caller actually experiences."""
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("98765.4321")
@@ -339,7 +339,7 @@ def test_noDigitsAreGainedOrLostAcrossTheRoundTrip(text: str, tmp_path: Path) ->
     A cell's trailing zeros are how Numbers shows its precision, so a value that
     round trips numerically but changes scale has still lost something visible.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal(text)
@@ -359,18 +359,18 @@ def test_oneEditChangesOnlyItsTileAndTheDirtySet(tmp_path: Path) -> None:
 
     The second archive is the calculation engine's dirty set, which grows from
     nothing to name the edited cell. It is not optional and it is not conditional on
-    the document holding formulas, because none of the 46 fixtures reports zero:
-    `00-baseline` and this fixture both carry seven, since merges and interactive
+    the document holding formulas, because none of the 46 documents reports zero:
+    `00-baseline` and this measurement both carry seven, since merges and interactive
     controls are stored as formulas too.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
-    source = documentPath("11-value-types-noformats")
+    working = copyDocument("11-value-types-noformats", tmp_path)
+    source = findDocumentPath("11-value-types-noformats")
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("4242.42")
     document.save()
 
-    differences = archiveDifferences(readPackage(source), readPackage(working))
+    differences = listArchiveDifferences(readPackage(source), readPackage(working))
     assert len(differences) == 2, (
         f"expected the tile and the dirty set, got {len(differences)}:\n  "
         + "\n  ".join(differences)
@@ -387,17 +387,17 @@ def test_aSaveThatChangesNothingWritesNoDirtySet(tmp_path: Path) -> None:
     written back does no calculation-engine work at all and its dirty set stays the
     empty archive Numbers wrote.
     """
-    working = workingCopy("20-formula-shapes", tmp_path)
-    source = documentPath("20-formula-shapes")
+    working = copyDocument("20-formula-shapes", tmp_path)
+    source = findDocumentPath("20-formula-shapes")
 
     pybers.open(working).save()
 
-    assert not archiveDifferences(readPackage(source), readPackage(working))
+    assert not listArchiveDifferences(readPackage(source), readPackage(working))
 
 
 def test_theNeighborsOfAnEditedCellAreUntouched(tmp_path: Path) -> None:
     """A wrong offset here writes into the wrong cell and raises nothing."""
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
     before = pybers.open(working).sheets[0].tables[0]
     expected = {
         reference: cell.value
@@ -420,8 +420,8 @@ def test_aCellsNumberFormatSurvivesAnEdit(tmp_path: Path) -> None:
     Asserted through the archive rather than the model, because pybers does not read
     number formats yet and so cannot see the loss from the model side.
     """
-    source = documentPath("12-number-currency")
-    working = workingCopy("12-number-currency", tmp_path)
+    source = findDocumentPath("12-number-currency")
+    working = copyDocument("12-number-currency", tmp_path)
 
     document = pybers.open(working)
     table = document.sheets[0].tables[0]
@@ -435,8 +435,8 @@ def test_aCellsNumberFormatSurvivesAnEdit(tmp_path: Path) -> None:
     table.cells[target].value = Decimal("77.77")
     document.save()
 
-    beforeRecords = numericRecords(source)
-    afterRecords = numericRecords(working)
+    beforeRecords = readNumericRecords(source)
+    afterRecords = readNumericRecords(working)
     assert len(beforeRecords) == len(afterRecords)
     for before, after in zip(beforeRecords, afterRecords, strict=True):
         assert before.references == after.references, (
@@ -452,7 +452,7 @@ def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
     Writing only the result leaves a document whose formula and displayed value
     disagree until Numbers recalculates, so this refuses instead.
     """
-    working = workingCopy("18-formula-literals", tmp_path)
+    working = copyDocument("18-formula-literals", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("999")
@@ -463,7 +463,7 @@ def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
 
 def test_aRefusedSaveLeavesTheFileExactlyAsItWas(tmp_path: Path) -> None:
     """The refusal is worth nothing if half the package has already been written."""
-    working = workingCopy("18-formula-literals", tmp_path)
+    working = copyDocument("18-formula-literals", tmp_path)
     before = working.read_bytes()
 
     document = pybers.open(working)
@@ -480,7 +480,7 @@ def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
     Superseded for #61. The refusal was correct while text could not be pooled, and
     the test is rewritten rather than deleted so the boundary that moved is visible.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = "not a number"
@@ -493,7 +493,7 @@ def test_writingSomethingNeitherTextNorANumberIsStillRefused(
     tmp_path: Path,
 ) -> None:
     """The refusal that remains, since a date or a boolean has no write path yet."""
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = [1, 2]
@@ -511,7 +511,7 @@ def test_changingATypeThisLibraryCannotMeasureIsStillRefused(
     this library has not identified, so retyping one would place them wrong and
     raise nothing.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     table = document.sheets[0].tables[0]
@@ -531,7 +531,7 @@ goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 
 def test_aNumericEditMatchesTheGoldenFile(tmp_path: Path) -> None:
-    """AC 5. One mutation against a fixture, compared to a file Numbers accepted.
+    """AC 5. One mutation against a document, compared to a file Numbers accepted.
 
     Every other test here checks pybers against pybers, which can agree with itself
     while both halves are wrong. This one compares against output that a human opened
@@ -547,12 +547,12 @@ def test_aNumericEditMatchesTheGoldenFile(tmp_path: Path) -> None:
     golden = goldenDirectory / "11-value-types-noformats-A1-edited.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("98765.4321")
     document.save()
 
-    differences = archiveDifferences(readPackage(golden), readPackage(working))
+    differences = listArchiveDifferences(readPackage(golden), readPackage(working))
     assert not differences, (
         "the writer no longer produces the confirmed output:\n  "
         + "\n  ".join(differences)
@@ -596,7 +596,7 @@ def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
     golden = goldenDirectory / "20-formula-shapes-multisheet-edited.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    working = workingCopy("20-formula-shapes", tmp_path)
+    working = copyDocument("20-formula-shapes", tmp_path)
     document = pybers.open(working)
     for _, _, cell in document.cellsIterate():
         # Rows 11 and 12 are the formula row and its labels. A formula-backed cell is
@@ -605,7 +605,7 @@ def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
             cell.value = cell.value + Decimal(1000)
     document.save()
 
-    differences = archiveDifferences(readPackage(golden), readPackage(working))
+    differences = listArchiveDifferences(readPackage(golden), readPackage(working))
     assert not differences, (
         "the writer no longer produces the confirmed output:\n  "
         + "\n  ".join(differences)
@@ -686,8 +686,8 @@ def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
 
     A table with no owner id cannot be marked, and the writer refuses the save rather
     than producing a file with stale results. That refusal is unreachable today, and
-    this is what says so: 74 tables across the corpus, every one resolving. A future
-    fixture that broke the assumption would fail here rather than in someone's save.
+    this is what says so: 74 tables across the documents, every one resolving. A future
+    document that broke the assumption would fail here rather than in someone's save.
     """
     index = ArchiveIndex(readPackage(path))
     engineArchive = next(
@@ -712,7 +712,7 @@ def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
 
 # ── #16: merges written back into the merge store ────────────────────────────
 
-def storedMerges(path: Path) -> list[str]:
+def readStoredMerges(path: Path) -> list[str]:
     """Return a table's merges as the file holds them, decoded through the reader."""
     index = ArchiveIndex(readPackage(path))
     for sheetReference in findRoot(index).sheets:
@@ -728,7 +728,7 @@ def storedMerges(path: Path) -> list[str]:
     return []
 
 
-def rowColumns(path: Path, row: int = 0) -> list[int]:
+def readRowColumns(path: Path, row: int = 0) -> list[int]:
     """Return which columns of one row hold a record at all.
 
     A covered cell has NO record, so this is how a swallowed cell is told from an
@@ -761,13 +761,13 @@ def rowColumns(path: Path, row: int = 0) -> list[int]:
 
 def test_aMergeSurvivesASaveAndAReopen(tmp_path: Path) -> None:
     """AC 5, through this library. Numbers itself is the golden's job."""
-    working = workingCopy("22b-merge-2x2-unmerged", tmp_path)
+    working = copyDocument("22b-merge-2x2-unmerged", tmp_path)
     document = pybers.open(working)
     document.sheet(1).table(1).mergeAdd("A1:B1")
     document.sheet(1).table(1).mergeAdd("C1:D1")
     document.save()
 
-    assert storedMerges(working) == ["A1:B1", "C1:D1"]
+    assert readStoredMerges(working) == ["A1:B1", "C1:D1"]
     reopened = pybers.open(working).sheet(1).table(1)
     assert [str(merge.extent) for merge in reopened.mergeRanges] == ["A1:B1", "C1:D1"]
     assert reopened.addressable("B1") is False
@@ -781,15 +781,15 @@ def test_aMergeRemovesTheRecordOfEveryCellItSwallows(tmp_path: Path) -> None:
     over one has something to delete. A record left behind would be a cell Numbers
     never wrote, and no model-level assertion can see it.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
-    assert rowColumns(working) == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    working = copyDocument("11-value-types-noformats", tmp_path)
+    assert readRowColumns(working) == [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
     document = pybers.open(working)
     document.sheet(1).table(1).mergeAdd("B1:C1")
     document.save()
 
     # Column 2 is C1, the swallowed cell. Its anchor at column 1 stays.
-    assert rowColumns(working) == [0, 1, 3, 4, 5, 6, 7, 8]
+    assert readRowColumns(working) == [0, 1, 3, 4, 5, 6, 7, 8]
     assert pybers.open(working).sheet(1).table(1).cell("B1").value == Decimal(42)
 
 
@@ -799,8 +799,8 @@ def test_unmergingEmptiesTheStoreAndKeepsIt(tmp_path: Path) -> None:
     Deleting the owner rather than emptying it would produce something Numbers does
     not write, so the archive is asserted rather than only the decoded merges.
     """
-    working = workingCopy("22-merge-2x2", tmp_path)
-    assert len(storedMerges(working)) == 5
+    working = copyDocument("22-merge-2x2", tmp_path)
+    assert len(readStoredMerges(working)) == 5
 
     document = pybers.open(working)
     table = document.sheet(1).table(1)
@@ -808,7 +808,7 @@ def test_unmergingEmptiesTheStoreAndKeepsIt(tmp_path: Path) -> None:
         table.mergeRemove(merge.anchor)
     document.save()
 
-    assert storedMerges(working) == []
+    assert readStoredMerges(working) == []
     index = ArchiveIndex(readPackage(working))
     for sheetReference in findRoot(index).sheets:
         sheet = index.resolve(sheetReference, tn.SheetArchive)
@@ -828,29 +828,29 @@ def test_unmergingEmptiesTheStoreAndKeepsIt(tmp_path: Path) -> None:
 def test_aMergeWrittenHereMatchesTheOneNumbersWrote(tmp_path: Path) -> None:
     """Rebuild `22-merge-2x2`'s five merges into its unmerged twin and compare.
 
-    The strongest check available without opening Numbers: the twin fixtures differ
+    The strongest check available without opening Numbers: the twin measurements differ
     only by the merges, so writing them into `22b` should reproduce what `22` holds.
     """
-    working = workingCopy("22b-merge-2x2-unmerged", tmp_path)
+    working = copyDocument("22b-merge-2x2-unmerged", tmp_path)
     document = pybers.open(working)
     table = document.sheet(1).table(1)
     for start in "ACEGI":
         table.mergeAdd(f"{start}1:{chr(ord(start) + 1)}1")
     document.save()
 
-    assert storedMerges(working) == storedMerges(
-        documentPath("22-merge-2x2")
+    assert readStoredMerges(working) == readStoredMerges(
+        findDocumentPath("22-merge-2x2")
     )
 
 
 def test_savingATableWhoseMergesDidNotChangeRewritesNothing(tmp_path: Path) -> None:
     """The store is compared, not rewritten, so an untouched save stays identical."""
-    working = workingCopy("22-merge-2x2", tmp_path)
-    source = documentPath("22-merge-2x2")
+    working = copyDocument("22-merge-2x2", tmp_path)
+    source = findDocumentPath("22-merge-2x2")
 
     pybers.open(working).save()
 
-    assert not archiveDifferences(readPackage(source), readPackage(working))
+    assert not listArchiveDifferences(readPackage(source), readPackage(working))
 
 
 def test_theMergeGoldensMatchWhatThisLibraryProduces(tmp_path: Path) -> None:
@@ -859,7 +859,7 @@ def test_theMergeGoldensMatchWhatThisLibraryProduces(tmp_path: Path) -> None:
     Merging `22b` and unmerging `22` are the two directions, and each golden should be
     reproduced exactly by running the same operation again.
     """
-    for golden, fixture, operation in (
+    for golden, source, operation in (
         ("22b-merged-by-pybers", "22b-merge-2x2-unmerged", "merge"),
         ("22-unmerged-by-pybers", "22-merge-2x2", "unmerge"),
     ):
@@ -868,7 +868,7 @@ def test_theMergeGoldensMatchWhatThisLibraryProduces(tmp_path: Path) -> None:
 
         directory = tmp_path / operation
         directory.mkdir()
-        working = workingCopy(fixture, directory)
+        working = copyDocument(source, directory)
         document = pybers.open(working)
         table = document.sheet(1).table(1)
         if operation == "merge":
@@ -879,7 +879,9 @@ def test_theMergeGoldensMatchWhatThisLibraryProduces(tmp_path: Path) -> None:
                 table.mergeRemove(merge.anchor)
         document.save()
 
-        differences = archiveDifferences(readPackage(expected), readPackage(working))
+        differences = listArchiveDifferences(
+            readPackage(expected), readPackage(working)
+        )
         assert not differences, (
             f"the writer no longer produces the confirmed {operation}:\n  "
             + "\n  ".join(differences)
@@ -893,7 +895,7 @@ def test_theMergeGoldensHoldWhatTheyClaimTo() -> None:
     library evaluates nothing. `L1` holds `=J1`, so merging `I1:J1` invalidates that
     reference and unmerging restores it, and Numbers recomputes on open because the
     dirty set asks it to. Asserting the stale type here is what stops someone
-    "correcting" it to match the fixture it was built from.
+    "correcting" it to match the measurement it was built from.
     """
     merged = pybers.open(
         goldenDirectory / "22b-merged-by-pybers.numbers"
@@ -925,7 +927,7 @@ def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     place, so a second save indexes the already-edited archives. Nothing else asserts
     that, and a stale index would write the second edit on top of the original bytes.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("111.11")
@@ -949,7 +951,9 @@ def test_editingAndSavingRepeatedlyKeepsWorking(tmp_path: Path) -> None:
     assert table.cell("B1").value == Decimal("777")
 
 
-def formatEntries(path: Path, tableName: str | None) -> list[tuple[int, int | None]]:
+def readFormatEntries(
+    path: Path, tableName: str | None
+) -> list[tuple[int, int | None]]:
     """Return one table's format list as key and kind, for asserting on references."""
     from pybers._persistence.index import ArchiveIndex
     from pybers.document._read import findRoot
@@ -975,7 +979,7 @@ def formatEntries(path: Path, tableName: str | None) -> list[tuple[int, int | No
     raise AssertionError(f"{tableName!r} is not in {path.name}")
 
 
-def tileOf(path: Path, tableName: str) -> tst.Tile:
+def findTile(path: Path, tableName: str) -> tst.Tile:
     """Return the one tile of a named table, for asserting on row storage."""
     from pybers._persistence.index import ArchiveIndex
     from pybers.document._read import findRoot
@@ -1022,7 +1026,7 @@ def test_aFormulaWrittenIntoAnUnstoredRowSurvivesTheSave(
     visited, and a table declaring ten rows can store one. Same class as PYB-65.
     """
     working = Path(
-        shutil.copy(documentPath("20-formula-shapes"),
+        shutil.copy(findDocumentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
     document = pybers.open(working)
@@ -1039,7 +1043,7 @@ def test_aRowThisSaveCreatedCountsItsOwnCellsAndKeepsRowOrder(
     """Numbers keeps `numrows` accurate and writes zero in `numCells`, so only the
     first is corrected here. Row order matters because the reader trusts it."""
     working = Path(
-        shutil.copy(documentPath("20-formula-shapes"),
+        shutil.copy(findDocumentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
     document = pybers.open(working)
@@ -1049,7 +1053,7 @@ def test_aRowThisSaveCreatedCountsItsOwnCellsAndKeepsRowOrder(
     table.cell("B7").formulaText = "=SUM(A1:A2)"
     document.save()
 
-    tile = tileOf(working, "Table 2")
+    tile = findTile(working, "Table 2")
     assert tile.numrows == len(tile.rowInfos)
     assert [row.tile_row_index for row in tile.rowInfos] == [0, 2, 6]
     assert [row.cell_count for row in tile.rowInfos] == [1, 2, 1]
@@ -1058,15 +1062,15 @@ def test_aRowThisSaveCreatedCountsItsOwnCellsAndKeepsRowOrder(
 def test_aFormulaAlreadyInAStoredRowStillWritesUnchanged(tmp_path: Path) -> None:
     """No row is created where one exists, so an ordinary edit is untouched."""
     working = Path(
-        shutil.copy(documentPath("20-formula-shapes"),
+        shutil.copy(findDocumentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
-    before = len(tileOf(working, "Table 2").rowInfos)
+    before = len(findTile(working, "Table 2").rowInfos)
     document = pybers.open(working)
     document.sheet("Sheet 1").table("Table 2").cell("A1").value = Decimal("7")
     document.save()
 
-    assert len(tileOf(working, "Table 2").rowInfos) == before
+    assert len(findTile(working, "Table 2").rowInfos) == before
 
 
 def test_formulasInCreatedRowsMatchTheirGoldenFile(tmp_path: Path) -> None:
@@ -1078,7 +1082,7 @@ def test_formulasInCreatedRowsMatchTheirGoldenFile(tmp_path: Path) -> None:
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
     working = Path(
-        shutil.copy(documentPath("20-formula-shapes"),
+        shutil.copy(findDocumentPath("20-formula-shapes"),
                     tmp_path / "20.numbers")
     )
     document = pybers.open(working)
@@ -1087,7 +1091,7 @@ def test_formulasInCreatedRowsMatchTheirGoldenFile(tmp_path: Path) -> None:
         table.cell(address).formulaText = text
     document.save()
 
-    assert tileOf(golden, "Table 2").SerializeToString() == tileOf(
+    assert findTile(golden, "Table 2").SerializeToString() == findTile(
         working, "Table 2"
     ).SerializeToString(), "the writer no longer produces the confirmed tile"
 
@@ -1100,12 +1104,12 @@ def test_theCreatedRowGoldenHoldsWhatItClaimsTo() -> None:
     table = pybers.open(golden).sheet("Sheet 1").table("Table 2")
     for address, text in createdRowFormulas:
         assert table.cell(address).formulaText == text
-    assert [row.tile_row_index for row in tileOf(golden, "Table 2").rowInfos] == [
+    assert [row.tile_row_index for row in findTile(golden, "Table 2").rowInfos] == [
         0, 2, 6, 9
     ]
 
 
-def stringEntries(path: Path, tableName: str) -> dict[int, object]:
+def readStringEntries(path: Path, tableName: str) -> dict[int, object]:
     """Return one table's pooled string list, keyed as cell records address it."""
     from pybers._persistence.index import (
         ArchiveIndex,
@@ -1130,7 +1134,7 @@ def stringEntries(path: Path, tableName: str) -> dict[int, object]:
     raise AssertionError(f"{tableName!r} is not in {path.name}")
 
 
-def recordAt(
+def readRecordAt(
     path: Path, address: str, table: str | None = None
 ) -> CellRecord:
     """Return the raw cell record at an address, in the first table or a named one."""
@@ -1181,14 +1185,14 @@ retypedCells: tuple[tuple[str, object], ...] = (
 
 def test_theSameTextInTwoCellsIsPooledOnceWithACount(tmp_path: Path) -> None:
     """AC 4. Numbers points both cells at one entry and counts them, so this must."""
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
     document = pybers.open(working)
     table = document.sheets[0].tables[0]
     table.cell("A1").value = "shared label"
     table.cell("B1").value = "shared label"
     document.save()
 
-    entries = stringEntries(working, table.name)
+    entries = readStringEntries(working, table.name)
     matching = [entry for entry in entries.values() if entry.string == "shared label"]
     assert len(matching) == 1, "one entry, not one per cell"
     assert matching[0].refcount == 2
@@ -1196,7 +1200,7 @@ def test_theSameTextInTwoCellsIsPooledOnceWithACount(tmp_path: Path) -> None:
 
 def test_changingOneCellSharingAnEntryLeavesTheOtherAlone(tmp_path: Path) -> None:
     """A shared entry is split rather than overwritten, as the formula pool does."""
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
     document = pybers.open(working)
     table = document.sheets[0].tables[0]
     table.cell("A1").value = "shared"
@@ -1220,12 +1224,12 @@ def test_aTypeChangeMovesTheFormatIntoTheSlotItsKindUses(tmp_path: Path) -> None
     rather than the number format it displayed with. One bit leaves and one arrives,
     so the count the reference rule derives is unchanged. See findings-01-values.md.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
-    before = recordAt(working, "A1")
+    working = copyDocument("11-value-types-noformats", tmp_path)
+    before = readRecordAt(working, "A1")
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = "now text"
     document.save()
-    after = recordAt(working, "A1")
+    after = readRecordAt(working, "A1")
 
     assert after.typeByte == 3, "the cell became text"
     assert after.raw[8] & 0x0F == 0x08, "byte 8's low nibble names a pooled key"
@@ -1241,14 +1245,14 @@ def test_aTypeChangeDropsTheControlTheOldValueWoreTypeChange(tmp_path: Path) -> 
     Star Rating on a cell holding a sentence. A control describes the value it was
     built for, so it does not survive that value being replaced.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
-    before = recordAt(working, "F1")
+    working = copyDocument("11-value-types-noformats", tmp_path)
+    before = readRecordAt(working, "F1")
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("F1").value = "now text"
     document.save()
-    after = recordAt(working, "F1")
+    after = readRecordAt(working, "F1")
 
-    assert before.raw[9] & 0x04, "the fixture cell wears a control"
+    assert before.raw[9] & 0x04, "the measurement cell wears a control"
     assert not after.raw[9] & 0x04, "and the cell that became text does not"
     assert after.raw[8] & 0xE0 == before.raw[8] & 0xE0, "the style bits held"
 
@@ -1259,13 +1263,13 @@ def test_aRecordShapedFromASiblingDoesNotInheritItsControl(tmp_path: Path) -> No
     The golden showed `J1` offering `I1`'s three menu items while holding a
     sentence. A shape is borrowed; a control is not.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("J1").value = "into an empty cell"
     document.save()
 
-    assert not recordAt(working, "J1").raw[9] & 0x04, "no control was inherited"
-    assert recordAt(working, "I1").raw[9] & 0x04, "and the sibling kept its own"
+    assert not readRecordAt(working, "J1").raw[9] & 0x04, "no control was inherited"
+    assert readRecordAt(working, "I1").raw[9] & 0x04, "and the sibling kept its own"
 
 
 @pytest.mark.parametrize("address", ["B1", "A3", "E10"])
@@ -1278,7 +1282,7 @@ def test_theFirstTextInATableOfNumbersIsWritten(
     across, which is the conversion AC 2 already performs. `A3` and `E10` also sit
     in rows the file stores nothing for, so this crosses PYB-78's path as well.
     """
-    working = workingCopy("20-formula-shapes", tmp_path)
+    working = copyDocument("20-formula-shapes", tmp_path)
     document = pybers.open(working)
     table = document.sheet("Sheet 1").table("Table 2")
     table.cell(address).value = "first text in this table"
@@ -1298,7 +1302,7 @@ def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
     `I1` from `Item 1` to the new text, because the template's pooled key was read
     as `J1`'s previous claim and the entry was then rewritten in place.
     """
-    working = workingCopy("11-value-types-noformats", tmp_path)
+    working = copyDocument("11-value-types-noformats", tmp_path)
     document = pybers.open(working)
     table = document.sheets[0].tables[0]
     before = table.cell("I1").value
@@ -1317,23 +1321,23 @@ def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
     and the cells named a format the table did not hold. Numbers accepted the golden
     anyway, which is why only the bytes catch this.
     """
-    working = workingCopy("20-formula-shapes", tmp_path)
+    working = copyDocument("20-formula-shapes", tmp_path)
     document = pybers.open(working)
     document.sheet("Sheet 1").table("Table 2").cell("B1").value = "first text"
     document.save()
 
-    entries = formatEntries(working, "Table 2")
+    entries = readFormatEntries(working, "Table 2")
     assert 260 in {kind for _, kind in entries}, "the text format reached the file"
-    named = formatClaims(recordAt(working, "B1", table="Table 2").raw)
+    named = formatClaims(readRecordAt(working, "B1", table="Table 2").raw)
     assert set(named) <= {key for key, _ in entries}, "no cell names a missing format"
 
 
 def test_aPlainNumericEditLeavesTheFormatListAlone(tmp_path: Path) -> None:
     """The format list is rewritten only where a written record moved a count."""
-    working = workingCopy("11-value-types-noformats", tmp_path)
-    before = formatEntries(working, None)
+    working = copyDocument("11-value-types-noformats", tmp_path)
+    before = readFormatEntries(working, None)
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = Decimal("7")
     document.save()
 
-    assert formatEntries(working, None) == before
+    assert readFormatEntries(working, None) == before

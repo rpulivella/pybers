@@ -123,8 +123,9 @@ about the format is measured against a fixture that labels its own contents.
   PascalCase. The linter is configured for this, not against it.
 - **Method names are subject first, verb last**: `rowAdd`, `cellStyleRemove`,
   `cellFormatNumberApply`. Sorting then groups everything acting on a row together. The
-  subject is as specific as the method. Module-level functions keep verb-first names,
-  which is why the entry point is `pybers.open`.
+  subject is as specific as the method. Module-level functions, test helpers included,
+  keep verb-first names, which is why the entry point is `pybers.open`. **Every function
+  name holds a noun and a verb**: `findDocumentPath`, never `documentPath`.
 - **Type names lead with the base noun**, so a family sorts together and builds on its
   atom: `Table`, `TableRow`, `TableRows`, never `RowOfTable`. A scientific or geometric
   value names what it is measured against: `mercatorX` rather than `x`, `cieX1931`

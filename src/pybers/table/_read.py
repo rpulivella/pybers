@@ -2,7 +2,7 @@
 """\
 One table out of its archives and into the model: tiles, rows and cell records.
 
-Three traps the fixtures established, all of which produce a plausible wrong
+Three traps the documents established, all of which produce a plausible wrong
 answer rather than an error, and all of which are handled here rather than left
 to a caller:
 
@@ -72,7 +72,7 @@ def readRichTextTable(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int
     """Return the plain text of each rich-text payload, keyed as cells address it.
 
     A rich-text cell is not in this ticket's acceptance criteria, but every cell
-    in every fixture has to read without failing, and a payload key returned raw
+    in every document has to read without failing, and a payload key returned raw
     would be indistinguishable from a number. The text is taken and the run tables
     are left alone; those are `TSWP.StorageArchive`'s twenty-one parallel tables,
     indexed in UTF-16 code units, and they have their own ticket.
@@ -145,7 +145,7 @@ def readTable(
     formulas = readFormulaTable(index, dataStore)
 
     # The grid size is declared by the table, never inferred from which cells hold
-    # something. Seven of the corpus's tables declare more rows or columns than
+    # something. Seven of the documents' tables declare more rows or columns than
     # their populated cells reach, so an inferred size is silently short.
     table = Table(
         name=model.table_name,

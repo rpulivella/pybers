@@ -4,7 +4,7 @@ The decimal128 type: its limits, its 16-byte form, and what it refuses.
 
 Two things are asserted that a round trip through our own codec cannot establish,
 because a codec can agree with itself while both halves are wrong. Every one of the
-6,091 decimal128 values in the fixture corpus re-encodes to the exact bytes Numbers
+6,091 decimal128 values in the documents re-encodes to the exact bytes Numbers
 wrote, and the decoder is pinned against buffers built by hand from the layout rather
 than produced by the encoder.
 
@@ -41,8 +41,8 @@ from pybers._persistence.decimal128 import (
 tileTypeId: int = 6002
 
 
-def everyNumber(path: Path) -> list[tuple[Decimal, bytes]]:
-    """Return every decimal128 in a fixture as its value and the bytes it came from."""
+def readEveryDecimal(path: Path) -> list[tuple[Decimal, bytes]]:
+    """Return every decimal128 in a document as its value and the bytes it came from."""
     from pybers._generated import TSTArchives_pb2 as tst
 
     found: list[tuple[Decimal, bytes]] = []
@@ -86,7 +86,7 @@ def test_aValueDecodesExactlyRatherThanApproximately() -> None:
     """1234.5 is exact, which is the whole reason values are not floats.
 
     Built by hand rather than read from a file, so this tests the decoder and not
-    the fixture: coefficient 12345 with exponent -1.
+    a document: coefficient 12345 with exponent -1.
     """
     raw = (12345).to_bytes(8, "little") + ((exponentBias - 1) << 49).to_bytes(
         8, "little"
@@ -126,8 +126,8 @@ def test_decodingIgnoresTheCallersDecimalContext(precision: int) -> None:
 
     Under the default precision of 28 that rounded away the 34 digits decimal128
     can hold, and a caller who had set `prec=6` for their own arithmetic read
-    1234567.891 out of a file as 1.23457E+6, with nothing raising. No fixture
-    caught it because the most precise value in the whole corpus has 15 digits.
+    1234567.891 out of a file as 1.23457E+6, with nothing raising. No document
+    caught it because the most precise value in every document has 15 digits.
     """
     raw = b"\xd3\x02\x96\x49" + bytes(10) + b"\x3a\x30"
     previous = decimal.getcontext().prec
@@ -174,21 +174,21 @@ def test_theEncodedFormIsSixteenBytes() -> None:
     assert len(Decimal128(Decimal("1")).asBytes()) == 16
 
 
-def test_everyCorpusValueReEncodesToWhatNumbersWrote() -> None:
+def test_everyDocumentValueReEncodesToWhatNumbersWrote() -> None:
     """The encoder reproduces Apple's own bytes, not merely a valid encoding.
 
-    Measured on 2026-09-01 over all 6,091 decimal128 values in the fixture corpus.
+    Measured on 2026-09-01 over all 6,091 decimal128 values in the documents.
     That is a far stronger statement than a round trip through our own decoder,
     which could agree with itself while both halves were wrong.
     """
     examined = 0
     for path in allDocuments:
-        for value, raw in everyNumber(path):
+        for value, raw in readEveryDecimal(path):
             examined += 1
             assert Decimal128(value).asBytes() == raw, (
                 f"{path.name}: {value} did not re-encode to the bytes Numbers wrote"
             )
-    assert examined > 5000, f"only {examined} values examined; the corpus shrank"
+    assert examined > 5000, f"only {examined} values examined; the documents shrank"
 
 
 # ── Refusals, which fire at construction rather than at encode time ──────────

@@ -6,7 +6,7 @@ from one of these by a single change is a measurement, in
 [`tests/measurements/`](../measurements/README.md). What each established is indexed in
 [FINDINGS.md](../../docs/findings/FINDINGS.md).
 
-Tests name a document by its stem through `documentPath` in `tests/conftest.py`, so a test
+Tests name a document by its stem through `findDocumentPath` in `tests/conftest.py`, so a test
 never depends on which directory holds it.
 
 ## Adding one

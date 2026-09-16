@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Smoke tests for the pybers object model, proving the package installs, imports, and
 that the model's basic equality behavior holds before any real archive I/O exists. Real
-round-trip tests (read a fixture .numbers file, write it back unchanged, assert
+round-trip tests (read a document .numbers file, write it back unchanged, assert
 byte-for-byte equality) land once pybers._persistence exists, see CLAUDE.md.
 
 UPDATES
@@ -60,12 +60,12 @@ def testDocumentRoundTripsThroughEquality() -> None:
     """A model built twice the same way must compare equal, the baseline every future
     real archive round-trip test (read, write, read again) will build on."""
 
-    def build() -> pybers.Document:
+    def buildDocument() -> pybers.Document:
         table = pybers.Table(name="Table 1", rowCount=1, colCount=1)
         table.cell("A1").value = Decimal("42")
         return pybers.Document(sheets=[pybers.Sheet(name="Sheet 1", tables=[table])])
 
-    assert build() == build()
+    assert buildDocument() == buildDocument()
 
 
 def testEveryErrorThisLibraryRaisesAnswersToOneName() -> None:

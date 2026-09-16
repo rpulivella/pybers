@@ -29,22 +29,22 @@ from decimal import Decimal
 import pytest
 
 import pybers
-from conftest import documentPath
+from conftest import findDocumentPath
 from pybers.addressing import ReferenceError
 from pybers.table import MergeRange, Table
 
 
-def unmergedTable() -> Table:
+def openUnmergedTable() -> Table:
     """Return `22b`'s table, the unmerged twin, as a starting point."""
     return pybers.open(
-        documentPath("22b-merge-2x2-unmerged")
+        findDocumentPath("22b-merge-2x2-unmerged")
     ).sheet(1).table(1)
 
 
 # ── AC 1: a merge makes one cell, anchored top-left ──────────────────────────
 
 def test_aMergeIsReportedForEveryPositionItCovers() -> None:
-    table = unmergedTable()
+    table = openUnmergedTable()
     merge = table.mergeAdd("A1:B1")
 
     assert isinstance(merge, MergeRange)
@@ -56,7 +56,7 @@ def test_aMergeIsReportedForEveryPositionItCovers() -> None:
 
 def test_aMergeAcrossRowsAndColumnsCoversTheWholeBlock() -> None:
     """A merge is a rectangle, not a run, so both axes have to be walked."""
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.mergeAdd("A1:B2")
     covered = [
         reference
@@ -69,7 +69,7 @@ def test_aMergeAcrossRowsAndColumnsCoversTheWholeBlock() -> None:
 def test_theCoveredCellsAreRemovedFromTheTable() -> None:
     """AC 1.i. A covered cell has no record in the file, so one left behind would
     be written out as a cell Numbers never had."""
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.cell("A1").value = "anchor"
     table.cell("B1").value = "covered"
     stored = len(table.cells)
@@ -81,8 +81,8 @@ def test_theCoveredCellsAreRemovedFromTheTable() -> None:
 
 
 def test_theAnchorKeepsItsValueAndTheCoveredCellsLoseTheirs() -> None:
-    """AC 1.ii, and it is permanent: see the twin fixtures."""
-    table = unmergedTable()
+    """AC 1.ii, and it is permanent: see the twin measurements."""
+    table = openUnmergedTable()
     table.cell("A1").value = Decimal(42)
     table.cell("B1").value = Decimal(99)
 
@@ -95,7 +95,7 @@ def test_theAnchorKeepsItsValueAndTheCoveredCellsLoseTheirs() -> None:
 
 def test_aCoveredCellCannotBeReachedThroughTheTable() -> None:
     """The anchor is the only way in, which is what makes a merge one cell."""
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.mergeAdd("A1:B1")
 
     assert table.addressable("A1") is True
@@ -105,7 +105,7 @@ def test_aCoveredCellCannotBeReachedThroughTheTable() -> None:
 # ── AC 2: unmerging returns ordinary, empty cells ────────────────────────────
 
 def test_unmergingReturnsTheBlockToOrdinaryCells() -> None:
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.mergeAdd("A1:B1")
 
     removed = table.mergeRemove("B1")
@@ -121,7 +121,7 @@ def test_aCoveredValueDoesNotComeBack() -> None:
     Measured, not chosen: `22-merge-2x2` and `22b` hold the same 18 cells, and `B1`
     is absent from the unmerged file as well as the merged one.
     """
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.cell("B1").value = "gone"
     table.mergeAdd("A1:B1")
     table.mergeRemove("A1")
@@ -132,13 +132,13 @@ def test_aCoveredValueDoesNotComeBack() -> None:
 def test_unmergingTakesAnyCellOfTheBlock() -> None:
     """Two merges can never claim one cell, so any of them names the merge."""
     for reference in ("A1", "B1"):
-        table = unmergedTable()
+        table = openUnmergedTable()
         table.mergeAdd("A1:B1")
         assert table.mergeRemove(reference).extent == pybers.CellRange(1, 1, 1, 2)
 
 
 def test_unmergingWhereThereIsNoMergeIsRefused() -> None:
-    table = unmergedTable()
+    table = openUnmergedTable()
     with pytest.raises(ReferenceError, match="No merge"):
         table.mergeRemove("A1")
 
@@ -146,7 +146,7 @@ def test_unmergingWhereThereIsNoMergeIsRefused() -> None:
 # ── AC 3: an overlapping merge raises ────────────────────────────────────────
 
 def test_aMergeOverlappingAnotherIsRefused() -> None:
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.mergeAdd("A1:B1")
 
     with pytest.raises(ReferenceError, match="overlaps"):
@@ -155,7 +155,7 @@ def test_aMergeOverlappingAnotherIsRefused() -> None:
 
 def test_aRefusedMergeLeavesTheTableExactlyAsItWas() -> None:
     """Checked before anything is discarded, so a refusal cannot half-apply."""
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.mergeAdd("A1:B1")
     table.cell("C1").value = "kept"
     stored = len(table.cells)
@@ -169,7 +169,7 @@ def test_aRefusedMergeLeavesTheTableExactlyAsItWas() -> None:
 
 
 def test_twoMergesThatDoNotTouchAreBothKept() -> None:
-    table = unmergedTable()
+    table = openUnmergedTable()
     table.mergeAdd("A1:B1")
     table.mergeAdd("C1:D1")
 
@@ -197,30 +197,30 @@ def test_aMergeThatCannotBeABlockIsRefused(address: str, reason: str) -> None:
     one-cell merge, so writing the formula for one would put an unconfirmed construct
     into the file.
     """
-    table = unmergedTable()
+    table = openUnmergedTable()
     with pytest.raises(ReferenceError, match=reason):
         table.mergeAdd(address)
 
 
 def test_aRefusedMergeAddsNothing() -> None:
-    table = unmergedTable()
+    table = openUnmergedTable()
     with pytest.raises(ReferenceError):
         table.mergeAdd("A:B")
     assert table.mergeRanges == []
 
 
-# ── the fixture pair the destructive rule was measured from ──────────────────
+# ── the measurement pair the destructive rule was measured from ──────────────
 
-def test_theTwinFixturesAgreeOnWhatAMergeDiscarded() -> None:
+def test_theTwinMeasurementsAgreeOnWhatAMergeDiscarded() -> None:
     """The evidence behind AC 1.ii and AC 2, asserted rather than cited.
 
     If this ever fails, the rule those criteria encode was wrong and both need
     revisiting before the code does.
     """
     merged = pybers.open(
-        documentPath("22-merge-2x2")
+        findDocumentPath("22-merge-2x2")
     ).sheet(1).table(1)
-    unmerged = unmergedTable()
+    unmerged = openUnmergedTable()
 
     assert len(merged.mergeRanges) == 5
     assert unmerged.mergeRanges == []

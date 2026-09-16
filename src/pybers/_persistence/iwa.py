@@ -95,7 +95,7 @@ class Archive:
 
     `infoBytes` is the archive's own `ArchiveInfo`, kept serialized. Rebuilding one
     from the identifier and the message shapes would discard the rest of what it
-    holds, and the rest is not rare: measured across the corpus on 2026-09-01,
+    holds, and the rest is not rare: measured across the documents on 2026-09-01,
     40.2% of messages carry `field_infos` and 22.3% carry `object_references`,
     neither of which this library models. Keeping the bytes is what preserves them
     through a rewrite.
@@ -364,7 +364,7 @@ def compressPayload(payload: bytes) -> bytes:
     """Frame a payload into Snappy blocks the way Numbers does.
 
     Chunked at 64 KiB of uncompressed input, which is what Apple emits and what
-    every non-final frame in the corpus measures. An empty payload still produces
+    every non-final frame in the documents measures. An empty payload still produces
     one frame, because a member with no archives is a member, not an absent file.
     """
     out = bytearray()

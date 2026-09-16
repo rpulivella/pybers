@@ -22,8 +22,8 @@ fixed line. `Coordinate` is the only thing that knows which of the two a given
 number is, and `resolve` is the only way to turn one into a real coordinate.
 
 **Anchoring is recorded in two different places depending on the node**, measured
-across the whole fixture corpus on 2026-09-03. A single-cell reference carries it
-only as `absolute` on each coordinate: not one of the 21 such nodes in the corpus
+across every document on 2026-09-03. A single-cell reference carries it
+only as `absolute` on each coordinate: not one of the 21 such nodes in the documents
 carries `ASTStickyBits`. A range carries both, the field variant it sits in and
 the sticky bits beside it. Reading the sticky bits as authoritative for a
 single-cell reference therefore finds nothing and reports everything unlocked.
@@ -43,7 +43,7 @@ UPDATES
             for #44. The index stays the stored form, so authoring by name
             and by index write one archive.
 2026-09-03  Written for #41. Node types, the key slot and the sticky-bits rule
-            were all measured against the corpus rather than read off the schema,
+            were all measured against the documents rather than read off the schema,
             which permits far more than Numbers writes.
 """
 from __future__ import annotations
@@ -73,7 +73,7 @@ from pybers.formula.functions import (
 )
 
 # The node types this model gives meaning to. Every other type is carried through
-# untouched: the node message has 45 fields and the corpus uses 16, so a model
+# untouched: the node message has 45 fields and the documents use 16, so a model
 # claiming to understand the rest would be describing the schema rather than the
 # documents.
 functionNodeType: int = 16
@@ -120,7 +120,7 @@ emptyArgumentNodeType: int = 22
 # A second node for an argument that is not there, which Numbers writes in some
 # positions where it writes type 22 in others. `DURATION(,,,K1,,)` fills its first
 # three with type 22 and its last two with this, and both evaluate to nothing:
-# the arithmetic of the two duration fixtures accounts for K1 and for no other
+# the arithmetic of the two duration measurements accounts for K1 and for no other
 # argument. The rule choosing between them is not established, so this is
 # rendered as the omitted argument it behaves as and never written.
 tokenNodeType: int = 23

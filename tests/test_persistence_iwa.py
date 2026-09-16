@@ -4,7 +4,7 @@ The IWA write path: rebuilding an archive stream, framing it, and choosing betwe
 replaying a member and rewriting one.
 
 The sweep asserts the strongest property available: every one of the 2,549 IWA
-members in the corpus re-serializes byte for byte from its decoded archives. That
+members in the documents re-serializes byte for byte from its decoded archives. That
 is what makes a rewrite trustworthy, since the only difference between a member
 this library rewrites and the one Numbers wrote is then confined to the message
 bodies that were deliberately changed.
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import allDocuments, documentPath
+from conftest import allDocuments, findDocumentPath
 from pybers._generated import TSPArchiveMessages_pb2 as archiveMessages
 from pybers._persistence.iwa import (
     Archive,
@@ -51,8 +51,8 @@ from pybers._persistence.iwa import (
 from pybers._persistence.varint import readVarint
 
 
-def everyMemberOf(path: Path) -> list[tuple[str, bytes]]:
-    """Return every IWA member of a fixture as its name and its raw bytes."""
+def readEveryMember(path: Path) -> list[tuple[str, bytes]]:
+    """Return every IWA member of a document as its name and its raw bytes."""
     with zipfile.ZipFile(path) as archive:
         return [
             (info.filename, archive.read(info.filename))
@@ -61,9 +61,9 @@ def everyMemberOf(path: Path) -> list[tuple[str, bytes]]:
         ]
 
 
-def oneMember(name: str = "00-baseline") -> IWAFile:
-    """Read the first IWA member of a fixture, for the single-member cases."""
-    memberName, data = everyMemberOf(documentPath(name))[0]
+def readFirstMember(name: str = "00-baseline") -> IWAFile:
+    """Read the first IWA member of a document, for the single-member cases."""
+    memberName, data = readEveryMember(findDocumentPath(name))[0]
     return readIWAFile(memberName, data)
 
 
@@ -72,7 +72,7 @@ def oneMember(name: str = "00-baseline") -> IWAFile:
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyArchiveStreamReSerializesByteIdentically(path: Path) -> None:
     """`writeArchives` is the exact inverse of `readArchives`, on real data."""
-    members = everyMemberOf(path)
+    members = readEveryMember(path)
     assert members, f"{path.name} holds no IWA members"
     for name, data in members:
         payload = decompressPayload(data)
@@ -84,7 +84,7 @@ def test_everyArchiveStreamReSerializesByteIdentically(path: Path) -> None:
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_framingSurvivesTheCompressor(path: Path) -> None:
     """A payload framed and re-read gives back exactly what went in."""
-    for name, data in everyMemberOf(path):
+    for name, data in readEveryMember(path):
         payload = decompressPayload(data)
         assert decompressPayload(compressPayload(payload)) == payload, (
             f"{path.name}/{name} did not survive framing"
@@ -111,7 +111,7 @@ def test_anEmptyPayloadStillProducesOneFrame() -> None:
 
 def test_anUnmodifiedMemberReplaysItsOriginalBytes() -> None:
     """The exactness of the no-change round trip rests on this being a replay."""
-    member = oneMember()
+    member = readFirstMember()
     assert member.modified is False
     assert writeIWAFile(member) == member.originalBytes
 
@@ -125,7 +125,7 @@ def test_aModifiedMemberIsRebuiltRatherThanReplayed() -> None:
     decodes correctly cannot see that, which is why this one asserts the bytes
     themselves changed.
     """
-    member = oneMember()
+    member = readFirstMember()
     target = member.archives[0]
     member.messageReplace(target.identifier, 0, target.messages[0].data + b"")
 
@@ -137,7 +137,7 @@ def test_aModifiedMemberIsRebuiltRatherThanReplayed() -> None:
 
 def test_anEditedBodyIsWhatComesBackOut() -> None:
     """The edit reaches the file rather than merely setting a flag."""
-    member = oneMember()
+    member = readFirstMember()
     target = member.archives[0]
     replacement = b"\x08\x2a"
     member.messageReplace(target.identifier, 0, replacement)
@@ -149,7 +149,7 @@ def test_anEditedBodyIsWhatComesBackOut() -> None:
 
 def test_aResizedBodyUpdatesTheDeclaredLength() -> None:
     """The stream is length-delimited, so a stale length desynchronizes everything."""
-    member = oneMember()
+    member = readFirstMember()
     target = member.archives[0]
     replacement = target.messages[0].data + b"\x00" * 32
     member.messageReplace(target.identifier, 0, replacement)
@@ -171,7 +171,7 @@ def test_unmodeledArchiveInfoFieldsSurviveARewrite() -> None:
     """
     member, carrier = None, None
     for path in allDocuments:
-        for name, data in everyMemberOf(path):
+        for name, data in readEveryMember(path):
             candidate = readIWAFile(name, data)
             for archive in candidate.archives:
                 info = archiveMessages.ArchiveInfo()
@@ -185,7 +185,7 @@ def test_unmodeledArchiveInfoFieldsSurviveARewrite() -> None:
             break
 
     assert carrier is not None and member is not None, (
-        "no archive in the corpus carries field_infos"
+        "no archive in the documents carries field_infos"
     )
     before = archiveMessages.ArchiveInfo()
     before.ParseFromString(carrier.infoBytes)
@@ -207,13 +207,13 @@ def test_unmodeledArchiveInfoFieldsSurviveARewrite() -> None:
 # ── Refusals ─────────────────────────────────────────────────────────────────
 
 def test_replacingAMessageOfAnUnknownArchiveIsRefused() -> None:
-    member = oneMember()
+    member = readFirstMember()
     with pytest.raises(IWAError, match="no archive with identifier"):
         member.messageReplace(999_999_999, 0, b"")
 
 
 def test_replacingAMessageIndexOutOfRangeIsRefused() -> None:
-    member = oneMember()
+    member = readFirstMember()
     with pytest.raises(IWAError, match="out of range"):
         member.messageReplace(member.archives[0].identifier, 7, b"")
 

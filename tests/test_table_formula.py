@@ -29,7 +29,7 @@ import pytest
 from google.protobuf import text_format
 
 import pybers
-from conftest import archiveBodies, documentPath
+from conftest import findDocumentPath, readArchiveBodies
 from pybers._engine import calculationEngine, tableOwnerEntries
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
@@ -43,12 +43,12 @@ from pybers.formula.nodes import FormulaReference
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 
-def shapes() -> Document:
+def openShapes() -> Document:
     """Return `20-formula-shapes`, whose formulas read across tables and sheets."""
-    return pybers.open(documentPath("20-formula-shapes"))
+    return pybers.open(findDocumentPath("20-formula-shapes"))
 
 
-def withFormulas(document: Document) -> Document:
+def addFormulas(document: Document) -> Document:
     """Add the golden's two tables and their formulas, and return the document."""
     inputs = document.sheet("Sheet 1").tableAdd("Inputs", rows=2, cols=2)
     inputs.cell("A1").value = Decimal("5")
@@ -61,14 +61,14 @@ def withFormulas(document: Document) -> Document:
     return document
 
 
-def savedWithFormulas(tmp_path: Path) -> Path:
+def saveWithFormulas(tmp_path: Path) -> Path:
     """Save the golden's additions, and return where they were written."""
     destination = tmp_path / "formulas-added.numbers"
-    withFormulas(shapes()).save(destination)
+    addFormulas(openShapes()).save(destination)
     return destination
 
 
-def ownerTiles(
+def readOwnerTiles(
     path: Path, sheet: str, table: str
 ) -> tuple[tsce.FormulaOwnerDependenciesArchive, list[tsce.CellRecordTileArchive]]:
     """Return one table's engine owner and the dependency tiles it lists."""
@@ -83,7 +83,7 @@ def ownerTiles(
     return owner, tiles
 
 
-def registered(records: object) -> set[tuple[int, int]]:
+def readRegisteredPairs(records: object) -> set[tuple[int, int]]:
     """Return the (row, column) pairs a register holds."""
     return {(record.row, record.column) for record in records}  # type: ignore[attr-defined]
 
@@ -92,7 +92,7 @@ def registered(records: object) -> set[tuple[int, int]]:
 
 
 def testFormulasWrittenIntoACreatedTableReadBack(tmp_path: Path) -> None:
-    calc = pybers.open(savedWithFormulas(tmp_path)).sheet("Sheet 1").table("Calc")
+    calc = pybers.open(saveWithFormulas(tmp_path)).sheet("Sheet 1").table("Calc")
 
     assert calc.cell("A1").value == Decimal("2")
     assert [calc.cell(ref).formulaText for ref in ("B1", "C1", "A2", "A3")] == [
@@ -104,49 +104,49 @@ def testFormulasWrittenIntoACreatedTableReadBack(tmp_path: Path) -> None:
 
 
 def testACreatedTableGainsOneTileHoldingEveryFormulaCell(tmp_path: Path) -> None:
-    owner, tiles = ownerTiles(savedWithFormulas(tmp_path), "Sheet 1", "Calc")
+    owner, tiles = readOwnerTiles(saveWithFormulas(tmp_path), "Sheet 1", "Calc")
 
     formulaCells = {(0, 1), (0, 2), (1, 0), (2, 0)}
     assert len(tiles) == 1
     assert (tiles[0].tile_column_begin, tiles[0].tile_row_begin) == (0, 0)
     assert tiles[0].internal_owner_id == owner.internal_formula_owner_id
-    assert registered(tiles[0].cell_records) == formulaCells
-    assert registered(owner.cell_dependencies.cell_record) == formulaCells
+    assert readRegisteredPairs(tiles[0].cell_records) == formulaCells
+    assert readRegisteredPairs(owner.cell_dependencies.cell_record) == formulaCells
 
 
 def testATableWithNoFormulaGainsNoTile(tmp_path: Path) -> None:
-    _, tiles = ownerTiles(savedWithFormulas(tmp_path), "Sheet 1", "Inputs")
+    _, tiles = readOwnerTiles(saveWithFormulas(tmp_path), "Sheet 1", "Inputs")
 
     assert tiles == []
 
 
 def testTheTileMatchesTheOneNumbersCreatedApartFromEdges(tmp_path: Path) -> None:
     """Replay `55` on `48`; edges stay empty until the golden shows they matter."""
-    document = pybers.open(documentPath("48-table-inserted"))
+    document = pybers.open(findDocumentPath("48-table-inserted"))
     table = document.sheet(1).table(1)
     table.cell("A1").value = Decimal("2")
     table.cell("B1").formulaText = "=A1*3"
     document.save(tmp_path / "replayed.numbers")
 
-    def shape(path: Path) -> list[tuple[int, int, int, set[tuple[int, int]]]]:
-        _, tiles = ownerTiles(path, "Sheet 1", "Table 1")
+    def readTileShape(path: Path) -> list[tuple[int, int, int, set[tuple[int, int]]]]:
+        _, tiles = readOwnerTiles(path, "Sheet 1", "Table 1")
         return [
             (
                 tile.internal_owner_id,
                 tile.tile_column_begin,
                 tile.tile_row_begin,
-                registered(tile.cell_records),
+                readRegisteredPairs(tile.cell_records),
             )
             for tile in tiles
         ]
 
-    assert shape(tmp_path / "replayed.numbers") == shape(
-        documentPath("55-table-inserted-formula")
+    assert readTileShape(tmp_path / "replayed.numbers") == readTileShape(
+        findDocumentPath("55-table-inserted-formula")
     )
 
 
 def testTheCreatedTileFollowsTheRegistryRules(tmp_path: Path) -> None:
-    registry = PackageRegistry(readPackage(savedWithFormulas(tmp_path)))
+    registry = PackageRegistry(readPackage(saveWithFormulas(tmp_path)))
 
     for identifier, component in registry.components.items():
         stored = {
@@ -166,8 +166,8 @@ def testTheCreatedTileFollowsTheRegistryRules(tmp_path: Path) -> None:
 
 
 def testTheFormulaCellsAreMarkedForRecalculation(tmp_path: Path) -> None:
-    path = savedWithFormulas(tmp_path)
-    owner, _ = ownerTiles(path, "Sheet 1", "Calc")
+    path = saveWithFormulas(tmp_path)
+    owner, _ = readOwnerTiles(path, "Sheet 1", "Calc")
     index = ArchiveIndex(readPackage(path))
 
     dirty = index.resolve(
@@ -187,7 +187,7 @@ def testTheFormulaCellsAreMarkedForRecalculation(tmp_path: Path) -> None:
     assert {(0, 1), (0, 2), (1, 0), (2, 0)} <= cells
 
 
-def identityBytes(identity: str) -> bytes:
+def encodeIdentityBytes(identity: str) -> bytes:
     """Return a table identity as the bytes its canonical UUID spells."""
     return b"".join(
         int(identity[at : at + 8], 16).to_bytes(4, "little") for at in range(0, 32, 8)
@@ -199,17 +199,17 @@ def testACreatedTablesIdentityIsAVersionFourUuidAsNumbersStoresOne(
 ) -> None:
     """Every table identity Numbers writes reads as one; pybers' laid out its bytes
     the other way round."""
-    document = pybers.open(savedWithFormulas(tmp_path))
+    document = pybers.open(saveWithFormulas(tmp_path))
 
     for table in document.sheet("Sheet 1").tables:
-        stored = identityBytes(table.identifier)
+        stored = encodeIdentityBytes(table.identifier)
         assert (stored[6] >> 4, stored[8] >> 6) == (4, 0b10), table.name
 
 
 def testACreatedTablesIdIsItsIdentity(tmp_path: Path) -> None:
     """`table_id` is how Numbers finds a table's owners, and any other value costs it
     its whole owner family on open."""
-    path = savedWithFormulas(tmp_path)
+    path = saveWithFormulas(tmp_path)
 
     document = pybers.open(path)
     index = ArchiveIndex(readPackage(path))
@@ -218,16 +218,16 @@ def testACreatedTablesIdIsItsIdentity(tmp_path: Path) -> None:
             tsp.Reference(identifier=table._identifier), tst.TableInfoArchive
         )
         model = index.resolve(info.tableModel, tst.TableModelArchive)
-        spelled = str(uuid.UUID(bytes=identityBytes(table.identifier))).upper()
+        spelled = str(uuid.UUID(bytes=encodeIdentityBytes(table.identifier))).upper()
         assert model.table_id == spelled, table.name
 
 
 # ── AC 2: what a formula declares that it reads ─────────────────────────────
 
 
-def registers(path: Path, sheet: str, table: str) -> list[str]:
+def readRegisters(path: Path, sheet: str, table: str) -> list[str]:
     """Return one table's three precedent registers, as text, in file order."""
-    owner, _ = ownerTiles(path, sheet, table)
+    owner, _ = readOwnerTiles(path, sheet, table)
     index = ArchiveIndex(readPackage(path))
     lines = [text_format.MessageToString(record, as_one_line=True)
              for record in owner.cell_dependencies.cell_record]
@@ -246,7 +246,7 @@ def registers(path: Path, sheet: str, table: str) -> list[str]:
 
 def testRewritingNumbersOwnFormulasReproducesItsRegisters(tmp_path: Path) -> None:
     """Strip the eight formulas of `20-formula-shapes` and write them back."""
-    source = documentPath("20-formula-shapes")
+    source = findDocumentPath("20-formula-shapes")
     references = ("A11", "B11", "C11", "D11", "E11", "F11", "G11", "H11")
     kept = {
         reference: pybers.open(source).sheet("Sheet 1").table("Table 1")
@@ -262,13 +262,14 @@ def testRewritingNumbersOwnFormulasReproducesItsRegisters(tmp_path: Path) -> Non
         rewritten.sheet("Sheet 1").table("Table 1").cell(reference).formula = formula
     rewritten.save(tmp_path / "rewritten.numbers")
 
-    assert registers(tmp_path / "rewritten.numbers", "Sheet 1", "Table 1") == registers(
+    rewritten = tmp_path / "rewritten.numbers"
+    assert readRegisters(rewritten, "Sheet 1", "Table 1") == readRegisters(
         source, "Sheet 1", "Table 1"
     )
 
 
 def testAFormulaInACreatedTableDeclaresTheCellItReads(tmp_path: Path) -> None:
-    owner, tiles = ownerTiles(savedWithFormulas(tmp_path), "Sheet 1", "Calc")
+    owner, tiles = readOwnerTiles(saveWithFormulas(tmp_path), "Sheet 1", "Calc")
 
     edges = {
         (record.row, record.column): (
@@ -292,8 +293,8 @@ def testAFormulaInACreatedTableDeclaresTheCellItReads(tmp_path: Path) -> None:
 
 
 def testARangeInACreatedTableIsDeclaredInBothRangeRegisters(tmp_path: Path) -> None:
-    path = savedWithFormulas(tmp_path)
-    owner, _ = ownerTiles(path, "Sheet 1", "Calc")
+    path = saveWithFormulas(tmp_path)
+    owner, _ = readOwnerTiles(path, "Sheet 1", "Calc")
     index = ArchiveIndex(readPackage(path))
 
     backDependencies = [
@@ -316,13 +317,13 @@ def testARangeInACreatedTableIsDeclaredInBothRangeRegisters(tmp_path: Path) -> N
 
 def testReplacingAFormulaRedeclaresWhatItReads(tmp_path: Path) -> None:
     """A swapped formula kept the precedent of the one it replaced, PYB-86."""
-    document = withFormulas(shapes())
+    document = addFormulas(openShapes())
     document.save(tmp_path / "first.numbers")
     reopened = pybers.open(tmp_path / "first.numbers")
     reopened.sheet("Sheet 1").table("Calc").cell("B1").formulaText = "=A2*3"
     reopened.save(tmp_path / "second.numbers")
 
-    owner, tiles = ownerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
+    owner, tiles = readOwnerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
 
     for records in (owner.cell_dependencies.cell_record, tiles[0].cell_records):
         edges = {
@@ -336,13 +337,13 @@ def testReplacingAFormulaRedeclaresWhatItReads(tmp_path: Path) -> None:
 
 
 def testRemovingAFormulaDropsWhatItDeclared(tmp_path: Path) -> None:
-    document = withFormulas(shapes())
+    document = addFormulas(openShapes())
     document.save(tmp_path / "first.numbers")
     for reference in ("B1", "C1", "A2", "A3"):
         document.sheet("Sheet 1").table("Calc").cell(reference).formula = None
     document.save(tmp_path / "second.numbers")
 
-    owner, _ = ownerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
+    owner, _ = readOwnerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
 
     assert list(owner.range_dependencies.back_dependency) == []
     assert list(owner.spanning_column_dependencies.coord_refers_to_spans) == []
@@ -357,7 +358,7 @@ def testRemovingAFormulaDropsWhatItDeclared(tmp_path: Path) -> None:
 def testAReferenceIntoAnotherTableNamesThatTablesIdentity(
     tmp_path: Path, reference: str, table: str
 ) -> None:
-    reopened = pybers.open(savedWithFormulas(tmp_path))
+    reopened = pybers.open(saveWithFormulas(tmp_path))
     formula = reopened.sheet("Sheet 1").table("Calc").cell(reference).formula
     assert formula is not None
 
@@ -374,37 +375,37 @@ def testAReferenceIntoAnotherTableNamesThatTablesIdentity(
 
 
 def testASecondSaveAddsToTheTileRatherThanCreatingAnother(tmp_path: Path) -> None:
-    document = withFormulas(shapes())
+    document = addFormulas(openShapes())
     document.save(tmp_path / "first.numbers")
     document.sheet("Sheet 1").table("Calc").cell("C3").formulaText = "=B1+1"
     document.save(tmp_path / "second.numbers")
 
-    _, tiles = ownerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
+    _, tiles = readOwnerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
 
     assert len(tiles) == 1
-    assert (2, 2) in registered(tiles[0].cell_records)
+    assert (2, 2) in readRegisteredPairs(tiles[0].cell_records)
 
 
 def testRemovingTheFormulaEmptiesBothRegisters(tmp_path: Path) -> None:
-    document = withFormulas(shapes())
+    document = addFormulas(openShapes())
     document.save(tmp_path / "first.numbers")
     calc = document.sheet("Sheet 1").table("Calc")
     for ref in ("B1", "C1", "A2", "A3"):
         calc.cell(ref).formula = None
     document.save(tmp_path / "second.numbers")
 
-    owner, tiles = ownerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
+    owner, tiles = readOwnerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
 
-    assert registered(owner.cell_dependencies.cell_record) == set()
-    assert registered(tiles[0].cell_records) == set()
+    assert readRegisteredPairs(owner.cell_dependencies.cell_record) == set()
+    assert readRegisteredPairs(tiles[0].cell_records) == set()
 
 
 # ── AC 4: everything already there is untouched ────────────────────────────
 
 
 def testExistingTablesAndTheirFormulasReadBackUnchanged(tmp_path: Path) -> None:
-    original = shapes()
-    reopened = pybers.open(savedWithFormulas(tmp_path))
+    original = openShapes()
+    reopened = pybers.open(saveWithFormulas(tmp_path))
 
     for sheet in original.sheets:
         for table in sheet.tables:
@@ -412,7 +413,7 @@ def testExistingTablesAndTheirFormulasReadBackUnchanged(tmp_path: Path) -> None:
 
 
 def testMergesElsewhereReadBackUnchanged(tmp_path: Path) -> None:
-    source = documentPath("22-merge-2x2")
+    source = findDocumentPath("22-merge-2x2")
     document = pybers.open(source)
     added = document.sheet(1).tableAdd("Calc", rows=1, cols=2)
     added.cell("A1").value = Decimal("3")
@@ -426,8 +427,8 @@ def testMergesElsewhereReadBackUnchanged(tmp_path: Path) -> None:
 
 
 def testOnlyTheArchivesThatRegisterAreRewritten(tmp_path: Path) -> None:
-    source = readPackage(documentPath("20-formula-shapes"))
-    written = readPackage(savedWithFormulas(tmp_path))
+    source = readPackage(findDocumentPath("20-formula-shapes"))
+    written = readPackage(saveWithFormulas(tmp_path))
     registering = {
         "Index/Metadata.iwa",
         "Index/Document.iwa",
@@ -437,12 +438,12 @@ def testOnlyTheArchivesThatRegisterAreRewritten(tmp_path: Path) -> None:
 
     before = {
         (member, identifier): body
-        for member, identifier, body in archiveBodies(source)
+        for member, identifier, body in readArchiveBodies(source)
         if member not in registering
     }
     after = {
         (member, identifier): body
-        for member, identifier, body in archiveBodies(written)
+        for member, identifier, body in readArchiveBodies(written)
         if (member, identifier) in before
     }
     assert after == before
@@ -452,12 +453,11 @@ def testOnlyTheArchivesThatRegisterAreRewritten(tmp_path: Path) -> None:
 
 
 def testSavingAgainWithNoEditWritesEveryArchiveUnchanged(tmp_path: Path) -> None:
-    first = savedWithFormulas(tmp_path)
+    first = saveWithFormulas(tmp_path)
     pybers.open(first).save(tmp_path / "again.numbers")
 
-    assert archiveBodies(readPackage(tmp_path / "again.numbers")) == archiveBodies(
-        readPackage(first)
-    )
+    again = readPackage(tmp_path / "again.numbers")
+    assert readArchiveBodies(again) == readArchiveBodies(readPackage(first))
 
 
 # ── Refusals ────────────────────────────────────────────────────────────────
@@ -468,10 +468,10 @@ def testAFormulaPastTheFirstTileIsRefusedAndWritesNothing(
     tmp_path: Path, references: list[str]
 ) -> None:
     """Only the tile at column 0 was measured, so no tile is guessed beyond it."""
-    document = shapes()
+    document = openShapes()
     package = document._package
     assert package is not None
-    before = archiveBodies(package)
+    before = readArchiveBodies(package)
     added = document.sheet(1).tableAdd("Wide", rows=1, cols=40)
     added.cell("A1").value = Decimal("1")
     for reference in references:
@@ -480,7 +480,7 @@ def testAFormulaPastTheFirstTileIsRefusedAndWritesNothing(
     with pytest.raises(WriteError, match="No dependency tile covers"):
         document.save(tmp_path / "refused.numbers")
 
-    assert archiveBodies(package) == before
+    assert readArchiveBodies(package) == before
     assert added._identifier is None
     assert not (tmp_path / "refused.numbers").exists()
 
@@ -494,7 +494,7 @@ def testTheReplacedGoldenDeclaresTheCellItReadsNow() -> None:
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
     table = pybers.open(golden).sheet("Sheet 1").table("Table 2")
-    owner, _ = ownerTiles(golden, "Sheet 1", "Table 2")
+    owner, _ = readOwnerTiles(golden, "Sheet 1", "Table 2")
 
     assert table.cell("B1").formulaText == "=A2*3"
     edges = {
@@ -521,14 +521,16 @@ def testTheGoldenHoldsTheFormulasItClaims() -> None:
 def testTheGoldenIsWhatWritingTheFormulasWritesToday(tmp_path: Path) -> None:
     """The created tile and both registers match the golden's."""
 
-    def shape(path: Path) -> tuple[set[tuple[int, int]], set[tuple[int, int]]]:
-        owner, tiles = ownerTiles(path, "Sheet 1", "Calc")
+    def readRegisterShape(
+        path: Path,
+    ) -> tuple[set[tuple[int, int]], set[tuple[int, int]]]:
+        owner, tiles = readOwnerTiles(path, "Sheet 1", "Calc")
         return (
-            registered(owner.cell_dependencies.cell_record),
-            {cell for tile in tiles for cell in registered(tile.cell_records)},
+            readRegisteredPairs(owner.cell_dependencies.cell_record),
+            {cell for tile in tiles for cell in readRegisteredPairs(tile.cell_records)},
         )
 
-    assert shape(savedWithFormulas(tmp_path)) == shape(
+    assert readRegisterShape(saveWithFormulas(tmp_path)) == readRegisterShape(
         goldenDirectory / "20-formulas-in-created-tables.numbers"
     )
 
@@ -538,7 +540,7 @@ def testTheGoldenIsWhatWritingTheFormulasWritesToday(tmp_path: Path) -> None:
 
 def testAScriptBuildsATableAndItsTotalInOnePass(tmp_path: Path) -> None:
     """The `import pybers` consumer: a table, a loop over values, a total, a save."""
-    document = shapes()
+    document = openShapes()
     table = document.sheetAdd("Budget").tableAdd("Costs", rows=4, cols=2)
     for row, (label, amount) in enumerate(
         [("rent", "1200"), ("food", "450"), ("power", "80")], start=1
@@ -555,7 +557,7 @@ def testAScriptBuildsATableAndItsTotalInOnePass(tmp_path: Path) -> None:
 
 def testACliWritesAFormulaIntoANewTableAndPrintsIt(tmp_path: Path) -> None:
     """The `pybers cell formula SHEET TABLE REF TEXT` consumer, after `table add`."""
-    document = shapes()
+    document = openShapes()
     table = document.sheet("Sheet 2").tableAdd("Scratch", rows=2, cols=2)
     arguments = ["Sheet 2", "Scratch", "B2", "=Sheet 2::Table 1::A1*2"]
     cell = document.sheet(arguments[0]).table(arguments[1]).cell(arguments[2])

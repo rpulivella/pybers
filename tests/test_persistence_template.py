@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import documentPath
+from conftest import findDocumentPath
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._persistence import PackageRegistry, readPackage
 from pybers._persistence.template import (
@@ -48,9 +48,9 @@ documentBindings: dict[int, int] = {
 }
 
 
-def registry() -> PackageRegistry:
+def readRegistry() -> PackageRegistry:
     """Return the registry of `49-sheet-inserted`, the sheet templates' source."""
-    return PackageRegistry(readPackage(documentPath("49-sheet-inserted")))
+    return PackageRegistry(readPackage(findDocumentPath("49-sheet-inserted")))
 
 
 def testTheSheetTemplatesReadAsOneSheetAndItsSevenParts() -> None:
@@ -71,7 +71,7 @@ def testTheSheetTemplatesReadAsOneSheetAndItsSevenParts() -> None:
 
 
 def testACopyRemapsEveryReferenceToAFreshIdentifier() -> None:
-    found = registry()
+    found = readRegistry()
     highest = found.metadata.last_object_identifier
 
     copies = templatesCopy(
@@ -86,7 +86,7 @@ def testACopyRemapsEveryReferenceToAFreshIdentifier() -> None:
 
 
 def testAnUnboundReferenceIsRefusedBeforeAnythingIsAllocated() -> None:
-    found = registry()
+    found = readRegistry()
     highest = found.metadata.last_object_identifier
     partial = {templateSheetStyle: templateSheetStyle}
 
@@ -97,7 +97,7 @@ def testAnUnboundReferenceIsRefusedBeforeAnythingIsAllocated() -> None:
 
 def testARoleNoTemplatePlaysIsRefusedNamingTheRoles() -> None:
     copies = templatesCopy(
-        registry(), templatesRead(sheetTemplateDirectory), documentBindings
+        readRegistry(), templatesRead(sheetTemplateDirectory), documentBindings
     )
 
     with pytest.raises(TemplateError, match="the roles are"):

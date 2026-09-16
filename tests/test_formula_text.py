@@ -2,9 +2,9 @@
 """\
 A formula written as text becomes the nodes the file stores, and reads back.
 
-The corpus test is the one that means anything. Every other assertion here checks
-pybers against pybers, which can agree with itself while both halves are wrong;
-rendering every formula in a real document and parsing it back starts from an AST
+The sweep across every document is the test that means anything. Every other assertion
+here checks pybers against pybers, which can agree with itself while both halves are
+wrong; rendering every formula in a real document and parsing it back starts from an AST
 that came out of Numbers rather than out of this library.
 
 Node arrays are asserted as `(nodeType, content)` pairs, because `FormulaNode`
@@ -31,7 +31,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import allDocuments, dataListBytes, documentPath
+from conftest import allDocuments, findDocumentPath, readDataListBytes
 from pybers import (
     CellRange,
     CellReference,
@@ -63,7 +63,7 @@ from pybers.formula.nodes import (
     tokenNodeType,
 )
 
-# The three formulas in the corpus carrying node type 23, whose placement rule is
+# The three formulas in the documents carrying node type 23, whose placement rule is
 # not established. Their text round trips and their node array does not, which is
 # named here so a fourth appearing is a failure rather than a silent widening.
 # See findings-08-formula-text.md.
@@ -74,17 +74,17 @@ textOnlyRoundTrip: frozenset[tuple[str, str]] = frozenset({
 })
 
 
-def firstTable(name: str) -> pybers.Table:
-    """Return the first table of a fixture, which is where these formulas live."""
-    return pybers.open(documentPath(name)).sheets[0].tables[0]
+def openFirstTable(name: str) -> pybers.Table:
+    """Return the first table of a document, which is where these formulas live."""
+    return pybers.open(findDocumentPath(name)).sheets[0].tables[0]
 
 
-def shape(formula: Formula) -> list[tuple[int, object]]:
+def reduceFormulaShape(formula: Formula) -> list[tuple[int, object]]:
     """Return a formula as the pairs that carry its meaning, dropping its bytes."""
     return [(node.nodeType, node.content) for node in formula]
 
 
-def typed(formula: Formula) -> list[tuple[int, object]]:
+def dropTypedWhitespace(formula: Formula) -> list[tuple[int, object]]:
     """Return the same, without the nodes recording whitespace a person typed.
 
     Types 32 and 33 carry where the space bar was pressed, which no reading of the
@@ -92,13 +92,15 @@ def typed(formula: Formula) -> list[tuple[int, object]]:
     findings-08-formula-text.md.
     """
     return [
-        pair for pair in shape(formula)
+        pair for pair in reduceFormulaShape(formula)
         if pair[0] not in (appendWhitespaceNodeType, prependWhitespaceNodeType)
     ]
 
 
-def formulasInCorpus() -> list[tuple[str, str, Formula, CellReference, dict[str, str]]]:
-    """Return every formula in every fixture, with what rendering one needs."""
+def collectDocumentFormulas() -> list[
+    tuple[str, str, Formula, CellReference, dict[str, str]]
+]:
+    """Return every formula in every document, with what rendering one needs."""
     found = []
     for path in allDocuments:
         document = pybers.open(path)
@@ -120,35 +122,37 @@ def formulasInCorpus() -> list[tuple[str, str, Formula, CellReference, dict[str,
 def testTextBecomesTheNodesTheFileStores() -> None:
     """`=1+1` parses to the three nodes `18-formula-literals` holds for it.
 
-    Compared against a fixture Numbers wrote rather than against an array written
+    Compared against a document Numbers wrote rather than against an array written
     here, so this asserts what the format does and not what the parser prefers.
     """
-    stored = firstTable("18-formula-literals").cell("A1").formula
+    stored = openFirstTable("18-formula-literals").cell("A1").formula
     assert stored is not None
-    assert shape(parseFormula("=1+1", "A1")) == typed(stored)
+    assert reduceFormulaShape(parseFormula("=1+1", "A1")) == dropTypedWhitespace(stored)
 
 
 def testASumOfLiteralsParsesToTheIndexedCallNumbersWrote() -> None:
     """`=SUM(1,2,3)` carries SUM's own index and its argument count."""
-    stored = firstTable("18-formula-literals").cell("C1").formula
+    stored = openFirstTable("18-formula-literals").cell("C1").formula
     assert stored is not None
     parsed = parseFormula("=SUM(1,2,3)", "C1")
-    assert shape(parsed) == typed(stored)
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
     assert parsed.nodes[-1].content == FormulaFunctionCall(index=168, argumentCount=3)
 
 
 def testTheLeadingEqualsIsOptionalOnTheWayIn() -> None:
     """A person types the equals sign or does not, and both mean one formula."""
-    assert shape(parseFormula("=1+1", "A1")) == shape(parseFormula("1+1", "A1"))
+    assert reduceFormulaShape(parseFormula("=1+1", "A1")) == reduceFormulaShape(
+        parseFormula("1+1", "A1")
+    )
 
 
 def testAssigningFormulaTextStoresTheFormulaAgainstThatCell() -> None:
     """`cell.formulaText = ...` parses against the cell, so no host can be wrong."""
-    table = firstTable("18-formula-literals")
+    table = openFirstTable("18-formula-literals")
     table.cell("A2").formulaText = "=SUM(1,2,3)"
     stored = table.cell("A2").formula
     assert stored is not None
-    assert shape(stored) == shape(table.cell("C1").formula)
+    assert reduceFormulaShape(stored) == reduceFormulaShape(table.cell("C1").formula)
 
 
 # ── AC 2: a stored formula renders to what Numbers displays ──────────────────
@@ -162,7 +166,7 @@ def testAStoredFormulaRendersAsTheTextItWasTypedFrom() -> None:
     compares the rendering against a human's own record rather than against a
     string written here to match what the renderer already does.
     """
-    table = firstTable("20-formula-shapes")
+    table = openFirstTable("20-formula-shapes")
     for column in "ABCDEF":
         label = table.cell(f"{column}12").value
         assert isinstance(label, str)
@@ -173,7 +177,7 @@ def testAStoredFormulaRendersAsTheTextItWasTypedFrom() -> None:
 
 def testACellWithoutAFormulaRendersAsNothingRatherThanEmptyText() -> None:
     """None and the empty string are different answers, and only one is honest."""
-    assert firstTable("18-formula-literals").cell("A2").formulaText is None
+    assert openFirstTable("18-formula-literals").cell("A2").formulaText is None
 
 
 def testOneSharedArchiveRendersDifferentlyInEachCellHoldingIt() -> None:
@@ -183,17 +187,17 @@ def testOneSharedArchiveRendersDifferentlyInEachCellHoldingIt() -> None:
     rendering without a host would have to invent one and would be wrong in every
     cell but that one.
     """
-    table = firstTable("19-formula-dragged")
+    table = openFirstTable("19-formula-dragged")
     assert table.cell("E2").formula == table.cell("E3").formula
     assert table.cell("E2").formulaText == "=SUM(B1:D1)"
     assert table.cell("E3").formulaText == "=SUM(B2:D2)"
 
 
-# ── AC 3: the two are inverses over a real corpus ────────────────────────────
+# ── AC 3: the two are inverses over real documents ────────────────────────────
 
 
-def testEveryFormulaInTheCorpusRendersAndParsesBackToItsOwnNodes() -> None:
-    """Render then parse every formula in every fixture, and compare the nodes.
+def testEveryFormulaInEveryDocumentRendersAndParsesBackToItsOwnNodes() -> None:
+    """Render then parse every formula in every document, and compare the nodes.
 
     The anchor for everything else here: each AST came out of Numbers, so the two
     halves cannot agree with each other while both are wrong. The three exceptions
@@ -201,23 +205,23 @@ def testEveryFormulaInTheCorpusRendersAndParsesBackToItsOwnNodes() -> None:
     """
     checked = 0
     exceptions = set()
-    for name, address, formula, host, names in formulasInCorpus():
+    for name, address, formula, host, names in collectDocumentFormulas():
         text = renderFormula(formula, host, tables=names)
         again = parseFormula(text, host, tables=names)
         checked += 1
-        if shape(again) != typed(formula):
+        if reduceFormulaShape(again) != dropTypedWhitespace(formula):
             exceptions.add((name, address))
-    assert checked > 70, "the corpus carries the formulas this depends on"
+    assert checked > 70, "the documents carry the formulas this depends on"
     assert exceptions == set(textOnlyRoundTrip)
 
 
-def testEveryFormulaInTheCorpusRendersToTextThatSurvivesReparsing() -> None:
+def testEveryFormulaInEveryDocumentRendersToTextThatSurvivesReparsing() -> None:
     """The property with no exceptions: the text is stable, all 77 of them.
 
     Weaker than node equality and true where that is not, which is what a caller
     printing a formula and writing it back actually depends on.
     """
-    for name, address, formula, host, names in formulasInCorpus():
+    for name, address, formula, host, names in collectDocumentFormulas():
         text = renderFormula(formula, host, tables=names)
         again = renderFormula(
             parseFormula(text, host, tables=names), host, tables=names
@@ -284,11 +288,11 @@ def testPrecedenceFollowsNumbersRatherThanTheOrderWritten(
 
 
 def testACallNestedInsideACallIsStoredAsOneFlatArray() -> None:
-    """`IF(SUM(A1:A5)>10,...)` against the fixture Numbers wrote it in."""
-    stored = firstTable("20-formula-shapes").cell("D11").formula
+    """`IF(SUM(A1:A5)>10,...)` against the measurement Numbers wrote it in."""
+    stored = openFirstTable("20-formula-shapes").cell("D11").formula
     assert stored is not None
     parsed = parseFormula('=IF(SUM(A1:A5)>10,"big","small")', "D11")
-    assert shape(parsed) == typed(stored)
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
 
 
 def testALazyArgumentIsBracketedAndAConditionIsNot() -> None:
@@ -341,9 +345,10 @@ def testAnchoringIsPerAxisAndSurvivesBeingWritten(
 
 def testMixedAnchoringMatchesWhatNumbersStoredForTheSameText() -> None:
     """`$B1+C$1` at G2, against `19-formula-dragged`, which holds exactly that."""
-    stored = firstTable("19-formula-dragged").cell("G2").formula
+    stored = openFirstTable("19-formula-dragged").cell("G2").formula
     assert stored is not None
-    assert shape(parseFormula("=$B1+C$1", "G2")) == typed(stored)
+    parsed = parseFormula("=$B1+C$1", "G2")
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
 
 
 def testALockedRangeLocksBothEndsOrNeither() -> None:
@@ -361,19 +366,19 @@ def testALockedRangeLocksBothEndsOrNeither() -> None:
 
 def testARangeParsesToTheTractNodeTheArchiveUses() -> None:
     """`SUM(A1:A10)` is a colon tract, not two coordinates."""
-    stored = firstTable("20-formula-shapes").cell("A11").formula
+    stored = openFirstTable("20-formula-shapes").cell("A11").formula
     assert stored is not None
     parsed = parseFormula("=SUM(A1:A10)", "A11")
-    assert shape(parsed) == typed(stored)
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
     assert parsed.nodes[0].nodeType == rangeNodeType
 
 
 def testAWholeColumnParsesToACoordinateWithNoRowAtAll() -> None:
     """`SUM(A)` stores a column and no row, which is how unboundedness is written."""
-    stored = firstTable("20-formula-shapes").cell("F11").formula
+    stored = openFirstTable("20-formula-shapes").cell("F11").formula
     assert stored is not None
     parsed = parseFormula("=SUM(A)", "F11")
-    assert shape(parsed) == typed(stored)
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
     assert parsed.nodes[0].nodeType == referenceNodeType
     assert parsed.references[0].row is None
 
@@ -381,23 +386,23 @@ def testAWholeColumnParsesToACoordinateWithNoRowAtAll() -> None:
 def testAReferenceIntoAnotherTableCarriesThatTablesIdentity() -> None:
     """`Table 2::A1` names a table by identity, which the document supplies.
 
-    Both directions, against the fixture holding a cross-table and a cross-sheet
+    Both directions, against the measurement holding a cross-table and a cross-sheet
     reference, the second of which has to qualify because two tables are named
     `Table 1`.
     """
-    document = pybers.open(documentPath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     table = document.sheets[0].tables[0]
     assert table.cell("G11").formulaText == "=Table 2::A1"
     assert table.cell("H11").formulaText == "=Sheet 2::Table 1::A1"
 
     parsed = parseFormula("=Table 2::A1", "G11", tables=document.tableIdentities)
-    assert shape(parsed) == typed(table.cell("G11").formula)
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(table.cell("G11").formula)
     assert parsed.references[0].crossTable
 
 
 def testACellReachesAnotherTableWithoutBeingHandedTheNames() -> None:
     """The ergonomic half of the above: a cell knows the document it sits in."""
-    table = pybers.open(documentPath("20-formula-shapes")).sheets[0].tables[0]
+    table = pybers.open(findDocumentPath("20-formula-shapes")).sheets[0].tables[0]
     table.cell("A1").formulaText = "=Table 2::A1*2"
     assert table.cell("A1").formulaText == "=Table 2::A1*2"
     assert table.cell("A1").formula is not None
@@ -416,10 +421,10 @@ def testATableNamedAnythingNumbersAllowsRoundTripsThroughTheText(
 
     Matched against the names the document carries rather than against a rule over
     characters, which is the only way to know where a name Numbers permits ends.
-    Every fixture is named `Table 1` or `Table 2`, so nothing else here would
+    Every document is named `Table 1` or `Table 2`, so nothing else here would
     notice a parser that could read only those.
     """
-    document = pybers.open(documentPath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     document.sheet("Sheet 1").table("Table 2").name = name
     source = document.sheet("Sheet 1").table("Table 1")
 
@@ -427,7 +432,7 @@ def testATableNamedAnythingNumbersAllowsRoundTripsThroughTheText(
     assert rendered == f"={name}::A1"
     again = parseFormula("=" + f"{name}::A1", "G11",
                          tables=document.tableIdentities)
-    assert shape(again) == typed(source.cell("G11").formula)
+    assert reduceFormulaShape(again) == dropTypedWhitespace(source.cell("G11").formula)
 
 
 def testATableNameWithOuterSpacesIsRefusedRatherThanMisread() -> None:
@@ -437,7 +442,7 @@ def testATableNameWithOuterSpacesIsRefusedRatherThanMisread() -> None:
     so a name whose own first character is a space cannot be told from the gap in
     front of it. Numbers has never been seen to keep one.
     """
-    document = pybers.open(documentPath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     document.sheet("Sheet 1").table("Table 2").name = "  padded  "
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
         parseFormula("=  padded  ::A1", "G11", tables=document.tableIdentities)
@@ -460,7 +465,7 @@ def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
     So `1-Table 2::A1` read as a table called `1-Table 2`, and 1469 formulas in one
     real document failed to reparse on it. Found while measuring #67.
     """
-    document = pybers.open(documentPath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     formula = parseFormula(text, "A1", tables=document.tableIdentities)
 
     assert any(
@@ -470,7 +475,7 @@ def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
 
 def testAHyphenatedTableNameStillResolvesWhenTheDocumentNamesIt() -> None:
     """The names are authoritative, so one carrying an operator is matched literally."""
-    document = pybers.open(documentPath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     document.sheet("Sheet 2").table("Table 1").name = "Table 1-1"
 
     formula = parseFormula(
@@ -504,7 +509,7 @@ def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> No
     Both spellings are covered, one where the tail is a real table and one where
     nothing resolves at all.
     """
-    document = pybers.open(documentPath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     document.sheet("Sheet 2").table("Table 1").name = "Two"
 
     with pytest.raises(FormulaSyntaxError, match="past column 1000"):
@@ -513,7 +518,7 @@ def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> No
 
 def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
     """A name naming no table would otherwise be written as a reference to nothing."""
-    document = pybers.open(documentPath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
         parseFormula(
             "=Ledger::A1", "A1", tables=document.tableIdentities
@@ -574,7 +579,7 @@ def testTextNestedDeeperThanTheParserGoesIsRefusedRatherThanCrashing() -> None:
 
 def testARefusedFormulaLeavesTheCellExactlyAsItWas() -> None:
     """A failed parse writes nothing, so a cell keeps whatever it held."""
-    cell = firstTable("18-formula-literals").cell("A1")
+    cell = openFirstTable("18-formula-literals").cell("A1")
     before = cell.formula
     with pytest.raises(FormulaSyntaxError):
         cell.formulaText = "=SUM(1,"
@@ -586,7 +591,7 @@ def testARefusedFormulaLeavesTheCellExactlyAsItWas() -> None:
 
 def testAnAddressMayBePassedAsAPieceRatherThanSplicedIntoTheText() -> None:
     """A range this library validated stays validated on its way into a formula."""
-    table = firstTable("20-formula-shapes")
+    table = openFirstTable("20-formula-shapes")
     table.cell("A1").formulaSet(
         "=SUM({sales})", sales=CellRange.parse("A1:A10")
     )
@@ -617,21 +622,22 @@ def testLetRoundTripsThroughTextLikeAnyOtherFormula() -> None:
     Asserted against `46-formula-rare-functions`, whose `LET` Numbers accepted and
     evaluated to 3.
     """
-    stored = firstTable("46-formula-rare-functions").cell("B9").formula
+    stored = openFirstTable("46-formula-rare-functions").cell("B9").formula
     assert stored is not None
     assert renderFormula(stored, "B9") == "=LET(x,2,x+1)"
-    assert shape(parseFormula("=LET(x,2,x+1)", "B9")) == typed(stored)
+    parsed = parseFormula("=LET(x,2,x+1)", "B9")
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
 
 
 def testLambdaRoundTripsThroughTextWithItsParametersAheadOfItsBody() -> None:
     """A `LAMBDA` reached through `LAMBDA.APPLY`, both directions."""
-    stored = firstTable("46-formula-rare-functions").cell("B13").formula
+    stored = openFirstTable("46-formula-rare-functions").cell("B13").formula
     assert stored is not None
     text = "=LAMBDA.APPLY(2,LAMBDA(x,x+1))"
     assert renderFormula(stored, "B13") == text
     # The stored formula carries whitespace nodes a person typed, which the text
     # cannot express and retyping in Numbers drops as well.
-    assert shape(parseFormula(text, "B13")) == typed(stored)
+    assert reduceFormulaShape(parseFormula(text, "B13")) == dropTypedWhitespace(stored)
 
 
 def testALambdaBindsItsParametersOnlyInsideItself() -> None:
@@ -647,10 +653,10 @@ def testALambdaBindsItsParametersOnlyInsideItself() -> None:
 
 def testAFunctionNumbersDoesNotKnowKeepsItsSpelling() -> None:
     """Stored the way Numbers stores it, so text Numbers takes this takes too."""
-    stored = firstTable("21-formula-errors").cell("D1").formula
+    stored = openFirstTable("21-formula-errors").cell("D1").formula
     assert stored is not None
     parsed = parseFormula("=UNKNOWNFUNC(1)", "D1")
-    assert shape(parsed) == typed(stored)
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
     assert parsed.nodes[-1].content == FormulaUnknownCall("UNKNOWNFUNC", 1)
 
 
@@ -660,10 +666,10 @@ def testAReservedFunctionIsWrittenBySpellingRatherThanByItsIndex() -> None:
     So the index is not what it writes, and writing one would produce a formula
     calling something else. Measured against `46-formula-rare-functions`.
     """
-    stored = firstTable("46-formula-rare-functions").cell("B20").formula
+    stored = openFirstTable("46-formula-rare-functions").cell("B20").formula
     assert stored is not None
     parsed = parseFormula('=ALTITUDE("Denver")', "B20")
-    assert shape(parsed) == typed(stored)
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
     assert parsed.nodes[-1].nodeType != functionNodeType
 
 
@@ -673,19 +679,20 @@ def testAnArgumentCountNumbersAcceptsIsNotRefusedHere() -> None:
     Refusing it would decline text Numbers itself takes, which is the whole of
     this criterion.
     """
-    stored = firstTable("18-formula-literals").cell("D1").formula
+    stored = openFirstTable("18-formula-literals").cell("D1").formula
     assert stored is not None
-    assert shape(parseFormula("=ROUND(2.5)", "D1")) == typed(stored)
+    parsed = parseFormula("=ROUND(2.5)", "D1")
+    assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
 
 
 def testAnOmittedArgumentIsANodeRatherThanAnAbsence() -> None:
     """Each comma of `DURATION(,,,K1,,)` writes an argument that is not there.
 
-    The two the corpus writes as node type 23 come back as 22, which is the only
+    The two the documents write as node type 23 come back as 22, which is the only
     one of the two whose placement is established. The text is what round trips.
     See findings-08-formula-text.md.
     """
-    table = firstTable("15-number-duration-formats")
+    table = openFirstTable("15-number-duration-formats")
     assert table.cell("L1").formulaText == "=DURATION(,,,K1,,)"
     parsed = parseFormula("=DURATION(,,,K1,,)", "L1")
     assert parsed.nodes[-1].content == FormulaFunctionCall(index=212, argumentCount=6)
@@ -714,7 +721,7 @@ def testAQuoteInsideAStringIsDoubledRatherThanEscaped() -> None:
 
 def testABrokenReferenceIsWrittenAndReadAsTheOneNumbersShows() -> None:
     """`#REF!` is coordinates pointing nowhere on purpose, both ways."""
-    stored = firstTable("21-formula-errors").cell("C1").formula
+    stored = openFirstTable("21-formula-errors").cell("C1").formula
     assert stored is not None
     assert renderFormula(stored, "C1") == "=#REF!"
     assert parseFormula("=#REF!", "C1").broken
@@ -762,10 +769,10 @@ def testFormulasAuthoredAsTextMatchTheirGoldenFile(tmp_path: Path) -> None:
     golden = goldenDirectory / "20-formula-authored-as-text.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    working = Path(shutil.copy(documentPath("20-formula-shapes"),
+    working = Path(shutil.copy(findDocumentPath("20-formula-shapes"),
                                tmp_path / "20.numbers"))
     authorFormulas(working)
-    assert dataListBytes(golden) == dataListBytes(working), (
+    assert readDataListBytes(golden) == readDataListBytes(working), (
         "the writer no longer produces the confirmed formula lists"
     )
 
@@ -797,7 +804,7 @@ def testTheAuthoredGoldenHoldsWhatItClaimsTo() -> None:
 # ── A range records its anchoring twice, found while building #13's golden ───
 
 
-def stickyBitsFor(text: str, host: str) -> tsce.ASTNodeArrayArchive.ASTStickyBits:
+def readStickyBits(text: str, host: str) -> tsce.ASTNodeArrayArchive.ASTStickyBits:
     """Return the sticky bits an authored formula's one range node is written with."""
     from pybers.formula._write import encodeFormulaNode
 
@@ -810,17 +817,17 @@ def stickyBitsFor(text: str, host: str) -> tsce.ASTNodeArrayArchive.ASTStickyBit
 
 
 def testEveryRangeNumbersWroteCarriesStickyBits() -> None:
-    """The measurement the writer rests on: 9 of 9 in the corpus, none without."""
+    """The measurement the writer rests on: 9 of 9 in the documents, none without."""
     seen = [
         archiveNode.HasField("AST_sticky_bits")
         for path in allDocuments
-        for archiveNode in stickyBitsSurvey(path)
+        for archiveNode in surveyStickyBits(path)
     ]
     assert seen and all(seen)
 
 
-def stickyBitsSurvey(path: Path) -> list[tsce.ASTNodeArrayArchive.ASTNodeArchive]:
-    """Return the decoded archive of every range node one fixture stores."""
+def surveyStickyBits(path: Path) -> list[tsce.ASTNodeArrayArchive.ASTNodeArchive]:
+    """Return the decoded archive of every range node one document stores."""
     found = []
     for sheet in pybers.open(path).sheets:
         for table in sheet.tables:
@@ -842,7 +849,7 @@ def testAnAuthoredAnchoredRangeWritesTheAnchoringTwice() -> None:
     Found on 2026-09-09 building #13's golden: `SUM($A$1:$A$5)` was written with an
     absolute tract and no bits, and Numbers showed it as `SUM(A1:A5)`.
     """
-    bits = stickyBitsFor("=SUM($A$1:$A$5)", "E10")
+    bits = readStickyBits("=SUM($A$1:$A$5)", "E10")
     assert bits.begin_column_is_absolute
     assert bits.end_column_is_absolute
     assert bits.begin_row_is_absolute
@@ -851,18 +858,18 @@ def testAnAuthoredAnchoredRangeWritesTheAnchoringTwice() -> None:
 
 def testAnAuthoredRangeRecordsEachAxisSeparately() -> None:
     """One axis locked and the other free, both ways round, since a span shares one."""
-    columnsOnly = stickyBitsFor("=SUM($A1:$A5)", "G10")
+    columnsOnly = readStickyBits("=SUM($A1:$A5)", "G10")
     assert columnsOnly.begin_column_is_absolute
     assert not columnsOnly.begin_row_is_absolute
 
-    rowsOnly = stickyBitsFor("=SUM(A$1:A$5)", "F10")
+    rowsOnly = readStickyBits("=SUM(A$1:A$5)", "F10")
     assert not rowsOnly.begin_column_is_absolute
     assert rowsOnly.begin_row_is_absolute
 
 
 def testAnAuthoredRelativeRangeWritesBitsThatSaySo() -> None:
     """Absent bits read as relative, so the correct answer still has to be written."""
-    bits = stickyBitsFor("=SUM(A1:A10)", "A11")
+    bits = readStickyBits("=SUM(A1:A10)", "A11")
     assert not bits.begin_column_is_absolute
     assert not bits.end_row_is_absolute
 
@@ -913,7 +920,7 @@ def testABracketPrecedenceDoesNotNeedIsKeptRatherThanDropped() -> None:
 
 
 def testABracketTheTreeNeedsIsWrittenWithNoListNodeToRecordIt() -> None:
-    """The one corpus formula needing a bracket that Apple stored none for.
+    """The one formula in the documents needing a bracket that Apple stored none for.
 
     `F22/(C22/1000)`, whose stored result matches the bracketed reading and not the
     left-associative one. Rendering from the list nodes alone would write
@@ -949,7 +956,8 @@ def testBracketedTextParsesBackToTheNodesItRenderedFrom(text: str) -> None:
     formula = parseFormula(text, "B3")
 
     assert renderFormula(formula, "B3") == text
-    assert shape(parseFormula(renderFormula(formula, "B3"), "B3")) == shape(formula)
+    reparsed = parseFormula(renderFormula(formula, "B3"), "B3")
+    assert reduceFormulaShape(reparsed) == reduceFormulaShape(formula)
 
 
 def testAnEnclosedBracketIsNotBracketedTwice() -> None:
@@ -972,7 +980,7 @@ def testAListNodeCarriesItsOwnCountThroughTheArchive() -> None:
 # ── PYB-67: the golden, which is the only test Numbers itself confirmed ──────
 
 # One bracket per open question: redundant, required by precedence, around an
-# atom (a shape the corpus never shows), and required by associativity alone
+# atom (a shape the documents never show), and required by associativity alone
 # (the shape Numbers recorded no node for).
 bracketedFormulas: tuple[tuple[str, str], ...] = (
     ("B1", "=22+(3/12)"),
@@ -999,10 +1007,10 @@ def testBracketedFormulasMatchTheirGoldenFile(tmp_path: Path) -> None:
     golden = goldenDirectory / "20-formula-brackets.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    working = Path(shutil.copy(documentPath("20-formula-shapes"),
+    working = Path(shutil.copy(findDocumentPath("20-formula-shapes"),
                                tmp_path / "20.numbers"))
     authorBrackets(working)
-    assert dataListBytes(golden) == dataListBytes(working), (
+    assert readDataListBytes(golden) == readDataListBytes(working), (
         "the writer no longer produces the confirmed bracket nodes"
     )
 

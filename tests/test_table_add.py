@@ -27,7 +27,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, documentPath
+from conftest import findDocumentPath, readArchiveBodies
 from pybers._engine import calculationEngine
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
@@ -46,12 +46,12 @@ metadataMember: str = "Index/Metadata.iwa"
 ownerKinds: frozenset[int] = frozenset({1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 35})
 
 
-def shapes() -> Document:
+def openShapes() -> Document:
     """Return `20-formula-shapes`, whose formulas read across tables and sheets."""
-    return pybers.open(documentPath("20-formula-shapes"))
+    return pybers.open(findDocumentPath("20-formula-shapes"))
 
 
-def withTables(document: Document) -> Document:
+def addTables(document: Document) -> Document:
     """Add the golden's three tables and their values, and return the document."""
     first = document.sheet("Sheet 1").tableAdd("Table 1", rows=3, cols=4)
     first.cell("A1").value = "text in a created table"
@@ -64,14 +64,14 @@ def withTables(document: Document) -> Document:
     return document
 
 
-def savedWithTables(tmp_path: Path) -> Path:
+def saveWithTables(tmp_path: Path) -> Path:
     """Save the golden's additions, and return where they were written."""
     destination = tmp_path / "tables-added.numbers"
-    withTables(shapes()).save(destination)
+    addTables(openShapes()).save(destination)
     return destination
 
 
-def tableArchives(
+def findTableArchives(
     path: Path, sheet: str, table: str
 ) -> tuple[ArchiveIndex, tst.TableInfoArchive, tst.TableModelArchive]:
     """Return a file's index, and one table's info and model archives."""
@@ -88,7 +88,7 @@ def tableArchives(
 
 
 def testATableIsAddedToItsSheetWithTheSizeAskedFor() -> None:
-    sheet = shapes().sheet("Sheet 2")
+    sheet = openShapes().sheet("Sheet 2")
 
     added = sheet.tableAdd("Report", rows=4, cols=6)
 
@@ -97,7 +97,7 @@ def testATableIsAddedToItsSheetWithTheSizeAskedFor() -> None:
 
 
 def testAnAddedTableReadsBackWithItsSize(tmp_path: Path) -> None:
-    reopened = pybers.open(savedWithTables(tmp_path))
+    reopened = pybers.open(saveWithTables(tmp_path))
 
     assert [
         (sheet.name, [(t.name, t.rowCount, t.colCount) for t in sheet.tables])
@@ -122,7 +122,7 @@ def testAnAddedTableReadsBackWithItsSize(tmp_path: Path) -> None:
     [(0, 3), (3, 0), (-1, 3), (True, 3), (3, 2.0), ("3", 3), (1_000_001, 3), (3, 1001)],
 )
 def testASizeNoTableCanHaveIsRefused(rows: object, cols: object) -> None:
-    sheet = shapes().sheet(1)
+    sheet = openShapes().sheet(1)
 
     with pytest.raises(SelectionError):
         sheet.tableAdd("Nowhere", rows=rows, cols=cols)  # type: ignore[arg-type]
@@ -131,7 +131,7 @@ def testASizeNoTableCanHaveIsRefused(rows: object, cols: object) -> None:
 
 @pytest.mark.parametrize("name", ["", None, 7])
 def testATableWithoutANameIsRefused(name: object) -> None:
-    sheet = shapes().sheet(1)
+    sheet = openShapes().sheet(1)
 
     with pytest.raises(SelectionError):
         sheet.tableAdd(name, rows=1, cols=1)  # type: ignore[arg-type]
@@ -141,7 +141,7 @@ def testATableWithoutANameIsRefused(name: object) -> None:
 
 
 def testValuesWrittenIntoCreatedTablesReadBack(tmp_path: Path) -> None:
-    reopened = pybers.open(savedWithTables(tmp_path))
+    reopened = pybers.open(saveWithTables(tmp_path))
 
     first = reopened.sheet("Sheet 1").table("Table 1-1")
     output = reopened.sheet("Fresh").table("Output")
@@ -152,7 +152,7 @@ def testValuesWrittenIntoCreatedTablesReadBack(tmp_path: Path) -> None:
 
 
 def testANumberInACreatedTableNamesTheAutomaticFormat(tmp_path: Path) -> None:
-    index, _, model = tableArchives(savedWithTables(tmp_path), "Fresh", "Output")
+    index, _, model = findTableArchives(saveWithTables(tmp_path), "Fresh", "Output")
 
     formats = index.resolve(model.base_data_store.format_table, tst.TableDataList)
 
@@ -168,8 +168,8 @@ def testANumberInACreatedTableNamesTheAutomaticFormat(tmp_path: Path) -> None:
 
 
 def testExistingTablesReadBackUnchanged(tmp_path: Path) -> None:
-    original = shapes()
-    reopened = pybers.open(savedWithTables(tmp_path))
+    original = openShapes()
+    reopened = pybers.open(saveWithTables(tmp_path))
 
     for sheet in original.sheets:
         for table in sheet.tables:
@@ -177,7 +177,7 @@ def testExistingTablesReadBackUnchanged(tmp_path: Path) -> None:
 
 
 def testFormulasReadingAcrossTablesStillNameTheSameTables(tmp_path: Path) -> None:
-    reopened = pybers.open(savedWithTables(tmp_path)).sheet("Sheet 1").table("Table 1")
+    reopened = pybers.open(saveWithTables(tmp_path)).sheet("Sheet 1").table("Table 1")
 
     assert reopened.cell("G11").formulaText == "=Table 2::A1"
     assert reopened.cell("H11").formulaText == "=Sheet 2::Table 1::A1"
@@ -185,8 +185,8 @@ def testFormulasReadingAcrossTablesStillNameTheSameTables(tmp_path: Path) -> Non
 
 def testOnlyTheArchivesThatRegisterATableAreRewritten(tmp_path: Path) -> None:
     """Every member but the four that list sheets, owners and styles is untouched."""
-    source = readPackage(documentPath("20-formula-shapes"))
-    written = readPackage(savedWithTables(tmp_path))
+    source = readPackage(findDocumentPath("20-formula-shapes"))
+    written = readPackage(saveWithTables(tmp_path))
     registering = {
         metadataMember,
         "Index/Document.iwa",
@@ -196,12 +196,12 @@ def testOnlyTheArchivesThatRegisterATableAreRewritten(tmp_path: Path) -> None:
 
     before = {
         (member, identifier): body
-        for member, identifier, body in archiveBodies(source)
+        for member, identifier, body in readArchiveBodies(source)
         if member not in registering
     }
     after = {
         (member, identifier): body
-        for member, identifier, body in archiveBodies(written)
+        for member, identifier, body in readArchiveBodies(written)
         if (member, identifier) in before
     }
     assert after == before
@@ -211,7 +211,7 @@ def testOnlyTheArchivesThatRegisterATableAreRewritten(tmp_path: Path) -> None:
 
 
 def testANameTheSheetCarriesTakesTheFirstFreeSuffix() -> None:
-    sheet = shapes().sheet("Sheet 1")
+    sheet = openShapes().sheet("Sheet 1")
 
     first = sheet.tableAdd("Table 1", rows=1, cols=1)
     second = sheet.tableAdd("TABLE 1", rows=1, cols=1)
@@ -220,7 +220,7 @@ def testANameTheSheetCarriesTakesTheFirstFreeSuffix() -> None:
 
 
 def testANameAnotherSheetCarriesIsKept() -> None:
-    added = shapes().sheet("Sheet 2").tableAdd("Table 2", rows=1, cols=1)
+    added = openShapes().sheet("Sheet 2").tableAdd("Table 2", rows=1, cols=1)
 
     assert added.name == "Table 2"
 
@@ -229,7 +229,8 @@ def testANameAnotherSheetCarriesIsKept() -> None:
 
 
 def testACreatedTableShowsNoTitleHeadersOrStrokes(tmp_path: Path) -> None:
-    index, _, model = tableArchives(savedWithTables(tmp_path), "Sheet 1", "Table 1-1")
+    saved = saveWithTables(tmp_path)
+    index, _, model = findTableArchives(saved, "Sheet 1", "Table 1-1")
 
     style = index.resolve(model.table_style, tst.TableStyleArchive)
 
@@ -246,7 +247,8 @@ def testACreatedTableShowsNoTitleHeadersOrStrokes(tmp_path: Path) -> None:
 
 
 def testACreatedTableUsesTheResetSizesAndDoesNotWrap(tmp_path: Path) -> None:
-    index, _, model = tableArchives(savedWithTables(tmp_path), "Sheet 1", "Table 1-1")
+    saved = saveWithTables(tmp_path)
+    index, _, model = findTableArchives(saved, "Sheet 1", "Table 1-1")
 
     cell = index.resolve(model.body_cell_style, tst.CellStyleArchive)
 
@@ -255,7 +257,8 @@ def testACreatedTableUsesTheResetSizesAndDoesNotWrap(tmp_path: Path) -> None:
 
 
 def testEveryTextSlotButTheTitleNamesPybersBase(tmp_path: Path) -> None:
-    index, _, model = tableArchives(savedWithTables(tmp_path), "Sheet 1", "Table 1-1")
+    saved = saveWithTables(tmp_path)
+    index, _, model = findTableArchives(saved, "Sheet 1", "Table 1-1")
 
     base = index.resolve(model.body_text_style, tswp.ParagraphStyleArchive)
     textSlots = [
@@ -275,7 +278,7 @@ def testEveryTextSlotButTheTitleNamesPybersBase(tmp_path: Path) -> None:
 
 
 def testPybersBaseIsCreatedOnceAcrossTablesAndSaves(tmp_path: Path) -> None:
-    document = withTables(shapes())
+    document = addTables(openShapes())
     document.save(tmp_path / "first.numbers")
     document.sheet("Sheet 2").tableAdd("Later", rows=1, cols=1)
     document.save(tmp_path / "second.numbers")
@@ -304,13 +307,13 @@ def testPybersBaseIsCreatedOnceAcrossTablesAndSaves(tmp_path: Path) -> None:
 
 
 def testATableIsPlacedWithItsTopLeftCornerAtAPosition(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     document.sheet(1).tableAdd(
         "Placed", rows=2, cols=2, position=pybers.Position(144.0, 36.0)
     )
     document.save(tmp_path / "placed.numbers")
 
-    _, info, _ = tableArchives(tmp_path / "placed.numbers", "Sheet 1", "Placed")
+    _, info, _ = findTableArchives(tmp_path / "placed.numbers", "Sheet 1", "Placed")
 
     assert (info.super.geometry.position.x, info.super.geometry.position.y) == (
         144.0,
@@ -319,10 +322,10 @@ def testATableIsPlacedWithItsTopLeftCornerAtAPosition(tmp_path: Path) -> None:
 
 
 def testATableWithNoPositionLandsBelowTheTablesAlreadyThere(tmp_path: Path) -> None:
-    path = savedWithTables(tmp_path)
-    _, lower, model = tableArchives(path, "Sheet 1", "Table 2")
-    _, added, _ = tableArchives(path, "Sheet 1", "Table 1-1")
-    _, after, _ = tableArchives(path, "Sheet 1", "table 2-1")
+    path = saveWithTables(tmp_path)
+    _, lower, model = findTableArchives(path, "Sheet 1", "Table 2")
+    _, added, _ = findTableArchives(path, "Sheet 1", "Table 1-1")
+    _, after, _ = findTableArchives(path, "Sheet 1", "table 2-1")
 
     bottom = (
         lower.super.geometry.position.y
@@ -333,7 +336,7 @@ def testATableWithNoPositionLandsBelowTheTablesAlreadyThere(tmp_path: Path) -> N
 
 
 def testAPositionThatIsNotAPositionIsRefused() -> None:
-    sheet = shapes().sheet(1)
+    sheet = openShapes().sheet(1)
 
     with pytest.raises(SelectionError, match="Position"):
         sheet.tableAdd("Nowhere", rows=1, cols=1, position=(1.0, 2.0))  # type: ignore[arg-type]
@@ -343,7 +346,7 @@ def testAPositionThatIsNotAPositionIsRefused() -> None:
 
 
 def testACreatedTableRegistersElevenOwnersOnItsIdentity(tmp_path: Path) -> None:
-    path = savedWithTables(tmp_path)
+    path = saveWithTables(tmp_path)
     reopened = pybers.open(path).sheet("Fresh").table("Output")
     index = ArchiveIndex(readPackage(path))
     words = [int(reopened.identifier[at : at + 8], 16) for at in range(0, 32, 8)]
@@ -362,7 +365,7 @@ def testACreatedTableRegistersElevenOwnersOnItsIdentity(tmp_path: Path) -> None:
 
 
 def testEveryCreatedTableGetsItsOwnHeaderNameSlot(tmp_path: Path) -> None:
-    index = ArchiveIndex(readPackage(savedWithTables(tmp_path)))
+    index = ArchiveIndex(readPackage(saveWithTables(tmp_path)))
     names = index.resolve(
         calculationEngine(index).header_name_manager, tst.HeaderNameMgrArchive
     )
@@ -374,7 +377,7 @@ def testEveryCreatedTableGetsItsOwnHeaderNameSlot(tmp_path: Path) -> None:
 
 
 def testACreatedTableFollowsTheRegistryRules(tmp_path: Path) -> None:
-    registry = PackageRegistry(readPackage(savedWithTables(tmp_path)))
+    registry = PackageRegistry(readPackage(saveWithTables(tmp_path)))
 
     for identifier, component in registry.components.items():
         stored = {
@@ -394,7 +397,7 @@ def testACreatedTableFollowsTheRegistryRules(tmp_path: Path) -> None:
 
 
 def testSavingTwiceCreatesTheTableOnce(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     document.sheet(1).tableAdd("Once", rows=1, cols=1)
     document.save(tmp_path / "first.numbers")
 
@@ -410,20 +413,20 @@ def testANewTableBeforeAnExistingOneIsRefusedAndWritesNothing(
     tmp_path: Path,
 ) -> None:
     """Pairing is by position, so a table ahead of an old one would take its cells."""
-    document = shapes()
+    document = openShapes()
     package = document._package
     assert package is not None
-    before = archiveBodies(package)
+    before = readArchiveBodies(package)
     document.sheet(1).tables.insert(0, Table("Ahead", rowCount=1, colCount=1))
 
     with pytest.raises(WriteError, match="sits before a table already"):
         document.save(tmp_path / "ahead.numbers")
 
-    assert archiveBodies(package) == before
+    assert readArchiveBodies(package) == before
 
 
 def testATableBuiltByHandAndAppendedIsCreated(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     document.sheet(2).tables.append(Table("By hand", rowCount=2, colCount=2))
 
     document.save(tmp_path / "hand.numbers")
@@ -434,7 +437,7 @@ def testATableBuiltByHandAndAppendedIsCreated(tmp_path: Path) -> None:
 
 
 def testRemovingATableIsRefused(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     del document.sheet(1).tables[1]
 
     with pytest.raises(WriteError, match="Removing or reordering a table"):
@@ -464,7 +467,7 @@ def testTheGoldenHoldsTheTablesItClaims() -> None:
 def testTheGoldenIsWhatAddingTheTablesWritesToday(tmp_path: Path) -> None:
     """Every created table's model matches the golden's, apart from its fresh names."""
 
-    def shaped(path: Path) -> list[tst.TableModelArchive]:
+    def readTableModels(path: Path) -> list[tst.TableModelArchive]:
         reopened = pybers.open(path)
         models = []
         for sheet, table in (
@@ -472,7 +475,7 @@ def testTheGoldenIsWhatAddingTheTablesWritesToday(tmp_path: Path) -> None:
             ("Sheet 1", "table 2-1"),
             ("Fresh", "Output"),
         ):
-            _, _, model = tableArchives(path, sheet, table)
+            _, _, model = findTableArchives(path, sheet, table)
             kept = tst.TableModelArchive()
             for name in (
                 "table_name",
@@ -488,7 +491,7 @@ def testTheGoldenIsWhatAddingTheTablesWritesToday(tmp_path: Path) -> None:
         assert reopened
         return models
 
-    assert shaped(savedWithTables(tmp_path)) == shaped(
+    assert readTableModels(saveWithTables(tmp_path)) == readTableModels(
         goldenDirectory / "20-tables-added.numbers"
     )
 
@@ -498,7 +501,7 @@ def testTheGoldenIsWhatAddingTheTablesWritesToday(tmp_path: Path) -> None:
 
 def testAScriptBuildsAReportTableOnANewSheet(tmp_path: Path) -> None:
     """The `import pybers` consumer: a sheet, a table, a loop over values, a save."""
-    document = shapes()
+    document = openShapes()
     table = document.sheetAdd("Report").tableAdd("Totals", rows=3, cols=2)
     for row, (label, amount) in enumerate(
         [("rent", "1200"), ("food", "450"), ("power", "80")], start=1
@@ -520,7 +523,7 @@ def testAScriptBuildsAReportTableOnANewSheet(tmp_path: Path) -> None:
 
 def testACliAddsATableAtAPointAndPrintsItsName(tmp_path: Path) -> None:
     """The `pybers table add SHEET NAME --rows R --cols C --at X,Y` consumer."""
-    document = shapes()
+    document = openShapes()
     x, y = (float(part) for part in ["72", "432"])
     added = document.sheet("Sheet 1").tableAdd(
         "Table 2", rows=2, cols=2, position=pybers.Position(x, y)

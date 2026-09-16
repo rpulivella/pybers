@@ -8,7 +8,7 @@ archives reference in OTHER components. A created archive that is missing from
 either list is an object Numbers cannot place, so creating one goes through here.
 
 **A strong external reference is derived, never chosen.** Measured across all 51
-fixtures on 2026-09-14: every component's strong external references are exactly
+documents on 2026-09-14: every component's strong external references are exactly
 the cross-component targets of its archives' `object_references`, naming the
 object as 0 when it is the target component's own root. Only weak references are
 stored beyond that, and no schema marks a reference weak, so those are stated by

@@ -8,7 +8,7 @@ table for one rather than walking a tile.
 
 **A table is sparse and declares more than it holds.** The grid comes from what the
 table declares, never from which cells hold something: 7 of the 74 tables in the
-corpus declare more rows or columns than their records reach, so an inferred size
+documents declare more rows or columns than their records reach, so an inferred size
 is silently short.
 
 **A merge discards what it covers, and unmerging does not bring it back.** That is

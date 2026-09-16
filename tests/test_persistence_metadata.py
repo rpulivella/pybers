@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import allDocuments, archiveBodies, documentPath
+from conftest import allDocuments, findDocumentPath, readArchiveBodies
 from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.container import ContainerError
@@ -39,12 +39,12 @@ tileTypeId: int = 6002
 documentComponent: int = 1
 
 
-def registry(name: str = "00-baseline") -> PackageRegistry:
-    """Return the registry of a freshly read fixture."""
-    return PackageRegistry(readPackage(documentPath(name)))
+def readRegistry(name: str = "00-baseline") -> PackageRegistry:
+    """Return the registry of a freshly read document."""
+    return PackageRegistry(readPackage(findDocumentPath(name)))
 
 
-def infoFor(identifier: int, references: list[int]) -> tspArchive.ArchiveInfo:
+def buildTileInfo(identifier: int, references: list[int]) -> tspArchive.ArchiveInfo:
     """Return an `ArchiveInfo` for one tile message naming the given references."""
     info = tspArchive.ArchiveInfo(identifier=identifier)
     message = info.message_infos.add(type=tileTypeId, length=0)
@@ -82,7 +82,7 @@ def testEveryArchiveOutsideTheRegistryBelongsToAComponent(path: Path) -> None:
 
 
 def testAnAllocatedIdentifierIsNewAndTheNextIsHigher() -> None:
-    found = registry()
+    found = readRegistry()
     used = set(found.componentOf) | {found.metadata.last_object_identifier}
 
     first = found.identifierAllocate()
@@ -93,9 +93,9 @@ def testAnAllocatedIdentifierIsNewAndTheNextIsHigher() -> None:
 
 
 def testACreatedComponentSurvivesBeingWrittenAndRead(tmp_path: Path) -> None:
-    found = registry()
+    found = readRegistry()
     identifier = found.identifierAllocate()
-    root = archiveCreate(infoFor(identifier, [documentComponent]), [b""])
+    root = archiveCreate(buildTileInfo(identifier, [documentComponent]), [b""])
 
     found.componentAdd(root, "Tables/Tile")
     found.save()
@@ -115,9 +115,9 @@ def testACreatedComponentSurvivesBeingWrittenAndRead(tmp_path: Path) -> None:
 
 
 def testCreatingAComponentLeavesEveryOtherArchiveUnchanged(tmp_path: Path) -> None:
-    source = documentPath("00-baseline")
-    found = registry()
-    root = archiveCreate(infoFor(found.identifierAllocate(), []), [b""])
+    source = findDocumentPath("00-baseline")
+    found = readRegistry()
+    root = archiveCreate(buildTileInfo(found.identifierAllocate(), []), [b""])
 
     found.componentAdd(root, "Tables/Tile")
     found.save()
@@ -126,18 +126,18 @@ def testCreatingAComponentLeavesEveryOtherArchiveUnchanged(tmp_path: Path) -> No
 
     metadataMember = found.metadataFile.name
     before = [
-        body for body in archiveBodies(readPackage(source))
+        body for body in readArchiveBodies(readPackage(source))
         if body[0] != metadataMember
     ]
     after = [
-        body for body in archiveBodies(readPackage(destination))
+        body for body in readArchiveBodies(readPackage(destination))
         if body[0] != metadataMember and body[1] != root.identifier
     ]
     assert after == before
 
 
 def testAnArchiveAddedToAnExistingComponentIsRegisteredThere() -> None:
-    found = registry()
+    found = readRegistry()
     engine = next(
         identifier for identifier, component in found.components.items()
         if component.preferred_locator == "CalculationEngine"
@@ -148,7 +148,7 @@ def testAnArchiveAddedToAnExistingComponentIsRegisteredThere() -> None:
         if component.preferred_locator == "Tables/Tile"
     )
 
-    found.archiveAdd(engine, archiveCreate(infoFor(identifier, [tile]), [b""]))
+    found.archiveAdd(engine, archiveCreate(buildTileInfo(identifier, [tile]), [b""]))
     found.save()
 
     assert found.componentOf[identifier] == engine
@@ -159,7 +159,7 @@ def testAnArchiveAddedToAnExistingComponentIsRegisteredThere() -> None:
 
 
 def testAWeakReferenceIsRecordedWeakAndNamesTheObject() -> None:
-    found = registry()
+    found = readRegistry()
     engine = next(
         identifier for identifier, component in found.components.items()
         if component.preferred_locator == "CalculationEngine"
@@ -182,24 +182,24 @@ def testAWeakReferenceIsRecordedWeakAndNamesTheObject() -> None:
 
 
 def testAReferenceToAnObjectNoComponentHoldsIsRefused() -> None:
-    found = registry()
+    found = readRegistry()
 
     with pytest.raises(MetadataError, match="belongs to no component"):
         found.weakReferenceAdd(documentComponent, 999_999_999)
 
 
 def testAnArchiveIdentifierAlreadyHeldIsRefused() -> None:
-    found = registry()
+    found = readRegistry()
     held = found.componentMember(documentComponent).archives[0].identifier
 
     with pytest.raises(IWAError, match="already holds"):
         found.archiveAdd(
-            documentComponent, archiveCreate(infoFor(held, []), [b""])
+            documentComponent, archiveCreate(buildTileInfo(held, []), [b""])
         )
 
 
 def testAMemberNameAlreadyTakenIsRefused() -> None:
-    package = readPackage(documentPath("00-baseline"))
+    package = readPackage(findDocumentPath("00-baseline"))
 
     with pytest.raises(ContainerError, match="already holds"):
         package.iwaFileAdd(memberNameFor("Document"))
@@ -207,4 +207,4 @@ def testAMemberNameAlreadyTakenIsRefused() -> None:
 
 def testAnArchiveGivenTheWrongNumberOfBodiesIsRefused() -> None:
     with pytest.raises(IWAError, match="declares 1 messages"):
-        archiveCreate(infoFor(1, []), [b"", b""])
+        archiveCreate(buildTileInfo(1, []), [b"", b""])

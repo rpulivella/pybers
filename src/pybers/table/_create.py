@@ -99,7 +99,7 @@ tableGap: float = resetRowHeight
 geometryFrame: float = 4.0
 
 headerNameOwnerKind: int = 200
-# Measured across the fixtures holding one, three and nine tables: each adds four.
+# Measured across the documents holding one, three and nine tables: each adds four.
 formulasPerTable: int = 4
 
 ownerIdFields: frozenset[str] = frozenset(

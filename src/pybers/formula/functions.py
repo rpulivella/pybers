@@ -17,7 +17,7 @@ function is a `None` rather than an error, and why it round-trips untouched.
 declares a maximum of two arguments with a repeating group of one, which is how
 an eight-argument `SUM` is legal. Read `accepts` rather than comparing against
 `maximumArguments`, which is right only when there is no group. Measured across
-the fixture corpus on 2026-09-04, where no valid formula contradicts the table
+the documents on 2026-09-04, where no valid formula contradicts the table
 and the one Numbers marked as an error is the one the table rejects.
 
 **Existing and being offered are different things**, so every index Numbers

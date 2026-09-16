@@ -32,7 +32,12 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, documentPath, recordedColumns, recordedRows
+from conftest import (
+    findDocumentPath,
+    readArchiveBodies,
+    readRecordedColumns,
+    readRecordedRows,
+)
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
@@ -41,8 +46,8 @@ from pybers.addressing.reference import CellReference
 from pybers.errors import ReadError, WriteError
 from pybers.table._write import rewriteRow, tileTypeId
 
-wideFixture: Path = documentPath("45-columns-over-255")
-narrowFixture: Path = documentPath("11-value-types-noformats")
+wideFixture: Path = findDocumentPath("45-columns-over-255")
+narrowMeasurement: Path = findDocumentPath("11-value-types-noformats")
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # The four cells cleared from the last row of the wide fixture.
@@ -61,7 +66,7 @@ wideMergeCovered: int = 295
 alignedRecord: bytes = bytes(12)
 
 
-def firstTable(document: pybers.Document) -> pybers.Table:
+def findFirstTable(document: pybers.Document) -> pybers.Table:
     """Return the document's first table."""
     return document.sheets[0].tables[0]
 
@@ -76,7 +81,7 @@ def testOffsetsCountWordsOnlyWhenTheArchiveSaysTheRowIsWide() -> None:
 
 def testATableWiderThanTwoHundredFiftyFiveColumnsOpens() -> None:
     """The whole point: this raised before, on the first row of the first tile."""
-    table = firstTable(pybers.open(wideFixture))
+    table = findFirstTable(pybers.open(wideFixture))
     assert (table.rowCount, table.colCount) == (7, 300)
 
 
@@ -86,7 +91,7 @@ def testEveryPopulatedCellReportsTheAddressItNames() -> None:
     Column 300 matters most, being furthest from the start of the row: an offset
     off by a factor of four lands somewhere else entirely.
     """
-    table = firstTable(pybers.open(wideFixture))
+    table = findFirstTable(pybers.open(wideFixture))
     assert table.cell("A1").value == "col1"
     assert table.cell("KN1").value == "col300"
     assert table.cell("B2").value == "r1c2"
@@ -99,7 +104,7 @@ def testAClearedCellInAWideRowStaysEmpty() -> None:
     Reading the marker as an offset would give these cells a neighbor's text and
     shift every record after them, without raising.
     """
-    table = firstTable(pybers.open(wideFixture))
+    table = findFirstTable(pybers.open(wideFixture))
     assert [table.cell(reference).value for reference in clearedCells] == [None] * 4
     assert table.cell("A7").value == "r6c1"
     assert table.cell("C7").value == "r6c3"
@@ -109,14 +114,14 @@ def testTheWideFixtureWritesBackUnchanged(tmp_path: Path) -> None:
     """The base contract, on the one fixture that reaches the other layout."""
     target = tmp_path / "written.numbers"
     pybers.open(wideFixture).save(target)
-    assert archiveBodies(readPackage(target)) == archiveBodies(
+    assert readArchiveBodies(readPackage(target)) == readArchiveBodies(
         readPackage(wideFixture)
     )
 
 
 def testANarrowTableStillReadsAsItDid() -> None:
     """A 255-slot row decodes exactly as before, so the fix added a case."""
-    assert firstTable(pybers.open(narrowFixture)).cell("A2").value is not None
+    assert findFirstTable(pybers.open(narrowMeasurement)).cell("A2").value is not None
 
 
 def testARowWhoseOffsetsFallOutsideItsBufferNamesWhereItIs(tmp_path: Path) -> None:
@@ -125,7 +130,7 @@ def testARowWhoseOffsetsFallOutsideItsBufferNamesWhereItIs(tmp_path: Path) -> No
     Built by telling a narrow tile its rows are wide, which multiplies every
     offset by four and is the exact shape of the defect this ticket fixes.
     """
-    package = readPackage(narrowFixture)
+    package = readPackage(narrowMeasurement)
     for iwaFile in package.iwaFiles:
         for archive in list(iwaFile.archives):
             if archive.messages[0].typeId != tileTypeId:
@@ -187,7 +192,7 @@ def widelyMerged(tmp_path: Path) -> Path:
     """
     target = Path(shutil.copy(wideFixture, tmp_path / "45-merged.numbers"))
     document = pybers.open(target)
-    firstTable(document).mergeAdd(wideMerge)
+    findFirstTable(document).mergeAdd(wideMerge)
     document.save()
     return target
 
@@ -196,21 +201,21 @@ def testAMergePastColumnTwoFiftyFiveDropsOnlyTheCoveredRecord(
     widelyMerged: Path,
 ) -> None:
     """One record leaves the row, and no slot gains one."""
-    before = recordedColumns(wideFixture, editedRow)
-    after = recordedColumns(widelyMerged, editedRow)
+    before = readRecordedColumns(wideFixture, editedRow)
+    after = readRecordedColumns(widelyMerged, editedRow)
     assert before - after == {wideMergeCovered}
     assert after - before == set()
 
 
 def testEveryOtherCellInTheEditedRowStillNamesItself(widelyMerged: Path) -> None:
     """A wrong offset yields a wrong value, not an exception, so read all of them."""
-    table = firstTable(pybers.open(widelyMerged))
+    table = findFirstTable(pybers.open(widelyMerged))
     surviving = {
         column: table.cell(CellReference(editedRow + originOffset, column)).value
         for column in range(originOffset, table.colCount + originOffset)
         if column != wideMergeCovered + originOffset
     }
-    original = firstTable(pybers.open(wideFixture))
+    original = findFirstTable(pybers.open(wideFixture))
     assert surviving == {
         column: original.cell(CellReference(editedRow + originOffset, column)).value
         for column in surviving
@@ -220,13 +225,13 @@ def testEveryOtherCellInTheEditedRowStillNamesItself(widelyMerged: Path) -> None
 @pytest.mark.parametrize("reference", clearedCells)
 def testAGapInTheEditedRowIsStillAGap(widelyMerged: Path, reference: str) -> None:
     """An empty slot is an absent record, and a rebuild must not fill one in."""
-    assert firstTable(pybers.open(widelyMerged)).cell(reference).value is None
+    assert findFirstTable(pybers.open(widelyMerged)).cell(reference).value is None
 
 
 def testTheRowsTheEditDidNotTouchAreUnchanged(widelyMerged: Path) -> None:
     """An edit to one row rewrites that row and leaves the rest of the tile alone."""
-    before = recordedRows(wideFixture)
-    after = recordedRows(widelyMerged)
+    before = readRecordedRows(wideFixture)
+    after = readRecordedRows(widelyMerged)
     assert {row: columns for row, columns in before.items() if row != editedRow} == {
         row: columns for row, columns in after.items() if row != editedRow
     }
@@ -239,10 +244,10 @@ def testAFormulaStillCannotReachAColumnPastTwoFiftyFive(tmp_path: Path) -> None:
     would leave a stale result Numbers never recalculates, so the write refuses
     instead. Borrowed from `19` because this fixture holds no formula to copy.
     """
-    borrowed = firstTable(pybers.open(documentPath("19-formula-dragged")))
+    borrowed = findFirstTable(pybers.open(findDocumentPath("19-formula-dragged")))
     target = Path(shutil.copy(wideFixture, tmp_path / "45-formula.numbers"))
     document = pybers.open(target)
-    firstTable(document).cell("KJ7").formula = borrowed.cell("E2").formula
+    findFirstTable(document).cell("KJ7").formula = borrowed.cell("E2").formula
     with pytest.raises(WriteError, match="No dependency tile covers"):
         document.save()
 
@@ -258,9 +263,9 @@ def testAWideRowEditMatchesItsGoldenFile(tmp_path: Path) -> None:
 
     target = Path(shutil.copy(wideFixture, tmp_path / "45.numbers"))
     document = pybers.open(target)
-    firstTable(document).mergeAdd(wideMerge)
+    findFirstTable(document).mergeAdd(wideMerge)
     document.save()
 
-    assert archiveBodies(readPackage(golden)) == archiveBodies(
+    assert readArchiveBodies(readPackage(golden)) == readArchiveBodies(
         readPackage(target)
     ), "the writer no longer produces the wide-row edit Numbers confirmed"

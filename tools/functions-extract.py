@@ -35,7 +35,7 @@ Three readings, two of them independent, all measured on Numbers 15.3.1:
 **A repeating group makes the maximum a floor rather than a ceiling.** `SUM`
 declares a maximum of two with a repeating group of one, which is how a document
 holding an eight-argument `SUM` is legal. Reading `maxArgs` as a hard limit
-rejects real formulas, measured against the corpus 2026-09-04.
+rejects real formulas, measured against the documents 2026-09-04.
 
 Numbers' own localized function list decides which extracted names are real. A
 class whose name is absent from `en.lproj/TSCalculationEngine.strings` is an

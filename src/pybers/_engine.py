@@ -68,7 +68,7 @@ def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
     """Return the document's one calculation engine, or refuse and say why.
 
     Exactly one archive in a document carries this type, the same way exactly one
-    carries `TN.DocumentArchive`. All 46 fixtures have one, so a document without
+    carries `TN.DocumentArchive`. All 46 documents have one, so a document without
     one is not what this library expects rather than a case to work around.
     """
     found = [
@@ -168,7 +168,7 @@ sumFunctionIndex: int = 168
 
 # The calculation engine tiles its register of formula-bearing cells 32 columns
 # wide. Measured 2026-09-04: `40-table-bands` carries eight tiles beginning at
-# columns 0, 32, 64 and so on to 224, and every tile in the corpus begins at row
+# columns 0, 32, 64 and so on to 224, and every tile in the documents begins at row
 # zero, so the row extent of a tile is not established and is never assumed here.
 dependencyTileColumns: int = 32
 
@@ -545,7 +545,7 @@ def ownerEntryFor(
     if entry is None:
         raise WriteError(
             f"{name!r} has no calculation-engine owner entry, so neither its merges "
-            "nor its edited cells can be written. Every table in the fixture corpus "
+            "nor its edited cells can be written. Every table in the documents "
             "has one."
         )
     return entry
@@ -587,7 +587,7 @@ def requestRecalculation(
         raise WriteError(
             "This document has no TSCE.CalculationEngineArchive, so Numbers cannot "
             "be asked to recalculate and the saved file would display stale formula "
-            "results. Every document in the fixture corpus carries one."
+            "results. Every document in the documents carries one."
         )
     engine = parseArchive(engineArchive)
     if not isinstance(engine, tsce.CalculationEngineArchive):
