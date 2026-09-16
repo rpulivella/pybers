@@ -165,24 +165,6 @@ def testANumberInACreatedTableNamesTheAutomaticFormat(tmp_path: Path) -> None:
     assert not numbers[0].show_thousands_separator
 
 
-def testAFormulaInACreatedTableIsRefusedAndWritesNothing(tmp_path: Path) -> None:
-    """PYB-86: the engine has no dependency tile for it, which is never guessed at."""
-    document = shapes()
-    package = document._package
-    assert package is not None
-    before = archiveBodies(package)
-    added = document.sheet(1).tableAdd("Calculated", rows=2, cols=2)
-    added.cell("A1").value = Decimal("20")
-    added.cell("A2").formulaText = "=A1*2"
-
-    with pytest.raises(WriteError, match="No dependency tile"):
-        document.save(tmp_path / "refused.numbers")
-
-    assert archiveBodies(package) == before
-    assert added._identifier is None
-    assert not (tmp_path / "refused.numbers").exists()
-
-
 # ── AC 4: everything already there is untouched ──────────────────────────────
 
 

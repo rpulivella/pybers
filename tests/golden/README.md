@@ -38,6 +38,22 @@ other when reaching for something to test against.
 | `20-formula-retargeted.numbers` | `20-formula-shapes.numbers` | eight anchored formulas written into row 10, then every reference into `Sheet 1 / Table 1` moved one row down and seven columns right, leaving the two that point elsewhere untouched | 2026-09-09, Numbers 15.3.1 |
 | `20-sheets-added.numbers` | `20-formula-shapes.numbers` | an empty sheet `Inserted` added at position 2, between the sheet holding a cross-sheet formula and the sheet it reads, and `Appended` added last. The first golden whose archives this library created rather than edited | 2026-09-14, Numbers 15.3.1 |
 | `20-tables-added.numbers` | `20-formula-shapes.numbers` | three tables created in the pybers reset: `Table 1` added beside a `Table 1` on `Sheet 1`, which becomes `Table 1-1`, with text at `A1` and 12.5 at `B2`; `table 2`, which becomes `table 2-1` because names clash regardless of case, with text at `C2`; and `Output` on a new sheet `Fresh`, with 1 at `A1` and text at `B5`. The first golden whose tables, styles and engine owners this library created | 2026-09-14, Numbers 15.3.1. **Superseded 2026-09-15**: regenerated for PYB-89, storing the displayed kind in four cells that held a format key instead. Re-confirmed 2026-09-15, Numbers 15.3.1: Quick Look and Numbers show all five created cells, and `A1` and `B2` of `Table 1-1`, `C2` of `table 2-1`, and `A1` and `B5` of `Output` all read Automatic |
+| `20-formulas-in-created-tables.numbers` | `20-formula-shapes.numbers` | two tables created on `Sheet 1`: `Inputs` holding 5 at `A1`, and `Calc` holding 2 at `A1` and four formulas, `B1` reading `A1`, `C1` reading the existing `Table 2`, `A2` reading `Inputs` and `A3` summing `A1:B1`. The first golden whose formulas sit in a table this library created, and the first declaring what each formula reads | 2026-09-16, Numbers 15.3.1 |
+
+`20-formulas-in-created-tables` is the golden that found two defects no test could have.
+A created table carried a `table_id` unrelated to its formula-owner identity, so Numbers
+re-identified the table on open and dropped its dependency tiles, leaving every formula
+unevaluated and a reference to it reading `The formula contains an invalid reference`.
+And a formula that declares no precedents computes once, in whatever order Numbers
+chooses: the same file read 8 at `A3` on one open and `Cell "B1" contains an error` on
+the next. Both are in findings-10-creation.md and findings-02-formulas.md.
+
+Confirmed 2026-09-16: no repair prompt, `Calc` reads 2, 6, 42, 6 and 8, the formula bars
+show `A1×3`, `Table 2::A1`, `Inputs::A1+1` and `SUM(A1:B1)`, and Quick Look shows only
+the two typed numbers, since Numbers computes the rest on open. Then, in the document:
+`Calc::A1` to 4 gives 12 and 16, `Inputs::A1` to 10 gives 11, and `Table 2::A1` to 50
+gives 50 in both `Calc::C1` and `Table 1::G11`. Reopened, `A3` still reads its own sum.
+The copy that was opened is not the copy committed here.
 
 `22c-merged-by-pybers` is the first golden where pybers REMOVED a record rather than
 adding or changing one. A merge Numbers makes leaves nothing at a covered position, but a
