@@ -315,6 +315,27 @@ def testARangeInACreatedTableIsDeclaredInBothRangeRegisters(tmp_path: Path) -> N
             for entry in tiles[0].from_to_range] == [(2, 0, 2)]
 
 
+def testReplacingAFormulaRedeclaresWhatItReads(tmp_path: Path) -> None:
+    """A swapped formula kept the precedent of the one it replaced, PYB-86."""
+    document = withFormulas(shapes())
+    document.save(tmp_path / "first.numbers")
+    reopened = pybers.open(tmp_path / "first.numbers")
+    reopened.sheet("Sheet 1").table("Calc").cell("B1").formulaText = "=A2*3"
+    reopened.save(tmp_path / "second.numbers")
+
+    owner, tiles = ownerTiles(tmp_path / "second.numbers", "Sheet 1", "Calc")
+
+    for records in (owner.cell_dependencies.cell_record, tiles[0].cell_records):
+        edges = {
+            (record.row, record.column): (
+                list(record.expanded_edges.edge_without_owner_rows),
+                list(record.expanded_edges.edge_without_owner_columns),
+            )
+            for record in records
+        }
+        assert edges[(0, 1)] == ([1], [0])
+
+
 def testRemovingAFormulaDropsWhatItDeclared(tmp_path: Path) -> None:
     document = withFormulas(shapes())
     document.save(tmp_path / "first.numbers")
@@ -466,6 +487,25 @@ def testAFormulaPastTheFirstTileIsRefusedAndWritesNothing(
 
 
 # ── The golden ──────────────────────────────────────────────────────────────
+
+
+def testTheReplacedGoldenDeclaresTheCellItReadsNow() -> None:
+    """Guard the guard: the golden's swapped formula, and what it says it reads."""
+    golden = goldenDirectory / "20-formula-precedent-replaced.numbers"
+    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
+
+    table = pybers.open(golden).sheet("Sheet 1").table("Table 2")
+    owner, _ = ownerTiles(golden, "Sheet 1", "Table 2")
+
+    assert table.cell("B1").formulaText == "=A2*3"
+    edges = {
+        (record.row, record.column): (
+            list(record.expanded_edges.edge_without_owner_rows),
+            list(record.expanded_edges.edge_without_owner_columns),
+        )
+        for record in owner.cell_dependencies.cell_record
+    }
+    assert edges[(0, 1)] == ([1], [0])
 
 
 def testTheGoldenHoldsTheFormulasItClaims() -> None:

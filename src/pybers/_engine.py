@@ -27,6 +27,8 @@ and nothing here knows a model type: the one thing that did was the merge formul
 which went to the feature that owns merges.
 
 UPDATES
+2026-09-16  A formula declares the cells, rectangles and whole lines it reads, in
+            three registers kept twice each, for PYB-86.
 2026-09-15  An owner with no dependency tile gains its first, for PYB-86.
 2026-09-08  The two halves joined for #58, and the merge formula left for the
             feature that owns it, which took the last model type out.
@@ -322,7 +324,7 @@ def rewriteRangeDependencies(
                 if span.end != span.begin:
                     lines.extent_end = span.end
 
-    return rangeTilesRewrite(index, registry, owner, added, removed)
+    return rewriteRangeTiles(index, registry, owner, added, removed)
 
 
 def rangeAssign(target: tsce.RangeCoordinateArchive, extent: RangeEdge) -> None:
@@ -333,7 +335,7 @@ def rangeAssign(target: tsce.RangeCoordinateArchive, extent: RangeEdge) -> None:
     target.bottom_right_column = extent.right
 
 
-def rangeTilesRewrite(
+def rewriteRangeTiles(
     index: ArchiveIndex,
     registry: PackageRegistry,
     owner: TableOwner,

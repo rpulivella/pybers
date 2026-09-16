@@ -16,6 +16,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-16  A formula swapped for another is reported as added, so the engine
+            hears what the cell reads now, for PYB-86.
 2026-09-15  A merge releases the formulas, rich text, strings and styles of the
             records it removes, and a string nothing names is removed, for
             PYB-92.
@@ -809,6 +811,9 @@ class TableEdits:
     `formulaRemoved` are a different fact: the calculation engine keeps its own
     register of which cells hold formulas, and a cell that merely changed value
     does not belong in either list.
+
+    **A formula swapped for another is `formulaAdded`**, since the register also
+    carries what each formula reads, and the cell now reads something else.
     """
 
     written: list[tuple[int, int]]
@@ -1007,7 +1012,7 @@ def applyTableEdits(
                     formatsCount(record.raw, patched, reference)
                 if pool is not None and edit != "none":
                     patched = applyFormulaEdit(edit, patched, record, cell, pool)
-                    if edit == "attach":
+                    if edit in ("attach", "replace"):
                         formulaAdded.append((row, record.column))
                     elif edit == "detach":
                         formulaRemoved.append((row, record.column))
