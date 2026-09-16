@@ -5,7 +5,7 @@ A stored formula out as the text Numbers displays for it.
 The other half of `pybers.formula.parse`, and the half that makes it
 testable: comparing hand-written node arrays stops scaling at about a dozen
 cases, and rendering every formula in a real document and parsing it back does
-not. See tests/fixtures/findings-08-formula-text.md.
+not. See docs/findings/findings-08-formula-text.md.
 
 It walks a stack, because the file is postfix. Each node takes what it needs off
 that stack and puts one piece back, and a complete formula leaves exactly one.

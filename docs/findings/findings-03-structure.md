@@ -44,6 +44,18 @@ The cells a merge covers have **no record in the tile at all**, indistinguishabl
 covered cell from an empty one by looking at the tile; it has to consult the merge ranges.
 That makes merges essential to reading a table correctly, not an optional nicety.
 
+**No gesture inside Numbers leaves a record at a covered position.** `22c-merge-overpaints`
+tried four, measured 2026-09-07: content then merge, style then merge, a whole-row fill over
+an existing merge, and a whole-column fill over one. Every uncovered empty cell a fill
+touches gains a type-0 record with a style and no value; every covered one stays absent.
+`22d` confirms it on the vertical axis.
+
+**An import does leave one.** `22e-merge-imported` is converted from an `.xlsx`, which writes
+a cell for every position of a merged range. Numbers keeps each covered cell's style-only
+record, on import and across every later edit, and that record is what made a real document
+fail to open. A covered cell given both a style and a value in Excel loses the value, so a
+covered record never holds one.
+
 ### Merging is destructive, and unmerging does not undo it
 
 When two cells that both hold content are merged, their values are **joined into a single
@@ -397,8 +409,9 @@ labels its tables and they read exactly: `(144, 144)` is "x2.0in y2.0in", `(-72,
 `angle` means a table can be rotated, and `locked` and `aspect_ratio_locked` are real state.
 
 The `title` / `caption` / `title_hidden` / `caption_hidden` fields on the same block are the
-settings switched off in every fixture in this directory, so the "atypical fixtures" note in
-the README is visible right here.
+settings switched off in every measurement made from `00-baseline`, which also has header rows,
+header columns and footers set to zero. That is not the Numbers default, so those documents
+are deliberately atypical, and `42-table-titles-captions` covers the default shape.
 
 ### A table's `geometry.size` is STALE and must never be used
 
