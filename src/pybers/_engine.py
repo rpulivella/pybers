@@ -27,6 +27,9 @@ and nothing here knows a model type: the one thing that did was the merge formul
 which went to the feature that owns merges.
 
 UPDATES
+2026-09-16  A formula declares the cells, rectangles and whole lines it reads, in
+            three registers kept twice each, for PYB-86.
+2026-09-15  An owner with no dependency tile gains its first, for PYB-86.
 2026-09-08  The two halves joined for #58, and the merge formula left for the
             feature that owns it, which took the last model type out.
 2026-09-08  Split out of the reader and the writer for #45, unchanged.
@@ -41,13 +44,15 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
 from ._generated import TSCEArchives_pb2 as tsce
+from ._generated import TSPArchiveMessages_pb2 as tspArchive
 from ._generated import TSPMessages_pb2 as tsp
-from ._persistence import IWAFile
+from ._persistence import IWAFile, PackageRegistry, archiveCreate
 from ._persistence.index import (
     ArchiveIndex,
     calculationEngineTypeId,
@@ -167,6 +172,61 @@ sumFunctionIndex: int = 168
 # zero, so the row extent of a tile is not established and is never assumed here.
 dependencyTileColumns: int = 32
 
+# The type and version of the tile Numbers created in `55-table-inserted-formula`.
+cellRecordTileTypeId: int = 4009
+cellRecordTileVersion: tuple[int, ...] = (1, 0, 5)
+
+# The tile mirroring the range half of the register, as `20-formula-shapes` holds it.
+rangePrecedentsTileTypeId: int = 4010
+rangePrecedentsTileVersion: tuple[int, ...] = (1, 0, 5)
+
+# A rectangle's size counts from one, and Numbers omits an axis of one line.
+singleLine: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class CellEdge:
+    """One cell a formula reads, its owner named only when it is another table."""
+
+    row: int
+    column: int
+    owner: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RangeEdge:
+    """One bounded rectangle a formula reads, in the owner that holds it."""
+
+    top: int
+    left: int
+    bottom: int
+    right: int
+    owner: int
+
+
+@dataclass(frozen=True, slots=True)
+class SpanEdge:
+    """Whole columns or whole rows a formula reads, in the owner that holds them."""
+
+    begin: int
+    end: int
+    columns: bool
+    owner: int
+
+
+@dataclass(frozen=True, slots=True)
+class FormulaDependencies:
+    """Everything one formula reads, which is what makes it recompute again.
+
+    Numbers evaluates an undeclared formula once, on open, in an order of its own,
+    so a formula reading a cell computed after it caches that cell's stale state.
+    See findings-02-formulas.md.
+    """
+
+    cells: tuple[CellEdge, ...] = ()
+    ranges: tuple[RangeEdge, ...] = ()
+    spans: tuple[SpanEdge, ...] = ()
+
 # The generated container both copies of that register are held in. Named so the
 # one function updating either can say what it takes.
 type CellRecordList = RepeatedCompositeFieldContainer[
@@ -175,36 +235,196 @@ type CellRecordList = RepeatedCompositeFieldContainer[
 
 def rewriteCellRecords(
     records: CellRecordList,
-    added: list[tuple[int, int]],
+    added: Mapping[tuple[int, int], FormulaDependencies],
     removed: list[tuple[int, int]],
 ) -> None:
-    """Add and drop entries in one register of formula-bearing cells."""
-    dropping = set(removed)
+    """Add and drop entries in one register of formula-bearing cells.
+
+    A cell already registered is rewritten rather than left, since its formula may
+    now read something else.
+    """
+    dropping = set(removed) | set(added)
     kept = [
         record for record in records
         if (record.row, record.column) not in dropping
     ]
-    present = {(record.row, record.column) for record in kept}
     del records[:]
     for record in kept:
         records.add().CopyFrom(record)
-    for row, column in added:
-        if (row, column) in present:
-            continue
+    for (row, column), dependencies in added.items():
         fresh = records.add()
         fresh.column = column
         fresh.row = row
-        # An empty edge set, which is what every entry in the corpus carries.
-        fresh.expanded_edges.SetInParent()
+        edges = fresh.expanded_edges
+        edges.SetInParent()
+        for cell in dependencies.cells:
+            if cell.owner is None:
+                edges.edge_without_owner_rows.append(cell.row)
+                edges.edge_without_owner_columns.append(cell.column)
+                continue
+            edges.edge_with_owner_rows.append(cell.row)
+            edges.edge_with_owner_columns.append(cell.column)
+            edges.internal_owner_id_for_edge.append(cell.owner)
+
+
+def rewriteRangeDependencies(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    owner: TableOwner,
+    added: Mapping[tuple[int, int], FormulaDependencies],
+    removed: list[tuple[int, int]],
+) -> list[int]:
+    """Record the rectangles and whole columns the formulas read, and drop the rest.
+
+    A range is kept twice, as `20-formula-shapes` keeps it: once on the owner as a
+    back dependency, and once in a tile per owner the ranges belong to. Whole
+    columns and whole rows are a third register, since they grow with the table.
+    """
+    dependencies = owner.dependencies
+    dropping = set(removed) | set(added)
+    backDependencies = [
+        entry for entry in dependencies.range_dependencies.back_dependency
+        if (entry.cell_coord_row, entry.cell_coord_column) not in dropping
+    ]
+    del dependencies.range_dependencies.back_dependency[:]
+    for entry in backDependencies:
+        dependencies.range_dependencies.back_dependency.add().CopyFrom(entry)
+    for (row, column), formula in added.items():
+        for extent in formula.ranges:
+            fresh = dependencies.range_dependencies.back_dependency.add(
+                cell_coord_row=row, cell_coord_column=column
+            )
+            fresh.internal_range_reference.owner_id = extent.owner
+            rangeAssign(fresh.internal_range_reference.range, extent)
+
+    for spanning, columns in (
+        (dependencies.spanning_column_dependencies, True),
+        (dependencies.spanning_row_dependencies, False),
+    ):
+        keptSpans = [
+            entry for entry in spanning.coord_refers_to_spans
+            if (entry.coordinate.row, entry.coordinate.column) not in dropping
+        ]
+        del spanning.coord_refers_to_spans[:]
+        for keptSpan in keptSpans:
+            spanning.coord_refers_to_spans.add().CopyFrom(keptSpan)
+        for (row, column), formula in added.items():
+            spans = [span for span in formula.spans if span.columns is columns]
+            if not spans:
+                continue
+            refers = spanning.coord_refers_to_spans.add()
+            refers.coordinate.row = row
+            refers.coordinate.column = column
+            for span in spans:
+                context = refers.ranges_by_table_context.add(
+                    owner_id=span.owner,
+                    range_context=tsce.SpanningDependenciesExpandedArchive.DEFAULT,
+                )
+                lines = context.ranges.add(extent_begin=span.begin)
+                if span.end != span.begin:
+                    lines.extent_end = span.end
+
+    return rewriteRangeTiles(index, registry, owner, added, removed)
+
+
+def rangeAssign(target: tsce.RangeCoordinateArchive, extent: RangeEdge) -> None:
+    """Set a range coordinate from a rectangle the engine was given."""
+    target.top_left_row = extent.top
+    target.top_left_column = extent.left
+    target.bottom_right_row = extent.bottom
+    target.bottom_right_column = extent.right
+
+
+def rewriteRangeTiles(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    owner: TableOwner,
+    added: Mapping[tuple[int, int], FormulaDependencies],
+    removed: list[tuple[int, int]],
+) -> list[int]:
+    """Keep the tiled copy of the range register in step, one tile per owner read.
+
+    Returns the tiles created, which the owner has to declare as its own.
+    """
+    references = owner.dependencies.tiled_range_dependencies.range_precedents_tile
+    tiles = {
+        reference.identifier: index.resolve(
+            reference, tsce.RangePrecedentsTileArchive
+        )
+        for reference in references
+    }
+    byOwner = {tile.to_owner_id: identifier for identifier, tile in tiles.items()}
+    wanted = {
+        extent.owner for formula in added.values() for extent in formula.ranges
+    }
+    created: set[int] = set()
+    for target in sorted(wanted - set(byOwner)):
+        identifier = registry.identifierAllocate()
+        tiles[identifier] = tsce.RangePrecedentsTileArchive(to_owner_id=target)
+        byOwner[target] = identifier
+        references.add(identifier=identifier)
+        created.add(identifier)
+
+    dropping = set(removed) | set(added)
+    componentId = registry.componentOf[owner.identifier]
+    for identifier, tile in tiles.items():
+        kept = [
+            entry for entry in tile.from_to_range
+            if (entry.from_coord.row, entry.from_coord.column) not in dropping
+        ]
+        fresh = [
+            (cell, extent)
+            for cell, formula in added.items()
+            for extent in formula.ranges
+            if byOwner.get(extent.owner) == identifier
+        ]
+        untouched = len(kept) == len(tile.from_to_range) and not fresh
+        if identifier not in created and untouched:
+            continue
+        del tile.from_to_range[:]
+        for entry in kept:
+            tile.from_to_range.add().CopyFrom(entry)
+        for (row, column), extent in fresh:
+            entry = tile.from_to_range.add()
+            entry.from_coord.row = row
+            entry.from_coord.column = column
+            entry.refers_to_rect.origin.row = extent.top
+            entry.refers_to_rect.origin.column = extent.left
+            entry.refers_to_rect.size.SetInParent()
+            if extent.bottom - extent.top + 1 != singleLine:
+                entry.refers_to_rect.size.num_rows = extent.bottom - extent.top + 1
+            if extent.right - extent.left + 1 != singleLine:
+                entry.refers_to_rect.size.num_columns = extent.right - extent.left + 1
+        if identifier in created:
+            info = tspArchive.ArchiveInfo(identifier=identifier)
+            message = info.message_infos.add(
+                type=rangePrecedentsTileTypeId, length=0
+            )
+            message.version.extend(rangePrecedentsTileVersion)
+            registry.archiveAdd(
+                componentId, archiveCreate(info, [tile.SerializeToString()])
+            )
+            continue
+        registry.componentMember(registry.componentOf[identifier]).messageReplace(
+            identifier, 0, tile.SerializeToString()
+        )
+    return sorted(created)
+
+
+def tileCovers(tile: tsce.CellRecordTileArchive, row: int, column: int) -> bool:
+    """Return whether a dependency tile's band holds a cell."""
+    band = range(tile.tile_column_begin, tile.tile_column_begin + dependencyTileColumns)
+    return column in band and row >= tile.tile_row_begin
 
 
 def registerFormulaCells(
     index: ArchiveIndex,
+    registry: PackageRegistry,
     owner: TableOwner,
-    added: list[tuple[int, int]],
+    added: Mapping[tuple[int, int], FormulaDependencies],
     removed: list[tuple[int, int]],
-) -> dict[int, bytes]:
-    """Tell the calculation engine which cells hold formulas now, and report a change.
+) -> None:
+    """Tell the calculation engine which cells hold formulas now, and what they read.
 
     **Not optional, and its absence fails silently.** Setting the record flag and
     pooling the archive leaves a formula that is never evaluated, and the register is
@@ -212,53 +432,74 @@ def registerFormulaCells(
     shows the formula in Numbers' formula bar while the cell keeps its old value.
     See findings-02-formulas.md, which records all three attempts.
 
-    Coordinates count from zero here. Returns the archives that changed, since the
-    tiles are not part of the owner entry.
+    An owner with no tile gains the one at column 0, which is the only tile creation
+    measured, in findings-10-creation.md. Coordinates count from zero here.
     """
     if not added and not removed:
-        return {}
+        return
+    references = owner.dependencies.tiled_cell_dependencies.cell_record_tiles
+    tiles = {
+        reference.identifier: index.resolve(reference, tsce.CellRecordTileArchive)
+        for reference in references
+    }
+    firstTile = not tiles and any(
+        column < dependencyTileColumns for _, column in added
+    )
+    uncovered = sorted(
+        (row, column) for row, column in added
+        if not (firstTile and column < dependencyTileColumns)
+        and not any(tileCovers(tile, row, column) for tile in tiles.values())
+    )
+    if uncovered:
+        raise WriteError(
+            f"No dependency tile covers {uncovered}, so a formula written there would "
+            "be registered in one of the engine's two registers and not the other. "
+            "Creating a tile beyond column 0 has never been measured."
+        )
+
+    componentId = registry.componentOf[owner.identifier]
+    createdTile: int | None = None
+    gained: list[int] = []
+    if firstTile:
+        createdTile = registry.identifierAllocate()
+        tiles[createdTile] = tsce.CellRecordTileArchive(
+            internal_owner_id=owner.dependencies.internal_formula_owner_id,
+            tile_column_begin=0,
+            tile_row_begin=0,
+        )
+        references.add(identifier=createdTile)
+        gained.append(createdTile)
+
     rewriteCellRecords(owner.dependencies.cell_dependencies.cell_record,
                        added, removed)
-    changed: dict[int, bytes] = {}
-    for reference in owner.dependencies.tiled_cell_dependencies.cell_record_tiles:
-        tile = index.resolve(reference, tsce.CellRecordTileArchive)
-        band = range(
-            tile.tile_column_begin,
-            tile.tile_column_begin + dependencyTileColumns,
-        )
-        inTile = [
-            (row, column) for row, column in added
-            if column in band and row >= tile.tile_row_begin
-        ]
-        outTile = [
-            (row, column) for row, column in removed
-            if column in band and row >= tile.tile_row_begin
-        ]
-        if not inTile and not outTile:
+    gained.extend(rewriteRangeDependencies(index, registry, owner, added, removed))
+    ownerReferences: list[int] | None = None
+    if gained:
+        ownerReferences = registry.strongReferencesOf(owner.identifier)
+        ownerReferences.extend(gained)
+    for identifier, tile in tiles.items():
+        inTile = {
+            cell: dependencies for cell, dependencies in added.items()
+            if tileCovers(tile, *cell)
+        }
+        outTile = [cell for cell in removed if tileCovers(tile, *cell)]
+        if identifier != createdTile and not inTile and not outTile:
             continue
         rewriteCellRecords(tile.cell_records, inTile, outTile)
-        changed[reference.identifier] = tile.SerializeToString()
-
-    placed = {
-        (row, column)
-        for reference in owner.dependencies.tiled_cell_dependencies.cell_record_tiles
-        for row, column in added
-        if column
-        in range(
-            index.resolve(reference, tsce.CellRecordTileArchive).tile_column_begin,
-            index.resolve(reference, tsce.CellRecordTileArchive).tile_column_begin
-            + dependencyTileColumns,
+        if identifier == createdTile:
+            info = tspArchive.ArchiveInfo(identifier=identifier)
+            message = info.message_infos.add(type=cellRecordTileTypeId, length=0)
+            message.version.extend(cellRecordTileVersion)
+            registry.archiveAdd(
+                componentId, archiveCreate(info, [tile.SerializeToString()])
+            )
+            continue
+        registry.componentMember(registry.componentOf[identifier]).messageReplace(
+            identifier, 0, tile.SerializeToString()
         )
-    }
-    missing = sorted(set(added) - placed)
-    if missing:
-        raise WriteError(
-            f"No dependency tile covers {missing}, so a formula written there would "
-            "be registered in one of the engine's two registers and not the other. "
-            "Creating a tile has never been measured."
-        )
-    changed[owner.identifier] = owner.dependencies.SerializeToString()
-    return changed
+    registry.componentMember(componentId).messageReplace(
+        owner.identifier, 0, owner.dependencies.SerializeToString(), ownerReferences
+    )
 
 
 def buildDirtySet(

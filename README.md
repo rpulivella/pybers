@@ -1,7 +1,5 @@
 # pybers
 
-[![preflight](https://github.com/rpulivella/pybers/actions/workflows/preflight.yml/badge.svg?branch=develop)](https://github.com/rpulivella/pybers/actions/workflows/preflight.yml)
-
 A round-trip-tested Python library for reading and writing Apple Numbers documents, built in deep respect for Apple Numbers itself. The goal is for editing a `.numbers` file programmatically to be as reliable as editing it by hand.
 
 > **Status: early, and narrow.** A real `.numbers` file opens, its cells read, numbers > and merges can be changed, and the file saves back so that Numbers opens it showing > the result with nothing else altered. Writing text, writing formulas, styles, and > inserting or deleting rows and columns are not built. See > [What works today](#what-works-today) for the honest line between finished and not.

@@ -71,6 +71,7 @@ archiveTypes: dict[int, type[Message]] = {
     4004: tsce.TrackedReferenceStoreArchive,  # the references a sort rule tracks
     4008: tsce.FormulaOwnerDependenciesArchive,  # one owner's dependencies
     4009: tsce.CellRecordTileArchive,       # which cells of a tile hold formulas
+    4010: tsce.RangePrecedentsTileArchive,  # the ranges those cells read
     4011: tsce.ReferencesToDirtyArchive,     # cells to recalculate on next open
     6000: tst.TableInfoArchive,     # the drawable that wraps a table
     6001: tst.TableModelArchive,    # the table proper: geometry, stores, merges

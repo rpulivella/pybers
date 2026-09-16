@@ -142,6 +142,17 @@ def identityValue(identity: str) -> int:
     return words[0] | words[1] << 32 | words[2] << 64 | words[3] << 96
 
 
+def identityText(identity: str) -> str:
+    """Return the canonical UUID a table's `table_id` spells its identity as.
+
+    **`table_id` is how Numbers finds a table's calculation-engine owners.** A table
+    carrying any other value is re-identified on open: Numbers mints a fresh owner
+    family, drops every dependency tile, and the formulas in it are never evaluated.
+    Measured 2026-09-16 for PYB-86, see findings-10-creation.md.
+    """
+    return str(uuid.UUID(bytes=identityValue(identity).to_bytes(16, "little"))).upper()
+
+
 @dataclass(slots=True)
 class UuidRenewal:
     """Renews every UUID in a template set: owner UUIDs from a base, others fresh."""
@@ -450,7 +461,10 @@ def headerSlotAdd(state: EngineState, base: int) -> None:
         state.headerTile.cell_records,
     ):
         record = records.add(column=slot, row=1)
-        record.expanded_edges.SetInParent()
+        # Every slot Numbers writes depends on the owner's own first cell, and a
+        # slot without that edge is a table Numbers re-identifies on open.
+        record.expanded_edges.edge_without_owner_rows.append(0)
+        record.expanded_edges.edge_without_owner_columns.append(0)
 
 
 def tableBottom(index: ArchiveIndex, info: tst.TableInfoArchive) -> float:
@@ -558,7 +572,7 @@ def tableShape(copies: TemplateCopies, table: Table, origin: Position) -> None:
     model.number_of_columns = table.colCount
     model.default_row_height = resetRowHeight
     model.default_column_width = resetColumnWidth
-    model.table_id = str(uuid.uuid4()).upper()
+    model.table_id = identityText(table.identifier)
     sidecar.row_count = table.rowCount
     sidecar.column_count = table.colCount
     uidsAssign(uids, table.rowCount, table.colCount)

@@ -89,7 +89,9 @@ perform yourself, and the report says so rather than implying the machine did it
    and is never a finding. `/pr-merge` is where it becomes a refusal.
 7. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
-8. **Only on green gates with no unresolved finding**, promote it:
+8. **Only on green gates with no unresolved finding**, check `I performed a self-review`
+   in the body, because this review stands in for that human check, through the
+   mechanism `/pr-draft edit <N>` owns. Then promote it:
    `python3 scripts/pr.py ready <N>`. Until PYB-3 lands, "green gates" means the two
    commands above run clean, and the report says that is what was run.
 
