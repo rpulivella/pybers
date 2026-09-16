@@ -9,8 +9,8 @@ on:
     # `ready_for_review` fires this the moment a pull request leaves draft, so a
     # branch is covered without any draft run.
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [develop]
+  # No push to develop: a pull request merges only once this is green, so a run
+  # after the merge could only report what is already known.
 
 # Pushing three commits in a row cancels the two superseded runs.
 concurrency:
@@ -24,7 +24,7 @@ jobs:
   preflight:
     # A draft skips rather than runs: the same preflight already ran on the
     # developer's machine, a draft cannot merge, and a skipped job costs nothing.
-    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     # A run measures in single-digit minutes, and the runner default of 360 would
     # put one hung job past a third of a free plan's monthly allowance.
@@ -54,9 +54,14 @@ jobs:
         if: always()
         run: |
           {
-            echo "### preflight, Python $(python -V | cut -d' ' -f2)"
+            echo "### Preflight · Python $(python -V | cut -d' ' -f2)"
             echo
-            echo '```'
-            grep -E '^(PASS|FAIL) [^ ]+  ' "$RUNNER_TEMP/preflight.log" || echo 'The preflight produced no gate lines.'
-            echo '```'
+            echo '| Gate | Result |'
+            echo '| --- | --- |'
+            gates=$(grep -E '^(PASS|FAIL) [^ ]+  ' "$RUNNER_TEMP/preflight.log" || true)
+            if [ -z "$gates" ]; then
+              echo '| none | ❌ the preflight printed no gate lines |'
+            else
+              echo "$gates" | sed -E 's/^PASS ([^ ]+)  (.*)$/| \1 | ✅ \2 |/; s/^FAIL ([^ ]+)  (.*)$/| \1 | ❌ \2 |/'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
