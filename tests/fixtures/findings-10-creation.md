@@ -152,5 +152,50 @@ and reports 0.34 in. `52-table-reset-styled` stored the same 24.43 as its fittin
 roughly 0.93 pt beyond 23.5 is Numbers' text layout rather than rounding. Whether a cell
 border adds to the fit was unmeasured as of 2026-09-14, and belongs to PYB-87.
 
-A formula written into a created table is refused, because the table's owner holds no
-dependency tile and Numbers creating one has not been measured. That is PYB-86.
+## The first formula in a table
+
+`48` → `55-table-inserted-formula` types `2` into `A1` and `=A1*3` into `B1` of the
+inserted table, whose owner of kind 1 held no dependency tile. Measured for PYB-86 on
+2026-09-15.
+
+**Numbers creates the tile.** One `TSCE.CellRecordTileArchive` joins
+`CalculationEngine.iwa`, in the component already holding the owner, so no external
+reference changes. It carries the owner's `internal_owner_id`, begins at column 0 and
+row 0, and holds the same cell record as the owner's `cell_dependencies`. The owner lists
+it in `tiled_cell_dependencies` and names it as a strong object reference.
+
+**The record carries the precedent as an edge.** `B1`'s record holds
+`edge_without_owner_rows: 0` and `edge_without_owner_columns: 0`, naming `A1`. pybers
+writes an empty edge set, as it does for every formula. Whether Numbers then recalculates
+`B1` when `A1` is edited is what the golden `20-formulas-in-created-tables` settles.
+
+## `table_id` is the table's identity, and the engine is reached through it
+
+**`TableModelArchive.table_id` is the table's formula-owner identity, spelled as a
+canonical uppercase UUID.** It matches in every table of every fixture: the identity's
+four words, each written low byte first, are the UUID's sixteen bytes. pybers wrote a
+fresh unrelated UUID there until 2026-09-16, and the cost was the whole calculation
+engine registration.
+
+Numbers opens such a document without a prompt, then **re-identifies the table**: it mints
+a fresh owner base, creates new owners of kind 1, 6 and 8, rewrites the group-by and
+tracked-reference UUIDs to that base, and drops every dependency tile, leaving pybers'
+owners registered and inert. Nothing warns. A formula in the table is never evaluated and
+shows a warning triangle with no message, a reference to the table from elsewhere reads
+`The formula contains an invalid reference`, and re-entering the formula by hand makes
+that one cell compute.
+
+Measured for PYB-86 by bisection: a created table holding no formula is repaired the same
+way, a formula pybers writes into a table Numbers made evaluates correctly, and the repair
+is indifferent to the pybers reset styles, to row height and column width, and to the
+table title. Everything else about a created table already matched a Numbers-inserted one,
+archive for archive.
+
+Two consequences follow. A table identity is a **version 4 UUID in file byte order**,
+which is what `table_id` spells, and every identity in the fixtures reads as one. The
+header name manager's slot record for a table carries an **edge on cell (0, 0)**, as every
+slot Numbers writes does. Neither was the cause, and both are now what pybers writes.
+
+The same save raises `number_of_formulas` from 7 to 8 and drops `owner_id_map` entry 34,
+which no owner archive names. `49` and `50` drop it too, so it is a leftover Numbers culls
+on any save rather than part of the edit.

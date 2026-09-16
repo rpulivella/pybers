@@ -231,6 +231,35 @@ the half that looked confirmed was passing by luck.
 `40-table-bands` is the only fixture with more than one tile: eight of them, at columns
 0, 32, 64, 96, 128, 160, 192 and 224.
 
+### A registered formula still has to say what it reads, or it computes once
+
+Measured 2026-09-16 for PYB-86, and found the same way: a golden opened twice gave two
+answers. `SUM(A1:B1)` read 8 on the first open and `Cell "B1" contains an error` on the
+second, because Numbers evaluates in an order of its own and a formula reading a cell
+computed later caches whatever that cell still held. Nothing warns, and the second
+answer survives every reselection.
+
+**The engine stores what each formula reads, in three registers, each kept twice.**
+
+```
+a cell       expanded_edges on the formula's own record, in BOTH copies of the
+             register above: edge_without_owner_rows/columns inside the table,
+             edge_with_owner_* plus internal_owner_id_for_edge across tables
+a rectangle  range_dependencies.back_dependency on the owner, and a
+             RangePrecedentsTileArchive (type 4010) per owner the ranges belong
+             to, referenced from tiled_range_dependencies
+whole lines  spanning_column_dependencies.coord_refers_to_spans, or the row
+             counterpart, which is where `SUM(A)` lands rather than in a rectangle
+```
+
+Coordinates are absolute and count from zero, never the offsets the formula itself
+stores. A call naming one range twice, as `SUMIFS` does in `20-formula-shapes`, is one
+entry. A rectangle of one line omits that axis of its size, as the default is 1.
+
+The check that settles it: strip the eight formulas of `20-formula-shapes` and write
+them back with pybers. All three registers, and the range tile, come back identical to
+what Numbers wrote. `tests/test_table_formula.py` holds that as a test.
+
 ### Broken references, unknown functions, and what errors do NOT store
 
 From `21-formula-errors`.
