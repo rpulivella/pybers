@@ -256,6 +256,11 @@ Coordinates are absolute and count from zero, never the offsets the formula itse
 stores. A call naming one range twice, as `SUMIFS` does in `20-formula-shapes`, is one
 entry. A rectangle of one line omits that axis of its size, as the default is 1.
 
+**A formula swapped for another has to re-declare what it reads**, which is a third
+state beside attaching and detaching one. Confirmed 2026-09-16 in
+`20-formula-precedent-replaced`: a cell moved from `=A1*3` to `=A2*3` follows `A2` and
+ignores `A1`, where the register left alone had it the other way round.
+
 The check that settles it: strip the eight formulas of `20-formula-shapes` and write
 them back with pybers. All three registers, and the range tile, come back identical to
 what Numbers wrote. `tests/test_table_formula.py` holds that as a test.
