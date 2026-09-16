@@ -40,11 +40,18 @@ import tempfile
 from pathlib import Path
 
 from .._engine import (
+    CellEdge,
+    FormulaDependencies,
+    RangeEdge,
+    SpanEdge,
+    TableOwner,
     calculationEngine,
     ownerEntryFor,
     registerFormulaCells,
     requestRecalculation,
+    tableIdentities,
     tableOwnerEntries,
+    tableOwnerIds,
 )
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSTArchives_pb2 as tst
@@ -60,11 +67,81 @@ from .._persistence.index import (
     tableInfoTypeId,
 )
 from ..errors import WriteError
+from ..formula.precedents import formulaPrecedents
 from ..table._create import tablesCreate
 from ..table._write import applyMerges, applyTableEdits, mergesAdded
 from ..table.cells import Table
 from ._create import sheetsCreate
 from .sheets import Document, Sheet
+
+
+def formulaDependencies(
+    table: Table,
+    entry: TableOwner,
+    added: list[tuple[int, int]],
+    ownerIds: dict[str, int],
+) -> dict[tuple[int, int], FormulaDependencies]:
+    """Return what each newly attached formula reads, in the engine's own terms.
+
+    The formula says which table by identity and where by offset; the engine wants
+    an internal owner id and an absolute coordinate, so this is where the two meet.
+    """
+    host = entry.dependencies.internal_formula_owner_id
+
+    def owner(identity: str | None) -> int:
+        if identity is None:
+            return host
+        found = ownerIds.get(identity)
+        if found is None:
+            raise WriteError(
+                f"A formula in {table.name!r} reads table {identity}, which this "
+                "document's calculation engine does not register, so what the "
+                "formula depends on cannot be recorded."
+            )
+        return found
+
+    dependencies: dict[tuple[int, int], FormulaDependencies] = {}
+    for row, column in added:
+        cell = table.cell(row=row + originOffset, col=column + originOffset)
+        if cell.formula is None:
+            raise WriteError(
+                f"{table.name!r} reports a formula at row {row + originOffset}, "
+                f"column {column + originOffset} that the model does not hold."
+            )
+        reads = formulaPrecedents(cell.formula, cell.reference)
+        dependencies[(row, column)] = FormulaDependencies(
+            cells=tuple(
+                CellEdge(
+                    row=precedent.row,
+                    column=precedent.column,
+                    owner=(
+                        None if precedent.tableId is None
+                        else owner(precedent.tableId)
+                    ),
+                )
+                for precedent in reads.cells
+            ),
+            ranges=tuple(
+                RangeEdge(
+                    top=extent.top,
+                    left=extent.left,
+                    bottom=extent.bottom,
+                    right=extent.right,
+                    owner=owner(extent.tableId),
+                )
+                for extent in reads.ranges
+            ),
+            spans=tuple(
+                SpanEdge(
+                    begin=span.begin,
+                    end=span.end,
+                    columns=span.columns,
+                    owner=owner(span.tableId),
+                )
+                for span in reads.spans
+            ),
+        )
+    return dependencies
 
 
 def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
@@ -85,7 +162,16 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     }
     root = findRoot(index)
     written: dict[int, list[tuple[int, int]]] = {}
-    entries = tableOwnerEntries(index, calculationEngine(index))
+    engine = calculationEngine(index)
+    entries = tableOwnerEntries(index, engine)
+    # A formula names the table it reads by identity, and the engine by internal
+    # owner id, so declaring what a formula reads needs both halves in hand.
+    internalIds = tableOwnerIds(index, engine)
+    ownerIds = {
+        identity: internalIds[identifier]
+        for identifier, identity in tableIdentities(index).items()
+        if identifier in internalIds
+    }
 
     # Strict, because `sheetsCreate` has made the two lists one list, and a plain
     # `zip` would stop at the shorter side in silence if that ever stopped holding.
@@ -127,11 +213,14 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 )
             # The engine's register of formula-bearing cells, which is a separate
             # fact from a cell having moved and is what makes a newly attached
-            # formula evaluate at all.
-            for identifier, body in registerFormulaCells(
-                index, entry, edits.formulaAdded, edits.formulaRemoved
-            ).items():
-                owners[identifier].messageReplace(identifier, 0, body)
+            # formula evaluate at all, and recompute afterward.
+            registerFormulaCells(
+                index,
+                registry,
+                entry,
+                formulaDependencies(table, entry, edits.formulaAdded, ownerIds),
+                edits.formulaRemoved,
+            )
             if edits.written or moved:
                 written[tableReference.identifier] = (
                     edits.written + sorted(moved)
