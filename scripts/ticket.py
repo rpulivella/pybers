@@ -871,6 +871,26 @@ def closeTicket(token: str, number: int, reason: str) -> None:
     )
 
 
+def reopenTicket(token: str, number: int) -> None:
+    """Reopen an issue a merge closed, for a ticket more than one pull request carries.
+
+    The closing keyword is what links a pull request to its ticket, so the link is
+    worth the close even when the work continues. Reopening is the correction, and
+    the caller restores the Status the board moved.
+    """
+    url = f"{restRoot}/repos/{repositoryOwner}/{repositoryName}/issues/{number}"
+    requestJson(url, token, method="PATCH", payload={"state": "open"})
+
+
+def moveTicketStatus(token: str, number: int, status: str) -> None:
+    """Set one ticket's board Status, for a caller that is not the status command."""
+    coordinates = readBoardCoordinates(token)
+    itemId = findBoardItem(token, coordinates, number)
+    if itemId is None:
+        raise RuntimeError(f"Issue #{number} is not on the board.")
+    setBoardStatus(token, coordinates, itemId, status)
+
+
 def assignTicket(token: str, number: int, assignee: str) -> None:
     """Assign an issue. Assignment marks the moment work actually begins."""
     url = (
