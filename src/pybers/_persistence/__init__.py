@@ -60,8 +60,8 @@ from .iwa import (
     ArchiveMessage,
     IWAError,
     IWAFile,
-    archiveCreate,
     compressPayload,
+    createArchive,
     decompressPayload,
     readArchives,
     readIWAFile,
@@ -76,7 +76,7 @@ from .varint import VarintError, readVarint, writeVarint
 __all__ = [
     "carriesFormula",
     "Archive",
-    "archiveCreate",
+    "createArchive",
     "MetadataError",
     "PackageRegistry",
     "memberNameFor",

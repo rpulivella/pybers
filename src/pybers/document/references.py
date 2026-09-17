@@ -156,7 +156,7 @@ def targetFor(
     return target
 
 
-def referencesIterate(document: Document) -> Iterator[ReferenceLocation]:
+def iterateReferences(document: Document) -> Iterator[ReferenceLocation]:
     """Yield a location for every reference and every range in every formula."""
     tables = tablesByIdentity(document)
     for sheet, table, cell in document.cellsIterate():
@@ -174,7 +174,7 @@ def referencesIterate(document: Document) -> Iterator[ReferenceLocation]:
 
 __all__ = [
     "ReferenceLocation",
-    "referencesIterate",
+    "iterateReferences",
     "tablesByIdentity",
     "targetFor",
 ]

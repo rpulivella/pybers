@@ -30,10 +30,10 @@ from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import NumbersPackage, archiveCreate
+from .._persistence import NumbersPackage, createArchive
 from .._persistence.index import ArchiveIndex, documentTypeId, findRoot
 from .._persistence.metadata import PackageRegistry, documentComponentId
-from .._persistence.template import ArchiveTemplate, templatesCopy, templatesRead
+from .._persistence.template import ArchiveTemplate, copyTemplates, readTemplates
 from ..errors import WriteError
 from .sheets import Document, Sheet
 
@@ -62,7 +62,7 @@ uuidRoles: tuple[str, ...] = (
 )
 
 
-def uuidFresh() -> tsp.UUID:
+def generateUuid() -> tsp.UUID:
     """Return a random UUID in the two-halves form the file stores."""
     value = uuid.uuid4().int
     return tsp.UUID(lower=value & 0xFFFFFFFFFFFFFFFF, upper=value >> 64)
@@ -94,7 +94,7 @@ def sheetBindings(index: ArchiveIndex, root: tn.DocumentArchive) -> dict[int, in
     }
 
 
-def sheetCreate(
+def createSheet(
     index: ArchiveIndex,
     registry: PackageRegistry,
     templates: list[ArchiveTemplate],
@@ -102,7 +102,7 @@ def sheetCreate(
     bindings: dict[int, int],
 ) -> int:
     """Create one sheet's archives and return the sheet's identifier."""
-    copies = templatesCopy(registry, templates, bindings)
+    copies = copyTemplates(registry, templates, bindings)
     body = copies["sheet"].body
     if not isinstance(body, tn.SheetArchive):
         raise WriteError("The sheet template does not hold a TN.SheetArchive.")
@@ -110,12 +110,12 @@ def sheetCreate(
     copies.place(registry, {"Document": documentComponentId})
     for role in uuidRoles:
         registry.objectUuidAdd(
-            documentComponentId, copies[role].identifier, uuidFresh()
+            documentComponentId, copies[role].identifier, generateUuid()
         )
     return copies["sheet"].identifier
 
 
-def sidebarNodeCreate(registry: PackageRegistry, sheetIdentifier: int) -> int:
+def createSidebarNode(registry: PackageRegistry, sheetIdentifier: int) -> int:
     """Create the sidebar tree entry for a sheet, and return its identifier."""
     identifier = registry.identifierAllocate()
     info = tspArchive.ArchiveInfo(identifier=identifier)
@@ -125,12 +125,12 @@ def sidebarNodeCreate(registry: PackageRegistry, sheetIdentifier: int) -> int:
     node = tsk.TreeNode()
     node.object.identifier = sheetIdentifier
     registry.archiveAdd(
-        documentComponentId, archiveCreate(info, [node.SerializeToString()])
+        documentComponentId, createArchive(info, [node.SerializeToString()])
     )
     return identifier
 
 
-def sheetsCreate(
+def createSheets(
     document: Document, package: NumbersPackage, registry: PackageRegistry
 ) -> None:
     """Create every sheet the model gained, and list each where the model has it.
@@ -153,7 +153,7 @@ def sheetsCreate(
     created = [sheet for sheet in document.sheets if sheet._identifier is None]
     if not created:
         return
-    templates = templatesRead(sheetTemplateDirectory)
+    templates = readTemplates(sheetTemplateDirectory)
     bindings = sheetBindings(index, root)
     sidebar = index.resolve(root.sidebar_order, tsk.TreeNode)
     nodes = list(sidebar.children)
@@ -167,8 +167,8 @@ def sheetsCreate(
             "cannot be placed in it without disturbing what else it lists."
         )
     for sheet in created:
-        identifier = sheetCreate(index, registry, templates, sheet, bindings)
-        nodeFor[identifier] = sidebarNodeCreate(registry, identifier)
+        identifier = createSheet(index, registry, templates, sheet, bindings)
+        nodeFor[identifier] = createSidebarNode(registry, identifier)
         sheet._identifier = identifier
 
     order: list[int] = []
@@ -199,4 +199,4 @@ def sheetsCreate(
     )
 
 
-__all__ = ["sheetsCreate"]
+__all__ = ["createSheets"]

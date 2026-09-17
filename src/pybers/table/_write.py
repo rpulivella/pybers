@@ -16,6 +16,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-16  A record carries the chosen-format bit its cell holds, so literal
+            text opens as Text, for PYB-83.
 2026-09-16  A formula swapped for another is reported as added, so the engine
             hears what the cell reads now, for PYB-86.
 2026-09-15  A merge releases the formulas, rich text, strings and styles of the
@@ -56,7 +58,10 @@ from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, decodeRecord, decodeRow, offsetUnitFor
 from .._persistence.cells import (
     CellRecord,
+    carriesChosenFormat,
     carriesFormula,
+    chosenFormatBit,
+    chosenFormatOffset,
     emptyOffset,
     formulaKeySlot,
     offsetWidth,
@@ -205,6 +210,16 @@ def writtenRecord(
     )
 
 
+def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:
+    """Return a record carrying the chosen-format bit its cell holds."""
+    header = bytearray(raw[:valueOffset])
+    if cell.formatChosen:
+        header[chosenFormatOffset] |= chosenFormatBit
+    else:
+        header[chosenFormatOffset] &= ~chosenFormatBit
+    return bytes(header) + raw[valueOffset:]
+
+
 def patchRecord(record: CellRecord, value: Decimal) -> bytes:
     """Return one cell record with its number replaced and everything else kept.
 
@@ -345,12 +360,6 @@ def kindOf(slot: tuple[int, int]) -> int:
     """Return the kind `displayedKindSlot` stores for one per-kind format slot."""
     return countedFormatSlots.index(slot) + 1
 
-# Byte 6's high bit marks a format a person chose rather than one Numbers decided.
-# 108 text records carry it against 4515 that do not, and the Data Format inspector
-# reads `Text` with it and `Automatic` without, which is what typing into Numbers
-# produces. Measured 2026-09-14 from a golden that inherited one.
-chosenFormatBit: int = 0x80
-
 # A format entry states its own kind. `260` carries nothing else, so a text format
 # can be created for a table that has never held any.
 numberFormatType: int = 256
@@ -390,7 +399,7 @@ def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
     """Return a key naming a format of this kind, creating one when there is none.
 
     A `260` entry carries nothing but its kind, so creating one states no more than
-    the documents do. Counts nothing: `formatReferencesMove` counts the record that
+    the documents do. Counts nothing: `moveFormatReferences` counts the record that
     names the key, so looking a format up once for many cells counts every cell.
 
     **Takes the resolved list rather than resolving one.** `ArchiveIndex.resolve`
@@ -424,7 +433,7 @@ def formatClaims(raw: bytes) -> Counter[int]:
     )
 
 
-def formatReferencesMove(
+def moveFormatReferences(
     dataList: tst.TableDataList, before: bytes | None, after: bytes | None, where: str
 ) -> set[int]:
     """Move refcounts from the formats a record named to those it names now.
@@ -522,7 +531,7 @@ def richTextClaims(record: CellRecord) -> Iterable[int]:
     return ()
 
 
-def entriesRelease(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
+def releaseEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
     """Release one reference per key given, and say whether any count moved."""
     named = Counter(keys)
     moved = False
@@ -568,7 +577,7 @@ def templateRecord(
     return None
 
 
-def recordFresh(
+def buildFreshRecord(
     column: int, typeByte: int, formatFor: Callable[[int], int | None]
 ) -> CellRecord:
     """Return Numbers' plain-number record for a table holding no record to copy.
@@ -709,7 +718,7 @@ def rowsNeedingStorage(
     return sorted(wanted)
 
 
-def rowStorageCreate(tile: tst.Tile, tileRowIndex: int) -> tst.TileRowInfo:
+def createRowStorage(tile: tst.Tile, tileRowIndex: int) -> tst.TileRowInfo:
     """Add an empty row to a tile, shaped like the rows already in it.
 
     The offset array's length is copied from a sibling rather than computed: a
@@ -906,7 +915,7 @@ def applyTableEdits(
         """Move the format refcounts one written or removed record changed."""
         if formatList is not None:
             formatsMoved.update(
-                formatReferencesMove(formatList, before, after, str(where))
+                moveFormatReferences(formatList, before, after, str(where))
             )
 
     written: list[tuple[int, int]] = []
@@ -960,7 +969,7 @@ def applyTableEdits(
                         "Numbers' first row for more than 255 columns has not been "
                         "measured, so it is not written."
                     )
-                rowStorageCreate(tile, missing - firstRow)
+                createRowStorage(tile, missing - firstRow)
                 createdRows.add(missing)
                 touched = True
 
@@ -985,9 +994,9 @@ def applyTableEdits(
                         for key in stringClaims(record):
                             textPool.release(key)
                     if styleList is not None:
-                        stylesMoved |= entriesRelease(styleList, styleClaims(record))
+                        stylesMoved |= releaseEntries(styleList, styleClaims(record))
                     if richTextList is not None:
-                        richTextMoved |= entriesRelease(
+                        richTextMoved |= releaseEntries(
                             richTextList, richTextClaims(record)
                         )
                     if pool is not None and carriesFormula(record):
@@ -999,7 +1008,8 @@ def applyTableEdits(
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
                 edit = formulaEdit(cell.formula, record, pool)
-                if not valueChanged and edit == "none":
+                chosenChanged = cell.formatChosen != carriesChosenFormat(record)
+                if not valueChanged and edit == "none" and not chosenChanged:
                     continue
                 patched = record.raw
                 # The value first, so that writing a value OVER a formula still
@@ -1016,7 +1026,7 @@ def applyTableEdits(
                         formulaAdded.append((row, record.column))
                     elif edit == "detach":
                         formulaRemoved.append((row, record.column))
-                replacements[record.column] = patched
+                replacements[record.column] = applyChosenFormat(patched, cell)
             present = frozenset(
                 record.column
                 for record in decodeRow(
@@ -1036,8 +1046,8 @@ def applyTableEdits(
                     if cell is None:
                         continue
                     if cell.formula is not None:
-                        replacements[column] = buildFormulaRecord(
-                            pool.keyFor(cell.formula)
+                        replacements[column] = applyChosenFormat(
+                            buildFormulaRecord(pool.keyFor(cell.formula)), cell
                         )
                         formulaAdded.append((row, column))
                         continue
@@ -1052,9 +1062,12 @@ def applyTableEdits(
                     )
                     shape = templateRecord(index, store, wanted)
                     if shape is None:
-                        shape = recordFresh(column, wanted, formatFor)
-                    replacements[column] = writtenRecord(
-                        cell, shape, textPool, borrowed=True, formatFor=formatFor
+                        shape = buildFreshRecord(column, wanted, formatFor)
+                    replacements[column] = applyChosenFormat(
+                        writtenRecord(
+                            cell, shape, textPool, borrowed=True, formatFor=formatFor
+                        ),
+                        cell,
                     )
                     formatsCount(None, replacements[column], reference)
             dropped = removals & present

@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-09-16  A cell reads whether its format was chosen, for PYB-83.
 2026-09-08  Split out of `pybers.document._read` for #58, unchanged.
 """
 from __future__ import annotations
@@ -37,7 +38,7 @@ from typing import cast
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import CellDecodeError, decodeRow, offsetUnitFor
-from .._persistence.cells import CellRecord
+from .._persistence.cells import CellRecord, carriesChosenFormat
 from .._persistence.index import (
     ArchiveIndex,
     originOffset,
@@ -198,6 +199,7 @@ def readTable(
                 # guarantee depends on the other holding.
                 cell.formula = resolveFormula(record, formulas)
                 cell.errored = record.typeByte == formulaErrorType
+                cell._formatChosen = carriesChosenFormat(record)
     return table
 
 

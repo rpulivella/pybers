@@ -20,6 +20,7 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-09-16  Byte 6's chosen-format bit moved here from the writer, for PYB-83.
 2026-09-10  The formula key's position is computed from the attributes a
             cell carries, for #65. Reading a fixed slot lost 416 formulas in
             one real document. See findings-09-cell-records.md.
@@ -78,6 +79,12 @@ valueOffset: int = 12
 # so a dragged formula and a merge both reuse one entry across several cells.
 formulaFlagOffset: int = 9
 formulaFlagBit: int = 0x02
+
+# Byte 6's high bit marks a format a person chose rather than one Numbers decided.
+# 108 text records carry it against 4515 that do not, and the Data Format inspector
+# reads `Text` with it and `Automatic` without. See findings-01-values.md.
+chosenFormatOffset: int = 6
+chosenFormatBit: int = 0x80
 
 
 class CellDecodeError(PybersError, RuntimeError):
@@ -206,6 +213,14 @@ def carriesFormula(record: CellRecord) -> bool:
     return (
         len(record.raw) > formulaFlagOffset
         and bool(record.raw[formulaFlagOffset] & formulaFlagBit)
+    )
+
+
+def carriesChosenFormat(record: CellRecord) -> bool:
+    """Report whether a cell record displays with a format a person chose."""
+    return (
+        len(record.raw) > chosenFormatOffset
+        and bool(record.raw[chosenFormatOffset] & chosenFormatBit)
     )
 
 
