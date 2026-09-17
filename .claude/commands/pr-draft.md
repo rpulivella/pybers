@@ -18,6 +18,9 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    line for this work, run `/changelog-add` and commit it. Then push (`git push`). The
    entry is `- [PYB-<N>] <title>` for ticketed work; `/changelog-add` also handles the
    ticketless case with `[init]` or `[hotfix]`, and a bare bullet is never correct.
+
+   A golden row this branch confirms records the Numbers version, never asked for:
+   `mdls -raw -name kMDItemVersion "$(mdfind 'kMDItemCFBundleIdentifier == com.apple.Numbers' | head -1)"`
 4. Fetch the issue. The title is used **verbatim** in step 5, so read it verbatim:
    - `python3 scripts/ticket.py export-as-source <N> --title` for the title.
    - `python3 scripts/ticket.py show <N>` for the ACs, which you are reading, not copying.
