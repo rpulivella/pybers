@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-16  A cell holds text Numbers will not interpret, and says whether its
+            format was chosen rather than decided (PYB-83).
 2026-09-15  A fresh table identity is a version 4 UUID in file byte order (PYB-86).
 2026-09-14  A table walks its declared grid, a cell is reached by row and column,
             and a cell says which merge it anchors (PYB-62). A merge drops the
@@ -53,6 +55,7 @@ from pybers.addressing.reference import (
     firstRow,
     toCellReference,
 )
+from pybers.errors import WriteError
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
@@ -205,6 +208,9 @@ class Cell:
     formula: Formula | None = None
     errored: bool = False
     style: Style = field(default_factory=Style)
+    # Read from the record and set only by `textLiteralSet`, so the model never holds
+    # a chosen format beside something no document has been measured carrying one on.
+    _formatChosen: bool = field(default=False, kw_only=True)
     # The table this belongs to, so that reading or writing a formula as text needs
     # neither the cell's own address nor the names of the other tables passed in.
     # Excluded from equality and `repr` for the reason `Document._package` is: it is
@@ -243,6 +249,30 @@ class Cell:
             text, self.reference, tables=self.tableNames, pieces=pieces
         )
         return self.formula
+
+    @property
+    def formatChosen(self) -> bool:
+        """Whether Numbers shows a chosen Data Format here rather than Automatic."""
+        return self._formatChosen
+
+    def textLiteralSet(self, text: str) -> None:
+        """Hold text Numbers will not interpret, as a cell formatted Text before typing.
+
+        `=SUM(A1:A5)` then stays that text when somebody edits the cell. Refused on a
+        cell holding a formula, which this would discard.
+        """
+        if not isinstance(text, str):
+            raise WriteError(
+                f"{self.reference} holds literal text, and was given "
+                f"{type(text).__name__}."
+            )
+        if self.formula is not None:
+            raise WriteError(
+                f"{self.reference} is backed by a formula, so holding literal text "
+                "would discard it. Clear the formula first."
+            )
+        self.value = text
+        self._formatChosen = True
 
     @property
     def tableNames(self) -> Mapping[str, str]:

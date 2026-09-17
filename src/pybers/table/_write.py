@@ -16,6 +16,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-16  A record carries the chosen-format bit its cell holds, so literal
+            text opens as Text, for PYB-83.
 2026-09-16  A formula swapped for another is reported as added, so the engine
             hears what the cell reads now, for PYB-86.
 2026-09-15  A merge releases the formulas, rich text, strings and styles of the
@@ -56,7 +58,10 @@ from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, decodeRecord, decodeRow, offsetUnitFor
 from .._persistence.cells import (
     CellRecord,
+    carriesChosenFormat,
     carriesFormula,
+    chosenFormatBit,
+    chosenFormatOffset,
     emptyOffset,
     formulaKeySlot,
     offsetWidth,
@@ -205,6 +210,16 @@ def writtenRecord(
     )
 
 
+def chosenFormatApply(raw: bytes, cell: Cell) -> bytes:
+    """Return a record carrying the chosen-format bit its cell holds."""
+    header = bytearray(raw[:valueOffset])
+    if cell.formatChosen:
+        header[chosenFormatOffset] |= chosenFormatBit
+    else:
+        header[chosenFormatOffset] &= ~chosenFormatBit
+    return bytes(header) + raw[valueOffset:]
+
+
 def patchRecord(record: CellRecord, value: Decimal) -> bytes:
     """Return one cell record with its number replaced and everything else kept.
 
@@ -344,12 +359,6 @@ displayedKindSlot: tuple[int, int] = (9, 0x10)
 def kindOf(slot: tuple[int, int]) -> int:
     """Return the kind `displayedKindSlot` stores for one per-kind format slot."""
     return countedFormatSlots.index(slot) + 1
-
-# Byte 6's high bit marks a format a person chose rather than one Numbers decided.
-# 108 text records carry it against 4515 that do not, and the Data Format inspector
-# reads `Text` with it and `Automatic` without, which is what typing into Numbers
-# produces. Measured 2026-09-14 from a golden that inherited one.
-chosenFormatBit: int = 0x80
 
 # A format entry states its own kind. `260` carries nothing else, so a text format
 # can be created for a table that has never held any.
@@ -999,7 +1008,8 @@ def applyTableEdits(
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
                 edit = formulaEdit(cell.formula, record, pool)
-                if not valueChanged and edit == "none":
+                chosenChanged = cell.formatChosen != carriesChosenFormat(record)
+                if not valueChanged and edit == "none" and not chosenChanged:
                     continue
                 patched = record.raw
                 # The value first, so that writing a value OVER a formula still
@@ -1016,7 +1026,7 @@ def applyTableEdits(
                         formulaAdded.append((row, record.column))
                     elif edit == "detach":
                         formulaRemoved.append((row, record.column))
-                replacements[record.column] = patched
+                replacements[record.column] = chosenFormatApply(patched, cell)
             present = frozenset(
                 record.column
                 for record in decodeRow(
@@ -1036,8 +1046,8 @@ def applyTableEdits(
                     if cell is None:
                         continue
                     if cell.formula is not None:
-                        replacements[column] = buildFormulaRecord(
-                            pool.keyFor(cell.formula)
+                        replacements[column] = chosenFormatApply(
+                            buildFormulaRecord(pool.keyFor(cell.formula)), cell
                         )
                         formulaAdded.append((row, column))
                         continue
@@ -1053,8 +1063,11 @@ def applyTableEdits(
                     shape = templateRecord(index, store, wanted)
                     if shape is None:
                         shape = recordFresh(column, wanted, formatFor)
-                    replacements[column] = writtenRecord(
-                        cell, shape, textPool, borrowed=True, formatFor=formatFor
+                    replacements[column] = chosenFormatApply(
+                        writtenRecord(
+                            cell, shape, textPool, borrowed=True, formatFor=formatFor
+                        ),
+                        cell,
                     )
                     formatsCount(None, replacements[column], reference)
             dropped = removals & present
