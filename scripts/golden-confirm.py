@@ -21,6 +21,9 @@ Usage:
     python3 scripts/golden-confirm.py helper-build --identity <SHA-1> --dry-run
     python3 scripts/golden-confirm.py permissions
 
+A run holds `caffeinate` while it drives Numbers, because the screen lock that follows
+display sleep stops it.
+
 Each run's helper log is `helper.log` beside its report rather than in workarea/logs/,
 so the log is purged with the ticket's folder that holds the run it explains.
 
@@ -51,6 +54,8 @@ import sys
 import tempfile
 import tomllib
 import zipfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -255,6 +260,17 @@ def checkHelperCurrent() -> None:
             "the installed helper was built from different source than this checkout; "
             "run `python3 scripts/golden-confirm.py helper-build`"
         )
+
+
+@contextmanager
+def holdDisplayAwake() -> Iterator[None]:
+    """Keep the display awake, since the lock that follows its sleep stops a run."""
+    awake = subprocess.Popen(["caffeinate", "-d", "-i"])
+    try:
+        yield
+    finally:
+        awake.terminate()
+        awake.wait(timeout=5)
 
 
 def requestHelper(
@@ -541,6 +557,14 @@ def runGoldenConfirm(golden: Path, dryRun: bool) -> GoldenRun:
     if dryRun:
         return run
 
+    with holdDisplayAwake():
+        return confirmGolden(golden, run)
+
+
+def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
+    """Drive the helper over one golden, with the display held awake around it."""
+    expectedCells = readExpectedCells(golden)
+    outputDirectory = run.outputDirectory
     problems = checkPermissions()
     if problems:
         raise GoldenConfirmError("the helper cannot run:\n" + "\n".join(
@@ -706,7 +730,8 @@ def checkDamagedCopies(golden: Path) -> list[Check]:
         shutil.rmtree(outputDirectory)
     outputDirectory.mkdir(parents=True)
     checks: list[Check] = []
-    with tempfile.TemporaryDirectory(prefix="pybers-golden-damage-") as work:
+    with (holdDisplayAwake(),
+          tempfile.TemporaryDirectory(prefix="pybers-golden-damage-") as work):
         for label, copy in writeDamagedCopies(golden, Path(work)).items():
             result = requestHelper({
                 "operation": "documentInspect",
