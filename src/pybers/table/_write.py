@@ -55,7 +55,7 @@ from decimal import Decimal
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import IWAFile, decodeRecord, decodeRow, offsetUnitFor
+from .._persistence import IWAFile, chooseOffsetUnit, decodeRecord, decodeRow
 from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
@@ -63,7 +63,7 @@ from .._persistence.cells import (
     chosenFormatBit,
     chosenFormatOffset,
     emptyOffset,
-    formulaKeySlot,
+    findFormulaKeySlot,
     offsetWidth,
     valueOffset,
 )
@@ -80,10 +80,10 @@ from ..formula._write import (
     FormulaPool,
     attachFormulaKey,
     buildFormulaRecord,
+    classifyFormulaEdit,
     detachFormulaKey,
-    formulaEdit,
-    formulaPoolFor,
     patchFormulaKey,
+    readFormulaPool,
 )
 from ._read import (
     readMerges,
@@ -139,7 +139,7 @@ def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
         )
 
 
-def writtenRecord(
+def buildWrittenRecord(
     cell: Cell,
     record: CellRecord,
     pool: StringPool | None,
@@ -151,7 +151,7 @@ def writtenRecord(
 
     Four paths. Text over text and a number over a number patch the value in place,
     leaving the header and every trailing reference alone. Text over a number and a
-    number over text go through `retypedRecord`, because the value widths differ by
+    number over text go through `retypeRecord`, because the value widths differ by
     twelve bytes and everything behind them moves.
 
     **`borrowed` says the record belongs to another cell** and is here only for its
@@ -162,7 +162,7 @@ def writtenRecord(
     """
     refuseFormulaOverwrite(cell, record)
     if borrowed:
-        record = decodeRecord(record.column, borrowedShape(record))
+        record = decodeRecord(record.column, borrowShape(record))
     value = cell.value
 
     if isinstance(value, str):
@@ -183,7 +183,7 @@ def writtenRecord(
                 record.raw[:valueOffset] + encoded
                 + record.raw[valueOffset + stringKeyWidth:]
             )
-        return retypedRecord(
+        return retypeRecord(
             record, stringTypeByte, encoded,
             formatKey=formatFor(textFormatType),
         )
@@ -192,7 +192,7 @@ def writtenRecord(
         if record.typeByte == stringTypeByte:
             if pool is not None and not borrowed and isinstance(record.value, int):
                 pool.release(record.value)
-            return retypedRecord(
+            return retypeRecord(
                 record, numericTypeBytes[0], Decimal128(value).asBytes(),
                 formatKey=formatFor(numberFormatType),
             )
@@ -310,7 +310,7 @@ class StringPool:
         self.released.add(key)
 
 
-def stringPoolFor(index: ArchiveIndex, store: tst.DataStore) -> StringPool | None:
+def readStringPool(index: ArchiveIndex, store: tst.DataStore) -> StringPool | None:
     """Return the table's string pool, or None when it carries no string list.
 
     A table that has never held text carries no list to write into, which is a
@@ -356,7 +356,7 @@ controlSlot: tuple[int, int] = (9, 0x04)
 displayedKindSlot: tuple[int, int] = (9, 0x10)
 
 
-def kindOf(slot: tuple[int, int]) -> int:
+def findSlotKind(slot: tuple[int, int]) -> int:
     """Return the kind `displayedKindSlot` stores for one per-kind format slot."""
     return countedFormatSlots.index(slot) + 1
 
@@ -390,12 +390,12 @@ slotOrder: tuple[tuple[int, int], ...] = (
 )
 
 
-def referenceSlots(raw: bytes) -> list[tuple[int, int]]:
+def listReferenceSlots(raw: bytes) -> list[tuple[int, int]]:
     """Return the slots this record's trailing references fill, in their order."""
     return [(at, bit) for at, bit in slotOrder if raw[at] & bit]
 
 
-def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
+def findFormatKey(dataList: tst.TableDataList, formatType: int) -> int:
     """Return a key naming a format of this kind, creating one when there is none.
 
     A `260` entry carries nothing but its kind, so creating one states no more than
@@ -423,12 +423,12 @@ def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
     return int(fresh.key)
 
 
-def formatClaims(raw: bytes) -> Counter[int]:
+def countFormatClaims(raw: bytes) -> Counter[int]:
     """Return how often one record names each format, counted as refcounts count."""
     references = decodeRecord(0, raw).references
     return Counter(
         key
-        for slot, key in zip(referenceSlots(raw), references, strict=True)
+        for slot, key in zip(listReferenceSlots(raw), references, strict=True)
         if slot in countedFormatSlots
     )
 
@@ -443,8 +443,8 @@ def moveFormatReferences(
     keeps the count Numbers wrote even where that count disagrees with its cells.
     Returns the keys whose counts moved.
     """
-    change = formatClaims(after) if after is not None else Counter()
-    change.subtract(formatClaims(before) if before is not None else Counter())
+    change = countFormatClaims(after) if after is not None else Counter()
+    change.subtract(countFormatClaims(before) if before is not None else Counter())
     entries = {int(entry.key): entry for entry in dataList.entries}
     moved: set[int] = set()
     for key, delta in change.items():
@@ -485,7 +485,7 @@ def removeSpentEntries(
         return spent
     for tile in tiles:
         for rowInfo in tile.rowInfos:
-            unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
             for record in decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
             ):
@@ -496,7 +496,7 @@ def removeSpentEntries(
     return spent
 
 
-def stringClaims(record: CellRecord) -> Iterable[int]:
+def listStringClaims(record: CellRecord) -> Iterable[int]:
     """Return the pooled string key a text record names, if it is one."""
     if record.typeByte == stringTypeByte and isinstance(record.value, int):
         return (record.value,)
@@ -508,12 +508,12 @@ def stringClaims(record: CellRecord) -> Iterable[int]:
 countedStyleSlots: tuple[tuple[int, int], ...] = ((8, 0x20), (8, 0x40))
 
 
-def styleClaims(record: CellRecord) -> Iterable[int]:
+def listStyleClaims(record: CellRecord) -> Iterable[int]:
     """Return the style keys a record names, once per counted slot."""
     return [
         key
         for slot, key in zip(
-            referenceSlots(record.raw), record.references, strict=True
+            listReferenceSlots(record.raw), record.references, strict=True
         )
         if slot in countedStyleSlots
     ]
@@ -524,7 +524,7 @@ def styleClaims(record: CellRecord) -> Iterable[int]:
 richTextTypeByte: int = 9
 
 
-def richTextClaims(record: CellRecord) -> Iterable[int]:
+def listRichTextClaims(record: CellRecord) -> Iterable[int]:
     """Return the rich-text key a rich-text record names, if it is one."""
     if record.typeByte == richTextTypeByte and isinstance(record.value, int):
         return (record.value,)
@@ -542,7 +542,7 @@ def releaseEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
     return moved
 
 
-def templateRecord(
+def findTemplateRecord(
     index: ArchiveIndex, store: tst.DataStore, typeByte: int
 ) -> CellRecord | None:
     """Return a record to shape a new one from, preferring the type being written.
@@ -562,7 +562,7 @@ def templateRecord(
     for entry in store.tiles.tiles:
         tile = index.resolve(entry.tile, tst.Tile)
         for rowInfo in tile.rowInfos:
-            unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
             for record in decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
             ):
@@ -596,13 +596,13 @@ def buildFreshRecord(
             )
         key = found
     references = (
-        kindOf(numberFormatSlot).to_bytes(referenceWidth, "little")
+        findSlotKind(numberFormatSlot).to_bytes(referenceWidth, "little")
         + key.to_bytes(referenceWidth, "little")
     )
     return decodeRecord(column, plainNumberRecord[:-2 * referenceWidth] + references)
 
 
-def stringValueWidth(record: CellRecord) -> int:
+def measureValueWidth(record: CellRecord) -> int:
     """Return how many bytes this record's value occupies, for a type being changed."""
     if record.typeByte == stringTypeByte:
         return stringKeyWidth
@@ -614,7 +614,7 @@ def stringValueWidth(record: CellRecord) -> int:
     )
 
 
-def borrowedShape(record: CellRecord) -> bytes:
+def borrowShape(record: CellRecord) -> bytes:
     """Return a sibling's record reduced to what a new cell may take from it.
 
     A control describes the cell it was built for: writing into an empty cell gave
@@ -631,7 +631,7 @@ def borrowedShape(record: CellRecord) -> bytes:
     raw = bytes(raw[:6]) + bytes([raw[6] & ~chosenFormatBit]) + bytes(raw[7:])
     own = textFormatSlot if record.typeByte == stringTypeByte else numberFormatSlot
     dropped = {controlSlot, *countedFormatSlots} - {own}
-    slots = referenceSlots(raw)
+    slots = listReferenceSlots(raw)
     start = len(raw) - len(slots) * referenceWidth
     kept = [
         raw[start + index * referenceWidth:start + (index + 1) * referenceWidth]
@@ -643,7 +643,7 @@ def borrowedShape(record: CellRecord) -> bytes:
     return bytes(header) + b"".join(kept)
 
 
-def retypedRecord(
+def retypeRecord(
     record: CellRecord,
     typeByte: int,
     value: bytes,
@@ -661,7 +661,7 @@ def retypedRecord(
     cell's style across. `formatKey` is None when the table has no format list, and
     the old slot is then dropped without a replacement.
     """
-    width = stringValueWidth(record)
+    width = measureValueWidth(record)
     if len(record.raw) < valueOffset + width:
         raise WriteError(
             f"The record for column {record.column + originOffset} is "
@@ -671,7 +671,7 @@ def retypedRecord(
     leaving = numberFormatSlot if toText else textFormatSlot
     arriving = textFormatSlot if toText else numberFormatSlot
 
-    slots = referenceSlots(record.raw)
+    slots = listReferenceSlots(record.raw)
     carried = {
         slot: reference
         for slot, reference in zip(slots, record.references, strict=True)
@@ -681,7 +681,7 @@ def retypedRecord(
         carried[arriving] = formatKey
         # The cell now displays as its new kind, so the kind it displays with follows.
         if displayedKindSlot in carried:
-            carried[displayedKindSlot] = kindOf(arriving)
+            carried[displayedKindSlot] = findSlotKind(arriving)
 
     header = bytearray(record.raw[:valueOffset])
     header[typeByteOffset] = typeByte
@@ -699,7 +699,7 @@ def retypedRecord(
     return bytes(header) + value + tail
 
 
-def rowsNeedingStorage(
+def findRowsNeedingStorage(
     table: Table, firstRow: int, tileSize: int, present: frozenset[int]
 ) -> list[int]:
     """Return the rows of this tile holding a formula the file stores no row for.
@@ -843,13 +843,13 @@ def applyFormulaEdit(
         assert cell.formula is not None
         return attachFormulaKey(raw, record, pool.keyFor(cell.formula))
     if edit == "detach":
-        pool.release(record.references[formulaKeySlot(record)])
+        pool.release(record.references[findFormulaKeySlot(record)])
         return detachFormulaKey(raw, record)
     assert cell.formula is not None
     return patchFormulaKey(
         raw,
         record,
-        pool.keyFor(cell.formula, record.references[formulaKeySlot(record)]),
+        pool.keyFor(cell.formula, record.references[findFormulaKeySlot(record)]),
     )
 
 
@@ -879,8 +879,8 @@ def applyTableEdits(
     # key would make every text cell look edited on every save.
     strings = readStringTable(index, store)
     richText = readRichTextTable(index, store)
-    pool = formulaPoolFor(index, store)
-    textPool = stringPoolFor(index, store)
+    pool = readFormulaPool(index, store)
+    textPool = readStringPool(index, store)
     # Resolved ONCE, because resolving parses afresh and a second copy would take
     # the edits with it. Rewritten only when a written record moved a count.
     formatList = (
@@ -906,7 +906,7 @@ def applyTableEdits(
         if formatList is None:
             return None
         if formatType not in formatKeys:
-            formatKeys[formatType] = formatKeyFor(formatList, formatType)
+            formatKeys[formatType] = findFormatKey(formatList, formatType)
         return formatKeys[formatType]
 
     def formatsCount(
@@ -961,7 +961,7 @@ def applyTableEdits(
             stored = frozenset(
                 firstRow + rowInfo.tile_row_index for rowInfo in tile.rowInfos
             )
-            for missing in rowsNeedingStorage(table, firstRow, tileSize, stored):
+            for missing in findRowsNeedingStorage(table, firstRow, tileSize, stored):
                 if not tile.rowInfos and table.colCount > narrowRowSlots:
                     raise WriteError(
                         f"Row {missing + originOffset} of {table.name!r} is the first "
@@ -974,7 +974,7 @@ def applyTableEdits(
                 touched = True
 
         for rowInfo in tile.rowInfos:
-            offsetUnit = offsetUnitFor(
+            offsetUnit = chooseOffsetUnit(
                 rowInfo.has_wide_offsets, tile.should_use_wide_rows
             )
             row = firstRow + rowInfo.tile_row_index
@@ -991,23 +991,25 @@ def applyTableEdits(
                 if (row, record.column) in swallowed:
                     formatsCount(record.raw, None, reference)
                     if textPool is not None:
-                        for key in stringClaims(record):
+                        for key in listStringClaims(record):
                             textPool.release(key)
                     if styleList is not None:
-                        stylesMoved |= releaseEntries(styleList, styleClaims(record))
+                        stylesMoved |= releaseEntries(
+                            styleList, listStyleClaims(record)
+                        )
                     if richTextList is not None:
                         richTextMoved |= releaseEntries(
-                            richTextList, richTextClaims(record)
+                            richTextList, listRichTextClaims(record)
                         )
                     if pool is not None and carriesFormula(record):
-                        pool.release(record.references[formulaKeySlot(record)])
+                        pool.release(record.references[findFormulaKeySlot(record)])
                         formulaRemoved.append((row, record.column))
                     continue
                 cell = table.cells.get(reference)
                 if cell is None:
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
-                edit = formulaEdit(cell.formula, record, pool)
+                edit = classifyFormulaEdit(cell.formula, record, pool)
                 chosenChanged = cell.formatChosen != carriesChosenFormat(record)
                 if not valueChanged and edit == "none" and not chosenChanged:
                     continue
@@ -1016,7 +1018,7 @@ def applyTableEdits(
                 # refuses here rather than being masked by the formula edit below.
                 # Attaching a formula is a different act and is allowed.
                 if valueChanged:
-                    patched = writtenRecord(
+                    patched = buildWrittenRecord(
                         cell, record, textPool, formatFor=formatFor
                     )
                     formatsCount(record.raw, patched, reference)
@@ -1060,11 +1062,11 @@ def applyTableEdits(
                         stringTypeByte if isinstance(cell.value, str)
                         else numericTypeBytes[0]
                     )
-                    shape = templateRecord(index, store, wanted)
+                    shape = findTemplateRecord(index, store, wanted)
                     if shape is None:
                         shape = buildFreshRecord(column, wanted, formatFor)
                     replacements[column] = applyChosenFormat(
-                        writtenRecord(
+                        buildWrittenRecord(
                             cell, shape, textPool, borrowed=True, formatFor=formatFor
                         ),
                         cell,
@@ -1102,7 +1104,7 @@ def applyTableEdits(
     if formatList is not None and formatsMoved:
         removeSpentEntries(
             formatList, formatsMoved, tiles,
-            lambda record: formatClaims(record.raw).keys(),
+            lambda record: countFormatClaims(record.raw).keys(),
         )
         formatId = store.format_table.identifier
         owners[formatId].messageReplace(
@@ -1123,7 +1125,7 @@ def applyTableEdits(
 
     if textPool is not None and textPool.touched:
         for key in removeSpentEntries(
-            textPool.dataList, textPool.released, tiles, stringClaims
+            textPool.dataList, textPool.released, tiles, listStringClaims
         ):
             textPool.stored.pop(key, None)
         textId = store.stringTable.identifier
@@ -1193,7 +1195,7 @@ def writeMergeFormula(
     function.AST_function_node_numArgs = 1
 
 
-def mergesAdded(table: Table, model: tst.TableModelArchive) -> list[MergeRange]:
+def findAddedMerges(table: Table, model: tst.TableModelArchive) -> list[MergeRange]:
     """Return the merges the model holds that the stored archive does not.
 
     Compared against what is stored rather than tracked as merges are added, for

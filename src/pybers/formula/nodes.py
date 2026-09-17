@@ -66,10 +66,10 @@ from pybers.errors import PybersError
 from pybers.formula.functions import (
     ArgumentCountError,
     NumbersFunction,
-    functionFor,
-    functionIndexFor,
-    functionNamed,
-    functionNameFor,
+    findFunction,
+    findFunctionIndex,
+    findFunctionName,
+    findFunctionNamed,
 )
 
 # The node types this model gives meaning to. Every other type is carried through
@@ -377,12 +377,12 @@ class FormulaFunctionCall:
     @property
     def name(self) -> str | None:
         """Return the function's name, or None when the table does not carry it."""
-        return functionNameFor(self.index)
+        return findFunctionName(self.index)
 
     @property
     def function(self) -> NumbersFunction | None:
         """Return the function this calls, with its argument counts, or None."""
-        return functionFor(self.index)
+        return findFunction(self.index)
 
     @classmethod
     def named(cls, name: str, argumentCount: int) -> FormulaFunctionCall:
@@ -392,7 +392,7 @@ class FormulaFunctionCall:
         since either would store as an error cell. Construct with an index to
         write one anyway.
         """
-        function = functionNamed(name)
+        function = findFunctionNamed(name)
         if not function.offered:
             raise ArgumentCountError(
                 f"{function.name} is {function.availability} rather than offered, "
@@ -405,7 +405,7 @@ class FormulaFunctionCall:
                 f"{function.name} takes {function.minimumArguments} to {bound} "
                 f"arguments, not {argumentCount}."
             )
-        return cls(index=functionIndexFor(name), argumentCount=argumentCount)
+        return cls(index=findFunctionIndex(name), argumentCount=argumentCount)
 
 
 @dataclass(frozen=True, slots=True)

@@ -37,7 +37,7 @@ from .._generated import TSTArchives_pb2 as tst
 from ..errors import ReadError
 from .container import NumbersPackage
 from .iwa import Archive
-from .types import archiveTypeId, parseArchive
+from .types import parseArchive, readArchiveTypeId
 
 # The stored format counts rows and columns from zero. The model counts from
 # one, because that is what Numbers shows and what a caller means by "row 1". The
@@ -136,7 +136,7 @@ class ArchiveIndex:
         text boxes. Those have their own tickets and are not in the registry yet,
         so they have to be recognized and skipped rather than parsed and refused.
         """
-        return archiveTypeId(self.archive(reference.identifier))
+        return readArchiveTypeId(self.archive(reference.identifier))
 
 
 def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
@@ -149,7 +149,7 @@ def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
     """
     roots = [
         archive for archive in index.byIdentifier.values()
-        if archiveTypeId(archive) == documentTypeId
+        if readArchiveTypeId(archive) == documentTypeId
     ]
     if len(roots) != 1:
         raise ReadError(

@@ -52,7 +52,7 @@ from .._persistence.template import (
     copyTemplates,
     readTemplates,
 )
-from .._persistence.types import archiveTypeId
+from .._persistence.types import readArchiveTypeId
 from ..errors import WriteError
 from ..geometry import Position
 from .cells import Table, generateOwnerIdentity
@@ -107,7 +107,7 @@ ownerIdFields: frozenset[str] = frozenset(
 )
 
 
-def uuidValue(message: tsp.UUID) -> int:
+def readUuidValue(message: tsp.UUID) -> int:
     """Return a UUID's value from its two halves."""
     return (message.upper << halfBits) | message.lower
 
@@ -118,7 +118,7 @@ def assignUuid(message: tsp.UUID, value: int) -> None:
     message.upper = value >> halfBits
 
 
-def wordsValue(message: tsp.CFUUIDArchive) -> int:
+def readWordsValue(message: tsp.CFUUIDArchive) -> int:
     """Return a UUID's value from its four words."""
     return (
         message.uuid_w0
@@ -136,13 +136,13 @@ def assignWords(message: tsp.CFUUIDArchive, value: int) -> None:
     message.uuid_w3 = value >> 3 * wordBits & wordMask
 
 
-def identityValue(identity: str) -> int:
+def readIdentityValue(identity: str) -> int:
     """Return the UUID a table's formula identity spells, four words low first."""
     words = [int(identity[start:start + 8], 16) for start in range(0, 32, 8)]
     return words[0] | words[1] << 32 | words[2] << 64 | words[3] << 96
 
 
-def identityText(identity: str) -> str:
+def renderIdentityText(identity: str) -> str:
     """Return the canonical UUID a table's `table_id` spells its identity as.
 
     **`table_id` is how Numbers finds a table's calculation-engine owners.** A table
@@ -150,7 +150,8 @@ def identityText(identity: str) -> str:
     family, drops every dependency tile, and the formulas in it are never evaluated.
     Measured 2026-09-16 for PYB-86, see findings-10-creation.md.
     """
-    return str(uuid.UUID(bytes=identityValue(identity).to_bytes(16, "little"))).upper()
+    value = readIdentityValue(identity)
+    return str(uuid.UUID(bytes=value.to_bytes(16, "little"))).upper()
 
 
 @dataclass(slots=True)
@@ -172,11 +173,11 @@ class UuidRenewal:
     def apply(self, message: Message) -> None:
         """Renew every UUID a message holds, in place."""
         if isinstance(message, tsp.UUID):
-            assignUuid(message, self.renewed(uuidValue(message)))
+            assignUuid(message, self.renewed(readUuidValue(message)))
             return
         if isinstance(message, tsp.CFUUIDArchive):
             if message.HasField("uuid_w0"):
-                assignWords(message, self.renewed(wordsValue(message)))
+                assignWords(message, self.renewed(readWordsValue(message)))
             return
         for descriptor, value in message.ListFields():
             if descriptor.message_type is None:
@@ -242,15 +243,15 @@ class ResetStyles:
     textStyle: int
 
 
-def themeFor(index: ArchiveIndex) -> tuple[int, tn.ThemeArchive]:
+def findTheme(index: ArchiveIndex) -> tuple[int, tn.ThemeArchive]:
     """Return the document's theme archive and its identifier."""
     root = findRoot(index)
     return root.theme.identifier, index.resolve(root.theme, tn.ThemeArchive)
 
 
-def documentStyles(index: ArchiveIndex) -> DocumentStyles:
+def findDocumentStyles(index: ArchiveIndex) -> DocumentStyles:
     """Return the theme's first table style preset and the network it names."""
-    _, theme = themeFor(index)
+    _, theme = findTheme(index)
     presets = theme.super.Extensions[tstStyles.ThemePresetsArchive.extension]
     if not presets.table_style_presets:
         raise WriteError("This document's theme carries no table style preset.")
@@ -272,7 +273,7 @@ def findNamedStyle(index: ArchiveIndex, stylesheetId: int) -> int | None:
     )
     for reference in stylesheet.styles:
         archive = index.byIdentifier.get(reference.identifier)
-        if archive is None or archiveTypeId(archive) != paragraphStyleTypeId:
+        if archive is None or readArchiveTypeId(archive) != paragraphStyleTypeId:
             continue
         style = index.resolve(reference, tswp.ParagraphStyleArchive)
         if style.super.name == baseStyleName:
@@ -356,7 +357,7 @@ def createResetStyles(
     )
 
     if existing is None:
-        themeId, theme = themeFor(index)
+        themeId, theme = findTheme(index)
         presets = theme.super.Extensions[tswp.ThemePresetsArchive.extension]
         presets.paragraph_style_presets.add(identifier=reset.textStyle)
         themeReferences = registry.strongReferencesOf(themeId)
@@ -372,7 +373,7 @@ def generateUuid() -> tsp.UUID:
     return message
 
 
-def styleBindings(
+def bindStyles(
     template: ArchiveTemplate, styles: DocumentStyles, reset: ResetStyles
 ) -> dict[int, int]:
     """Bind every style the table model template names to what the reset puts there.
@@ -417,7 +418,7 @@ class EngineState:
     headerTileId: int
 
 
-def engineState(index: ArchiveIndex, registry: PackageRegistry) -> EngineState:
+def findEngineState(index: ArchiveIndex, registry: PackageRegistry) -> EngineState:
     """Find the engine, its header name manager, and that manager's owner."""
     engineId = registry.componentNamed("CalculationEngine")
     engine = index.resolve(
@@ -467,7 +468,7 @@ def addHeaderSlot(state: EngineState, base: int) -> None:
         record.expanded_edges.edge_without_owner_columns.append(0)
 
 
-def tableBottom(index: ArchiveIndex, info: tst.TableInfoArchive) -> float:
+def measureTableBottom(index: ArchiveIndex, info: tst.TableInfoArchive) -> float:
     """Return where a table's content ends on its sheet, from its row heights.
 
     The stored frame size is stale, so the height is the rows' own, taking the
@@ -498,12 +499,12 @@ def createTable(
     """Create one table's archives and engine entries, and return its info archive."""
     modelTemplate = next(template for template in templates if template.role == "model")
     bindings = {templateSheet: sheetId, templatePreset: styles.preset}
-    bindings.update(styleBindings(modelTemplate, styles, reset))
+    bindings.update(bindStyles(modelTemplate, styles, reset))
     if not table.identifier:
         table.identifier = generateOwnerIdentity()
     copies = copyTemplates(registry, templates, bindings)
 
-    base = identityValue(table.identifier)
+    base = readIdentityValue(table.identifier)
     renewal = UuidRenewal(base=base)
     owners = [
         copy for copy in copies.copies.values()
@@ -516,14 +517,14 @@ def createTable(
     nextOwnerId = 1 + max(registered, default=0)
     ownerIds: dict[int, int] = {}
     for copy in owners:
-        body = ownerBody(copy)
+        body = readOwnerBody(copy)
         ownerIds[body.internal_formula_owner_id] = nextOwnerId
         nextOwnerId += 1
     for copy in copies.copies.values():
         renewal.apply(copy.body)
         remapOwnerIds(copy.body, ownerIds)
 
-    tableShape(copies, table, origin)
+    shapeTable(copies, table, origin)
     copies.place(registry, {"CalculationEngine": state.identifier})
     for role in ("table-info", "caption", "title", "model"):
         registry.objectUuidAdd(
@@ -534,18 +535,18 @@ def createTable(
 
     tracker = state.engine.dependency_tracker
     for copy in owners:
-        body = ownerBody(copy)
+        body = readOwnerBody(copy)
         tracker.formula_owner_dependencies.add(identifier=copy.identifier)
         entry = tracker.owner_id_map.map_entry.add(
             internal_owner_id=body.internal_formula_owner_id
         )
-        assignWords(entry.owner_id, uuidValue(body.formula_owner_uid))
+        assignWords(entry.owner_id, readUuidValue(body.formula_owner_uid))
     tracker.number_of_formulas += formulasPerTable
     addHeaderSlot(state, base)
     return copies["table-info"].identifier
 
 
-def ownerBody(copy: ArchiveCopy) -> tsce.FormulaOwnerDependenciesArchive:
+def readOwnerBody(copy: ArchiveCopy) -> tsce.FormulaOwnerDependenciesArchive:
     """Return an owner template's message, refusing a template of another type."""
     if not isinstance(copy.body, tsce.FormulaOwnerDependenciesArchive):
         raise WriteError(
@@ -554,7 +555,7 @@ def ownerBody(copy: ArchiveCopy) -> tsce.FormulaOwnerDependenciesArchive:
     return copy.body
 
 
-def tableShape(copies: TemplateCopies, table: Table, origin: Position) -> None:
+def shapeTable(copies: TemplateCopies, table: Table, origin: Position) -> None:
     """Set a copied table's name, size and place, and every count its size decides."""
     model = copies["model"].body
     info = copies["table-info"].body
@@ -574,7 +575,7 @@ def tableShape(copies: TemplateCopies, table: Table, origin: Position) -> None:
     model.number_of_columns = table.colCount
     model.default_row_height = resetRowHeight
     model.default_column_width = resetColumnWidth
-    model.table_id = identityText(table.identifier)
+    model.table_id = renderIdentityText(table.identifier)
     sidecar.row_count = table.rowCount
     sidecar.column_count = table.colCount
     assignUids(uids, table.rowCount, table.colCount)
@@ -628,7 +629,7 @@ def addSidebarNodes(
     raise WriteError(f"The sidebar lists no sheet {sheetId} to place a table under.")
 
 
-def tablesPending(
+def findPendingTables(
     index: ArchiveIndex, document: Document
 ) -> list[tuple[Sheet, tn.SheetArchive, list[Table]]]:
     """Return each sheet holding tables the model gained, refusing any other change.
@@ -679,18 +680,20 @@ def createTables(
 ) -> None:
     """Create every table the model gained, on every sheet, once the sheets exist."""
     index = ArchiveIndex(package)
-    pending = tablesPending(index, document)
+    pending = findPendingTables(index, document)
     if not pending:
         return
-    styles = documentStyles(index)
+    styles = findDocumentStyles(index)
     reset = createResetStyles(index, registry, styles)
-    state = engineState(index, registry)
+    state = findEngineState(index, registry)
     templates = readTemplates(templateDirectory / "table")
     for sheet, sheetArchive, created in pending:
-        sheetId = sheetIdentifierOf(sheet)
+        sheetId = readSheetIdentifier(sheet)
         top = max(
             (
-                tableBottom(index, index.resolve(reference, tst.TableInfoArchive))
+                measureTableBottom(
+                    index, index.resolve(reference, tst.TableInfoArchive)
+                )
                 + tableGap
                 for reference in sheetArchive.drawable_infos
                 if index.typeOf(reference) == tableInfoTypeId
@@ -731,7 +734,7 @@ def createTables(
         registry.archiveReplace(identifier, message.SerializeToString())
 
 
-def sheetIdentifierOf(sheet: Sheet) -> int:
+def readSheetIdentifier(sheet: Sheet) -> int:
     """Return a sheet's archive identifier, which every sheet has once created."""
     if sheet._identifier is None:
         raise WriteError(f"{sheet.name!r} has no archive to hold its tables.")

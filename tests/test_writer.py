@@ -40,15 +40,15 @@ import pytest
 
 import pybers
 from conftest import allDocuments, findDocumentPath
-from pybers._engine import tableOwnerIds
+from pybers._engine import readTableOwnerIds
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import (
     CellRecord,
     NumbersPackage,
+    chooseOffsetUnit,
     decodeRow,
-    offsetUnitFor,
     readPackage,
 )
 from pybers._persistence.index import (
@@ -57,13 +57,13 @@ from pybers._persistence.index import (
     findRoot,
     tableInfoTypeId,
 )
-from pybers._persistence.types import archiveTypeId, archiveTypes, parseArchive
+from pybers._persistence.types import archiveTypes, parseArchive, readArchiveTypeId
 from pybers.addressing import toCellReference
 from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
 from pybers.table._read import readMerges
-from pybers.table._write import formatClaims
+from pybers.table._write import countFormatClaims
 
 
 def readNumericRecords(path: Path) -> list[CellRecord]:
@@ -79,7 +79,7 @@ def readNumericRecords(path: Path) -> list[CellRecord]:
                 tile = tst.Tile()
                 tile.ParseFromString(message.data)
                 for info in tile.rowInfos:
-                    unit = offsetUnitFor(
+                    unit = chooseOffsetUnit(
                         info.has_wide_offsets, tile.should_use_wide_rows
                     )
                     records += [
@@ -650,7 +650,7 @@ def test_theGoldenAsksNumbersToRecalculateTheCellsThatMoved() -> None:
     engine = next(
         parseArchive(archive)
         for archive in index.byIdentifier.values()
-        if archiveTypeId(archive) == calculationEngineTypeId
+        if readArchiveTypeId(archive) == calculationEngineTypeId
     )
     dirty = index.resolve(engine.refs_to_dirty, tsce.ReferencesToDirtyArchive)
 
@@ -693,12 +693,12 @@ def test_everyTableResolvesToACalculationEngineOwnerId(path: Path) -> None:
     engineArchive = next(
         (
             archive for archive in index.byIdentifier.values()
-            if archiveTypeId(archive) == calculationEngineTypeId
+            if readArchiveTypeId(archive) == calculationEngineTypeId
         ),
         None,
     )
     assert engineArchive is not None, "no calculation engine in this document"
-    ownerIds = tableOwnerIds(index, parseArchive(engineArchive))
+    ownerIds = readTableOwnerIds(index, parseArchive(engineArchive))
 
     for sheetReference in findRoot(index).sheets:
         sheet = index.resolve(sheetReference, tn.SheetArchive)
@@ -747,7 +747,7 @@ def readRowColumns(path: Path, row: int = 0) -> list[int]:
             store = model.base_data_store
             tile = index.resolve(store.tiles.tiles[0].tile, tst.Tile)
             info = tile.rowInfos[row]
-            unit = offsetUnitFor(
+            unit = chooseOffsetUnit(
                 info.has_wide_offsets, tile.should_use_wide_rows
             )
             return sorted(
@@ -1159,7 +1159,7 @@ def readRecordAt(
                 for rowInfo in tile.rowInfos:
                     if rowInfo.tile_row_index != wanted.row - 1:
                         continue
-                    unit = offsetUnitFor(
+                    unit = chooseOffsetUnit(
                         rowInfo.has_wide_offsets, tile.should_use_wide_rows
                     )
                     for record in decodeRow(
@@ -1328,7 +1328,7 @@ def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
 
     entries = readFormatEntries(working, "Table 2")
     assert 260 in {kind for _, kind in entries}, "the text format reached the file"
-    named = formatClaims(readRecordAt(working, "B1", table="Table 2").raw)
+    named = countFormatClaims(readRecordAt(working, "B1", table="Table 2").raw)
     assert set(named) <= {key for key, _ in entries}, "no cell names a missing format"
 
 

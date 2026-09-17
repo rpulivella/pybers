@@ -30,7 +30,7 @@ import pybers
 from conftest import findDocumentPath
 from pybers._persistence import readPackage
 from pybers._persistence.cells import carriesChosenFormat
-from pybers.table._write import referenceSlots, textFormatSlot
+from pybers.table._write import listReferenceSlots, textFormatSlot
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
@@ -48,7 +48,7 @@ def assertLiteralRecord(path: Path, address: str) -> None:
     assert record.typeByte == 3, "the cell holds text"
     assert carriesChosenFormat(record), "byte 6 marks the format as chosen"
     assert readDisplayedKind(record) == (5, {5}), "it displays with the text kind"
-    assert textFormatSlot in referenceSlots(record.raw)
+    assert textFormatSlot in listReferenceSlots(record.raw)
 
 
 def openFirstTableCell(stem: str, address: str) -> pybers.Cell:

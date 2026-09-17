@@ -27,8 +27,8 @@ from decimal import Decimal
 from conftest import findDocumentPath
 from pybers._persistence import readPackage
 from pybers._persistence.cells import (
+    chooseOffsetUnit,
     decodeRow,
-    offsetUnitFor,
 )
 
 # TST.Tile and TST.TableModelArchive. Named here rather than imported because
@@ -85,7 +85,7 @@ def decodeValueRow(name: str) -> dict[int, object]:
                         records = decodeRow(
                             info.cell_offsets,
                             info.cell_storage_buffer,
-                            offsetUnitFor(
+                            chooseOffsetUnit(
                                 info.has_wide_offsets,
                                 tile.should_use_wide_rows,
                             ),

@@ -37,7 +37,7 @@ from typing import cast
 
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import CellDecodeError, decodeRow, offsetUnitFor
+from .._persistence import CellDecodeError, chooseOffsetUnit, decodeRow
 from .._persistence.cells import CellRecord, carriesChosenFormat
 from .._persistence.index import (
     ArchiveIndex,
@@ -173,7 +173,7 @@ def readTable(
                 records = decodeRow(
                     rowInfo.cell_offsets,
                     rowInfo.cell_storage_buffer,
-                    offsetUnitFor(
+                    chooseOffsetUnit(
                         rowInfo.has_wide_offsets, tile.should_use_wide_rows
                     ),
                 )

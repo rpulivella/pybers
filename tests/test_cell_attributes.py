@@ -39,12 +39,12 @@ from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.cells import (
     CellRecord,
+    chooseOffsetUnit,
     decodeRow,
-    formulaKeySlot,
-    offsetUnitFor,
+    findFormulaKeySlot,
 )
 from pybers._persistence.index import ArchiveIndex
-from pybers._persistence.types import archiveTypeId, archiveTypes
+from pybers._persistence.types import archiveTypes, readArchiveTypeId
 from pybers.formula._read import resolveFormula
 
 fixtureName: str = "47-formula-cell-attributes"
@@ -84,7 +84,7 @@ def readFormulaTables(path: Path) -> list[tuple[str, dict[int, int], list[CellRe
     tables: list[tuple[str, dict[int, int], list[CellRecord]]] = []
     for identifier in index.byIdentifier:
         archive = index.archive(identifier)
-        if archiveTypeId(archive) != tableModelType:
+        if readArchiveTypeId(archive) != tableModelType:
             continue
         model = tst.TableModelArchive()
         model.ParseFromString(archive.messages[0].data)
@@ -104,7 +104,7 @@ def readFormulaTables(path: Path) -> list[tuple[str, dict[int, int], list[CellRe
         for entry in store.tiles.tiles:
             tile = index.resolve(entry.tile, tst.Tile)
             for info in tile.rowInfos:
-                unit = offsetUnitFor(
+                unit = chooseOffsetUnit(
                     info.has_wide_offsets, tile.should_use_wide_rows
                 )
                 records.extend(
@@ -153,9 +153,10 @@ def testTheKeyMovesAsACellGainsAttributes() -> None:
     """
     path = findDocumentPath(fixtureName)
 
-    assert {formulaKeySlot(r) for r in readNamedFormulaRecords(path, "Plain")} == {0}
+    plain = readNamedFormulaRecords(path, "Plain")
+    assert {findFormulaKeySlot(r) for r in plain} == {0}
     assert sorted(
-        formulaKeySlot(r) for r in readNamedFormulaRecords(path, "Decorated")
+        findFormulaKeySlot(r) for r in readNamedFormulaRecords(path, "Decorated")
     ) == sorted(decoratedSlots.values())
 
 
@@ -173,7 +174,7 @@ def testTheSlotRuleReproducesEveryPooledRefcount() -> None:
             if not refcounts:
                 continue
             counted = collections.Counter(
-                record.references[formulaKeySlot(record)] for record in records
+                record.references[findFormulaKeySlot(record)] for record in records
             )
             assert dict(counted) == refcounts, f"{path.name} / {table}"
             checked += 1

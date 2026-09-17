@@ -122,12 +122,12 @@ def remapReferences(message: Message, mapping: Mapping[int, int]) -> None:
             items = list(value) if descriptor.is_repeated else [value]
         for item in items:
             if descriptor.message_type.full_name == referenceTypeName:
-                item.identifier = identifierMapped(item.identifier, mapping)
+                item.identifier = mapIdentifier(item.identifier, mapping)
             else:
                 remapReferences(item, mapping)
 
 
-def identifierMapped(identifier: int, mapping: Mapping[int, int]) -> int:
+def mapIdentifier(identifier: int, mapping: Mapping[int, int]) -> int:
     """Return what a template identifier becomes, or refuse one nothing binds."""
     mapped = mapping.get(identifier)
     if mapped is None:
@@ -176,7 +176,7 @@ class TemplateCopies:
             info.identifier = copy.identifier
             for message in info.message_infos:
                 remapped = [
-                    identifierMapped(target, self.mapping)
+                    mapIdentifier(target, self.mapping)
                     for target in message.object_references
                 ]
                 del message.object_references[:]
@@ -203,7 +203,7 @@ def copyTemplates(
         for message in template.info.message_infos:
             for target in message.object_references:
                 if target not in internal and target not in bound:
-                    identifierMapped(target, bound)
+                    mapIdentifier(target, bound)
     mapping = dict(bound)
     for template in templates:
         mapping[template.info.identifier] = registry.identifierAllocate()

@@ -71,12 +71,12 @@ class ReferenceError(PybersError, ValueError):
     """An address that is not a valid A1-style reference, range or list."""
 
 
-def columnLetter(col: int) -> str:
+def toColumnLetter(col: int) -> str:
     """Return the letter label for a column number, 1 to A and 27 to AA.
 
     The only public conversion in this direction, so a base-26 correction lands in
     one place rather than in each caller that grew its own. Bounded at both ends
-    like `columnNumber`, so the two agree on which columns exist and stay inverses
+    like `toColumnNumber`, so the two agree on which columns exist and stay inverses
     over every number either accepts.
     """
     if col < firstColumn:
@@ -95,7 +95,7 @@ def columnLetter(col: int) -> str:
     return letters
 
 
-def columnNumber(letters: str) -> int:
+def toColumnNumber(letters: str) -> int:
     """Return the column number for a letter label, A to 1 and AA to 27.
 
     Refuses a label past the last column a table can hold. Every letter is a valid
@@ -116,7 +116,7 @@ def columnNumber(letters: str) -> int:
     return col
 
 
-def markerFor(absolute: bool) -> str:
+def chooseMarker(absolute: bool) -> str:
     """Return the locking marker a coordinate is written with, or nothing."""
     return absoluteMarker if absolute else ""
 
@@ -182,7 +182,7 @@ class CellReference:
             )
         return cls(
             int(digits),
-            columnNumber(letters),
+            toColumnNumber(letters),
             rowAbsolute=rowMarker == absoluteMarker,
             colAbsolute=colMarker == absoluteMarker,
         )
@@ -190,8 +190,8 @@ class CellReference:
     def asReference(self) -> str:
         """Return this address as it would be written, markers included."""
         return (
-            f"{markerFor(self.colAbsolute)}{columnLetter(self.col)}"
-            f"{markerFor(self.rowAbsolute)}{self.row}"
+            f"{chooseMarker(self.colAbsolute)}{toColumnLetter(self.col)}"
+            f"{chooseMarker(self.rowAbsolute)}{self.row}"
         )
 
     def asRowColumn(self) -> tuple[int, int]:

@@ -140,18 +140,18 @@ functionsByIndex: Final[MappingProxyType[int, NumbersFunction]] = MappingProxyTy
 })
 
 
-def functionFor(index: int) -> NumbersFunction | None:
+def findFunction(index: int) -> NumbersFunction | None:
     """Return the function an index names, or None when the table lacks it."""
     return functionsByIndex.get(index)
 
 
-def functionNameFor(index: int) -> str | None:
+def findFunctionName(index: int) -> str | None:
     """Return the name of a function index, or None when the table lacks it."""
     function = functionsByIndex.get(index)
     return None if function is None else function.name
 
 
-def functionNamed(name: str) -> NumbersFunction:
+def findFunctionNamed(name: str) -> NumbersFunction:
     """Return the function Numbers spells `name`, `SUM` or `sum` alike.
 
     Raises rather than guessing, because an index invented for an unknown name
@@ -171,14 +171,14 @@ def functionNamed(name: str) -> NumbersFunction:
     return function
 
 
-def functionIndexFor(name: str) -> int:
+def findFunctionIndex(name: str) -> int:
     """Return the index of a function named as Numbers spells it.
 
     Raises for one the format stores as node types rather than as an indexed
     call, since there is no index to return and inventing one would write a
     formula calling something else.
     """
-    function = functionNamed(name)
+    function = findFunctionNamed(name)
     if function.index is None:
         raise UnknownFunctionError(
             f"{function.name} is stored as its own node types rather than as an "

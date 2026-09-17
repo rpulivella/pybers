@@ -103,7 +103,7 @@ class ArchiveTypeError(PybersError, RuntimeError):
     """An archive whose type is not in the registry, or which failed to parse."""
 
 
-def archiveTypeId(archive: Archive) -> int:
+def readArchiveTypeId(archive: Archive) -> int:
     """Return the type identifier that classifies an archive.
 
     The first message is the archive itself and any others are companions to it.
@@ -128,7 +128,7 @@ def parseArchive(archive: Archive) -> Message:
     so an unknown type there means the read path is wrong, and continuing past it
     would build a model with a silent hole in it.
     """
-    typeId = archiveTypeId(archive)
+    typeId = readArchiveTypeId(archive)
     messageClass = archiveTypes.get(typeId)
     if messageClass is None:
         raise ArchiveTypeError(

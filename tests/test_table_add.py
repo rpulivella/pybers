@@ -28,7 +28,7 @@ import pytest
 
 import pybers
 from conftest import findDocumentPath, readArchiveBodies
-from pybers._engine import calculationEngine
+from pybers._engine import findCalculationEngine
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSSArchives_pb2 as tss
@@ -353,7 +353,7 @@ def testACreatedTableRegistersElevenOwnersOnItsIdentity(tmp_path: Path) -> None:
     base = words[0] | words[1] << 32 | words[2] << 64 | words[3] << 96
 
     kinds = set()
-    for reference in calculationEngine(
+    for reference in findCalculationEngine(
         index
     ).dependency_tracker.formula_owner_dependencies:
         owner = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
@@ -367,7 +367,7 @@ def testACreatedTableRegistersElevenOwnersOnItsIdentity(tmp_path: Path) -> None:
 def testEveryCreatedTableGetsItsOwnHeaderNameSlot(tmp_path: Path) -> None:
     index = ArchiveIndex(readPackage(saveWithTables(tmp_path)))
     names = index.resolve(
-        calculationEngine(index).header_name_manager, tst.HeaderNameMgrArchive
+        findCalculationEngine(index).header_name_manager, tst.HeaderNameMgrArchive
     )
 
     slots = [entry.per_table_precedent.column for entry in names.per_tables]

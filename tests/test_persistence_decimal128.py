@@ -29,7 +29,7 @@ import pytest
 
 from conftest import allDocuments
 from pybers._persistence import readPackage
-from pybers._persistence.cells import decodeRow, offsetUnitFor
+from pybers._persistence.cells import chooseOffsetUnit, decodeRow
 from pybers._persistence.decimal128 import (
     Decimal128,
     Decimal128Error,
@@ -54,7 +54,7 @@ def readEveryDecimal(path: Path) -> list[tuple[Decimal, bytes]]:
                 tile = tst.Tile()
                 tile.ParseFromString(message.data)
                 for info in tile.rowInfos:
-                    unit = offsetUnitFor(
+                    unit = chooseOffsetUnit(
                         info.has_wide_offsets, tile.should_use_wide_rows
                     )
                     for record in decodeRow(

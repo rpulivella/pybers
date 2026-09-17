@@ -68,7 +68,7 @@ def generateUuid() -> tsp.UUID:
     return tsp.UUID(lower=value & 0xFFFFFFFFFFFFFFFF, upper=value >> 64)
 
 
-def sheetBindings(index: ArchiveIndex, root: tn.DocumentArchive) -> dict[int, int]:
+def bindSheetObjects(index: ArchiveIndex, root: tn.DocumentArchive) -> dict[int, int]:
     """Bind the template's document objects to those the first sheet already uses.
 
     Taken from an existing sheet rather than from the theme, so a created sheet shares
@@ -154,7 +154,7 @@ def createSheets(
     if not created:
         return
     templates = readTemplates(sheetTemplateDirectory)
-    bindings = sheetBindings(index, root)
+    bindings = bindSheetObjects(index, root)
     sidebar = index.resolve(root.sidebar_order, tsk.TreeNode)
     nodes = list(sidebar.children)
     nodeFor = {

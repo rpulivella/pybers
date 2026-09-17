@@ -75,7 +75,7 @@ class Precedents:
     spans: tuple[SpanPrecedent, ...] = ()
 
 
-def formulaPrecedents(formula: Formula, host: CellReference) -> Precedents:
+def resolveFormulaPrecedents(formula: Formula, host: CellReference) -> Precedents:
     """Return what a formula reads, resolved against the cell holding it.
 
     Duplicates are dropped and order is kept, since a call naming one range twice
@@ -90,7 +90,7 @@ def formulaPrecedents(formula: Formula, host: CellReference) -> Precedents:
             if content.broken:
                 continue
             if content.row is None or content.column is None:
-                spans.update(dict.fromkeys(referenceSpans(content, host)))
+                spans.update(dict.fromkeys(expandReferenceSpans(content, host)))
                 continue
             cells[
                 CellPrecedent(
@@ -102,12 +102,12 @@ def formulaPrecedents(formula: Formula, host: CellReference) -> Precedents:
         elif isinstance(content, FormulaRange):
             extent = content.resolve(host)
             if extent.startRow is None or extent.endRow is None:
-                whole = rangeSpans(
+                whole = expandRangeSpans(
                     extent.startCol, extent.endCol, True, content.tableId
                 )
                 spans.update(dict.fromkeys(whole))
             elif extent.startCol is None or extent.endCol is None:
-                whole = rangeSpans(
+                whole = expandRangeSpans(
                     extent.startRow, extent.endRow, False, content.tableId
                 )
                 spans.update(dict.fromkeys(whole))
@@ -124,7 +124,7 @@ def formulaPrecedents(formula: Formula, host: CellReference) -> Precedents:
     return Precedents(tuple(cells), tuple(ranges), tuple(spans))
 
 
-def referenceSpans(
+def expandReferenceSpans(
     reference: FormulaReference, host: CellReference
 ) -> list[SpanPrecedent]:
     """Return the whole column or row one unbounded reference names."""
@@ -137,7 +137,7 @@ def referenceSpans(
     return []
 
 
-def rangeSpans(
+def expandRangeSpans(
     begin: int | None, end: int | None, columns: bool, tableId: str | None
 ) -> list[SpanPrecedent]:
     """Return the whole columns or rows one half-unbounded range names."""
@@ -153,5 +153,5 @@ __all__ = [
     "Precedents",
     "RangePrecedent",
     "SpanPrecedent",
-    "formulaPrecedents",
+    "resolveFormulaPrecedents",
 ]

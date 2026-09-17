@@ -38,21 +38,21 @@ from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import CellRecord, decodeRecord, readPackage, writePackage
 from pybers._persistence.cells import (
     carriesFormula,
+    chooseOffsetUnit,
     decodeRow,
-    formulaKeySlot,
-    offsetUnitFor,
+    findFormulaKeySlot,
 )
 from pybers._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
 from pybers.errors import WriteError
 from pybers.table._write import (
-    borrowedShape,
+    borrowShape,
     countedFormatSlots,
     countedStyleSlots,
+    countFormatClaims,
     displayedKindSlot,
-    formatClaims,
-    referenceSlots,
-    richTextClaims,
-    stringClaims,
+    listReferenceSlots,
+    listRichTextClaims,
+    listStringClaims,
     textFormatSlot,
 )
 
@@ -87,7 +87,7 @@ def readTableRecords(
     for entry in store.tiles.tiles:
         tile = index.resolve(entry.tile, tst.Tile)
         for rowInfo in tile.rowInfos:
-            unit = offsetUnitFor(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
             records.extend(decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
             ))
@@ -98,13 +98,13 @@ def countCellClaims(index: ArchiveIndex, model: tst.TableModelArchive) -> Counte
     """Return how often this table's cells name each format."""
     counted: Counter[int] = Counter()
     for record in readTableRecords(index, model):
-        counted.update(formatClaims(record.raw))
+        counted.update(countFormatClaims(record.raw))
     return counted
 
 
 def readDisplayedKind(record: CellRecord) -> tuple[int | None, set[int]]:
     """Return the kind a record displays with, and the kinds of the slots it holds."""
-    named = dict(zip(referenceSlots(record.raw), record.references, strict=True))
+    named = dict(zip(listReferenceSlots(record.raw), record.references, strict=True))
     held = {
         position + 1 for position, slot in enumerate(countedFormatSlots)
         if slot in named
@@ -337,10 +337,10 @@ def test_aBorrowedShapeKeepsOnlyTheFormatSlotOfItsOwnKind() -> None:
     would claim counts in slots this library does not maintain.
     """
     record = readRecordAt(findDocumentPath("15-number-duration-formats"), "N2")
-    shaped = decodeRecord(record.column, borrowedShape(record))
+    shaped = decodeRecord(record.column, borrowShape(record))
 
-    kept = set(referenceSlots(shaped.raw))
-    assert len(referenceSlots(record.raw)) == 5, "the measured cell remembers formats"
+    kept = set(listReferenceSlots(shaped.raw))
+    assert len(listReferenceSlots(record.raw)) == 5, "the cell remembers formats"
     assert kept == {textFormatSlot, displayedKindSlot}
     assert not shaped.raw[6] & 0x80, "a chosen format is not borrowed either"
     assert shaped.value == record.value
@@ -501,11 +501,11 @@ def countPooledReferences(
     strings: Counter[int] = Counter()
     styles: Counter[int] = Counter()
     for record in readTableRecords(index, model):
-        strings.update(stringClaims(record))
+        strings.update(listStringClaims(record))
         styles.update(
             key
             for slot, key in zip(
-                referenceSlots(record.raw), record.references, strict=True
+                listReferenceSlots(record.raw), record.references, strict=True
             )
             if slot in countedStyleSlots
         )
@@ -589,7 +589,7 @@ def test_aMergeReleasesTheStylesOfTheRecordItRemoves(tmp_path: Path) -> None:
     document.sheets[0].tables[0].mergeAdd("L3:M3")
     document.save()
 
-    assert {slot for slot in referenceSlots(before.raw)} >= set(countedStyleSlots)
+    assert {slot for slot in listReferenceSlots(before.raw)} >= set(countedStyleSlots)
     for index, model in readTableModels(working):
         assert findDisagreeingLists(index, model) == []
 
@@ -658,10 +658,12 @@ def findDisagreeingPools(path: Path) -> list[str]:
         store = model.base_data_store
         records = readTableRecords(index, model)
         formulas = Counter(
-            record.references[formulaKeySlot(record)]
+            record.references[findFormulaKeySlot(record)]
             for record in records if carriesFormula(record)
         )
-        richText = Counter(key for record in records for key in richTextClaims(record))
+        richText = Counter(
+            key for record in records for key in listRichTextClaims(record)
+        )
         for name, present, reference, counted in (
             ("formula", store.formula_table.identifier, store.formula_table, formulas),
             ("rich text", store.HasField("rich_text_table"), store.rich_text_table,

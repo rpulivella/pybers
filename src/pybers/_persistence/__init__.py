@@ -38,10 +38,10 @@ from .cells import (
     CellDecodeError,
     CellRecord,
     carriesFormula,
+    chooseOffsetUnit,
     decodeCellValue,
     decodeRecord,
     decodeRow,
-    offsetUnitFor,
 )
 from .compression import SnappyError, compressRaw, decompressRaw
 from .container import (
@@ -70,7 +70,7 @@ from .iwa import (
     writeArchives,
     writeIWAFile,
 )
-from .metadata import MetadataError, PackageRegistry, memberNameFor
+from .metadata import MetadataError, PackageRegistry, findMemberName
 from .varint import VarintError, readVarint, writeVarint
 
 __all__ = [
@@ -79,7 +79,7 @@ __all__ = [
     "createArchive",
     "MetadataError",
     "PackageRegistry",
-    "memberNameFor",
+    "findMemberName",
     "ArchiveMessage",
     "CellDecodeError",
     "CellRecord",
@@ -101,7 +101,7 @@ __all__ = [
     "decompressPayload",
     "decompressRaw",
     "isDocumentMember",
-    "offsetUnitFor",
+    "chooseOffsetUnit",
     "readArchives",
     "readIWAFile",
     "readPackage",

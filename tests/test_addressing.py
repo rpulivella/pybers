@@ -32,8 +32,8 @@ from pybers.addressing import (
     CellRangeList,
     CellReference,
     ReferenceError,
-    columnLetter,
-    columnNumber,
+    toColumnLetter,
+    toColumnNumber,
 )
 from pybers.addressing import reference as referenceModule
 from pybers.addressing.reference import (
@@ -74,18 +74,18 @@ def test_aReferenceIsBuiltFromAStringOrFromARowAndColumn() -> None:
 @pytest.mark.parametrize("col", boundaryColumns)
 def test_aColumnSurvivesTheBase26Boundary(col: int) -> None:
     """Z is 26 and AA is 27, so a plain base conversion is off by one here."""
-    assert columnNumber(columnLetter(col)) == col
+    assert toColumnNumber(toColumnLetter(col)) == col
 
 
 def test_theBase26BoundaryIsWhereItIsClaimedToBe() -> None:
     """Pin the boundary itself, since the round trip above would survive a
     conversion that was self-consistently wrong in both directions."""
-    assert columnLetter(1) == "A"
-    assert columnLetter(26) == "Z"
-    assert columnLetter(27) == "AA"
-    assert columnLetter(702) == "ZZ"
-    assert columnLetter(703) == "AAA"
-    assert columnNumber("AA") == 27
+    assert toColumnLetter(1) == "A"
+    assert toColumnLetter(26) == "Z"
+    assert toColumnLetter(27) == "AA"
+    assert toColumnLetter(702) == "ZZ"
+    assert toColumnLetter(703) == "AAA"
+    assert toColumnNumber("AA") == 27
 
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
@@ -378,9 +378,9 @@ def test_anEmptyRangeInAListIsRefused() -> None:
 def test_thereIsOneConversionBetweenAColumnLetterAndAColumnNumber() -> None:
     """The loose helpers `table.py` carried are retired, so the conversion has one
     home and a base-26 correction lands once."""
-    assert pybers.columnLetter is referenceModule.columnLetter
-    assert pybers.columnNumber is referenceModule.columnNumber
-    for name in ("columnLetter", "columnNumber", "parseReference"):
+    assert pybers.toColumnLetter is referenceModule.toColumnLetter
+    assert pybers.toColumnNumber is referenceModule.toColumnNumber
+    for name in ("toColumnLetter", "toColumnNumber", "parseReference"):
         assert name not in vars(tableModule)
 
 
@@ -393,7 +393,7 @@ def test_thereIsOneConversionBetweenAColumnLetterAndAColumnNumber() -> None:
 )
 def test_aColumnLabelInsideTheLimitStillConverts(letters: str, column: int) -> None:
     """The last column a table can hold is `ALL`, and it is not the one refused."""
-    assert columnNumber(letters) == column
+    assert toColumnNumber(letters) == column
 
 
 @pytest.mark.parametrize("letters", ["ALM", "AMJ", "Ledger", "ZZZZ"])
@@ -404,7 +404,7 @@ def test_aColumnLabelPastTheLimitIsRefusedRatherThanConverted(letters: str) -> N
     with nothing raising. Found reviewing #67.
     """
     with pytest.raises(ReferenceError, match="past column"):
-        columnNumber(letters)
+        toColumnNumber(letters)
 
 
 def test_anAddressPastEitherLimitIsRefusedAtConstruction() -> None:
@@ -429,13 +429,13 @@ def test_aRangeEndpointPastTheRowLimitIsRefusedNamingWhatWasWritten() -> None:
 def test_theTwoColumnConversionsAgreeOnWhichColumnsExist() -> None:
     """A bound on one and not the other leaves them disagreeing above it.
 
-    `columnLetter(1001)` produced `ALM`, which `columnNumber` then refused, so the
+    `toColumnLetter(1001)` produced `ALM`, which `toColumnNumber` then refused, so the
     pair stopped being inverses exactly where the bound was added.
     """
     with pytest.raises(ReferenceError, match="past column"):
-        columnLetter(lastColumn + 1)
+        toColumnLetter(lastColumn + 1)
     assert all(
-        columnNumber(columnLetter(col)) == col
+        toColumnNumber(toColumnLetter(col)) == col
         for col in range(firstColumn, lastColumn + 1)
     )
 

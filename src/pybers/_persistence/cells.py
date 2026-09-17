@@ -199,7 +199,7 @@ byteEightOffset: int = 8
 # formulas were lost and a seventh was wrong.
 
 
-def formulaKeySlot(record: CellRecord) -> int:
+def findFormulaKeySlot(record: CellRecord) -> int:
     """Return which trailing reference of a record holds its formula key."""
     if len(record.raw) <= formulaFlagOffset:
         return 0
@@ -224,7 +224,7 @@ def carriesChosenFormat(record: CellRecord) -> bool:
     )
 
 
-def offsetUnitFor(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:
+def chooseOffsetUnit(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:
     """Return what one row's offsets count, from the archive's own two flags.
 
     The parameters carry Apple's spelling because they are Apple's fields:
