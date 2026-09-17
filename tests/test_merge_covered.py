@@ -34,12 +34,12 @@ import pytest
 import pybers
 from conftest import (
     findDocumentPath,
-    readArchiveBodies,
     readRecordedColumns,
     tableModelType,
 )
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
+from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import readArchiveTypeId
 from pybers.addressing.reference import ReferenceError as CellReferenceError
@@ -94,9 +94,8 @@ def testTheImportedFixtureWritesBackUnchanged(tmp_path: Path) -> None:
     """The base contract, on the one fixture holding covered records."""
     target = tmp_path / "written.numbers"
     pybers.open(importedFixture).save(target)
-    assert readArchiveBodies(readPackage(target)) == readArchiveBodies(
-        readPackage(importedFixture)
-    )
+    before, after = readPackage(importedFixture), readPackage(target)
+    assert listPackageDifferences(before, after) == []
 
 
 def testNoGestureInNumbersProducesACoveredRecord() -> None:
@@ -162,6 +161,6 @@ def testAMergeOverACoveredRecordMatchesItsGoldenFile(tmp_path: Path) -> None:
     document.sheets[0].tables[0].mergeAdd("L3:M3")
     document.save()
 
-    assert readArchiveBodies(readPackage(golden)) == readArchiveBodies(
-        readPackage(working)
-    ), "the writer no longer produces the merge Numbers confirmed"
+    assert listPackageDifferences(readPackage(golden), readPackage(working)) == [], (
+        "the writer no longer produces the merge Numbers confirmed"
+    )

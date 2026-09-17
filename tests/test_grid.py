@@ -27,8 +27,9 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import findDocumentPath, readArchiveBodies
+from conftest import findDocumentPath
 from pybers._persistence import readPackage
+from pybers._persistence.difference import listPackageDifferences
 from pybers.addressing import ReferenceError
 from pybers.table import Cell, Table
 
@@ -193,9 +194,7 @@ def testAWalkChangesNothingInTheSavedFile(tmp_path: Path) -> None:
 
     document.save(walked)
 
-    assert readArchiveBodies(readPackage(walked)) == readArchiveBodies(
-        readPackage(untouched)
-    )
+    assert listPackageDifferences(readPackage(untouched), readPackage(walked)) == []
 
 
 # ── AC 4: no grid walks as nothing ───────────────────────────────────────────

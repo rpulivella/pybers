@@ -29,8 +29,9 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import findDocumentPath, readArchiveBodies, readRecordedRows
+from conftest import findDocumentPath, readRecordedRows
 from pybers._persistence import readPackage
+from pybers._persistence.difference import listPackageDifferences
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.table import Table
 
@@ -127,6 +128,5 @@ def testTheFixtureWritesBackUnchanged(tmp_path: Path) -> None:
     """The base contract, on the one fixture holding a merge taller than a row."""
     target = tmp_path / "written.numbers"
     pybers.open(multiRowFixture).save(target)
-    assert readArchiveBodies(readPackage(target)) == readArchiveBodies(
-        readPackage(multiRowFixture)
-    )
+    before, after = readPackage(multiRowFixture), readPackage(target)
+    assert listPackageDifferences(before, after) == []
