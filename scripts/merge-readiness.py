@@ -41,6 +41,7 @@ import re
 import subprocess
 import sys
 import tomllib
+import urllib.parse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,7 @@ console: Console = Console()
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 projectPath: Path = repositoryRoot / "pyproject.toml"
 reportWorkflowFile: str = "merge-readiness.yml"
+preflightWorkflowFile: str = "preflight.yml"
 failedExitCode: int = 1
 errorExitCode: int = 2
 
@@ -192,6 +194,19 @@ def runReport(arguments: argparse.Namespace) -> int:
     return failedExitCode if verdict == checks.failed else 0
 
 
+def findLatestPreflightRun(token: str, ref: str) -> int:
+    """Return the newest finished preflight run on a branch, which carries its facts."""
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
+        f"/actions/workflows/{preflightWorkflowFile}/runs"
+        f"?branch={urllib.parse.quote(ref)}&status=completed&per_page=1"
+    )
+    runs = ticket.requestJson(url, token).get("workflow_runs", [])
+    if not runs:
+        raise RuntimeError(f"no finished preflight run on {ref}")
+    return int(runs[0]["id"])
+
+
 def runDispatch(arguments: argparse.Namespace) -> int:
     """Ask GitHub to run the reporting workflow from a branch, on one preflight run.
 
@@ -202,11 +217,14 @@ def runDispatch(arguments: argparse.Namespace) -> int:
         f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
         f"/actions/workflows/{reportWorkflowFile}/dispatches"
     )
+    token = ticket.resolveToken()
+    runId = arguments.run_id or findLatestPreflightRun(token, arguments.ref)
     ticket.requestJson(
-        url, ticket.resolveToken(), method="POST",
-        payload={"ref": arguments.ref, "inputs": {"run-id": str(arguments.run_id)}},
+        url, token, method="POST",
+        payload={"ref": arguments.ref, "inputs": {"run-id": str(runId)}},
     )
-    console.print(f"[green]dispatched[/] {reportWorkflowFile} on {arguments.ref}")
+    console.print(f"[green]dispatched[/] {reportWorkflowFile} on {arguments.ref} "
+                  f"for preflight run {runId}")
     return 0
 
 
@@ -243,7 +261,7 @@ def buildParser() -> argparse.ArgumentParser:
         "dispatch", help="run the reporting workflow by hand, from a branch",
         formatter_class=RichHelpFormatter,
     )
-    dispatch.add_argument("--run-id", type=int, required=True, help="the preflight run")
+    dispatch.add_argument("--run-id", type=int, help="a preflight run, or the newest")
     dispatch.add_argument("--ref", required=True, help="the branch to run it from")
     dispatch.set_defaults(handler=runDispatch)
     return parser
