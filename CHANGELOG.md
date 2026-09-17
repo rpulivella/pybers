@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-83] Write a value Numbers will not interpret
 - [PYB-90] Separate measurement documents and findings from test fixtures
 - [PYB-86] Write a formula into a table pybers created
 - [PYB-92] Release the strings and styles a merge removes
