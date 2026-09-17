@@ -1,0 +1,77 @@
+# Measurements: one change from an origin
+
+A measurement is a document made from another document here by exactly one change, so that a
+diff against its origin shows where that change lives. Origins are in
+[`tests/fixtures/`](../fixtures/README.md). What each established is indexed in
+[FINDINGS.md](../../docs/findings/FINDINGS.md).
+
+## Making one
+
+- **Save As from the origin, then make one change.** A new document renumbers every object
+  identifier, so it cannot be compared; a Save As copy kept 36 of 37 members named alike.
+- **A star, not a chain.** Derive from the origin directly, never from the previous
+  measurement, or isolating one change means unpicking the ones before it.
+- **Label what each cell displays**, in text beside it. What was typed cannot be recovered
+  from the file, and `13-number-percent` showed the two can differ.
+- Preview images and selection archives change on every save and mean nothing.
+- Saved from **Numbers 15.3.1**, the version that supplied `src/pybers/protos/`.
+
+## Catalog
+
+| Document | Origin | The one change | Finding |
+| --- | --- | --- | --- |
+| `01-text-plain` | `00-baseline` | a plain string, which creates no archives | [text](../../docs/findings/findings-04-text.md) |
+| `02-text-rich` | `00-baseline` | four differently formatted runs in one cell | [text](../../docs/findings/findings-04-text.md) |
+| `03-text-multiline` | `00-baseline` | two paragraphs in one cell | [text](../../docs/findings/findings-04-text.md) |
+| `04-text-monospace` | `00-baseline` | a font change over a whole cell | [text](../../docs/findings/findings-04-text.md) |
+| `05-opentype` | `00-baseline` | ten character styles carrying OpenType features | [text](../../docs/findings/findings-04-text.md) |
+| `06-strikethrough` | `00-baseline` | strikethrough over a whole cell | [text](../../docs/findings/findings-04-text.md) |
+| `07-text-superscript` | `00-baseline` | synthetic superscript beside the real OpenType feature | [text](../../docs/findings/findings-04-text.md) |
+| `08-text-para-backgrounds` | `00-baseline` | a text background at paragraph and at character scope | [text](../../docs/findings/findings-04-text.md) |
+| `09-text-capitalization` | `00-baseline` | all caps | [text](../../docs/findings/findings-04-text.md) |
+| `10-text-ligatures` | `00-baseline` | ligatures off on a paragraph, overridden on some letters | [text](../../docs/findings/findings-04-text.md) |
+| `11-value-types-noformats` | `00-baseline` | one cell of every value type, labeled | [values](../../docs/findings/findings-01-values.md) |
+| `12-number-currency` | `00-baseline` | nine currency formats beside a plain number | [values](../../docs/findings/findings-01-values.md) |
+| `13-number-percent` | `00-baseline` | percent formats | [values](../../docs/findings/findings-01-values.md) |
+| `14-number-date` | `00-baseline` | date and time formats | [values](../../docs/findings/findings-01-values.md) |
+| `15-number-duration-formats` | `00-baseline` | one duration in every duration format | [values](../../docs/findings/findings-01-values.md) |
+| `16-number-scientific-numeralsystems` | `00-baseline` | scientific notation and numeral systems | [values](../../docs/findings/findings-01-values.md) |
+| `17-number-custom` | `00-baseline` | a custom format with positive, negative and zero forms | [values](../../docs/findings/findings-01-values.md) |
+| `18-formula-literals` | `00-baseline` | formulas computed from literals only | [formulas](../../docs/findings/findings-02-formulas.md) |
+| `19-formula-dragged` | `00-baseline` | relative, locked and mixed references, dragged down a row | [formulas](../../docs/findings/findings-02-formulas.md) |
+| `20-formula-shapes` | `00-baseline` | ranges, nesting, whole columns, and references across tables and sheets | [formulas](../../docs/findings/findings-02-formulas.md) |
+| `21-formula-errors` | `00-baseline` | broken references, an unknown function, and circularity | [formulas](../../docs/findings/findings-02-formulas.md) |
+| `22-merge-2x2` | `00-baseline` | five merges, two over content, read by formulas | [structure](../../docs/findings/findings-03-structure.md) |
+| `22b-merge-2x2-unmerged` | `22-merge-2x2` | every merge removed | [structure](../../docs/findings/findings-03-structure.md) |
+| `23-row-inserted` | `22-merge-2x2` | rows inserted around the merged row | [structure](../../docs/findings/findings-03-structure.md) |
+| `24-column-inserted` | `22-merge-2x2` | columns inserted through the merges | [structure](../../docs/findings/findings-03-structure.md) |
+| `25-multi-tables` | `00-baseline` | more tables on one sheet | [structure](../../docs/findings/findings-03-structure.md) |
+| `26-multi-sheets` | `00-baseline` | three sheets, with a tab color and a background | [structure](../../docs/findings/findings-03-structure.md) |
+| `28-style-fills` | `00-baseline` | ten fills, including three image fills of `tile-pattern.png` | [styles](../../docs/findings/findings-06-styles.md) |
+| `29-style-border` | `00-baseline` | cell borders, a table outline, gridlines and banding | [styles](../../docs/findings/findings-06-styles.md) |
+| `30-style-align` | `00-baseline` | horizontal and vertical alignment and wrap | [styles](../../docs/findings/findings-06-styles.md) |
+| `31-style-inset-2pt` | `00-baseline` | cell insets and paragraph indents | [styles](../../docs/findings/findings-06-styles.md) |
+| `32-named-styles` | `00-baseline` | a named style applied, and formatting over it | [styles](../../docs/findings/findings-06-styles.md) |
+| `33-textbox` | `00-baseline` | text boxes nudged, flipped and rotated | [drawables](../../docs/findings/findings-07-drawables.md) |
+| `34-shape` | `00-baseline` | nine shape kinds sharing styles | [drawables](../../docs/findings/findings-07-drawables.md) |
+| `35-image` | `00-baseline` | `orientation-test.png` and `tile-pattern.png` in thirteen placements | [drawables](../../docs/findings/findings-07-drawables.md) |
+| `36-unicode-text` | `00-baseline` | accented, CJK, astral, emoji and right-to-left text | [text](../../docs/findings/findings-04-text.md) |
+| `37-text-baselineshift` | `00-baseline` | baseline shift, and line spacing modes | [text](../../docs/findings/findings-04-text.md) |
+| `38-text-outline-shadow` | `00-baseline` | text outlines in every dash and brush, and shadows | [text](../../docs/findings/findings-04-text.md) |
+| `39-text-tabs-indents` | `00-baseline` | tab stops and indents on a cell and on a paragraph | [text](../../docs/findings/findings-04-text.md) |
+| `40-table-bands` | `00-baseline` | header, footer and frozen bands, set and unset | [structure](../../docs/findings/findings-03-structure.md) |
+| `41-table-geometry` | `00-baseline` | tables resized, moved, and a row and a column hidden | [structure](../../docs/findings/findings-03-structure.md) |
+| `42-table-titles-captions` | `00-baseline` | table titles and captions | [structure](../../docs/findings/findings-03-structure.md) |
+| `43-stroke-dashes` | `00-baseline` | every dash preset at 1pt and 5pt | [drawables](../../docs/findings/findings-07-drawables.md) |
+| `44-line-ends` | `00-baseline` | connectors attached to shapes | [drawables](../../docs/findings/findings-07-drawables.md) |
+| `46-formula-rare-functions` | `27-big-table` | rare functions typed over labels rewritten by `workarea/fixture-build/build46.py` | [formula text](../../docs/findings/findings-08-formula-text.md) |
+| `49-sheet-inserted` | `48-table-inserted` | a sheet inserted | [creation](../../docs/findings/findings-10-creation.md) |
+| `50-table-inserted-beside` | `48-table-inserted` | a table inserted beside the existing one | [creation](../../docs/findings/findings-10-creation.md) |
+| `51-table-pasted-name-clash` | `48-table-inserted` | the table copied and pasted | [creation](../../docs/findings/findings-10-creation.md) |
+| `54-format-star-rating` | `00-baseline` | a star-rating control and a label | [values](../../docs/findings/findings-01-values.md) |
+| `54b-format-star-rating-released` | `54-format-star-rating` | the control's format set to Text, and the label retyped | [values](../../docs/findings/findings-01-values.md) |
+| `54c-format-star-rating-cleared` | `54-format-star-rating` | Clear All on `A1:A2` | [values](../../docs/findings/findings-01-values.md) |
+| `55-table-inserted-formula` | `48-table-inserted` | `2` in `A1` and `=A1*3` in `B1` | [creation](../../docs/findings/findings-10-creation.md) |
+
+`tile-pattern.png` and `orientation-test.png` are the source images, generated by
+`workarea/make-tile.py` and `workarea/make-image.py`.

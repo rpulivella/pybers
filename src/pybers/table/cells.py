@@ -21,7 +21,7 @@ UPDATES
             name nothing and raise: one beyond that grid, and one swallowed by a
             merge.
 2026-08-17  Typed Cell.value, and pinned numbers to Decimal rather than float.
-            Numbers stores them as IEEE-754 decimal128, measured in the fixtures,
+            Numbers stores them as IEEE-754 decimal128, measured in the documents,
             so a float would introduce binary rounding error into documents that
             never had any.
 2026-08-12  Initial scaffold.
@@ -399,7 +399,7 @@ class Table:
         """Return the grid this table declares, or None when it has none.
 
         Read from the declared size, never derived from populated cells: 7 of the 74
-        tables in the corpus declare more than their cells reach, so deriving it
+        tables in the documents declare more than their cells reach, so deriving it
         returns a real rectangle smaller than the table.
         """
         if self.rowCount < 1 or self.colCount < 1:
@@ -436,7 +436,7 @@ class Table:
         record at each one, which a save preserves rather than cleans up.
         """
         extent = self.rangeSingle(address, "merge")
-        # A single cell is refused because Numbers cannot produce one: no fixture holds
+        # A single cell is refused because Numbers cannot produce one: no document holds
         # a merge covering one cell and the interface offers no way to make one, so
         # writing the formula for it would put a construct in the file that has never
         # been confirmed to open. Declining to invent is not the same as inventing a

@@ -11,7 +11,7 @@ had no cell to put them in, and refused to open at all.
 `22e-merge-imported` is that document, converted from a generated workbook.
 `22c-merge-overpaints` is the control: four gestures in Numbers itself, none of
 which produces a covered record. Both measured 2026-09-07; see
-tests/fixtures/README.md.
+docs/findings/findings-03-structure.md.
 
 UPDATES
 2026-09-07  Written for #49.
@@ -32,7 +32,12 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, recordedColumns, tableModelType
+from conftest import (
+    findDocumentPath,
+    readArchiveBodies,
+    readRecordedColumns,
+    tableModelType,
+)
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.index import ArchiveIndex
@@ -40,9 +45,8 @@ from pybers._persistence.types import archiveTypeId
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.table import MergeRange, Table
 
-fixtures: Path = Path(__file__).parent / "fixtures"
-importedFixture: Path = fixtures / "22e-merge-imported.numbers"
-overpaintFixture: Path = fixtures / "22c-merge-overpaints.numbers"
+importedFixture: Path = findDocumentPath("22e-merge-imported")
+overpaintFixture: Path = findDocumentPath("22c-merge-overpaints")
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # The covered positions of the imported fixture's three merges, A1:B1, C1:E1
@@ -51,20 +55,20 @@ goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 coveredPositions: tuple[str, ...] = ("B1", "D1", "E1")
 
 
-def firstTable(document: pybers.Document) -> Table:
+def findFirstTable(document: pybers.Document) -> Table:
     """Return the document's first table."""
     return document.sheets[0].tables[0]
 
 
 def testAnImportedMergeOpensAtAll() -> None:
     """The defect: the reader raised on the first covered record it decoded."""
-    table = firstTable(pybers.open(importedFixture))
+    table = findFirstTable(pybers.open(importedFixture))
     assert table.cell("A1").value == "two wide, anchor"
 
 
 def testEveryAnchorReportsTheValueNumbersShows() -> None:
     """Three merges, two and three and two wide, each labeling itself."""
-    table = firstTable(pybers.open(importedFixture))
+    table = findFirstTable(pybers.open(importedFixture))
     assert table.cell("C1").value == "three wide, anchor"
     assert table.cell("F1").value == "covered holds a value, anchor"
 
@@ -76,21 +80,21 @@ def testACoveredPositionIsStillRefused(reference: str) -> None:
     Reading a record at a covered position and handing out a cell there are two
     different questions, and only the second is refused.
     """
-    table = firstTable(pybers.open(importedFixture))
+    table = findFirstTable(pybers.open(importedFixture))
     with pytest.raises(CellReferenceError, match="covered by the merge"):
         table.cell(reference)
 
 
 def testTheCoveredRecordsSurviveARoundTrip() -> None:
     """A save must not strip records the document arrived with."""
-    assert recordedColumns(importedFixture, 0) == {0, 1, 2, 3, 4, 5}
+    assert readRecordedColumns(importedFixture, 0) == {0, 1, 2, 3, 4, 5}
 
 
 def testTheImportedFixtureWritesBackUnchanged(tmp_path: Path) -> None:
     """The base contract, on the one fixture holding covered records."""
     target = tmp_path / "written.numbers"
     pybers.open(importedFixture).save(target)
-    assert archiveBodies(readPackage(target)) == archiveBodies(
+    assert readArchiveBodies(readPackage(target)) == readArchiveBodies(
         readPackage(importedFixture)
     )
 
@@ -102,7 +106,7 @@ def testNoGestureInNumbersProducesACoveredRecord() -> None:
     filled, then had a whole-row fill painted over it. Every empty cell the fill
     touched gained a record and every covered position stayed absent.
     """
-    recorded = recordedColumns(overpaintFixture, 4)
+    recorded = readRecordedColumns(overpaintFixture, 4)
     assert recorded.isdisjoint({1, 3, 5, 6})
     assert {0, 2, 4}.issubset(recorded)
 
@@ -117,8 +121,8 @@ def testAMergePybersMakesStillClearsItsCoveredPositions(tmp_path: Path) -> None:
     document = pybers.open(overpaintFixture)
     document.sheets[0].tables[0].mergeAdd("L3:M3")
     document.save(target)
-    assert 12 in recordedColumns(overpaintFixture, 2)
-    assert 12 not in recordedColumns(target, 2)
+    assert 12 in readRecordedColumns(overpaintFixture, 2)
+    assert 12 not in readRecordedColumns(target, 2)
 
 
 def testAMergeAlreadyInTheFileIsNotTreatedAsAdded() -> None:
@@ -127,7 +131,7 @@ def testAMergeAlreadyInTheFileIsNotTreatedAsAdded() -> None:
 
     index = ArchiveIndex(readPackage(importedFixture))
     document = pybers.open(importedFixture)
-    table = firstTable(document)
+    table = findFirstTable(document)
     for identifier in index.byIdentifier:
         archive = index.archive(identifier)
         if archiveTypeId(archive) != tableModelType:
@@ -158,6 +162,6 @@ def testAMergeOverACoveredRecordMatchesItsGoldenFile(tmp_path: Path) -> None:
     document.sheets[0].tables[0].mergeAdd("L3:M3")
     document.save()
 
-    assert archiveBodies(readPackage(golden)) == archiveBodies(
+    assert readArchiveBodies(readPackage(golden)) == readArchiveBodies(
         readPackage(working)
     ), "the writer no longer produces the merge Numbers confirmed"

@@ -205,7 +205,7 @@ The Character Spacing control in "More Text Options" writes
 `CharacterStylePropertiesArchive.tracking`, **stored as a fraction rather than points**. A
 setting of +2% is `0.02`, so a reader must not report the stored number as a point value.
 
-Measured across every fixture in this directory, there are exactly two non-zero values:
+Measured across every document under `tests/fixtures/` and `tests/measurements/`, there are exactly two non-zero values:
 
 ```
 tracking = -0.01    in ALL 38 fixtures, including 00-baseline

@@ -3,9 +3,9 @@
 Base-128 varints, checked as an exact inverse pair and against real archive streams.
 
 The synthetic cases sit on the boundaries where the encoding grows a byte, which is
-where an off-by-one in the shift arithmetic would show. The corpus case is the one
-that matters most: every archive in every fixture is reached by reading a varint, so
-a bad decode desynchronizes the whole stream rather than raising.
+where an off-by-one in the shift arithmetic would show. The sweep across every document
+is the one that matters most: every archive in every document is reached by reading a
+varint, so a bad decode desynchronizes the whole stream rather than raising.
 
 UPDATES
 2026-09-01  Split out of the Snappy codec's tests with the code they cover.

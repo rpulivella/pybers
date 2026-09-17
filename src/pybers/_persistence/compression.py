@@ -17,7 +17,7 @@ so a decode that drifts is caught rather than returning plausible garbage.
 An unmodified frame is still written from the bytes it was read from, see
 `pybers._persistence.iwa`, so the encoder here runs only on a frame that was genuinely
 rewritten. It emits back-references rather than a stream of literals because the
-difference is large: measured across the 2,811 frames of the fixture corpus on
+difference is large: measured across the 2,811 frames of the documents on
 2026-09-01, Apple's own encoder reaches 0.183x and an all-literal encoding measures
 1.001x, so a rewritten member would arrive 5.5 times larger than Numbers writes it.
 
@@ -136,7 +136,7 @@ literalInlineMaximum: int = 59
 minimumMatchLength: int = 4
 
 # Match extension walks in blocks before it walks in bytes. Pure Python pays per
-# iteration rather than per byte, and the corpus is full of long runs, so
+# iteration rather than per byte, and the documents are full of long runs, so
 # comparing a slice at a time is what keeps a rewrite off the critical path.
 matchStrideLength: int = 16
 

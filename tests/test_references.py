@@ -2,7 +2,7 @@
 """\
 Every reference a document makes, found, followed and moved.
 
-`20-formula-shapes` is the fixture that matters here: it is the only one holding
+`20-formula-shapes` is the measurement that matters here: it is the only one holding
 a reference into another table and a reference into another sheet, side by side
 with six table-local ones, so a walk that took the wrong table has somewhere to
 show it.
@@ -31,12 +31,11 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, dataListBytes
+from conftest import findDocumentPath, readArchiveBodies, readDataListBytes
 from pybers import CellReference, Table
 from pybers._persistence import readPackage
 from pybers.formula.nodes import FormulaRange, FormulaReference, Span
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # What `20-formula-shapes` reads as before anything moves, which is also what the
@@ -93,25 +92,17 @@ retargetedText: dict[str, str] = {
 }
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
+def openShapes() -> pybers.Document:
+    """Return `20-formula-shapes`, the three-table two-sheet measurement."""
+    return pybers.open(findDocumentPath("20-formula-shapes"))
 
 
-def shapes() -> pybers.Document:
-    """Return `20-formula-shapes`, the three-table two-sheet fixture."""
-    return pybers.open(fixturePath("20-formula-shapes"))
+def copyDocument(name: str, into: Path) -> Path:
+    """Return a writable copy of a document, so a save never touches the documents."""
+    return Path(shutil.copy(findDocumentPath(name), into / f"{name}.numbers"))
 
 
-def workingCopy(name: str, into: Path) -> Path:
-    """Return a writable copy of a fixture, so a save never touches the corpus."""
-    return Path(shutil.copy(fixturePath(name), into / f"{name}.numbers"))
-
-
-def formulaTexts(table: Table) -> dict[str, str]:
+def readFormulaTexts(table: Table) -> dict[str, str]:
     """Return every formula a table holds, as text, keyed by its cell."""
     return {
         str(reference): cell.formulaText
@@ -122,7 +113,7 @@ def formulaTexts(table: Table) -> dict[str, str]:
     }
 
 
-def locationAt(document: pybers.Document, name: str) -> pybers.ReferenceLocation:
+def findLocationAt(document: pybers.Document, name: str) -> pybers.ReferenceLocation:
     """Return the one reference location in a named cell, where there is one."""
     return next(
         location
@@ -136,8 +127,8 @@ def locationAt(document: pybers.Document, name: str) -> pybers.ReferenceLocation
 
 def testACrossTableReferenceResolvesToTheTableObjectItNames() -> None:
     """AC 1. `G11` holds `=Table 2::A1`, and that is the Table 2 on Sheet 1."""
-    document = shapes()
-    assert locationAt(document, "G11").target is (
+    document = openShapes()
+    assert findLocationAt(document, "G11").target is (
         document.sheet("Sheet 1").table("Table 2")
     )
 
@@ -148,21 +139,21 @@ def testACrossSheetReferenceResolvesToTheTableOnTheOtherSheet() -> None:
     The archive draws no distinction between another table and another sheet, so
     the only thing separating these two is the identity, which is the claim.
     """
-    document = shapes()
-    far = locationAt(document, "H11").target
+    document = openShapes()
+    far = findLocationAt(document, "H11").target
     assert far is document.sheet("Sheet 2").table("Table 1")
     assert far is not document.sheet(1).table("Table 1")
 
 
 def testATableLocalReferenceTargetsTheTableHoldingIt() -> None:
     """AC 1. Every location has a table, so filtering by one tests no absence."""
-    document = shapes()
-    assert locationAt(document, "A11").target is document.sheet(1).table("Table 1")
+    document = openShapes()
+    assert findLocationAt(document, "A11").target is document.sheet(1).table("Table 1")
 
 
 def testTableForFindsATableByTheIdentityAFormulaNamesItBy() -> None:
     """AC 1. The reverse of `tableIdentities`, and what a location resolves through."""
-    document = shapes()
+    document = openShapes()
     table = document.sheet("Sheet 1").table("Table 2")
     assert document.tableFor(table.identifier) is table
 
@@ -170,7 +161,7 @@ def testTableForFindsATableByTheIdentityAFormulaNamesItBy() -> None:
 def testTableForRaisesNamingAnIdentityTheDocumentDoesNotHold() -> None:
     """AC 1. A miss says which identity failed rather than returning nothing."""
     with pytest.raises(pybers.SelectionError, match="ff" * 16):
-        shapes().tableFor("ff" * 16)
+        openShapes().tableFor("ff" * 16)
 
 
 def testTheWalkRefusesAReferenceIntoATableTheDocumentDoesNotHold() -> None:
@@ -179,7 +170,7 @@ def testTheWalkRefusesAReferenceIntoATableTheDocumentDoesNotHold() -> None:
     The refusal lives in the walk rather than in `tableFor`, and the two are
     separate branches, so a test of one says nothing about the other.
     """
-    document = shapes()
+    document = openShapes()
     document.sheet("Sheet 1").table("Table 2").identifier = "ff" * 16
 
     with pytest.raises(pybers.SelectionError, match="reaches into table"):
@@ -200,7 +191,7 @@ def testACellReferenceNeverNamesATable() -> None:
 
 def testEveryReferenceInTheDocumentIsWalkedInOneCall() -> None:
     """AC 2. Nine locations across eight formulas, none of them named in advance."""
-    locations = list(shapes().referencesIterate())
+    locations = list(openShapes().referencesIterate())
     assert [str(location.cell.reference) for location in locations] == [
         "A11", "B11", "C11", "C11", "D11", "E11", "F11", "G11", "H11",
     ]
@@ -209,7 +200,7 @@ def testEveryReferenceInTheDocumentIsWalkedInOneCall() -> None:
 def testTheWalkYieldsEachRangeOfAMultiRangeCallSeparately() -> None:
     """AC 2. `SUMIFS(A1:A10,A1:A10,">5")` is two ranges, and both can move."""
     locations = [
-        location for location in shapes().referencesIterate()
+        location for location in openShapes().referencesIterate()
         if str(location.cell.reference) == "C11"
     ]
     assert [location.index for location in locations] == [0, 1]
@@ -222,7 +213,7 @@ def testTheWalkFindsReferencesOnEverySheet() -> None:
     Both locations here point into Sheet 2's table: one from the sheet holding it and
     one from the sheet before it, so a walk finding either alone is short.
     """
-    document = shapes()
+    document = openShapes()
     far = document.sheet("Sheet 2").table("Table 1")
     far.cell("C1").formulaText = "=A1+1"
 
@@ -236,7 +227,7 @@ def testTheWalkFindsReferencesOnEverySheet() -> None:
 
 def testACellHoldingNoFormulaContributesNoSite() -> None:
     """AC 2. `20-formula-shapes` stores 96 cells and 8 of them hold a formula."""
-    document = shapes()
+    document = openShapes()
     stored = sum(
         len(table.cells) for sheet in document.sheets for table in sheet.tables
     )
@@ -245,7 +236,7 @@ def testACellHoldingNoFormulaContributesNoSite() -> None:
 
 def testASiteReportsWhetherItLeavesTheTableHoldingIt() -> None:
     """AC 2. What a CLI filters on, and the reason `target` alone is not enough."""
-    document = shapes()
+    document = openShapes()
     assert [
         str(location.cell.reference) for location in document.referencesIterate()
         if location.crossTable
@@ -254,16 +245,16 @@ def testASiteReportsWhetherItLeavesTheTableHoldingIt() -> None:
 
 def testASiteShowsItsReferenceAsNumbersSpellsIt() -> None:
     """AC 2. One reference on its own, without rendering the formula around it."""
-    document = shapes()
-    assert locationAt(document, "G11").text == "Table 2::A1"
-    assert locationAt(document, "H11").text == "Sheet 2::Table 1::A1"
-    assert locationAt(document, "F11").text == "A"
+    document = openShapes()
+    assert findLocationAt(document, "G11").text == "Table 2::A1"
+    assert findLocationAt(document, "H11").text == "Sheet 2::Table 1::A1"
+    assert findLocationAt(document, "F11").text == "A"
 
 
 def testASiteWhoseFormulaWasReplacedRefusesRatherThanReadingTheWrongNode() -> None:
     """AC 2. A location views a formula, so dropping that formula invalidates it."""
-    document = shapes()
-    location = locationAt(document, "A11")
+    document = openShapes()
+    location = findLocationAt(document, "A11")
     location.cell.formula = None
     with pytest.raises(pybers.FormulaError, match="no longer the reference"):
         _ = location.content
@@ -274,13 +265,14 @@ def testASiteWhoseFormulaWasReplacedRefusesRatherThanReadingTheWrongNode() -> No
 
 def testCrossTableLinksSurviveASaveAndAReopen(tmp_path: Path) -> None:
     """AC 3. Identity is what a link is, so the check is that it resolves again."""
-    working = workingCopy("20-formula-shapes", tmp_path)
+    working = copyDocument("20-formula-shapes", tmp_path)
     pybers.open(working).save()
 
     after = pybers.open(working)
-    assert locationAt(after, "G11").target is after.sheet("Sheet 1").table("Table 2")
-    assert locationAt(after, "H11").target is after.sheet("Sheet 2").table("Table 1")
-    assert formulaTexts(after.sheet(1).table("Table 1")) == originalText
+    firstSheet, secondSheet = after.sheet("Sheet 1"), after.sheet("Sheet 2")
+    assert findLocationAt(after, "G11").target is firstSheet.table("Table 2")
+    assert findLocationAt(after, "H11").target is secondSheet.table("Table 1")
+    assert readFormulaTexts(after.sheet(1).table("Table 1")) == originalText
 
 
 # ── AC 4: a scripted retarget ────────────────────────────────────────────────
@@ -288,7 +280,7 @@ def testCrossTableLinksSurviveASaveAndAReopen(tmp_path: Path) -> None:
 
 def testARetargetMovesEveryReferenceIntoOneTableAndNoOther() -> None:
     """AC 4. Seven locations point into Table 1, and the two pointing away stay put."""
-    document = shapes()
+    document = openShapes()
     target = document.sheet("Sheet 1").table("Table 1")
 
     moved = sum(
@@ -298,12 +290,12 @@ def testARetargetMovesEveryReferenceIntoOneTableAndNoOther() -> None:
     )
 
     assert moved == 7
-    assert formulaTexts(target) == retargetedText
+    assert readFormulaTexts(target) == retargetedText
 
 
 def testARetargetSurvivesASaveAndAReopen(tmp_path: Path) -> None:
     """AC 4. The edit reaches the file, not only the model that made it."""
-    working = workingCopy("20-formula-shapes", tmp_path)
+    working = copyDocument("20-formula-shapes", tmp_path)
     document = pybers.open(working)
     target = document.sheet("Sheet 1").table("Table 1")
     for location in document.referencesIterate():
@@ -312,15 +304,15 @@ def testARetargetSurvivesASaveAndAReopen(tmp_path: Path) -> None:
     document.save()
 
     after = pybers.open(working)
-    assert formulaTexts(after.sheet(1).table("Table 1")) == retargetedText
+    assert readFormulaTexts(after.sheet(1).table("Table 1")) == retargetedText
 
 
 def testALockedAxisDoesNotMove() -> None:
     """AC 4.i. `B$1` shifted down one row is still `B$1`, and its column is not."""
-    document = shapes()
+    document = openShapes()
     cell = document.sheet("Sheet 1").table("Table 2").cell("E9")
     cell.formulaText = "=B$1"
-    location = locationAt(document, "E9")
+    location = findLocationAt(document, "E9")
 
     assert location.shift(rows=1) is False
     assert location.text == "B$1"
@@ -330,8 +322,8 @@ def testALockedAxisDoesNotMove() -> None:
 
 def testABrokenReferenceStaysBroken() -> None:
     """AC 4.ii. Numbers records `#REF` as coordinates pointing nowhere on purpose."""
-    document = pybers.open(fixturePath("21-formula-errors"))
-    location = locationAt(document, "C1")
+    document = pybers.open(findDocumentPath("21-formula-errors"))
+    location = findLocationAt(document, "C1")
 
     assert location.broken
     assert location.shift(rows=1, cols=7) is False
@@ -340,10 +332,10 @@ def testABrokenReferenceStaysBroken() -> None:
 
 def testARangeMovesBothEndsTogether() -> None:
     """AC 4.iii. `C3:C25` shifted down one is `C4:C26`, never `C3:C26`."""
-    document = shapes()
+    document = openShapes()
     cell = document.sheet("Sheet 1").table("Table 2").cell("E10")
     cell.formulaText = "=SUM(C3:C25)"
-    location = locationAt(document, "E10")
+    location = findLocationAt(document, "E10")
 
     assert location.shift(rows=1) is True
     assert location.text == "C4:C26"
@@ -358,8 +350,8 @@ def testARangeLockedAtBothEndsDoesNotMove() -> None:
 
 def testAnUnboundedAxisHasNothingToMove() -> None:
     """AC 4. `SUM(A)` is a whole column, so its rows are absent rather than zero."""
-    document = shapes()
-    location = locationAt(document, "F11")
+    document = openShapes()
+    location = findLocationAt(document, "F11")
 
     assert location.shift(rows=1) is False
     assert location.shift(cols=7) is True
@@ -368,7 +360,7 @@ def testAnUnboundedAxisHasNothingToMove() -> None:
 
 def testAShiftOfNothingReportsNothingAndWritesNothing() -> None:
     """AC 4. A no-op must report accurately and must not touch the formula."""
-    document = shapes()
+    document = openShapes()
     before = {
         str(location.cell.reference): location.cell.formula
         for location in document.referencesIterate()
@@ -383,19 +375,19 @@ def testAShiftOfNothingReportsNothingAndWritesNothing() -> None:
 
 def testAShiftOfNothingLeavesEveryArchiveUntouched(tmp_path: Path) -> None:
     """AC 4. The write path has to agree that nothing happened, not only the model."""
-    working = workingCopy("20-formula-shapes", tmp_path)
-    before = archiveBodies(readPackage(working))
+    working = copyDocument("20-formula-shapes", tmp_path)
+    before = readArchiveBodies(readPackage(working))
     document = pybers.open(working)
     for location in document.referencesIterate():
         location.shift()
     document.save()
 
-    assert archiveBodies(readPackage(working)) == before
+    assert readArchiveBodies(readPackage(working)) == before
 
 
 def testShiftingOneLocationLeavesTheOthersOnThatFormulaUsable() -> None:
     """AC 4. Two ranges in one formula, and moving one does not strand the other."""
-    document = shapes()
+    document = openShapes()
     first, second = (
         location for location in document.referencesIterate()
         if str(location.cell.reference) == "C11"
@@ -408,8 +400,8 @@ def testShiftingOneLocationLeavesTheOthersOnThatFormulaUsable() -> None:
 
 def testAReferenceCarriesFieldsThisModelDoesNotInterpretThroughAShift() -> None:
     """AC 4. A shift patches the node it was read as, rather than building a new one."""
-    document = shapes()
-    location = locationAt(document, "G11")
+    document = openShapes()
+    location = findLocationAt(document, "G11")
     raw = location.node.raw
 
     assert raw
@@ -449,9 +441,9 @@ def testARetargetMatchesItsGoldenFile(tmp_path: Path) -> None:
     golden = goldenDirectory / "20-formula-retargeted.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    working = workingCopy("20-formula-shapes", tmp_path)
+    working = copyDocument("20-formula-shapes", tmp_path)
     assert buildGolden(working) == 11
-    assert dataListBytes(golden) == dataListBytes(working), (
+    assert readDataListBytes(golden) == readDataListBytes(working), (
         "the writer no longer produces the confirmed formula lists"
     )
 
@@ -467,11 +459,11 @@ def testTheRetargetGoldenHoldsWhatItClaimsTo() -> None:
         pytest.skip(f"{golden.name} is not present yet")
     document = pybers.open(golden)
 
-    assert formulaTexts(document.sheet(1).table("Table 1")) == (
+    assert readFormulaTexts(document.sheet(1).table("Table 1")) == (
         rowTenRetargeted | retargetedText
     )
-    assert locationAt(document, "G11").target is document.sheet(1).table("Table 2")
-    assert locationAt(document, "H11").target is document.sheet(2).table("Table 1")
+    assert findLocationAt(document, "G11").target is document.sheet(1).table("Table 2")
+    assert findLocationAt(document, "H11").target is document.sheet(2).table("Table 1")
 
 
 def testTheGoldensAnchoredReferencesRecordWhichAxisMoved() -> None:
@@ -496,8 +488,8 @@ def testTheGoldensAnchoredReferencesRecordWhichAxisMoved() -> None:
 
 def testACrossTableReferenceSurvivesRenamingTheTableItPointsAt() -> None:
     """AC 5. The archive stores the identity, so a rename is a display change."""
-    document = shapes()
-    location = locationAt(document, "G11")
+    document = openShapes()
+    location = findLocationAt(document, "G11")
     target = location.target
 
     target.name = "Receipts"
@@ -509,10 +501,10 @@ def testACrossTableReferenceSurvivesRenamingTheTableItPointsAt() -> None:
 
 def testRenamingATableDoesNotDisturbAReferenceIntoADifferentOne() -> None:
     """AC 5. Guard the guard: a rename that renamed by name would pass the above."""
-    document = shapes()
+    document = openShapes()
     document.sheet("Sheet 1").table("Table 2").name = "Receipts"
 
-    assert locationAt(document, "H11").text == "Sheet 2::Table 1::A1"
+    assert findLocationAt(document, "H11").text == "Sheet 2::Table 1::A1"
 
 
 # ── The two consumers ────────────────────────────────────────────────────────
@@ -524,7 +516,7 @@ def testAScriptRetargetsOneTableInThreeLines() -> None:
     The assertion is the shape as much as the count. A `target` that could be
     absent, or a shift needing the node index, would each add a branch here.
     """
-    document = pybers.open(fixturePath("20-formula-shapes"))
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
     sales = document.sheet("Sheet 1").table("Table 1")
     moved = sum(
         location.shift(rows=1, cols=7)
@@ -537,7 +529,7 @@ def testAScriptRetargetsOneTableInThreeLines() -> None:
 
 def testACliListsEveryReferenceWithWhereItIsAndWhereItPoints() -> None:
     """The `pybers references list` consumer: one printable line per reference."""
-    document = shapes()
+    document = openShapes()
     report = [
         f"{location.sheet.name}/{location.table.name}/{location.cell.reference}"
         f"  {location.text}  -> {location.target.name}"
@@ -553,7 +545,7 @@ def testACliListsEveryReferenceWithWhereItIsAndWhereItPoints() -> None:
 
 def testACliReportsBrokenReferencesAndTheirCount() -> None:
     """The `pybers references check` consumer, whose exit code is that count."""
-    document = pybers.open(fixturePath("21-formula-errors"))
+    document = pybers.open(findDocumentPath("21-formula-errors"))
     broken = [location for location in document.referencesIterate() if location.broken]
 
     assert [str(location.cell.reference) for location in broken] == ["C1"]
@@ -561,8 +553,8 @@ def testACliReportsBrokenReferencesAndTheirCount() -> None:
 
 def testATuiFollowsAReferenceToTheCellItPointsAt() -> None:
     """The reveal-target action: from the reference under the cursor to its cell."""
-    document = shapes()
-    location = locationAt(document, "G11")
+    document = openShapes()
+    location = findLocationAt(document, "G11")
 
     destination = location.target.cell(
         location.content.resolve(location.cell.reference)
@@ -573,7 +565,7 @@ def testATuiFollowsAReferenceToTheCellItPointsAt() -> None:
 
 def testATuiShowsEveryReferenceOfTheCellUnderTheCursor() -> None:
     """The inspector panel: the references of one cell, without walking the rest."""
-    document = shapes()
+    document = openShapes()
     cursor = document.sheet(1).table("Table 1").cell("C11")
     shown = [
         location.text

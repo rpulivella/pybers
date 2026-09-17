@@ -36,7 +36,7 @@ be checked against a fixture where the tables hold visibly different text.
 
 ## A value present in a fixture is not a value someone set
 
-`tracking = -0.01` appears in every fixture in this directory, `00-baseline` included. It was
+`tracking = -0.01` appears in every document under `tests/fixtures/` and `tests/measurements/`, `00-baseline` included. It was
 briefly recorded as a deliberate character-spacing setting. It is a built-in template style's
 default, and the baseline proves it: nothing had been done to that file.
 

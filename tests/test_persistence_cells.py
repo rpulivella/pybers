@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """\
-Cell decoding, asserted against fixtures whose contents are known independently.
+Cell decoding, asserted against documents whose contents are known independently.
 
-Every expectation here comes from a fixture that labels its own cells in an adjacent
+Every expectation here comes from a document that labels its own cells in an adjacent
 row of text. That is the only reason these assertions mean anything: a wrong offset in
 this format produces plausible wrong numbers rather than an exception, so a decoder can
 only be checked against content established outside itself.
@@ -23,17 +23,13 @@ __date__ = "2026/08/18"
 
 import datetime
 from decimal import Decimal
-from pathlib import Path
 
-import pytest
-
+from conftest import findDocumentPath
 from pybers._persistence import readPackage
 from pybers._persistence.cells import (
     decodeRow,
     offsetUnitFor,
 )
-
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
 # TST.Tile and TST.TableModelArchive. Named here rather than imported because
 # these identifiers are ours, read from the archive, and do not come from a
@@ -42,18 +38,10 @@ tileTypeId: int = 6002
 tableModelTypeId: int = 6001
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
+def decodeValueRow(name: str) -> dict[int, object]:
+    """Decode document row 0 of a document, returning column to value.
 
-
-def valueRow(name: str) -> dict[int, object]:
-    """Decode document row 0 of a fixture, returning column to value.
-
-    Row 0 holds the values in every fixture built for this purpose; the labels sit in a
+    Row 0 holds the values in every document built for this purpose; the labels sit in a
     later row and are read by eye, not by the tests.
 
     **Resolved through the tile list, not by scanning tile archives.** `27-big-table`
@@ -65,7 +53,7 @@ def valueRow(name: str) -> dict[int, object]:
     """
     from pybers._generated import TSTArchives_pb2 as tst
 
-    package = readPackage(fixturePath(name))
+    package = readPackage(findDocumentPath(name))
     tiles = {
         archive.identifier: message.data
         for iwaFile in package.iwaFiles
@@ -107,10 +95,10 @@ def valueRow(name: str) -> dict[int, object]:
     raise AssertionError(f"No populated row 0 found in {name}.")
 
 
-def testValueTypesFixture() -> None:
-    """Every value type in 11, matching the labels that fixture carries in its
+def testValueTypesMeasurement() -> None:
+    """Every value type in 11, matching the labels that measurement carries in its
     own text."""
-    values = valueRow("11-value-types-noformats")
+    values = decodeValueRow("11-value-types-noformats")
 
     assert values[0] == Decimal("1234.5")
     assert values[1] == Decimal("42")
@@ -135,7 +123,7 @@ def testCurrencyIsANumberWithADifferentTypeByte() -> None:
     identically. Which currency it is belongs to the format, not the value, so the two
     must decode alike.
     """
-    values = valueRow("12-number-currency")
+    values = decodeValueRow("12-number-currency")
     assert values[0] == Decimal("1234.5")
     for column in (1, 2, 3, 4):
         assert values[column] == Decimal("1234.5")
@@ -145,7 +133,7 @@ def testCurrencyIsANumberWithADifferentTypeByte() -> None:
 
 def testPercentStoresTheFractionNotTheDisplayedNumber() -> None:
     """A cell displaying 1,000% holds 10.0, and one displaying -0.25% holds -0.0025."""
-    values = valueRow("13-number-percent")
+    values = decodeValueRow("13-number-percent")
     assert values[0] == Decimal("0.25")
     assert values[2] == Decimal("10.0")
     for column in (4, 5, 6):
@@ -154,7 +142,7 @@ def testPercentStoresTheFractionNotTheDisplayedNumber() -> None:
 
 def testDateTimeLivesInsideTheValue() -> None:
     """A date-time is one number: the time is not a separate field."""
-    values = valueRow("14-number-date")
+    values = decodeValueRow("14-number-date")
     midnight = datetime.datetime(2027, 6, 15, tzinfo=datetime.UTC)
     withTime = datetime.datetime(2027, 6, 15, 11, tzinfo=datetime.UTC)
 
@@ -171,7 +159,7 @@ def testFormulaCellCachesItsTypedResult() -> None:
     cell holding 2 and `="a"&"b"` is a text cell. Reading a value therefore never
     requires evaluating a formula.
     """
-    values = valueRow("18-formula-literals")
+    values = decodeValueRow("18-formula-literals")
     assert values[0] == Decimal("2")       # =1+1
     assert values[1] == Decimal("6")       # =2*3
     assert values[2] == Decimal("6")       # =SUM(1,2,3)
@@ -204,7 +192,7 @@ def testRichTextCellConsumesItsPayloadKey() -> None:
     and every reference on a rich-text cell was read one slot early, yielding plausible
     style keys that pointed at the wrong styles, with nothing raising.
 
-    Built by hand so it tests the decoder rather than a fixture.
+    Built by hand so it tests the decoder rather than a document.
     """
     from pybers._persistence.cells import decodeRecord
 

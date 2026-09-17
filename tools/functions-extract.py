@@ -35,7 +35,7 @@ Three readings, two of them independent, all measured on Numbers 15.3.1:
 **A repeating group makes the maximum a floor rather than a ceiling.** `SUM`
 declares a maximum of two with a repeating group of one, which is how a document
 holding an eight-argument `SUM` is legal. Reading `maxArgs` as a hard limit
-rejects real formulas, measured against the corpus 2026-09-04.
+rejects real formulas, measured against the documents 2026-09-04.
 
 Numbers' own localized function list decides which extracted names are real. A
 class whose name is absent from `en.lproj/TSCalculationEngine.strings` is an
@@ -107,7 +107,7 @@ frameworkName: str = "TSTables"
 # canonical spelling rather than a display string.
 stringsTableName: str = "TSCalculationEngine"
 
-# Measured against real documents in tests/fixtures, so a mismatch here is a
+# Measured against real documents in tests/measurements, so a mismatch here is a
 # defect in this script rather than a change in Numbers.
 knownPairs: dict[str, int] = {"SUM": 168, "IF": 62, "SUMIFS": 231, "ROUND": 126}
 
@@ -526,7 +526,7 @@ def buildTable(application: NumbersApplication) -> FunctionTable:
         elif arity is None:
             # No argument spec means the parser has nothing to accept the name
             # with, which is what Numbers answers for all four of these in
-            # tests/fixtures/46-formula-rare-functions.
+            # tests/measurements/46-formula-rare-functions.
             availability = "reserved"
         else:
             availability = "offered"
@@ -563,7 +563,7 @@ def buildTable(application: NumbersApplication) -> FunctionTable:
             raise ExtractionError(
                 f"{name} read as index {found.index if found else None} rather "
                 f"than {expected}. These four pairs are measured against real "
-                "documents in tests/fixtures, so a disagreement is a defect in "
+                "documents in tests/measurements, so a disagreement is a defect in "
                 "this script rather than a change in Numbers."
             )
 

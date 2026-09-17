@@ -259,7 +259,7 @@ class Document:
         A formula naming another table writes `Table 2::A1`, and qualifies it as
         `Sheet 2::Table 1::A1` when a bare name would be ambiguous. Both spellings
         appear here for a table whose name is unique, and only the qualified one for
-        a name two tables share, which `20-formula-shapes` is the corpus example of.
+        a name two tables share, which `20-formula-shapes` is the example of.
         """
         qualified: dict[str, str] = {}
         seen: Counter[str] = Counter(

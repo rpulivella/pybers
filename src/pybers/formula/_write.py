@@ -70,7 +70,7 @@ from .nodes import (
 # Every trailing reference in a cell record is a little-endian uint32.
 referenceWidth: int = 4
 
-# Byte 0 of every cell record in the corpus. A created record carries it too.
+# Byte 0 of every cell record in the documents. A created record carries it too.
 storageVersion: int = 5
 
 # A table identity is a 128-bit value the formula spells as four 32-bit words, so
@@ -257,13 +257,13 @@ def encodeStickyBits(
     """Restate a range's anchoring beside its tract, which is what Numbers reads.
 
     **A range records its anchoring twice and Numbers believes this copy.** Every
-    one of the 9 ranges in the corpus carries these bits, and a range pybers built
+    one of the 9 ranges in the documents carries these bits, and a range pybers built
     from text carried none until 2026-09-09, so `SUM($A$1:$A$5)` was written with
     an absolute tract and displayed by Numbers as `SUM(A1:A5)`. Both ends of an
     axis share one flag because `Span` cannot express a range locked at one end.
 
     An axis the range leaves unbounded is written as not absolute, which is an
-    assumption rather than a measurement: no range in the corpus omits an axis.
+    assumption rather than a measurement: no range in the documents omits an axis.
     """
     columns = extent.columns.absolute if extent.columns is not None else False
     rows = extent.rows.absolute if extent.rows is not None else False
@@ -399,9 +399,10 @@ def buildFormulaRecord(key: int) -> bytes:
 def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     """Return a record that had no formula, now naming one.
 
-    Measured corpus-wide 2026-09-04: a formula-backed record is the plain record for
-    the same result type with byte 9 bit `0x02` set and ONE more trailing reference,
-    the key, placed at the slot `formulaKeySlot` names rather than always first.
+    Measured in every document 2026-09-04: a formula-backed record is the plain
+    record for the same result type with byte 9 bit `0x02` set and ONE more trailing
+    reference, the key, placed at the slot `formulaKeySlot` names rather than always
+    first.
     Byte 8 never moves, being fixed by the type and by what else the cell carries.
 
     Derived from matched pairs rather than synthesized, because the rest of byte 9

@@ -4,14 +4,15 @@ Cell values: the one part of the format the protobuf schemas do not describe.
 
 A table's rows live in `TST.Tile`, but the cells inside a row do not. They sit in an
 opaque `cell_storage_buffer` indexed by a `cell_offsets` array, in a layout Apple
-never published. Everything here was reverse-engineered against the fixtures under
-tests/fixtures/, each of which carries a row of text labels describing its own
-contents, which is what makes a decode verifiable rather than merely plausible.
+never published. Everything here was reverse-engineered against the documents under
+tests/fixtures/ and tests/measurements/, each of which carries a row of text labels
+describing its own contents, which is what makes a decode verifiable rather than
+merely plausible.
 
 The failure mode to keep in mind while reading this module: a wrong offset in this
 format yields **wrong numbers, not an exception**. Every field is a fixed-width
 integer or float, so misreading one still parses. That is why the layout constants
-below are stated once and why the tests assert decoded values against fixtures whose
+below are stated once and why the tests assert decoded values against documents whose
 contents are known independently.
 
 Values are returned as `Decimal`, never `float`. Numbers stores them as IEEE-754
@@ -23,7 +24,7 @@ UPDATES
             cell carries, for #65. Reading a fixed slot lost 416 formulas in
             one real document. See findings-09-cell-records.md.
 2026-08-18  Written. Decodes numbers, currency, text, dates, booleans and durations,
-            verified against fixtures 11 through 14.
+            verified against measurements 11 through 14.
 2026-09-03  The formula flag moved here from the writer for #41, so the one
             module documenting the record layout owns all of it.
 2026-09-01  Moved the decimal128 codec out to pybers._persistence.decimal128, which
@@ -62,7 +63,7 @@ emptyOffset: int = 0xFFFF
 # fewer counts bytes; a wider one counts four-byte words, which keeps the offset a
 # uint16 while a row grows to Numbers' 1000-column limit. Lossless because every
 # record is already four-byte aligned: measured 2026-09-06, all 9,497 offsets in
-# the 46 fixtures that predate 45-columns-over-255 are multiples of four.
+# the 46 documents that predate 45-columns-over-255 are multiples of four.
 offsetUnitByte: int = 1
 offsetUnitWord: int = 4
 
@@ -71,7 +72,7 @@ offsetUnitWord: int = 4
 valueOffset: int = 12
 
 # Byte 9 of the header is a second bitmask, and this bit marks a cell backed by a
-# formula. Established across the corpus on 2026-09-01: in all 74 tables, a table
+# formula. Established across the documents on 2026-09-01: in all 74 tables, a table
 # declaring formulas has marked records and a table declaring none has none. The
 # marked count can exceed the declared count, because the formula list is pooled,
 # so a dragged formula and a merge both reuse one entry across several cells.
@@ -174,7 +175,7 @@ def decodeRecord(column: int, record: bytes) -> CellRecord:
 # Which bits put a reference AHEAD of the formula key, so its position moves as a
 # cell gains attributes. Byte 8 carries three and byte 9 one, and each is worth a
 # single slot, counted rather than added, so widening either mask stays correct.
-# Identified from the fixtures that label themselves: 0x20 is a cell
+# Identified from the documents that label themselves: 0x20 is a cell
 # fill (28-style-fills reads "No fill" without it and every filled cell with it),
 # 0x40 is an explicit horizontal alignment (30-style-align reads "h: auto" without
 # it and "h: left" with it), and 0x80 is conditional highlighting. A comment adds a
@@ -183,8 +184,8 @@ precedingByteEightBits: int = 0xE0
 precedingByteNineBit: int = 0x01
 byteEightOffset: int = 8
 
-# The rule this replaced counted 0x40 alone, fitted to a corpus where one fixture
-# set it. Validated by refcount reproduction across 22 formula pools: the old rule
+# The rule this replaced counted 0x40 alone, fitted to documents where
+# one set it. Validated by refcount reproduction across 22 formula pools: the old rule
 # reproduced 11 and this reproduces all 22. Reading one slot short finds a key the
 # pool does not hold, which drops the formula, and a key it does hold by accident,
 # which reports the wrong one. See 47-formula-cell-attributes, where six of eight

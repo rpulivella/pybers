@@ -48,7 +48,7 @@ firstColumn: int = 1
 # column 144,936,576, which a formula then stored as an offset with nothing
 # raising. The column figure is this repository's own, measured for the
 # over-255-column work and stated in findings-01-values.md. The row figure is
-# Apple's published one and is not measured here, so a fixture disproving it
+# Apple's published one and is not measured here, so a document disproving it
 # changes this line.
 lastColumn: int = 1000
 lastRow: int = 1000000

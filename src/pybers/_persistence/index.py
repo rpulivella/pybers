@@ -69,7 +69,7 @@ richTextListType: int = 8
 
 # A formula-backed cell names its formula in the FIRST of its trailing
 # references. Established on 2026-09-03 by reproducing declared refcounts: in all
-# nine tables in the corpus that declare formulas, counting the cells that name
+# nine tables in the documents that declare formulas, counting the cells that name
 # each key through slot 0 equals the refcount the table declares, and no other
 # slot does so in any table. Value matching alone could not settle it, because
 # formula keys and style indices are both small integers and several slots
@@ -143,7 +143,7 @@ def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
     """Return the document's root `TN.DocumentArchive`.
 
     Found by type rather than by position or by member name. Exactly one archive
-    in a document carries this type, verified across the whole fixture corpus, so
+    in a document carries this type, verified across every document, so
     a count other than one means the file is not what this library thinks it is
     and is worth stopping on.
     """

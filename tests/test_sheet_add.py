@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import findDocumentPath, readArchiveBodies
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSKArchives_pb2 as tsk
 from pybers._generated import TSWPArchives_pb2 as tswp
@@ -35,20 +35,19 @@ from pybers.document import Document, SelectionError
 from pybers.errors import WriteError
 from pybers.table import Table
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 metadataMember: str = "Index/Metadata.iwa"
 
 
-def shapes() -> Document:
+def openShapes() -> Document:
     """Return `20-formula-shapes`, two sheets and a formula reading across them."""
-    return pybers.open(fixtureDirectory / "20-formula-shapes.numbers")
+    return pybers.open(findDocumentPath("20-formula-shapes"))
 
 
-def savedWithSheets(tmp_path: Path) -> Path:
+def saveWithSheets(tmp_path: Path) -> Path:
     """Save the golden's two insertions, and return where they were written."""
-    document = shapes()
+    document = openShapes()
     document.sheetAdd("Inserted", position=2)
     document.sheetAdd("Appended")
     destination = tmp_path / "sheets-added.numbers"
@@ -56,7 +55,7 @@ def savedWithSheets(tmp_path: Path) -> Path:
     return destination
 
 
-def sheetArchive(path: Path, name: str) -> tuple[ArchiveIndex, tn.SheetArchive]:
+def findSheetArchive(path: Path, name: str) -> tuple[ArchiveIndex, tn.SheetArchive]:
     """Return a file's index and the sheet archive carrying a name."""
     index = ArchiveIndex(readPackage(path))
     for reference in findRoot(index).sheets:
@@ -70,7 +69,7 @@ def sheetArchive(path: Path, name: str) -> tuple[ArchiveIndex, tn.SheetArchive]:
 
 
 def testASheetIsAddedLastByDefault() -> None:
-    document = shapes()
+    document = openShapes()
 
     added = document.sheetAdd("Appended")
 
@@ -83,7 +82,7 @@ def testASheetIsAddedLastByDefault() -> None:
 
 
 def testASheetIsAddedAtAPositionCountedFromOne() -> None:
-    document = shapes()
+    document = openShapes()
 
     document.sheetAdd("First", position=1)
     document.sheetAdd("Between", position=3)
@@ -97,7 +96,7 @@ def testASheetIsAddedAtAPositionCountedFromOne() -> None:
 
 
 def testANameAnotherSheetCarriesIsAccepted() -> None:
-    document = shapes()
+    document = openShapes()
 
     document.sheetAdd("Sheet 1")
 
@@ -106,7 +105,7 @@ def testANameAnotherSheetCarriesIsAccepted() -> None:
 
 @pytest.mark.parametrize("position", [0, 4, -1, True, 2.0, "2"])
 def testAPositionOutsideTheTabsIsRefused(position: object) -> None:
-    document = shapes()
+    document = openShapes()
 
     with pytest.raises(SelectionError):
         document.sheetAdd("Nowhere", position=position)  # type: ignore[arg-type]
@@ -115,7 +114,7 @@ def testAPositionOutsideTheTabsIsRefused(position: object) -> None:
 
 @pytest.mark.parametrize("name", ["", None, 7])
 def testASheetWithoutANameIsRefused(name: object) -> None:
-    document = shapes()
+    document = openShapes()
 
     with pytest.raises(SelectionError):
         document.sheetAdd(name)  # type: ignore[arg-type]
@@ -123,7 +122,7 @@ def testASheetWithoutANameIsRefused(name: object) -> None:
 
 
 def testAnAddedSheetReadsBackNamedAndInPlace(tmp_path: Path) -> None:
-    reopened = pybers.open(savedWithSheets(tmp_path))
+    reopened = pybers.open(saveWithSheets(tmp_path))
 
     assert [(sheet.name, len(sheet.tables)) for sheet in reopened.sheets] == [
         ("Sheet 1", 2),
@@ -134,7 +133,7 @@ def testAnAddedSheetReadsBackNamedAndInPlace(tmp_path: Path) -> None:
 
 
 def testSavingTwiceCreatesTheSheetOnce(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     document.sheetAdd("Once")
     document.save(tmp_path / "first.numbers")
 
@@ -145,7 +144,7 @@ def testSavingTwiceCreatesTheSheetOnce(tmp_path: Path) -> None:
 
 
 def testAnAddedSheetIsListedInTheSidebarInTabOrder(tmp_path: Path) -> None:
-    index = ArchiveIndex(readPackage(savedWithSheets(tmp_path)))
+    index = ArchiveIndex(readPackage(saveWithSheets(tmp_path)))
     root = findRoot(index)
 
     listed = [
@@ -160,7 +159,7 @@ def testAnAddedSheetIsListedInTheSidebarInTabOrder(tmp_path: Path) -> None:
 
 
 def testAnAddedSheetPrintsOneToOneWithTheResetMargins(tmp_path: Path) -> None:
-    _, sheet = sheetArchive(savedWithSheets(tmp_path), "Inserted")
+    _, sheet = findSheetArchive(saveWithSheets(tmp_path), "Inserted")
 
     assert not sheet.is_autofit_on
     assert sheet.content_scale == 1.0
@@ -175,7 +174,7 @@ def testAnAddedSheetPrintsOneToOneWithTheResetMargins(tmp_path: Path) -> None:
 
 
 def testEveryHeaderAndFooterOfAnAddedSheetIsEmpty(tmp_path: Path) -> None:
-    index, sheet = sheetArchive(savedWithSheets(tmp_path), "Inserted")
+    index, sheet = findSheetArchive(saveWithSheets(tmp_path), "Inserted")
 
     storages = [
         index.resolve(reference, tswp.StorageArchive)
@@ -188,17 +187,17 @@ def testEveryHeaderAndFooterOfAnAddedSheetIsEmpty(tmp_path: Path) -> None:
 
 
 def testAnAddedSheetSharesTheStyleOfTheFirstSheet(tmp_path: Path) -> None:
-    path = savedWithSheets(tmp_path)
-    _, first = sheetArchive(path, "Sheet 1")
-    _, added = sheetArchive(path, "Appended")
+    path = saveWithSheets(tmp_path)
+    _, first = findSheetArchive(path, "Sheet 1")
+    _, added = findSheetArchive(path, "Appended")
 
     assert added.style.identifier == first.style.identifier
 
 
 def testAnAddedSheetFollowsTheRegistryRules(tmp_path: Path) -> None:
-    path = savedWithSheets(tmp_path)
+    path = saveWithSheets(tmp_path)
     registry = PackageRegistry(readPackage(path))
-    _, added = sheetArchive(path, "Inserted")
+    _, added = findSheetArchive(path, "Inserted")
 
     uuids = {
         entry.identifier
@@ -222,20 +221,20 @@ def testAnAddedSheetFollowsTheRegistryRules(tmp_path: Path) -> None:
 def testAddingASheetRewritesOnlyTheRootTheSidebarAndTheRegistry(
     tmp_path: Path,
 ) -> None:
-    source = readPackage(fixtureDirectory / "20-formula-shapes.numbers")
-    written = readPackage(savedWithSheets(tmp_path))
+    source = readPackage(findDocumentPath("20-formula-shapes"))
+    written = readPackage(saveWithSheets(tmp_path))
     index = ArchiveIndex(source)
     root = findRoot(index)
     rewritten = {1, root.sidebar_order.identifier}
 
     before = {
         (member, identifier): body
-        for member, identifier, body in archiveBodies(source)
+        for member, identifier, body in readArchiveBodies(source)
         if member != metadataMember and identifier not in rewritten
     }
     after = {
         key: body
-        for member, identifier, body in archiveBodies(written)
+        for member, identifier, body in readArchiveBodies(written)
         if (key := (member, identifier)) in before
     }
 
@@ -243,7 +242,7 @@ def testAddingASheetRewritesOnlyTheRootTheSidebarAndTheRegistry(
 
 
 def testAFormulaReadingAcrossSheetsStillNamesTheSameTable(tmp_path: Path) -> None:
-    reopened = pybers.open(savedWithSheets(tmp_path))
+    reopened = pybers.open(saveWithSheets(tmp_path))
 
     cell = reopened.sheet("Sheet 1").table("Table 1").cell("H11")
 
@@ -254,23 +253,23 @@ def testAFormulaReadingAcrossSheetsStillNamesTheSameTable(tmp_path: Path) -> Non
 
 
 def testARefusedSaveUndoesTheSheetsItHadCreated(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     package = document._package
     assert package is not None
-    before = archiveBodies(package)
+    before = readArchiveBodies(package)
     added = document.sheetAdd("With an empty table")
     added.tables.append(Table("No grid"))
 
     with pytest.raises(WriteError, match="at least one of each"):
         document.save(tmp_path / "refused.numbers")
 
-    assert archiveBodies(package) == before
+    assert readArchiveBodies(package) == before
     assert added._identifier is None
     assert not (tmp_path / "refused.numbers").exists()
 
 
 def testRemovingASheetIsRefused(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     del document.sheets[1]
 
     with pytest.raises(WriteError, match="Removing or reordering"):
@@ -278,7 +277,7 @@ def testRemovingASheetIsRefused(tmp_path: Path) -> None:
 
 
 def testReorderingSheetsIsRefused(tmp_path: Path) -> None:
-    document = shapes()
+    document = openShapes()
     document.sheets.reverse()
 
     with pytest.raises(WriteError, match="Removing or reordering"):
@@ -293,14 +292,14 @@ def testTheGoldenIsWhatAddingTheSheetsWritesToday(tmp_path: Path) -> None:
     golden = goldenDirectory / "20-sheets-added.numbers"
     assert golden.is_file(), f"{golden.name} is missing; see the golden README"
 
-    def sheetsOf(path: Path) -> list[bytes]:
+    def readSheets(path: Path) -> list[bytes]:
         index = ArchiveIndex(readPackage(path))
         return [
             index.archive(reference.identifier).messages[0].data
             for reference in findRoot(index).sheets
         ]
 
-    assert sheetsOf(savedWithSheets(tmp_path)) == sheetsOf(golden)
+    assert readSheets(saveWithSheets(tmp_path)) == readSheets(golden)
 
 
 def testTheGoldenHoldsTheSheetsItClaims() -> None:
@@ -320,7 +319,7 @@ def testTheGoldenHoldsTheSheetsItClaims() -> None:
 
 def testAScriptPutsItsOutputOnASheetOfItsOwn(tmp_path: Path) -> None:
     """The `import pybers` consumer: a report tab added in two lines and saved."""
-    document = shapes()
+    document = openShapes()
     document.sheetAdd("Report")
     document.save(tmp_path / "report.numbers")
 
@@ -329,7 +328,7 @@ def testAScriptPutsItsOutputOnASheetOfItsOwn(tmp_path: Path) -> None:
 
 def testACliAddsATabAtTheIndexItWasGiven(tmp_path: Path) -> None:
     """The `pybers sheet add NAME --at N` consumer, printing the tabs afterward."""
-    document = shapes()
+    document = openShapes()
     document.sheetAdd("Summary", position=1)
     document.save(tmp_path / "summary.numbers")
 

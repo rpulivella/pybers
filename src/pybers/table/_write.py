@@ -309,7 +309,7 @@ def stringPoolFor(index: ArchiveIndex, store: tst.DataStore) -> StringPool | Non
     )
 
 
-# Which bit carries which format reference, measured across the corpus: a slot is
+# Which bit carries which format reference, measured across the documents: a slot is
 # per format KIND rather than per cell, which is why a number and a string in one
 # table put their format in different places. See findings-01-values.md.
 numberFormatSlot: tuple[int, int] = (9, 0x20)
@@ -320,7 +320,7 @@ textFormatSlot: tuple[int, int] = (10, 0x02)
 checkboxFormatSlot: tuple[int, int] = (10, 0x04)
 
 # A format's refcount is how often its key sits in these slots, which reproduces
-# every format list in the fixtures. The order is Numbers' own: a kind is its
+# every format list in the documents. The order is Numbers' own: a kind is its
 # position here counted from 1, which is what `displayedKindSlot` stores.
 countedFormatSlots: tuple[tuple[int, int], ...] = (
     numberFormatSlot, currencyFormatSlot, dateFormatSlot,
@@ -335,7 +335,7 @@ countedFormatSlots: tuple[tuple[int, int], ...] = (
 controlSlot: tuple[int, int] = (9, 0x04)
 
 # Which per-kind slot a cell displays with, as a kind rather than a key: 1 number
-# through 6 checkbox. In all 11,581 records the fixtures carry, it names a kind slot
+# through 6 checkbox. In all 11,581 records the documents carry, it names a kind slot
 # the record holds, and no refcount counts it. Read as a format key until
 # `54-format-star-rating` stored 5 where no list holds a key 5.
 displayedKindSlot: tuple[int, int] = (9, 0x10)
@@ -390,7 +390,7 @@ def formatKeyFor(dataList: tst.TableDataList, formatType: int) -> int:
     """Return a key naming a format of this kind, creating one when there is none.
 
     A `260` entry carries nothing but its kind, so creating one states no more than
-    the corpus does. Counts nothing: `formatReferencesMove` counts the record that
+    the documents do. Counts nothing: `formatReferencesMove` counts the record that
     names the key, so looking a format up once for many cells counts every cell.
 
     **Takes the resolved list rather than resolving one.** `ArchiveIndex.resolve`
@@ -495,7 +495,7 @@ def stringClaims(record: CellRecord) -> Iterable[int]:
 
 
 # A style's refcount is how often its key sits in these two slots, which reproduces
-# every style list in the fixtures, measured 2026-09-15 for PYB-92.
+# every style list in the documents, measured 2026-09-15 for PYB-92.
 countedStyleSlots: tuple[tuple[int, int], ...] = ((8, 0x20), (8, 0x40))
 
 
@@ -511,7 +511,7 @@ def styleClaims(record: CellRecord) -> Iterable[int]:
 
 
 # A rich-text cell names its payload by key, and an entry's refcount is how many such
-# records name it, which reproduces all 16 rich-text lists in the fixtures.
+# records name it, which reproduces all 16 rich-text lists in the documents.
 richTextTypeByte: int = 9
 
 
@@ -914,7 +914,7 @@ def applyTableEdits(
     formulaRemoved: list[tuple[int, int]] = []
 
     # A row belongs to the tile covering its index, and a tile that holds nothing
-    # may be absent. No table in the 46 fixtures has such a gap, so this refuses
+    # may be absent. No table in the 46 documents has such a gap, so this refuses
     # rather than guessing what an absent tile should be built from, and refusing
     # is what keeps the formula from being dropped in silence.
     if pool is not None:

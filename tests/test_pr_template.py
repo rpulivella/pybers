@@ -30,7 +30,7 @@ import pytest
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 
 
-def tool() -> ModuleType:
+def loadPrTool() -> ModuleType:
     """Return scripts/pr.py as a module, which is where the checks live."""
     if str(repositoryRoot / "scripts") not in sys.path:
         sys.path.insert(0, str(repositoryRoot / "scripts"))
@@ -40,7 +40,7 @@ def tool() -> ModuleType:
 @pytest.fixture
 def template() -> str:
     """The repository's own pull request template."""
-    return tool().readTemplate()
+    return loadPrTool().readTemplate()
 
 
 def testAMissingTemplateRefusesRatherThanSkipping(
@@ -52,7 +52,7 @@ def testAMissingTemplateRefusesRatherThanSkipping(
     intended consequence: there is nothing left to check a body against, and a
     check that disappears with its rule is worse than no check.
     """
-    module = tool()
+    module = loadPrTool()
     monkeypatch.setattr(module, "templatePath", tmp_path / "absent.md")
     with pytest.raises(RuntimeError, match="No pull request template"):
         module.readTemplate()
@@ -63,12 +63,12 @@ def testAMissingTemplateRefusesRatherThanSkipping(
 
 def testTheTemplatePassesItsOwnCheck(template: str) -> None:
     """A body that is the template unchanged has departed from nothing."""
-    assert tool().bodyFindings(template, template) == []
+    assert loadPrTool().bodyFindings(template, template) == []
 
 
 def testAnInventedHeadingIsRefusedAndNamed(template: str) -> None:
     """The failure that prompted this ticket: a section nobody sanctioned."""
-    findings = tool().bodyFindings(
+    findings = loadPrTool().bodyFindings(
         template + "\n## What a reviewer should push on\n\nSomething.\n", template
     )
     assert len(findings) == 1
@@ -78,7 +78,7 @@ def testAnInventedHeadingIsRefusedAndNamed(template: str) -> None:
 def testAMissingHeadingIsRefused(template: str) -> None:
     """The template asks for `None` under a heading rather than for it to go."""
     body = template.replace("## Breaking Changes", "Breaking Changes")
-    findings = tool().bodyFindings(body, template)
+    findings = loadPrTool().bodyFindings(body, template)
     assert any("missing" in finding for finding in findings)
     assert any("Breaking Changes" in finding for finding in findings)
 
@@ -88,7 +88,7 @@ def testAMissingHeadingIsRefused(template: str) -> None:
 
 def testHeadingsOutOfOrderAreRefused(template: str) -> None:
     """A record reads back the same way only if every body orders it alike."""
-    module = tool()
+    module = loadPrTool()
     headings = module.readHeadings(template)
     body = template.replace(headings[0], "PLACEHOLDER")
     body = body.replace(headings[1], headings[0]).replace("PLACEHOLDER", headings[1])
@@ -101,7 +101,7 @@ def testHeadingsOutOfOrderAreRefused(template: str) -> None:
 
 def testABoldLineAloneIsTreatedAsAHeading(template: str) -> None:
     """`**Like this**` on its own line looks like a section and hides from `##`."""
-    findings = tool().bodyFindings(
+    findings = loadPrTool().bodyFindings(
         template + "\n**A section in disguise**\n\nSomething.\n", template
     )
     assert len(findings) == 1
@@ -111,7 +111,7 @@ def testABoldLineAloneIsTreatedAsAHeading(template: str) -> None:
 def testBoldInsideALineIsNotAHeading(template: str) -> None:
     """The template itself opens Breaking Changes entries with inline bold, so
     only a line that is entirely bold counts."""
-    findings = tool().bodyFindings(
+    findings = loadPrTool().bodyFindings(
         template + "\n**Emphasis** inside a sentence is ordinary prose.\n", template
     )
     assert findings == []
@@ -122,7 +122,7 @@ def testBoldInsideALineIsNotAHeading(template: str) -> None:
 
 def testARewordedCheckboxLabelIsRefused(template: str) -> None:
     """The label belongs to the template even when the state belongs to the author."""
-    module = tool()
+    module = loadPrTool()
     label = module.readCheckboxLabels(template)[0]
     body = template.replace(label, f"{label} probably")
     findings = module.bodyFindings(body, template)
@@ -131,12 +131,12 @@ def testARewordedCheckboxLabelIsRefused(template: str) -> None:
 
 def testTickingABoxIsNotARewording(template: str) -> None:
     """The state is exactly what an author is supposed to change."""
-    assert tool().bodyFindings(template.replace("- [ ]", "- [x]"), template) == []
+    assert loadPrTool().bodyFindings(template.replace("- [ ]", "- [x]"), template) == []
 
 
 def testRemovingACheckboxIsAccepted(template: str) -> None:
     """`/pr-draft` tells an author to delete the boxes that do not apply."""
-    module = tool()
+    module = loadPrTool()
     label = module.readCheckboxLabels(template)[0]
     body = "\n".join(
         line for line in template.splitlines() if label not in line
@@ -149,7 +149,7 @@ def testRemovingACheckboxIsAccepted(template: str) -> None:
 def testAnItemMarkedNotApplicableKeepsItsLabelUnderComparison(template: str) -> None:
     """`NA` is a state, so an item moved to the end stays compared rather than
     escaping the way a deleted line would."""
-    module = tool()
+    module = loadPrTool()
     label = module.readCheckboxLabels(template)[0]
     assert label in module.readCheckboxLabels(f"- NA {label}\n")
 
@@ -160,14 +160,14 @@ def testAnItemMarkedNotApplicableKeepsItsLabelUnderComparison(template: str) -> 
 def testHtmlCommentsAreNotCountedAsProse(template: str) -> None:
     """The template is largely instructions inside comments, and counting them
     raises the ceiling by guidance no body ever publishes."""
-    module = tool()
+    module = loadPrTool()
     assert module.countProseWords("<!-- a b c d e -->") == 0
     assert module.countProseWords(template) < len(template.split())
 
 
 def testABodyOverTheCeilingIsRefusedWithBothCounts(template: str) -> None:
     """Reporting one number leaves an author guessing what to cut to."""
-    module = tool()
+    module = loadPrTool()
     ceiling = module.countProseWords(template) * module.maximumBodyLengthMultiple
     findings = module.bodyFindings(template + " word" * ceiling, template)
     assert any(str(ceiling) in finding for finding in findings)
@@ -175,5 +175,5 @@ def testABodyOverTheCeilingIsRefusedWithBothCounts(template: str) -> None:
 
 def testABodyUnderTheCeilingIsAccepted(template: str) -> None:
     """A body may say twice what the template does before it is too long."""
-    module = tool()
+    module = loadPrTool()
     assert module.bodyFindings(template + "\nOne short sentence.\n", template) == []

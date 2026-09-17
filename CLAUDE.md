@@ -35,7 +35,7 @@ A feature with no archive half yet is a module rather than a directory, and beco
 directory the day it gains a `_read.py`. That is how `formula` and `table` grew.
 
 Reasoning for settled decisions lives in `docs/decisions.md`. Format measurements live
-in `tests/fixtures/findings-*.md`. **Read the findings index before designing anything**,
+in `docs/findings/findings-*.md`. **Read the findings index before designing anything**,
 because several of them invalidate the obvious approach.
 
 ## Build and gates
@@ -123,8 +123,9 @@ about the format is measured against a fixture that labels its own contents.
   PascalCase. The linter is configured for this, not against it.
 - **Method names are subject first, verb last**: `rowAdd`, `cellStyleRemove`,
   `cellFormatNumberApply`. Sorting then groups everything acting on a row together. The
-  subject is as specific as the method. Module-level functions keep verb-first names,
-  which is why the entry point is `pybers.open`.
+  subject is as specific as the method. Module-level functions, test helpers included,
+  keep verb-first names, which is why the entry point is `pybers.open`. **Every function
+  name holds a noun and a verb**: `findDocumentPath`, never `documentPath`.
 - **Type names lead with the base noun**, so a family sorts together and builds on its
   atom: `Table`, `TableRow`, `TableRows`, never `RowOfTable`. A scientific or geometric
   value names what it is measured against: `mercatorX` rather than `x`, `cieX1931`
@@ -147,7 +148,7 @@ functions over explanation.
   is read in an editor tooltip: a one-line imperative summary, then at most a short why.
 - **Internal, twelve lines soft limit**, and only to record a measurement, an invariant,
   or a format trap that would otherwise be rediscovered the hard way.
-- **Longer than that belongs in `tests/fixtures/findings-*.md`** with a one-line pointer.
+- **Longer than that belongs in `docs/findings/findings-*.md`** with a one-line pointer.
   A docstring is the wrong container for a corpus survey.
 - **Comments are one line, and say why.** Never narrate code, restate a name, describe
   the current patch, leave removal breadcrumbs, or comment out code.
@@ -168,7 +169,8 @@ functions over explanation.
   clear. Descriptive names, and no comments narrating arrange, act and assert.
 - Every bug fix earns a regression test that fails for the original defect.
 - Test negative paths: validation, no-op, partial failure, and invariant preservation.
-- Unique temporary directories, cleaned up. Never write into `tests/fixtures/`.
+- Unique temporary directories, cleaned up. Never write into `tests/fixtures/` or
+  `tests/measurements/`.
 - pytest functions and fixtures, not `TestCase` classes.
 
 ### Who verifies what

@@ -6,7 +6,7 @@ Excel stores a `<c>` element for every cell of a merged range, and a covered one
 carries a style attribute with no value. Numbers keeps each of them on import
 and across every later edit, which is the ONLY route to a record at a covered
 position: its own merge command discards them under every gesture tried. See
-tests/fixtures/README.md.
+docs/findings/findings-03-structure.md.
 
 `G1` deliberately carries both a style and a value, which Numbers discards on
 import. That is what establishes that a covered record never holds a value.

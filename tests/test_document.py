@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """\
-Reading a `.numbers` file into the object model, asserted against fixture contents.
+Reading a `.numbers` file into the object model, asserted against document contents.
 
-Every expectation here is anchored in something the fixture states about itself: a
+Every expectation here is anchored in something the document states about itself: a
 row of text labels beside the values it describes, a sheet name, a table name, or a
 filename. That is what makes an assertion evidence rather than a restatement of
 whatever the decoder happened to produce. A wrong offset in this format yields a
@@ -10,6 +10,8 @@ plausible wrong number rather than an exception, so a test that compares the rea
 against itself proves nothing.
 
 UPDATES
+2026-09-16  A document found in neither directory, or in both, fails for
+            PYB-90 rather than skipping.
 2026-08-31  Written for #1.
 """
 from __future__ import annotations
@@ -28,7 +30,9 @@ from pathlib import Path
 
 import pytest
 
+import conftest
 import pybers
+from conftest import allDocuments, findDocumentPath
 from pybers.addressing import (
     CellReference,
     ReferenceError,
@@ -36,31 +40,47 @@ from pybers.addressing import (
     columnNumber,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
-
-
-def fixture(name: str):
-    """Open one fixture by its stem."""
-    return pybers.open(fixtureDirectory / f"{name}.numbers")
+def openDocument(name: str):
+    """Open one document by its stem."""
+    return pybers.open(findDocumentPath(name))
 
 
-def onlyTable(name: str):
-    """Return the single table of a single-table fixture."""
-    document = fixture(name)
+def openOnlyTable(name: str):
+    """Return the single table of a single-table document."""
+    document = openDocument(name)
     return document.sheets[0].tables[0]
 
 
-# ── AC 1: every fixture opens ────────────────────────────────────────────────
+# ── AC 1: every document opens ────────────────────────────────────────────────
 
-def test_thereIsACorpusToReadAtAll() -> None:
+def test_thereAreDocumentsToReadAtAll() -> None:
     """Guard the parametrization: an empty glob would make every case vacuous."""
-    assert len(allFixtures) >= 40
+    assert len(allDocuments) >= 62
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
-def test_everyFixtureOpensWithoutRaising(path: Path) -> None:
+def test_aDocumentInNeitherDirectoryFailsRatherThanSkipping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(conftest, "documentDirectories", (tmp_path,))
+    with pytest.raises(AssertionError, match="in 0 document directories"):
+        findDocumentPath("00-baseline")
+
+
+def test_aDocumentInBothDirectoriesFails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    origins, measurements = tmp_path / "fixtures", tmp_path / "measurements"
+    for directory in (origins, measurements):
+        directory.mkdir()
+        (directory / "00-baseline.numbers").write_bytes(b"")
+    monkeypatch.setattr(conftest, "documentDirectories", (origins, measurements))
+    with pytest.raises(AssertionError, match="in 2 document directories"):
+        findDocumentPath("00-baseline")
+
+
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
+def test_everyDocumentOpensWithoutRaising(path: Path) -> None:
     document = pybers.open(path)
     assert document.sheets, f"{path.name} produced no sheets"
 
@@ -69,7 +89,7 @@ def test_everyFixtureOpensWithoutRaising(path: Path) -> None:
 
 def test_sheetsComeBackInOrderWithTheirTabNames() -> None:
     """`26-multi-sheets` names its three tabs, and two say what they are."""
-    document = fixture("26-multi-sheets")
+    document = openDocument("26-multi-sheets")
     names = [sheet.name for sheet in document.sheets]
     assert names == [
         "Sheet 1",
@@ -82,13 +102,13 @@ def test_sheetsComeBackInOrderWithTheirTabNames() -> None:
 
 def test_aSheetYieldsEveryTableItHolds() -> None:
     """`25-multi-tables` puts three tables on one sheet."""
-    sheet = fixture("25-multi-tables").sheets[0]
+    sheet = openDocument("25-multi-tables").sheets[0]
     assert len(sheet.tables) == 3
 
 
 def test_aSheetWithNoTableYieldsNone() -> None:
     """`34-shape` holds only drawables that are not tables, and must not invent one."""
-    assert fixture("34-shape").sheets[0].tables == []
+    assert openDocument("34-shape").sheets[0].tables == []
 
 
 # ── AC 4: addressing, and an absent cell reading as empty ────────────────────
@@ -96,7 +116,7 @@ def test_aSheetWithNoTableYieldsNone() -> None:
 def test_anAbsentCellReadsAsEmptyRatherThanRaising() -> None:
     """J1 is the one cell inside this table's declared 2 by 10 grid that holds
     nothing, so it is absent from the archive without being outside the table."""
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     assert CellReference.parse("J1") not in table.cells
     assert table.cell("J1").value is None
 
@@ -104,14 +124,14 @@ def test_anAbsentCellReadsAsEmptyRatherThanRaising() -> None:
 def test_aCellOutsideTheDeclaredGridIsRefused() -> None:
     """A Numbers table is a fixed number of rows and columns, unlike a sheet in
     Excel, so an address beyond it names nothing rather than naming an empty cell."""
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     assert table.extent is not None
     with pytest.raises(ReferenceError):
         table.cell("AN400")
 
 
 def test_readingAnAbsentCellDoesNotDisturbItsNeighbors() -> None:
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     before = table.cell("A1").value
     table.cell("J1")
     assert table.cell("A1").value == before
@@ -119,7 +139,7 @@ def test_readingAnAbsentCellDoesNotDisturbItsNeighbors() -> None:
 
 def test_rowsAndColumnsCountFromOne() -> None:
     """A1 is the first cell, and the Python instinct of zero fails loudly."""
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     assert table.cell("A1") is table.cell(CellReference(1, 1))
     with pytest.raises(ReferenceError):
         CellReference(0, 0)
@@ -140,21 +160,21 @@ def test_aLockedReferenceAddressesTheSameCellAndIsNotTheSameReference() -> None:
     They still compare unequal, because locking is part of what was written. AC 2
     covers that side; this covers the side a table cares about.
     """
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     assert CellReference.parse("$A$1").asRowColumn() == (1, 1)
     assert table.cell("$A$1") is table.cell("A1")
 
 
 def test_aCellKnowsItsOwnReference() -> None:
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     assert table.cell("I1").reference == CellReference(1, 9)
 
 
 # ── AC 5: every value type the persistence layer reads ───────────────────────
 
-def test_everyValueTypeDecodesAsTheFixtureLabelsIt() -> None:
-    """Row 1 holds the values; row 2 labels each one in the fixture's own words."""
-    table = onlyTable("11-value-types-noformats")
+def test_everyValueTypeDecodesAsTheMeasurementLabelsIt() -> None:
+    """Row 1 holds the values; row 2 labels each one in the measurement's own words."""
+    table = openOnlyTable("11-value-types-noformats")
     labels = {
         column: table.cell(CellReference(2, column)).value
         for column in range(1, 10)
@@ -173,13 +193,13 @@ def test_everyValueTypeDecodesAsTheFixtureLabelsIt() -> None:
 
 
 def test_aCurrencyAmountReadsAsAnExactDecimal() -> None:
-    table = onlyTable("12-number-currency")
+    table = openOnlyTable("12-number-currency")
     assert isinstance(table.cell("A1").value, Decimal)
 
 
 # AC 5.a
 def test_numbersAreDecimalAndNeverFloat() -> None:
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     value = table.cell("A1").value
     assert isinstance(value, Decimal)
     assert not isinstance(value, float)
@@ -187,7 +207,7 @@ def test_numbersAreDecimalAndNeverFloat() -> None:
 
 def test_aValueRoundTripsThroughStringWithNoDigitsGainedOrLost() -> None:
     """The reason `Decimal` is not a preference: `float` fails this."""
-    table = onlyTable("11-value-types-noformats")
+    table = openOnlyTable("11-value-types-noformats")
     value = table.cell("A1").value
     assert str(value) == "1234.5"
     assert Decimal(str(value)) == value
@@ -196,7 +216,7 @@ def test_aValueRoundTripsThroughStringWithNoDigitsGainedOrLost() -> None:
 # AC 5.b
 def test_aFormulaCellExposesItsCachedResult() -> None:
     """`18-formula-literals` labels each formula in the row beneath its result."""
-    table = onlyTable("18-formula-literals")
+    table = openOnlyTable("18-formula-literals")
     assert table.cell("A2").value == "1+1"
     assert table.cell("A1").value == Decimal("2")
     assert table.cell("C2").value == "SUM(1,2,3)"
@@ -209,7 +229,7 @@ def test_aFormulaCellExposesItsCachedResult() -> None:
 
 def test_mergesComeBackFromTheMergeStore() -> None:
     """`22-merge-2x2` carries five merged pairs across row 1, per findings-03."""
-    table = onlyTable("22-merge-2x2")
+    table = openOnlyTable("22-merge-2x2")
     anchors = sorted(merge.anchor.asRowColumn() for merge in table.mergeRanges)
     assert anchors == [(1, 1), (1, 3), (1, 5), (1, 7), (1, 9)]
     assert all(
@@ -220,7 +240,7 @@ def test_mergesComeBackFromTheMergeStore() -> None:
 
 def test_theUnmergedTwinReportsNoMerges() -> None:
     """`22b` differs from `22` only in that the merges were undone."""
-    assert onlyTable("22b-merge-2x2-unmerged").mergeRanges == []
+    assert openOnlyTable("22b-merge-2x2-unmerged").mergeRanges == []
 
 
 def test_aCoveredCellIsDistinguishableFromAnEmptyOne() -> None:
@@ -230,7 +250,7 @@ def test_aCoveredCellIsDistinguishableFromAnEmptyOne() -> None:
     absent from `cells` and nothing about the grid separates them, so a reader that
     consults only the tiles reports a merged table as a table full of holes.
     """
-    table = onlyTable("22-merge-2x2")
+    table = openOnlyTable("22-merge-2x2")
     assert CellReference.parse("B1") not in table.cells
     assert CellReference.parse("H2") not in table.cells
     assert table.mergeCovering("B1") is not None
@@ -239,7 +259,7 @@ def test_aCoveredCellIsDistinguishableFromAnEmptyOne() -> None:
 
 def test_aCoveredCellIsNotAddressableAndLeavesNoRecord() -> None:
     """`22-merge-2x2` merges A1:B1, so B1 is swallowed and only A1 addresses it."""
-    table = onlyTable("22-merge-2x2")
+    table = openOnlyTable("22-merge-2x2")
     stored = len(table.cells)
     with pytest.raises(ReferenceError):
         table.cell("B1")
@@ -247,9 +267,9 @@ def test_aCoveredCellIsNotAddressableAndLeavesNoRecord() -> None:
     assert table.cell("A1").value == "Hello"
 
 
-# ── AC 8: the whole corpus reads, and the traps stay caught ──────────────────
+# ── AC 8: every document reads, and the traps stay caught ──────────────────
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def test_everyCellOfEveryTableReads(path: Path) -> None:
     document = pybers.open(path)
     for sheet in document.sheets:
@@ -266,7 +286,7 @@ def test_aMultiTileTableKeepsItsRowsInOrder() -> None:
     order, so a reader that ignores either produces a scrambled table and raises
     nothing. Row 2000 saying "row 2000" is what catches that.
     """
-    table = onlyTable("27-big-table")
+    table = openOnlyTable("27-big-table")
     rows = sorted({reference.row for reference in table.cells})
     assert rows == list(range(1, 2002))
     assert table.cell("A1").value == "Label"
@@ -276,7 +296,7 @@ def test_aMultiTileTableKeepsItsRowsInOrder() -> None:
 
 def test_astralCharactersSurviveTheRead() -> None:
     """`36-unicode-text` exists because run indices count UTF-16 code units."""
-    table = onlyTable("36-unicode-text")
+    table = openOnlyTable("36-unicode-text")
     texts = [
         cell.value for cell in table.cells.values() if isinstance(cell.value, str)
     ]

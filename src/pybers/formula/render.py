@@ -5,7 +5,7 @@ A stored formula out as the text Numbers displays for it.
 The other half of `pybers.formula.parse`, and the half that makes it
 testable: comparing hand-written node arrays stops scaling at about a dozen
 cases, and rendering every formula in a real document and parsing it back does
-not. See tests/fixtures/findings-08-formula-text.md.
+not. See docs/findings/findings-08-formula-text.md.
 
 It walks a stack, because the file is postfix. Each node takes what it needs off
 that stack and puts one piece back, and a complete formula leaves exactly one.
@@ -13,7 +13,7 @@ that stack and puts one piece back, and a complete formula leaves exactly one.
 **Brackets come from two places, and both are needed.** Apple's list node records
 the bracket an author typed, including the 193 distinct formulas whose brackets
 precedence already implied. It does not record every bracket: one formula in the
-corpus needs one that associativity alone forces and carries no node for it, so
+documents needs one that associativity alone forces and carries no node for it, so
 the tree still has to supply what the nodes do not.
 
 **What a person cannot type is dropped.** The whitespace nodes record where a
@@ -290,7 +290,7 @@ class Renderer:
         The result scores as an atom, so an operator enclosing it adds no second
         pair. Refuses a wider list: every one of the 4364 measured encloses one
         value, and rendering a wider one as a bracket would state something the
-        corpus does not support.
+        documents do not support.
         """
         if group.argumentCount != 1:
             raise FormulaError(

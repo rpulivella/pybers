@@ -117,7 +117,7 @@ Two consequences that are easy to get wrong:
 A spreadsheet built by a program serves a different purpose from one built in the
 interface, so pybers does not start from Numbers' own new sheet or table. It starts from a
 reset, in the sense of a CSS reset: every value stated, nothing inherited from a theme by
-accident. The measurements behind it are in `tests/fixtures/findings-10-creation.md`.
+accident. The measurements behind it are in `docs/findings/findings-10-creation.md`.
 
 A created **sheet** prints 1:1, with autofit off and a content scale of 1.0, because
 printing at true size is Numbers' strongest use. Its margins are 1 in at top and bottom and
@@ -143,5 +143,5 @@ The name leads with `pybers` so later styles sort beside it, and carries no lead
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on
 2026-09-04. Every fact in it already lived somewhere better: the named-style rules in
-`tests/fixtures/findings-06-styles.md`, and the schema provenance in
+`docs/findings/findings-06-styles.md`, and the schema provenance in
 `src/pybers/protos/README.md`. A third copy would have gone stale against both.

@@ -34,7 +34,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import allDocuments, findDocumentPath, readArchiveBodies
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.cells import (
@@ -47,7 +47,6 @@ from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypeId, archiveTypes
 from pybers.formula._read import resolveFormula
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 fixtureName: str = "47-formula-cell-attributes"
 
 tableModelType: int = next(
@@ -75,15 +74,7 @@ decoratedSlots: dict[str, int] = {
 }
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
-
-
-def formulaTables(path: Path) -> list[tuple[str, dict[int, int], list[CellRecord]]]:
+def readFormulaTables(path: Path) -> list[tuple[str, dict[int, int], list[CellRecord]]]:
     """Return every table's name, its pooled refcounts and its formula records.
 
     Keyed by archive rather than by name, because `20-formula-shapes` carries a
@@ -127,9 +118,9 @@ def formulaTables(path: Path) -> list[tuple[str, dict[int, int], list[CellRecord
     return tables
 
 
-def recordsOf(path: Path, name: str) -> list[CellRecord]:
+def readNamedFormulaRecords(path: Path, name: str) -> list[CellRecord]:
     """Return the formula records of the one table carrying a name."""
-    found = [records for table, _, records in formulaTables(path) if table == name]
+    found = [records for table, _, records in readFormulaTables(path) if table == name]
     assert len(found) == 1, f"{name} names {len(found)} tables in {path.name}"
     return found[0]
 
@@ -139,7 +130,7 @@ def recordsOf(path: Path, name: str) -> list[CellRecord]:
 
 def testEveryFormulaInADecoratedTableReads() -> None:
     """AC 1. Six of these eight read as no formula at all before the fix."""
-    table = pybers.open(fixturePath(fixtureName)).sheet(1).table("Decorated")
+    table = pybers.open(findDocumentPath(fixtureName)).sheet(1).table("Decorated")
 
     assert {
         address: table.cell(address).formulaText for address in decoratedFormulas
@@ -148,7 +139,7 @@ def testEveryFormulaInADecoratedTableReads() -> None:
 
 def testAPlainTableIsUnaffected() -> None:
     """AC 1. The control: a cell carrying nothing keeps its key at the front."""
-    table = pybers.open(fixturePath(fixtureName)).sheet(1).table("Plain")
+    table = pybers.open(findDocumentPath(fixtureName)).sheet(1).table("Plain")
 
     assert table.cell("B1").formulaText == "=SUM(A1:A5)"
     assert table.cell("B2").formulaText == "=A1*A2"
@@ -160,16 +151,16 @@ def testTheKeyMovesAsACellGainsAttributes() -> None:
     `Plain` puts the key first, `Decorated` puts it third, and the one cell with
     conditional highlighting puts it fifth.
     """
-    path = fixturePath(fixtureName)
+    path = findDocumentPath(fixtureName)
 
-    assert {formulaKeySlot(r) for r in recordsOf(path, "Plain")} == {0}
+    assert {formulaKeySlot(r) for r in readNamedFormulaRecords(path, "Plain")} == {0}
     assert sorted(
-        formulaKeySlot(r) for r in recordsOf(path, "Decorated")
+        formulaKeySlot(r) for r in readNamedFormulaRecords(path, "Decorated")
     ) == sorted(decoratedSlots.values())
 
 
 def testTheSlotRuleReproducesEveryPooledRefcount() -> None:
-    """AC 1. The measurement the rule rests on, run over the whole corpus.
+    """AC 1. The measurement the rule rests on, run over every document.
 
     A pooled formula records how many cells name it. Reading the key from the
     right slot reproduces that count for every entry in every table; reading it
@@ -177,8 +168,8 @@ def testTheSlotRuleReproducesEveryPooledRefcount() -> None:
     that a formula merely appears.
     """
     checked = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
-        for table, refcounts, records in formulaTables(path):
+    for path in allDocuments:
+        for table, refcounts, records in readFormulaTables(path):
             if not refcounts:
                 continue
             counted = collections.Counter(
@@ -186,8 +177,8 @@ def testTheSlotRuleReproducesEveryPooledRefcount() -> None:
             )
             assert dict(counted) == refcounts, f"{path.name} / {table}"
             checked += 1
-    # Thirteen tables in the corpus pool a formula, and 47 contributes two of
-    # them. A floor rather than an equality, so adding a fixture cannot fail this.
+    # Thirteen tables in the documents pool a formula, and 47 contributes two of
+    # them. A floor rather than an equality, so adding a document cannot fail this.
     assert checked >= 13
 
 
@@ -211,7 +202,7 @@ def testAFormulaKeyThePoolDoesNotHoldIsRefused() -> None:
 
 def testANoOpSaveDetachesNothing(tmp_path: Path) -> None:
     """AC 2. Six formulas were removed from this file by opening and saving it."""
-    working = Path(shutil.copy(fixturePath(fixtureName), tmp_path / "47.numbers"))
+    working = Path(shutil.copy(findDocumentPath(fixtureName), tmp_path / "47.numbers"))
     pybers.open(working).save()
 
     table = pybers.open(working).sheet(1).table("Decorated")
@@ -223,19 +214,19 @@ def testANoOpSaveDetachesNothing(tmp_path: Path) -> None:
 def testADecoratedDocumentRoundTripsWithEveryArchiveUnchanged(
     tmp_path: Path,
 ) -> None:
-    """AC 3. The base contract, on the one fixture that used to fail it."""
-    working = Path(shutil.copy(fixturePath(fixtureName), tmp_path / "47.numbers"))
-    before = archiveBodies(readPackage(working))
+    """AC 3. The base contract, on the one document that used to fail it."""
+    working = Path(shutil.copy(findDocumentPath(fixtureName), tmp_path / "47.numbers"))
+    before = readArchiveBodies(readPackage(working))
     pybers.open(working).save()
 
-    assert archiveBodies(readPackage(working)) == before
+    assert readArchiveBodies(readPackage(working)) == before
 
 
 # ── An invariant #66 made worth asserting, though 47 does not exercise it ────
 
 
-def testEveryReferenceInTheCorpusResolvesOnTheGrid() -> None:
-    """No reference or range resolves to a line before the first, corpus-wide.
+def testEveryReferenceInEveryDocumentResolvesOnTheGrid() -> None:
+    """No reference or range resolves to a line before the first, across every document.
 
     Attributing a formula to the wrong cell moves every reference in it, since a
     reference is an offset from the cell holding it. That is what #66 was filed
@@ -244,11 +235,11 @@ def testEveryReferenceInTheCorpusResolvesOnTheGrid() -> None:
     **This does not regress #66 and 47 does not exercise it.** There the wrong key
     is unresolvable, so the formula vanishes rather than resolving somewhere
     impossible, and the assertion below passes on the unfixed reader. It is kept
-    as a corpus-wide invariant, which is the part worth having permanently, and
+    as an invariant across every document, the part worth having permanently, and
     #66's own symptom was measured against a document that cannot be committed.
     """
     checked = 0
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         for _, _, cell in pybers.open(path).cellsIterate():
             if cell.formula is None:
                 continue

@@ -11,7 +11,7 @@ error, which is why each is handled here and not left to a caller:
 - **Anchoring is recorded in two different places depending on the node.** A range
   carries the field variant its axis sits in and `ASTStickyBits` beside it. A
   single-cell reference carries the flag on the coordinate and no bits at all, 0
-  of 21 in the corpus, so reading the bits reports every such reference unlocked.
+  of 21 in the documents, so reading the bits reports every such reference unlocked.
 - **A broken reference is coordinates pointing nowhere on purpose.** Read as
   ordinary numbers they name a cell far outside the table and raise nothing.
 
@@ -210,7 +210,7 @@ def readFormulaNode(
     """Return one node, giving meaning only to the types the model claims.
 
     Everything else keeps its type and its bytes and nothing more. The node
-    message carries 45 fields and the corpus uses 16, so interpreting the rest
+    message carries 45 fields and the documents use 16, so interpreting the rest
     would be describing the schema rather than the documents, and a formula is
     shared state that other cells depend on.
     """

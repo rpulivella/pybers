@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """\
-Names for function indices, checked against fixtures whose formulas are known.
+Names for function indices, checked against documents whose formulas are known.
 
 The four pairs asserted here come from documents that carry the formulas in their
-own cells, so `SUM` is 168 because a fixture written in Numbers says so, not
+own cells, so `SUM` is 168 because a document written in Numbers says so, not
 because the extractor and this suite agree with each other.
 
 UPDATES
@@ -29,9 +29,8 @@ from types import ModuleType
 import pytest
 
 import pybers
+from conftest import allDocuments, findDocumentPath, readDataListBytes
 from pybers import Formula, FormulaFunctionCall, FormulaNode
-from pybers._persistence import readPackage
-from pybers._persistence.types import archiveTypeId
 from pybers.formula.functions import (
     ArgumentCountError,
     UnknownFunctionError,
@@ -44,12 +43,7 @@ from pybers.formula.functions import (
 )
 from pybers.formula.nodes import functionNodeType
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-
-# TSCE.FormulaArchive, the pooled formula list. Named here rather than imported
-# because the identifier is read from the archive and is not a generated constant.
-formulaListTypeId: int = 6005
 
 # The highest index Apple assigned in the original alphabetical pass, measured
 # 2026-09-04 on Numbers 15.3.1. Everything above it was appended later and is
@@ -57,20 +51,12 @@ formulaListTypeId: int = 6005
 originalAlphabeticalCeiling: int = 167
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, skipping when it has not been made yet."""
-    path = fixtureDirectory / f"{name}.numbers"
-    if not path.is_file():
-        pytest.skip(f"Fixture {path.name} is not present.")
-    return path
+def openFirstTable(name: str) -> pybers.Table:
+    """Return the first table of a document, which is where these formulas live."""
+    return pybers.open(findDocumentPath(name)).sheets[0].tables[0]
 
 
-def firstTable(name: str) -> pybers.Table:
-    """Return the first table of a fixture, which is where these formulas live."""
-    return pybers.open(fixturePath(name)).sheets[0].tables[0]
-
-
-def calls(table: pybers.Table) -> list[FormulaFunctionCall]:
+def collectCalls(table: pybers.Table) -> list[FormulaFunctionCall]:
     """Return every function call in a table's formulas, in cell iteration order."""
     return [
         node.content
@@ -81,18 +67,7 @@ def calls(table: pybers.Table) -> list[FormulaFunctionCall]:
     ]
 
 
-def dataListBytes(path: Path) -> dict[int, bytes]:
-    """Return every pooled data list in a package, keyed by archive identifier."""
-    package = readPackage(path)
-    return {
-        archive.identifier: b"".join(message.data for message in archive.messages)
-        for iwaFile in package.iwaFiles
-        for archive in iwaFile.archives
-        if archiveTypeId(archive) == formulaListTypeId
-    }
-
-
-def extractor() -> ModuleType:
+def loadExtractor() -> ModuleType:
     """Return the extraction script as a module, for its comparison logic.
 
     `scripts/` carries no `__init__.py` and the file name has a hyphen, so
@@ -109,7 +84,7 @@ def extractor() -> ModuleType:
 # ── AC 1: a call reports its name ────────────────────────────────────────────
 
 
-def testEveryKnownPairMatchesTheFixtureThatEstablishedIt() -> None:
+def testEveryKnownPairMatchesTheMeasurementThatEstablishedIt() -> None:
     """The four indices measured from real documents name the right functions."""
     assert functionNameFor(168) == "SUM"
     assert functionNameFor(62) == "IF"
@@ -117,17 +92,17 @@ def testEveryKnownPairMatchesTheFixtureThatEstablishedIt() -> None:
     assert functionNameFor(126) == "ROUND"
 
 
-def testFormulaLiteralsFixtureNamesItsCalls() -> None:
+def testFormulaLiteralsMeasurementNamesItsCalls() -> None:
     """18 carries SUM, ROUND twice and IF, which is what the map must report."""
-    named = sorted(call.name or str(call.index) for call in calls(firstTable(
+    named = sorted(call.name or str(call.index) for call in collectCalls(openFirstTable(
         "18-formula-literals"
     )))
     assert named == ["IF", "ROUND", "ROUND", "SUM"]
 
 
-def testFormulaShapesFixtureNamesItsCalls() -> None:
+def testFormulaShapesMeasurementNamesItsCalls() -> None:
     """20 adds SUMIFS over ranges, so the map covers more than the arithmetic ones."""
-    named = sorted(call.name or str(call.index) for call in calls(firstTable(
+    named = sorted(call.name or str(call.index) for call in collectCalls(openFirstTable(
         "20-formula-shapes"
     )))
     assert named == ["IF", "SUM", "SUM", "SUM", "SUM", "SUMIFS"]
@@ -187,7 +162,9 @@ def testUnknownNameRefusesRatherThanInventingAnIndex() -> None:
 
 def testUnknownIndexRoundTripsThroughTheFileUnchanged(tmp_path: Path) -> None:
     """A call the map cannot name is written and read back with its index intact."""
-    source = shutil.copy(fixturePath("18-formula-literals"), tmp_path / "18.numbers")
+    source = shutil.copy(
+        findDocumentPath("18-formula-literals"), tmp_path / "18.numbers"
+    )
     document = pybers.open(source)
     cell = document.sheets[0].tables[0].cell("D1")
     nodes = list(cell.formula.nodes)
@@ -218,8 +195,8 @@ def testAuthoringByNameWritesTheSameArchiveAsAuthoringByIndex(
 ) -> None:
     """The same edit made both ways produces byte-identical formula archives."""
 
-    def write(target: Path, call: FormulaFunctionCall) -> dict[int, bytes]:
-        source = shutil.copy(fixturePath("18-formula-literals"), target)
+    def writeCall(target: Path, call: FormulaFunctionCall) -> dict[int, bytes]:
+        source = shutil.copy(findDocumentPath("18-formula-literals"), target)
         document = pybers.open(source)
         cell = document.sheets[0].tables[0].cell("A1")
         cell.formula = Formula(
@@ -229,10 +206,10 @@ def testAuthoringByNameWritesTheSameArchiveAsAuthoringByIndex(
             )
         )
         document.save()
-        return dataListBytes(source)
+        return readDataListBytes(source)
 
-    byIndex = write(tmp_path / "index.numbers", FormulaFunctionCall(168, 2))
-    byName = write(tmp_path / "name.numbers", FormulaFunctionCall.named("sum", 2))
+    byIndex = writeCall(tmp_path / "index.numbers", FormulaFunctionCall(168, 2))
+    byName = writeCall(tmp_path / "name.numbers", FormulaFunctionCall.named("sum", 2))
     assert byIndex == byName
 
 
@@ -318,14 +295,14 @@ def testAuthoringByIndexStillWritesWhateverIsAsked() -> None:
 # ── AC 8: no claim contradicts a document ────────────────────────────────────
 
 
-def testNoValidFormulaInTheCorpusContradictsTheTable() -> None:
-    """Every argument count in every fixture is accepted by the function holding it.
+def testNoValidFormulaInAnyDocumentContradictsTheTable() -> None:
+    """Every argument count in every document is accepted by the function holding it.
 
     Errored cells are excluded because Numbers itself rejected them, and the
     table agreeing that they are errors is the next test rather than this one.
     """
     offenders: list[str] = []
-    for path in sorted(fixtureDirectory.glob("*.numbers")):
+    for path in allDocuments:
         document = pybers.open(path)
         for sheet in document.sheets:
             for table in sheet.tables:
@@ -349,7 +326,7 @@ def testNoValidFormulaInTheCorpusContradictsTheTable() -> None:
 
 def testTheTableAgreesWithNumbersAboutAnErroredCall() -> None:
     """`=ROUND(2.5)` is stored as an error, and the table independently rejects it."""
-    table = firstTable("18-formula-literals")
+    table = openFirstTable("18-formula-literals")
     errored = [
         node.content
         for cell in table.cells.values()
@@ -424,7 +401,7 @@ def testAnInternalFunctionIsRefusedByNameAndAllowedByIndex() -> None:
 
 
 def testAnOperatorCarriesAFunctionIndexAsWellAsANodeType() -> None:
-    """Operators are node types in every formula the corpus holds, and Numbers
+    """Operators are node types in every formula the documents hold, and Numbers
     also declares an indexed form for each."""
     multiply = functionNamed("op.Multiply")
     assert multiply.index == 169
@@ -465,7 +442,7 @@ def testAFunctionWithNoIndexRefusesToProduceOne() -> None:
 
 def testComparisonReportsAnAddedFunction() -> None:
     """A function Numbers gained appears as added rather than silently arriving."""
-    module = extractor()
+    module = loadExtractor()
     before = {"ABS": module.NumbersFunction("ABS", 1, 1, 1, 0)}
     after = dict(before) | {"NEWONE": module.NumbersFunction("NEWONE", 2, 1, 1, 0)}
     comparison = module.compareTables(after, before)
@@ -476,7 +453,7 @@ def testComparisonReportsAnAddedFunction() -> None:
 
 def testComparisonReportsARemovedAndAChangedFunction() -> None:
     """A withdrawn index and one whose counts moved are different findings."""
-    module = extractor()
+    module = loadExtractor()
     before = {
         "ABS": module.NumbersFunction("ABS", 1, 1, 1, 0),
         "GONE": module.NumbersFunction("GONE", 2, 1, 1, 0),
@@ -496,7 +473,7 @@ def testComparisonReportsARemovedAndAChangedFunction() -> None:
 def testComparisonAgainstItselfIsEmpty() -> None:
     """Regenerating on the same Numbers reports nothing, which is what makes a
     real change visible."""
-    module = extractor()
+    module = loadExtractor()
     committed = module.readCommitted(
         repositoryRoot / "src" / "pybers" / "_generated" / "functions.py"
     )
@@ -509,12 +486,12 @@ def testComparisonAgainstItselfIsEmpty() -> None:
 def testTheCommittedTableMatchesWhatTheLibraryLoads() -> None:
     """The generated file and the model read the same table, so a stale
     regeneration cannot pass unnoticed."""
-    module = extractor()
+    module = loadExtractor()
     committed = module.readCommitted(
         repositoryRoot / "src" / "pybers" / "_generated" / "functions.py"
     )
     assert committed is not None
-    def fields(function: object) -> tuple[object, ...]:
+    def listFields(function: object) -> tuple[object, ...]:
         return tuple(
             getattr(function, attribute)
             for attribute in ("name", "index", "minimumArguments",
@@ -523,6 +500,6 @@ def testTheCommittedTableMatchesWhatTheLibraryLoads() -> None:
 
     # Compared field by field: the extractor and the model each define their own
     # NumbersFunction, so two identical rows are never the same type.
-    assert {name: fields(f) for name, f in committed.items()} == {
-        name: fields(f) for name, f in functionsByName.items()
+    assert {name: listFields(f) for name, f in committed.items()} == {
+        name: listFields(f) for name, f in functionsByName.items()
     }

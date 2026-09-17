@@ -8,7 +8,7 @@ own. This is that source of truth, and parsing an archive is the one thing it
 does.
 
 **Curated deliberately, and it is meant to stay incomplete.** Apple's registry
-runs to hundreds of types; the 46 fixtures here exercise 76 of them; this file
+runs to hundreds of types; the 46 documents here exercise 76 of them; this file
 carries only the ones a real read path reaches. An entry earns its place by
 being resolved while reading a document, and a ticket that reaches a new type
 adds it with the rest of its work. The alternative, shipping a full table
@@ -57,7 +57,7 @@ from .iwa import Archive
 # The identifiers are Apple's own and are not carried in the `.proto` schemas,
 # which is why this table cannot be derived from them: all 33 were checked for a
 # type-id option and none carries one. Each entry below was confirmed against the
-# fixture corpus rather than assumed.
+# documents rather than assumed.
 archiveTypes: dict[int, type[Message]] = {
     1: tn.DocumentArchive,          # the root: holds the ordered sheet list
     2: tn.SheetArchive,             # a tab: its name and its ordered drawables
@@ -107,7 +107,7 @@ def archiveTypeId(archive: Archive) -> int:
     """Return the type identifier that classifies an archive.
 
     The first message is the archive itself and any others are companions to it.
-    Measured across the corpus: of 31,028 archives, 30,706 carry exactly one
+    Measured across the documents: of 31,028 archives, 30,706 carry exactly one
     message, and in the 322 that carry more, the untyped companions appear only
     at positions one through three. Position zero is never one of them, so the
     first message is always the one that says what the archive is.

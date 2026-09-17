@@ -26,6 +26,7 @@ from pathlib import Path
 import pytest
 
 import pybers
+from conftest import allDocuments
 from pybers.addressing import (
     CellRange,
     CellRangeList,
@@ -44,16 +45,12 @@ from pybers.addressing.reference import (
 from pybers.table import MergeRange, Table
 from pybers.table import cells as tableModule
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
-
 # Either side of every base-26 boundary this library can reach, plus the two the
 # conversion is most likely to get wrong: Z to AA, and ZZ to AAA.
 boundaryColumns: list[int] = [1, 25, 26, 27, 28, 51, 52, 53, 701, 702, 703, 704]
 
 
-def sampleTable() -> Table:
+def buildSampleTable() -> Table:
     """Return a three-by-three table, built through the public addressing only.
 
     The size is declared rather than grown into, because a Numbers table has a
@@ -91,9 +88,9 @@ def test_theBase26BoundaryIsWhereItIsClaimedToBe() -> None:
     assert columnNumber("AA") == 27
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
-def test_everyReferenceInTheCorpusSurvivesTheRoundTrip(path: Path) -> None:
-    """Every cell in every fixture re-parses to the reference it came from."""
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
+def test_everyReferenceInEveryDocumentSurvivesTheRoundTrip(path: Path) -> None:
+    """Every cell in every document re-parses to the reference it came from."""
     document = pybers.open(path)
     for sheet in document.sheets:
         for table in sheet.tables:
@@ -248,19 +245,19 @@ def test_aTableTakesAnAddressAndNotARowAndColumnPair() -> None:
 
 
 def test_aTableAcceptsBothFormsOfAnAddress() -> None:
-    table = sampleTable()
+    table = buildSampleTable()
     assert table.cell("B2") is table.cell(CellReference(2, 2))
 
 
 # AC 6.a
 def test_aTableReturnsTheCellsARangeCovers() -> None:
-    table = sampleTable()
+    table = buildSampleTable()
     covered = [cell.reference.asReference() for cell in table.range("A1:B2")]
     assert covered == ["A1", "B1", "A2", "B2"]
 
 
 def test_aTableReturnsTheCellsEveryRangeInAListCovers() -> None:
-    table = sampleTable()
+    table = buildSampleTable()
     covered = [cell.reference.asReference() for cell in table.range("A1,C3")]
     assert covered == ["A1", "C3"]
 
@@ -268,7 +265,7 @@ def test_aTableReturnsTheCellsEveryRangeInAListCovers() -> None:
 def test_anUnboundedRangeIsBoundedByTheTablesOwnExtent() -> None:
     """A range knows nothing about the table it is used against, so the extent is
     the only thing that can answer what `A` covers."""
-    table = sampleTable()
+    table = buildSampleTable()
     covered = [cell.reference.asReference() for cell in table.range("A")]
     assert covered == ["A1", "A2", "A3"]
     assert [cell.reference.asReference() for cell in table.range("1")] == [
@@ -280,7 +277,7 @@ def test_aRangeReachingPastTheGridIsRefusedByItsOwnName() -> None:
     """The refusal names the range the caller wrote. Letting the first cell past
     the edge raise instead reports an interior address nobody asked for, which is
     a worse answer to the same question."""
-    table = sampleTable()
+    table = buildSampleTable()
     with pytest.raises(ReferenceError) as raised:
         table.range("A1:Z99")
     assert "A1:Z99" in str(raised.value)
@@ -298,7 +295,7 @@ def test_aTableWithNoDeclaredGridHasNoExtentAndHoldsNoCells() -> None:
 
 
 def test_anExtentIsTheDeclaredGridAndNotWhatTheCellsReach() -> None:
-    """Seven of the corpus's 74 tables declare more rows or columns than their
+    """Seven of the documents' 74 tables declare more rows or columns than their
     populated cells reach, so a derived extent is a real rectangle that is too
     small and nothing about it looks wrong."""
     table = Table(name="Table 1", rowCount=10, colCount=5)
@@ -323,7 +320,7 @@ def test_aMergeCannotBeUnbounded() -> None:
         MergeRange(CellRange.parse("A"))
 
 
-def mergedTable() -> Table:
+def buildMergedTable() -> Table:
     """Return a one-by-three table whose first two cells are merged."""
     table = Table(name="Table 1", rowCount=1, colCount=3)
     table.mergeRanges.append(MergeRange(CellRange.parse("A1:B1")))
@@ -336,7 +333,7 @@ def test_aCellSwallowedByAMergeIsNotAddressable() -> None:
     access files a record the archive never had, and a save would then emit it.
     That is the phantom merge anchor CLAUDE.md lists among the defects this
     project exists to avoid."""
-    table = mergedTable()
+    table = buildMergedTable()
     stored = len(table.cells)
     with pytest.raises(ReferenceError):
         table.cell("B1")
@@ -346,7 +343,7 @@ def test_aCellSwallowedByAMergeIsNotAddressable() -> None:
 
 def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
     """A merged region is one cell, so a range over it returns one cell."""
-    table = mergedTable()
+    table = buildMergedTable()
     assert [cell.reference.asReference() for cell in table.range("A1:C1")] == [
         "A1", "C1"
     ]
@@ -356,7 +353,7 @@ def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
 
 
 def test_mergeCoveringStillTellsACoveredCellFromAnEmptyOne() -> None:
-    table = sampleTable()
+    table = buildSampleTable()
     table.mergeRanges.append(MergeRange(CellRange.parse("A1:B1")))
     assert table.mergeCovering("B1") is not None
     assert table.mergeCovering("C2") is None

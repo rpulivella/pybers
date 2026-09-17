@@ -7,11 +7,11 @@ only property the format promises, because Snappy has no canonical encoding and
 Apple's output is one valid answer among many. Matching Apple byte for byte is
 therefore not a goal and is not tested for.
 
-The corpus sweep is the real test. It runs the encoder over all 2,811 frames of
-all 46 fixtures, which is around 20 MB of real protobuf, and demands the decoder
-return each one exactly. Synthetic inputs cover the shapes real data does not
-reach: empty, shorter than a match, a single repeated byte, and lengths sitting on
-each tag boundary.
+The sweep across every document is the real test. It runs the encoder over all 2,811
+frames of all 46 documents, which is around 20 MB of real protobuf, and demands the
+decoder return each one exactly. Synthetic inputs cover the shapes real data does not
+reach: empty, shorter than a match, a single repeated byte, and lengths sitting on each
+tag boundary.
 
 UPDATES
 2026-09-01  Written for #2, alongside the encoder.
@@ -33,16 +33,13 @@ from pathlib import Path
 
 import pytest
 
+from conftest import allDocuments
 from pybers._persistence.compression import compressRaw, decompressRaw
 from pybers._persistence.iwa import splitFrames
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
 
-allFixtures: list[Path] = sorted(fixtureDirectory.glob("*.numbers"))
-
-
-def everyFrameOf(path: Path) -> list[bytes]:
-    """Return every IWA frame of a fixture, already decompressed."""
+def readEveryFrame(path: Path) -> list[bytes]:
+    """Return every IWA frame of a document, already decompressed."""
     payloads: list[bytes] = []
     with zipfile.ZipFile(path) as archive:
         for info in archive.infolist():
@@ -95,10 +92,10 @@ def test_matchesReachingBackPastTheShortCopyWindowSurvive() -> None:
     assert decompressRaw(compressRaw(doubled)) == doubled
 
 
-@pytest.mark.parametrize("path", allFixtures, ids=lambda path: path.stem)
-def test_everyFrameOfEveryFixtureReEncodesToItself(path: Path) -> None:
+@pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
+def test_everyFrameOfEveryDocumentReEncodesToItself(path: Path) -> None:
     """The sweep: real protobuf payloads, encoded by us, decoded by us."""
-    payloads = everyFrameOf(path)
+    payloads = readEveryFrame(path)
     assert payloads, f"{path.name} yielded no frames to encode"
     for index, payload in enumerate(payloads):
         assert decompressRaw(compressRaw(payload)) == payload, (
@@ -111,19 +108,19 @@ def test_everyFrameOfEveryFixtureReEncodesToItself(path: Path) -> None:
 def test_theEncoderKeepsEmittingBackReferences() -> None:
     """Guard the ratio, so a regression to literals is caught rather than shipped.
 
-    Measured across the whole corpus on 2026-09-01: Apple 0.183x, pybers 0.182x.
+    Measured across every document on 2026-09-01: Apple 0.183x, pybers 0.182x.
     An all-literal encoder measures 1.001x, which is what this exists to exclude.
     The bound is deliberately loose, because the encoder is free to change how it
     matches and is not free to stop matching.
     """
     original = 0
     encoded = 0
-    for path in allFixtures:
-        for payload in everyFrameOf(path):
+    for path in allDocuments:
+        for payload in readEveryFrame(path):
             original += len(payload)
             encoded += len(compressRaw(payload))
 
-    assert original > 10_000_000, "the corpus shrank; this bound means nothing now"
+    assert original > 10_000_000, "the documents shrank; this bound means nothing now"
     assert encoded / original < 0.30, (
         f"the encoder reached {encoded / original:.3f}x, well above the 0.182x "
         "measured when it was written. It has stopped emitting back-references."

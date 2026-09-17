@@ -7,24 +7,24 @@ changes, and get the input byte for byte. Everything above this layer depends on
 that holding, so it is the first test worth having and the one worth breaking the
 build.
 
-The fixtures are this project's own, under `tests/fixtures/`, and three of the
-forty-five are exercised here. They are chosen to span the shapes the container has
-to survive rather than to be representative: the empty baseline, a document carrying
-floating objects and embedded image assets, and the 2001-row table that forces
-multi-tile storage and the largest members. A failure therefore says something about
-which shape broke.
+The documents are this project's own, under `tests/fixtures/` and
+`tests/measurements/`, and three of them are exercised here. They are chosen to
+span the shapes the container has to survive rather than to be representative:
+the empty baseline, a document carrying floating objects and embedded image
+assets, and the 2001-row table that forces multi-tile storage and the largest
+members. A failure therefore says something about which shape broke.
 
-A missing fixture now FAILS rather than skips. These are first-party files committed
+A missing document now FAILS rather than skips. These are first-party files committed
 to this repository, so an absent one is a defect, and a skip would let the round-trip
 contract quietly stop being tested.
 
 UPDATES
 2026-08-27  Repointed from the vendored numbers-parser `empty-*.numbers` files onto
-            this project's own corpus, and turned the skip into a failure. The
+            this project's own documents, and turned the skip into a failure. The
             vendored checkout was purged from the repository, which left all eleven
             of these tests skipping, green, and testing nothing. The replacement
-            fixtures are better on every axis: first-party, saved by the same Numbers
-            15.3.1 the schemas were extracted from, and already the corpus every
+            documents are better on every axis: first-party, saved by the same Numbers
+            15.3.1 the schemas were extracted from, and already the documents every
             other test uses.
 2026-08-16  Written with the container layer.
 """
@@ -44,6 +44,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import findDocumentPath
 from pybers._persistence import (
     IWAError,
     decompressRaw,
@@ -53,36 +54,21 @@ from pybers._persistence import (
     writePackage,
 )
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
-
-# Three fixtures spanning the shapes the container has to survive, chosen so a
+# Three documents spanning the shapes the container has to survive, chosen so a
 # failure says something about WHICH shape broke rather than only that one did:
 # the empty baseline, a document with floating objects and embedded image assets,
 # and the 2001-row table that forces multi-tile storage and the largest members.
-fixtureNames: tuple[str, ...] = ("00-baseline", "35-image", "27-big-table")
+documentNames: tuple[str, ...] = ("00-baseline", "35-image", "27-big-table")
 
 # The ZIP64 extended-information extra field Numbers writes into local headers:
 # a 4-byte tag and size, then 16 bytes of payload.
 localExtraFieldLength: int = 20
 
 
-def fixturePath(name: str) -> Path:
-    """Return a fixture path, failing when it is absent.
-
-    These are first-party fixtures committed to this repository, so a missing one
-    is a defect rather than an absent optional dependency. It used to skip, because
-    the fixtures were then a third-party checkout that might not be present; that
-    is no longer true and a skip here would hide the round-trip contract failing.
-    """
-    path = fixtureDirectory / f"{name}.numbers"
-    assert path.is_file(), f"Fixture {path} is missing from the corpus."
-    return path
-
-
-@pytest.mark.parametrize("name", fixtureNames)
+@pytest.mark.parametrize("name", documentNames)
 def testReadsEveryIWAMember(name: str) -> None:
     """Every Index/*.iwa member parses into at least one archive."""
-    package = readPackage(fixturePath(name))
+    package = readPackage(findDocumentPath(name))
 
     assert package.iwaFiles, "No IWA members were read."
     assert len(package.members) == len(package.iwaFiles) + len(
@@ -98,7 +84,7 @@ def testReadsEveryIWAMember(name: str) -> None:
                 assert message.typeId >= 0
 
 
-@pytest.mark.parametrize("name", fixtureNames)
+@pytest.mark.parametrize("name", documentNames)
 def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(
     name: str, tmp_path: Path
 ) -> None:
@@ -122,7 +108,7 @@ def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(
     test exists to keep the divergence bounded and named, so that a *different*
     difference appearing later is a failure rather than a shrug.
     """
-    source = fixturePath(name)
+    source = findDocumentPath(name)
     destination = tmp_path / f"{name}-roundtrip.numbers"
     writePackage(readPackage(source), destination)
 
@@ -148,7 +134,7 @@ def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(
     )
 
 
-@pytest.mark.parametrize("name", fixtureNames)
+@pytest.mark.parametrize("name", documentNames)
 def testRoundTripPreservesEveryMemberExactly(name: str, tmp_path: Path) -> None:
     """Content and zip metadata survive the round trip for every single member.
 
@@ -157,7 +143,7 @@ def testRoundTripPreservesEveryMemberExactly(name: str, tmp_path: Path) -> None:
     headers. What it does not cover is the local-header extra field, which is the
     only thing standing between this and the byte-identical test above.
     """
-    source = fixturePath(name)
+    source = findDocumentPath(name)
     destination = tmp_path / f"{name}-roundtrip.numbers"
     writePackage(readPackage(source), destination)
 
@@ -199,10 +185,10 @@ def testDecompressedFrameMatchesItsDeclaredLength() -> None:
     the tag stream that produces it, so agreement is real evidence rather than a
     tautology.
     """
-    package = readPackage(fixturePath("00-baseline"))
+    package = readPackage(findDocumentPath("00-baseline"))
     frameCount = 0
 
-    with zipfile.ZipFile(fixturePath("00-baseline")) as archive:
+    with zipfile.ZipFile(findDocumentPath("00-baseline")) as archive:
         for iwaFile in package.iwaFiles:
             for frame in splitFrames(archive.read(iwaFile.name)):
                 decompressRaw(frame)  # raises on any length mismatch
@@ -212,19 +198,19 @@ def testDecompressedFrameMatchesItsDeclaredLength() -> None:
 
 
 def testMultiFrameMemberIsExercised() -> None:
-    """At least one fixture member spans several 64 KiB frames.
+    """At least one document member spans several 64 KiB frames.
 
     Recorded as a test because the chunked path would otherwise be assumed rather
     than covered, and a reader that only ever saw single-frame members could be
     wrong about concatenation without anything noticing.
     """
-    with zipfile.ZipFile(fixturePath("00-baseline")) as archive:
+    with zipfile.ZipFile(findDocumentPath("00-baseline")) as archive:
         counts = [
             len(splitFrames(archive.read(name)))
             for name in archive.namelist()
             if isDocumentMember(name)
         ]
-    assert max(counts) > 1, "No multi-frame IWA member in this fixture."
+    assert max(counts) > 1, "No multi-frame IWA member in this document."
 
 
 def testRejectsAnUnknownFrameFlag() -> None:

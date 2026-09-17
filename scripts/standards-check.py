@@ -149,10 +149,9 @@ skipSubstrings: tuple[str, ...] = (
     "workarea/",
     ".venv/",
 )
-# NOTE tests/fixtures/ is deliberately NOT here. It holds the .numbers corpus,
-# which the extension filter already excludes, alongside the findings documents,
-# which are some of the longest prose in the repository. Excluding the directory
-# to keep binaries out silently dropped all of that from the gate.
+# NOTE tests/fixtures/ and tests/measurements/ are deliberately NOT here. The
+# extension filter already excludes their .numbers files, and excluding either
+# directory to keep binaries out would silently drop its README from the gate.
 
 # Skipped even inside an explicitly named directory.  You never mean to lint
 # protoc output just because it sits under a directory you named.

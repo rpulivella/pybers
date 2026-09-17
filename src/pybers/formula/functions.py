@@ -17,7 +17,7 @@ function is a `None` rather than an error, and why it round-trips untouched.
 declares a maximum of two arguments with a repeating group of one, which is how
 an eight-argument `SUM` is legal. Read `accepts` rather than comparing against
 `maximumArguments`, which is right only when there is no group. Measured across
-the fixture corpus on 2026-09-04, where no valid formula contradicts the table
+the documents on 2026-09-04, where no valid formula contradicts the table
 and the one Numbers marked as an error is the one the table rejects.
 
 **Existing and being offered are different things**, so every index Numbers
@@ -31,7 +31,7 @@ all of them; only an offered one may be written by name.
                and every cell a formula spills into holds `SPILL($anchor)`, so
                dropping these would read a spilled document as a bare number.
 
-Measured against `tests/fixtures/46-formula-rare-functions`, where Numbers
+Measured against `tests/measurements/46-formula-rare-functions`, where Numbers
 answers "isn't a valid function name" for each reserved one and where a
 `MAKEARRAY` spill fills three cells with `SPILL`.
 

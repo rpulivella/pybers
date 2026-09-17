@@ -2,7 +2,7 @@
 """\
 Walking a table's declared grid, row by row or whole, and reaching a cell by number.
 
-`22d-merge-multi-row` is the merge fixture because its text names each position,
+`22d-merge-multi-row` is the merge document because its text names each position,
 so a covered position is recognizable in the anchor's joined value, and its three
 merges span rows as well as columns. `20-formula-shapes` carries the measurement
 the ticket quotes, 26 stored cells in a declared grid of 96.
@@ -27,25 +27,23 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies
+from conftest import findDocumentPath, readArchiveBodies
 from pybers._persistence import readPackage
 from pybers.addressing import ReferenceError
 from pybers.table import Cell, Table
 
-fixtureDirectory: Path = Path(__file__).resolve().parent / "fixtures"
+
+def openDocumentTable(name: str, table: str | int = 1) -> Table:
+    """Return one table from the first sheet of a document."""
+    return pybers.open(findDocumentPath(name)).sheet(1).table(table)
 
 
-def fixtureTable(name: str, table: str | int = 1) -> Table:
-    """Return one table from the first sheet of a fixture."""
-    return pybers.open(fixtureDirectory / f"{name}.numbers").sheet(1).table(table)
-
-
-def merged() -> Table:
+def openMergedTable() -> Table:
     """Return `22d`, five rows by seven columns with merges A2:A3, C2:D3 and F2:F4."""
-    return fixtureTable("22d-merge-multi-row")
+    return openDocumentTable("22d-merge-multi-row")
 
 
-def addresses(cells: object) -> list[str]:
+def listWalkAddresses(cells: object) -> list[str]:
     """Return the written address of each cell in a walk, in the order walked."""
     return [str(cell.reference) for cell in cells]  # type: ignore[attr-defined]
 
@@ -55,7 +53,8 @@ def addresses(cells: object) -> list[str]:
 
 def testAWalkYieldsEveryPositionOfTheDeclaredGridInRowOrder() -> None:
     """`Table 2` stores one cell and declares ten rows by five columns."""
-    walked = addresses(fixtureTable("20-formula-shapes", "Table 2").gridIterate())
+    table = openDocumentTable("20-formula-shapes", "Table 2")
+    walked = listWalkAddresses(table.gridIterate())
 
     assert len(walked) == 50
     assert walked[:6] == ["A1", "B1", "C1", "D1", "E1", "A2"]
@@ -63,13 +62,13 @@ def testAWalkYieldsEveryPositionOfTheDeclaredGridInRowOrder() -> None:
 
 
 def testAWalkYieldsEachCellOnce() -> None:
-    walked = list(merged().gridIterate())
+    walked = list(openMergedTable().gridIterate())
 
     assert len({id(cell) for cell in walked}) == len(walked)
 
 
 def testAMergedBlockAppearsAtItsAnchorAndNowhereElse() -> None:
-    walked = addresses(merged().gridIterate())
+    walked = listWalkAddresses(openMergedTable().gridIterate())
 
     assert {"A2", "C2", "F2"} <= set(walked)
     assert not {"A3", "C3", "D2", "D3", "F3", "F4"} & set(walked)
@@ -80,7 +79,7 @@ def testAMergedBlockAppearsAtItsAnchorAndNowhereElse() -> None:
 
 
 def testTheRowsOfATableAreItsDeclaredRows() -> None:
-    rows = merged().rows
+    rows = openMergedTable().rows
 
     assert len(rows) == 5
     assert rows[0].rowNumber == 1
@@ -89,23 +88,23 @@ def testTheRowsOfATableAreItsDeclaredRows() -> None:
 
 
 def testARowHoldsOnlyTheCellsNoMergeSwallowed() -> None:
-    rows = merged().rows
+    rows = openMergedTable().rows
 
-    assert addresses(rows[1]) == ["A2", "B2", "C2", "E2", "F2", "G2"]
-    assert addresses(rows[2]) == ["B3", "E3", "G3"]
+    assert listWalkAddresses(rows[1]) == ["A2", "B2", "C2", "E2", "F2", "G2"]
+    assert listWalkAddresses(rows[2]) == ["B3", "E3", "G3"]
     assert len(rows[2]) == 3
 
 
 def testIndexingARowCountsItsCellsRatherThanItsColumns() -> None:
-    row = merged().rows[1]
+    row = openMergedTable().rows[1]
 
     assert str(row[3].reference) == "E2"
     assert str(row[-1].reference) == "G2"
-    assert addresses(row[1:4]) == ["B2", "C2", "E2"]
+    assert listWalkAddresses(row[1:4]) == ["B2", "C2", "E2"]
 
 
 def testIndexingPastTheEndRaisesIndexError() -> None:
-    rows = merged().rows
+    rows = openMergedTable().rows
 
     with pytest.raises(IndexError):
         rows[5]
@@ -114,7 +113,7 @@ def testIndexingPastTheEndRaisesIndexError() -> None:
 
 
 def testWalkingRowByRowYieldsWhatTheWholeWalkYields() -> None:
-    table = merged()
+    table = openMergedTable()
 
     assert [cell for row in table.rows for cell in row] == list(table.gridIterate())
 
@@ -125,24 +124,24 @@ def testARowTakenBeforeAMergeHoldsWhatTheMergeLeft() -> None:
 
     table.mergeAdd("A1:B2")
 
-    assert addresses(row) == ["A1", "C1"]
+    assert listWalkAddresses(row) == ["A1", "C1"]
     assert len(row) == 2
 
 
 def testRowsAndSlicesCompareByWhatTheyName() -> None:
-    table = merged()
+    table = openMergedTable()
 
     assert table.rows[1] == table.rows[1]
     assert table.rows[1:3] == table.rows[1:3]
     assert table.rows[1] in table.rows
-    assert table.rows[1] != merged().rows[1]
+    assert table.rows[1] != openMergedTable().rows[1]
 
 
 # ── AC 3: measuring or slicing creates no cell ───────────────────────────────
 
 
 def testMeasuringAndSlicingAWalkCreatesNoCell() -> None:
-    table = fixtureTable("20-formula-shapes")
+    table = openDocumentTable("20-formula-shapes")
     stored = len(table.cells)
 
     rows = table.rows
@@ -154,7 +153,7 @@ def testMeasuringAndSlicingAWalkCreatesNoCell() -> None:
 
 
 def testAskingWhetherARowHoldsACellCreatesNoCell() -> None:
-    table = fixtureTable("20-formula-shapes")
+    table = openDocumentTable("20-formula-shapes")
     stored = len(table.cells)
     held = table.cell("A1")
 
@@ -164,16 +163,16 @@ def testAskingWhetherARowHoldsACellCreatesNoCell() -> None:
 
 
 def testReachingACellCreatesOnlyThatCell() -> None:
-    table = fixtureTable("20-formula-shapes", "Table 2")
+    table = openDocumentTable("20-formula-shapes", "Table 2")
 
     table.rows[9][4]
 
-    assert set(addresses(table.cells.values())) == {"A1", "E10"}
+    assert set(listWalkAddresses(table.cells.values())) == {"A1", "E10"}
 
 
 def testAWholeWalkStoresEveryCellOfTheGrid() -> None:
     """The measurement the ticket records, 26 stored cells becoming 96."""
-    table = fixtureTable("20-formula-shapes")
+    table = openDocumentTable("20-formula-shapes")
     assert len(table.cells) == 26
 
     for _ in table.gridIterate():
@@ -183,7 +182,7 @@ def testAWholeWalkStoresEveryCellOfTheGrid() -> None:
 
 
 def testAWalkChangesNothingInTheSavedFile(tmp_path: Path) -> None:
-    source = fixtureDirectory / "20-formula-shapes.numbers"
+    source = findDocumentPath("20-formula-shapes")
     untouched, walked = tmp_path / "untouched.numbers", tmp_path / "walked.numbers"
     pybers.open(source).save(untouched)
     document = pybers.open(source)
@@ -194,7 +193,9 @@ def testAWalkChangesNothingInTheSavedFile(tmp_path: Path) -> None:
 
     document.save(walked)
 
-    assert archiveBodies(readPackage(walked)) == archiveBodies(readPackage(untouched))
+    assert readArchiveBodies(readPackage(walked)) == readArchiveBodies(
+        readPackage(untouched)
+    )
 
 
 # ── AC 4: no grid walks as nothing ───────────────────────────────────────────
@@ -215,13 +216,13 @@ def testATableThatDeclaresNoGridWalksAsNothing(rowCount: int, colCount: int) -> 
 
 
 def testRowAndColNameTheCellTheirAddressNames() -> None:
-    table = fixtureTable("20-formula-shapes")
+    table = openDocumentTable("20-formula-shapes")
 
     assert table.cell(row=3, col=5) is table.cell("E3")
 
 
 def testANumberedCellHasItsAxesNamed() -> None:
-    table = fixtureTable("20-formula-shapes")
+    table = openDocumentTable("20-formula-shapes")
 
     with pytest.raises(TypeError):
         table.cell(3, 5)  # type: ignore[call-arg, misc]
@@ -255,7 +256,7 @@ def testANumberedCellHasItsAxesNamed() -> None:
     ],
 )
 def testACellNamedWrongIsRefusedAndCreatesNothing(named: dict[str, object]) -> None:
-    table = fixtureTable("20-formula-shapes")
+    table = openDocumentTable("20-formula-shapes")
     stored = len(table.cells)
 
     with pytest.raises(ReferenceError):
@@ -265,21 +266,21 @@ def testACellNamedWrongIsRefusedAndCreatesNothing(named: dict[str, object]) -> N
 
 def testACoveredPositionIsRefusedByNumberAsByAddress() -> None:
     with pytest.raises(ReferenceError, match="anchor is A2"):
-        merged().cell(row=3, col=1)
+        openMergedTable().cell(row=3, col=1)
 
 
 # ── AC 6: a walk and a lookup hand over the same cell ────────────────────────
 
 
 def testEveryCellAWalkYieldsIsTheCellTheTableReturns() -> None:
-    table = merged()
+    table = openMergedTable()
 
     assert all(cell is table.cell(cell.reference) for cell in table.gridIterate())
 
 
 def testAWriteThroughAWalkReachesTheFile(tmp_path: Path) -> None:
     working = tmp_path / "walked.numbers"
-    shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", working)
+    shutil.copy(findDocumentPath("20-formula-shapes"), working)
     document = pybers.open(working)
 
     last = list(document.sheet(1).table("Table 2").gridIterate())[-1]
@@ -292,7 +293,7 @@ def testAWriteThroughAWalkReachesTheFile(tmp_path: Path) -> None:
 
 def testAWriteThroughARowReachesTheFile(tmp_path: Path) -> None:
     working = tmp_path / "rows.numbers"
-    shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", working)
+    shutil.copy(findDocumentPath("20-formula-shapes"), working)
     document = pybers.open(working)
 
     document.sheet(1).table("Table 2").rows[4][2].value = "through a row"
@@ -306,20 +307,20 @@ def testAWriteThroughARowReachesTheFile(tmp_path: Path) -> None:
 
 
 def testAnAnchorSaysWhichMergeItAnchors() -> None:
-    anchor = merged().cell("C2").mergeAnchored
+    anchor = openMergedTable().cell("C2").mergeAnchored
 
     assert anchor is not None
     assert str(anchor.extent) == "C2:D3"
 
 
 def testACellAnchoringNoMergeSaysNothing() -> None:
-    assert merged().cell("B2").mergeAnchored is None
+    assert openMergedTable().cell("B2").mergeAnchored is None
 
 
 def testAWalkFindsEveryMergeWithoutASecondLookup() -> None:
     found = [
         str(cell.mergeAnchored.extent)
-        for cell in merged().gridIterate()
+        for cell in openMergedTable().gridIterate()
         if cell.mergeAnchored is not None
     ]
 
@@ -327,7 +328,7 @@ def testAWalkFindsEveryMergeWithoutASecondLookup() -> None:
 
 
 def testAnUnmergedAnchorSaysNothing() -> None:
-    table = merged()
+    table = openMergedTable()
     anchor = table.cell("A2")
 
     table.mergeRemove("A3")
@@ -350,7 +351,7 @@ def testAMergeWrittenLockedKeepsItsAnchor() -> None:
     table.mergeAdd("$A$1:B2")
 
     assert table.cell("A1").value == "kept"
-    assert addresses(table.rows[0]) == ["A1", "C1"]
+    assert listWalkAddresses(table.rows[0]) == ["A1", "C1"]
 
 
 def testAMergeIsTheSameBlockHoweverItIsLocked() -> None:
@@ -365,7 +366,7 @@ def testAMergeIsTheSameBlockHoweverItIsLocked() -> None:
 def testAScriptFillsEveryEmptyCellInALoop(tmp_path: Path) -> None:
     """The `import pybers` consumer: a batch over a grid, no address built as text."""
     working = tmp_path / "filled.numbers"
-    shutil.copy(fixtureDirectory / "20-formula-shapes.numbers", working)
+    shutil.copy(findDocumentPath("20-formula-shapes"), working)
     document = pybers.open(working)
 
     table = document.sheet(1).table("Table 2")
@@ -384,7 +385,7 @@ def testACliPrintsATableRowByRow() -> None:
     lines = [
         f"{row.rowNumber}: "
         + " | ".join(str(cell.value).split("\n")[0] for cell in row)
-        for row in merged().rows
+        for row in openMergedTable().rows
     ]
 
     assert lines[1] == (
@@ -396,7 +397,7 @@ def testACliPrintsATableRowByRow() -> None:
 
 def testATuiDrawsOnlyTheVisibleWindowAndMovesItsCursorByNumber() -> None:
     """The grid view: a scrolled window of cells, creating only what it shows."""
-    table = fixtureTable("27-big-table")
+    table = openDocumentTable("27-big-table")
     stored = len(table.cells)
     top, height, left, width = 1000, 3, 1, 2
 

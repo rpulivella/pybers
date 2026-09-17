@@ -12,7 +12,7 @@ The archive index and the two lookups every reader needs are in
 engine in `pybers.readengine`. What is left here is the walk from a document down
 to a cell.
 
-Three traps the fixtures established, all of which produce a plausible wrong
+Three traps the documents established, all of which produce a plausible wrong
 answer rather than an error, and all of which are handled here rather than left
 to a caller:
 
@@ -31,7 +31,7 @@ UPDATES
 2026-08-31  Written for #1: document, sheets, tables and cell values.
 2026-09-01  The package read here travels with the document, for #2.
 2026-09-03  Formulas, for #41. The key slot and the sticky-bits rule were
-            measured against the corpus, not read off the schema.
+            measured against the documents, not read off the schema.
 2026-09-08  Formulas, the engine and the index moved to modules of their own
             for #45, and a table carries the identity formulas name it by.
 2026-09-14  A sheet carries the identifier of the archive it was read from,

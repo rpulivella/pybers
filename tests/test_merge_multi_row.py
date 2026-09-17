@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """\
-A merge that spans more than one row, which no fixture held until now.
+A merge that spans more than one row, which no document held until now.
 
-All 35 merges measured across the corpus on 2026-09-06 were one row tall, so the
+All 35 merges measured on 2026-09-06 were one row tall, so the
 vertical axis of an extent had never been read, while the example documents hold
 twenty-seven vertical merges in a single table.
 
@@ -29,13 +29,12 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import archiveBodies, recordedRows
+from conftest import findDocumentPath, readArchiveBodies, readRecordedRows
 from pybers._persistence import readPackage
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.table import Table
 
-fixtures: Path = Path(__file__).parent / "fixtures"
-multiRowFixture: Path = fixtures / "22d-merge-multi-row.numbers"
+multiRowFixture: Path = findDocumentPath("22d-merge-multi-row")
 
 # The extent of each merge, against the anchor that carries it.
 extents: tuple[tuple[str, str], ...] = (
@@ -65,20 +64,20 @@ recordLayout: dict[int, set[int]] = {
 }
 
 
-def firstTable(document: pybers.Document) -> Table:
+def findFirstTable(document: pybers.Document) -> Table:
     """Return the document's first table."""
     return document.sheets[0].tables[0]
 
 
 def testTheFixtureHoldsExactlyTheThreeMergesItWasMadeWith() -> None:
     """Every other check here looks a merge up, so none of them would see a fourth."""
-    table = firstTable(pybers.open(multiRowFixture))
+    table = findFirstTable(pybers.open(multiRowFixture))
     assert len(table.mergeRanges) == len(extents)
 
 
 @pytest.mark.parametrize(("anchor", "extent"), extents)
 def testEachMergeReportsTheExtentNumbersDisplays(anchor: str, extent: str) -> None:
-    table = firstTable(pybers.open(multiRowFixture))
+    table = findFirstTable(pybers.open(multiRowFixture))
     merge = table.mergeCovering(anchor)
     assert merge is not None
     assert str(merge.extent) == extent
@@ -87,7 +86,7 @@ def testEachMergeReportsTheExtentNumbersDisplays(anchor: str, extent: str) -> No
 
 @pytest.mark.parametrize("reference", coveredPositions)
 def testACoveredPositionIsRefused(reference: str) -> None:
-    table = firstTable(pybers.open(multiRowFixture))
+    table = findFirstTable(pybers.open(multiRowFixture))
     with pytest.raises(CellReferenceError, match="covered by the merge"):
         table.cell(reference)
 
@@ -95,7 +94,7 @@ def testACoveredPositionIsRefused(reference: str) -> None:
 @pytest.mark.parametrize("reference", coveredPositions)
 def testACoveredPositionResolvesToTheMergeThatCoversIt(reference: str) -> None:
     """`mergeCovering` answers on the vertical axis, which nothing had exercised."""
-    table = firstTable(pybers.open(multiRowFixture))
+    table = findFirstTable(pybers.open(multiRowFixture))
     merge = table.mergeCovering(reference)
     assert merge is not None
     assert merge.covers(reference)
@@ -103,13 +102,13 @@ def testACoveredPositionResolvesToTheMergeThatCoversIt(reference: str) -> None:
 
 @pytest.mark.parametrize("reference", neighbors)
 def testEveryCellBesideAMergeStillNamesItself(reference: str) -> None:
-    table = firstTable(pybers.open(multiRowFixture))
+    table = findFirstTable(pybers.open(multiRowFixture))
     assert table.cell(reference).value == reference.lower()
 
 
 def testNoCoveredPositionHoldsARecord() -> None:
     """The 22c result holds on the vertical axis: a covered cell has no record."""
-    assert recordedRows(multiRowFixture) == recordLayout
+    assert readRecordedRows(multiRowFixture) == recordLayout
 
 
 def testMergingJoinsColumnsWithTabsAndRowsWithNewlines() -> None:
@@ -118,7 +117,7 @@ def testMergingJoinsColumnsWithTabsAndRowsWithNewlines() -> None:
     Numbers coerces the swallowed cells into one text value in row-major order,
     a tab between columns and a newline between rows. Measured 2026-09-07.
     """
-    table = firstTable(pybers.open(multiRowFixture))
+    table = findFirstTable(pybers.open(multiRowFixture))
     assert table.cell("A2").value == "two rows tall, anchor\na3"
     assert table.cell("C2").value == "two by two, anchor\td2\nc3\td3"
     assert table.cell("F2").value == "three rows tall, anchor\nf3\nf4"
@@ -128,6 +127,6 @@ def testTheFixtureWritesBackUnchanged(tmp_path: Path) -> None:
     """The base contract, on the one fixture holding a merge taller than a row."""
     target = tmp_path / "written.numbers"
     pybers.open(multiRowFixture).save(target)
-    assert archiveBodies(readPackage(target)) == archiveBodies(
+    assert readArchiveBodies(readPackage(target)) == readArchiveBodies(
         readPackage(multiRowFixture)
     )
