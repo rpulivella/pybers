@@ -122,7 +122,7 @@ def readTicketPrefix() -> str:
 ticketPrefix: str = readTicketPrefix()
 
 
-def ticketNumber(value: str) -> int:
+def parseTicketNumber(value: str) -> int:
     """Parse `PYB-39`, `39`, `#39` or the issue URL, which cannot differ here.
 
     ArgumentTypeError rather than ValueError, so argparse prints usage.
@@ -140,7 +140,7 @@ def ticketNumber(value: str) -> int:
     return int(text)
 
 
-def ticketRef(number: int) -> str:
+def formatTicketRef(number: int) -> str:
     """Return a ticket reference in the house form, never a bare number.
 
     GitHub numbers issues and pull requests from one counter, so `#34` names two.
@@ -269,7 +269,7 @@ lineSeparators: tuple[str, ...] = (
 )
 
 
-def lineEnding(line: str) -> str:
+def readLineEnding(line: str) -> str:
     """Return the separator one line from `splitlines(keepends=True)` carries.
 
     The empty string for the last line of a body that does not end in one.
@@ -287,7 +287,7 @@ def lineEnding(line: str) -> str:
 codeIndent: int = 4
 
 
-def leadingWidth(content: str) -> int:
+def measureLeadingWidth(content: str) -> int:
     """Return how many columns a line is indented before its first other character."""
     width = 0
     for character in content:
@@ -355,10 +355,10 @@ def unwrapParagraphs(body: str) -> BodyChanges:
         paragraphTrims = 0
 
     for line in lines:
-        ending = lineEnding(line)
+        ending = readLineEnding(line)
         content = line[: len(line) - len(ending)]
         stripped = content.strip()
-        indent = leadingWidth(content)
+        indent = measureLeadingWidth(content)
 
         if stripped.startswith(("```", "~~~")):
             flush()
@@ -816,7 +816,7 @@ def readIssueNodeId(token: str, number: int) -> str:
     )
     issue = data["repository"]["issue"]
     if issue is None:
-        raise RuntimeError(f"Issue {ticketRef(number)} was not found.")
+        raise RuntimeError(f"Issue {formatTicketRef(number)} was not found.")
     return issue["id"]
 
 
@@ -1016,7 +1016,7 @@ def showTicket(summary: TicketSummary) -> None:
     """
     labelText = ", ".join(summary["labels"]) or "none"
     console.print(
-        f"[bold cyan]{ticketRef(summary['number'])}[/] "
+        f"[bold cyan]{formatTicketRef(summary['number'])}[/] "
         f"[bold]{escape(summary['title'])}[/]"
     )
     console.print(f"[dim]{escape(summary['url'])}[/]")
@@ -1034,7 +1034,7 @@ def showTicket(summary: TicketSummary) -> None:
     ):
         if related:
             listed = ", ".join(
-                f"{ticketRef(number)} {title}" for number, title in related
+                f"{formatTicketRef(number)} {title}" for number, title in related
             )
             console.print(f"{label}: [{tint}]{escape(listed)}[/]")
     if summary["body"]:
@@ -1048,7 +1048,7 @@ def showTicket(summary: TicketSummary) -> None:
         console.print(summary["body"], markup=False, highlight=False)
 
 
-def cmdCreate(arguments: argparse.Namespace) -> int:
+def runCreate(arguments: argparse.Namespace) -> int:
     """File a ticket, place it on the board, and set its Status to Todo."""
     if arguments.label not in validLabels:
         console.print(f"[red]Unknown label {arguments.label!r}.[/]")
@@ -1082,7 +1082,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
 
     summary = createTicket(token, arguments.label, arguments.title, body)
     console.print(
-        f"[green]Filed[/] [bold cyan]{ticketRef(summary['number'])}[/] "
+        f"[green]Filed[/] [bold cyan]{formatTicketRef(summary['number'])}[/] "
         f"{escape(summary['title'])}"
     )
 
@@ -1094,7 +1094,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdShow(arguments: argparse.Namespace) -> int:
+def runShow(arguments: argparse.Namespace) -> int:
     """Print one ticket for a human reader.
 
     `show` renders; `export-as-source` does not. That is the whole distinction, and the
@@ -1110,7 +1110,7 @@ def cmdShow(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdExportAsSource(arguments: argparse.Namespace) -> int:
+def runExportAsSource(arguments: argparse.Namespace) -> int:
     """Emit one field of a ticket verbatim, for a skill that will send it back.
 
     Separate from `show` because displaying and round-tripping are different actions
@@ -1126,7 +1126,7 @@ def cmdExportAsSource(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdStart(arguments: argparse.Namespace) -> int:
+def runStart(arguments: argparse.Namespace) -> int:
     """Assign a ticket and move it to In Progress."""
     token = resolveToken()
     summary = readTicket(token, arguments.number)
@@ -1134,7 +1134,7 @@ def cmdStart(arguments: argparse.Namespace) -> int:
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
         console.print(
-            f"would assign {ticketRef(summary['number'])} to {arguments.assignee}"
+            f"would assign {formatTicketRef(summary['number'])} to {arguments.assignee}"
         )
         console.print("would set Status to [cyan]In Progress[/]")
         return 0
@@ -1150,7 +1150,7 @@ def cmdStart(arguments: argparse.Namespace) -> int:
     setBoardStatus(token, coordinates, itemId, "In Progress")
 
     console.print(
-        f"[green]Started[/] [bold cyan]{ticketRef(summary['number'])}[/] "
+        f"[green]Started[/] [bold cyan]{formatTicketRef(summary['number'])}[/] "
         f"{escape(summary['title'])}"
     )
     console.print(
@@ -1160,7 +1160,7 @@ def cmdStart(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdEdit(arguments: argparse.Namespace) -> int:
+def runEdit(arguments: argparse.Namespace) -> int:
     """Revise a filed ticket in place."""
     if arguments.label is not None and arguments.label not in validLabels:
         console.print(f"[red]Unknown label {arguments.label!r}.[/]")
@@ -1227,7 +1227,7 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         return 1
 
     console.print(
-        f"[green]Edited[/] [bold cyan]{ticketRef(summary['number'])}[/] "
+        f"[green]Edited[/] [bold cyan]{formatTicketRef(summary['number'])}[/] "
         f"{escape(summary['title'])}"
     )
     console.print("[dim]verified against the filed ticket[/]")
@@ -1257,7 +1257,7 @@ def verifyCommentBody(token: str, comment: CommentSummary, sent: str) -> bool:
     return False
 
 
-def cmdComment(arguments: argparse.Namespace) -> int:
+def runComment(arguments: argparse.Namespace) -> int:
     """Add one comment to a ticket."""
     bodyPath = Path(arguments.bodyFile)
     if not bodyPath.is_file():
@@ -1266,20 +1266,22 @@ def cmdComment(arguments: argparse.Namespace) -> int:
     changes = readBodyFile(bodyPath)
     body = changes.text
     if arguments.dryRun:
-        console.print(f"[yellow]Dry run[/] comment on {ticketRef(arguments.number)}:")
+        console.print(
+            f"[yellow]Dry run[/] comment on {formatTicketRef(arguments.number)}:"
+        )
         console.print(body, markup=False, highlight=False)
         return 0
     token = resolveToken()
     comment = postComment(token, arguments.number, body)
     reportUnwrapping(changes)
     console.print(
-        f"[green]Commented on[/] [bold cyan]{ticketRef(arguments.number)}[/] "
+        f"[green]Commented on[/] [bold cyan]{formatTicketRef(arguments.number)}[/] "
         f"as comment [bold cyan]{comment['id']}[/]"
     )
     return 0 if verifyCommentBody(token, comment, body) else 1
 
 
-def cmdCommentExport(arguments: argparse.Namespace) -> int:
+def runCommentExport(arguments: argparse.Namespace) -> int:
     """Emit one comment's body verbatim, for a caller that will send it back.
 
     Separate from `comment-list` for the reason `export-as-source` is separate from
@@ -1290,7 +1292,7 @@ def cmdCommentExport(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdCommentEdit(arguments: argparse.Namespace) -> int:
+def runCommentEdit(arguments: argparse.Namespace) -> int:
     """Replace one comment's body, keeping its id and its place in the thread."""
     bodyPath = Path(arguments.bodyFile)
     if not bodyPath.is_file():
@@ -1309,7 +1311,7 @@ def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     return 0 if verifyCommentBody(token, comment, body) else 1
 
 
-def cmdCommentDelete(arguments: argparse.Namespace) -> int:
+def runCommentDelete(arguments: argparse.Namespace) -> int:
     """Remove one comment, after printing what is about to be lost.
 
     GitHub keeps no copy and offers no undo, so the body is shown first. A
@@ -1330,7 +1332,7 @@ def cmdCommentDelete(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdClose(arguments: argparse.Namespace) -> int:
+def runClose(arguments: argparse.Namespace) -> int:
     """Close a ticket and move it to Done.
 
     Merging a pull request whose body carries `Closes #N` already closes the
@@ -1347,19 +1349,19 @@ def cmdClose(arguments: argparse.Namespace) -> int:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
         if alreadyClosed:
             console.print(
-                f"{ticketRef(summary['number'])} is already closed; "
+                f"{formatTicketRef(summary['number'])} is already closed; "
                 "would leave the issue alone"
             )
         else:
             console.print(
-                f"would close {ticketRef(summary['number'])} as [cyan]{reason}[/]"
+                f"would close {formatTicketRef(summary['number'])} as [cyan]{reason}[/]"
             )
         console.print("would set Status to [cyan]Done[/]")
         return 0
 
     if alreadyClosed:
         console.print(
-            f"[yellow]{ticketRef(arguments.number)} is already closed[/], "
+            f"[yellow]{formatTicketRef(arguments.number)} is already closed[/], "
             "setting Status only."
         )
     else:
@@ -1375,13 +1377,13 @@ def cmdClose(arguments: argparse.Namespace) -> int:
 
     verb = "Completed" if reason == "completed" else "Abandoned"
     console.print(
-        f"[green]{verb}[/] [bold cyan]{ticketRef(summary['number'])}[/] "
+        f"[green]{verb}[/] [bold cyan]{formatTicketRef(summary['number'])}[/] "
         f"{escape(summary['title'])}"
     )
     return 0
 
 
-def cmdStatus(arguments: argparse.Namespace) -> int:
+def runStatus(arguments: argparse.Namespace) -> int:
     """Move a ticket to a named Status on the board."""
     token = resolveToken()
     coordinates = readBoardCoordinates(token)
@@ -1394,25 +1396,27 @@ def cmdStatus(arguments: argparse.Namespace) -> int:
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
         console.print(
-            f"would set {ticketRef(arguments.number)} to [cyan]{arguments.setStatus}[/]"
+            f"would set {formatTicketRef(arguments.number)} "
+            f"to [cyan]{arguments.setStatus}[/]"
         )
         return 0
 
     itemId = findBoardItem(token, coordinates, arguments.number)
     if itemId is None:
         console.print(
-            f"[red]Issue {ticketRef(arguments.number)} is not on the board.[/]"
+            f"[red]Issue {formatTicketRef(arguments.number)} is not on the board.[/]"
         )
         return 1
 
     setBoardStatus(token, coordinates, itemId, arguments.setStatus)
     console.print(
-        f"[green]{ticketRef(arguments.number)}[/] is now [cyan]{arguments.setStatus}[/]"
+        f"[green]{formatTicketRef(arguments.number)}[/] "
+        f"is now [cyan]{arguments.setStatus}[/]"
     )
     return 0
 
 
-def cmdList(arguments: argparse.Namespace) -> int:
+def runList(arguments: argparse.Namespace) -> int:
     """List open tickets, optionally narrowed to one Status."""
     token = resolveToken()
     query = """
@@ -1498,13 +1502,13 @@ def cmdList(arguments: argparse.Namespace) -> int:
         # carrying `[hotfix]` printed without the word. `[PYB-99]` survives and
         # `[hotfix]` does not, so one example never reveals it.
         console.print(
-            f"[cyan]{statusName:<12}[/] [bold]{ticketRef(number):<8}[/] "
+            f"[cyan]{statusName:<12}[/] [bold]{formatTicketRef(number):<8}[/] "
             f"{escape(title)}  [magenta]{escape(labelText)}[/]"
         )
     return 0
 
 
-def cmdBlock(arguments: argparse.Namespace) -> int:
+def runBlock(arguments: argparse.Namespace) -> int:
     """Record, drop, or list what a ticket is waiting on."""
     token = resolveToken()
     number = arguments.number
@@ -1513,12 +1517,13 @@ def cmdBlock(arguments: argparse.Namespace) -> int:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
         for blocker in arguments.blockedBy:
             console.print(
-                f"would mark {ticketRef(number)} blocked by {ticketRef(blocker)}"
+                f"would mark {formatTicketRef(number)} "
+                f"blocked by {formatTicketRef(blocker)}"
             )
         for blocker in arguments.unblock:
             console.print(
-                f"would clear {ticketRef(blocker)} as a blocker of "
-                f"{ticketRef(number)}"
+                f"would clear {formatTicketRef(blocker)} as a blocker of "
+                f"{formatTicketRef(number)}"
             )
         return 0
 
@@ -1528,21 +1533,21 @@ def cmdBlock(arguments: argparse.Namespace) -> int:
             return 1
         addBlockedBy(token, number, blocker)
         console.print(
-            f"[green]{ticketRef(number)}[/] is now blocked by "
-            f"[bold cyan]{ticketRef(blocker)}[/]"
+            f"[green]{formatTicketRef(number)}[/] is now blocked by "
+            f"[bold cyan]{formatTicketRef(blocker)}[/]"
         )
 
     for blocker in arguments.unblock:
         removeBlockedBy(token, number, blocker)
         console.print(
-            f"[green]{ticketRef(number)}[/] no longer blocked by "
-            f"[bold cyan]{ticketRef(blocker)}[/]"
+            f"[green]{formatTicketRef(number)}[/] no longer blocked by "
+            f"[bold cyan]{formatTicketRef(blocker)}[/]"
         )
 
     blockedBy = readDependencies(token, number, "blocked_by")
     blocking = readDependencies(token, number, "blocking")
     if not blockedBy and not blocking:
-        console.print(f"[dim]{ticketRef(number)} has no dependencies.[/]")
+        console.print(f"[dim]{formatTicketRef(number)} has no dependencies.[/]")
         return 0
 
     for label, related, tint in (
@@ -1551,7 +1556,7 @@ def cmdBlock(arguments: argparse.Namespace) -> int:
     ):
         for relatedNumber, title in related:
             console.print(
-                f"{label}: [{tint}]{ticketRef(relatedNumber)}[/] {escape(title)}"
+                f"{label}: [{tint}]{formatTicketRef(relatedNumber)}[/] {escape(title)}"
             )
     return 0
 
@@ -1577,26 +1582,26 @@ def buildParser() -> argparse.ArgumentParser:
         "--status", default="Todo", help="starting Status (default: Todo)"
     )
     createParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    createParser.set_defaults(handler=cmdCreate)
+    createParser.set_defaults(handler=runCreate)
 
     showParser = subparsers.add_parser(
         "show",
         help="RENDERED for reading: colored, wrapped to your terminal. "
         "Never copy from it.",
     )
-    showParser.add_argument("number", type=ticketNumber)
+    showParser.add_argument("number", type=parseTicketNumber)
     showParser.add_argument(
         "--comments", action="store_true",
         help="also print the ticket's comments, with the id each is reached by",
     )
-    showParser.set_defaults(handler=cmdShow)
+    showParser.set_defaults(handler=runShow)
 
     exportParser = subparsers.add_parser(
         "export-as-source",
         help="The SOURCE, byte for byte, nothing rendered: the form to edit and send "
         "back to `edit`. Contrast `show`, which renders.",
     )
-    exportParser.add_argument("number", type=ticketNumber)
+    exportParser.add_argument("number", type=parseTicketNumber)
     # Mutually exclusive and required, because these never compose: each is a whole
     # output, not a modifier on a shared one.
     fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
@@ -1606,16 +1611,16 @@ def buildParser() -> argparse.ArgumentParser:
     fieldGroup.add_argument(
         "--title", action="store_true", help="the title, with nothing added"
     )
-    exportParser.set_defaults(handler=cmdExportAsSource)
+    exportParser.set_defaults(handler=runExportAsSource)
 
     startParser = subparsers.add_parser("start", help="assign and move to In Progress")
-    startParser.add_argument("number", type=ticketNumber)
+    startParser.add_argument("number", type=parseTicketNumber)
     startParser.add_argument("--assignee", default=repositoryOwner)
     startParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    startParser.set_defaults(handler=cmdStart)
+    startParser.set_defaults(handler=runStart)
 
     editParser = subparsers.add_parser("edit", help="revise a filed ticket")
-    editParser.add_argument("number", type=ticketNumber)
+    editParser.add_argument("number", type=parseTicketNumber)
     editParser.add_argument("--title", default=None, help="replace the title")
     editParser.add_argument(
         "--body-file", dest="bodyFile", default=None, help="replace the body"
@@ -1624,18 +1629,18 @@ def buildParser() -> argparse.ArgumentParser:
         "--label", default=None, help=f"one of: {', '.join(validLabels)}"
     )
     editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    editParser.set_defaults(handler=cmdEdit)
+    editParser.set_defaults(handler=runEdit)
 
     commentParser = subparsers.add_parser(
         "comment", help="add a comment to a ticket"
     )
-    commentParser.add_argument("number", type=ticketNumber)
+    commentParser.add_argument("number", type=parseTicketNumber)
     commentParser.add_argument(
         "--body-file", dest="bodyFile", required=True,
         help="drafted comment body, a file so lists and code fences survive",
     )
     commentParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentParser.set_defaults(handler=cmdComment)
+    commentParser.set_defaults(handler=runComment)
 
     commentExportParser = subparsers.add_parser(
         "comment-export",
@@ -1643,7 +1648,7 @@ def buildParser() -> argparse.ArgumentParser:
         "send back to `comment-edit`.",
     )
     commentExportParser.add_argument("commentId", type=int)
-    commentExportParser.set_defaults(handler=cmdCommentExport)
+    commentExportParser.set_defaults(handler=runCommentExport)
 
     commentEditParser = subparsers.add_parser(
         "comment-edit", help="replace a comment's body in place"
@@ -1653,19 +1658,19 @@ def buildParser() -> argparse.ArgumentParser:
         "--body-file", dest="bodyFile", required=True, help="revised comment body"
     )
     commentEditParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentEditParser.set_defaults(handler=cmdCommentEdit)
+    commentEditParser.set_defaults(handler=runCommentEdit)
 
     commentDeleteParser = subparsers.add_parser(
         "comment-delete", help="delete a comment (permanent, no GitHub undo)"
     )
     commentDeleteParser.add_argument("commentId", type=int)
     commentDeleteParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentDeleteParser.set_defaults(handler=cmdCommentDelete)
+    commentDeleteParser.set_defaults(handler=runCommentDelete)
 
     closeParser = subparsers.add_parser(
         "close", help="close a ticket and set Status to Done"
     )
-    closeParser.add_argument("number", type=ticketNumber)
+    closeParser.add_argument("number", type=parseTicketNumber)
     closeParser.add_argument(
         "--reason",
         choices=("completed", "not-planned"),
@@ -1673,26 +1678,26 @@ def buildParser() -> argparse.ArgumentParser:
         help="completed for delivered work, not-planned for an abandoned ticket",
     )
     closeParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    closeParser.set_defaults(handler=cmdClose)
+    closeParser.set_defaults(handler=runClose)
 
     statusParser = subparsers.add_parser("status", help="move a ticket to a Status")
-    statusParser.add_argument("number", type=ticketNumber)
+    statusParser.add_argument("number", type=parseTicketNumber)
     statusParser.add_argument("--set", dest="setStatus", required=True)
     statusParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    statusParser.set_defaults(handler=cmdStatus)
+    statusParser.set_defaults(handler=runStatus)
 
     listParser = subparsers.add_parser("list", help="list tickets on the board")
     listParser.add_argument("--status", default=None, help="narrow to one Status")
-    listParser.set_defaults(handler=cmdList)
+    listParser.set_defaults(handler=runList)
 
     blockParser = subparsers.add_parser(
         "block", help="record or list what a ticket is waiting on"
     )
-    blockParser.add_argument("number", type=ticketNumber)
+    blockParser.add_argument("number", type=parseTicketNumber)
     blockParser.add_argument(
         "--by",
         dest="blockedBy",
-        type=ticketNumber,
+        type=parseTicketNumber,
         nargs="+",
         default=[],
         metavar="N",
@@ -1700,14 +1705,14 @@ def buildParser() -> argparse.ArgumentParser:
     )
     blockParser.add_argument(
         "--unblock",
-        type=ticketNumber,
+        type=parseTicketNumber,
         nargs="+",
         default=[],
         metavar="N",
         help="issue numbers that no longer block this one",
     )
     blockParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    blockParser.set_defaults(handler=cmdBlock)
+    blockParser.set_defaults(handler=runBlock)
 
     return parser
 

@@ -84,20 +84,20 @@ class PreflightError(RuntimeError):
     """A gate that could not be run at all, as distinct from one that failed."""
 
 
-def repositoryRoot() -> Path:
+def findRepositoryRoot() -> Path:
     """Return the repository root, so the script runs from any directory."""
     return Path(__file__).resolve().parent.parent
 
 
-def standardsModule() -> ModuleType:
+def loadStandardsModule() -> ModuleType:
     """Return the standards checker as a module.
 
     `scripts/` carries no `__init__.py` and is an implicit namespace package, and
     the file name has a hyphen, so `import_module` with a string is the only
     spelling that works. It needs no importlib machinery beyond that.
     """
-    if str(repositoryRoot()) not in sys.path:
-        sys.path.insert(0, str(repositoryRoot()))
+    if str(findRepositoryRoot()) not in sys.path:
+        sys.path.insert(0, str(findRepositoryRoot()))
     return importlib.import_module("scripts.standards-check")
 
 
@@ -119,7 +119,7 @@ def runStandards() -> GateResult:
     A warning here is a heuristic worth reading and not a defect, so it is
     reported and never gates.
     """
-    standards = standardsModule()
+    standards = loadStandardsModule()
     warnings: list[str] = []
     # The checker records a finding as (level, path, line, message).
     findings: list[tuple[str, Path, int, str]] = []
@@ -249,7 +249,7 @@ def main() -> int:
     # pyproject.toml there, and the standards checker resolves its own roots.
     # Done once here so that running this from anywhere is one guarantee rather
     # than four separate habits, one of which was already missing.
-    with contextlib.chdir(repositoryRoot()):
+    with contextlib.chdir(findRepositoryRoot()):
         return report(runGates(chosen))
 
 
