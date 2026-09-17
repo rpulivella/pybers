@@ -16,6 +16,7 @@ house rules allow: no Python library signs an app or starts one under its own gr
 Usage:
     python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers
     python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers --dry-run
+    python3 scripts/golden-confirm.py damage-check
     python3 scripts/golden-confirm.py helper-build
     python3 scripts/golden-confirm.py helper-build --identity <SHA-1> --dry-run
     python3 scripts/golden-confirm.py permissions
@@ -49,6 +50,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -78,6 +80,7 @@ expectedKeys: frozenset[str] = frozenset({
     "sheet", "table", "cell", "value", "formula", "format", "dataFormat", "human",
 })
 maxCaptures: int = 40
+damageCheckGolden: str = "11-text-written-and-retyped.numbers"
 quickLookScale: float = 3.0
 numbersOperators: dict[int, str] = str.maketrans({"×": "*", "÷": "/", "−": "-"})
 inspectDeadlineSeconds: float = 300.0
@@ -661,6 +664,72 @@ def runPermissions(arguments: argparse.Namespace) -> int:
     return 1
 
 
+def writeDamagedCopies(golden: Path, work: Path) -> dict[str, Path]:
+    """Write a truncated copy, and a copy with its first tile archive overwritten."""
+    truncated = work / "truncated.numbers"
+    data = golden.read_bytes()
+    truncated.write_bytes(data[: len(data) // 2])
+
+    damaged = work / "damaged-tile.numbers"
+    with zipfile.ZipFile(golden) as source, zipfile.ZipFile(damaged, "w") as target:
+        tiles = [name for name in source.namelist() if "/Tile" in name]
+        if not tiles:
+            raise GoldenConfirmError(f"{golden.name} holds no tile archive to damage")
+        for info in source.infolist():
+            member = bytearray(source.read(info.filename))
+            if info.filename == tiles[0]:
+                middle = len(member) // 2
+                member[middle : middle + 64] = b"\xff" * 64
+            target.writestr(info, bytes(member))
+    return {"truncated file": truncated, "zip holding a damaged tile archive": damaged}
+
+
+def runDamageCheck(golden: Path) -> list[Check]:
+    """Open each damaged copy and check that the run fails and says why (AC 3)."""
+    ticket = readTicketKey()
+    problems = checkPermissions()
+    if problems:
+        raise GoldenConfirmError("the helper cannot run:\n" + "\n".join(
+            f"  {p.kind}: {p.detail}. {p.remedy}" for p in problems
+        ))
+    outputDirectory = reportRoot / ticket / "damage-check"
+    if outputDirectory.exists():
+        shutil.rmtree(outputDirectory)
+    outputDirectory.mkdir(parents=True)
+    checks: list[Check] = []
+    with tempfile.TemporaryDirectory(prefix="pybers-golden-damage-") as work:
+        for label, copy in writeDamagedCopies(golden, Path(work)).items():
+            result = requestHelper({
+                "operation": "documentInspect",
+                "documentPath": str(copy),
+                "savedCopyPath": str(Path(work) / f"{copy.stem}-saved.numbers"),
+                "captureDirectory": str(outputDirectory),
+                "cells": [],
+                "maxCaptures": maxCaptures,
+                "freshNumbers": True,
+            }, deadlineSeconds=inspectDeadlineSeconds,
+                logPath=outputDirectory / f"{copy.stem}-helper.log")
+            outcome = result.get("openOutcome")
+            reasons = [problem.detail for problem in readProblems(result)]
+            said = "; ".join(reasons) or "no reason given"
+            failedLoudly = outcome in ("refused", "alert", "crashed") and bool(
+                result.get("problems"))
+            checks.append(Check(
+                "passed" if failedLoudly else "failed", label,
+                f"Numbers {outcome or 'was never asked'}: {said}"))
+    return checks
+
+
+def runDamaged(arguments: argparse.Namespace) -> int:
+    """Show that a damaged golden fails the run and names what Numbers did."""
+    checks = runDamageCheck(findGolden(arguments.golden))
+    for check in checks:
+        color = "green" if check.status == "passed" else "red"
+        subject, detail = escape(check.subject), escape(check.detail)
+        console.print(f"[{color}]{check.status}[/] {subject}: {detail}")
+    return 0 if all(check.status == "passed" for check in checks) else 1
+
+
 def runRun(arguments: argparse.Namespace) -> int:
     """Confirm a golden in running Numbers and summarize the report it wrote."""
     golden = findGolden(arguments.golden)
@@ -716,6 +785,15 @@ def buildParser() -> argparse.ArgumentParser:
     confirm.add_argument("--dry-run", action="store_true",
                          help="check the golden and its expected values, open nothing")
     confirm.set_defaults(handler=runRun)
+
+    damaged = commands.add_parser(
+        "damage-check",
+        help="open damaged copies of a golden and check that each run fails loudly",
+        formatter_class=RichHelpFormatter,
+    )
+    damaged.add_argument("golden", nargs="?", default=damageCheckGolden,
+                         help="a .numbers file in tests/golden/ to damage copies of")
+    damaged.set_defaults(handler=runDamaged)
     return parser
 
 

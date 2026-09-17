@@ -21,7 +21,9 @@ import UniformTypeIdentifiers
 
 let numbersBundleIdentifier = "com.apple.Numbers"
 let appleScriptTimeoutSeconds = 60
-let windowAttempts = 10
+let windowAttempts = 20
+let connectionInvalidError = -609
+let quitTimeoutSeconds = 10
 let retryPauseSeconds = 0.5
 // The four-character code AppleScript uses for missing value, which Swift does not import.
 let missingValueCode: OSType = 0x6D73_6E67
@@ -48,6 +50,7 @@ struct HelperRequest: Codable {
     var captureDirectory: String?
     var cells: [CellAddress]?
     var maxCaptures: Int?
+    var freshNumbers: Bool?
 }
 
 struct HelperProblem: Codable {
@@ -170,13 +173,14 @@ func checkAutomationPermission() throws {
 }
 
 // A damaged golden can crash Numbers, which would take unsaved work in other documents with it.
-func checkNoUnsavedDocuments() throws {
+func checkNoUnsavedDocuments(timeoutSeconds: Int = appleScriptTimeoutSeconds) throws {
     let names = try runAppleScript(
         "set unsaved to {}\n"
             + "repeat with d in documents\n"
             + "if modified of d then set end of unsaved to name of d\n"
             + "end repeat\n"
-            + "return unsaved")
+            + "return unsaved",
+        timeoutSeconds: timeoutSeconds)
     guard names.numberOfItems == 0 else {
         let listed = (1...names.numberOfItems).compactMap { names.atIndex($0)?.stringValue }
         throw HelperFailure(problem: HelperProblem(
@@ -231,9 +235,11 @@ struct AppleScriptError: Error {
     let message: String
 }
 
-func runAppleScript(_ body: String) throws -> NSAppleEventDescriptor {
+func runAppleScript(
+    _ body: String, timeoutSeconds: Int = appleScriptTimeoutSeconds
+) throws -> NSAppleEventDescriptor {
     let source = """
-        with timeout of \(appleScriptTimeoutSeconds) seconds
+        with timeout of \(timeoutSeconds) seconds
         tell application id "\(numbersBundleIdentifier)"
         \(body)
         end tell
@@ -314,9 +320,15 @@ func collectElements(_ root: AXUIElement) -> [AXUIElement] {
 func findNumbersWindow(named title: String, pid: pid_t) -> AXUIElement? {
     let application = AXUIElementCreateApplication(pid)
     let windows = readAttribute(application, kAXWindowsAttribute) as? [AXUIElement] ?? []
+    // The title bar may drop the extension that AppleScript's window name keeps.
+    let stem = (title as NSString).deletingPathExtension
+    let matching = windows.filter { [title, stem].contains(readText($0, kAXTitleAttribute)) }
+    if matching.isEmpty {
+        writeLog("no Accessibility window titled '\(title)' among "
+            + windows.map { "'\(readText($0, kAXTitleAttribute))'" }.joined(separator: ", "))
+    }
     // Numbers keeps a second, empty window under the same title, so the fuller one is the document.
-    return windows.filter { readText($0, kAXTitleAttribute) == title }
-        .max { collectElements($0).count < collectElements($1).count }
+    return matching.max { collectElements($0).count < collectElements($1).count }
 }
 
 func findButton(in root: AXUIElement, role: String, description: String) -> AXUIElement? {
@@ -520,6 +532,54 @@ func launchNumbers() throws -> (NSRunningApplication, Bool) {
     return (launched, true)
 }
 
+// Addressing Numbers after it has crashed would launch it again, so its process is checked.
+func checkProcessEnded(pid: pid_t) -> Bool {
+    for _ in 0..<windowAttempts {
+        if kill(pid, 0) != 0 { return true }
+        Thread.sleep(forTimeInterval: retryPauseSeconds)
+    }
+    return false
+}
+
+// A run that launched Numbers quits it, unless someone has since begun unsaved work there.
+func quitNumbersLaunched(_ launched: Bool, numbers: NSRunningApplication) {
+    let pid = numbers.processIdentifier
+    guard launched, kill(pid, 0) == 0 else { return }
+    do {
+        try checkNoUnsavedDocuments(timeoutSeconds: quitTimeoutSeconds)
+        _ = try runAppleScript("close every document saving no\nquit", timeoutSeconds: quitTimeoutSeconds)
+        if checkProcessEnded(pid: pid) {
+            writeLog("quit Numbers")
+            return
+        }
+    } catch is HelperFailure {
+        writeLog("left Numbers running: it holds unsaved work")
+        return
+    } catch {
+        writeLog("Numbers did not answer: \(error)")
+    }
+    // A damaged golden can leave the Numbers this run launched hung, holding nothing of anyone's.
+    numbers.forceTerminate()
+    writeLog("force-quit the Numbers this run launched: \(checkProcessEnded(pid: pid))")
+}
+
+func dismissAlerts(pid: pid_t) {
+    let application = AXUIElementCreateApplication(pid)
+    for window in readAttribute(application, kAXWindowsAttribute) as? [AXUIElement] ?? [] {
+        for element in collectElements(window) {
+            let subrole = readText(element, kAXSubroleAttribute)
+            guard readText(element, kAXRoleAttribute) == kAXSheetRole
+                || subrole == kAXDialogSubrole || subrole == kAXSystemDialogSubrole
+            else { continue }
+            let cancel = readAttribute(element, kAXCancelButtonAttribute)
+            let fallback = readAttribute(element, kAXDefaultButtonAttribute)
+            if let button = (cancel ?? fallback).map({ $0 as! AXUIElement }) {
+                AXUIElementPerformAction(button, kAXPressAction as CFString)
+            }
+        }
+    }
+}
+
 func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
     var result = HelperResult(sourceHash: readSourceHash(), operation: request.operation.rawValue)
     result.problems = findSessionProblems() + findGrantProblems()
@@ -537,14 +597,18 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
                 detail: "this run needs \(captureCount) captures, over the limit of \(request.maxCaptures ?? 0)",
                 remedy: "check fewer cells in one run"))
         }
+        if request.freshNumbers == true, !NSRunningApplication.runningApplications(
+            withBundleIdentifier: numbersBundleIdentifier).isEmpty {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "numbersRunning",
+                detail: "Numbers is already running, and a damaged document can hang it",
+                remedy: "quit Numbers, then rerun"))
+        }
         writeLog("launching Numbers")
         let (numbers, launched) = try launchNumbers()
         result.launchedNumbers = launched
-        defer {
-            if launched, (try? runAppleScript("count documents").int32Value) == 0 {
-                _ = try? runAppleScript("quit")
-            }
-        }
+        writeLog("Numbers pid \(numbers.processIdentifier), launched by this run: \(launched)")
+        defer { quitNumbersLaunched(launched, numbers: numbers) }
         writeLog("checking Automation")
         try checkAutomationPermission()
         try checkNoUnsavedDocuments()
@@ -582,6 +646,7 @@ func inspectDocument(
         result.alertText = readAlertText(pid: numbers.processIdentifier)
         guard let id = readOptionalText(opened) else {
             result.openOutcome = result.alertText.isEmpty ? "refused" : "alert"
+            dismissAlerts(pid: numbers.processIdentifier)
             throw HelperFailure(problem: HelperProblem(
                 kind: "open",
                 detail: "Numbers did not open the document"
@@ -590,17 +655,28 @@ func inspectDocument(
         }
         documentId = id
     } catch let failure as AppleScriptError {
-        let crashed = numbers.isTerminated
-        result.openOutcome = crashed ? "crashed" : "refused"
+        // A dropped connection means Numbers died, however long its crash report keeps the process.
+        let crashed = failure.number == connectionInvalidError
+            || checkProcessEnded(pid: numbers.processIdentifier)
+        writeLog("open failed with \(failure.number), process alive: \(kill(numbers.processIdentifier, 0) == 0)")
+        if !crashed {
+            result.alertText = readAlertText(pid: numbers.processIdentifier)
+            dismissAlerts(pid: numbers.processIdentifier)
+        }
+        result.openOutcome = crashed ? "crashed" : result.alertText.isEmpty ? "refused" : "alert"
+        let alert = result.alertText.joined(separator: " ")
         throw HelperFailure(problem: HelperProblem(
             kind: "open",
             detail: crashed
-                ? "Numbers quit while opening the document (error \(failure.number))"
-                : "Numbers refused the document: \(failure.message)",
+                ? "Numbers crashed while opening the document (error \(failure.number))"
+                : alert.isEmpty
+                    ? "Numbers refused the document: \(failure.message)"
+                    : "Numbers showed an alert while opening: \(alert)",
             remedy: "open a copy by hand to see what Numbers reports"))
     }
     guard result.alertText.isEmpty else {
         result.openOutcome = "alert"
+        dismissAlerts(pid: numbers.processIdentifier)
         _ = try? runAppleScript("close (document id \(quoteAppleScript(documentId))) saving no")
         throw HelperFailure(problem: HelperProblem(
             kind: "open",
@@ -609,7 +685,11 @@ func inspectDocument(
     }
     result.openOutcome = "opened"
     writeLog("opened \(documentId)")
-    defer { _ = try? runAppleScript("close (document id \(quoteAppleScript(documentId))) saving no") }
+    defer {
+        if kill(numbers.processIdentifier, 0) == 0 {
+            _ = try? runAppleScript("close (document id \(quoteAppleScript(documentId))) saving no")
+        }
+    }
 
     let document = "document id \(quoteAppleScript(documentId))"
     let (windowId, window) = try findDocumentWindow(documentId: documentId, pid: numbers.processIdentifier)
