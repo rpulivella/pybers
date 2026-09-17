@@ -983,8 +983,7 @@ def runReady(arguments: argparse.Namespace) -> int:
     if not markReadyForReview(token, summary["nodeId"]):
         console.print(
             f"[red]{formatPullRequestRef(summary['number'])} is still a draft "
-            "after the "
-            "mutation reported success.[/]"
+            "after the mutation reported success.[/]"
         )
         return errorExitCode
 
