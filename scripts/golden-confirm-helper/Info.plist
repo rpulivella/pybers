@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.pybers.dev.golden-confirm</string>
+	<key>CFBundleName</key>
+	<string>pybersdev-golden-confirm</string>
+	<key>CFBundleExecutable</key>
+	<string>pybersdev-golden-confirm</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSBackgroundOnly</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>pybersdev-golden-confirm opens a temporary copy of a pybers golden file in Numbers and reads what Numbers shows.</string>
+</dict>
+</plist>
