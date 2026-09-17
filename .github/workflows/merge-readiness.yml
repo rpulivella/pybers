@@ -1,0 +1,52 @@
+# The reporting half of PYB-76. It runs this repository's own code, never the
+# branch's: a workflow triggered by `workflow_run` checks out the default branch,
+# and the facts the branch supplied arrive as an artifact, read as data.
+#
+# Posting from the preflight itself is the obvious approach and cannot work: a
+# `pull_request` run from a fork has no write access by design.
+name: merge readiness
+
+on:
+  workflow_run:
+    workflows: [preflight]
+    types: [completed]
+
+# The only write this repository's automation holds, and it reaches one comment.
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  report:
+    # A run that carried no facts is a draft or a cancelled run, and neither earns
+    # a comment. The download step below decides that by what it finds.
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: pyproject.toml
+
+      - name: Install what the report needs
+        # `rich` alone: the reporting half imports no part of the library, so a
+        # full install would buy nothing and widen what runs here.
+        run: pip install rich
+
+      - name: Take the facts the preflight collected
+        id: facts
+        uses: actions/download-artifact@v6
+        continue-on-error: true
+        with:
+          name: merge-readiness
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report merge readiness
+        if: steps.facts.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/merge-readiness.py report --results merge-readiness.json

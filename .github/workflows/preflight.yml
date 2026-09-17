@@ -31,6 +31,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The facts below read this branch's log and its diff against the base,
+          # and a shallow checkout carries neither.
+          fetch-depth: 0
+
+      - name: Fetch the base branch the facts compare against
+        run: git fetch --no-tags origin ${{ github.event.pull_request.base.ref }}
 
       - uses: actions/setup-python@v6
         with:
@@ -46,6 +53,24 @@ jobs:
         # `pipefail` because the default shell reports the exit code of `tee`.
         shell: bash -o pipefail -e {0}
         run: python scripts/pr-preflight-check.py 2>&1 | tee "$RUNNER_TEMP/preflight.log"
+
+      - name: Collect the facts the report needs
+        # Always, because a failed gate is exactly what the report exists to show.
+        if: always()
+        run: |
+          python scripts/merge-readiness.py collect \
+            --pull-request ${{ github.event.pull_request.number }} \
+            --base origin/${{ github.event.pull_request.base.ref }} \
+            --preflight-log "$RUNNER_TEMP/preflight.log" \
+            --output merge-readiness.json
+
+      - name: Hand the facts to the reporting half
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: merge-readiness
+          path: merge-readiness.json
+          retention-days: 1
 
       - name: Summarize the gates
         # A verdict is matched by its two-space column rather than by any gate
