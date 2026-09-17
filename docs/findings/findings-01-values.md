@@ -185,6 +185,18 @@ stopping a formula from evaluating so its own text shows. That is a capability o
 own rather than a side effect of writing a string, and nothing in this library offers it
 yet.
 
+**Superseded 2026-09-16 for PYB-83: `Cell.textLiteralSet` offers it**, and every read
+cell reports the bit as `Cell.formatChosen`, whatever its type. The fixtures carry it on
+271 text records, 24 empty styled ones and 3 numbers. One record pairs it with a formula,
+`A2` of the golden `18-formula-attached-and-detached`, which Numbers accepted, so the
+writer carries the bit on a formula record rather than refusing one.
+
+**Pressing return does not interpret stored text, even under Automatic.** Measured
+2026-09-17 on the golden `11-text-literal-written` and on a new document made in Numbers:
+`=1+1` stored as text with an Automatic format stays text when the cell is clicked into and
+return is pressed. Numbers interprets only when `=` is typed into a cleared cell. What a
+chosen Text format changes is that interpretation step, not the editing that comes before it.
+
 **Byte 9 bit `0x04` is the control a cell presents as**, a `control_cell_spec_table` key.
 `11-value-types-noformats` settles it: its checkbox, star rating, slider, stepper and
 pop-up menu carry keys 1 to 5 in the order that table lists them, and every plain cell
