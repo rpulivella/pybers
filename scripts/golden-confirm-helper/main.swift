@@ -22,6 +22,7 @@ import UniformTypeIdentifiers
 let numbersBundleIdentifier = "com.apple.Numbers"
 let appleScriptTimeoutSeconds = 60
 let windowAttempts = 20
+let otherDesktopAttempts = 3
 let connectionInvalidError = -609
 let quitTimeoutSeconds = 10
 let retryPauseSeconds = 0.5
@@ -328,11 +329,41 @@ func findNumbersWindow(named title: String, pid: pid_t) -> AXUIElement? {
     let stem = (title as NSString).deletingPathExtension
     let matching = windows.filter { [title, stem].contains(readText($0, kAXTitleAttribute)) }
     if matching.isEmpty {
+        var raw: AnyObject?
+        let status = AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &raw)
         writeLog("no Accessibility window titled '\(title)' among "
-            + windows.map { "'\(readText($0, kAXTitleAttribute))'" }.joined(separator: ", "))
+            + windows.map { "'\(readText($0, kAXTitleAttribute))'" }.joined(separator: ", ")
+            + " (AXWindows status \(status.rawValue), trusted \(AXIsProcessTrusted()), "
+            + describeWindowPlacement(pid: pid) + ")")
     }
     // Numbers keeps a second, empty window under the same title, so the fuller one is the document.
     return matching.max { collectElements($0).count < collectElements($1).count }
+}
+
+func countNumbersWindows(pid: pid_t) -> (all: Int, onScreen: Int) {
+    let listed = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
+    let owned = listed.filter {
+        ($0[kCGWindowOwnerPID as String] as? Int32) == pid
+            && ($0[kCGWindowLayer as String] as? Int) == 0
+    }
+    return (owned.count, owned.filter { ($0[kCGWindowIsOnscreen as String] as? Bool) == true }.count)
+}
+
+// Accessibility lists only the windows on the current desktop, so a miss says where they are.
+func describeWindowPlacement(pid: pid_t) -> String {
+    let counts = countNumbersWindows(pid: pid)
+    let front = NSWorkspace.shared.frontmostApplication?.localizedName ?? "unknown"
+    return "Numbers windows \(counts.all), on screen \(counts.onScreen), frontmost app \(front)"
+}
+
+// Refused rather than brought forward, so nothing the developer types can land in the copy.
+func checkNumbersOnThisDesktop(pid: pid_t) throws {
+    let counts = countNumbersWindows(pid: pid)
+    guard counts.all > 0, counts.onScreen == 0 else { return }
+    throw HelperFailure(problem: HelperProblem(
+        kind: "otherDesktop",
+        detail: "Numbers opened its window on another desktop, where the helper cannot reach it",
+        remedy: "leave any full-screen app and stay on a regular desktop during the run, then rerun"))
 }
 
 func findButton(in root: AXUIElement, role: String, description: String) -> AXUIElement? {
@@ -342,24 +373,32 @@ func findButton(in root: AXUIElement, role: String, description: String) -> AXUI
     }
 }
 
-func readAlertText(pid: pid_t) -> [String] {
-    let application = AXUIElementCreateApplication(pid)
-    var texts: [String] = []
-    for window in readAttribute(application, kAXWindowsAttribute) as? [AXUIElement] ?? [] {
-        let dialogs = collectElements(window).filter {
-            let role = readText($0, kAXRoleAttribute)
-            let subrole = readText($0, kAXSubroleAttribute)
-            return role == kAXSheetRole || subrole == kAXDialogSubrole
-                || subrole == kAXSystemDialogSubrole
+func readNumbersWindows(pid: pid_t) -> [AXUIElement] {
+    readAttribute(AXUIElementCreateApplication(pid), kAXWindowsAttribute) as? [AXUIElement] ?? []
+}
+
+// Only windows that appeared after opening are searched, so a developer's own document is never
+// read as an alert or has a button pressed in it.
+func findAlerts(pid: pid_t, excluding existing: [AXUIElement]) -> [AXUIElement] {
+    var alerts: [AXUIElement] = []
+    for window in readNumbersWindows(pid: pid) where !existing.contains(where: { CFEqual($0, window) }) {
+        let subrole = readText(window, kAXSubroleAttribute)
+        if subrole == kAXDialogSubrole || subrole == kAXSystemDialogSubrole {
+            alerts.append(window)
         }
-        for dialog in dialogs {
-            texts += collectElements(dialog)
-                .filter { readText($0, kAXRoleAttribute) == kAXStaticTextRole }
-                .map { readText($0, kAXValueAttribute) }
-                .filter { !$0.isEmpty }
-        }
+        alerts += (readAttribute(window, kAXChildrenAttribute) as? [AXUIElement] ?? [])
+            .filter { readText($0, kAXRoleAttribute) == kAXSheetRole }
     }
-    return texts
+    return alerts
+}
+
+func readAlertText(_ alerts: [AXUIElement]) -> [String] {
+    alerts.flatMap { alert in
+        collectElements(alert)
+            .filter { readText($0, kAXRoleAttribute) == kAXStaticTextRole }
+            .map { readText($0, kAXValueAttribute) }
+            .filter { !$0.isEmpty }
+    }
 }
 
 func openCellTab(in window: AXUIElement) throws {
@@ -430,7 +469,9 @@ func readFrame(_ element: AXUIElement) -> CGRect? {
 }
 
 // Captured at the display's own pixels and kept lossless, so graphical detail stays sharp.
-func captureWindow(id windowId: Int, window: AXUIElement, crop: CGRect?, to path: String) throws {
+func captureWindow(
+    id windowId: Int, window: AXUIElement, crop: CGRect?, to path: String, pid: pid_t
+) throws {
     let raw = path + ".raw.png"
     defer { try? FileManager.default.removeItem(atPath: raw) }
     var said = ""
@@ -448,6 +489,7 @@ func captureWindow(id windowId: Int, window: AXUIElement, crop: CGRect?, to path
         if capture.terminationStatus == 0, FileManager.default.fileExists(atPath: raw) { break }
         Thread.sleep(forTimeInterval: retryPauseSeconds)
     }
+    if !FileManager.default.fileExists(atPath: raw) { try checkNumbersOnThisDesktop(pid: pid) }
     let failure = HelperFailure(problem: HelperProblem(
         kind: "capture",
         detail: "the Numbers window could not be captured to \((path as NSString).lastPathComponent)"
@@ -567,19 +609,12 @@ func quitNumbersLaunched(_ launched: Bool, numbers: NSRunningApplication) {
     writeLog("force-quit the Numbers this run launched: \(checkProcessEnded(pid: pid))")
 }
 
-func dismissAlerts(pid: pid_t) {
-    let application = AXUIElementCreateApplication(pid)
-    for window in readAttribute(application, kAXWindowsAttribute) as? [AXUIElement] ?? [] {
-        for element in collectElements(window) {
-            let subrole = readText(element, kAXSubroleAttribute)
-            guard readText(element, kAXRoleAttribute) == kAXSheetRole
-                || subrole == kAXDialogSubrole || subrole == kAXSystemDialogSubrole
-            else { continue }
-            let cancel = readAttribute(element, kAXCancelButtonAttribute)
-            let fallback = readAttribute(element, kAXDefaultButtonAttribute)
-            if let button = (cancel ?? fallback).map({ $0 as! AXUIElement }) {
-                AXUIElementPerformAction(button, kAXPressAction as CFString)
-            }
+func dismissAlerts(_ alerts: [AXUIElement]) {
+    for alert in alerts {
+        let cancel = readAttribute(alert, kAXCancelButtonAttribute)
+        let fallback = readAttribute(alert, kAXDefaultButtonAttribute)
+        if let button = (cancel ?? fallback).map({ $0 as! AXUIElement }) {
+            AXUIElementPerformAction(button, kAXPressAction as CFString)
         }
     }
 }
@@ -642,16 +677,18 @@ func inspectDocument(
     result: inout HelperResult
 ) throws {
     let documentId: String
+    let existingWindows = readNumbersWindows(pid: numbers.processIdentifier)
     do {
         let opened = try runAppleScript(
             "set opened to open (POSIX file \(quoteAppleScript(documentPath)))\n"
                 + "if opened is missing value then return missing value\n"
                 + "return id of opened")
         Thread.sleep(forTimeInterval: 1.0)
-        result.alertText = readAlertText(pid: numbers.processIdentifier)
+        let alerts = findAlerts(pid: numbers.processIdentifier, excluding: existingWindows)
+        result.alertText = readAlertText(alerts)
         guard let id = readOptionalText(opened) else {
             result.openOutcome = result.alertText.isEmpty ? "refused" : "alert"
-            dismissAlerts(pid: numbers.processIdentifier)
+            dismissAlerts(alerts)
             throw HelperFailure(problem: HelperProblem(
                 kind: "open",
                 detail: "Numbers did not open the document"
@@ -665,8 +702,9 @@ func inspectDocument(
             || checkProcessEnded(pid: numbers.processIdentifier)
         writeLog("open failed with \(failure.number), process alive: \(kill(numbers.processIdentifier, 0) == 0)")
         if !crashed {
-            result.alertText = readAlertText(pid: numbers.processIdentifier)
-            dismissAlerts(pid: numbers.processIdentifier)
+            let alerts = findAlerts(pid: numbers.processIdentifier, excluding: existingWindows)
+            result.alertText = readAlertText(alerts)
+            dismissAlerts(alerts)
         }
         result.openOutcome = crashed ? "crashed" : result.alertText.isEmpty ? "refused" : "alert"
         let alert = result.alertText.joined(separator: " ")
@@ -681,7 +719,7 @@ func inspectDocument(
     }
     guard result.alertText.isEmpty else {
         result.openOutcome = "alert"
-        dismissAlerts(pid: numbers.processIdentifier)
+        dismissAlerts(findAlerts(pid: numbers.processIdentifier, excluding: existingWindows))
         _ = try? runAppleScript("close (document id \(quoteAppleScript(documentId))) saving no")
         throw HelperFailure(problem: HelperProblem(
             kind: "open",
@@ -704,7 +742,8 @@ func inspectDocument(
         try selectCell(first, documentId: documentId)
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["sheet", sheet]))
-        try captureWindow(id: Int(windowId), window: window, crop: nil, to: path)
+        try captureWindow(
+            id: Int(windowId), window: window, crop: nil, to: path, pid: numbers.processIdentifier)
         result.sheetCaptures.append(SheetCapture(sheet: sheet, path: path))
     }
 
@@ -723,7 +762,8 @@ func inspectDocument(
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["cell", address.sheet, address.table, address.cell]))
         try captureWindow(
-            id: Int(windowId), window: window, crop: findDataFormatFrame(in: window), to: path)
+            id: Int(windowId), window: window, crop: findDataFormatFrame(in: window), to: path,
+            pid: numbers.processIdentifier)
         reading.inspectorCapture = path
         result.cells.append(reading)
     }
@@ -742,13 +782,15 @@ func findDocumentWindow(documentId: String, pid: pid_t) throws -> (Int32, AXUIEl
         + "end repeat\n"
         + "return {0, \"\"}"
     var seen = ""
-    for _ in 0..<windowAttempts {
+    for attempt in 0..<windowAttempts {
         let facts = try runAppleScript(lookup)
         seen = facts.atIndex(2)?.stringValue ?? ""
         if let windowId = facts.atIndex(1)?.int32Value, windowId != 0,
            let window = findNumbersWindow(named: seen, pid: pid) {
             return (windowId, window)
         }
+        // A window just opened can be off screen for a moment, so the desktop check waits.
+        if attempt >= otherDesktopAttempts { try checkNumbersOnThisDesktop(pid: pid) }
         Thread.sleep(forTimeInterval: retryPauseSeconds)
     }
     throw HelperFailure(problem: HelperProblem(
