@@ -21,6 +21,8 @@ import UniformTypeIdentifiers
 
 let numbersBundleIdentifier = "com.apple.Numbers"
 let appleScriptTimeoutSeconds = 60
+let windowAttempts = 10
+let retryPauseSeconds = 0.5
 // The four-character code AppleScript uses for missing value, which Swift does not import.
 let missingValueCode: OSType = 0x6D73_6E67
 
@@ -414,18 +416,28 @@ func readFrame(_ element: AXUIElement) -> CGRect? {
 // Captured at the display's own pixels and kept lossless, so graphical detail stays sharp.
 func captureWindow(id windowId: Int, window: AXUIElement, crop: CGRect?, to path: String) throws {
     let raw = path + ".raw.png"
-    let capture = Process()
-    capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-    capture.arguments = ["-x", "-o", "-l", String(windowId), "-t", "png", raw]
-    try capture.run()
-    capture.waitUntilExit()
     defer { try? FileManager.default.removeItem(atPath: raw) }
+    var said = ""
+    // A window not yet drawn, or briefly off the current desktop, captures on a later try.
+    for _ in 0..<windowAttempts {
+        let capture = Process()
+        let errors = Pipe()
+        capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        capture.arguments = ["-x", "-o", "-l", String(windowId), "-t", "png", raw]
+        capture.standardError = errors
+        try capture.run()
+        capture.waitUntilExit()
+        said = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if capture.terminationStatus == 0, FileManager.default.fileExists(atPath: raw) { break }
+        Thread.sleep(forTimeInterval: retryPauseSeconds)
+    }
     let failure = HelperFailure(problem: HelperProblem(
         kind: "capture",
-        detail: "the Numbers window could not be captured to \(path)",
-        remedy: "check Screen Recording for pybersdev-golden-confirm"))
-    guard capture.terminationStatus == 0,
-          let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: raw) as CFURL, nil),
+        detail: "the Numbers window could not be captured to \((path as NSString).lastPathComponent)"
+            + (said.isEmpty ? "" : ": \(said)"),
+        remedy: "keep Numbers on the current desktop, not minimized or in full screen, then rerun"))
+    guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: raw) as CFURL, nil),
           var image = CGImageSourceCreateImageAtIndex(source, 0, nil)
     else { throw failure }
     if let crop, let frame = readFrame(window), frame.width > 0 {
@@ -600,22 +612,7 @@ func inspectDocument(
     defer { _ = try? runAppleScript("close (document id \(quoteAppleScript(documentId))) saving no") }
 
     let document = "document id \(quoteAppleScript(documentId))"
-    // A `whose document is` filter fails on Numbers' document-less windows, so each is tried.
-    let windowFacts = try runAppleScript(
-        "repeat with w in windows\n"
-            + "try\n"
-            + "if id of document of w is \(quoteAppleScript(documentId)) then return {id of w, name of w}\n"
-            + "end try\n"
-            + "end repeat\n"
-            + "return {0, \"\"}")
-    guard let windowId = windowFacts.atIndex(1)?.int32Value, windowId != 0,
-          let windowTitle = windowFacts.atIndex(2)?.stringValue,
-          let window = findNumbersWindow(named: windowTitle, pid: numbers.processIdentifier)
-    else {
-        throw HelperFailure(problem: HelperProblem(
-            kind: "window", detail: "the opened document has no window the helper can reach",
-            remedy: "rerun with Numbers visible on this desktop"))
-    }
+    let (windowId, window) = try findDocumentWindow(documentId: documentId, pid: numbers.processIdentifier)
 
     for sheet in sheets {
         let first = cells.first { $0.sheet == sheet }!
@@ -648,6 +645,31 @@ func inspectDocument(
 
     _ = try runAppleScript("save \(document) in (POSIX file \(quoteAppleScript(savedCopyPath)))")
     result.savedCopy = FileManager.default.fileExists(atPath: savedCopyPath)
+}
+
+// A document's window appears a moment after `open` returns, so the lookup waits for it.
+func findDocumentWindow(documentId: String, pid: pid_t) throws -> (Int32, AXUIElement) {
+    // A `whose document is` filter fails on Numbers' document-less windows, so each is tried.
+    let lookup = "repeat with w in windows\n"
+        + "try\n"
+        + "if id of document of w is \(quoteAppleScript(documentId)) then return {id of w, name of w}\n"
+        + "end try\n"
+        + "end repeat\n"
+        + "return {0, \"\"}"
+    var seen = ""
+    for _ in 0..<windowAttempts {
+        let facts = try runAppleScript(lookup)
+        seen = facts.atIndex(2)?.stringValue ?? ""
+        if let windowId = facts.atIndex(1)?.int32Value, windowId != 0,
+           let window = findNumbersWindow(named: seen, pid: pid) {
+            return (windowId, window)
+        }
+        Thread.sleep(forTimeInterval: retryPauseSeconds)
+    }
+    throw HelperFailure(problem: HelperProblem(
+        kind: "window",
+        detail: "the opened document's window \(seen.isEmpty ? "never appeared" : "'\(seen)' was not reachable through Accessibility")",
+        remedy: "keep Numbers on the current desktop, not minimized or in full screen, then rerun"))
 }
 
 func selectCell(_ address: CellAddress, documentId: String) throws {

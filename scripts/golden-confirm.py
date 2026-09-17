@@ -20,6 +20,9 @@ Usage:
     python3 scripts/golden-confirm.py helper-build --identity <SHA-1> --dry-run
     python3 scripts/golden-confirm.py permissions
 
+Each run's helper log is `helper.log` beside its report rather than in workarea/logs/,
+so the log is purged with the ticket's folder that holds the run it explains.
+
 Requires rich, and the Xcode command line tools for `helper-build`.
 
 UPDATES
@@ -68,7 +71,6 @@ helperName: str = "pybersdev-golden-confirm"
 helperInstallDirectory: Path = Path.home() / "Library/Application Support/pybers"
 helperBundle: Path = helperInstallDirectory / f"{helperName}.app"
 helperSourceHashKey: str = "PybersSourceHash"
-logDirectory: Path = repositoryRoot / "workarea" / "logs"
 goldenDirectory: Path = repositoryRoot / "tests" / "golden"
 reportRoot: Path = repositoryRoot / "workarea" / "golden-confirm"
 expectedSuffix: str = ".expected.toml"
@@ -76,11 +78,13 @@ expectedKeys: frozenset[str] = frozenset({
     "sheet", "table", "cell", "value", "formula", "format", "dataFormat", "human",
 })
 maxCaptures: int = 40
+quickLookScale: float = 3.0
 numbersOperators: dict[int, str] = str.maketrans({"×": "*", "÷": "/", "−": "-"})
 inspectDeadlineSeconds: float = 300.0
 
 # Slack beyond the helper's own deadline, for `open` to start it and write the result.
 helperLaunchSlackSeconds: float = 30.0
+openAttempts: int = 2
 
 
 class GoldenConfirmError(RuntimeError):
@@ -250,12 +254,11 @@ def checkHelperCurrent() -> None:
         )
 
 
-def requestHelper(request: dict[str, Any], deadlineSeconds: float) -> dict[str, Any]:
+def requestHelper(
+    request: dict[str, Any], deadlineSeconds: float, logPath: Path = Path("/dev/null")
+) -> dict[str, Any]:
     """Start the helper on one request and return its result, failing without one."""
     checkHelperCurrent()
-    logDirectory.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y-%m-%dt%H-%M-%S")
-    logPath = logDirectory / f"golden-confirm-helper-{stamp}.log"
     with tempfile.TemporaryDirectory(prefix="pybers-golden-confirm-") as exchange:
         requestPath = Path(exchange) / "request.json"
         resultPath = Path(exchange) / "result.json"
@@ -265,20 +268,23 @@ def requestHelper(request: dict[str, Any], deadlineSeconds: float) -> dict[str, 
             "deadlineSeconds": deadlineSeconds,
         }
         requestPath.write_text(json.dumps(body))
+        command = [
+            "open", "-n", "-W", "-g", "--stdout", str(logPath), "--stderr",
+            str(logPath), "-a", str(helperBundle), "--args", str(requestPath),
+        ]
         try:
-            subprocess.run(
-                [
-                    "open", "-n", "-W", "-g", "--stdout", str(logPath),
-                    "--stderr", str(logPath), "-a", str(helperBundle),
-                    "--args", str(requestPath),
-                ],
-                check=True, capture_output=True, text=True,
-                timeout=deadlineSeconds + helperLaunchSlackSeconds,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise GoldenConfirmError(
-                f"open could not start the helper: {exc.stderr}"
-            ) from exc
+            for attempt in range(openAttempts):
+                opened = subprocess.run(
+                    command, check=False, capture_output=True, text=True,
+                    timeout=deadlineSeconds + helperLaunchSlackSeconds,
+                )
+                # `open` can fail to start waiting, which leaves the helper never run.
+                if opened.returncode == 0 or resultPath.is_file():
+                    break
+                if attempt == openAttempts - 1:
+                    raise GoldenConfirmError(
+                        f"open could not start the helper: {opened.stderr.strip()}"
+                    )
         except subprocess.TimeoutExpired as exc:
             raise GoldenConfirmError(
                 f"the helper ran past its deadline and wrote no result; see {logPath}"
@@ -300,7 +306,9 @@ def readProblems(result: dict[str, Any]) -> list[HelperProblem]:
 
 def checkPermissions() -> list[HelperProblem]:
     """Ask the helper for every session and permission problem it can see (AC 9)."""
-    result = requestHelper({"operation": "permissionsCheck"}, deadlineSeconds=20.0)
+    result = requestHelper(
+        {"operation": "permissionsCheck"}, deadlineSeconds=20.0
+    )
     return readProblems(result)
 
 
@@ -459,15 +467,40 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
     return checks
 
 
-def renderQuickLook(golden: Path, outputDirectory: Path) -> Path:
-    """Render the golden's Quick Look image, whose values Numbers never recalculated."""
-    runTool(["qlmanage", "-t", "-s", "2400", "-o", str(outputDirectory), str(golden)])
-    rendered = outputDirectory / f"{golden.name}.png"
-    if not rendered.is_file():
-        raise GoldenConfirmError(f"Quick Look rendered nothing for {golden.name}")
-    target = outputDirectory / "quick-look.png"
-    rendered.rename(target)
-    return target
+def renderQuickLook(golden: Path, outputDirectory: Path) -> list[tuple[str, Path]]:
+    """Render each sheet of the golden's Quick Look preview sharply, as it was stored.
+
+    The thumbnail is the 720-pixel preview.jpg inside the file, so the full preview's
+    per-sheet vector PDFs are rendered instead, at three times their own size.
+    """
+    rendered: list[tuple[str, Path]] = []
+    with tempfile.TemporaryDirectory(prefix="pybers-quick-look-") as work:
+        runTool(["qlmanage", "-p", "-o", work, str(golden)])
+        preview = Path(work) / f"{golden.name}.qlpreview"
+        index = (preview / "Preview.html").read_text(errors="replace")
+        # Each sheet tab follows its page: `AttachmentN.html`, then `>Name</div>`.
+        pages = re.findall(r"(Attachment\d+\.html).*?>([^<>]+)</div>", index, re.DOTALL)
+        for position, (page, sheet) in enumerate(dict(pages).items(), start=1):
+            pdfs = re.findall(r"Attachment\d+\.pdf", (preview / page).read_text())
+            if not pdfs:
+                continue
+            pdf = preview / pdfs[0]
+            size = runTool(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(pdf)])
+            points = [float(value) for value in re.findall(r": ([\d.]+)", size.stdout)]
+            pixels = str(int(max(points) * quickLookScale))
+            runTool(["qlmanage", "-t", "-s", pixels, "-o", work, str(pdf)])
+            target = outputDirectory / formatQuickLookName(position, sheet)
+            (Path(work) / f"{pdf.name}.png").rename(target)
+            rendered.append((sheet, target))
+    if not rendered:
+        raise GoldenConfirmError(f"Quick Look rendered no sheet of {golden.name}")
+    return rendered
+
+
+def formatQuickLookName(position: int, sheet: str) -> str:
+    """Name a sheet's Quick Look image so the images sort in sheet order."""
+    slug = re.sub(r"[^a-z0-9]+", "-", sheet.lower()).strip("-")
+    return f"quick-look-{position}-{slug}.png"
 
 
 def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
@@ -517,7 +550,8 @@ def runGoldenConfirm(golden: Path, dryRun: bool) -> GoldenRun:
             "cells": [{"sheet": c.sheet, "table": c.table, "cell": c.cell}
                       for c in expectedCells],
             "maxCaptures": maxCaptures,
-        }, deadlineSeconds=inspectDeadlineSeconds)
+        }, deadlineSeconds=inspectDeadlineSeconds,
+            logPath=outputDirectory / "helper.log")
         run.numbersVersion = result.get("numbersVersion")
         run.problems.extend(readProblems(result))
         opened = result.get("openOutcome")
@@ -556,9 +590,10 @@ def runGoldenConfirm(golden: Path, dryRun: bool) -> GoldenRun:
                 "human", "saved copy",
                 f"{len(differences)} members or archives differ once Numbers saves it",
                 "report.md"))
-    run.checks.append(Check(
-        "human", "Quick Look", "what pybers stored, before Numbers recalculates",
-        renderQuickLook(golden, outputDirectory).name))
+    for sheet, image in renderQuickLook(golden, outputDirectory):
+        run.checks.append(Check(
+            "human", f"Quick Look {sheet}",
+            "what pybers stored, before Numbers recalculates", image.name))
     unchanged = readFileHash(golden) == goldenHash
     run.checks.append(Check(
         "passed" if unchanged else "failed", "golden",
