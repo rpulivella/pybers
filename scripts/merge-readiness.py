@@ -17,6 +17,7 @@ Usage:
         --preflight-log preflight.log --output results.json
     python3 scripts/merge-readiness.py report --results results.json
     python3 scripts/merge-readiness.py report --results results.json --dry-run
+    python3 scripts/merge-readiness.py dispatch --run-id 123 --ref my-branch
 
 Requires rich, and a GitHub token for `report`, resolved by scripts/ticket.py.
 
@@ -61,6 +62,7 @@ console: Console = Console()
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 projectPath: Path = repositoryRoot / "pyproject.toml"
+reportWorkflowFile: str = "merge-readiness.yml"
 failedExitCode: int = 1
 errorExitCode: int = 2
 
@@ -190,6 +192,24 @@ def runReport(arguments: argparse.Namespace) -> int:
     return failedExitCode if verdict == checks.failed else 0
 
 
+def runDispatch(arguments: argparse.Namespace) -> int:
+    """Ask GitHub to run the reporting workflow from a branch, on one preflight run.
+
+    The only way to exercise that workflow before it reaches the default branch,
+    since `workflow_run` fires from the default branch's copy alone.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
+        f"/actions/workflows/{reportWorkflowFile}/dispatches"
+    )
+    ticket.requestJson(
+        url, ticket.resolveToken(), method="POST",
+        payload={"ref": arguments.ref, "inputs": {"run-id": str(arguments.run_id)}},
+    )
+    console.print(f"[green]dispatched[/] {reportWorkflowFile} on {arguments.ref}")
+    return 0
+
+
 def buildParser() -> argparse.ArgumentParser:
     """Describe the command line, one subcommand per half of the report."""
     parser = argparse.ArgumentParser(
@@ -218,6 +238,14 @@ def buildParser() -> argparse.ArgumentParser:
     report.add_argument("--results", required=True, help="the collected facts")
     report.add_argument("--dry-run", action="store_true", help="render, post nothing")
     report.set_defaults(handler=runReport)
+
+    dispatch = commands.add_parser(
+        "dispatch", help="run the reporting workflow by hand, from a branch",
+        formatter_class=RichHelpFormatter,
+    )
+    dispatch.add_argument("--run-id", type=int, required=True, help="the preflight run")
+    dispatch.add_argument("--ref", required=True, help="the branch to run it from")
+    dispatch.set_defaults(handler=runDispatch)
     return parser
 
 

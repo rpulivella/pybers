@@ -6,10 +6,19 @@
 # `pull_request` run from a fork has no write access by design.
 name: merge readiness
 
+# GitHub runs a `workflow_run` workflow only from the copy on the default branch,
+# so a change to this file proves nothing until it lands. `workflow_dispatch` is
+# what exercises it from a branch, and it stays because re-running a report by
+# hand is worth having.
 on:
   workflow_run:
     workflows: [preflight]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: The preflight run whose facts to report on.
+        required: true
 
 # The only write this repository's automation holds, and it reaches one comment.
 permissions:
@@ -21,7 +30,9 @@ jobs:
   report:
     # A run that carried no facts is a draft or a cancelled run, and neither earns
     # a comment. The download step below decides that by what it finds.
-    if: github.event.workflow_run.event == 'pull_request'
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -42,7 +53,7 @@ jobs:
         continue-on-error: true
         with:
           name: merge-readiness
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Report merge readiness
