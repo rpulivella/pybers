@@ -28,9 +28,9 @@ from pybers._generated import TNArchives_pb2 as tn
 from pybers._persistence import PackageRegistry, readPackage
 from pybers._persistence.template import (
     TemplateError,
+    copyTemplates,
     readTemplate,
     readTemplates,
-    templatesCopy,
 )
 from pybers.document._create import (
     sheetTemplateDirectory,
@@ -74,7 +74,7 @@ def testACopyRemapsEveryReferenceToAFreshIdentifier() -> None:
     found = readRegistry()
     highest = found.metadata.last_object_identifier
 
-    copies = templatesCopy(
+    copies = copyTemplates(
         found, readTemplates(sheetTemplateDirectory), documentBindings
     )
 
@@ -91,12 +91,12 @@ def testAnUnboundReferenceIsRefusedBeforeAnythingIsAllocated() -> None:
     partial = {templateSheetStyle: templateSheetStyle}
 
     with pytest.raises(TemplateError, match="neither in the template set nor bound"):
-        templatesCopy(found, readTemplates(sheetTemplateDirectory), partial)
+        copyTemplates(found, readTemplates(sheetTemplateDirectory), partial)
     assert found.metadata.last_object_identifier == highest
 
 
 def testARoleNoTemplatePlaysIsRefusedNamingTheRoles() -> None:
-    copies = templatesCopy(
+    copies = copyTemplates(
         readRegistry(), readTemplates(sheetTemplateDirectory), documentBindings
     )
 

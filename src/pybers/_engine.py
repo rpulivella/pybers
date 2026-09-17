@@ -295,7 +295,7 @@ def rewriteRangeDependencies(
                 cell_coord_row=row, cell_coord_column=column
             )
             fresh.internal_range_reference.owner_id = extent.owner
-            rangeAssign(fresh.internal_range_reference.range, extent)
+            assignRange(fresh.internal_range_reference.range, extent)
 
     for spanning, columns in (
         (dependencies.spanning_column_dependencies, True),
@@ -327,7 +327,7 @@ def rewriteRangeDependencies(
     return rewriteRangeTiles(index, registry, owner, added, removed)
 
 
-def rangeAssign(target: tsce.RangeCoordinateArchive, extent: RangeEdge) -> None:
+def assignRange(target: tsce.RangeCoordinateArchive, extent: RangeEdge) -> None:
     """Set a range coordinate from a rectangle the engine was given."""
     target.top_left_row = extent.top
     target.top_left_column = extent.left
@@ -411,7 +411,7 @@ def rewriteRangeTiles(
     return sorted(created)
 
 
-def tileCovers(tile: tsce.CellRecordTileArchive, row: int, column: int) -> bool:
+def checkTileCovers(tile: tsce.CellRecordTileArchive, row: int, column: int) -> bool:
     """Return whether a dependency tile's band holds a cell."""
     band = range(tile.tile_column_begin, tile.tile_column_begin + dependencyTileColumns)
     return column in band and row >= tile.tile_row_begin
@@ -448,7 +448,7 @@ def registerFormulaCells(
     uncovered = sorted(
         (row, column) for row, column in added
         if not (firstTile and column < dependencyTileColumns)
-        and not any(tileCovers(tile, row, column) for tile in tiles.values())
+        and not any(checkTileCovers(tile, row, column) for tile in tiles.values())
     )
     if uncovered:
         raise WriteError(
@@ -480,9 +480,9 @@ def registerFormulaCells(
     for identifier, tile in tiles.items():
         inTile = {
             cell: dependencies for cell, dependencies in added.items()
-            if tileCovers(tile, *cell)
+            if checkTileCovers(tile, *cell)
         }
-        outTile = [cell for cell in removed if tileCovers(tile, *cell)]
+        outTile = [cell for cell in removed if checkTileCovers(tile, *cell)]
         if identifier != createdTile and not inTile and not outTile:
             continue
         rewriteCellRecords(tile.cell_records, inTile, outTile)

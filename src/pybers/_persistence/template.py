@@ -109,7 +109,7 @@ def readTemplates(directory: Path) -> list[ArchiveTemplate]:
     return templates
 
 
-def referencesRemap(message: Message, mapping: Mapping[int, int]) -> None:
+def remapReferences(message: Message, mapping: Mapping[int, int]) -> None:
     """Rewrite every reference a message holds through a mapping, in place."""
     for descriptor, value in message.ListFields():
         if descriptor.message_type is None:
@@ -124,7 +124,7 @@ def referencesRemap(message: Message, mapping: Mapping[int, int]) -> None:
             if descriptor.message_type.full_name == referenceTypeName:
                 item.identifier = identifierMapped(item.identifier, mapping)
             else:
-                referencesRemap(item, mapping)
+                remapReferences(item, mapping)
 
 
 def identifierMapped(identifier: int, mapping: Mapping[int, int]) -> int:
@@ -188,7 +188,7 @@ class TemplateCopies:
                 registry.archiveAdd(componentId, archive)
 
 
-def templatesCopy(
+def copyTemplates(
     registry: PackageRegistry,
     templates: list[ArchiveTemplate],
     bound: Mapping[int, int],
@@ -211,7 +211,7 @@ def templatesCopy(
     for template in templates:
         body = type(template.body)()
         body.CopyFrom(template.body)
-        referencesRemap(body, mapping)
+        remapReferences(body, mapping)
         copies[template.role] = ArchiveCopy(
             template=template,
             identifier=mapping[template.info.identifier],

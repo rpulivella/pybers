@@ -33,7 +33,7 @@ from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import NumbersPackage, createArchive
 from .._persistence.index import ArchiveIndex, documentTypeId, findRoot
 from .._persistence.metadata import PackageRegistry, documentComponentId
-from .._persistence.template import ArchiveTemplate, readTemplates, templatesCopy
+from .._persistence.template import ArchiveTemplate, copyTemplates, readTemplates
 from ..errors import WriteError
 from .sheets import Document, Sheet
 
@@ -102,7 +102,7 @@ def createSheet(
     bindings: dict[int, int],
 ) -> int:
     """Create one sheet's archives and return the sheet's identifier."""
-    copies = templatesCopy(registry, templates, bindings)
+    copies = copyTemplates(registry, templates, bindings)
     body = copies["sheet"].body
     if not isinstance(body, tn.SheetArchive):
         raise WriteError("The sheet template does not hold a TN.SheetArchive.")
