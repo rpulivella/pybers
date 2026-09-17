@@ -208,8 +208,7 @@ class Cell:
     formula: Formula | None = None
     errored: bool = False
     style: Style = field(default_factory=Style)
-    # Read from the record and set only by `textLiteralSet`, so the model never holds
-    # a chosen format beside something no document has been measured carrying one on.
+    # Set only by the reader and `textLiteralSet`, so a write chooses only text.
     _formatChosen: bool = field(default=False, kw_only=True)
     # The table this belongs to, so that reading or writing a formula as text needs
     # neither the cell's own address nor the names of the other tables passed in.
@@ -263,7 +262,7 @@ class Cell:
         """
         if not isinstance(text, str):
             raise WriteError(
-                f"{self.reference} holds literal text, and was given "
+                f"Literal text for {self.reference} must be a str, and was given "
                 f"{type(text).__name__}."
             )
         if self.formula is not None:
