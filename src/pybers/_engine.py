@@ -52,7 +52,7 @@ from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPArchiveMessages_pb2 as tspArchive
 from ._generated import TSPMessages_pb2 as tsp
-from ._persistence import IWAFile, PackageRegistry, archiveCreate
+from ._persistence import IWAFile, PackageRegistry, createArchive
 from ._persistence.index import (
     ArchiveIndex,
     calculationEngineTypeId,
@@ -402,7 +402,7 @@ def rewriteRangeTiles(
             )
             message.version.extend(rangePrecedentsTileVersion)
             registry.archiveAdd(
-                componentId, archiveCreate(info, [tile.SerializeToString()])
+                componentId, createArchive(info, [tile.SerializeToString()])
             )
             continue
         registry.componentMember(registry.componentOf[identifier]).messageReplace(
@@ -491,7 +491,7 @@ def registerFormulaCells(
             message = info.message_infos.add(type=cellRecordTileTypeId, length=0)
             message.version.extend(cellRecordTileVersion)
             registry.archiveAdd(
-                componentId, archiveCreate(info, [tile.SerializeToString()])
+                componentId, createArchive(info, [tile.SerializeToString()])
             )
             continue
         registry.componentMember(registry.componentOf[identifier]).messageReplace(

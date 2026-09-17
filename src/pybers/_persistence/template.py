@@ -35,7 +35,7 @@ from google.protobuf.message import Message
 
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from ..errors import PybersError
-from .iwa import archiveCreate
+from .iwa import createArchive
 from .metadata import PackageRegistry
 from .types import archiveTypes
 
@@ -69,7 +69,7 @@ class ArchiveCopy:
     body: Message
 
 
-def templateRead(path: Path) -> ArchiveTemplate:
+def readTemplate(path: Path) -> ArchiveTemplate:
     """Return the template one file holds, named by its role after the `NN-` prefix."""
     text = path.read_text(encoding="utf-8")
     header = [
@@ -99,10 +99,10 @@ def templateRead(path: Path) -> ArchiveTemplate:
     )
 
 
-def templatesRead(directory: Path) -> list[ArchiveTemplate]:
+def readTemplates(directory: Path) -> list[ArchiveTemplate]:
     """Return every template in a directory, in the order their prefixes give."""
     templates = [
-        templateRead(path) for path in sorted(directory.glob(f"*{templateSuffix}"))
+        readTemplate(path) for path in sorted(directory.glob(f"*{templateSuffix}"))
     ]
     if not templates:
         raise TemplateError(f"{directory} holds no templates.")
@@ -181,7 +181,7 @@ class TemplateCopies:
                 ]
                 del message.object_references[:]
                 message.object_references.extend(remapped)
-            archive = archiveCreate(info, [copy.body.SerializeToString()])
+            archive = createArchive(info, [copy.body.SerializeToString()])
             if componentId is None:
                 registry.componentAdd(archive, component[len(newComponentPrefix):])
             else:

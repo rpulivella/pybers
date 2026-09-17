@@ -28,9 +28,9 @@ from pybers._generated import TNArchives_pb2 as tn
 from pybers._persistence import PackageRegistry, readPackage
 from pybers._persistence.template import (
     TemplateError,
-    templateRead,
+    readTemplate,
+    readTemplates,
     templatesCopy,
-    templatesRead,
 )
 from pybers.document._create import (
     sheetTemplateDirectory,
@@ -54,7 +54,7 @@ def readRegistry() -> PackageRegistry:
 
 
 def testTheSheetTemplatesReadAsOneSheetAndItsSevenParts() -> None:
-    templates = templatesRead(sheetTemplateDirectory)
+    templates = readTemplates(sheetTemplateDirectory)
 
     assert [template.role for template in templates] == [
         "sheet",
@@ -75,7 +75,7 @@ def testACopyRemapsEveryReferenceToAFreshIdentifier() -> None:
     highest = found.metadata.last_object_identifier
 
     copies = templatesCopy(
-        found, templatesRead(sheetTemplateDirectory), documentBindings
+        found, readTemplates(sheetTemplateDirectory), documentBindings
     )
 
     sheet = copies["sheet"].body
@@ -91,13 +91,13 @@ def testAnUnboundReferenceIsRefusedBeforeAnythingIsAllocated() -> None:
     partial = {templateSheetStyle: templateSheetStyle}
 
     with pytest.raises(TemplateError, match="neither in the template set nor bound"):
-        templatesCopy(found, templatesRead(sheetTemplateDirectory), partial)
+        templatesCopy(found, readTemplates(sheetTemplateDirectory), partial)
     assert found.metadata.last_object_identifier == highest
 
 
 def testARoleNoTemplatePlaysIsRefusedNamingTheRoles() -> None:
     copies = templatesCopy(
-        readRegistry(), templatesRead(sheetTemplateDirectory), documentBindings
+        readRegistry(), readTemplates(sheetTemplateDirectory), documentBindings
     )
 
     with pytest.raises(TemplateError, match="the roles are"):
@@ -109,9 +109,9 @@ def testATemplateThatDoesNotNameItsComponentIsRefused(tmp_path: Path) -> None:
     path.write_text('name: "Sheet"\n', encoding="utf-8")
 
     with pytest.raises(TemplateError, match="naming its component"):
-        templateRead(path)
+        readTemplate(path)
 
 
 def testADirectoryWithoutTemplatesIsRefused(tmp_path: Path) -> None:
     with pytest.raises(TemplateError, match="holds no templates"):
-        templatesRead(tmp_path)
+        readTemplates(tmp_path)

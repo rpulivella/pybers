@@ -179,7 +179,7 @@ class IWAFile:
         self.modified = True
 
 
-def archiveCreate(
+def createArchive(
     info: archiveMessages.ArchiveInfo, bodies: list[bytes]
 ) -> Archive:
     """Return a new archive from its `ArchiveInfo` and one body per message.
@@ -321,7 +321,7 @@ def writeArchiveInfo(archive: Archive) -> bytes:
     if not archive.infoBytes:
         raise IWAError(
             f"Archive {archive.identifier} carries no ArchiveInfo, so it cannot be "
-            "written. Only an archive read from a file or built by `archiveCreate` "
+            "written. Only an archive read from a file or built by `createArchive` "
             "carries one."
         )
     info = archiveMessages.ArchiveInfo()

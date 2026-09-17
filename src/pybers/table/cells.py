@@ -106,7 +106,7 @@ CellValue = (
 ownerBaseMask: int = ~0xFF
 
 
-def ownerIdentityFresh() -> str:
+def generateOwnerIdentity() -> str:
     """Return a fresh table identity, spelled as a formula spells it, low word first.
 
     Built from the version 4 UUID's bytes in file order, which is how every table

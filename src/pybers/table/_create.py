@@ -42,20 +42,20 @@ from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import NumbersPackage, archiveCreate
+from .._persistence import NumbersPackage, createArchive
 from .._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
 from .._persistence.metadata import PackageRegistry
 from .._persistence.template import (
     ArchiveCopy,
     ArchiveTemplate,
     TemplateCopies,
+    readTemplates,
     templatesCopy,
-    templatesRead,
 )
 from .._persistence.types import archiveTypeId
 from ..errors import WriteError
 from ..geometry import Position
-from .cells import Table, ownerIdentityFresh
+from .cells import Table, generateOwnerIdentity
 
 if TYPE_CHECKING:
     # Guarded because the document feature imports this one to create its tables.
@@ -280,13 +280,13 @@ def namedStyleFind(index: ArchiveIndex, stylesheetId: int) -> int | None:
     return None
 
 
-def resetStylesCreate(
+def createResetStyles(
     index: ArchiveIndex, registry: PackageRegistry, styles: DocumentStyles
 ) -> ResetStyles:
     """Create the reset's two variations, and `pybers-base` unless it exists."""
     network = styles.network
     bodyText = index.resolve(network.body_text_style, tswp.ParagraphStyleArchive)
-    templates = templatesRead(templateDirectory / "styles")
+    templates = readTemplates(templateDirectory / "styles")
     existing = namedStyleFind(index, styles.stylesheet)
     if existing is not None:
         templates = [
@@ -331,7 +331,7 @@ def resetStylesCreate(
     created = [copy.identifier for copy in copies.copies.values()]
     for identifier in created:
         stylesheet.styles.add(identifier=identifier)
-        registry.objectUuidAdd(componentId, identifier, uuidFresh())
+        registry.objectUuidAdd(componentId, identifier, generateUuid())
     for parent, child in (
         (network.table_style.identifier, reset.tableStyle),
         (network.body_cell_style.identifier, reset.cellStyle),
@@ -365,7 +365,7 @@ def resetStylesCreate(
     return reset
 
 
-def uuidFresh() -> tsp.UUID:
+def generateUuid() -> tsp.UUID:
     """Return a random UUID in the two-halves form the file stores."""
     message = tsp.UUID()
     uuidAssign(message, uuid.uuid4().int)
@@ -446,7 +446,7 @@ def engineState(index: ArchiveIndex, registry: PackageRegistry) -> EngineState:
     raise WriteError("The calculation engine registers no header name owner.")
 
 
-def headerSlotAdd(state: EngineState, base: int) -> None:
+def addHeaderSlot(state: EngineState, base: int) -> None:
     """Give a table the next header name slot, and register it as a dependency."""
     slot = 1 + max(
         (entry.per_table_precedent.column for entry in state.headerNames.per_tables),
@@ -485,7 +485,7 @@ def tableBottom(index: ArchiveIndex, info: tst.TableInfoArchive) -> float:
     return float(info.super.geometry.position.y) + height
 
 
-def tableCreate(
+def createTable(
     registry: PackageRegistry,
     templates: list[ArchiveTemplate],
     table: Table,
@@ -500,7 +500,7 @@ def tableCreate(
     bindings = {templateSheet: sheetId, templatePreset: styles.preset}
     bindings.update(styleBindings(modelTemplate, styles, reset))
     if not table.identifier:
-        table.identifier = ownerIdentityFresh()
+        table.identifier = generateOwnerIdentity()
     copies = templatesCopy(registry, templates, bindings)
 
     base = identityValue(table.identifier)
@@ -526,7 +526,9 @@ def tableCreate(
     tableShape(copies, table, origin)
     copies.place(registry, {"CalculationEngine": state.identifier})
     for role in ("table-info", "caption", "title", "model"):
-        registry.objectUuidAdd(state.identifier, copies[role].identifier, uuidFresh())
+        registry.objectUuidAdd(
+            state.identifier, copies[role].identifier, generateUuid()
+        )
     registry.weakReferenceAdd(state.identifier, sheetId)
     registry.weakReferenceAdd(state.identifier, styles.preset)
 
@@ -539,7 +541,7 @@ def tableCreate(
         )
         wordsAssign(entry.owner_id, uuidValue(body.formula_owner_uid))
     tracker.number_of_formulas += formulasPerTable
-    headerSlotAdd(state, base)
+    addHeaderSlot(state, base)
     return copies["table-info"].identifier
 
 
@@ -594,7 +596,7 @@ def tableShape(copies: TemplateCopies, table: Table, origin: Position) -> None:
             extent.bottom_right_row = table.rowCount - 1
 
 
-def sidebarNodesAdd(
+def addSidebarNodes(
     index: ArchiveIndex, registry: PackageRegistry, sheetId: int, tableIds: list[int]
 ) -> None:
     """List a sheet's created tables under it in the sidebar tree, in one rewrite."""
@@ -615,7 +617,7 @@ def sidebarNodesAdd(
             child.object.identifier = tableId
             registry.archiveAdd(
                 registry.componentOf[reference.identifier],
-                archiveCreate(info, [child.SerializeToString()]),
+                createArchive(info, [child.SerializeToString()]),
             )
             node.children.add(identifier=identifier)
             references.append(identifier)
@@ -672,7 +674,7 @@ def tablesPending(
     return pending
 
 
-def tablesCreate(
+def createTables(
     document: Document, package: NumbersPackage, registry: PackageRegistry
 ) -> None:
     """Create every table the model gained, on every sheet, once the sheets exist."""
@@ -681,9 +683,9 @@ def tablesCreate(
     if not pending:
         return
     styles = documentStyles(index)
-    reset = resetStylesCreate(index, registry, styles)
+    reset = createResetStyles(index, registry, styles)
     state = engineState(index, registry)
-    templates = templatesRead(templateDirectory / "table")
+    templates = readTemplates(templateDirectory / "table")
     for sheet, sheetArchive, created in pending:
         sheetId = sheetIdentifierOf(sheet)
         top = max(
@@ -701,13 +703,13 @@ def tablesCreate(
             if origin is None:
                 origin = Position(0.0, top)
                 top += table.rowCount * resetRowHeight + tableGap
-            identifier = tableCreate(
+            identifier = createTable(
                 registry, templates, table, sheetId, origin, styles, reset, state
             )
             table._identifier = identifier
             tableIds.append(identifier)
             sheetArchive.drawable_infos.add(identifier=identifier)
-        sidebarNodesAdd(index, registry, sheetId, tableIds)
+        addSidebarNodes(index, registry, sheetId, tableIds)
         references = registry.strongReferencesOf(sheetId)
         references.extend(tableIds)
         registry.archiveReplace(sheetId, sheetArchive.SerializeToString(), references)
@@ -736,4 +738,4 @@ def sheetIdentifierOf(sheet: Sheet) -> int:
     return sheet._identifier
 
 
-__all__ = ["tablesCreate"]
+__all__ = ["createTables"]

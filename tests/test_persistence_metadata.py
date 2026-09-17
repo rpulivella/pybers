@@ -28,7 +28,7 @@ from conftest import allDocuments, findDocumentPath, readArchiveBodies
 from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.container import ContainerError
-from pybers._persistence.iwa import IWAError, archiveCreate
+from pybers._persistence.iwa import IWAError, createArchive
 from pybers._persistence.metadata import (
     MetadataError,
     PackageRegistry,
@@ -95,7 +95,7 @@ def testAnAllocatedIdentifierIsNewAndTheNextIsHigher() -> None:
 def testACreatedComponentSurvivesBeingWrittenAndRead(tmp_path: Path) -> None:
     found = readRegistry()
     identifier = found.identifierAllocate()
-    root = archiveCreate(buildTileInfo(identifier, [documentComponent]), [b""])
+    root = createArchive(buildTileInfo(identifier, [documentComponent]), [b""])
 
     found.componentAdd(root, "Tables/Tile")
     found.save()
@@ -117,7 +117,7 @@ def testACreatedComponentSurvivesBeingWrittenAndRead(tmp_path: Path) -> None:
 def testCreatingAComponentLeavesEveryOtherArchiveUnchanged(tmp_path: Path) -> None:
     source = findDocumentPath("00-baseline")
     found = readRegistry()
-    root = archiveCreate(buildTileInfo(found.identifierAllocate(), []), [b""])
+    root = createArchive(buildTileInfo(found.identifierAllocate(), []), [b""])
 
     found.componentAdd(root, "Tables/Tile")
     found.save()
@@ -148,7 +148,7 @@ def testAnArchiveAddedToAnExistingComponentIsRegisteredThere() -> None:
         if component.preferred_locator == "Tables/Tile"
     )
 
-    found.archiveAdd(engine, archiveCreate(buildTileInfo(identifier, [tile]), [b""]))
+    found.archiveAdd(engine, createArchive(buildTileInfo(identifier, [tile]), [b""]))
     found.save()
 
     assert found.componentOf[identifier] == engine
@@ -194,7 +194,7 @@ def testAnArchiveIdentifierAlreadyHeldIsRefused() -> None:
 
     with pytest.raises(IWAError, match="already holds"):
         found.archiveAdd(
-            documentComponent, archiveCreate(buildTileInfo(held, []), [b""])
+            documentComponent, createArchive(buildTileInfo(held, []), [b""])
         )
 
 
@@ -207,4 +207,4 @@ def testAMemberNameAlreadyTakenIsRefused() -> None:
 
 def testAnArchiveGivenTheWrongNumberOfBodiesIsRefused() -> None:
     with pytest.raises(IWAError, match="declares 1 messages"):
-        archiveCreate(buildTileInfo(1, []), [b"", b""])
+        createArchive(buildTileInfo(1, []), [b"", b""])

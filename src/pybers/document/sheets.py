@@ -56,7 +56,7 @@ from pybers.addressing.reference import lastColumn, lastRow, tableNameSeparator
 from pybers.drawable import GraphicalObject
 from pybers.errors import PybersError
 from pybers.geometry import Position
-from pybers.table.cells import Cell, Table, ownerIdentityFresh
+from pybers.table.cells import Cell, Table, generateOwnerIdentity
 
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.
@@ -221,7 +221,7 @@ class Sheet:
             name=unique,
             rowCount=rows,
             colCount=cols,
-            identifier=ownerIdentityFresh(),
+            identifier=generateOwnerIdentity(),
             document=self.document,
             _origin=position,
         )
@@ -342,9 +342,9 @@ class Document:
         them. A location is a view of one reference, so shifting one writes through to
         the cell holding it.
         """
-        from pybers.document.references import referencesIterate
+        from pybers.document.references import iterateReferences
 
-        yield from referencesIterate(self)
+        yield from iterateReferences(self)
 
     def save(self, path: Path | str | None = None) -> None:
         """Write this document back to a `.numbers` package, in place by default.

@@ -68,10 +68,10 @@ from .._persistence.index import (
 )
 from ..errors import WriteError
 from ..formula.precedents import formulaPrecedents
-from ..table._create import tablesCreate
+from ..table._create import createTables
 from ..table._write import applyMerges, applyTableEdits, mergesAdded
 from ..table.cells import Table
-from ._create import sheetsCreate
+from ._create import createSheets
 from .sheets import Document, Sheet
 
 
@@ -152,8 +152,8 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     change, and a comparison cannot go stale the way a dirty flag can.
     """
     registry = PackageRegistry(package)
-    sheetsCreate(document, package, registry)
-    tablesCreate(document, package, registry)
+    createSheets(document, package, registry)
+    createTables(document, package, registry)
     index = ArchiveIndex(package)
     owners = {
         archive.identifier: iwaFile
@@ -173,7 +173,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
         if identifier in internalIds
     }
 
-    # Strict, because `sheetsCreate` has made the two lists one list, and a plain
+    # Strict, because `createSheets` has made the two lists one list, and a plain
     # `zip` would stop at the shorter side in silence if that ever stopped holding.
     for sheet, reference in zip(document.sheets, root.sheets, strict=True):
         sheetArchive = index.resolve(reference, tn.SheetArchive)
