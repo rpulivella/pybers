@@ -47,7 +47,7 @@ exceeded 255 columns keeps the wide form after they are deleted. `TSTables` carr
 and nothing that narrows one back.
 
 Both `TileRowInfo.has_wide_offsets` and `Tile.should_use_wide_rows` are set together in
-every document measured. `pybers._persistence.cells.offsetUnitFor` honors either alone,
+every document measured. `pybers._persistence.cells.chooseOffsetUnit` honors either alone,
 since which one is authoritative has not been established.
 
 Record layout, as far as it is needed to read a value:

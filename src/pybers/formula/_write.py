@@ -41,9 +41,9 @@ from .._persistence.cells import (
     CellRecord,
     carriesFormula,
     decodeCellValue,
+    findFormulaKeySlot,
     formulaFlagBit,
     formulaFlagOffset,
-    formulaKeySlot,
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128
@@ -368,7 +368,7 @@ class FormulaPool:
             self.stored.pop(key, None)
 
 
-def formulaKeyOffset(record: CellRecord) -> int:
+def findFormulaKeyOffset(record: CellRecord) -> int:
     """Return where a record keeps its formula key.
 
     Computed from the value's own width rather than from a constant, because the
@@ -377,7 +377,7 @@ def formulaKeyOffset(record: CellRecord) -> int:
     the same arithmetic finds its key at byte 12.
     """
     _, width = decodeCellValue(record.typeByte, record.raw[valueOffset:])
-    return valueOffset + width + formulaKeySlot(record) * referenceWidth
+    return valueOffset + width + findFormulaKeySlot(record) * referenceWidth
 
 
 def buildFormulaRecord(key: int) -> bytes:
@@ -401,7 +401,7 @@ def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
 
     Measured in every document 2026-09-04: a formula-backed record is the plain
     record for the same result type with byte 9 bit `0x02` set and ONE more trailing
-    reference, the key, placed at the slot `formulaKeySlot` names rather than always
+    reference, the key, placed at the slot `findFormulaKeySlot` names rather than always
     first.
     Byte 8 never moves, being fixed by the type and by what else the cell carries.
 
@@ -409,7 +409,7 @@ def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     encodes things this library does not model. The cached value stays and becomes
     the placeholder, which Numbers repairs while recalculating.
     """
-    at = formulaKeyOffset(record)
+    at = findFormulaKeyOffset(record)
     if len(raw) < at:
         raise WriteError(
             f"column {record.column} is {len(raw)} bytes and its formula key would "
@@ -431,7 +431,7 @@ def detachFormulaKey(raw: bytes, record: CellRecord) -> bytes:
     becomes an ordinary one holding the number the formula produced, rather than
     emptying and losing what a reader could see a moment earlier.
     """
-    at = formulaKeyOffset(record)
+    at = findFormulaKeyOffset(record)
     if len(raw) < at + referenceWidth:
         raise WriteError(
             f"column {record.column} is marked as carrying a formula, but its record "
@@ -449,7 +449,7 @@ def patchFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     format and style lists and rewriting the record would strip a cell's number
     format while appearing to succeed.
     """
-    at = formulaKeyOffset(record)
+    at = findFormulaKeyOffset(record)
     if len(raw) < at + referenceWidth:
         raise WriteError(
             f"{record.column} is marked as carrying a formula, but its record is "
@@ -458,7 +458,7 @@ def patchFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     return raw[:at] + key.to_bytes(referenceWidth, "little") + raw[at + referenceWidth:]
 
 
-def formulaPoolFor(
+def readFormulaPool(
     index: ArchiveIndex, store: tst.DataStore
 ) -> FormulaPool | None:
     """Return the table's formula pool, or None when it declares no formulas.
@@ -475,7 +475,7 @@ def formulaPoolFor(
     )
 
 
-def formulaEdit(
+def classifyFormulaEdit(
     formula: Formula | None, record: CellRecord, pool: FormulaPool | None
 ) -> str:
     """Return which of the four things happened to this cell's formula.
@@ -492,7 +492,7 @@ def formulaEdit(
     """
     if pool is None:
         return "none"
-    slot = formulaKeySlot(record)
+    slot = findFormulaKeySlot(record)
     stored = carriesFormula(record) and len(record.references) > slot
     if formula is not None and not stored:
         return "attach"
@@ -504,4 +504,4 @@ def formulaEdit(
     return "none"
 
 
-__all__ = ["FormulaPool", "encodeFormula", "formulaEdit", "formulaPoolFor"]
+__all__ = ["FormulaPool", "encodeFormula", "classifyFormulaEdit", "readFormulaPool"]

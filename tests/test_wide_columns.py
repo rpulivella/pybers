@@ -40,7 +40,7 @@ from conftest import (
 )
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
-from pybers._persistence.cells import offsetUnitByte, offsetUnitFor, offsetUnitWord
+from pybers._persistence.cells import chooseOffsetUnit, offsetUnitByte, offsetUnitWord
 from pybers._persistence.index import originOffset
 from pybers.addressing.reference import CellReference
 from pybers.errors import ReadError, WriteError
@@ -73,10 +73,10 @@ def findFirstTable(document: pybers.Document) -> pybers.Table:
 
 def testOffsetsCountWordsOnlyWhenTheArchiveSaysTheRowIsWide() -> None:
     """Either of Apple's two flags selects the word unit, and neither means byte."""
-    assert offsetUnitFor(False, False) == offsetUnitByte
-    assert offsetUnitFor(True, False) == offsetUnitWord
-    assert offsetUnitFor(False, True) == offsetUnitWord
-    assert offsetUnitFor(True, True) == offsetUnitWord
+    assert chooseOffsetUnit(False, False) == offsetUnitByte
+    assert chooseOffsetUnit(True, False) == offsetUnitWord
+    assert chooseOffsetUnit(False, True) == offsetUnitWord
+    assert chooseOffsetUnit(True, True) == offsetUnitWord
 
 
 def testATableWiderThanTwoHundredFiftyFiveColumnsOpens() -> None:

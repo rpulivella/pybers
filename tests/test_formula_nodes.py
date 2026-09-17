@@ -44,10 +44,10 @@ from pybers import (
     FormulaRange,
     FormulaUnknownCall,
     Span,
-    columnLetter,
+    toColumnLetter,
 )
 from pybers._persistence import readPackage
-from pybers._persistence.types import archiveTypeId
+from pybers._persistence.types import readArchiveTypeId
 from pybers.formula.nodes import FormulaError
 
 # TST.TableInfoArchive, TSCE.CalculationEngineArchive and the owner_kind a table's
@@ -406,7 +406,7 @@ def testAStyledCellStillResolvesToItsOwnFormula() -> None:
         for node in cell.formula:
             call = node.content
             if isinstance(call, FormulaFunctionCall):
-                called[f"{columnLetter(address.col)}{address.row}"] = call.index
+                called[f"{toColumnLetter(address.col)}{address.row}"] = call.index
     # Indices rather than names, so this tests which formula a cell resolves to
     # and not what the function table happens to call it.
     assert called["B13"] == lambdaApplyIndex
@@ -502,7 +502,7 @@ def testChangedFormulaMarksItsCellForRecalculation(tmp_path: Path) -> None:
     def readDirtyBytes(path: Path) -> int:
         index = ArchiveIndex(readPackage(path))
         for archive in list(index.byIdentifier.values()):
-            if archiveTypeId(archive) != 4000:
+            if readArchiveTypeId(archive) != 4000:
                 continue
             from pybers._persistence.types import parseArchive
             engine = parseArchive(archive)
@@ -645,15 +645,15 @@ def testTheGoldenFilesHoldWhatTheyClaimTo() -> None:
 def readFormulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
     """Return (row, column, formula key) for every formula-backed cell of a table."""
     from pybers._generated import TSTArchives_pb2 as tst
-    from pybers._persistence import carriesFormula, decodeRow, offsetUnitFor
+    from pybers._persistence import carriesFormula, chooseOffsetUnit, decodeRow
     from pybers._persistence.index import ArchiveIndex
-    from pybers._persistence.types import archiveTypeId, parseArchive
-    from pybers.formula._write import formulaKeySlot
+    from pybers._persistence.types import parseArchive, readArchiveTypeId
+    from pybers.formula._write import findFormulaKeySlot
 
     index = ArchiveIndex(readPackage(path))
     found: list[tuple[int, int, int]] = []
     for archive in list(index.byIdentifier.values()):
-        if archiveTypeId(archive) != tableInfoTypeId:
+        if readArchiveTypeId(archive) != tableInfoTypeId:
             continue
         model = index.resolve(parseArchive(archive).tableModel,
                               tst.TableModelArchive)
@@ -663,7 +663,7 @@ def readFormulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
         for entry in store.tiles.tiles:
             tile = index.resolve(entry.tile, tst.Tile)
             for rowInfo in tile.rowInfos:
-                unit = offsetUnitFor(
+                unit = chooseOffsetUnit(
                     rowInfo.has_wide_offsets, tile.should_use_wide_rows
                 )
                 row = entry.tileid * store.tiles.tile_size + rowInfo.tile_row_index
@@ -672,7 +672,7 @@ def readFormulaRecords(path: Path, name: str) -> list[tuple[int, int, int]]:
                     if carriesFormula(record):
                         found.append(
                             (row, record.column,
-                             record.references[formulaKeySlot(record)])
+                             record.references[findFormulaKeySlot(record)])
                         )
     return found
 
@@ -689,7 +689,7 @@ def readFormulaCellRegister(path: Path) -> tuple[list[tuple[int, int]], ...]:
 
     index = ArchiveIndex(readPackage(path))
     for archive in list(index.byIdentifier.values()):
-        if archiveTypeId(archive) != calculationEngineTypeId:
+        if readArchiveTypeId(archive) != calculationEngineTypeId:
             continue
         engine = parseArchive(archive)
         for reference in engine.dependency_tracker.formula_owner_dependencies:

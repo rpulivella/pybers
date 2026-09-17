@@ -41,7 +41,7 @@ from pybers.formula.nodes import (
     FormulaRange,
     FormulaReference,
 )
-from pybers.formula.render import addressText, shortestNames
+from pybers.formula.render import findShortestNames, renderAddress
 from pybers.table.cells import Cell, Table
 
 
@@ -98,8 +98,8 @@ class ReferenceLocation:
     @property
     def text(self) -> str:
         """This reference as Numbers spells it, `Table 2::A1`, qualified as needed."""
-        return addressText(
-            self.node, self.cell.reference, shortestNames(self.cell.tableNames)
+        return renderAddress(
+            self.node, self.cell.reference, findShortestNames(self.cell.tableNames)
         )
 
     def shift(self, *, rows: int = 0, cols: int = 0) -> bool:
@@ -125,7 +125,7 @@ class ReferenceLocation:
         return True
 
 
-def tablesByIdentity(document: Document) -> dict[str, Table]:
+def indexTablesByIdentity(document: Document) -> dict[str, Table]:
     """Return every table in a document, keyed by what a formula names it by.
 
     A table built by hand has no identity until a document gives it one, and one
@@ -139,7 +139,7 @@ def tablesByIdentity(document: Document) -> dict[str, Table]:
     }
 
 
-def targetFor(
+def resolveReferenceTarget(
     content: FormulaReference | FormulaRange,
     host: Table,
     tables: Mapping[str, Table],
@@ -158,7 +158,7 @@ def targetFor(
 
 def iterateReferences(document: Document) -> Iterator[ReferenceLocation]:
     """Yield a location for every reference and every range in every formula."""
-    tables = tablesByIdentity(document)
+    tables = indexTablesByIdentity(document)
     for sheet, table, cell in document.cellsIterate():
         formula = cell.formula
         if formula is None:
@@ -168,13 +168,14 @@ def iterateReferences(document: Document) -> Iterator[ReferenceLocation]:
             if not isinstance(content, FormulaReference | FormulaRange):
                 continue
             yield ReferenceLocation(
-                cell, index, sheet, table, targetFor(content, table, tables)
+                cell, index, sheet, table,
+                resolveReferenceTarget(content, table, tables),
             )
 
 
 __all__ = [
     "ReferenceLocation",
     "iterateReferences",
-    "tablesByIdentity",
-    "targetFor",
+    "indexTablesByIdentity",
+    "resolveReferenceTarget",
 ]

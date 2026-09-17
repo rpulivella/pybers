@@ -30,7 +30,7 @@ from google.protobuf import text_format
 
 import pybers
 from conftest import findDocumentPath, readArchiveBodies
-from pybers._engine import calculationEngine, tableOwnerEntries
+from pybers._engine import findCalculationEngine, readTableOwnerEntries
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSTArchives_pb2 as tst
@@ -75,7 +75,8 @@ def readOwnerTiles(
     identifier = pybers.open(path).sheet(sheet).table(table)._identifier
     assert identifier is not None
     index = ArchiveIndex(readPackage(path))
-    owner = tableOwnerEntries(index, calculationEngine(index))[identifier].dependencies
+    entries = readTableOwnerEntries(index, findCalculationEngine(index))
+    owner = entries[identifier].dependencies
     tiles = [
         index.resolve(reference, tsce.CellRecordTileArchive)
         for reference in owner.tiled_cell_dependencies.cell_record_tiles
@@ -171,7 +172,7 @@ def testTheFormulaCellsAreMarkedForRecalculation(tmp_path: Path) -> None:
     index = ArchiveIndex(readPackage(path))
 
     dirty = index.resolve(
-        calculationEngine(index).refs_to_dirty, tsce.ReferencesToDirtyArchive
+        findCalculationEngine(index).refs_to_dirty, tsce.ReferencesToDirtyArchive
     )
 
     cells = {

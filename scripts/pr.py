@@ -148,7 +148,7 @@ partialSuccessExitCode: int = 3
 noOpenPullRequestMarker: str = "no-open-pull-request"
 
 
-def pullRequestNumber(value: str) -> int:
+def parsePullRequestNumber(value: str) -> int:
     """Parse `PR #38`, `#38`, `38` or the pull request URL."""
     text = value.strip()
     if text.lower().startswith("pr"):
@@ -163,7 +163,7 @@ def pullRequestNumber(value: str) -> int:
     return int(text)
 
 
-def pullRequestRef(number: int) -> str:
+def formatPullRequestRef(number: int) -> str:
     """Return a pull request reference in the house form, both parts always."""
     return f"PR #{number}"
 
@@ -330,7 +330,9 @@ def findOpenPullRequest(
     if not matches:
         return None
     if len(matches) > 1:
-        numbers = ", ".join(f"{pullRequestRef(match['number'])}" for match in matches)
+        numbers = ", ".join(
+            f"{formatPullRequestRef(match['number'])}" for match in matches
+        )
         raise RuntimeError(
             f"{len(matches)} open pull requests from {head!r} into {base!r}: "
             f"{numbers}. "
@@ -386,7 +388,7 @@ def readCheckRuns(token: str, sha: str) -> list[CheckRun]:
     ]
 
 
-def checksHavePassed(runs: list[CheckRun]) -> bool:
+def confirmChecksPassed(runs: list[CheckRun]) -> bool:
     """Return whether every check completed and at least one actually succeeded.
 
     Two conditions rather than one. An empty list is False, because no checks
@@ -490,7 +492,9 @@ def mergePullRequest(
     payload = {"merge_method": method, "commit_title": subject}
     result = ticket.requestJson(url, token, method="PUT", payload=payload)
     if not result or not result.get("merged"):
-        raise RuntimeError(f"GitHub did not merge {pullRequestRef(number)}: {result}")
+        raise RuntimeError(
+            f"GitHub did not merge {formatPullRequestRef(number)}: {result}"
+        )
     return str(result["sha"])
 
 
@@ -508,7 +512,7 @@ def showPullRequest(summary: PullRequestSummary) -> None:
     state = "draft" if summary["isDraft"] else summary["state"]
     tint = "yellow" if summary["isDraft"] else "green"
     console.print(
-        f"[bold cyan]{pullRequestRef(summary['number'])}[/] "
+        f"[bold cyan]{formatPullRequestRef(summary['number'])}[/] "
         f"[bold]{escape(summary['title'])}[/]"
     )
     console.print(f"[dim]{escape(summary['url'])}[/]")
@@ -579,7 +583,7 @@ def countProseWords(text: str) -> int:
     return len(re.findall(r"\S+", re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)))
 
 
-def bodyFindings(body: str, template: str) -> list[str]:
+def findBodyFindings(body: str, template: str) -> list[str]:
     """Return every way a body departs from its template.
 
     Pure by design: two strings in and complaints out, so the checks are
@@ -641,12 +645,12 @@ def bodyFindings(body: str, template: str) -> list[str]:
 def refuseBody(body: str) -> bool:
     """Print what is wrong with a body and report whether to stop.
 
-    Kept apart from `bodyFindings` so the checks stay logic and the terminal
+    Kept apart from `findBodyFindings` so the checks stay logic and the terminal
     stays here. The sanctioned headings print with the refusal, because an
     author told which heading is wrong still has to be told which are right.
     """
     template = readTemplate()
-    findings = bodyFindings(body, template)
+    findings = findBodyFindings(body, template)
     if not findings:
         return False
 
@@ -659,7 +663,7 @@ def refuseBody(body: str) -> bool:
     return True
 
 
-def cmdCreate(arguments: argparse.Namespace) -> int:
+def runCreate(arguments: argparse.Namespace) -> int:
     """Open a draft pull request for the current branch."""
     bodyPath = Path(arguments.bodyFile)
     if not bodyPath.is_file():
@@ -709,7 +713,7 @@ def cmdCreate(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdFind(arguments: argparse.Namespace) -> int:
+def runFind(arguments: argparse.Namespace) -> int:
     """Print the open pull request for a branch, if there is one.
 
     Three outcomes, and each one says which it is in what it prints: a number, the
@@ -745,7 +749,7 @@ def cmdFind(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdChecks(arguments: argparse.Namespace) -> int:
+def runChecks(arguments: argparse.Namespace) -> int:
     """Print every check on a pull request's head commit and whether all passed.
 
     Three outcomes, the contract `find` already carries: passed, not passed, and
@@ -772,7 +776,7 @@ def cmdChecks(arguments: argparse.Namespace) -> int:
         state = run["conclusion"] or run["status"]
         console.print(f"{mark} [bold]{escape(run['name'])}[/]  {escape(state)}")
 
-    if checksHavePassed(runs):
+    if confirmChecksPassed(runs):
         console.print(f"[green]{checksPassedMarker}[/] on {commit}")
         return 0
 
@@ -788,7 +792,7 @@ def cmdChecks(arguments: argparse.Namespace) -> int:
     return notFoundExitCode
 
 
-def cmdExportAsSource(arguments: argparse.Namespace) -> int:
+def runExportAsSource(arguments: argparse.Namespace) -> int:
     """Emit one field of a pull request verbatim, for a skill that will send it back.
 
     Separate from `find` because displaying and round-tripping are different actions
@@ -805,7 +809,7 @@ def cmdExportAsSource(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdComment(arguments: argparse.Namespace) -> int:
+def runComment(arguments: argparse.Namespace) -> int:
     """Add one comment to a pull request."""
     bodyPath = Path(arguments.bodyFile)
     if not bodyPath.is_file():
@@ -815,7 +819,7 @@ def cmdComment(arguments: argparse.Namespace) -> int:
     body = changes.text
     if arguments.dryRun:
         console.print(
-            f"[yellow]Dry run[/] comment on {pullRequestRef(arguments.number)}:"
+            f"[yellow]Dry run[/] comment on {formatPullRequestRef(arguments.number)}:"
         )
         console.print(body, markup=False, highlight=False)
         return 0
@@ -823,13 +827,14 @@ def cmdComment(arguments: argparse.Namespace) -> int:
     comment = ticket.postComment(token, arguments.number, body)
     ticket.reportUnwrapping(changes)
     console.print(
-        f"[green]Commented on[/] [bold cyan]{pullRequestRef(arguments.number)}[/] "
+        "[green]Commented on[/] "
+        f"[bold cyan]{formatPullRequestRef(arguments.number)}[/] "
         f"as comment [bold cyan]{comment['id']}[/]"
     )
     return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
 
 
-def cmdCommentList(arguments: argparse.Namespace) -> int:
+def runCommentList(arguments: argparse.Namespace) -> int:
     """Print every comment on a pull request, rendered, with each one's id.
 
     A command of its own here where `ticket.py` puts the same thing behind
@@ -843,7 +848,7 @@ def cmdCommentList(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdCommentExport(arguments: argparse.Namespace) -> int:
+def runCommentExport(arguments: argparse.Namespace) -> int:
     """Emit one comment's body verbatim, for a caller that will send it back."""
     ticket.printCommentAsRawString(
         ticket.readComment(ticket.resolveToken(), arguments.commentId)
@@ -851,7 +856,7 @@ def cmdCommentExport(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdCommentEdit(arguments: argparse.Namespace) -> int:
+def runCommentEdit(arguments: argparse.Namespace) -> int:
     """Replace one comment's body, keeping its id and its place in the thread.
 
     What a re-running review needs: replacing its own summary costs neither the
@@ -874,7 +879,7 @@ def cmdCommentEdit(arguments: argparse.Namespace) -> int:
     return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
 
 
-def cmdCommentDelete(arguments: argparse.Namespace) -> int:
+def runCommentDelete(arguments: argparse.Namespace) -> int:
     """Remove one comment, after printing what is about to be lost."""
     token = ticket.resolveToken()
     comment = ticket.readComment(token, arguments.commentId)
@@ -891,7 +896,7 @@ def cmdCommentDelete(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def cmdEdit(arguments: argparse.Namespace) -> int:
+def runEdit(arguments: argparse.Namespace) -> int:
     """Revise an open pull request's title or body.
 
     Exists because the body is a durable record rather than a first draft: a branch
@@ -947,20 +952,22 @@ def cmdEdit(arguments: argparse.Namespace) -> int:
         console.print(summary["url"])
         return errorExitCode
 
-    console.print(f"[green]Edited[/] [bold cyan]{pullRequestRef(summary['number'])}[/]")
+    console.print(
+        f"[green]Edited[/] [bold cyan]{formatPullRequestRef(summary['number'])}[/]"
+    )
     console.print("[dim]verified against the pull request[/]")
     console.print(summary["url"])
     return 0
 
 
-def cmdReady(arguments: argparse.Namespace) -> int:
+def runReady(arguments: argparse.Namespace) -> int:
     """Take a draft pull request out of draft."""
     token = ticket.resolveToken()
     summary = readPullRequest(token, arguments.number)
 
     if not summary["isDraft"]:
         console.print(
-            f"[yellow]{pullRequestRef(summary['number'])} is already out of "
+            f"[yellow]{formatPullRequestRef(summary['number'])} is already out of "
             "draft.[/]"
         )
         return 0
@@ -968,27 +975,27 @@ def cmdReady(arguments: argparse.Namespace) -> int:
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
         console.print(
-            f"would mark [bold cyan]{pullRequestRef(summary['number'])}[/] "
+            f"would mark [bold cyan]{formatPullRequestRef(summary['number'])}[/] "
             "ready for review"
         )
         return 0
 
     if not markReadyForReview(token, summary["nodeId"]):
         console.print(
-            f"[red]{pullRequestRef(summary['number'])} is still a draft after the "
-            "mutation reported success.[/]"
+            f"[red]{formatPullRequestRef(summary['number'])} is still a draft "
+            "after the mutation reported success.[/]"
         )
         return errorExitCode
 
     console.print(
         f"[green]Ready for review[/] "
-        f"[bold cyan]{pullRequestRef(summary['number'])}[/]"
+        f"[bold cyan]{formatPullRequestRef(summary['number'])}[/]"
     )
     console.print(summary["url"])
     return 0
 
 
-def cmdMerge(arguments: argparse.Namespace) -> int:
+def runMerge(arguments: argparse.Namespace) -> int:
     """Merge a pull request and delete its branch."""
     if arguments.method not in validMergeMethods:
         console.print(f"[red]Unknown merge method {arguments.method!r}.[/]")
@@ -1000,14 +1007,14 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
 
     if summary["isDraft"]:
         console.print(
-            f"[red]{pullRequestRef(summary['number'])} is still a draft.[/] "
+            f"[red]{formatPullRequestRef(summary['number'])} is still a draft.[/] "
             "Run /pr-review-code, which owns the promotion out of draft."
         )
         return errorExitCode
 
-    if not checksHavePassed(readCheckRuns(token, summary["headSha"])):
+    if not confirmChecksPassed(readCheckRuns(token, summary["headSha"])):
         console.print(
-            f"[red]CI has not passed on {pullRequestRef(summary['number'])}.[/] "
+            f"[red]CI has not passed on {formatPullRequestRef(summary['number'])}.[/] "
             f"Run `python3 scripts/pr.py checks {summary['number']}` for which."
         )
         return errorExitCode
@@ -1040,7 +1047,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         )
     except Exception as exc:
         console.print(
-            f"[red]The merge request for {pullRequestRef(summary['number'])} "
+            f"[red]The merge request for {formatPullRequestRef(summary['number'])} "
             "did not complete "
             "cleanly, and whether it landed is unknown.[/]"
         )
@@ -1053,7 +1060,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         return partialSuccessExitCode
 
     console.print(
-        f"[green]Merged[/] [bold cyan]{pullRequestRef(summary['number'])}[/] "
+        f"[green]Merged[/] [bold cyan]{formatPullRequestRef(summary['number'])}[/] "
         f"by [cyan]{arguments.method}[/] as [dim]{sha[:12]}[/]"
     )
 
@@ -1088,7 +1095,7 @@ def cmdMerge(arguments: argparse.Namespace) -> int:
         console.print(f"  [dim]{escape(str(exc))}[/]")
         console.print(
             f"[bold]Do not re-run merge[/], "
-            f"{pullRequestRef(summary['number'])} is already merged. "
+            f"{formatPullRequestRef(summary['number'])} is already merged. "
             f"Finish by hand:\n  git push origin --delete {summary['head']}"
         )
         return partialSuccessExitCode
@@ -1121,7 +1128,7 @@ def buildParser() -> argparse.ArgumentParser:
         help=f"target branch (default: {defaultBaseBranch})",
     )
     createParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    createParser.set_defaults(handler=cmdCreate)
+    createParser.set_defaults(handler=runCreate)
 
     findParser = subparsers.add_parser(
         "find", help="print the open pull request for a branch"
@@ -1140,14 +1147,14 @@ def buildParser() -> argparse.ArgumentParser:
         action="store_true",
         help="print just the number, for a skill that only needs to resolve it",
     )
-    findParser.set_defaults(handler=cmdFind)
+    findParser.set_defaults(handler=runFind)
 
     exportParser = subparsers.add_parser(
         "export-as-source",
         help="The SOURCE, byte for byte, nothing rendered: the form to edit and send "
         "back to `edit`. Contrast `find`, which renders.",
     )
-    exportParser.add_argument("number", type=pullRequestNumber)
+    exportParser.add_argument("number", type=parsePullRequestNumber)
     # Mutually exclusive and required, because these never compose: each is a whole
     # output, not a modifier on a shared one. Same shape as ticket.py's.
     fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
@@ -1157,36 +1164,36 @@ def buildParser() -> argparse.ArgumentParser:
     fieldGroup.add_argument(
         "--title", action="store_true", help="the title, with nothing added"
     )
-    exportParser.set_defaults(handler=cmdExportAsSource)
+    exportParser.set_defaults(handler=runExportAsSource)
 
     editParser = subparsers.add_parser(
         "edit", help="revise a pull request's title or body"
     )
-    editParser.add_argument("number", type=pullRequestNumber)
+    editParser.add_argument("number", type=parsePullRequestNumber)
     editParser.add_argument("--title", help="replacement title, verbatim")
     editParser.add_argument(
         "--body-file", dest="bodyFile", help="file holding the replacement body"
     )
     editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    editParser.set_defaults(handler=cmdEdit)
+    editParser.set_defaults(handler=runEdit)
 
     commentParser = subparsers.add_parser(
         "comment", help="add a comment to a pull request"
     )
-    commentParser.add_argument("number", type=pullRequestNumber)
+    commentParser.add_argument("number", type=parsePullRequestNumber)
     commentParser.add_argument(
         "--body-file", dest="bodyFile", required=True,
         help="drafted comment body, a file so lists and code fences survive",
     )
     commentParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentParser.set_defaults(handler=cmdComment)
+    commentParser.set_defaults(handler=runComment)
 
     commentListParser = subparsers.add_parser(
         "comment-list",
         help="RENDERED for reading: every comment on a pull request, with its id.",
     )
-    commentListParser.add_argument("number", type=pullRequestNumber)
-    commentListParser.set_defaults(handler=cmdCommentList)
+    commentListParser.add_argument("number", type=parsePullRequestNumber)
+    commentListParser.set_defaults(handler=runCommentList)
 
     commentExportParser = subparsers.add_parser(
         "comment-export",
@@ -1194,7 +1201,7 @@ def buildParser() -> argparse.ArgumentParser:
         "send back to `comment-edit`.",
     )
     commentExportParser.add_argument("commentId", type=int)
-    commentExportParser.set_defaults(handler=cmdCommentExport)
+    commentExportParser.set_defaults(handler=runCommentExport)
 
     commentEditParser = subparsers.add_parser(
         "comment-edit", help="replace a comment's body in place"
@@ -1204,28 +1211,28 @@ def buildParser() -> argparse.ArgumentParser:
         "--body-file", dest="bodyFile", required=True, help="revised comment body"
     )
     commentEditParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentEditParser.set_defaults(handler=cmdCommentEdit)
+    commentEditParser.set_defaults(handler=runCommentEdit)
 
     commentDeleteParser = subparsers.add_parser(
         "comment-delete", help="delete a comment (permanent, no GitHub undo)"
     )
     commentDeleteParser.add_argument("commentId", type=int)
     commentDeleteParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentDeleteParser.set_defaults(handler=cmdCommentDelete)
+    commentDeleteParser.set_defaults(handler=runCommentDelete)
 
     checksParser = subparsers.add_parser(
         "checks", help="report whether every check on a pull request has passed"
     )
-    checksParser.add_argument("number", type=pullRequestNumber)
-    checksParser.set_defaults(handler=cmdChecks)
+    checksParser.add_argument("number", type=parsePullRequestNumber)
+    checksParser.set_defaults(handler=runChecks)
 
     readyParser = subparsers.add_parser("ready", help="take a draft out of draft")
-    readyParser.add_argument("number", type=pullRequestNumber)
+    readyParser.add_argument("number", type=parsePullRequestNumber)
     readyParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    readyParser.set_defaults(handler=cmdReady)
+    readyParser.set_defaults(handler=runReady)
 
     mergeParser = subparsers.add_parser("merge", help="merge a pull request")
-    mergeParser.add_argument("number", type=pullRequestNumber)
+    mergeParser.add_argument("number", type=parsePullRequestNumber)
     mergeParser.add_argument(
         "--subject",
         required=True,
@@ -1244,7 +1251,7 @@ def buildParser() -> argparse.ArgumentParser:
         help="leave the source branch in place instead of deleting it",
     )
     mergeParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    mergeParser.set_defaults(handler=cmdMerge)
+    mergeParser.set_defaults(handler=runMerge)
 
     return parser
 

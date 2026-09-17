@@ -76,12 +76,13 @@ UPDATES
             a code fence replaces it with spaces and every blanked line would
             otherwise report as a finding. A LOCAL check with no upstream, so
             expect it to diverge.
-2026-08-27  Added consoleProse, a SECOND view of a Python file. pythonProse
-            blanks string literals wholesale, which is right for docstrings and
-            comments and hid a whole category of prose: console output is read
-            by a person and is subject to the same rules. Measured rather than
-            theorized, scripts/ticket.py carried thirty em dashes and the gate
-            saw eighteen, the other twelve being console strings.
+2026-08-27  Added extractConsoleProse, a SECOND view of a Python file.
+            extractPythonProse blanks string literals wholesale, which is right
+            for docstrings and comments and hid a whole category of prose:
+            console output is read by a person and is subject to the same
+            rules. Measured rather than theorized, scripts/ticket.py carried
+            thirty em dashes and the gate saw eighteen, the other twelve being
+            console strings.
 
             Only literals passed to a printing call are taken, because a path, a
             URL, an API field name and a regex are all string literals and none
@@ -308,12 +309,12 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def lineNo(text: str, index: int) -> int:
+def findLineNumber(text: str, index: int) -> int:
     """Return the one-based line number of a character offset."""
     return text.count("\n", 0, index) + 1
 
 
-def blank(match: re.Match) -> str:
+def blankSpan(match: re.Match) -> str:
     """Replace a span with spaces, preserving newlines so offsets hold."""
     return re.sub(r"[^\n]", " ", match.group(0))
 
@@ -324,7 +325,7 @@ def blank(match: re.Match) -> str:
 suppressRe = re.compile(r"standards-ok")
 
 
-def suppressedLines(text: str) -> set[int]:
+def findSuppressedLines(text: str) -> set[int]:
     """Line numbers carrying a standards-ok marker.
 
     Line-scoped rather than file-scoped on purpose. A file-level opt-out would
@@ -349,7 +350,7 @@ def isRuleDoc(path: Path, check: str) -> bool:
     return any(marker in normalized for marker in ruleDocPaths)
 
 
-def pythonProse(text: str) -> str:
+def extractPythonProse(text: str) -> str:
     """Everything except docstrings and comments blanked, newlines preserved.
 
     The writing rules cover Python docstrings and comments, because a developer
@@ -391,14 +392,14 @@ def pythonProse(text: str) -> str:
     # proto import. Those are samples, not sentences, exactly as a markdown fence
     # is, so they come out before any prose rule sees them.
     out = "".join(keep)
-    out = re.sub(r"`[^`\n]*`", blank, out)
-    return re.sub(r'"[^"\n]*"', blank, out)
+    out = re.sub(r"`[^`\n]*`", blankSpan, out)
+    return re.sub(r'"[^"\n]*"', blankSpan, out)
 
 
-def consoleProse(text: str) -> str:
+def extractConsoleProse(text: str) -> str:
     """String literals that reach a user, everything else blanked.
 
-    The SECOND view of a Python file. `pythonProse` blanks string literals
+    The SECOND view of a Python file. `extractPythonProse` blanks string literals
     wholesale, which is right for docstrings and comments but hides a whole
     category of prose: `console.print("Dry run - nothing was filed.")` is read
     by a person and is subject to the same rules as any other sentence.
@@ -447,8 +448,8 @@ def consoleProse(text: str) -> str:
 
     out = "".join(keep)
     # Rich markup tags are machine syntax, not words.
-    out = re.sub(r"\[/?[a-z][^\]]*\]", blank, out)
-    return re.sub(r"`[^`\n]*`", blank, out)
+    out = re.sub(r"\[/?[a-z][^\]]*\]", blankSpan, out)
+    return re.sub(r"`[^`\n]*`", blankSpan, out)
 
 
 def mergeViews(first: str, second: str) -> str:
@@ -456,16 +457,16 @@ def mergeViews(first: str, second: str) -> str:
     return "".join(a if a != " " else b for a, b in zip(first, second, strict=True))
 
 
-def markdownProse(text: str) -> str:
+def extractMarkdownProse(text: str) -> str:
     """Markdown with code fences and inline code blanked.
 
     A fence is a sample, not a sentence.  Blanking rather than removing keeps
     every reported line number true to the file on disk.
     """
-    out = re.sub(r"```.*?```", blank, text, flags=re.DOTALL)
-    out = re.sub(r"`[^`\n]*`", blank, out)
-    out = re.sub(r"\]\([^)]*\)", blank, out)
-    return re.sub(r"^\s{4,}\S[^\n]*$", blank, out, flags=re.MULTILINE)
+    out = re.sub(r"```.*?```", blankSpan, text, flags=re.DOTALL)
+    out = re.sub(r"`[^`\n]*`", blankSpan, out)
+    out = re.sub(r"\]\([^)]*\)", blankSpan, out)
+    return re.sub(r"^\s{4,}\S[^\n]*$", blankSpan, out, flags=re.MULTILINE)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -477,7 +478,7 @@ def checkContractions(path: Path, prose: str, findings: list) -> None:
     if isRuleDoc(path, "contractions"):
         return
     for match in contractionRe.finditer(prose):
-        findings.append(("FAIL", path, lineNo(prose, match.start()),
+        findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          f"contraction '{match.group(0)}'"))
 
 
@@ -489,7 +490,7 @@ def checkCoAuthored(path: Path, text: str, findings: list) -> None:
     # for, which would make the checker flag itself.
     token = "Co-Authored" "-By:"
     for match in re.finditer(re.escape(token), text):
-        findings.append(("FAIL", path, lineNo(text, match.start()),
+        findings.append(("FAIL", path, findLineNumber(text, match.start()),
                          f"{token} attribution"))
 
 
@@ -508,7 +509,7 @@ def checkBritish(path: Path, prose: str, findings: list) -> None:
             start = match.start()
             if start and prose[start - 1] in "/@.-_":
                 continue
-            findings.append(("FAIL", path, lineNo(prose, start),
+            findings.append(("FAIL", path, findLineNumber(prose, start),
                              f"British spelling '{match.group(0)}', use {hint}"))
 
 
@@ -527,7 +528,7 @@ def checkEmDash(path: Path, prose: str, findings: list) -> None:
     # transform can reach it.
     emDash = chr(0x2014)
     for match in re.finditer(emDash, prose):
-        findings.append(("FAIL", path, lineNo(prose, match.start()),
+        findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          "em dash, use a comma, parentheses, or a new sentence"))
 
 
@@ -537,10 +538,10 @@ def checkBannedPhrases(path: Path, prose: str, findings: list) -> None:
         return
     for pattern, hint in bannedPhrases:
         for match in pattern.finditer(prose):
-            findings.append(("FAIL", path, lineNo(prose, match.start()),
+            findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                              f"'{match.group(0)}', {hint}"))
     for match in notJustRe.finditer(prose):
-        findings.append(("FAIL", path, lineNo(prose, match.start()),
+        findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          f"'{match.group(0)}', state the claim directly"))
 
 
@@ -551,7 +552,7 @@ def checkWeakLet(path: Path, prose: str, findings: list) -> None:
     for match in weakLetRe.finditer(prose):
         if letCarveOut.match(prose, match.start()):
             continue
-        findings.append(("WARN", path, lineNo(prose, match.start()),
+        findings.append(("WARN", path, findLineNumber(prose, match.start()),
                          f"weak '{match.group(0)}', prefer enables / gives the "
                          "ability"))
 
@@ -561,7 +562,7 @@ def checkSplitVerb(path: Path, prose: str, findings: list) -> None:
     if isRuleDoc(path, "splitVerb"):
         return
     for match in splitVerbRe.finditer(prose):
-        findings.append(("WARN", path, lineNo(prose, match.start()),
+        findings.append(("WARN", path, findLineNumber(prose, match.start()),
                          f"split verb '{match.group(0).strip()}'"))
 
 
@@ -570,21 +571,21 @@ def checkStrandedPreposition(path: Path, prose: str, findings: list) -> None:
     if isRuleDoc(path, "strandedPrep"):
         return
     for match in strandedPrepRe.finditer(prose):
-        findings.append(("WARN", path, lineNo(prose, match.start()),
+        findings.append(("WARN", path, findLineNumber(prose, match.start()),
                          f"stranded preposition '{match.group(0).strip()}'"))
 
 
 def checkYearHyphen(path: Path, prose: str, findings: list) -> None:
     """A year range takes an en dash."""
     for match in re.finditer(r"\b\d{4}-\d{4}\b", prose):
-        findings.append(("FAIL", path, lineNo(prose, match.start()),
+        findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          f"year range '{match.group(0)}' must use an en dash"))
 
 
 def checkEllipsis(path: Path, prose: str, findings: list) -> None:
     """Three periods are not an ellipsis."""
     for match in re.finditer(r"(?<![.\w])\.\.\.(?!\w)", prose):
-        findings.append(("FAIL", path, lineNo(prose, match.start()),
+        findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          "'...' must be a real ellipsis (…)"))
 
 
@@ -659,13 +660,13 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
         # regions blanked, so they are the same length and merge character by
         # character. Concatenating doubles the file and every line number
         # reported from the second view is wrong by the length of the first.
-        prose = mergeViews(pythonProse(body), consoleProse(body))
+        prose = mergeViews(extractPythonProse(body), extractConsoleProse(body))
         # A file that does not parse still has comments worth checking, and
         # reporting the syntax error is ruff's job rather than this gate's.
         with contextlib.suppress(SyntaxError):
             checkDocstringShape(path, ast.parse(body), findings)
     else:
-        prose = markdownProse(body)
+        prose = extractMarkdownProse(body)
 
     local: list = []
     # Both of these take the RAW body rather than the prose view.
@@ -678,7 +679,7 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
 
     # A file-level finding reports line 0 and cannot be suppressed this way, by
     # design: there is no line to carry the marker or the reason.
-    skip = suppressedLines(body)
+    skip = findSuppressedLines(body)
     findings.extend(f for f in local if not (f[2] and f[2] in skip))
 
 

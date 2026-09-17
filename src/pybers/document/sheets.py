@@ -83,14 +83,14 @@ class Named(Protocol):
     name: str
 
 
-def namesListed(items: Sequence[Named]) -> str:
+def listNames(items: Sequence[Named]) -> str:
     """Return the names present, for an error message that says what to ask for."""
     if not items:
         return "nothing"
     return ", ".join(repr(item.name) for item in items)
 
 
-def selectedByName[NamedT: Named](
+def selectByName[NamedT: Named](
     items: Sequence[NamedT], name: str, kind: str, within: str, foldCase: bool
 ) -> NamedT:
     """Return the one item carrying a name, raising when none or several do.
@@ -110,7 +110,7 @@ def selectedByName[NamedT: Named](
     if not matched:
         raise SelectionError(
             f"No {kind} in {within} is named {name!r}. "
-            f"Present: {namesListed(items)}."
+            f"Present: {listNames(items)}."
         )
     if len(matched) > 1:
         positions = ", ".join(str(position) for position, _ in matched)
@@ -122,7 +122,7 @@ def selectedByName[NamedT: Named](
     return matched[0][1]
 
 
-def selectedByPosition[NamedT: Named](
+def selectByPosition[NamedT: Named](
     items: Sequence[NamedT], position: int, kind: str, within: str
 ) -> NamedT:
     """Return the item at a one-based position in the file's own order."""
@@ -134,7 +134,7 @@ def selectedByPosition[NamedT: Named](
     return items[position - firstPosition]
 
 
-def selected[NamedT: Named](
+def selectItem[NamedT: Named](
     items: Sequence[NamedT],
     nameOrPosition: str | int,
     kind: str,
@@ -147,9 +147,9 @@ def selected[NamedT: Named](
     what a position counts from or about what a repeated name does.
     """
     if isinstance(nameOrPosition, str):
-        return selectedByName(items, nameOrPosition, kind, within, foldCase)
+        return selectByName(items, nameOrPosition, kind, within, foldCase)
     if isinstance(nameOrPosition, int) and not isinstance(nameOrPosition, bool):
-        return selectedByPosition(items, nameOrPosition, kind, within)
+        return selectByPosition(items, nameOrPosition, kind, within)
     # `True` reaching this as position 1 is the reason bool is excluded above: it is
     # an int in Python and it is never a position anyone meant to write.
     raise SelectionError(
@@ -180,7 +180,7 @@ class Sheet:
         it. Position is the table's place in the sheet's drawable list, which says
         nothing about where the table sits on the page.
         """
-        return selected(
+        return selectItem(
             self.tables, nameOrPosition, "table", repr(self.name), foldCase=True
         )
 
@@ -248,7 +248,7 @@ class Document:
         `sheets` remains, so an ordinary loop still works. Position is the sheet's
         place in the document's own list, which is the tab order a person sees.
         """
-        return selected(
+        return selectItem(
             self.sheets, nameOrPosition, "sheet", "this document", foldCase=False
         )
 
@@ -310,9 +310,9 @@ class Document:
         """
         # Imported inside for the reason `save` is: `references` builds on this
         # module, so reaching it from here at module scope would close a cycle.
-        from pybers.document.references import tablesByIdentity
+        from pybers.document.references import indexTablesByIdentity
 
-        table = tablesByIdentity(self).get(identity)
+        table = indexTablesByIdentity(self).get(identity)
         if table is None:
             raise SelectionError(
                 f"No table in this document carries the identity {identity!r}."

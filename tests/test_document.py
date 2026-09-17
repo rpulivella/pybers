@@ -36,8 +36,8 @@ from conftest import allDocuments, findDocumentPath
 from pybers.addressing import (
     CellReference,
     ReferenceError,
-    columnLetter,
-    columnNumber,
+    toColumnLetter,
+    toColumnNumber,
 )
 
 
@@ -146,12 +146,12 @@ def test_rowsAndColumnsCountFromOne() -> None:
 
 
 def test_columnLabelsAndNumbersAgreeAcrossTheBase26Boundary() -> None:
-    assert columnLetter(1) == "A"
-    assert columnLetter(26) == "Z"
-    assert columnLetter(27) == "AA"
-    assert columnNumber("AA") == 27
+    assert toColumnLetter(1) == "A"
+    assert toColumnLetter(26) == "Z"
+    assert toColumnLetter(27) == "AA"
+    assert toColumnNumber("AA") == 27
     for col in (1, 26, 27, 52, 53, 702, 703):
-        assert columnNumber(columnLetter(col)) == col
+        assert toColumnNumber(toColumnLetter(col)) == col
 
 
 def test_aLockedReferenceAddressesTheSameCellAndIsNotTheSameReference() -> None:

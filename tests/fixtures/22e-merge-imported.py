@@ -100,28 +100,28 @@ styles: str = f"""<?xml version="1.0" encoding="UTF-8"?>
 </styleSheet>"""
 
 
-def text(reference: str, style: int, value: str) -> str:
+def buildTextCell(reference: str, style: int, value: str) -> str:
     """Return one inline-string cell."""
     return f'<c r="{reference}" s="{style}" t="inlineStr"><is><t>{value}</t></is></c>'
 
 
-def shell(reference: str, style: int) -> str:
+def buildShellCell(reference: str, style: int) -> str:
     """Return one covered cell: a style and no value, as Excel writes it."""
     return f'<c r="{reference}" s="{style}"/>'
 
 
 rowOne: str = (
-    text("A1", 1, "two wide, anchor")
-    + shell("B1", 1)
-    + text("C1", 2, "three wide, anchor")
-    + shell("D1", 2)
-    + shell("E1", 2)
-    + text("F1", 1, "covered holds a value, anchor")
-    + text("G1", 1, "covered value that Numbers never shows")
+    buildTextCell("A1", 1, "two wide, anchor")
+    + buildShellCell("B1", 1)
+    + buildTextCell("C1", 2, "three wide, anchor")
+    + buildShellCell("D1", 2)
+    + buildShellCell("E1", 2)
+    + buildTextCell("F1", 1, "covered holds a value, anchor")
+    + buildTextCell("G1", 1, "covered value that Numbers never shows")
 )
 
 rowTwo: str = "".join(
-    text(reference, 0, label)
+    buildTextCell(reference, 0, label)
     for reference, label in (
         ("A2", "A1:B1 merged in Excel, B1 carries a style and no value"),
         ("C2", "C1:E1 merged in Excel, D1 and E1 carry a style and no value"),

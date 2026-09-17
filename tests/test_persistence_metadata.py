@@ -32,7 +32,7 @@ from pybers._persistence.iwa import IWAError, createArchive
 from pybers._persistence.metadata import (
     MetadataError,
     PackageRegistry,
-    memberNameFor,
+    findMemberName,
 )
 
 tileTypeId: int = 6002
@@ -202,7 +202,7 @@ def testAMemberNameAlreadyTakenIsRefused() -> None:
     package = readPackage(findDocumentPath("00-baseline"))
 
     with pytest.raises(ContainerError, match="already holds"):
-        package.iwaFileAdd(memberNameFor("Document"))
+        package.iwaFileAdd(findMemberName("Document"))
 
 
 def testAnArchiveGivenTheWrongNumberOfBodiesIsRefused() -> None:

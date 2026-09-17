@@ -188,7 +188,7 @@ def emitCopy(out: bytearray, offset: int, length: int) -> None:
     out += offset.to_bytes(2, "little")
 
 
-def matchLength(data: bytes, candidate: int, current: int, limit: int) -> int:
+def measureMatchLength(data: bytes, candidate: int, current: int, limit: int) -> int:
     """Return how many bytes agree from `candidate` and `current` up to `limit`.
 
     Both positions are known to share their first four bytes, so the walk starts
@@ -240,7 +240,7 @@ def compressRaw(data: bytes) -> bytes:
         if candidate < 0 or data[candidate:candidate + minimumMatchLength] != key:
             position += 1
             continue
-        length = matchLength(data, candidate, position, limit)
+        length = measureMatchLength(data, candidate, position, limit)
         emitLiteral(out, data, literalStart, position)
         emitCopy(out, position - candidate, length)
         position += length

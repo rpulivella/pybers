@@ -38,7 +38,7 @@ from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import carriesFormula
-from .._persistence.cells import CellRecord, formulaKeySlot
+from .._persistence.cells import CellRecord, findFormulaKeySlot
 from .._persistence.decimal128 import Decimal128
 from .._persistence.index import (
     ArchiveIndex,
@@ -305,7 +305,7 @@ def resolveFormula(
     """
     if not carriesFormula(record):
         return None
-    slot = formulaKeySlot(record)
+    slot = findFormulaKeySlot(record)
     if len(record.references) <= slot:
         raise ReadError(
             f"The cell record at column {record.column} names a formula at "

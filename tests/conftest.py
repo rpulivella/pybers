@@ -28,9 +28,9 @@ from pathlib import Path
 
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import NumbersPackage, readPackage
-from pybers._persistence.cells import decodeRow, offsetUnitFor
+from pybers._persistence.cells import chooseOffsetUnit, decodeRow
 from pybers._persistence.index import ArchiveIndex
-from pybers._persistence.types import archiveTypeId, archiveTypes
+from pybers._persistence.types import archiveTypes, readArchiveTypeId
 
 testsDirectory: Path = Path(__file__).resolve().parent
 
@@ -73,7 +73,7 @@ def readDataListBytes(path: Path) -> dict[int, bytes]:
         archive.identifier: b"".join(message.data for message in archive.messages)
         for iwaFile in package.iwaFiles
         for archive in iwaFile.archives
-        if archiveTypeId(archive) == dataListTypeId
+        if readArchiveTypeId(archive) == dataListTypeId
     }
 
 
@@ -91,7 +91,7 @@ def readRecordedRows(path: Path) -> dict[int, set[int]]:
     index = ArchiveIndex(readPackage(path))
     for identifier in index.byIdentifier:
         archive = index.archive(identifier)
-        if archiveTypeId(archive) != tableModelType:
+        if readArchiveTypeId(archive) != tableModelType:
             continue
         model = tst.TableModelArchive()
         model.ParseFromString(archive.messages[0].data)
@@ -101,7 +101,9 @@ def readRecordedRows(path: Path) -> dict[int, set[int]]:
             tile = index.resolve(entry.tile, tst.Tile)
             for info in tile.rowInfos:
                 row = entry.tileid * store.tiles.tile_size + info.tile_row_index
-                unit = offsetUnitFor(info.has_wide_offsets, tile.should_use_wide_rows)
+                unit = chooseOffsetUnit(
+                    info.has_wide_offsets, tile.should_use_wide_rows
+                )
                 recorded[row] = {
                     record.column
                     for record in decodeRow(

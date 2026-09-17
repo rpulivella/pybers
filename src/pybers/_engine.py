@@ -60,11 +60,11 @@ from ._persistence.index import (
     wordBits,
     wordMask,
 )
-from ._persistence.types import archiveTypeId, parseArchive
+from ._persistence.types import parseArchive, readArchiveTypeId
 from .errors import ReadError, WriteError
 
 
-def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
+def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
     """Return the document's one calculation engine, or refuse and say why.
 
     Exactly one archive in a document carries this type, the same way exactly one
@@ -73,7 +73,7 @@ def calculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
     """
     found = [
         archive for archive in index.byIdentifier.values()
-        if archiveTypeId(archive) == calculationEngineTypeId
+        if readArchiveTypeId(archive) == calculationEngineTypeId
     ]
     if len(found) != 1:
         raise ReadError(
@@ -104,7 +104,7 @@ class TableOwner:
     dependencies: tsce.FormulaOwnerDependenciesArchive
 
 
-def tableOwnerEntries(
+def readTableOwnerEntries(
     index: ArchiveIndex, engine: tsce.CalculationEngineArchive
 ) -> dict[int, TableOwner]:
     """Return each table's dependency entry, keyed by its `TST.TableInfoArchive`.
@@ -144,21 +144,21 @@ def readOwnerUuid(uid: tsp.UUID) -> str:
     return "".join(f"{word:08x}" for word in words)
 
 
-def tableIdentities(index: ArchiveIndex) -> dict[int, str]:
+def readTableIdentities(index: ArchiveIndex) -> dict[int, str]:
     """Return each table's formula identity, keyed by its `TST.TableInfoArchive`."""
     return {
         identifier: readOwnerUuid(owner.dependencies.formula_owner_uid)
-        for identifier, owner in tableOwnerEntries(
-            index, calculationEngine(index)
+        for identifier, owner in readTableOwnerEntries(
+            index, findCalculationEngine(index)
         ).items()
     }
 
 
 __all__ = [
     "TableOwner",
-    "calculationEngine",
-    "tableIdentities",
-    "tableOwnerEntries",
+    "findCalculationEngine",
+    "readTableIdentities",
+    "readTableOwnerEntries",
 ]
 
 
@@ -535,7 +535,7 @@ def buildDirtySet(
     return dirty
 
 
-def ownerEntryFor(
+def findOwnerEntry(
     entries: dict[int, TableOwner],
     identifier: int,
     name: str,
@@ -551,13 +551,13 @@ def ownerEntryFor(
     return entry
 
 
-def tableOwnerIds(
+def readTableOwnerIds(
     index: ArchiveIndex, engine: tsce.CalculationEngineArchive
 ) -> dict[int, int]:
     """Return each table's internal owner id, keyed by its own archive."""
     return {
         identifier: owner.dependencies.internal_formula_owner_id
-        for identifier, owner in tableOwnerEntries(index, engine).items()
+        for identifier, owner in readTableOwnerEntries(index, engine).items()
     }
 
 
@@ -579,7 +579,7 @@ def requestRecalculation(
     engineArchive = next(
         (
             archive for archive in index.byIdentifier.values()
-            if archiveTypeId(archive) == calculationEngineTypeId
+            if readArchiveTypeId(archive) == calculationEngineTypeId
         ),
         None,
     )
@@ -602,7 +602,7 @@ def requestRecalculation(
             "formula results."
         )
 
-    ownerIds = tableOwnerIds(index, engine)
+    ownerIds = readTableOwnerIds(index, engine)
     edits: dict[int, list[tuple[int, int]]] = {}
     for tableIdentifier, cells in written.items():
         ownerId = ownerIds.get(tableIdentifier)
@@ -621,8 +621,8 @@ def requestRecalculation(
 
 __all__ = [
     "buildDirtySet",
-    "ownerEntryFor",
+    "findOwnerEntry",
     "registerFormulaCells",
     "requestRecalculation",
-    "tableOwnerIds",
+    "readTableOwnerIds",
 ]

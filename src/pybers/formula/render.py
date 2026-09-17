@@ -23,7 +23,7 @@ the thunk brackets are structure the parser puts back from the function.
 UPDATES
 2026-09-11  A bracket the author typed is written back, for #67. The claim that
             the file records no parentheses was false; node type 25 is one.
-2026-09-08  `addressText` and `shortestNames` exported for #13, so that one
+2026-09-08  `renderAddress` and `findShortestNames` exported for #13, so that one
             reference can be shown without rendering the formula around it.
 2026-09-08  Written for #45.
 """
@@ -41,7 +41,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from pybers.addressing.ranges import RangeEndpoint, endpointText
+from pybers.addressing.ranges import RangeEndpoint, renderEndpoint
 from pybers.addressing.reference import (
     CellAddress,
     CellReference,
@@ -86,7 +86,7 @@ from pybers.formula.syntax import (
     operatorPrecedence,
     operatorSymbols,
     percentSymbol,
-    quoted,
+    quoteString,
     thunkNodeTypes,
 )
 
@@ -107,7 +107,7 @@ class Rendered:
         return f"({self.text})" if self.precedence < within else self.text
 
 
-def boundNames(formula: Formula) -> dict[int, str]:
+def collectBoundNames(formula: Formula) -> dict[int, str]:
     """Return the name every symbol in a formula carries, from its own bindings.
 
     Read in one pass up front because a use comes before its `LAMBDA` in stored
@@ -125,7 +125,7 @@ def boundNames(formula: Formula) -> dict[int, str]:
     return names
 
 
-def addressText(
+def renderAddress(
     node: FormulaNode, host: CellReference, names: Mapping[str, str]
 ) -> str:
     """Return the text of one reference or range node, from the cell holding it."""
@@ -135,7 +135,7 @@ def addressText(
     if isinstance(content, FormulaReference):
         column = content.column
         row = content.row
-        body = endpointText(
+        body = renderEndpoint(
             RangeEndpoint(
                 None if row is None else row.resolve(host.row),
                 None if column is None else column.resolve(host.col),
@@ -143,17 +143,17 @@ def addressText(
                 column.absolute if column is not None else False,
             )
         )
-        return qualifiedText(body, content.tableId, names)
+        return qualifyAddress(body, content.tableId, names)
     if not isinstance(content, FormulaRange):
         raise FormulaError(f"Node type {node.nodeType} names no address.")
     extent = content.resolve(host)
-    first = endpointText(
+    first = renderEndpoint(
         RangeEndpoint(
             extent.startRow, extent.startCol,
             extent.startRowAbsolute, extent.startColAbsolute,
         )
     )
-    last = endpointText(
+    last = renderEndpoint(
         RangeEndpoint(
             extent.endRow, extent.endCol,
             extent.endRowAbsolute, extent.endColAbsolute,
@@ -161,10 +161,10 @@ def addressText(
     )
     # Written out even when both ends coincide, because a tract covering one cell
     # is a range in the file and reading `A1` back would make it a coordinate.
-    return qualifiedText(f"{first}:{last}", content.tableId, names)
+    return qualifyAddress(f"{first}:{last}", content.tableId, names)
 
 
-def qualifiedText(
+def qualifyAddress(
     body: str, tableId: str | None, names: Mapping[str, str]
 ) -> str:
     """Return an address with the name of the table it reaches into, when it does."""
@@ -179,12 +179,12 @@ def qualifiedText(
     return f"{name}{tableNameSeparator}{body}"
 
 
-def numberText(value: Decimal) -> str:
+def renderNumber(value: Decimal) -> str:
     """Return a literal as it was written, without normalizing what it says."""
     return str(value)
 
 
-def callText(name: str, arguments: list[Rendered]) -> Rendered:
+def renderCall(name: str, arguments: list[Rendered]) -> Rendered:
     """Return one call written out, its arguments in the order they were stored."""
     body = argumentSeparator.join(item.text for item in arguments)
     return Rendered(f"{name}({body})")
@@ -218,7 +218,7 @@ class Renderer:
 
     def render(self) -> str:
         """Walk every node, and return the one piece a whole formula leaves behind."""
-        self.symbols = dict(boundNames(self.formula))
+        self.symbols = dict(collectBoundNames(self.formula))
         for node in self.formula:
             self.step(node)
         if len(self.stack) != 1:
@@ -235,10 +235,10 @@ class Renderer:
         if kind in cosmeticNodeTypes or kind in thunkNodeTypes:
             return
         if kind == numberNodeType and isinstance(content, Decimal):
-            self.stack.append(Rendered(numberText(content)))
+            self.stack.append(Rendered(renderNumber(content)))
             return
         if kind == stringNodeType and isinstance(content, str):
-            self.stack.append(Rendered(quoted(content)))
+            self.stack.append(Rendered(quoteString(content)))
             return
         # Type 23 is the second spelling of an argument that is not there, and it
         # writes the same nothing. Reading it back gives type 22, the only one of
@@ -249,7 +249,7 @@ class Renderer:
             return
         if kind in (referenceNodeType, brokenReferenceNodeType, rangeNodeType):
             self.stack.append(
-                Rendered(addressText(node, self.host, self.names))
+                Rendered(renderAddress(node, self.host, self.names))
             )
             return
         if isinstance(content, FormulaGroup):
@@ -260,7 +260,7 @@ class Renderer:
             return
         if isinstance(content, FormulaUnknownCall):
             self.stack.append(
-                callText(content.name, self.pop(content.argumentCount))
+                renderCall(content.name, self.pop(content.argumentCount))
             )
             return
         if isinstance(content, FormulaVariable):
@@ -308,7 +308,7 @@ class Renderer:
                 "there is no name to write. Regenerate it with "
                 "tools/functions-extract.py."
             )
-        self.stack.append(callText(call.name, self.pop(call.argumentCount)))
+        self.stack.append(renderCall(call.name, self.pop(call.argumentCount)))
 
     def stepVariable(self, variable: FormulaVariable) -> None:
         """Write one use of a bound name, refusing a number nothing bound."""
@@ -390,11 +390,11 @@ def renderFormula(
     `tables` names the tables a formula reaches into, from `Document.tableIdentities`.
     """
     return Renderer(
-        formula=formula, host=toCellReference(host), names=shortestNames(tables)
+        formula=formula, host=toCellReference(host), names=findShortestNames(tables)
     ).render()
 
 
-def shortestNames(tables: Mapping[str, str] | None) -> dict[str, str]:
+def findShortestNames(tables: Mapping[str, str] | None) -> dict[str, str]:
     """Return the shortest name each table identity answers to, keyed by identity.
 
     The inverse of `Document.tableIdentities`, which carries both `Table 2` and
@@ -409,4 +409,4 @@ def shortestNames(tables: Mapping[str, str] | None) -> dict[str, str]:
     return names
 
 
-__all__ = ["addressText", "renderFormula", "shortestNames"]
+__all__ = ["renderAddress", "renderFormula", "findShortestNames"]

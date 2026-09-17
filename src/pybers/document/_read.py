@@ -49,7 +49,7 @@ __date__ = "2026/08/31"
 
 from pathlib import Path
 
-from .._engine import tableIdentities
+from .._engine import readTableIdentities
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
@@ -108,7 +108,7 @@ def open(path: Path | str) -> Document:  # noqa: A001
 
     # The package travels with the document because `Document.save` writes it back.
     document = Document(_package=package, _sourcePath=source)
-    identities = tableIdentities(index)
+    identities = readTableIdentities(index)
     for reference in root.sheets:
         document.sheets.append(
             readSheet(index, reference.identifier, source, identities)

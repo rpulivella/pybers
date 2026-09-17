@@ -41,7 +41,7 @@ from conftest import (
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.index import ArchiveIndex
-from pybers._persistence.types import archiveTypeId
+from pybers._persistence.types import readArchiveTypeId
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.table import MergeRange, Table
 
@@ -127,20 +127,20 @@ def testAMergePybersMakesStillClearsItsCoveredPositions(tmp_path: Path) -> None:
 
 def testAMergeAlreadyInTheFileIsNotTreatedAsAdded() -> None:
     """The distinction the writer turns on, checked without writing anything."""
-    from pybers.document._write import mergesAdded
+    from pybers.document._write import findAddedMerges
 
     index = ArchiveIndex(readPackage(importedFixture))
     document = pybers.open(importedFixture)
     table = findFirstTable(document)
     for identifier in index.byIdentifier:
         archive = index.archive(identifier)
-        if archiveTypeId(archive) != tableModelType:
+        if readArchiveTypeId(archive) != tableModelType:
             continue
         model = tst.TableModelArchive()
         model.ParseFromString(archive.messages[0].data)
-        assert mergesAdded(table, model) == []
+        assert findAddedMerges(table, model) == []
         table.mergeRanges.append(MergeRange(table.rangeSingle("A4:B4", "merge")))
-        assert len(mergesAdded(table, model)) == 1
+        assert len(findAddedMerges(table, model)) == 1
         return
     raise AssertionError("No table model in the imported fixture.")
 

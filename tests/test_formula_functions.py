@@ -34,10 +34,10 @@ from pybers import Formula, FormulaFunctionCall, FormulaNode
 from pybers.formula.functions import (
     ArgumentCountError,
     UnknownFunctionError,
-    functionFor,
-    functionIndexFor,
-    functionNamed,
-    functionNameFor,
+    findFunction,
+    findFunctionIndex,
+    findFunctionName,
+    findFunctionNamed,
     functionsByIndex,
     functionsByName,
 )
@@ -86,10 +86,10 @@ def loadExtractor() -> ModuleType:
 
 def testEveryKnownPairMatchesTheMeasurementThatEstablishedIt() -> None:
     """The four indices measured from real documents name the right functions."""
-    assert functionNameFor(168) == "SUM"
-    assert functionNameFor(62) == "IF"
-    assert functionNameFor(231) == "SUMIFS"
-    assert functionNameFor(126) == "ROUND"
+    assert findFunctionName(168) == "SUM"
+    assert findFunctionName(62) == "IF"
+    assert findFunctionName(231) == "SUMIFS"
+    assert findFunctionName(126) == "ROUND"
 
 
 def testFormulaLiteralsMeasurementNamesItsCalls() -> None:
@@ -110,14 +110,14 @@ def testFormulaShapesMeasurementNamesItsCalls() -> None:
 
 def testNameLookupIsCaseInsensitiveAndTrimmed() -> None:
     """A caller typing a function the way Numbers accepts it gets the same index."""
-    assert functionIndexFor("sum") == 168
-    assert functionIndexFor("  Sum  ") == 168
-    assert functionIndexFor("SUM") == 168
+    assert findFunctionIndex("sum") == 168
+    assert findFunctionIndex("  Sum  ") == 168
+    assert findFunctionIndex("SUM") == 168
 
 
 def testDottedFunctionNamesKeepTheirDot() -> None:
     """`REFERENCE.NAME` is one function whose name contains a dot, not two names."""
-    assert functionNameFor(functionIndexFor("REFERENCE.NAME")) == "REFERENCE.NAME"
+    assert findFunctionName(findFunctionIndex("REFERENCE.NAME")) == "REFERENCE.NAME"
 
 
 def testTheOriginalIndicesAreInAlphabeticalOrder() -> None:
@@ -150,14 +150,14 @@ def testUnknownIndexReportsNoNameRatherThanRaising() -> None:
     call = FormulaFunctionCall(index=64000, argumentCount=2)
     assert call.name is None
     assert call.index == 64000
-    assert functionNameFor(64000) is None
+    assert findFunctionName(64000) is None
 
 
 def testUnknownNameRefusesRatherThanInventingAnIndex() -> None:
     """Authoring by a name the map lacks raises, since a guess would call
     something else."""
     with pytest.raises(UnknownFunctionError):
-        functionIndexFor("NOTAFUNCTION")
+        findFunctionIndex("NOTAFUNCTION")
 
 
 def testUnknownIndexRoundTripsThroughTheFileUnchanged(tmp_path: Path) -> None:
@@ -241,7 +241,7 @@ def testTheTableIsPopulatedAndReadOnly() -> None:
 
 def testACallReportsTheArgumentCountsItsFunctionAccepts() -> None:
     """`HYPERLINK` takes one or two, which a caller learns before writing either."""
-    hyperlink = functionNamed("HYPERLINK")
+    hyperlink = findFunctionNamed("HYPERLINK")
     assert (hyperlink.minimumArguments, hyperlink.maximumArguments) == (1, 2)
     assert hyperlink.accepts(1) and hyperlink.accepts(2)
     assert not hyperlink.accepts(0) and not hyperlink.accepts(3)
@@ -250,14 +250,14 @@ def testACallReportsTheArgumentCountsItsFunctionAccepts() -> None:
 def testAFunctionTakingNoArgumentsSaysSo() -> None:
     """`PI` accepts nothing, which a maximum read as a count of declared
     arguments would have reported as two."""
-    pi = functionNamed("PI")
+    pi = findFunctionNamed("PI")
     assert (pi.minimumArguments, pi.maximumArguments) == (0, 0)
     assert pi.accepts(0) and not pi.accepts(1)
 
 
 def testARepeatingGroupMakesTheMaximumAFloor() -> None:
     """`SUM` declares a maximum of two and accepts eight, because it repeats."""
-    total = functionNamed("SUM")
+    total = findFunctionNamed("SUM")
     assert total.maximumArguments == 2
     assert total.unbounded
     assert total.accepts(8) and total.accepts(3)
@@ -267,7 +267,7 @@ def testARepeatingGroupMakesTheMaximumAFloor() -> None:
 def testAPairedRepeatingGroupIsStillUnbounded() -> None:
     """`SUMIFS` takes three and then criteria pairs, which is why it has a
     group of two rather than a limit."""
-    sumifs = functionNamed("SUMIFS")
+    sumifs = findFunctionNamed("SUMIFS")
     assert sumifs.repeatingGroupSize == 2
     assert sumifs.accepts(3) and sumifs.accepts(101)
     assert not sumifs.accepts(2)
@@ -347,9 +347,9 @@ def testTheTableAgreesWithNumbersAboutAnErroredCall() -> None:
 def testFunctionsTheAuthoringMethodsNeverReachedAreNamed() -> None:
     """These 22 came from the class metadata, which the first reading never saw."""
     for name in ("TRUE", "FALSE", "HYPERLINK", "CURRENCY", "BITLSHIFT", "ISOWEEKNUM"):
-        function = functionNamed(name)
+        function = findFunctionNamed(name)
         assert function.index is not None
-        assert functionFor(function.index) == function
+        assert findFunction(function.index) == function
 
 
 # ── AC 11: a name Numbers declares but refuses ───────────────────────────────
@@ -364,15 +364,15 @@ def testAReservedFunctionIsNamedRatherThanDropped() -> None:
     """
     for name, index in (("LATITUDE", 281), ("LONGITUDE", 282),
                         ("BEARING", 283), ("ALTITUDE", 284)):
-        function = functionNamed(name)
+        function = findFunctionNamed(name)
         assert function.index == index
         assert function.reserved
-        assert functionNameFor(index) == name
+        assert findFunctionName(index) == name
 
 
 def testAReservedFunctionAcceptsNoArgumentCountAtAll() -> None:
     """Reading one names it; authoring one is refused whatever is passed."""
-    altitude = functionNamed("ALTITUDE")
+    altitude = findFunctionNamed("ALTITUDE")
     assert not any(altitude.accepts(count) for count in range(0, 6))
     with pytest.raises(ArgumentCountError):
         FormulaFunctionCall.named("ALTITUDE", 1)
@@ -385,12 +385,12 @@ def testAnInternalFunctionIsNamedSoASpilledDocumentIsLegible() -> None:
     leaves `SPILL($C$15)` in the three cells it covers. Dropping the internal
     functions would read every one of those as a bare number.
     """
-    spill = functionNamed("SPILL")
+    spill = findFunctionNamed("SPILL")
     assert spill.index == 337
     assert str(spill.availability) == "internal"
     assert not spill.offered
     assert spill.accepts(1) and not spill.accepts(2)
-    assert functionNameFor(337) == "SPILL"
+    assert findFunctionName(337) == "SPILL"
 
 
 def testAnInternalFunctionIsRefusedByNameAndAllowedByIndex() -> None:
@@ -403,7 +403,7 @@ def testAnInternalFunctionIsRefusedByNameAndAllowedByIndex() -> None:
 def testAnOperatorCarriesAFunctionIndexAsWellAsANodeType() -> None:
     """Operators are node types in every formula the documents hold, and Numbers
     also declares an indexed form for each."""
-    multiply = functionNamed("op.Multiply")
+    multiply = findFunctionNamed("op.Multiply")
     assert multiply.index == 169
     assert not multiply.offered
     assert multiply.minimumArguments == 2
@@ -419,11 +419,11 @@ def testLetAndLambdaCarryArgumentCountsAndNoIndex() -> None:
     browser: LET takes up to 126 name and value pairs plus a calculation, and
     LAMBDA up to 253 parameters plus one.
     """
-    let = functionNamed("LET")
+    let = findFunctionNamed("LET")
     assert (let.index, let.minimumArguments, let.maximumArguments) == (None, 3, 253)
     assert let.repeatingGroupSize == 2
 
-    lambdaFunction = functionNamed("LAMBDA")
+    lambdaFunction = findFunctionNamed("LAMBDA")
     assert lambdaFunction.index is None
     assert (lambdaFunction.minimumArguments, lambdaFunction.maximumArguments) == (
         1, 254
@@ -433,7 +433,7 @@ def testLetAndLambdaCarryArgumentCountsAndNoIndex() -> None:
 def testAFunctionWithNoIndexRefusesToProduceOne() -> None:
     """There is no index to write, and inventing one would call something else."""
     with pytest.raises(UnknownFunctionError):
-        functionIndexFor("LET")
+        findFunctionIndex("LET")
     assert "LET" not in {f.name for f in functionsByIndex.values()}
 
 

@@ -240,7 +240,7 @@ def unquote(text: str) -> str:
     return text[1:-1].replace('""', '"')
 
 
-def quoted(text: str) -> str:
+def quoteString(text: str) -> str:
     """Return a string literal as Numbers writes it, doubling any quote inside."""
     escaped = text.replace('"', '""')
     return f'"{escaped}"'
@@ -337,7 +337,7 @@ def readQualifier(text: str, position: int, known: Sequence[str]) -> str:
 
     What this exposes is caught one layer down. `Ledger-Two::A1` now reads `Ledger`
     on its own, and six letters are a valid base-26 column label, so it would have
-    become column 144,936,576. `columnNumber` refuses that, and the refusal names
+    become column 144,936,576. `toColumnNumber` refuses that, and the refusal names
     the impossible column rather than a table nobody typed.
     """
     for name in known:
@@ -400,7 +400,7 @@ def readValueToken(
     return Token(kind, body, position, len(body))
 
 
-def qualifierIdentity(
+def resolveQualifierIdentity(
     token: Token, tables: Mapping[str, str], text: str
 ) -> str | None:
     """Return the identity a `Table 2::` prefix names, or None when there is none.
@@ -425,14 +425,14 @@ def qualifierIdentity(
     return identity
 
 
-def coordinateFor(line: int, absolute: bool, host: int) -> Coordinate:
+def buildCoordinate(line: int, absolute: bool, host: int) -> Coordinate:
     """Return one axis of a reference, as an offset unless it was written locked."""
     return Coordinate(
         line if absolute else line - host, absolute=absolute
     )
 
 
-def spanFor(
+def buildSpan(
     begin: int, end: int, absolute: bool, host: int
 ) -> Span:
     """Return one axis of a range, with the end omitted when it spans one line.
@@ -445,7 +445,7 @@ def spanFor(
     return Span(begin=first, end=None if last == first else last, absolute=absolute)
 
 
-def referenceFor(
+def buildReference(
     extent: CellRange, host: CellReference, tableId: str | None
 ) -> FormulaReference:
     """Return the single-cell reference an address names, from the cell holding it.
@@ -455,16 +455,16 @@ def referenceFor(
     """
     column = (
         None if extent.startCol is None
-        else coordinateFor(extent.startCol, extent.startColAbsolute, host.col)
+        else buildCoordinate(extent.startCol, extent.startColAbsolute, host.col)
     )
     row = (
         None if extent.startRow is None
-        else coordinateFor(extent.startRow, extent.startRowAbsolute, host.row)
+        else buildCoordinate(extent.startRow, extent.startRowAbsolute, host.row)
     )
     return FormulaReference(column=column, row=row, tableId=tableId)
 
 
-def rangeFor(
+def buildRange(
     extent: CellRange, host: CellReference, tableId: str | None, text: str,
     position: int,
 ) -> FormulaRange:
@@ -488,13 +488,13 @@ def rangeFor(
             )
     columns = (
         None if extent.startCol is None or extent.endCol is None
-        else spanFor(
+        else buildSpan(
             extent.startCol, extent.endCol, extent.startColAbsolute, host.col
         )
     )
     rows = (
         None if extent.startRow is None or extent.endRow is None
-        else spanFor(
+        else buildSpan(
             extent.startRow, extent.endRow, extent.startRowAbsolute, host.row
         )
     )

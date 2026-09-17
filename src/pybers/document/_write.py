@@ -45,13 +45,13 @@ from .._engine import (
     RangeEdge,
     SpanEdge,
     TableOwner,
-    calculationEngine,
-    ownerEntryFor,
+    findCalculationEngine,
+    findOwnerEntry,
+    readTableIdentities,
+    readTableOwnerEntries,
+    readTableOwnerIds,
     registerFormulaCells,
     requestRecalculation,
-    tableIdentities,
-    tableOwnerEntries,
-    tableOwnerIds,
 )
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSTArchives_pb2 as tst
@@ -67,15 +67,15 @@ from .._persistence.index import (
     tableInfoTypeId,
 )
 from ..errors import WriteError
-from ..formula.precedents import formulaPrecedents
+from ..formula.precedents import resolveFormulaPrecedents
 from ..table._create import createTables
-from ..table._write import applyMerges, applyTableEdits, mergesAdded
+from ..table._write import applyMerges, applyTableEdits, findAddedMerges
 from ..table.cells import Table
 from ._create import createSheets
 from .sheets import Document, Sheet
 
 
-def formulaDependencies(
+def collectFormulaDependencies(
     table: Table,
     entry: TableOwner,
     added: list[tuple[int, int]],
@@ -108,7 +108,7 @@ def formulaDependencies(
                 f"{table.name!r} reports a formula at row {row + originOffset}, "
                 f"column {column + originOffset} that the model does not hold."
             )
-        reads = formulaPrecedents(cell.formula, cell.reference)
+        reads = resolveFormulaPrecedents(cell.formula, cell.reference)
         dependencies[(row, column)] = FormulaDependencies(
             cells=tuple(
                 CellEdge(
@@ -162,14 +162,14 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     }
     root = findRoot(index)
     written: dict[int, list[tuple[int, int]]] = {}
-    engine = calculationEngine(index)
-    entries = tableOwnerEntries(index, engine)
+    engine = findCalculationEngine(index)
+    entries = readTableOwnerEntries(index, engine)
     # A formula names the table it reads by identity, and the engine by internal
     # owner id, so declaring what a formula reads needs both halves in hand.
-    internalIds = tableOwnerIds(index, engine)
+    internalIds = readTableOwnerIds(index, engine)
     ownerIds = {
         identity: internalIds[identifier]
-        for identifier, identity in tableIdentities(index).items()
+        for identifier, identity in readTableIdentities(index).items()
         if identifier in internalIds
     }
 
@@ -191,7 +191,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
             modelArchive = index.archive(tableInfo.tableModel.identifier)
             model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
-            entry = ownerEntryFor(entries, tableReference.identifier, table.name)
+            entry = findOwnerEntry(entries, tableReference.identifier, table.name)
 
             # Only a merge being ADDED clears its covered positions. One already
             # in the file may carry a style-only record at each of them, which an
@@ -199,7 +199,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             # those would rewrite a document the caller only asked to save.
             swallowed = frozenset(
                 (reference.row - originOffset, reference.col - originOffset)
-                for merge in mergesAdded(table, model)
+                for merge in findAddedMerges(table, model)
                 for reference in merge.extent
                 if reference != merge.anchor
             )
@@ -218,7 +218,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 index,
                 registry,
                 entry,
-                formulaDependencies(table, entry, edits.formulaAdded, ownerIds),
+                collectFormulaDependencies(table, entry, edits.formulaAdded, ownerIds),
                 edits.formulaRemoved,
             )
             if edits.written or moved:
@@ -231,7 +231,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     return sum(len(cells) for cells in written.values())
 
 
-def targetFor(document: Document, path: Path | str | None) -> Path:
+def resolveSaveTarget(document: Document, path: Path | str | None) -> Path:
     """Resolve where a save lands: the argument, or where the document came from.
 
     A document that was never read from disk has no path to fall back on, so an
@@ -274,7 +274,7 @@ def writeAtomically(package: NumbersPackage, target: Path) -> None:
         raise
 
 
-def identifiable(document: Document) -> list[Sheet | Table]:
+def listIdentifiable(document: Document) -> list[Sheet | Table]:
     """Return every sheet and table, each of which records the archive it has."""
     items: list[Sheet | Table] = []
     for sheet in document.sheets:
@@ -302,14 +302,14 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
     # create them twice.
     snapshot = package.snapshot()
     identified = {
-        id(item) for item in identifiable(document) if item._identifier is not None
+        id(item) for item in listIdentifiable(document) if item._identifier is not None
     }
     try:
         applyDocumentEdits(document, package)
-        writeAtomically(package, targetFor(document, path))
+        writeAtomically(package, resolveSaveTarget(document, path))
     except Exception:
         package.restore(snapshot)
-        for item in identifiable(document):
+        for item in listIdentifiable(document):
             if id(item) not in identified:
                 item._identifier = None
         raise

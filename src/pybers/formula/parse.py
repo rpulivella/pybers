@@ -87,15 +87,15 @@ from pybers.formula.syntax import (
     FormulaSyntaxError,
     Token,
     binaryOperators,
+    buildRange,
+    buildReference,
     comparisonOperators,
     formulaMarker,
     lambdaName,
     letName,
     nestingLimit,
     percentSymbol,
-    qualifierIdentity,
-    rangeFor,
-    referenceFor,
+    resolveQualifierIdentity,
     tokenize,
     unaryOperators,
     unquote,
@@ -300,15 +300,15 @@ class Parser:
         if isinstance(piece, CellReference):
             self.emit(
                 referenceNodeType,
-                referenceFor(CellRange.fromReferences(piece, piece), self.host, None),
+                buildReference(CellRange.fromReferences(piece, piece), self.host, None),
             )
             return
         if piece.start is not None and piece.start == piece.end:
-            self.emit(referenceNodeType, referenceFor(piece, self.host, None))
+            self.emit(referenceNodeType, buildReference(piece, self.host, None))
             return
         self.emit(
             rangeNodeType,
-            rangeFor(piece, self.host, None, self.text, token.position),
+            buildRange(piece, self.host, None, self.text, token.position),
         )
 
     def emitAddress(self, token: Token) -> None:
@@ -322,16 +322,16 @@ class Parser:
             extent = CellRange.parse(token.text)
         except ReferenceError as exc:
             raise self.fail(str(exc), token) from exc
-        tableId = qualifierIdentity(token, self.tables, self.text)
+        tableId = resolveQualifierIdentity(token, self.tables, self.text)
         # A colon is what tells a range from a reference, rather than the shape it
         # covers: Numbers writes a tract for `A1:A1` and a coordinate for `A1`.
         if ":" in token.text:
             self.emit(
                 rangeNodeType,
-                rangeFor(extent, self.host, tableId, self.text, token.position),
+                buildRange(extent, self.host, tableId, self.text, token.position),
             )
             return
-        self.emit(referenceNodeType, referenceFor(extent, self.host, tableId))
+        self.emit(referenceNodeType, buildReference(extent, self.host, tableId))
 
     def parseCall(self, token: Token) -> None:
         """Parse a call, dispatching the two the format stores as node types."""

@@ -32,7 +32,7 @@ from .._generated import TSPMessages_pb2 as tsp
 from ..errors import PybersError
 from .container import NumbersPackage, indexPrefix, iwaSuffix
 from .iwa import Archive, IWAFile
-from .types import archiveTypeId
+from .types import readArchiveTypeId
 
 packageMetadataTypeId: int = 11006
 
@@ -45,7 +45,7 @@ class MetadataError(PybersError, RuntimeError):
     """A package registry that is missing, or a registration it cannot make."""
 
 
-def memberNameFor(locator: str) -> str:
+def findMemberName(locator: str) -> str:
     """Return the zip member a component locator names."""
     return f"{indexPrefix}{locator}{iwaSuffix}"
 
@@ -65,7 +65,7 @@ class PackageRegistry:
             (iwaFile, archive)
             for iwaFile in package.iwaFiles
             for archive in iwaFile.archives
-            if archiveTypeId(archive) == packageMetadataTypeId
+            if readArchiveTypeId(archive) == packageMetadataTypeId
         ]
         if len(found) != 1:
             raise MetadataError(
@@ -80,7 +80,7 @@ class PackageRegistry:
             component.identifier: component for component in self.metadata.components
         }
         byMember = {
-            memberNameFor(component.locator or component.preferred_locator):
+            findMemberName(component.locator or component.preferred_locator):
                 component.identifier
             for component in self.metadata.components
         }
@@ -106,7 +106,7 @@ class PackageRegistry:
         if component is None:
             raise MetadataError(f"No component {identifier} in this package.")
         return self.package.iwaFile(
-            memberNameFor(component.locator or component.preferred_locator)
+            findMemberName(component.locator or component.preferred_locator)
         )
 
     def componentAdd(self, root: Archive, preferredLocator: str) -> IWAFile:
@@ -128,7 +128,7 @@ class PackageRegistry:
         component.is_stored_outside_object_archive = False
         component.save_token = document.save_token
         self.components[root.identifier] = component
-        member = self.package.iwaFileAdd(memberNameFor(locator))
+        member = self.package.iwaFileAdd(findMemberName(locator))
         self.archiveAdd(root.identifier, root)
         return member
 
@@ -259,4 +259,4 @@ class PackageRegistry:
         )
 
 
-__all__ = ["MetadataError", "PackageRegistry", "memberNameFor"]
+__all__ = ["MetadataError", "PackageRegistry", "findMemberName"]

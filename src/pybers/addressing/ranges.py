@@ -35,14 +35,14 @@ from pybers.addressing.reference import (
     ReferenceError,
     absoluteMarker,
     cellPattern,
-    columnLetter,
-    columnNumber,
+    chooseMarker,
     firstColumn,
     firstRow,
     lastColumn,
     lastRow,
-    markerFor,
     toCellReference,
+    toColumnLetter,
+    toColumnNumber,
 )
 
 rangeSeparator: str = ":"
@@ -86,7 +86,7 @@ def parseEndpoint(text: str, whole: str) -> RangeEndpoint:
         colMarker, letters, rowMarker, digits = cell.groups()
         endpoint = RangeEndpoint(
             int(digits),
-            columnNumber(letters),
+            toColumnNumber(letters),
             rowMarker == absoluteMarker,
             colMarker == absoluteMarker,
         )
@@ -94,7 +94,7 @@ def parseEndpoint(text: str, whole: str) -> RangeEndpoint:
     if endpoint is None and column is not None:
         marker, letters = column.groups()
         endpoint = RangeEndpoint(
-            None, columnNumber(letters), False, marker == absoluteMarker
+            None, toColumnNumber(letters), False, marker == absoluteMarker
         )
     row = rowPattern.match(candidate)
     if endpoint is None and row is not None:
@@ -126,13 +126,13 @@ def orderAxis(one: AxisBound, other: AxisBound) -> tuple[AxisBound, AxisBound]:
     return (one, other) if one[0] <= other[0] else (other, one)
 
 
-def endpointText(bound: RangeEndpoint) -> str:
+def renderEndpoint(bound: RangeEndpoint) -> str:
     """Return one endpoint written out, omitting whichever axis is unbounded."""
     text = ""
     if bound.col is not None:
-        text += f"{markerFor(bound.colAbsolute)}{columnLetter(bound.col)}"
+        text += f"{chooseMarker(bound.colAbsolute)}{toColumnLetter(bound.col)}"
     if bound.row is not None:
-        text += f"{markerFor(bound.rowAbsolute)}{bound.row}"
+        text += f"{chooseMarker(bound.rowAbsolute)}{bound.row}"
     return text
 
 
@@ -338,7 +338,7 @@ class CellRange:
         A rectangle whose two endpoints are written identically comes back as the
         single cell it is, so what goes out is what a caller would have put in.
         """
-        first = endpointText(
+        first = renderEndpoint(
             RangeEndpoint(
                 self.startRow,
                 self.startCol,
@@ -346,7 +346,7 @@ class CellRange:
                 self.startColAbsolute,
             )
         )
-        last = endpointText(
+        last = renderEndpoint(
             RangeEndpoint(
                 self.endRow, self.endCol, self.endRowAbsolute, self.endColAbsolute
             )
