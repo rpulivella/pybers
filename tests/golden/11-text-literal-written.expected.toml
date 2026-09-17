@@ -1,0 +1,29 @@
+# What Numbers shows for 11-text-literal-written.numbers, checked by
+# `python3 scripts/golden-confirm.py run 11-text-literal-written.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A1"
+value = "=SUM(B1:C1)"
+formula = ""
+format = "text"
+dataFormat = { "Data Format" = "Text" }
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "J1"
+value = "=A1+1"
+formula = ""
+format = "text"
+dataFormat = { "Data Format" = "Text" }
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B1"
+value = "=1+1"
+formula = ""
+format = "automatic"
+dataFormat = { "Data Format" = "Automatic" }

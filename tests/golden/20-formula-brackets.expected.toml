@@ -1,0 +1,30 @@
+# What Numbers shows for 20-formula-brackets.numbers, checked by
+# `python3 scripts/golden-confirm.py run 20-formula-brackets.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "B1"
+value = 22.25
+formula = "=22+(3/12)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "C1"
+value = 9
+formula = "=(1+2)*3"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "D1"
+value = 5
+formula = "=(5)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "E1"
+value = 2
+formula = "=1-(2-3)"

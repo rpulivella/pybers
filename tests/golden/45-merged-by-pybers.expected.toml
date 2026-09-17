@@ -1,0 +1,38 @@
+# What Numbers shows for 45-merged-by-pybers.numbers, checked by
+# `python3 scripts/golden-confirm.py run 45-merged-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "45-row-offsets-32bit"
+cell = "KI7"
+value = "r6c295"
+formula = ""
+human = ["KI7:KJ7 is merged holding r6c295"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "45-row-offsets-32bit"
+cell = "A7"
+value = "r6c1"
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "45-row-offsets-32bit"
+cell = "KH7"
+value = "r6c294"
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "45-row-offsets-32bit"
+cell = "KK7"
+value = "r6c297"
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "45-row-offsets-32bit"
+cell = "KN7"
+value = "r6c300"
+formula = ""

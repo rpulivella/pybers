@@ -1,0 +1,28 @@
+# What Numbers shows for 20-first-text-in-a-table.numbers, checked by
+# `python3 scripts/golden-confirm.py run 20-first-text-in-a-table.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A1"
+value = 42
+formula = ""
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "B1"
+value = "first text here"
+formula = ""
+format = "automatic"
+dataFormat = { "Data Format" = "Automatic" }
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A3"
+value = "and a row with no storage"
+formula = ""
+format = "automatic"
+dataFormat = { "Data Format" = "Automatic" }

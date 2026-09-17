@@ -1,0 +1,38 @@
+# What Numbers shows for 22-unmerged-by-pybers.numbers, checked by
+# `python3 scripts/golden-confirm.py run 22-unmerged-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A1"
+value = "Hello"
+formula = ""
+human = ["no cell in row 1 is merged"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G1"
+value = 210
+formula = "=10*21"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "I1"
+value = 391
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "K1"
+value = 391
+formula = "=I1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "L1"
+formula = "=J1"
+human = ["L1 shows what its label in L2 predicts"]
