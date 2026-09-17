@@ -44,7 +44,15 @@ trigger sitting on it.
    that fails prints an error, changes nothing, and leaves a stale `develop` behind, so
    the merge looks complete when it is not. Confirm the merge commit is in `git log`
    rather than assuming it arrived.
-6. **Report** the merge commit, whether the branch was deleted, and the state of `develop`.
+6. **Purge that ticket's golden screenshots**, and only that ticket's:
+   ```
+   rm -rf workarea/golden-confirm/PYB-<N>
+   ```
+   `/golden-confirm` writes every report, screenshot and log for a ticket into that one
+   folder, so a folder still present for a merged ticket is stale. Leave every other
+   `PYB-` folder alone, because it belongs to work still open.
+7. **Report** the merge commit, whether the branch was deleted, the state of `develop`,
+   and whether a golden-confirm folder was purged.
 
 ## A real merge is the default
 

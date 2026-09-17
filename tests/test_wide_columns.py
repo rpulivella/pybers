@@ -34,13 +34,13 @@ import pytest
 import pybers
 from conftest import (
     findDocumentPath,
-    readArchiveBodies,
     readRecordedColumns,
     readRecordedRows,
 )
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import chooseOffsetUnit, offsetUnitByte, offsetUnitWord
+from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.index import originOffset
 from pybers.addressing.reference import CellReference
 from pybers.errors import ReadError, WriteError
@@ -114,9 +114,7 @@ def testTheWideFixtureWritesBackUnchanged(tmp_path: Path) -> None:
     """The base contract, on the one fixture that reaches the other layout."""
     target = tmp_path / "written.numbers"
     pybers.open(wideFixture).save(target)
-    assert readArchiveBodies(readPackage(target)) == readArchiveBodies(
-        readPackage(wideFixture)
-    )
+    assert listPackageDifferences(readPackage(wideFixture), readPackage(target)) == []
 
 
 def testANarrowTableStillReadsAsItDid() -> None:
@@ -266,6 +264,6 @@ def testAWideRowEditMatchesItsGoldenFile(tmp_path: Path) -> None:
     findFirstTable(document).mergeAdd(wideMerge)
     document.save()
 
-    assert readArchiveBodies(readPackage(golden)) == readArchiveBodies(
-        readPackage(target)
-    ), "the writer no longer produces the wide-row edit Numbers confirmed"
+    assert listPackageDifferences(readPackage(golden), readPackage(target)) == [], (
+        "the writer no longer produces the wide-row edit Numbers confirmed"
+    )

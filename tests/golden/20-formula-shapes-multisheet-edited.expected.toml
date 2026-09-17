@@ -1,0 +1,79 @@
+# What Numbers shows for 20-formula-shapes-multisheet-edited.numbers, checked by
+# `python3 scripts/golden-confirm.py run 20-formula-shapes-multisheet-edited.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A1"
+value = 1001
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A10"
+value = 1010
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A11"
+value = 10055
+formula = "=SUM(A1:A10)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B11"
+value = 10056
+formula = "=SUM(A1:A10)+1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C11"
+value = 10055
+formula = "=SUMIFS(A1:A10,A1:A10,\">5\")"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D11"
+value = "big"
+formula = "=IF(SUM(A1:A5)>10,\"big\",\"small\")"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E11"
+value = 20110
+formula = "=A11*2"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G11"
+value = 1042
+formula = "=Table 2::A1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H11"
+value = 1053
+formula = "=Sheet 2::Table 1::A1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A1"
+value = 1042
+formula = ""
+
+[[cell]]
+sheet = "Sheet 2"
+table = "Table 1"
+cell = "A1"
+value = 1053
+formula = ""

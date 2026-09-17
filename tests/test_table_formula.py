@@ -35,6 +35,7 @@ from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import PackageRegistry, readPackage
+from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.index import ArchiveIndex
 from pybers.document import Document
 from pybers.errors import WriteError
@@ -458,7 +459,7 @@ def testSavingAgainWithNoEditWritesEveryArchiveUnchanged(tmp_path: Path) -> None
     pybers.open(first).save(tmp_path / "again.numbers")
 
     again = readPackage(tmp_path / "again.numbers")
-    assert readArchiveBodies(again) == readArchiveBodies(readPackage(first))
+    assert listPackageDifferences(readPackage(first), again) == []
 
 
 # ── Refusals ────────────────────────────────────────────────────────────────

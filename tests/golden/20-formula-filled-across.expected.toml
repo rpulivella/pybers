@@ -1,0 +1,30 @@
+# What Numbers shows for 20-formula-filled-across.numbers, checked by
+# `python3 scripts/golden-confirm.py run 20-formula-filled-across.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A11"
+value = 55
+formula = "=SUM(A1:A10)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B11"
+value = 0
+formula = "=SUM(B1:B10)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C11"
+value = 0
+formula = "=SUM(C1:C10)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D11"
+value = 0
+formula = "=SUM(D1:D10)"

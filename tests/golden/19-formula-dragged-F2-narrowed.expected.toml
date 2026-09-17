@@ -1,0 +1,44 @@
+# What Numbers shows for 19-formula-dragged-F2-narrowed.numbers, checked by
+# `python3 scripts/golden-confirm.py run 19-formula-dragged-F2-narrowed.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E2"
+value = 6
+formula = "=SUM(B1:D1)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F2"
+value = 3
+formula = "=SUM($B$1:$C$1)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G2"
+value = 3
+formula = "=$B1+C$1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E3"
+value = 0
+formula = "=SUM(B2:D2)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F3"
+value = 6
+formula = "=SUM($B$1:$D$1)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G3"
+value = 2
+formula = "=$B2+C$1"

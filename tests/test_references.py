@@ -31,9 +31,10 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import findDocumentPath, readArchiveBodies, readDataListBytes
+from conftest import findDocumentPath, readDataListBytes
 from pybers import CellReference, Table
 from pybers._persistence import readPackage
+from pybers._persistence.difference import listPackageDifferences
 from pybers.formula.nodes import FormulaRange, FormulaReference, Span
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
@@ -376,13 +377,13 @@ def testAShiftOfNothingReportsNothingAndWritesNothing() -> None:
 def testAShiftOfNothingLeavesEveryArchiveUntouched(tmp_path: Path) -> None:
     """AC 4. The write path has to agree that nothing happened, not only the model."""
     working = copyDocument("20-formula-shapes", tmp_path)
-    before = readArchiveBodies(readPackage(working))
+    before = readPackage(working)
     document = pybers.open(working)
     for location in document.referencesIterate():
         location.shift()
     document.save()
 
-    assert readArchiveBodies(readPackage(working)) == before
+    assert listPackageDifferences(before, readPackage(working)) == []
 
 
 def testShiftingOneLocationLeavesTheOthersOnThatFormulaUsable() -> None:

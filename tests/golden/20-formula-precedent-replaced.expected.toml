@@ -1,0 +1,23 @@
+# What Numbers shows for 20-formula-precedent-replaced.numbers, checked by
+# `python3 scripts/golden-confirm.py run 20-formula-precedent-replaced.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A1"
+value = 2
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A2"
+value = 7
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "B1"
+value = 21
+formula = "=A2*3"

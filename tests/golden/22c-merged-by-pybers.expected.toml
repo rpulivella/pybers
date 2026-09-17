@@ -1,0 +1,50 @@
+# What Numbers shows for 22c-merged-by-pybers.numbers, checked by
+# `python3 scripts/golden-confirm.py run 22c-merged-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "L3"
+human = ["L3:M3 is merged and keeps row 3's fill"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A1"
+value = "Hello"
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G1"
+value = 210
+formula = "=10*21"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "K1"
+value = 391
+formula = "=I1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "L1"
+formula = "=J1"
+human = ["L1 shows the reference error its label predicts"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C4"
+value = 111
+formula = ""
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D4"
+value = 222
+formula = ""

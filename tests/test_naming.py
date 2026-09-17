@@ -8,6 +8,7 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-09-17  `hold` added for PYB-94, which holds the display awake through a run.
 2026-09-17  Written for PYB-98.
 """
 from __future__ import annotations
@@ -32,7 +33,8 @@ leadingVerbs: frozenset[str] = frozenset({
     "borrow", "build", "carries", "check", "choose", "classify", "close", "collect",
     "compress", "confirm", "copy", "count", "create", "decode", "decompress",
     "delete", "detach", "drop", "edit", "emit", "encode", "expand", "extract",
-    "find", "forge", "format", "generate", "index", "is", "iterate", "list", "load",
+    "find", "forge", "format", "generate", "hold", "index", "is", "iterate", "list",
+    "load",
     "map", "mark", "measure", "merge", "move", "open", "order", "parse", "patch",
     "place", "post", "print", "qualify", "quote", "read", "reduce", "refuse",
     "register", "release", "remap", "remove", "render", "report", "request",

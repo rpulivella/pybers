@@ -34,7 +34,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import allDocuments, findDocumentPath, readArchiveBodies
+from conftest import allDocuments, findDocumentPath
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.cells import (
@@ -43,6 +43,7 @@ from pybers._persistence.cells import (
     decodeRow,
     findFormulaKeySlot,
 )
+from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import archiveTypes, readArchiveTypeId
 from pybers.formula._read import resolveFormula
@@ -217,10 +218,10 @@ def testADecoratedDocumentRoundTripsWithEveryArchiveUnchanged(
 ) -> None:
     """AC 3. The base contract, on the one document that used to fail it."""
     working = Path(shutil.copy(findDocumentPath(fixtureName), tmp_path / "47.numbers"))
-    before = readArchiveBodies(readPackage(working))
+    before = readPackage(working)
     pybers.open(working).save()
 
-    assert readArchiveBodies(readPackage(working)) == before
+    assert listPackageDifferences(before, readPackage(working)) == []
 
 
 # ── An invariant #66 made worth asserting, though 47 does not exercise it ────
