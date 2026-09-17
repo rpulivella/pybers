@@ -284,7 +284,7 @@ def requestHelper(
                 # `open` can fail to start waiting, which leaves the helper never run.
                 if opened.returncode == 0 or resultPath.is_file():
                     break
-                if attempt == openAttempts - 1:
+                if attempt == openAttempts - 1 or checkHelperRunning():
                     raise GoldenConfirmError(
                         f"open could not start the helper: {opened.stderr.strip()}"
                     )
@@ -300,6 +300,13 @@ def requestHelper(
             "the helper that answered is not the build this checkout expects"
         )
     return result
+
+
+def checkHelperRunning() -> bool:
+    """Report whether a helper is still running, which a retried launch would double."""
+    executable = str(helperBundle / "Contents" / "MacOS" / helperName)
+    found = subprocess.run(["pgrep", "-f", executable], capture_output=True)
+    return found.returncode == 0
 
 
 def readProblems(result: dict[str, Any]) -> list[HelperProblem]:
@@ -331,6 +338,8 @@ def findGolden(argument: str) -> Path:
 
 def readTicketKey() -> str:
     """Return the ticket key the current branch names, such as PYB-94 (AC 18)."""
+    with (repositoryRoot / "pyproject.toml").open("rb") as handle:
+        prefix = tomllib.load(handle)["tool"]["pybers"]["ticketPrefix"]
     branch = runTool(["git", "-C", str(repositoryRoot), "branch", "--show-current"])
     match = re.match(r"^[a-z]+/(\d+)-", branch.stdout.strip())
     if match is None:
@@ -338,7 +347,7 @@ def readTicketKey() -> str:
             f"branch {branch.stdout.strip() or '(detached)'} names no ticket, so the "
             "report has no folder; switch to a <type>/<N>-<title> branch"
         )
-    return f"PYB-{match.group(1)}"
+    return f"{prefix}-{match.group(1)}"
 
 
 def readExpectedCells(golden: Path) -> list[ExpectedCell]:
@@ -684,7 +693,7 @@ def writeDamagedCopies(golden: Path, work: Path) -> dict[str, Path]:
     return {"truncated file": truncated, "zip holding a damaged tile archive": damaged}
 
 
-def runDamageCheck(golden: Path) -> list[Check]:
+def checkDamagedCopies(golden: Path) -> list[Check]:
     """Open each damaged copy and check that the run fails and says why (AC 3)."""
     ticket = readTicketKey()
     problems = checkPermissions()
@@ -720,9 +729,9 @@ def runDamageCheck(golden: Path) -> list[Check]:
     return checks
 
 
-def runDamaged(arguments: argparse.Namespace) -> int:
+def runDamageCheck(arguments: argparse.Namespace) -> int:
     """Show that a damaged golden fails the run and names what Numbers did."""
-    checks = runDamageCheck(findGolden(arguments.golden))
+    checks = checkDamagedCopies(findGolden(arguments.golden))
     for check in checks:
         color = "green" if check.status == "passed" else "red"
         subject, detail = escape(check.subject), escape(check.detail)
@@ -793,7 +802,7 @@ def buildParser() -> argparse.ArgumentParser:
     )
     damaged.add_argument("golden", nargs="?", default=damageCheckGolden,
                          help="a .numbers file in tests/golden/ to damage copies of")
-    damaged.set_defaults(handler=runDamaged)
+    damaged.set_defaults(handler=runDamageCheck)
     return parser
 
 

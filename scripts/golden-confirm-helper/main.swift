@@ -25,6 +25,8 @@ let windowAttempts = 20
 let connectionInvalidError = -609
 let quitTimeoutSeconds = 10
 let retryPauseSeconds = 0.5
+// The Numbers this run launched, which the deadline force-quits because nothing else will.
+nonisolated(unsafe) var numbersLaunchedByRun: NSRunningApplication?
 // The four-character code AppleScript uses for missing value, which Swift does not import.
 let missingValueCode: OSType = 0x6D73_6E67
 
@@ -197,9 +199,9 @@ func resolvePath(_ path: String) -> String {
 }
 
 func checkTemporaryPath(_ path: String?, field: String) throws -> String {
-    let temporary = resolvePath(NSTemporaryDirectory())
-    guard let path, path.hasSuffix(".numbers"),
-          resolvePath((path as NSString).deletingLastPathComponent).hasPrefix(temporary)
+    let temporary = resolvePath(NSTemporaryDirectory()) + "/"
+    guard let path, path.hasSuffix(".numbers"), !path.contains("/../"),
+          (resolvePath((path as NSString).deletingLastPathComponent) + "/").hasPrefix(temporary)
     else {
         throw HelperFailure(problem: HelperProblem(
             kind: "request",
@@ -211,13 +213,15 @@ func checkTemporaryPath(_ path: String?, field: String) throws -> String {
 
 func checkCaptureDirectory(_ path: String?) throws -> String {
     var isDirectory: ObjCBool = false
-    guard let path, path.contains("/workarea/golden-confirm/PYB-"),
+    // Resolved first, so `..` cannot walk a capture out of the report folder.
+    guard let path, resolvePath(path).contains("/workarea/golden-confirm/"),
+          !path.split(separator: "/").contains(".."),
           FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
           isDirectory.boolValue
     else {
         throw HelperFailure(problem: HelperProblem(
             kind: "request",
-            detail: "captureDirectory must be an existing workarea/golden-confirm/PYB-<N> folder",
+            detail: "captureDirectory must be an existing folder under workarea/golden-confirm/",
             remedy: "run the helper only through scripts/golden-confirm.py"))
     }
     return path
@@ -607,6 +611,7 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         writeLog("launching Numbers")
         let (numbers, launched) = try launchNumbers()
         result.launchedNumbers = launched
+        if launched { numbersLaunchedByRun = numbers }
         writeLog("Numbers pid \(numbers.processIdentifier), launched by this run: \(launched)")
         defer { quitNumbersLaunched(launched, numbers: numbers) }
         writeLog("checking Automation")
@@ -775,6 +780,7 @@ func runRequest(at requestPath: String) {
             kind: "deadline",
             detail: "the helper did not finish within \(Int(request.deadlineSeconds)) seconds",
             remedy: "look at Numbers for a dialog or a hang, then rerun")]
+        numbersLaunchedByRun?.forceTerminate()
         writeResult(result, to: request.resultPath)
         exit(3)
     }
