@@ -33,8 +33,8 @@ what the expected-values file says. The checks it leaves for a human remain your
    python3 scripts/golden-confirm.py run <golden> --dry-run
    python3 scripts/golden-confirm.py run <golden>
    ```
-   Numbers opens a copy for about twenty seconds. Tell the user before running, because
-   moving Numbers off the current desktop during a run disturbs its screenshots.
+   Numbers opens a copy hidden, and shows on screen for about a second. The run survives
+   switching desktops and full-screen apps, so the developer can keep working.
 4. **Relay the result:** the passed, failed and left-for-a-human counts, every failure
    verbatim, and the report path
    `workarea/golden-confirm/PYB-<N>/<golden>/report.md`. Name each check left for a human

@@ -17,6 +17,7 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 import ImageIO
+import ScreenCaptureKit
 import UniformTypeIdentifiers
 
 let numbersBundleIdentifier = "com.apple.Numbers"
@@ -106,8 +107,16 @@ struct HelperFailure: Error {
     let problem: HelperProblem
 }
 
+// Local time, so a log line matches the clock the developer was watching.
+let logTimeFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    return formatter
+}()
+
 func writeLog(_ message: String) {
-    FileHandle.standardError.write(Data("\(Date()) \(message)\n".utf8))
+    FileHandle.standardError.write(Data("\(logTimeFormatter.string(from: Date())) \(message)\n".utf8))
 }
 
 func readSourceHash() -> String {
@@ -383,7 +392,13 @@ func findAlerts(pid: pid_t, excluding existing: [AXUIElement]) -> [AXUIElement] 
     var alerts: [AXUIElement] = []
     for window in readNumbersWindows(pid: pid) where !existing.contains(where: { CFEqual($0, window) }) {
         let subrole = readText(window, kAXSubroleAttribute)
-        if subrole == kAXDialogSubrole || subrole == kAXSystemDialogSubrole {
+        // A document window can report a dialog subrole while hidden or minimized; an alert has no document.
+        let isDocument = !readText(window, kAXDocumentAttribute).isEmpty
+            || collectElements(window).contains { readText($0, kAXRoleAttribute) == kAXToolbarRole }
+        writeLog("new window '\(readText(window, kAXTitleAttribute))': role \(readText(window, kAXRoleAttribute)), "
+            + "subrole \(subrole), document \(isDocument), "
+            + "hidden \(NSRunningApplication(processIdentifier: pid)?.isHidden ?? false)")
+        if !isDocument, subrole == kAXDialogSubrole || subrole == kAXSystemDialogSubrole {
             alerts.append(window)
         }
         alerts += (readAttribute(window, kAXChildrenAttribute) as? [AXUIElement] ?? [])
@@ -469,35 +484,53 @@ func readFrame(_ element: AXUIElement) -> CGRect? {
 }
 
 // Captured at the display's own pixels and kept lossless, so graphical detail stays sharp.
+// ScreenCaptureKit captures one window whether it is hidden or covered, which `screencapture -l` cannot.
+func captureWindowImage(id windowId: Int) -> (CGImage?, String) {
+    var image: CGImage?
+    var said = ""
+    let done = DispatchSemaphore(value: 0)
+    SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: false) { content, error in
+        guard let window = content?.windows.first(where: { Int($0.windowID) == windowId }) else {
+            said = error.map { "\($0)" } ?? "ScreenCaptureKit lists no window \(windowId)"
+            done.signal()
+            return
+        }
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let configuration = SCStreamConfiguration()
+        configuration.width = Int(filter.contentRect.width * CGFloat(filter.pointPixelScale))
+        configuration.height = Int(filter.contentRect.height * CGFloat(filter.pointPixelScale))
+        configuration.ignoreShadowsSingleWindow = true
+        configuration.showsCursor = false
+        SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { captured, error in
+            image = captured
+            said = error.map { "\($0)" } ?? "window on screen \(window.isOnScreen)"
+            done.signal()
+        }
+    }
+    done.wait()
+    return (image, said)
+}
+
 func captureWindow(
     id windowId: Int, window: AXUIElement, crop: CGRect?, to path: String, pid: pid_t
 ) throws {
-    let raw = path + ".raw.png"
-    defer { try? FileManager.default.removeItem(atPath: raw) }
+    var captured: CGImage?
     var said = ""
-    // A window not yet drawn, or briefly off the current desktop, captures on a later try.
+    // A window not yet drawn captures on a later try.
     for _ in 0..<windowAttempts {
-        let capture = Process()
-        let errors = Pipe()
-        capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        capture.arguments = ["-x", "-o", "-l", String(windowId), "-t", "png", raw]
-        capture.standardError = errors
-        try capture.run()
-        capture.waitUntilExit()
-        said = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if capture.terminationStatus == 0, FileManager.default.fileExists(atPath: raw) { break }
+        (captured, said) = captureWindowImage(id: windowId)
+        if captured != nil { break }
         Thread.sleep(forTimeInterval: retryPauseSeconds)
     }
-    if !FileManager.default.fileExists(atPath: raw) { try checkNumbersOnThisDesktop(pid: pid) }
+    let counts = countNumbersWindows(pid: pid)
+    let hidden = NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
+    writeLog("captured \((path as NSString).lastPathComponent): \(captured != nil) (\(said)), "
+        + "Numbers hidden \(hidden), windows on screen \(counts.onScreen) of \(counts.all)")
     let failure = HelperFailure(problem: HelperProblem(
         kind: "capture",
-        detail: "the Numbers window could not be captured to \((path as NSString).lastPathComponent)"
-            + (said.isEmpty ? "" : ": \(said)"),
-        remedy: "keep Numbers on the current desktop, not minimized or in full screen, then rerun"))
-    guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: raw) as CFURL, nil),
-          var image = CGImageSourceCreateImageAtIndex(source, 0, nil)
-    else { throw failure }
+        detail: "the Numbers window could not be captured to \((path as NSString).lastPathComponent): \(said)",
+        remedy: "check Screen Recording for pybersdev-golden-confirm, then rerun"))
+    guard var image = captured else { throw failure }
     if let crop, let frame = readFrame(window), frame.width > 0 {
         let scale = CGFloat(image.width) / frame.width
         let pixels = CGRect(
@@ -544,6 +577,20 @@ func runPermissionsCheck(_ request: HelperRequest) -> HelperResult {
     return result
 }
 
+func readNumbersHidden(pid: pid_t) -> Bool {
+    (readAttribute(AXUIElementCreateApplication(pid), kAXHiddenAttribute) as? Bool) ?? false
+}
+
+// Hidden, Numbers stays out of the developer's way and still draws what the helper captures.
+@discardableResult
+func setNumbersHidden(pid: pid_t, _ hidden: Bool) -> Bool {
+    let status = AXUIElementSetAttributeValue(
+        AXUIElementCreateApplication(pid), kAXHiddenAttribute as CFString,
+        (hidden ? kCFBooleanTrue : kCFBooleanFalse) as CFTypeRef)
+    writeLog("set Numbers hidden \(hidden): status \(status.rawValue)")
+    return status == .success
+}
+
 func launchNumbers() throws -> (NSRunningApplication, Bool) {
     if let running = NSRunningApplication.runningApplications(
         withBundleIdentifier: numbersBundleIdentifier).first {
@@ -558,6 +605,7 @@ func launchNumbers() throws -> (NSRunningApplication, Bool) {
     }
     let configuration = NSWorkspace.OpenConfiguration()
     configuration.activates = false
+    configuration.hides = true
     var launched: NSRunningApplication?
     let done = DispatchSemaphore(value: 0)
     NSWorkspace.shared.openApplication(at: url, configuration: configuration) { application, _ in
@@ -649,6 +697,18 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         if launched { numbersLaunchedByRun = numbers }
         writeLog("Numbers pid \(numbers.processIdentifier), launched by this run: \(launched)")
         defer { quitNumbersLaunched(launched, numbers: numbers) }
+        let wasHidden = readNumbersHidden(pid: numbers.processIdentifier)
+        var hideAttempts = 0
+        while !setNumbersHidden(pid: numbers.processIdentifier, true), hideAttempts < windowAttempts {
+            Thread.sleep(forTimeInterval: retryPauseSeconds)
+            hideAttempts += 1
+        }
+        // A Numbers the developer already had open is shown again as it was found.
+        defer {
+            if !launched, !wasHidden, kill(numbers.processIdentifier, 0) == 0 {
+                setNumbersHidden(pid: numbers.processIdentifier, false)
+            }
+        }
         writeLog("checking Automation")
         try checkAutomationPermission()
         try checkNoUnsavedDocuments()
@@ -728,6 +788,8 @@ func inspectDocument(
     }
     result.openOutcome = "opened"
     writeLog("opened \(documentId)")
+    // Opening a document can bring Numbers back into view.
+    setNumbersHidden(pid: numbers.processIdentifier, true)
     defer {
         if kill(numbers.processIdentifier, 0) == 0 {
             _ = try? runAppleScript("close (document id \(quoteAppleScript(documentId))) saving no")
@@ -796,7 +858,7 @@ func findDocumentWindow(documentId: String, pid: pid_t) throws -> (Int32, AXUIEl
     throw HelperFailure(problem: HelperProblem(
         kind: "window",
         detail: "the opened document's window \(seen.isEmpty ? "never appeared" : "'\(seen)' was not reachable through Accessibility")",
-        remedy: "keep Numbers on the current desktop, not minimized or in full screen, then rerun"))
+        remedy: "keep the Numbers window out of full screen and not minimized, then rerun"))
 }
 
 func selectCell(_ address: CellAddress, documentId: String) throws {
