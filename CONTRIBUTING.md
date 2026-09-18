@@ -51,16 +51,12 @@ The standard a review is held to is [docs/code-review-rubric.md](docs/code-revie
 
 ## What GitHub checks
 
-Nothing runs while a pull request is a draft, and nothing is commented.
+Nothing runs on a draft. Once a pull request leaves draft, GitHub shows two checks:
 
-Once it leaves draft, GitHub shows two checks, `preflight` and `readiness`.
+- **`preflight`**, the four gates run locally, one step per gate.
+- **`readiness`**, what exists only at pull request level: the template, the checklist, the CHANGELOG entry, the ticket identifier, currency with `develop`, dependency advisories, and a confirmation date for every golden touched.
 
-1. **`preflight`** runs the same four gates run locally, one step per gate, so a failing gate is named in the Checks view rather than buried in a log.
-2. **`readiness`** waits for the preflight's result, then adds what only exists at pull request level: the body against its template, every checkbox either checked or NA, the CHANGELOG entry, one ticket identifier through the branch, the commits and the title, whether the branch is up to date with `develop`, advisories and yanks against the versions a fresh install resolves, and a confirmation date for every golden the change touches. Each failure and each decision becomes an annotation naming the check.
-
-A red `readiness` fails that check alone, so a green `preflight` still reads as green, and `pr.py merge` refuses while either is red.
-
-A third workflow posts the report as one comment and replaces that same comment on every later run. **Green means a person can now test the change, never that it is ready to merge.** That workflow runs this repository's own code rather than the branch's, and what the branch produced reaches it as data, which is what makes writing a comment safe from a pull request opened by anyone.
+A red `readiness` leaves `preflight` green, and `pr.py merge` refuses while either is red. A third workflow posts the report as one comment, replaced on every run. **Green means a person can now test the change, never that it is ready to merge.**
 
 ## One ticket, more than one pull request
 
