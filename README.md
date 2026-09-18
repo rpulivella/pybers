@@ -2,7 +2,7 @@
 
 A round-trip-tested Python library for reading and writing Apple Numbers documents, built in deep respect for Apple Numbers itself. The goal is for editing a `.numbers` file programmatically to be as reliable as editing it by hand.
 
-> **Status: early, and narrow.** A real `.numbers` file opens, its cells read, numbers > and merges can be changed, and the file saves back so that Numbers opens it showing > the result with nothing else altered. Writing text, writing formulas, styles, and > inserting or deleting rows and columns are not built. See > [What works today](#what-works-today) for the honest line between finished and not.
+> **Status: early, and narrow.** A real `.numbers` file opens, its cells read, and > numbers, text, formulas, merges, sheets and tables can be written, so that Numbers > opens the saved file showing the result with nothing else altered. Styles, and > inserting or deleting rows and columns, are not built. See > [What works today](#what-works-today) for the honest line between finished and not.
 
 ## Why this exists
 
@@ -18,8 +18,10 @@ There is a simpler reason under all of that: I love writing Python. Taking a `.n
 | --- | --- |
 | `pybers._persistence` | The persistence layer, private. **Reads** a `.numbers` package: zip container, IWA frames, a pure-Python Snappy codec with no C dependency, base-128 varints, length-prefixed protobuf archives, IEEE-754 decimal128, and cell values including numbers, text, dates, booleans, durations and currency. **Writes** one back, replaying an untouched member exactly and re-encoding an edited one. |
 | `pybers.addressing`, `pybers.document`, `pybers.formula`, `pybers.table` | The features, each owning its model types and both of its archive halves. `style`, `text`, `geometry` and `drawable` are model-only so far. |
-| The binding between them | `pybers.open(path)` returns a `Document` and `document.save()` writes it back. A cell set to a `Decimal` reaches the tile it came from; writing over a formula, writing text, and changing a cell's type all raise rather than losing anything. |
+| The binding between them | `pybers.open(path)` returns a `Document` and `document.save()` writes it back. A cell set to a `Decimal` reaches the tile it came from, and a cell's type can change: text over a number, a number over text, or text into a cell the file stored nothing for. |
 | Reaching and walking | `document.sheet(...)` and `sheet.table(...)` take a name or a position counted from one, and both refuse a name no sheet or table carries rather than returning whichever came first. `document.cellsIterate()` yields every cell a document stores, in a stated order, with the table and sheet holding it. |
+| Formulas | A formula is read and written as a typed AST rather than as text, so `cell.formulaText` renders one and setting it authors one. `table.formulaFill(...)` fills a formula across a range, and moving a reference rewrites its target. |
+| Creating | `document.sheetAdd(...)` and `sheet.tableAdd(...)` create a sheet and a table, including the styles and the calculation-engine records Numbers expects. |
 | Merging | `table.mergeAdd("A1:B1")` and `table.mergeRemove("A1")`. A merge discards the cells it covers, permanently, because that is what Numbers does. |
 | Recalculation | An edit marks the cells it changed, so Numbers recomputes whatever depended on them when it next opens the file. This library never evaluates a formula. |
 | `pybers.cli`, `pybers.tui` | Not started. |
@@ -40,7 +42,7 @@ costs.mergeAdd("A1:C1")
 document.save()
 ```
 
-Every document under `tests/fixtures/` and `tests/measurements/` reads and writes back with each of its archives unchanged. Four saved files have been opened in Numbers 15.3.1 and confirmed on screen, covering a numeric edit, an edit across two sheets, a merge and an unmerge. Those live in `tests/golden/`, and the reasoning for keeping them is in its README.
+Every document under `tests/fixtures/` and `tests/measurements/` reads and writes back with each of its archives unchanged. Every file this library has written and had confirmed in Numbers lives in `tests/golden/`, each with the date and version of its confirmation, and the reasoning for keeping them is in its README. `/golden-confirm` drives one of those confirmations from a single command.
 
 ## The format, and why there are so many fixtures
 
@@ -78,6 +80,7 @@ Requires Python 3.14 or newer. The only runtime dependency is `protobuf`.
 | `docs/` | Settled decisions, and `findings/`, what the real files established about the format. |
 | `scripts/` | Repository tooling, including the schema extractor and the writing gate. See `scripts/README.md`. |
 | `.claude/` | Project slash-commands used by the agentic workflow. |
+| `.github/` | The pull request template, and the two workflows that check a pull request. |
 | `workarea/` | Ephemeral scratch. Git-ignored apart from its README. |
 | `CLAUDE.md` | Design contract, house style, and the record of every architectural decision with its reasoning. |
 | `CONTRIBUTING.md` | Git workflow: commits, branches, releases. |
@@ -98,7 +101,7 @@ Requires Python 3.14 or newer. The only runtime dependency is `protobuf`.
   .venv/bin/python3 scripts/pr-preflight-check.py
   ```
 
-  One command runs pytest, ruff, mypy and the prose gate, and reports every one rather than stopping at the first. GitHub Actions runs that same command on every pull request, so no second copy of the gate list exists to drift.
+  One command runs pytest, ruff, mypy and the prose gate, and reports every one rather than stopping at the first. GitHub Actions runs that same command once a pull request leaves draft, so no second copy of the gate list exists to drift, and a second check then reports one verdict as a comment on the pull request. [`CONTRIBUTING.md`](CONTRIBUTING.md) describes that flow.
 
   The prose gate is the unusual one and worth explaining: it lints **prose**. Documentation, docstrings and comments are checked against the project's writing rules the way ruff checks code, because this repository treats a wrong comment as a defect.
 - **Tickets are written `PYB-34` and pull requests `PR #38`**, never a bare number and never a bare `#`. The key is declared once in `pyproject.toml` under `[tool.pybers]`, and `scripts/ticket.py` reads it from there.
