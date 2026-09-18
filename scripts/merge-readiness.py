@@ -234,26 +234,26 @@ def writeWorkflowOutput(results: list[checks.CheckResult], body: str) -> None:
 
 
 def runReport(arguments: argparse.Namespace) -> int:
-    """Check the pull request, render one comment, and fail loudly when red."""
+    """Post the comment the readiness check rendered, or replace the one already there.
+
+    This half decides nothing and checks nothing: the readiness check is where a
+    verdict comes from, and GitHub reports that check itself. Posting is the only
+    write this repository's automation makes, and the token it holds allows no
+    more than that.
+    """
     stored = json.loads(Path(arguments.results).read_text())
-    facts = checks.BranchFacts(**stored)
+    facts = checks.BranchFacts.fromDictionary(stored)
+    body = Path(arguments.comment).read_text()
     if not facts.pullRequest:
         console.print("[red]the collected facts name no pull request[/]")
         return errorExitCode
-    token = ticket.resolveToken()
-    if readPullRequestFacts(token, facts.pullRequest)["draft"]:
-        console.print("[dim]a draft carries no report, and none was posted[/]")
-        return 0
-    results = checkPullRequest(facts, token)
-    verdict = checks.readVerdict(results)
-    body = presenter.renderComment(results, facts, datetime.now(UTC))
-    presenter.reportResults(console, results, verdict)
     if arguments.dry_run:
         console.print(body, markup=False, highlight=False)
         return 0
+    token = ticket.resolveToken()
     console.print(f"{postReportComment(token, facts.pullRequest, body)} the report on "
                   f"{pr.formatPullRequestRef(facts.pullRequest)}")
-    return failedExitCode if verdict == checks.failed else 0
+    return 0
 
 
 def findLatestPreflightRun(token: str, ref: str) -> int:

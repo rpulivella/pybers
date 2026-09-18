@@ -9,7 +9,9 @@ name: readiness
 on:
   pull_request:
     branches: [develop]
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `edited` as well, because the template, the checklist and the CHANGELOG
+    # checks read the body, so an edited body can change this verdict.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
