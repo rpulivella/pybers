@@ -190,3 +190,24 @@ def testAMergeSubjectNamesItsTicket() -> None:
 
 def testAHotfixSubjectNamesNoTicketToReopen() -> None:
     assert loadPrTool().readTicketFromSubject("[hotfix] docs: a fix") is None
+
+
+# ── One entry per check, whatever history a commit carries ──────────────────
+
+
+def testOnlyTheNewestRunOfEachCheckIsReported() -> None:
+    runs = [
+        {"name": "preflight", "status": "completed", "conclusion": "skipped",
+         "started_at": "2026-09-18T01:00:00Z"},
+        {"name": "preflight", "status": "completed", "conclusion": "success",
+         "started_at": "2026-09-18T02:00:00Z"},
+        {"name": "merge readiness", "status": "completed", "conclusion": "failure",
+         "started_at": "2026-09-18T02:05:00Z"},
+    ]
+
+    reported = loadPrTool().chooseLatestRuns(runs)
+
+    assert [(run["name"], run["conclusion"]) for run in reported] == [
+        ("preflight", "success"),
+        ("merge readiness", "failure"),
+    ]
