@@ -1,0 +1,103 @@
+# What Numbers shows for 56-row-removed-by-pybers.numbers, `56-structure-base` with
+# row 8 deleted with `rowRemove(8)`, checked by
+# `python3 scripts/golden-confirm.py run 56-row-removed-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B1"
+value = 47
+formula = "=SUM(A1:A9)"
+human = ["A8 holds 9, the hidden row that followed the deleted one"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B2"
+value = 47
+formula = "=SUM($A$1:$A$9)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B3"
+value = 3
+formula = "=A3"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B5"
+formula = "=#REF!"
+human = ["B5 shows a reference error"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B6"
+formula = "=#REF!"
+human = ["B6 shows a reference error"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B7"
+value = 32
+formula = '=SUMIFS(A1:A9,A1:A9,">5")'
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B8"
+value = 7
+formula = "=SUM(A3:A4)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B9"
+value = 5
+formula = "=SUM(A2:A3)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B11"
+value = 5
+formula = "=E10"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D11"
+value = 7
+formula = "=G10"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F11"
+value = 33
+formula = "=SUM(C10:H10)"
+human = ["merges read C1:D1, C2:D3, D5:F5 and F7:G7, and merge C8:D8 is gone with its row", "row 8 and column H are hidden"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A1"
+formula = "=#REF!"
+human = ["Table 2 A1 shows a reference error"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A2"
+value = 47
+formula = "=SUM(Table 1::A1:A9)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A3"
+value = 7
+formula = "=Table 1::G10"
