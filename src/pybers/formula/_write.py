@@ -16,6 +16,7 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-09-18  A broken reference writes the lines it lost, for PYB-17.
 2026-09-11  A bracket is written back as the list node it was read from,
             for #67.
 2026-09-08  Split out of `pybers.document._write` for #45, unchanged.
@@ -47,7 +48,7 @@ from .._persistence.cells import (
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128
-from .._persistence.index import ArchiveIndex, originOffset
+from .._persistence.index import ArchiveIndex, assignUuid, originOffset
 from ..errors import WriteError
 from ._read import ColonTractAxis, decimalHalfFormat, readFormulaTable
 from .nodes import (
@@ -60,6 +61,7 @@ from .nodes import (
     FormulaNode,
     FormulaRange,
     FormulaReference,
+    FormulaReferenceLoss,
     FormulaUnknownCall,
     FormulaVariable,
     Span,
@@ -206,7 +208,11 @@ def encodeFormulaReference(
     encodeTableIdentity(archive, reference.tableId)
     if reference.broken:
         archive.AST_column.column = brokenColumnSentinel
+        archive.AST_column.absolute = False
         archive.AST_row.row = brokenRowSentinel
+        archive.AST_row.absolute = False
+        if reference.loss is not None:
+            encodeReferenceLoss(archive, reference.loss)
         return
     if reference.column is None:
         archive.ClearField("AST_column")
@@ -220,6 +226,32 @@ def encodeFormulaReference(
     else:
         archive.AST_row.row = encodeCoordinate(reference.row)
         archive.AST_row.absolute = reference.row.absolute
+
+
+def encodeReferenceLoss(
+    archive: tsce.ASTNodeArrayArchive.ASTNodeArchive, loss: FormulaReferenceLoss
+) -> None:
+    """Write the lines a broken reference lost, as the one tract Numbers writes.
+
+    Its locking is stated twice, on the node and on the tract list, both measured
+    all false on the three references `56c` and `56e` broke.
+    """
+    for bits in (archive.AST_sticky_bits, archive.AST_tract_list.sticky_bits):
+        bits.begin_column_is_absolute = loss.columnsAbsolute
+        bits.end_column_is_absolute = loss.columnsAbsolute
+        bits.begin_row_is_absolute = loss.rowsAbsolute
+        bits.end_row_is_absolute = loss.rowsAbsolute
+    archive.AST_tract_list.ClearField("tract")
+    tract = archive.AST_tract_list.tract.add()
+    for value in loss.columns:
+        assignUuid(tract.columnUids.uid.add(), value)
+    for value in loss.rows:
+        assignUuid(tract.rowUids.uid.add(), value)
+    tract.columnUids.SetInParent()
+    tract.rowUids.SetInParent()
+    tract.is_range_ref = loss.range
+    tract.purpose = tsce.ASTNodeArrayArchive.UIDS_INCLUDED
+    tract.preserve_rectangular = True
 
 
 def encodeFormulaRange(
