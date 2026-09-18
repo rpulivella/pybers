@@ -128,13 +128,21 @@ def readGoldenConfirmations() -> set[str]:
     return confirmed
 
 
-def collectBranchFacts(base: str, pullRequest: int, preflightLog: str) -> BranchFacts:
-    """Gather everything the checking half needs, from the branch it may not run."""
-    branch = runGit(["rev-parse", "--abbrev-ref", "HEAD"])
+def collectBranchFacts(
+    base: str, pullRequest: int, preflightLog: str,
+    branch: str = "", headSha: str = "",
+) -> BranchFacts:
+    """Gather everything the checking half needs, from the branch it may not run.
+
+    The branch and the head are passed in where a caller knows them, because a
+    pull request is checked out as a detached merge commit: git there reports the
+    branch as `HEAD` and the head as a commit no branch carries.
+    """
+    branch = branch or runGit(["rev-parse", "--abbrev-ref", "HEAD"])
     facts = BranchFacts(
         ticket=readTicketNumber(branch),
         branch=branch,
-        headSha=runGit(["rev-parse", "HEAD"]),
+        headSha=headSha or runGit(["rev-parse", "HEAD"]),
         pullRequest=pullRequest,
         changelogTickets=readChangelogTickets(),
         commitSubjects=runGit(["log", f"{base}..HEAD", "--format=%s"]).splitlines(),
