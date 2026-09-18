@@ -154,6 +154,9 @@ functions over explanation.
   the current patch, leave removal breadcrumbs, or comment out code.
 - Module docstrings carry a dated `UPDATES` block. No contractions anywhere.
 - Remove dead code, unused state and temporary diagnostics before finishing.
+- **Prose leaving this repository passes `/standards`, both passes, and the report says
+  what the judgment read found**: tickets, pull request bodies, commit messages, docs,
+  docstrings, and any sentence a tool prints or posts. A script result alone is one pass.
 
 ## Tests
 

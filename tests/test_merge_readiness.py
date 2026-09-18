@@ -40,44 +40,28 @@ def buildFacts(**overrides: object) -> checks.BranchFacts:
     return facts
 
 
-def testAPreflightLogYieldsOneEntryPerGate() -> None:
-    gates = checks.readPreflightGates(
-        "PASS pytest  1618 passed\nFAIL ruff  2 errors\nnoise\n"
-    )
+def testAFactsFileFromANewerBranchLoadsWithoutItsUnknownFields() -> None:
+    stored = {"ticket": "76", "branch": "chore/76-a", "somethingLater": ["new"]}
 
-    assert gates == [
-        ["pytest", checks.passed, "1618 passed"],
-        ["ruff", checks.failed, "2 errors"],
-    ]
+    facts = checks.BranchFacts.fromDictionary(stored)
+
+    assert facts.ticket == "76"
+    assert facts.branch == "chore/76-a"
 
 
-def testTheUnreleasedListIsReadPastTheFilesOwnMentionOfTheHeading() -> None:
-    text = (
-        "# Changelog\n\nMaintained by `/changelog-add`, one bullet under "
-        "`## Unreleased`.\n\n## Unreleased\n\n- [PYB-76] A thing\n- [PYB-94] Another"
-        "\n\n## 0.1.0\n\n- [PYB-1] Older\n"
-    )
-
-    assert checks.readUnreleasedSection(text).strip().startswith("- [PYB-76]")
-    assert "PYB-1] Older" not in checks.readUnreleasedSection(text)
+def testAPassingPreflightCheckPasses() -> None:
+    assert checks.checkPreflight("success").status == checks.passed
 
 
-def testTheRepositorysOwnChangelogNamesItsOpenTickets() -> None:
-    assert checks.readChangelogTickets(), "the Unreleased list parsed as empty"
-
-
-def testAFailedGateFailsThePreflightCheckAndNamesIt() -> None:
-    facts = buildFacts(preflightGates=[["pytest", checks.passed, ""],
-                                       ["mypy", checks.failed, "3 errors"]])
-
-    result = checks.checkPreflight(facts)
+def testAFailingPreflightCheckFailsAndSaysWhatItConcluded() -> None:
+    result = checks.checkPreflight("failure")
 
     assert result.status == checks.failed
-    assert "mypy" in result.detail
+    assert "failure" in result.detail
 
 
-def testAPreflightThatReportedNothingFailsRatherThanPasses() -> None:
-    assert checks.checkPreflight(buildFacts()).status == checks.failed
+def testAPreflightThatNeverRanIsSkippedRatherThanFailed() -> None:
+    assert checks.checkPreflight("").status == checks.skipped
 
 
 def testAChangelogNamingThisTicketPasses() -> None:
@@ -86,11 +70,40 @@ def testAChangelogNamingThisTicketPasses() -> None:
     assert checks.checkChangelog(facts).status == checks.passed
 
 
-def testAChangelogMissingThisTicketFailsAndNamesTheSkill() -> None:
+def testAMissingEntryWithARecordedReasonAsksForADecision() -> None:
+    facts = buildFacts(changelogTickets=["94"])
+    body = "Some prose.\n\n_No CHANGELOG entry, because this ticket ships nothing._\n"
+
+    result = checks.checkChangelog(facts, body)
+
+    assert result.status == checks.attention
+    assert "this ticket ships nothing" in result.detail
+
+
+def testAnUntickedChecklistItemFailsAndNamesIt() -> None:
+    body = (
+        "## Checklist\n- [x] I performed a self-review\n"
+        "- [ ] I added or updated pytest tests covering the change\n"
+        "- NA Round-trip tests pass\n"
+    )
+
+    result = checks.checkChecklist(body)
+
+    assert result.status == checks.failed
+    assert "I added or updated pytest tests covering the change" in result.detail
+
+
+def testAChecklistOfTickedAndNAItemsPasses() -> None:
+    body = "- [x] I performed a self-review\n- NA Round-trip tests pass\n"
+
+    assert checks.checkChecklist(body).status == checks.passed
+
+
+def testAChangelogMissingThisTicketWithNoReasonFails() -> None:
     result = checks.checkChangelog(buildFacts(changelogTickets=["94"]))
 
     assert result.status == checks.failed
-    assert "/changelog-add" in result.detail
+    assert "names no entry for PYB-76" in result.detail
 
 
 def testABranchNamingNoTicketSkipsRatherThanFails() -> None:
@@ -123,7 +136,7 @@ def testATitleNamingAnotherTicketDisagrees() -> None:
     result = checks.checkTicketAgreement(facts, "[PYB-94] Something else")
 
     assert result.status == checks.failed
-    assert "[PYB-94]" in result.detail
+    assert "the title names PYB-94" in result.detail
 
 
 def testATouchedGoldenWithNoConfirmationDateFails() -> None:
@@ -162,8 +175,8 @@ def testTheWorstStatusDecidesTheVerdict() -> None:
 
 def testTheCommentOpensWithItsMarkerSoALaterRunFindsIt() -> None:
     body = presenter.renderComment(
-        [checks.CheckResult("preflight", checks.passed, "four gates")],
-        buildFacts(), checks.passed, datetime(2026, 9, 17, 18, 54, tzinfo=UTC),
+        [checks.CheckResult("Preflight", checks.passed, "four gates")],
+        buildFacts(), datetime(2026, 9, 17, 18, 54, tzinfo=UTC),
     )
 
     assert body.splitlines()[0] == presenter.commentMarker
@@ -171,36 +184,53 @@ def testTheCommentOpensWithItsMarkerSoALaterRunFindsIt() -> None:
 
 def testTheCommentCarriesEveryCheckItsVerdictAndTheMomentItRan() -> None:
     results = [
-        checks.CheckResult("preflight", checks.passed, "four gates"),
-        checks.CheckResult("goldens", checks.skipped, "none touched"),
-        checks.CheckResult("changelog", checks.failed, "no entry"),
+        checks.CheckResult("Preflight", checks.passed, "four gates"),
+        checks.CheckResult("Goldens", checks.skipped, "none touched"),
+        checks.CheckResult("Changelog", checks.failed, "no entry"),
     ]
 
     body = presenter.renderComment(
-        results, buildFacts(), checks.failed, datetime(2026, 9, 17, 18, 54, tzinfo=UTC)
+        results, buildFacts(), datetime(2026, 9, 17, 18, 54, tzinfo=UTC)
     )
 
-    assert "### ✅ preflight\n\nfour gates" in body
-    assert "### ⊘ goldens\n\nnone touched" in body
-    assert "### ❌ changelog\n\nno entry" in body
+    assert "### ✅ Preflight\n\nfour gates" in body
+    assert "### ➖ Goldens\n\nnone touched" in body
+    assert "### ❌ Changelog\n\nno entry" in body
     assert "2026-09-17 18:54 UTC" in body
     assert "abc123def456" in body
 
 
-def testAGreenCommentNeverSaysAChangeIsReadyToMerge() -> None:
+def testTheCommentCarriesTheChecksRatherThanASentenceAboutThem() -> None:
     body = presenter.renderComment(
-        [checks.CheckResult("preflight", checks.passed, "four gates")],
-        buildFacts(), checks.passed, datetime.now(UTC),
+        [checks.CheckResult("Preflight", checks.passed, "four gates")],
+        buildFacts(), datetime.now(UTC),
     )
 
-    assert "a person can now test this change" in body.lower()
+    assert body.splitlines()[1] == presenter.commentHeading
+    assert "### ✅ Preflight" in body
     assert "ready to merge" not in body.lower()
 
 
 def testADetailReachesTheCommentWhateverPunctuationItCarries() -> None:
     body = presenter.renderComment(
-        [checks.CheckResult("dependencies", checks.failed, "rich 1.0 | yanked")],
-        buildFacts(), checks.failed, datetime.now(UTC),
+        [checks.CheckResult("Dependencies", checks.failed, "rich 1.0 | yanked")],
+        buildFacts(), datetime.now(UTC),
     )
 
     assert "rich 1.0 | yanked" in body
+
+
+def testOnlyAFailureOrADecisionBecomesAnAnnotation() -> None:
+    results = [
+        checks.CheckResult("Checklist", checks.failed, "1 checkbox is unresolved"),
+        checks.CheckResult("Base Branch", checks.attention, "2 commits behind"),
+        checks.CheckResult("Preflight", checks.passed, "the preflight passed"),
+        checks.CheckResult("Goldens", checks.skipped, "no golden"),
+    ]
+
+    commands = presenter.renderAnnotations(results)
+
+    assert commands == [
+        "::error title=Checklist::1 checkbox is unresolved",
+        "::warning title=Base Branch::2 commits behind",
+    ]

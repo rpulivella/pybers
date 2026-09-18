@@ -126,7 +126,7 @@ def testARewordedCheckboxLabelIsRefused(template: str) -> None:
     label = module.readCheckboxLabels(template)[0]
     body = template.replace(label, f"{label} probably")
     findings = module.findBodyFindings(body, template)
-    assert any("checkbox label" in finding for finding in findings)
+    assert any("checkbox the template does not" in finding for finding in findings)
 
 
 def testTickingABoxIsNotARewording(template: str) -> None:
@@ -143,7 +143,7 @@ def testRemovingACheckboxIsAccepted(template: str) -> None:
         line for line in template.splitlines() if label not in line
     )
     assert not any(
-        "checkbox label" in finding
+        "checkbox the template does not" in finding
         for finding in module.findBodyFindings(body, template)
     )
 
@@ -190,3 +190,24 @@ def testAMergeSubjectNamesItsTicket() -> None:
 
 def testAHotfixSubjectNamesNoTicketToReopen() -> None:
     assert loadPrTool().readTicketFromSubject("[hotfix] docs: a fix") is None
+
+
+# ── One entry per check, whatever history a commit carries ──────────────────
+
+
+def testOnlyTheNewestRunOfEachCheckIsReported() -> None:
+    runs = [
+        {"name": "preflight", "status": "completed", "conclusion": "skipped",
+         "started_at": "2026-09-18T01:00:00Z"},
+        {"name": "preflight", "status": "completed", "conclusion": "success",
+         "started_at": "2026-09-18T02:00:00Z"},
+        {"name": "merge readiness", "status": "completed", "conclusion": "failure",
+         "started_at": "2026-09-18T02:05:00Z"},
+    ]
+
+    reported = loadPrTool().chooseLatestRuns(runs)
+
+    assert [(run["name"], run["conclusion"]) for run in reported] == [
+        ("preflight", "success"),
+        ("merge readiness", "failure"),
+    ]

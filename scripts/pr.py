@@ -388,15 +388,25 @@ def readCheckRuns(token: str, sha: str) -> list[CheckRun]:
         f"{ticket.repositoryName}/commits/{sha}/check-runs"
     )
     payload = ticket.requestJson(url, token, apiVersion="2022-11-28")
-    return [
-        CheckRun(
+    return chooseLatestRuns(payload.get("check_runs", []))
+
+
+def chooseLatestRuns(runs: list[dict[str, Any]]) -> list[CheckRun]:
+    """Return the newest run per name, since GitHub keeps every run a commit had.
+
+    A pull request promoted out of draft carries the skipped draft run beside the
+    real one, under the same name. Reporting both says a check ran twice when it
+    ran once, and leaves a reader to work out which verdict is current.
+    """
+    latest: dict[str, CheckRun] = {}
+    for run in sorted(runs, key=lambda run: str(run.get("started_at") or "")):
+        latest[run["name"]] = CheckRun(
             name=run["name"],
             status=run["status"],
             # Null until a run completes, and "" reports better than "None".
             conclusion=run.get("conclusion") or "",
         )
-        for run in payload.get("check_runs", [])
-    ]
+    return list(latest.values())
 
 
 def confirmChecksPassed(runs: list[CheckRun]) -> bool:
@@ -638,7 +648,7 @@ def findBodyFindings(body: str, template: str) -> list[str]:
     ]
     if reworded:
         findings.append(
-            f"{len(reworded)} checkbox label(s) the template does not carry: "
+            f"this body carries {len(reworded)} checkbox the template does not: "
             + ", ".join(reworded)
         )
 

@@ -37,18 +37,22 @@ from rich.console import Console
 from rich.markup import escape
 
 commentMarker: str = "<!-- pybers-merge-readiness -->"
-commentHeading: str = "## Merge readiness"
+commentHeading: str = "## Merge Readiness"
 checkHeadingLevel: str = "###"
 
 verdictSymbols: dict[str, str] = {
-    passed: "✅", failed: "❌", attention: "⚠️", skipped: "⊘",
+    passed: "✅", failed: "❌", attention: "⚠️", skipped: "➖",
 }
-verdictLines: dict[str, str] = {
-    passed: "✅ Every check passed, so a person can now test this change.",
-    attention: "⚠️ A decision is required, and the checks below name what needs one.",
-    failed: "❌ A check failed, so `pr.py merge` refuses this change "
-            "until that check passes.",
+# The check run carries these, not the comment: a reader of the comment wants the
+# checks themselves rather than a sentence restating their worst verdict.
+verdictTitles: dict[str, str] = {
+    passed: "Every check passed",
+    attention: "A decision is required",
+    failed: "A check failed",
 }
+# A check GitHub should surface above the log, and the color it gives that check.
+annotationKinds: dict[str, str] = {failed: "error", attention: "warning"}
+
 consoleColors: dict[str, str] = {
     passed: "green", failed: "red", attention: "yellow", skipped: "dim",
 }
@@ -60,18 +64,33 @@ def formatTimestamp(moment: datetime) -> str:
 
 
 def renderComment(
-    results: list[CheckResult], facts: BranchFacts, verdict: str, moment: datetime
+    results: list[CheckResult], facts: BranchFacts, moment: datetime
 ) -> str:
     """Render the whole comment, marker first, from results and nothing else."""
-    lines = [commentMarker, commentHeading, "", verdictLines[verdict], ""]
+    lines = [commentMarker, commentHeading, ""]
     # A list rather than a table, because a table reads badly in a narrow window
     # and in an email, which is where a notification of this comment arrives.
     for result in results:
         symbol = verdictSymbols.get(result.status, verdictSymbols[skipped])
         lines += [f"{checkHeadingLevel} {symbol} {result.name}", "", result.detail, ""]
     commit = facts.headSha[:12] or "an unknown commit"
-    lines += [f"_Checked {formatTimestamp(moment)} against {commit}._"]
+    lines += [f"_Checked {formatTimestamp(moment)} against commit {commit}._"]
     return "\n".join(lines) + "\n"
+
+
+def renderAnnotations(results: list[CheckResult]) -> list[str]:
+    """Render one workflow command per check, which GitHub shows in its Checks view.
+
+    A failed check becomes an error and a decision becomes a warning, so the names
+    a reader needs sit above the log rather than inside it.
+    """
+    commands: list[str] = []
+    for result in results:
+        if result.status not in annotationKinds:
+            continue
+        kind = annotationKinds[result.status]
+        commands.append(f"::{kind} title={result.name}::{result.detail}")
+    return commands
 
 
 def reportResults(console: Console, results: list[CheckResult], verdict: str) -> None:

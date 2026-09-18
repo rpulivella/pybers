@@ -37,9 +37,11 @@ __usage__ = "python3 scripts/merge-readiness.py <command> [options]"
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 import tomllib
 import urllib.parse
 from datetime import UTC, datetime
@@ -66,6 +68,9 @@ projectPath: Path = repositoryRoot / "pyproject.toml"
 reportWorkflowFile: str = "merge-readiness.yml"
 checkRunName: str = "merge readiness"
 preflightWorkflowFile: str = "preflight.yml"
+preflightCheckName: str = "preflight"
+preflightAttempts: int = 40
+preflightPauseSeconds: float = 15.0
 failedExitCode: int = 1
 errorExitCode: int = 2
 
@@ -91,6 +96,28 @@ def readResolvedPackages() -> list[list[str]]:
     if listed.returncode != 0:
         return []
     return [[entry["name"], entry["version"]] for entry in json.loads(listed.stdout)]
+
+
+def waitForPreflight(token: str, sha: str) -> str:
+    """Return the preflight check's conclusion for a commit, waiting for it to finish.
+
+    Read from GitHub rather than handed over, because the preflight is its own
+    workflow and its own check. Waiting is what AC 3 asks for, and a preflight
+    that never finishes leaves this reporting a wait rather than a verdict.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
+        f"/commits/{sha}/check-runs"
+    )
+    for attempt in range(preflightAttempts):
+        runs = ticket.requestJson(url, token, apiVersion="2022-11-28")["check_runs"]
+        named = [run for run in runs if run["name"] == preflightCheckName]
+        finished = [run for run in named if run["status"] == "completed"]
+        if finished:
+            return str(finished[-1]["conclusion"] or "")
+        if attempt < preflightAttempts - 1:
+            time.sleep(preflightPauseSeconds)
+    return ""
 
 
 def readPullRequestFacts(token: str, number: int) -> dict[str, Any]:
@@ -144,42 +171,18 @@ def postReportComment(token: str, number: int, body: str) -> str:
     return "replaced"
 
 
-def writeCheckRun(
-    token: str, facts: checks.BranchFacts, verdict: str, body: str
-) -> None:
-    """Record the verdict as a check run on the reviewed commit, which blocks a merge.
-
-    A `workflow_run` job's own check belongs to no pull request, so `pr.py merge`
-    never sees it. This one is attached to the commit under review, where it does.
-    """
-    url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
-        "/check-runs"
-    )
-    ticket.requestJson(
-        url, token, method="POST", apiVersion="2022-11-28",
-        payload={
-            "name": checkRunName,
-            "head_sha": facts.headSha,
-            "status": "completed",
-            "conclusion": "failure" if verdict == checks.failed else "success",
-            "output": {
-                "title": presenter.verdictLines[verdict].replace("**", ""),
-                "summary": body,
-            },
-        },
-    )
-
-
 def checkPullRequest(facts: checks.BranchFacts, token: str) -> list[checks.CheckResult]:
     """Run every check, in the order the comment lists them."""
     pullRequest = readPullRequestFacts(token, facts.pullRequest)
     behind = readCommitsBehind(token, pullRequest["base"], facts.headSha)
-    findings = pr.findBodyFindings(pullRequest["body"], pr.readTemplate())
+    # The branch's template when it carried one, since the body was written against it.
+    template = facts.template or pr.readTemplate()
+    findings = pr.findBodyFindings(pullRequest["body"], template)
     return [
-        checks.checkPreflight(facts),
+        checks.checkPreflight(waitForPreflight(token, facts.headSha)),
         checks.checkTemplate(findings),
-        checks.checkChangelog(facts),
+        checks.checkChecklist(pullRequest["body"]),
+        checks.checkChangelog(facts, pullRequest["body"]),
         checks.checkTicketAgreement(facts, pullRequest["title"]),
         checks.checkBranchCurrent(behind, pullRequest["base"]),
         checks.checkDependencies(facts),
@@ -189,17 +192,45 @@ def checkPullRequest(facts: checks.BranchFacts, token: str) -> list[checks.Check
 
 def runCollect(arguments: argparse.Namespace) -> int:
     """Gather the branch's own facts into the file the reporting half reads."""
-    log = Path(arguments.preflight_log).read_text() if arguments.preflight_log else ""
     facts = checks.collectBranchFacts(
-        arguments.base, arguments.pull_request, log,
+        arguments.base, arguments.pull_request,
         branch=arguments.branch or "", headSha=arguments.head_sha or "",
     )
     facts.declaredPackages = readDeclaredPackages()
     facts.resolvedPackages = readResolvedPackages()
     Path(arguments.output).write_text(json.dumps(facts.toDictionary(), indent=1))
-    console.print(f"[green]collected[/] {len(facts.preflightGates)} gates into "
-                  f"{arguments.output}")
+    console.print(f"[green]collected[/] this branch's facts into {arguments.output}")
     return 0
+
+
+def runCheck(arguments: argparse.Namespace) -> int:
+    """Check the pull request, write the comment for the posting half, and fail on red.
+
+    This runs in the job Actions shows as its own check, so a red verdict fails
+    that job and GitHub reports it like any other check. Nothing here writes to
+    the pull request, which is why the job holds no write access.
+    """
+    stored = json.loads(Path(arguments.results).read_text())
+    facts = checks.BranchFacts.fromDictionary(stored)
+    token = ticket.resolveToken()
+    results = checkPullRequest(facts, token)
+    verdict = checks.readVerdict(results)
+    body = presenter.renderComment(results, facts, datetime.now(UTC))
+    Path(arguments.comment).write_text(body)
+    presenter.reportResults(console, results, verdict)
+    writeWorkflowOutput(results, body)
+    console.print(f"wrote the report to {arguments.comment}")
+    return failedExitCode if verdict == checks.failed else 0
+
+
+def writeWorkflowOutput(results: list[checks.CheckResult], body: str) -> None:
+    """Give GitHub the annotations and the summary page a run shows, when inside one."""
+    for command in presenter.renderAnnotations(results):
+        print(command)
+    summaryPath = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summaryPath:
+        # The same report the comment carries, so the two never disagree.
+        Path(summaryPath).write_text(body)
 
 
 def runReport(arguments: argparse.Namespace) -> int:
@@ -215,14 +246,13 @@ def runReport(arguments: argparse.Namespace) -> int:
         return 0
     results = checkPullRequest(facts, token)
     verdict = checks.readVerdict(results)
-    body = presenter.renderComment(results, facts, verdict, datetime.now(UTC))
+    body = presenter.renderComment(results, facts, datetime.now(UTC))
     presenter.reportResults(console, results, verdict)
     if arguments.dry_run:
         console.print(body, markup=False, highlight=False)
         return 0
     console.print(f"{postReportComment(token, facts.pullRequest, body)} the report on "
                   f"{pr.formatPullRequestRef(facts.pullRequest)}")
-    writeCheckRun(token, facts, verdict, body)
     return failedExitCode if verdict == checks.failed else 0
 
 
@@ -275,7 +305,6 @@ def buildParser() -> argparse.ArgumentParser:
     )
     collect.add_argument("--pull-request", type=int, required=True, help="its number")
     collect.add_argument("--base", default=pr.defaultBaseBranch, help="the base branch")
-    collect.add_argument("--preflight-log", help="the log the preflight wrote")
     collect.add_argument("--branch", help="its head branch, which a merge commit hides")
     collect.add_argument("--head-sha", help="its head commit, not the merge commit")
     collect.add_argument(
@@ -288,8 +317,17 @@ def buildParser() -> argparse.ArgumentParser:
         formatter_class=RichHelpFormatter,
     )
     report.add_argument("--results", required=True, help="the collected facts")
-    report.add_argument("--dry-run", action="store_true", help="render, post nothing")
+    report.add_argument("--comment", required=True, help="the rendered comment")
+    report.add_argument("--dry-run", action="store_true", help="print, post nothing")
     report.set_defaults(handler=runReport)
+
+    check = commands.add_parser(
+        "check", help="check the pull request and write the comment, posting nothing",
+        formatter_class=RichHelpFormatter,
+    )
+    check.add_argument("--results", required=True, help="the collected facts")
+    check.add_argument("--comment", default="merge-readiness.md", help="where to write")
+    check.set_defaults(handler=runCheck)
 
     dispatch = commands.add_parser(
         "dispatch", help="run the reporting workflow by hand, from a branch",

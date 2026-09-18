@@ -29,7 +29,7 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -37,10 +37,16 @@ repositoryRoot: Path = Path(__file__).resolve().parent.parent
 goldenDirectory: Path = repositoryRoot / "tests" / "golden"
 changelogPath: Path = repositoryRoot / "CHANGELOG.md"
 goldenReadmePath: Path = goldenDirectory / "README.md"
+templatePath: Path = repositoryRoot / ".github" / "pull_request_template.md"
 
 osvBatchUrl: str = "https://api.osv.dev/v1/querybatch"
 pypiRoot: str = "https://pypi.org/pypi"
 networkTimeoutSeconds: float = 30.0
+
+templateCheckName: str = "PR Template"
+changelogCheckName: str = "Changelog"
+ticketCheckName: str = "Ticket Identifier"
+baseCheckName: str = "Base Branch"
 
 passed: str = "passed"
 failed: str = "failed"
@@ -73,18 +79,29 @@ class BranchFacts:
     branch: str = ""
     headSha: str = ""
     pullRequest: int = 0
-    preflightGates: list[list[str]] = field(default_factory=list)
-    preflightPassed: bool = False
     changelogTickets: list[str] = field(default_factory=list)
     commitSubjects: list[str] = field(default_factory=list)
     goldensTouched: list[str] = field(default_factory=list)
     goldensConfirmed: list[str] = field(default_factory=list)
     resolvedPackages: list[list[str]] = field(default_factory=list)
     declaredPackages: list[str] = field(default_factory=list)
+    template: str = ""
 
     def toDictionary(self) -> dict[str, Any]:
         """Return the facts as the plain dictionary the artifact carries."""
         return asdict(self)
+
+    @classmethod
+    def fromDictionary(cls, stored: dict[str, Any]) -> BranchFacts:
+        """Build facts from a stored file, ignoring any field this code lacks.
+
+        The two halves run different copies of this repository: the collecting
+        half runs the branch's, and the checking half runs the default branch's.
+        A branch that adds a field would otherwise crash the older reader, which
+        is exactly how one run lost its check run entirely.
+        """
+        known = {field.name for field in fields(cls)}
+        return cls(**{name: value for name, value in stored.items() if name in known})
 
 
 def runGit(arguments: list[str]) -> str:
@@ -140,8 +157,7 @@ def readGoldenConfirmations() -> set[str]:
 
 
 def collectBranchFacts(
-    base: str, pullRequest: int, preflightLog: str,
-    branch: str = "", headSha: str = "",
+    base: str, pullRequest: int, branch: str = "", headSha: str = "",
 ) -> BranchFacts:
     """Gather everything the checking half needs, from the branch it may not run.
 
@@ -158,10 +174,6 @@ def collectBranchFacts(
         changelogTickets=readChangelogTickets(),
         commitSubjects=runGit(["log", f"{base}..HEAD", "--format=%s"]).splitlines(),
     )
-    facts.preflightGates = readPreflightGates(preflightLog)
-    facts.preflightPassed = bool(facts.preflightGates) and all(
-        gate[1] == passed for gate in facts.preflightGates
-    )
     confirmed = readGoldenConfirmations()
     changed = runGit(["diff", f"{base}...HEAD", "--name-only"]).splitlines()
     facts.goldensTouched = [
@@ -171,44 +183,58 @@ def collectBranchFacts(
     facts.goldensConfirmed = [
         name for name in facts.goldensTouched if name in confirmed
     ]
+    # The branch's own template, because a body is written against the template it
+    # was given, and a change that edits the template would fail against the base's.
+    if templatePath.is_file():
+        facts.template = templatePath.read_text()
     return facts
 
 
-def readPreflightGates(log: str) -> list[list[str]]:
-    """Return each gate the preflight reported, as a name and a verdict."""
-    gates: list[list[str]] = []
-    for line in log.splitlines():
-        match = re.match(r"^(PASS|FAIL) (\S+)\s\s+(.*)$", line)
-        if match is not None:
-            verdict = passed if match.group(1) == "PASS" else failed
-            gates.append([match.group(2), verdict, match.group(3).strip()])
-    return gates
+def formatList(items: list[str]) -> str:
+    """Join names as a sentence does, with a conjunction before the last."""
+    if len(items) < 2:
+        return "".join(items)
+    return ", ".join(items[:-1]) + f" and {items[-1]}"
 
 
-def checkPreflight(facts: BranchFacts) -> CheckResult:
-    """Report the gates the first half ran, which is where a code failure shows."""
-    if not facts.preflightGates:
-        return CheckResult(
-            "preflight", failed, "the preflight reported no gate at all"
-        )
-    broken = [gate[0] for gate in facts.preflightGates if gate[1] != passed]
-    if broken:
-        return CheckResult("preflight", failed, f"the {', '.join(broken)} gate failed")
-    names = ", ".join(gate[0] for gate in facts.preflightGates)
-    return CheckResult("preflight", passed, f"the {names} gates all passed")
+def checkPreflight(conclusion: str) -> CheckResult:
+    """Report what the preflight's own check concluded for this commit.
+
+    Its gates are named in its own check, so repeating them here would be a copy
+    that goes stale against a gate list this repository means to grow.
+    """
+    if conclusion == "success":
+        return CheckResult("Preflight", passed, "the preflight passed")
+    if conclusion in ("skipped", ""):
+        return CheckResult("Preflight", skipped, "the preflight did not run")
+    return CheckResult("Preflight", failed, f"the preflight {conclusion}")
 
 
-def checkChangelog(facts: BranchFacts) -> CheckResult:
-    """Report whether the CHANGELOG's Unreleased list names this ticket."""
+def readChangelogException(body: str) -> str:
+    """Return the reason a body records for carrying no CHANGELOG entry, if any."""
+    found = re.search(r"^_No CHANGELOG entry[,:]? (.+?)_\s*$", body, re.MULTILINE)
+    return found.group(1).strip() if found else ""
+
+
+def checkChangelog(facts: BranchFacts, body: str = "") -> CheckResult:
+    """Report whether an entry was added, or why an exception was made instead."""
     if not facts.ticket:
-        return CheckResult("changelog", skipped, "this branch names no ticket")
+        return CheckResult(changelogCheckName, skipped, "this branch names no ticket")
     if facts.ticket in facts.changelogTickets:
-        named = f"the Unreleased list names PYB-{facts.ticket}"
-        return CheckResult("changelog", passed, named)
+        return CheckResult(
+            changelogCheckName, passed,
+            f"the Unreleased list names PYB-{facts.ticket}",
+        )
+    excepted = readChangelogException(body)
+    if excepted:
+        return CheckResult(
+            changelogCheckName, attention,
+            f"the Unreleased list names no entry, and the reason given is {excepted}",
+        )
     return CheckResult(
-        "changelog", failed,
-        f"the Unreleased list names no PYB-{facts.ticket} entry, which "
-        "/changelog-add adds",
+        changelogCheckName, failed,
+        f"the Unreleased list names no entry for PYB-{facts.ticket}, and this pull "
+        "request gives no reason",
     )
 
 
@@ -216,46 +242,50 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     """Report whether one ticket number runs through every place that names one."""
     if not facts.ticket:
         return CheckResult(
-            "ticket number", skipped, "this branch names no ticket"
+            ticketCheckName, skipped, "this branch names no ticket"
         )
     disagreeing: list[str] = []
     subjects = {
         match.group(1) for subject in facts.commitSubjects
         if (match := re.match(r"^\[(\d+)\]", subject)) is not None
     }
-    if subjects - {facts.ticket}:
-        disagreeing.append(f"commit subjects name {', '.join(sorted(subjects))}")
-    # An absent entry belongs to the CHANGELOG check, so only a different one disagrees.
-    others = set(facts.changelogTickets) - {facts.ticket}
+    strangers = sorted(subjects - {facts.ticket})
+    if strangers:
+        named = formatList([f"PYB-{number}" for number in strangers])
+        disagreeing.append(f"the commits name {named}")
+    # An absent entry belongs to the Changelog check, so only a different one disagrees.
+    others = sorted(set(facts.changelogTickets) - {facts.ticket})
     if others and facts.ticket not in facts.changelogTickets:
-        disagreeing.append(f"the CHANGELOG's newest entry names {sorted(others)[0]}")
+        disagreeing.append(f"the Unreleased list names PYB-{others[0]}")
     titleMatch = re.match(r"^\[[A-Z]{3}-(\d+)\]", title)
-    if titleMatch is None or titleMatch.group(1) != facts.ticket:
-        disagreeing.append(f"the title reads {title.split(']')[0] + ']'}")
+    if titleMatch is None:
+        disagreeing.append("the title names no ticket")
+    elif titleMatch.group(1) != facts.ticket:
+        disagreeing.append(f"the title names PYB-{titleMatch.group(1)}")
     if disagreeing:
         return CheckResult(
-            "ticket number", failed,
-            f"the branch names PYB-{facts.ticket}, and " + ", while ".join(disagreeing),
+            ticketCheckName, failed,
+            f"the branch names PYB-{facts.ticket}, but " + formatList(disagreeing),
         )
     return CheckResult(
-        "ticket number", passed,
-        f"PYB-{facts.ticket} runs through the branch, the commits and the title",
+        ticketCheckName, passed,
+        f"PYB-{facts.ticket} names the branch, every commit subject and the title",
     )
 
 
 def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
     """Report whether every golden this change touches carries a confirmation date."""
     if not facts.goldensTouched:
-        return CheckResult("goldens", skipped, "this change touches no golden")
+        return CheckResult("Goldens", skipped, "this change touches no golden")
     missing = sorted(set(facts.goldensTouched) - set(facts.goldensConfirmed))
     if missing:
         return CheckResult(
-            "goldens", failed,
-            f"{', '.join(missing)} carries no confirmation date in the goldens README",
+            "Goldens", failed,
+            f"{formatList(missing)} carries no confirmation date",
         )
     return CheckResult(
-        "goldens", passed,
-        f"this change touches {len(set(facts.goldensTouched))}, each of them "
+        "Goldens", passed,
+        f"this change touches {len(set(facts.goldensTouched))} goldens, each "
         "confirmed in Numbers",
     )
 
@@ -263,20 +293,40 @@ def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
 def checkBranchCurrent(behind: int, base: str) -> CheckResult:
     """Report whether the branch has fallen behind the base it will merge into."""
     if behind == 0:
-        current = f"this branch is current with {base}"
-        return CheckResult("branch currency", passed, current)
+        current = f"this branch is up to date with {base}"
+        return CheckResult(baseCheckName, passed, current)
     return CheckResult(
-        "branch currency", attention,
-        f"this branch is {behind} commits behind {base}, and merging {base} in "
-        "runs the checks again",
+        baseCheckName, attention,
+        f"this branch is {behind} commits behind {base}",
     )
 
 
 def checkTemplate(findings: list[str]) -> CheckResult:
-    """Report whether the pull request body still matches its template."""
+    """Report whether the body still matches .github/pull_request_template.md."""
     if not findings:
-        return CheckResult("body template", passed, "this body matches the template")
-    return CheckResult("body template", failed, "; ".join(findings))
+        return CheckResult(templateCheckName, passed, "this body matches the template")
+    return CheckResult(templateCheckName, failed, ". ".join(findings))
+
+
+def checkChecklist(body: str) -> CheckResult:
+    """Report any checklist line still waiting to be ticked or marked NA.
+
+    An unticked box means not done, and the template says an item that cannot
+    apply moves to the end of its list with `NA` in place of its checkbox. A box
+    left blank at review time is therefore a question nobody answered.
+    """
+    waiting = [
+        line.split("] ", 1)[-1].strip()
+        for line in body.splitlines()
+        if re.match(r"\s*- \[ \]", line)
+    ]
+    if waiting:
+        subject = "checkbox is" if len(waiting) == 1 else "checkboxes are"
+        return CheckResult(
+            "Checklist", failed,
+            f"{len(waiting)} {subject} neither checked nor NA: " + formatList(waiting),
+        )
+    return CheckResult("Checklist", passed, "every checkbox is checked or NA")
 
 
 def readVerdict(results: list[CheckResult]) -> str:
@@ -343,15 +393,18 @@ def checkDependencies(facts: BranchFacts) -> CheckResult:
     ]
     if not watched:
         return CheckResult(
-            "dependencies", skipped, "this install resolved no declared dependency"
+            "Dependencies", skipped, "this install resolved no declared dependency"
         )
     advisories = readAdvisories(watched)
     yanked = readYankedPackages(watched)
     if advisories or yanked:
-        parts = [f"{package}: {', '.join(ids)}" for package, ids in advisories.items()]
-        parts += [f"{package}: yanked" for package in yanked]
-        return CheckResult("dependencies", failed, "; ".join(parts))
-    names = ", ".join(f"{name} {version}" for name, version in watched)
+        parts = [
+            f"{package} carries {', '.join(ids)}" for package, ids in advisories.items()
+        ]
+        parts += [f"PyPI has yanked {package}" for package in yanked]
+        return CheckResult("Dependencies", failed, ". ".join(parts))
     return CheckResult(
-        "dependencies", passed, f"no advisory stands against {names}"
+        "Dependencies", passed,
+        f"no advisory or yank against the {len(watched)} packages a fresh install "
+        "resolved",
     )

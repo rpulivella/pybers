@@ -38,6 +38,7 @@ None
 - [ ] The CHANGELOG.md Unreleased entry is in this PR (`/changelog-add`)
 - [ ] I added or updated pytest tests covering the change
 - [ ] Round-trip / golden-file tests pass for any archive-layer change
+- [ ] I created the goldens this change earns and confirmed each in Numbers (`/golden-confirm`)
 
 ## Screenshot(s) / video(s)
 <!-- If none, write None. -->

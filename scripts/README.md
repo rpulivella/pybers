@@ -37,6 +37,18 @@ pr-preflight-check.py
              `/pr-review-code`, and what `.github/workflows/preflight.yml`
              calls, so the gate list lives here rather than in two places, and
              that workflow names no gate of its own. Live now.
+merge-readiness.py
+             gather a branch's facts on GitHub, then check a pull request and
+             report one verdict as a single comment on it. Two halves for two
+             levels of trust: `collect` runs on the branch with no write access,
+             and `report` runs this repository's code over the facts it wrote.
+             `merge_readiness_lib.py` holds the checks and
+             `merge_readiness_presenter.py` renders the comment. Live now.
+golden-confirm.py
+             confirm a golden in running Numbers and write a report of what
+             Numbers shows, through a helper app that holds the permissions so
+             Terminal holds none. Backs `/golden-confirm`, and nothing in the
+             preflight, CI or the suite runs it. Live now.
 ```
 
 ## Naming
