@@ -86,7 +86,36 @@ def testAChangelogNamingThisTicketPasses() -> None:
     assert checks.checkChangelog(facts).status == checks.passed
 
 
-def testAChangelogMissingThisTicketFailsAndNamesTheSkill() -> None:
+def testAMissingEntryWithARecordedReasonAsksForADecision() -> None:
+    facts = buildFacts(changelogTickets=["94"])
+    body = "Some prose.\n\n_No CHANGELOG entry, because this ticket ships nothing._\n"
+
+    result = checks.checkChangelog(facts, body)
+
+    assert result.status == checks.attention
+    assert "this ticket ships nothing" in result.detail
+
+
+def testAnUntickedChecklistItemFailsAndNamesIt() -> None:
+    body = (
+        "## Checklist\n- [x] I performed a self-review\n"
+        "- [ ] I added or updated pytest tests covering the change\n"
+        "- NA Round-trip tests pass\n"
+    )
+
+    result = checks.checkChecklist(body)
+
+    assert result.status == checks.failed
+    assert "I added or updated pytest tests covering the change" in result.detail
+
+
+def testAChecklistOfTickedAndNAItemsPasses() -> None:
+    body = "- [x] I performed a self-review\n- NA Round-trip tests pass\n"
+
+    assert checks.checkChecklist(body).status == checks.passed
+
+
+def testAChangelogMissingThisTicketWithNoReasonFails() -> None:
     result = checks.checkChangelog(buildFacts(changelogTickets=["94"]))
 
     assert result.status == checks.failed

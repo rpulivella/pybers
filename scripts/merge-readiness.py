@@ -179,7 +179,8 @@ def checkPullRequest(facts: checks.BranchFacts, token: str) -> list[checks.Check
     return [
         checks.checkPreflight(facts),
         checks.checkTemplate(findings),
-        checks.checkChangelog(facts),
+        checks.checkChecklist(pullRequest["body"]),
+        checks.checkChangelog(facts, pullRequest["body"]),
         checks.checkTicketAgreement(facts, pullRequest["title"]),
         checks.checkBranchCurrent(behind, pullRequest["base"]),
         checks.checkDependencies(facts),
