@@ -151,6 +151,50 @@ That bug is now explained: it was not a quirk of merged cells, it was a structur
 did not maintain the merge store. Any row or column operation in pybers must update
 `merge_owner.formula_store` in the same pass, or it is incorrect.
 
+## Adding and removing rows and columns, measured against Numbers' own edits
+
+From `56-structure-base` and six copies, each with one edit made in Numbers, measured
+2026-09-18 for PYB-17. The base carries labeled formulas, merges before, across and
+beyond each edit, a hidden row and column, and a second table reading the first.
+
+**Numbers widens a selected row or column to cover every merge it touches**, and does
+so transitively. "Add row above row 3" inserted two rows because `C2:D3` spans rows 2
+and 3, and "add column before column E" inserted five because `D5:F5` touches
+`C1:D1`'s column. An edit made from a selected row therefore never cuts a merge. One
+made from a single selected cell does, which is what `56f` and `56g` were made from.
+
+**An insertion inside a merge grows it** and does not copy into the new line, the
+opposite of `23`, where rows inserted beside a merge inherited its pattern. A deletion
+inside one shrinks it.
+
+**A structural edit moves locked references too.** `$A$1:$A$10` became `$A$1:$A$12`
+and `$A$8` became `$A$10`. Locking pins a reference against dragging, not against the
+grid changing under it.
+
+**A range keeps its first and last surviving lines.** An insertion before its far end
+moves only that end, so `SUM(A2:A3)` with a row inserted at 3 became `SUM(A2:A4)`. A
+deletion pulls the ends in: deleting row 3 made `SUM(A3:A4)` into `SUM(A3:A3)` and
+`SUM(A2:A3)` into `SUM(A2:A2)`, each stored with `range_end` omitted.
+
+**A reference losing every line becomes node type 46 carrying the lines it lost.**
+Beside the sentinels sits an `AST_tract_list` holding the UUID of every row and column
+it named, as `21`'s deleted reference does too. A broken range names its own table
+even from inside it. A single cell and a whole range both break this way; a range
+losing only some lines shrinks instead.
+
+**Every line keeps its UUID through an edit**, so a hidden row or column stays hidden
+wherever it moves. An added line takes a fresh UUID, and the sorted list stays sorted.
+
+**Numbers maintains the counts it keeps by index**: each header bucket re-indexes and
+recounts `numberOfCells`, each tile row recounts `cell_count`, and the stroke sidecar
+takes the new size. The layout cache's `rows_fitting_entries` hold column indices and
+go stale; a created table carries that cache empty, which Numbers accepts.
+
+**The engine moves every coordinate**, in the table's registers, its merge owner and its
+`cell_errors`. A one-cell range such as `SUM(A2:A2)` is registered as a cell edge rather
+than a rectangle. A formula newly broken is stored as an error cell with an error
+entry, which pybers leaves to the recalculation it asks for.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:
