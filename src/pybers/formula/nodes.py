@@ -33,6 +33,7 @@ row of `None` means the whole column rather than row zero. The same rule
 `pybers.addressing.ranges` already follows.
 
 UPDATES
+2026-09-18  A broken reference names the rows and columns it lost, for PYB-17.
 2026-09-11  Apple's list node is a bracket the author typed, for #67. It
             enclosed one value in all 4364 instances measured.
 2026-09-08  A reference and a range follow a target that moved, for #13. A
@@ -249,6 +250,22 @@ class Span:
 
 
 @dataclass(frozen=True, slots=True)
+class FormulaReferenceLoss:
+    """The rows and columns a broken reference named before they were removed.
+
+    Numbers writes these beside the `#REF!` sentinels, as each line's UUID value,
+    in all three references measured breaking. `range` records whether a range
+    broke rather than a single cell, and each axis keeps the lock it had.
+    """
+
+    columns: tuple[int, ...] = ()
+    rows: tuple[int, ...] = ()
+    range: bool = False
+    columnsAbsolute: bool = False
+    rowsAbsolute: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class FormulaReference:
     """A reference to one cell from inside a formula.
 
@@ -261,6 +278,7 @@ class FormulaReference:
     row: Coordinate | None = None
     tableId: str | None = None
     broken: bool = False
+    loss: FormulaReferenceLoss | None = None
 
     @property
     def crossTable(self) -> bool:
@@ -306,7 +324,7 @@ class FormulaReference:
         row = None if self.row is None else self.row.shifted(rows)
         if column is self.column and row is self.row:
             return self
-        return FormulaReference(column, row, self.tableId, self.broken)
+        return FormulaReference(column, row, self.tableId)
 
 
 @dataclass(frozen=True, slots=True)

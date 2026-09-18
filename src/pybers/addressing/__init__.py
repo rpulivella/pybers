@@ -21,6 +21,7 @@ why each carries its own guard in the module that owns it:
   cannot represent what Numbers stores.
 
 UPDATES
+2026-09-18  `GridEdit`, where lines land after a structural edit, for PYB-17.
 2026-09-08  Made a package of its own for #58, out of `pybers.model`.
 """
 from __future__ import annotations
@@ -33,6 +34,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from pybers.addressing.lines import GridEdit
 from pybers.addressing.ranges import (
     AxisBound,
     CellRange,
@@ -67,6 +69,7 @@ __all__ = [
     "CellRange",
     "CellRangeList",
     "CellReference",
+    "GridEdit",
     "RangeAddress",
     "RangeEndpoint",
     "ReferenceError",

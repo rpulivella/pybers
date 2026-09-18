@@ -43,7 +43,15 @@ from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import NumbersPackage, createArchive
-from .._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
+from .._persistence.index import (
+    ArchiveIndex,
+    assignUuid,
+    findRoot,
+    readUuidValue,
+    tableInfoTypeId,
+    wordBits,
+    wordMask,
+)
 from .._persistence.metadata import PackageRegistry
 from .._persistence.template import (
     ArchiveCopy,
@@ -80,10 +88,6 @@ ownerKindLimit: int = 0x100
 # A UUID this small is a fixed value such as a root group, never an identity.
 fixedUuidLimit: int = 1 << 32
 
-halfBits: int = 64
-halfMask: int = (1 << halfBits) - 1
-wordBits: int = 32
-wordMask: int = (1 << wordBits) - 1
 
 ownerTypeId: int = 4008
 paragraphStyleTypeId: int = 2022
@@ -105,17 +109,6 @@ formulasPerTable: int = 4
 ownerIdFields: frozenset[str] = frozenset(
     {"internal_formula_owner_id", "internal_owner_id_for_edge", "internal_owner_id"}
 )
-
-
-def readUuidValue(message: tsp.UUID) -> int:
-    """Return a UUID's value from its two halves."""
-    return (message.upper << halfBits) | message.lower
-
-
-def assignUuid(message: tsp.UUID, value: int) -> None:
-    """Set a UUID's two halves from a value."""
-    message.lower = value & halfMask
-    message.upper = value >> halfBits
 
 
 def readWordsValue(message: tsp.CFUUIDArchive) -> int:
@@ -203,15 +196,16 @@ def remapOwnerIds(message: Message, mapping: dict[int, int]) -> None:
             remapOwnerIds(item, mapping)
 
 
-def assignUids(uidMap: tst.ColumnRowUIDMapArchive, rows: int, cols: int) -> None:
-    """Give a table a fresh UID for every row and column, in the order Numbers keeps.
+def assignUids(uidMap: tst.ColumnRowUIDMapArchive, table: Table) -> None:
+    """Write a table's row and column identities, in the order Numbers keeps.
 
     The UIDs are sorted by value, upper half first, and each index list is the
     permutation between that order and the table's own. Measured from `48`.
     """
-    for axis, count in (("column", cols), ("row", rows)):
-        uids = [uuid.uuid4().int for _ in range(count)]
-        ordered = sorted(range(count), key=lambda position: uids[position])
+    for axis, uids in (
+        ("column", table._columnIdentities), ("row", table._rowIdentities)
+    ):
+        ordered = sorted(range(len(uids)), key=lambda position: uids[position])
         sortedField = getattr(uidMap, f"sorted_{axis}_uids")
         indexForUid = getattr(uidMap, f"{axis}_index_for_uid")
         uidForIndex = getattr(uidMap, f"{axis}_uid_for_index")
@@ -222,7 +216,7 @@ def assignUids(uidMap: tst.ColumnRowUIDMapArchive, rows: int, cols: int) -> None
             assignUuid(sortedField.add(), uids[position])
         indexForUid.extend(ordered)
         rank = {position: slot for slot, position in enumerate(ordered)}
-        uidForIndex.extend(rank[position] for position in range(count))
+        uidForIndex.extend(rank[position] for position in range(len(uids)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -578,7 +572,7 @@ def shapeTable(copies: TemplateCopies, table: Table, origin: Position) -> None:
     model.table_id = renderIdentityText(table.identifier)
     sidecar.row_count = table.rowCount
     sidecar.column_count = table.colCount
-    assignUids(uids, table.rowCount, table.colCount)
+    assignUids(uids, table)
     cache = info.layout_engine.width_height_cache
     del cache.rows_fitting_entries[:]
     cache.columns_count = table.colCount
