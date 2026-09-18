@@ -180,9 +180,9 @@ def testTheCommentCarriesEveryCheckItsVerdictAndTheMomentItRan() -> None:
         results, buildFacts(), checks.failed, datetime(2026, 9, 17, 18, 54, tzinfo=UTC)
     )
 
-    assert "**✅ preflight**\n\nfour gates" in body
-    assert "**— goldens**\n\nnone touched" in body
-    assert "**❌ changelog**\n\nno entry" in body
+    assert "### ✅ preflight\n\nfour gates" in body
+    assert "### ⊘ goldens\n\nnone touched" in body
+    assert "### ❌ changelog\n\nno entry" in body
     assert "2026-09-17 18:54 UTC" in body
     assert "abc123def456" in body
 

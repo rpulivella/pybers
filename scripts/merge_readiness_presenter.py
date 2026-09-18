@@ -38,9 +38,10 @@ from rich.markup import escape
 
 commentMarker: str = "<!-- pybers-merge-readiness -->"
 commentHeading: str = "## Merge readiness"
+checkHeadingLevel: str = "###"
 
 verdictSymbols: dict[str, str] = {
-    passed: "✅", failed: "❌", attention: "⚠️", skipped: "—",
+    passed: "✅", failed: "❌", attention: "⚠️", skipped: "⊘",
 }
 verdictLines: dict[str, str] = {
     passed: "✅ Every check passed, so a person can now test this change.",
@@ -67,7 +68,7 @@ def renderComment(
     # and in an email, which is where a notification of this comment arrives.
     for result in results:
         symbol = verdictSymbols.get(result.status, verdictSymbols[skipped])
-        lines += [f"**{symbol} {result.name}**", "", result.detail, ""]
+        lines += [f"{checkHeadingLevel} {symbol} {result.name}", "", result.detail, ""]
     commit = facts.headSha[:12] or "an unknown commit"
     lines += [f"_Checked {formatTimestamp(moment)} against {commit}._"]
     return "\n".join(lines) + "\n"
