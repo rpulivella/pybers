@@ -43,9 +43,10 @@ jobs:
         with:
           python-version-file: pyproject.toml
 
-      - name: Install what the checks need
-        # `rich` alone: this half imports no part of the library.
-        run: pip install rich
+      - name: Install the project
+        # The whole project, because one check asks what a fresh install resolves,
+        # and an install of `rich` alone would answer for `rich` alone.
+        run: pip install -e ".[dev]"
 
       - name: Collect this branch's facts
         run: |
