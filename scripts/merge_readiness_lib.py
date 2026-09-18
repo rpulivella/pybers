@@ -37,6 +37,7 @@ repositoryRoot: Path = Path(__file__).resolve().parent.parent
 goldenDirectory: Path = repositoryRoot / "tests" / "golden"
 changelogPath: Path = repositoryRoot / "CHANGELOG.md"
 goldenReadmePath: Path = goldenDirectory / "README.md"
+templatePath: Path = repositoryRoot / ".github" / "pull_request_template.md"
 
 osvBatchUrl: str = "https://api.osv.dev/v1/querybatch"
 pypiRoot: str = "https://pypi.org/pypi"
@@ -86,6 +87,7 @@ class BranchFacts:
     goldensConfirmed: list[str] = field(default_factory=list)
     resolvedPackages: list[list[str]] = field(default_factory=list)
     declaredPackages: list[str] = field(default_factory=list)
+    template: str = ""
 
     def toDictionary(self) -> dict[str, Any]:
         """Return the facts as the plain dictionary the artifact carries."""
@@ -176,6 +178,10 @@ def collectBranchFacts(
     facts.goldensConfirmed = [
         name for name in facts.goldensTouched if name in confirmed
     ]
+    # The branch's own template, because a body is written against the template it
+    # was given, and a change that edits the template would fail against the base's.
+    if templatePath.is_file():
+        facts.template = templatePath.read_text()
     return facts
 
 

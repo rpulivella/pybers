@@ -175,7 +175,9 @@ def checkPullRequest(facts: checks.BranchFacts, token: str) -> list[checks.Check
     """Run every check, in the order the comment lists them."""
     pullRequest = readPullRequestFacts(token, facts.pullRequest)
     behind = readCommitsBehind(token, pullRequest["base"], facts.headSha)
-    findings = pr.findBodyFindings(pullRequest["body"], pr.readTemplate())
+    # The branch's template when it carried one, since the body was written against it.
+    template = facts.template or pr.readTemplate()
+    findings = pr.findBodyFindings(pullRequest["body"], template)
     return [
         checks.checkPreflight(facts),
         checks.checkTemplate(findings),
