@@ -88,6 +88,7 @@ __usage__ = "python3 scripts/pr.py <command> [options]"
 import argparse
 import re
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any, TypedDict
@@ -120,6 +121,11 @@ validMergeMethods: tuple[str, ...] = (
 # keyword stays in every body, because it is what links a pull request to its
 # ticket, so a ticket carried by more than one pull request is reopened instead.
 inProgressStatus: str = "In Progress"
+
+# How long to watch for GitHub to act on the closing keyword, which it does
+# seconds after the merge rather than with it.
+ticketCloseAttempts: int = 10
+ticketClosePauseSeconds: float = 3.0
 
 # Exit codes are distinguished because a skill reads them and acts. Collapsing
 # "there is no pull request" into "something went wrong" made a missing token
@@ -1006,6 +1012,21 @@ def readTicketFromSubject(subject: str) -> int | None:
     return int(matched.group(1)) if matched else None
 
 
+def waitForTicketClosed(token: str, number: int) -> bool:
+    """Wait for GitHub to act on the closing keyword, and say whether it did.
+
+    GitHub closes the ticket some seconds after the merge, so reopening at once
+    races it and loses: the reopen lands first and the close undoes it. Watching
+    for the close is what makes the correction reliable.
+    """
+    for attempt in range(ticketCloseAttempts):
+        if ticket.readTicket(token, number)["state"] == "closed":
+            return True
+        if attempt < ticketCloseAttempts - 1:
+            time.sleep(ticketClosePauseSeconds)
+    return False
+
+
 def reopenTicketAfterMerge(token: str, subject: str, status: str) -> bool:
     """Reopen the ticket this merge closed, and restore the Status the board moved.
 
@@ -1020,6 +1041,12 @@ def reopenTicketAfterMerge(token: str, subject: str, status: str) -> bool:
             "Reopen it by hand, and set its Status back."
         )
         return False
+    if not waitForTicketClosed(token, number):
+        console.print(
+            f"[yellow]{ticket.formatTicketRef(number)} is still open[/], so the merge "
+            "closed nothing and there was nothing to reopen"
+        )
+        return True
     try:
         ticket.reopenTicket(token, number)
         ticket.moveTicketStatus(token, number, status)
