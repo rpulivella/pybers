@@ -206,9 +206,27 @@ def testTheCommentCarriesTheChecksRatherThanASentenceAboutThem() -> None:
         buildFacts(), datetime.now(UTC),
     )
 
-    assert body.splitlines()[1] == presenter.commentHeading
+    assert body.splitlines()[1] == f"## ✅ {presenter.commentHeading}"
     assert "### ✅ Preflight" in body
     assert "ready to merge" not in body.lower()
+
+
+def testTheHeadingCarriesTheWorstVerdictAndASkipNeverColoursIt() -> None:
+    skippedOnly = [checks.CheckResult("Goldens", checks.skipped, "none touched")]
+    withDecision = [
+        *skippedOnly, checks.CheckResult("Base Branch", checks.attention, "2 behind")
+    ]
+    withFailure = [
+        *withDecision, checks.CheckResult("Checklist", checks.failed, "1 unresolved")
+    ]
+
+    def heading(results: list[checks.CheckResult]) -> str:
+        body = presenter.renderComment(results, buildFacts(), datetime.now(UTC))
+        return body.splitlines()[1]
+
+    assert heading(skippedOnly) == f"## ✅ {presenter.commentHeading}"
+    assert heading(withDecision) == f"## ⚠️ {presenter.commentHeading}"
+    assert heading(withFailure) == f"## ❌ {presenter.commentHeading}"
 
 
 def testADetailReachesTheCommentWhateverPunctuationItCarries() -> None:

@@ -31,13 +31,14 @@ from merge_readiness_lib import (
     attention,
     failed,
     passed,
+    readVerdict,
     skipped,
 )
 from rich.console import Console
 from rich.markup import escape
 
 commentMarker: str = "<!-- pybers-merge-readiness -->"
-commentHeading: str = "## Merge Readiness"
+commentHeading: str = "Merge Readiness"
 checkHeadingLevel: str = "###"
 
 verdictSymbols: dict[str, str] = {
@@ -67,7 +68,10 @@ def renderComment(
     results: list[CheckResult], facts: BranchFacts, moment: datetime
 ) -> str:
     """Render the whole comment, marker first, from results and nothing else."""
-    lines = [commentMarker, commentHeading, ""]
+    # The heading carries the verdict, because it is the line a reader lands on.
+    # A skipped check never decides it: only a failure or a decision can.
+    verdict = readVerdict(results)
+    lines = [commentMarker, f"## {verdictSymbols[verdict]} {commentHeading}", ""]
     # A list rather than a table, because a table reads badly in a narrow window
     # and in an email, which is where a notification of this comment arrives.
     for result in results:
