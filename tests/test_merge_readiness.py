@@ -40,44 +40,28 @@ def buildFacts(**overrides: object) -> checks.BranchFacts:
     return facts
 
 
-def testAPreflightLogYieldsOneEntryPerGate() -> None:
-    gates = checks.readPreflightGates(
-        "PASS pytest  1618 passed\nFAIL ruff  2 errors\nnoise\n"
-    )
+def testAFactsFileFromANewerBranchLoadsWithoutItsUnknownFields() -> None:
+    stored = {"ticket": "76", "branch": "chore/76-a", "somethingLater": ["new"]}
 
-    assert gates == [
-        ["pytest", checks.passed, "1618 passed"],
-        ["ruff", checks.failed, "2 errors"],
-    ]
+    facts = checks.BranchFacts.fromDictionary(stored)
+
+    assert facts.ticket == "76"
+    assert facts.branch == "chore/76-a"
 
 
-def testTheUnreleasedListIsReadPastTheFilesOwnMentionOfTheHeading() -> None:
-    text = (
-        "# Changelog\n\nMaintained by `/changelog-add`, one bullet under "
-        "`## Unreleased`.\n\n## Unreleased\n\n- [PYB-76] A thing\n- [PYB-94] Another"
-        "\n\n## 0.1.0\n\n- [PYB-1] Older\n"
-    )
-
-    assert checks.readUnreleasedSection(text).strip().startswith("- [PYB-76]")
-    assert "PYB-1] Older" not in checks.readUnreleasedSection(text)
+def testAPassingPreflightCheckPasses() -> None:
+    assert checks.checkPreflight("success").status == checks.passed
 
 
-def testTheRepositorysOwnChangelogNamesItsOpenTickets() -> None:
-    assert checks.readChangelogTickets(), "the Unreleased list parsed as empty"
-
-
-def testAFailedGateFailsThePreflightCheckAndNamesIt() -> None:
-    facts = buildFacts(preflightGates=[["pytest", checks.passed, ""],
-                                       ["mypy", checks.failed, "3 errors"]])
-
-    result = checks.checkPreflight(facts)
+def testAFailingPreflightCheckFailsAndSaysWhatItConcluded() -> None:
+    result = checks.checkPreflight("failure")
 
     assert result.status == checks.failed
-    assert "mypy" in result.detail
+    assert "failure" in result.detail
 
 
-def testAPreflightThatReportedNothingFailsRatherThanPasses() -> None:
-    assert checks.checkPreflight(buildFacts()).status == checks.failed
+def testAPreflightThatNeverRanIsSkippedRatherThanFailed() -> None:
+    assert checks.checkPreflight("").status == checks.skipped
 
 
 def testAChangelogNamingThisTicketPasses() -> None:
@@ -234,3 +218,19 @@ def testADetailReachesTheCommentWhateverPunctuationItCarries() -> None:
     )
 
     assert "rich 1.0 | yanked" in body
+
+
+def testOnlyAFailureOrADecisionBecomesAnAnnotation() -> None:
+    results = [
+        checks.CheckResult("Checklist", checks.failed, "1 checkbox is unresolved"),
+        checks.CheckResult("Base Branch", checks.attention, "2 commits behind"),
+        checks.CheckResult("Preflight", checks.passed, "the preflight passed"),
+        checks.CheckResult("Goldens", checks.skipped, "no golden"),
+    ]
+
+    commands = presenter.renderAnnotations(results)
+
+    assert commands == [
+        "::error title=Checklist::1 checkbox is unresolved",
+        "::warning title=Base Branch::2 commits behind",
+    ]

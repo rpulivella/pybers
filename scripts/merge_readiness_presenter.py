@@ -50,6 +50,9 @@ verdictTitles: dict[str, str] = {
     attention: "A decision is required",
     failed: "A check failed",
 }
+# A check GitHub should surface above the log, and the color it gives that check.
+annotationKinds: dict[str, str] = {failed: "error", attention: "warning"}
+
 consoleColors: dict[str, str] = {
     passed: "green", failed: "red", attention: "yellow", skipped: "dim",
 }
@@ -73,6 +76,21 @@ def renderComment(
     commit = facts.headSha[:12] or "an unknown commit"
     lines += [f"_Checked {formatTimestamp(moment)} against commit {commit}._"]
     return "\n".join(lines) + "\n"
+
+
+def renderAnnotations(results: list[CheckResult]) -> list[str]:
+    """Render one workflow command per check, which GitHub shows in its Checks view.
+
+    A failed check becomes an error and a decision becomes a warning, so the names
+    a reader needs sit above the log rather than inside it.
+    """
+    commands: list[str] = []
+    for result in results:
+        if result.status not in annotationKinds:
+            continue
+        kind = annotationKinds[result.status]
+        commands.append(f"::{kind} title={result.name}::{result.detail}")
+    return commands
 
 
 def reportResults(console: Console, results: list[CheckResult], verdict: str) -> None:
