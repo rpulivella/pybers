@@ -29,7 +29,7 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -79,8 +79,6 @@ class BranchFacts:
     branch: str = ""
     headSha: str = ""
     pullRequest: int = 0
-    preflightGates: list[list[str]] = field(default_factory=list)
-    preflightPassed: bool = False
     changelogTickets: list[str] = field(default_factory=list)
     commitSubjects: list[str] = field(default_factory=list)
     goldensTouched: list[str] = field(default_factory=list)
@@ -92,6 +90,18 @@ class BranchFacts:
     def toDictionary(self) -> dict[str, Any]:
         """Return the facts as the plain dictionary the artifact carries."""
         return asdict(self)
+
+    @classmethod
+    def fromDictionary(cls, stored: dict[str, Any]) -> BranchFacts:
+        """Build facts from a stored file, ignoring any field this code lacks.
+
+        The two halves run different copies of this repository: the collecting
+        half runs the branch's, and the checking half runs the default branch's.
+        A branch that adds a field would otherwise crash the older reader, which
+        is exactly how one run lost its check run entirely.
+        """
+        known = {field.name for field in fields(cls)}
+        return cls(**{name: value for name, value in stored.items() if name in known})
 
 
 def runGit(arguments: list[str]) -> str:
@@ -147,8 +157,7 @@ def readGoldenConfirmations() -> set[str]:
 
 
 def collectBranchFacts(
-    base: str, pullRequest: int, preflightLog: str,
-    branch: str = "", headSha: str = "",
+    base: str, pullRequest: int, branch: str = "", headSha: str = "",
 ) -> BranchFacts:
     """Gather everything the checking half needs, from the branch it may not run.
 
@@ -164,10 +173,6 @@ def collectBranchFacts(
         pullRequest=pullRequest,
         changelogTickets=readChangelogTickets(),
         commitSubjects=runGit(["log", f"{base}..HEAD", "--format=%s"]).splitlines(),
-    )
-    facts.preflightGates = readPreflightGates(preflightLog)
-    facts.preflightPassed = bool(facts.preflightGates) and all(
-        gate[1] == passed for gate in facts.preflightGates
     )
     confirmed = readGoldenConfirmations()
     changed = runGit(["diff", f"{base}...HEAD", "--name-only"]).splitlines()
@@ -185,17 +190,6 @@ def collectBranchFacts(
     return facts
 
 
-def readPreflightGates(log: str) -> list[list[str]]:
-    """Return each gate the preflight reported, as a name and a verdict."""
-    gates: list[list[str]] = []
-    for line in log.splitlines():
-        match = re.match(r"^(PASS|FAIL) (\S+)\s\s+(.*)$", line)
-        if match is not None:
-            verdict = passed if match.group(1) == "PASS" else failed
-            gates.append([match.group(2), verdict, match.group(3).strip()])
-    return gates
-
-
 def formatList(items: list[str]) -> str:
     """Join names as a sentence does, with a conjunction before the last."""
     if len(items) < 2:
@@ -203,17 +197,17 @@ def formatList(items: list[str]) -> str:
     return ", ".join(items[:-1]) + f" and {items[-1]}"
 
 
-def checkPreflight(facts: BranchFacts) -> CheckResult:
-    """Report the gates the first half ran, which is where a code failure shows."""
-    if not facts.preflightGates:
-        return CheckResult(
-            "Preflight", failed, "the preflight produced no result"
-        )
-    broken = [gate[0] for gate in facts.preflightGates if gate[1] != passed]
-    if broken:
-        return CheckResult("Preflight", failed, f"{formatList(broken)} failed")
-    names = formatList([gate[0] for gate in facts.preflightGates])
-    return CheckResult("Preflight", passed, f"{names} passed")
+def checkPreflight(conclusion: str) -> CheckResult:
+    """Report what the preflight's own check concluded for this commit.
+
+    Its gates are named in its own check, so repeating them here would be a copy
+    that goes stale against a gate list this repository means to grow.
+    """
+    if conclusion == "success":
+        return CheckResult("Preflight", passed, "the preflight passed")
+    if conclusion in ("skipped", ""):
+        return CheckResult("Preflight", skipped, "the preflight did not run")
+    return CheckResult("Preflight", failed, f"the preflight {conclusion}")
 
 
 def readChangelogException(body: str) -> str:

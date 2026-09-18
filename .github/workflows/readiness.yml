@@ -1,0 +1,74 @@
+# The checking half of PYB-76, and its own workflow so GitHub reports it as its
+# own check: a job inside preflight.yml would read as "preflight / readiness",
+# which says the preflight failed when it did not.
+#
+# It reads this branch and holds no write access. The comment it renders is
+# posted by merge-readiness.yml, which runs the default branch's code.
+name: readiness
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Reading the preflight's own check, and the pull request this reports on.
+  checks: read
+  pull-requests: read
+
+jobs:
+  readiness:
+    # A draft skips, like the preflight, and GitHub shows the skip.
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The facts read this branch's log and its diff against the base, and a
+          # shallow checkout carries neither.
+          fetch-depth: 0
+
+      - name: Fetch the base branch the facts compare against
+        run: git fetch --no-tags origin ${{ github.event.pull_request.base.ref }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: pyproject.toml
+
+      - name: Install what the checks need
+        # `rich` alone: this half imports no part of the library.
+        run: pip install rich
+
+      - name: Collect this branch's facts
+        run: |
+          python scripts/merge-readiness.py collect \
+            --pull-request ${{ github.event.pull_request.number }} \
+            --base origin/${{ github.event.pull_request.base.ref }} \
+            --branch ${{ github.event.pull_request.head.ref }} \
+            --head-sha ${{ github.event.pull_request.head.sha }} \
+            --output merge-readiness.json
+
+      - name: Check merge readiness
+        # A red verdict fails this step, which is the check a merge is refused on.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/merge-readiness.py check \
+            --results merge-readiness.json --comment merge-readiness.md
+
+      - name: Hand the report to the posting half
+        # Always, because a red report is the one most worth posting.
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: merge-readiness
+          path: |
+            merge-readiness.json
+            merge-readiness.md
+          retention-days: 1

@@ -1,41 +1,24 @@
-# The reporting half of PYB-76. It runs this repository's own code, never the
-# branch's: a workflow triggered by `workflow_run` checks out the default branch,
-# and the facts the branch supplied arrive as an artifact, read as data.
+# The posting half of PYB-76, and the only automation in this repository that
+# writes. A workflow reached by `workflow_run` checks out the default branch, so
+# this runs no branch code, and what the branch produced arrives as an artifact.
 #
-# Posting from the preflight itself is the obvious approach and cannot work: a
-# `pull_request` run from a fork has no write access by design.
+# readiness.yml decides the verdict, and Actions reports that workflow as its own
+# check. Nothing here decides anything.
 name: merge readiness
 
-# GitHub runs a `workflow_run` workflow only from the copy on the default branch,
-# so a change to this file proves nothing until it lands. `workflow_dispatch` is
-# what exercises it from a branch, and it stays because re-running a report by
-# hand is worth having.
 on:
   workflow_run:
-    workflows: [preflight]
+    workflows: [readiness]
     types: [completed]
-  workflow_dispatch:
-    inputs:
-      run-id:
-        description: The preflight run whose facts to report on.
-        required: true
 
-# The only write this repository's automation holds, and it reaches one comment.
 permissions:
   contents: read
   actions: read
   pull-requests: write
-  # The verdict is a check run on the commit under review, because a job reached
-  # by `workflow_run` belongs to no pull request and blocks nothing.
-  checks: write
 
 jobs:
-  report:
-    # A run that carried no facts is a draft or a cancelled run, and neither earns
-    # a comment. The download step below decides that by what it finds.
-    if: >-
-      github.event_name == 'workflow_dispatch'
-      || github.event.workflow_run.event == 'pull_request'
+  post:
+    if: github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -45,22 +28,25 @@ jobs:
         with:
           python-version-file: pyproject.toml
 
-      - name: Install what the report needs
-        # `rich` alone: the reporting half imports no part of the library, so a
-        # full install would buy nothing and widen what runs here.
+      - name: Install what posting needs
+        # `rich` alone: this half imports no part of the library.
         run: pip install rich
 
-      - name: Take the facts the preflight collected
-        id: facts
+      - name: Take what the checking job rendered
+        id: rendered
         uses: actions/download-artifact@v6
         continue-on-error: true
         with:
           name: merge-readiness
-          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Report merge readiness
-        if: steps.facts.outcome == 'success'
+      # A draft, or a run that never reached the checking job, rendered nothing,
+      # and a comment about a report that does not exist would say nothing.
+      - name: Post the report
+        if: steps.rendered.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python scripts/merge-readiness.py report --results merge-readiness.json
+        run: |
+          python scripts/merge-readiness.py report \
+            --results merge-readiness.json --comment merge-readiness.md

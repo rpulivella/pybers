@@ -31,13 +31,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-        with:
-          # The facts below read this branch's log and its diff against the base,
-          # and a shallow checkout carries neither.
-          fetch-depth: 0
-
-      - name: Fetch the base branch the facts compare against
-        run: git fetch --no-tags origin ${{ github.event.pull_request.base.ref }}
 
       - uses: actions/setup-python@v6
         with:
@@ -49,30 +42,27 @@ jobs:
       - name: Install the project
         run: pip install -e ".[dev]"
 
-      - name: Run the preflight
-        # `pipefail` because the default shell reports the exit code of `tee`.
+      # One step per gate, because GitHub shows a step as its own line with its own
+      # verdict. Each runs whatever the one before it did, so a failing run still
+      # reports all four.
+      - name: pytest
         shell: bash -o pipefail -e {0}
-        run: python scripts/pr-preflight-check.py 2>&1 | tee "$RUNNER_TEMP/preflight.log"
+        run: python scripts/pr-preflight-check.py --gate pytest 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
 
-      - name: Collect the facts the report needs
-        # Always, because a failed gate is exactly what the report exists to show.
+      - name: standards
         if: always()
-        run: |
-          python scripts/merge-readiness.py collect \
-            --pull-request ${{ github.event.pull_request.number }} \
-            --base origin/${{ github.event.pull_request.base.ref }} \
-            --branch ${{ github.event.pull_request.head.ref }} \
-            --head-sha ${{ github.event.pull_request.head.sha }} \
-            --preflight-log "$RUNNER_TEMP/preflight.log" \
-            --output merge-readiness.json
+        shell: bash -o pipefail -e {0}
+        run: python scripts/pr-preflight-check.py --gate standards 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
 
-      - name: Hand the facts to the reporting half
+      - name: ruff
         if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: merge-readiness
-          path: merge-readiness.json
-          retention-days: 1
+        shell: bash -o pipefail -e {0}
+        run: python scripts/pr-preflight-check.py --gate ruff 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+
+      - name: mypy
+        if: always()
+        shell: bash -o pipefail -e {0}
+        run: python scripts/pr-preflight-check.py --gate mypy 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
 
       - name: Summarize the gates
         # A verdict is matched by its two-space column rather than by any gate
