@@ -51,6 +51,21 @@ def testAPreflightLogYieldsOneEntryPerGate() -> None:
     ]
 
 
+def testTheUnreleasedListIsReadPastTheFilesOwnMentionOfTheHeading() -> None:
+    text = (
+        "# Changelog\n\nMaintained by `/changelog-add`, one bullet under "
+        "`## Unreleased`.\n\n## Unreleased\n\n- [PYB-76] A thing\n- [PYB-94] Another"
+        "\n\n## 0.1.0\n\n- [PYB-1] Older\n"
+    )
+
+    assert checks.readUnreleasedSection(text).strip().startswith("- [PYB-76]")
+    assert "PYB-1] Older" not in checks.readUnreleasedSection(text)
+
+
+def testTheRepositorysOwnChangelogNamesItsOpenTickets() -> None:
+    assert checks.readChangelogTickets(), "the Unreleased list parsed as empty"
+
+
 def testAFailedGateFailsThePreflightCheckAndNamesIt() -> None:
     facts = buildFacts(preflightGates=[["pytest", checks.passed, ""],
                                        ["mypy", checks.failed, "3 errors"]])
@@ -165,9 +180,9 @@ def testTheCommentCarriesEveryCheckItsVerdictAndTheMomentItRan() -> None:
         results, buildFacts(), checks.failed, datetime(2026, 9, 17, 18, 54, tzinfo=UTC)
     )
 
-    assert "| preflight | ✅ | four gates |" in body
-    assert "| goldens | — | none touched |" in body
-    assert "| changelog | ❌ | no entry |" in body
+    assert "### ✅ preflight\n\nfour gates" in body
+    assert "### ⊘ goldens\n\nnone touched" in body
+    assert "### ❌ changelog\n\nno entry" in body
     assert "2026-09-17 18:54 UTC" in body
     assert "abc123def456" in body
 
@@ -178,15 +193,14 @@ def testAGreenCommentNeverSaysAChangeIsReadyToMerge() -> None:
         buildFacts(), checks.passed, datetime.now(UTC),
     )
 
-    assert "ready for a person to test" in body.lower()
+    assert "a person can now test this change" in body.lower()
     assert "ready to merge" not in body.lower()
 
 
-def testADetailCarryingAPipeCannotBreakTheTable() -> None:
+def testADetailReachesTheCommentWhateverPunctuationItCarries() -> None:
     body = presenter.renderComment(
         [checks.CheckResult("dependencies", checks.failed, "rich 1.0 | yanked")],
         buildFacts(), checks.failed, datetime.now(UTC),
     )
 
-    row = next(line for line in body.splitlines() if line.startswith("| dependencies"))
-    assert r"rich 1.0 \| yanked" in row
+    assert "rich 1.0 | yanked" in body

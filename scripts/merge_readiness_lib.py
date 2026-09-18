@@ -110,11 +110,22 @@ def readTicketNumber(branch: str) -> str:
     return match.group(1) if match else ""
 
 
+def readUnreleasedSection(text: str) -> str:
+    """Return the CHANGELOG's Unreleased section, matched as a heading, not as text.
+
+    The file explains itself above the list and names `## Unreleased` while doing so,
+    so a plain search finds the sentence and reads the section as empty.
+    """
+    found = re.search(
+        r"^## Unreleased\s*$(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL
+    )
+    return found.group(1) if found else ""
+
+
 def readChangelogTickets() -> list[str]:
     """Return every ticket key the CHANGELOG's Unreleased list names."""
-    text = changelogPath.read_text()
-    unreleased = text.split("## Unreleased", 1)[-1].split("\n## ", 1)[0]
-    return re.findall(r"^- \[[A-Z]{3}-(\d+)\]", unreleased, re.MULTILINE)
+    section = readUnreleasedSection(changelogPath.read_text())
+    return re.findall(r"^- \[[A-Z]{3}-(\d+)\]", section, re.MULTILINE)
 
 
 def readGoldenConfirmations() -> set[str]:
@@ -128,13 +139,21 @@ def readGoldenConfirmations() -> set[str]:
     return confirmed
 
 
-def collectBranchFacts(base: str, pullRequest: int, preflightLog: str) -> BranchFacts:
-    """Gather everything the checking half needs, from the branch it may not run."""
-    branch = runGit(["rev-parse", "--abbrev-ref", "HEAD"])
+def collectBranchFacts(
+    base: str, pullRequest: int, preflightLog: str,
+    branch: str = "", headSha: str = "",
+) -> BranchFacts:
+    """Gather everything the checking half needs, from the branch it may not run.
+
+    The branch and the head are passed in where a caller knows them, because a
+    pull request is checked out as a detached merge commit: git there reports the
+    branch as `HEAD` and the head as a commit no branch carries.
+    """
+    branch = branch or runGit(["rev-parse", "--abbrev-ref", "HEAD"])
     facts = BranchFacts(
         ticket=readTicketNumber(branch),
         branch=branch,
-        headSha=runGit(["rev-parse", "HEAD"]),
+        headSha=headSha or runGit(["rev-parse", "HEAD"]),
         pullRequest=pullRequest,
         changelogTickets=readChangelogTickets(),
         commitSubjects=runGit(["log", f"{base}..HEAD", "--format=%s"]).splitlines(),
@@ -169,30 +188,36 @@ def readPreflightGates(log: str) -> list[list[str]]:
 def checkPreflight(facts: BranchFacts) -> CheckResult:
     """Report the gates the first half ran, which is where a code failure shows."""
     if not facts.preflightGates:
-        return CheckResult("preflight", failed, "the preflight reported no gates")
+        return CheckResult(
+            "preflight", failed, "the preflight reported no gate at all"
+        )
     broken = [gate[0] for gate in facts.preflightGates if gate[1] != passed]
     if broken:
-        return CheckResult("preflight", failed, f"{', '.join(broken)} failed")
+        return CheckResult("preflight", failed, f"the {', '.join(broken)} gate failed")
     names = ", ".join(gate[0] for gate in facts.preflightGates)
-    return CheckResult("preflight", passed, f"{names} passed")
+    return CheckResult("preflight", passed, f"the {names} gates all passed")
 
 
 def checkChangelog(facts: BranchFacts) -> CheckResult:
     """Report whether the CHANGELOG's Unreleased list names this ticket."""
     if not facts.ticket:
-        return CheckResult("changelog", skipped, "the branch names no ticket")
+        return CheckResult("changelog", skipped, "this branch names no ticket")
     if facts.ticket in facts.changelogTickets:
-        return CheckResult("changelog", passed, f"Unreleased names PYB-{facts.ticket}")
+        named = f"the Unreleased list names PYB-{facts.ticket}"
+        return CheckResult("changelog", passed, named)
     return CheckResult(
         "changelog", failed,
-        f"Unreleased names no PYB-{facts.ticket} entry; run /changelog-add",
+        f"the Unreleased list names no PYB-{facts.ticket} entry, which "
+        "/changelog-add adds",
     )
 
 
 def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     """Report whether one ticket number runs through every place that names one."""
     if not facts.ticket:
-        return CheckResult("ticket number", skipped, "the branch names no ticket")
+        return CheckResult(
+            "ticket number", skipped, "this branch names no ticket"
+        )
     disagreeing: list[str] = []
     subjects = {
         match.group(1) for subject in facts.commitSubjects
@@ -210,44 +235,47 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     if disagreeing:
         return CheckResult(
             "ticket number", failed,
-            f"the branch names PYB-{facts.ticket}, but " + "; ".join(disagreeing),
+            f"the branch names PYB-{facts.ticket}, and " + ", while ".join(disagreeing),
         )
     return CheckResult(
         "ticket number", passed,
-        f"PYB-{facts.ticket} in the branch, the commits and the title",
+        f"PYB-{facts.ticket} runs through the branch, the commits and the title",
     )
 
 
 def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
     """Report whether every golden this change touches carries a confirmation date."""
     if not facts.goldensTouched:
-        return CheckResult("goldens", skipped, "the change touches no golden")
+        return CheckResult("goldens", skipped, "this change touches no golden")
     missing = sorted(set(facts.goldensTouched) - set(facts.goldensConfirmed))
     if missing:
         return CheckResult(
             "goldens", failed,
-            f"{', '.join(missing)} carry no confirmation date in the goldens README",
+            f"{', '.join(missing)} carries no confirmation date in the goldens README",
         )
     return CheckResult(
         "goldens", passed,
-        f"{len(set(facts.goldensTouched))} touched, each confirmed in Numbers",
+        f"this change touches {len(set(facts.goldensTouched))}, each of them "
+        "confirmed in Numbers",
     )
 
 
 def checkBranchCurrent(behind: int, base: str) -> CheckResult:
     """Report whether the branch has fallen behind the base it will merge into."""
     if behind == 0:
-        return CheckResult("branch currency", passed, f"current with {base}")
+        current = f"this branch is current with {base}"
+        return CheckResult("branch currency", passed, current)
     return CheckResult(
         "branch currency", attention,
-        f"{behind} commits behind {base}; merge {base} in and let the checks rerun",
+        f"this branch is {behind} commits behind {base}, and merging {base} in "
+        "runs the checks again",
     )
 
 
 def checkTemplate(findings: list[str]) -> CheckResult:
     """Report whether the pull request body still matches its template."""
     if not findings:
-        return CheckResult("body template", passed, "the body matches the template")
+        return CheckResult("body template", passed, "this body matches the template")
     return CheckResult("body template", failed, "; ".join(findings))
 
 
@@ -314,7 +342,9 @@ def checkDependencies(facts: BranchFacts) -> CheckResult:
         if name.lower() in {package.lower() for package in facts.declaredPackages}
     ]
     if not watched:
-        return CheckResult("dependencies", skipped, "no declared dependency resolved")
+        return CheckResult(
+            "dependencies", skipped, "this install resolved no declared dependency"
+        )
     advisories = readAdvisories(watched)
     yanked = readYankedPackages(watched)
     if advisories or yanked:
@@ -322,4 +352,6 @@ def checkDependencies(facts: BranchFacts) -> CheckResult:
         parts += [f"{package}: yanked" for package in yanked]
         return CheckResult("dependencies", failed, "; ".join(parts))
     names = ", ".join(f"{name} {version}" for name, version in watched)
-    return CheckResult("dependencies", passed, f"no advisory against {names}")
+    return CheckResult(
+        "dependencies", passed, f"no advisory stands against {names}"
+    )

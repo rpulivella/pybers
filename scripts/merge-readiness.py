@@ -64,6 +64,7 @@ console: Console = Console()
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 projectPath: Path = repositoryRoot / "pyproject.toml"
 reportWorkflowFile: str = "merge-readiness.yml"
+checkRunName: str = "merge readiness"
 preflightWorkflowFile: str = "preflight.yml"
 failedExitCode: int = 1
 errorExitCode: int = 2
@@ -143,6 +144,33 @@ def postReportComment(token: str, number: int, body: str) -> str:
     return "replaced"
 
 
+def writeCheckRun(
+    token: str, facts: checks.BranchFacts, verdict: str, body: str
+) -> None:
+    """Record the verdict as a check run on the reviewed commit, which blocks a merge.
+
+    A `workflow_run` job's own check belongs to no pull request, so `pr.py merge`
+    never sees it. This one is attached to the commit under review, where it does.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
+        "/check-runs"
+    )
+    ticket.requestJson(
+        url, token, method="POST", apiVersion="2022-11-28",
+        payload={
+            "name": checkRunName,
+            "head_sha": facts.headSha,
+            "status": "completed",
+            "conclusion": "failure" if verdict == checks.failed else "success",
+            "output": {
+                "title": presenter.verdictLines[verdict].replace("**", ""),
+                "summary": body,
+            },
+        },
+    )
+
+
 def checkPullRequest(facts: checks.BranchFacts, token: str) -> list[checks.CheckResult]:
     """Run every check, in the order the comment lists them."""
     pullRequest = readPullRequestFacts(token, facts.pullRequest)
@@ -162,7 +190,10 @@ def checkPullRequest(facts: checks.BranchFacts, token: str) -> list[checks.Check
 def runCollect(arguments: argparse.Namespace) -> int:
     """Gather the branch's own facts into the file the reporting half reads."""
     log = Path(arguments.preflight_log).read_text() if arguments.preflight_log else ""
-    facts = checks.collectBranchFacts(arguments.base, arguments.pull_request, log)
+    facts = checks.collectBranchFacts(
+        arguments.base, arguments.pull_request, log,
+        branch=arguments.branch or "", headSha=arguments.head_sha or "",
+    )
     facts.declaredPackages = readDeclaredPackages()
     facts.resolvedPackages = readResolvedPackages()
     Path(arguments.output).write_text(json.dumps(facts.toDictionary(), indent=1))
@@ -191,6 +222,7 @@ def runReport(arguments: argparse.Namespace) -> int:
         return 0
     console.print(f"{postReportComment(token, facts.pullRequest, body)} the report on "
                   f"{pr.formatPullRequestRef(facts.pullRequest)}")
+    writeCheckRun(token, facts, verdict, body)
     return failedExitCode if verdict == checks.failed else 0
 
 
@@ -244,6 +276,8 @@ def buildParser() -> argparse.ArgumentParser:
     collect.add_argument("--pull-request", type=int, required=True, help="its number")
     collect.add_argument("--base", default=pr.defaultBaseBranch, help="the base branch")
     collect.add_argument("--preflight-log", help="the log the preflight wrote")
+    collect.add_argument("--branch", help="its head branch, which a merge commit hides")
+    collect.add_argument("--head-sha", help="its head commit, not the merge commit")
     collect.add_argument(
         "--output", default="merge-readiness.json", help="where to write"
     )

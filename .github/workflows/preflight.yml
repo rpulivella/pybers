@@ -61,6 +61,8 @@ jobs:
           python scripts/merge-readiness.py collect \
             --pull-request ${{ github.event.pull_request.number }} \
             --base origin/${{ github.event.pull_request.base.ref }} \
+            --branch ${{ github.event.pull_request.head.ref }} \
+            --head-sha ${{ github.event.pull_request.head.sha }} \
             --preflight-log "$RUNNER_TEMP/preflight.log" \
             --output merge-readiness.json
 
