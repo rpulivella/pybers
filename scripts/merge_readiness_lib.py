@@ -110,11 +110,22 @@ def readTicketNumber(branch: str) -> str:
     return match.group(1) if match else ""
 
 
+def readUnreleasedSection(text: str) -> str:
+    """Return the CHANGELOG's Unreleased section, matched as a heading, not as text.
+
+    The file explains itself above the list and names `## Unreleased` while doing so,
+    so a plain search finds the sentence and reads the section as empty.
+    """
+    found = re.search(
+        r"^## Unreleased\s*$(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL
+    )
+    return found.group(1) if found else ""
+
+
 def readChangelogTickets() -> list[str]:
     """Return every ticket key the CHANGELOG's Unreleased list names."""
-    text = changelogPath.read_text()
-    unreleased = text.split("## Unreleased", 1)[-1].split("\n## ", 1)[0]
-    return re.findall(r"^- \[[A-Z]{3}-(\d+)\]", unreleased, re.MULTILINE)
+    section = readUnreleasedSection(changelogPath.read_text())
+    return re.findall(r"^- \[[A-Z]{3}-(\d+)\]", section, re.MULTILINE)
 
 
 def readGoldenConfirmations() -> set[str]:

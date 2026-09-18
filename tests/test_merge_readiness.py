@@ -51,6 +51,21 @@ def testAPreflightLogYieldsOneEntryPerGate() -> None:
     ]
 
 
+def testTheUnreleasedListIsReadPastTheFilesOwnMentionOfTheHeading() -> None:
+    text = (
+        "# Changelog\n\nMaintained by `/changelog-add`, one bullet under "
+        "`## Unreleased`.\n\n## Unreleased\n\n- [PYB-76] A thing\n- [PYB-94] Another"
+        "\n\n## 0.1.0\n\n- [PYB-1] Older\n"
+    )
+
+    assert checks.readUnreleasedSection(text).strip().startswith("- [PYB-76]")
+    assert "PYB-1] Older" not in checks.readUnreleasedSection(text)
+
+
+def testTheRepositorysOwnChangelogNamesItsOpenTickets() -> None:
+    assert checks.readChangelogTickets(), "the Unreleased list parsed as empty"
+
+
 def testAFailedGateFailsThePreflightCheckAndNamesIt() -> None:
     facts = buildFacts(preflightGates=[["pytest", checks.passed, ""],
                                        ["mypy", checks.failed, "3 errors"]])
