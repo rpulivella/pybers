@@ -16,6 +16,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-18  Rows and records move to their new lines, and a removed one releases
+            what it named as a merge-swallowed one does, for PYB-17.
 2026-09-16  A record carries the chosen-format bit its cell holds, so literal
             text opens as Text, for PYB-83.
 2026-09-16  A formula swapped for another is reported as added, so the engine
@@ -91,6 +93,7 @@ from ._read import (
     readStringTable,
     resolveValue,
 )
+from ._structure import GridMaps, LineMap
 from .cells import Cell, MergeRange, Table
 
 # `TST.Tile` and the type bytes a numeric record may carry. 2 is a plain number
@@ -812,6 +815,96 @@ def rewriteRow(
     return bytes(rebuiltOffsets), bytes(rebuiltBuffer)
 
 
+def moveGridRecords(
+    tiles: list[tuple[int, tst.Tile]],
+    tileSize: int,
+    maps: GridMaps,
+    table: Table,
+    release: Callable[[CellRecord, CellReference], bool],
+) -> None:
+    """Move every stored row and record to its new line, releasing the removed ones.
+
+    A row keeps its bytes and only its index changes, so a record moved rather than
+    edited is the record Numbers wrote. Rows are dealt back to tiles by the new row
+    number, which refuses a destination tile the file lacks or one counting its
+    offsets differently, since neither has been measured.
+    """
+    byTile = dict(tiles)
+    moved: list[tuple[int, tst.TileRowInfo, tst.Tile]] = []
+    for tileid, tile in tiles:
+        for rowInfo in tile.rowInfos:
+            stored = tileid * tileSize + rowInfo.tile_row_index
+            row = maps.rows.lineMap(stored)
+            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            records = decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
+            for record in records:
+                column = maps.columns.lineMap(record.column)
+                if row is None or column is None:
+                    reference = CellReference(
+                        stored + originOffset, record.column + originOffset
+                    )
+                    release(record, reference)
+            if row is None:
+                continue
+            if maps.columns.changed:
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRowColumns(
+                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit,
+                    maps.columns, table.colCount,
+                )
+                rowInfo.cell_count = len(
+                    decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
+                )
+            moved.append((row, rowInfo, tile))
+
+    copies: dict[int, list[tst.TileRowInfo]] = {tileid: [] for tileid in byTile}
+    for row, rowInfo, source in moved:
+        destination = byTile.get(row // tileSize)
+        if destination is None or (
+            destination.should_use_wide_rows != source.should_use_wide_rows
+        ):
+            raise WriteError(
+                f"Row {row + originOffset} of {table.name!r} would move into a tile "
+                "the file does not hold, or one counting its offsets differently, "
+                "and neither has been measured."
+            )
+        copy = tst.TileRowInfo()
+        copy.CopyFrom(rowInfo)
+        copy.tile_row_index = row % tileSize
+        copies[row // tileSize].append(copy)
+    for tileid, tile in tiles:
+        del tile.rowInfos[:]
+        tile.rowInfos.extend(
+            sorted(copies[tileid], key=lambda rowInfo: rowInfo.tile_row_index)
+        )
+        tile.numrows = len(tile.rowInfos)
+
+
+def rewriteRowColumns(
+    offsets: bytes, buffer: bytes, unit: int, columns: LineMap, colCount: int
+) -> tuple[bytes, bytes]:
+    """Rebuild one row with each record in its new column and removed ones dropped.
+
+    A row carrying one offset slot per column grows or shrinks with the table; the
+    narrow shape keeps its fixed 255 slots, so a record past them is refused.
+    """
+    slots = len(offsets) // offsetWidth
+    if slots == len(columns.lines) and slots != narrowRowSlots:
+        slots = colCount
+    placed: dict[int, bytes] = {}
+    for record in decodeRow(offsets, buffer, unit):
+        column = columns.lineMap(record.column)
+        if column is None:
+            continue
+        if column >= slots:
+            raise WriteError(
+                f"A record would move to column {column + originOffset}, past the "
+                f"{slots} offset slots its row carries."
+            )
+        placed[column] = record.raw
+    empty = emptyOffset.to_bytes(offsetWidth, "little") * slots
+    return rewriteRow(empty, b"", unit, placed)
+
+
 @dataclass(frozen=True, slots=True)
 class TableEdits:
     """What one table's write changed, in the terms the engine has to be told.
@@ -859,6 +952,7 @@ def applyTableEdits(
     table: Table,
     model: tst.TableModelArchive,
     swallowed: frozenset[tuple[int, int]] = frozenset(),
+    maps: GridMaps | None = None,
 ) -> TableEdits:
     """Write every changed cell of one table back into the tiles it came from.
 
@@ -918,6 +1012,39 @@ def applyTableEdits(
                 moveFormatReferences(formatList, before, after, str(where))
             )
 
+    def releaseRecord(record: CellRecord, reference: CellReference) -> bool:
+        """Release every list entry a removed record names, reporting a formula."""
+        nonlocal stylesMoved, richTextMoved
+        formatsCount(record.raw, None, reference)
+        if textPool is not None:
+            for key in listStringClaims(record):
+                textPool.release(key)
+        if styleList is not None:
+            stylesMoved |= releaseEntries(styleList, listStyleClaims(record))
+        if richTextList is not None:
+            richTextMoved |= releaseEntries(richTextList, listRichTextClaims(record))
+        if pool is not None and carriesFormula(record):
+            pool.release(record.references[findFormulaKeySlot(record)])
+            return True
+        return False
+
+    # Resolved once, because resolving parses afresh and the structural move below
+    # has to be what the walk after it sees.
+    tileArchives = [
+        (
+            entry,
+            index.archive(entry.tile.identifier),
+            index.resolve(entry.tile, tst.Tile),
+        )
+        for entry in store.tiles.tiles
+    ]
+    restructured = maps is not None and maps.changed
+    if maps is not None and restructured:
+        moveGridRecords(
+            [(entry.tileid, tile) for entry, _, tile in tileArchives],
+            tileSize, maps, table, releaseRecord,
+        )
+
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
@@ -946,12 +1073,10 @@ def applyTableEdits(
                 f"stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
             )
 
-    for entry in store.tiles.tiles:
-        archive = index.archive(entry.tile.identifier)
-        tile = index.resolve(entry.tile, tst.Tile)
+    for entry, archive, tile in tileArchives:
         tiles.append(tile)
         firstRow = entry.tileid * tileSize
-        touched = False
+        touched = restructured
 
         # Rows the file stores nothing for, materialized before the walk below,
         # which only ever sees a row that already has storage. Doing it here rather
@@ -989,20 +1114,7 @@ def applyTableEdits(
                     row + originOffset, record.column + originOffset
                 )
                 if (row, record.column) in swallowed:
-                    formatsCount(record.raw, None, reference)
-                    if textPool is not None:
-                        for key in listStringClaims(record):
-                            textPool.release(key)
-                    if styleList is not None:
-                        stylesMoved |= releaseEntries(
-                            styleList, listStyleClaims(record)
-                        )
-                    if richTextList is not None:
-                        richTextMoved |= releaseEntries(
-                            richTextList, listRichTextClaims(record)
-                        )
-                    if pool is not None and carriesFormula(record):
-                        pool.release(record.references[findFormulaKeySlot(record)])
+                    if releaseRecord(record, reference):
                         formulaRemoved.append((row, record.column))
                     continue
                 cell = table.cells.get(reference)
