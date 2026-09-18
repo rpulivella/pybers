@@ -164,7 +164,7 @@ def writeCheckRun(
             "status": "completed",
             "conclusion": "failure" if verdict == checks.failed else "success",
             "output": {
-                "title": presenter.verdictLines[verdict].replace("**", ""),
+                "title": presenter.verdictTitles[verdict],
                 "summary": body,
             },
         },
@@ -218,7 +218,7 @@ def runReport(arguments: argparse.Namespace) -> int:
         return 0
     results = checkPullRequest(facts, token)
     verdict = checks.readVerdict(results)
-    body = presenter.renderComment(results, facts, verdict, datetime.now(UTC))
+    body = presenter.renderComment(results, facts, datetime.now(UTC))
     presenter.reportResults(console, results, verdict)
     if arguments.dry_run:
         console.print(body, markup=False, highlight=False)

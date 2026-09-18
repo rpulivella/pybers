@@ -638,7 +638,7 @@ def findBodyFindings(body: str, template: str) -> list[str]:
     ]
     if reworded:
         findings.append(
-            f"{len(reworded)} checkbox label(s) the template does not carry: "
+            f"this body carries {len(reworded)} checkbox the template does not: "
             + ", ".join(reworded)
         )
 

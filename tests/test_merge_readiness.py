@@ -119,7 +119,7 @@ def testAChangelogMissingThisTicketWithNoReasonFails() -> None:
     result = checks.checkChangelog(buildFacts(changelogTickets=["94"]))
 
     assert result.status == checks.failed
-    assert "/changelog-add" in result.detail
+    assert "names no entry for PYB-76" in result.detail
 
 
 def testABranchNamingNoTicketSkipsRatherThanFails() -> None:
@@ -152,7 +152,7 @@ def testATitleNamingAnotherTicketDisagrees() -> None:
     result = checks.checkTicketAgreement(facts, "[PYB-94] Something else")
 
     assert result.status == checks.failed
-    assert "[PYB-94]" in result.detail
+    assert "the title names PYB-94" in result.detail
 
 
 def testATouchedGoldenWithNoConfirmationDateFails() -> None:
@@ -191,8 +191,8 @@ def testTheWorstStatusDecidesTheVerdict() -> None:
 
 def testTheCommentOpensWithItsMarkerSoALaterRunFindsIt() -> None:
     body = presenter.renderComment(
-        [checks.CheckResult("preflight", checks.passed, "four gates")],
-        buildFacts(), checks.passed, datetime(2026, 9, 17, 18, 54, tzinfo=UTC),
+        [checks.CheckResult("Preflight", checks.passed, "four gates")],
+        buildFacts(), datetime(2026, 9, 17, 18, 54, tzinfo=UTC),
     )
 
     assert body.splitlines()[0] == presenter.commentMarker
@@ -200,36 +200,37 @@ def testTheCommentOpensWithItsMarkerSoALaterRunFindsIt() -> None:
 
 def testTheCommentCarriesEveryCheckItsVerdictAndTheMomentItRan() -> None:
     results = [
-        checks.CheckResult("preflight", checks.passed, "four gates"),
-        checks.CheckResult("goldens", checks.skipped, "none touched"),
-        checks.CheckResult("changelog", checks.failed, "no entry"),
+        checks.CheckResult("Preflight", checks.passed, "four gates"),
+        checks.CheckResult("Goldens", checks.skipped, "none touched"),
+        checks.CheckResult("Changelog", checks.failed, "no entry"),
     ]
 
     body = presenter.renderComment(
-        results, buildFacts(), checks.failed, datetime(2026, 9, 17, 18, 54, tzinfo=UTC)
+        results, buildFacts(), datetime(2026, 9, 17, 18, 54, tzinfo=UTC)
     )
 
-    assert "### ✅ preflight\n\nfour gates" in body
-    assert "### ⊘ goldens\n\nnone touched" in body
-    assert "### ❌ changelog\n\nno entry" in body
+    assert "### ✅ Preflight\n\nfour gates" in body
+    assert "### ➖ Goldens\n\nnone touched" in body
+    assert "### ❌ Changelog\n\nno entry" in body
     assert "2026-09-17 18:54 UTC" in body
     assert "abc123def456" in body
 
 
-def testAGreenCommentNeverSaysAChangeIsReadyToMerge() -> None:
+def testTheCommentCarriesTheChecksRatherThanASentenceAboutThem() -> None:
     body = presenter.renderComment(
-        [checks.CheckResult("preflight", checks.passed, "four gates")],
-        buildFacts(), checks.passed, datetime.now(UTC),
+        [checks.CheckResult("Preflight", checks.passed, "four gates")],
+        buildFacts(), datetime.now(UTC),
     )
 
-    assert "a person can now test this change" in body.lower()
+    assert body.splitlines()[1] == presenter.commentHeading
+    assert "### ✅ Preflight" in body
     assert "ready to merge" not in body.lower()
 
 
 def testADetailReachesTheCommentWhateverPunctuationItCarries() -> None:
     body = presenter.renderComment(
-        [checks.CheckResult("dependencies", checks.failed, "rich 1.0 | yanked")],
-        buildFacts(), checks.failed, datetime.now(UTC),
+        [checks.CheckResult("Dependencies", checks.failed, "rich 1.0 | yanked")],
+        buildFacts(), datetime.now(UTC),
     )
 
     assert "rich 1.0 | yanked" in body
