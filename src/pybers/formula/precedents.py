@@ -13,6 +13,7 @@ computed later caches the error that cell still held. Measured 2026-09-16 for
 PYB-86, see findings-02-formulas.md.
 
 UPDATES
+2026-09-18  A range of one cell reads as that cell, for PYB-17.
 2026-09-16  Written for PYB-86.
 """
 from __future__ import annotations
@@ -111,6 +112,16 @@ def resolveFormulaPrecedents(formula: Formula, host: CellReference) -> Precedent
                     extent.startRow, extent.endRow, False, content.tableId
                 )
                 spans.update(dict.fromkeys(whole))
+            elif (extent.startRow, extent.startCol) == (extent.endRow, extent.endCol):
+                # One cell is a cell edge however it was written, as Numbers
+                # registered `SUM(A2:A2)` in `56c-row-deleted`.
+                cells[
+                    CellPrecedent(
+                        row=extent.startRow - originOffset,
+                        column=extent.startCol - originOffset,
+                        tableId=content.tableId,
+                    )
+                ] = None
             else:
                 ranges[
                     RangePrecedent(
