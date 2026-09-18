@@ -71,7 +71,13 @@ def renderComment(
     # The heading carries the verdict, because it is the line a reader lands on.
     # A skipped check never decides it: only a failure or a decision can.
     verdict = readVerdict(results)
-    lines = [commentMarker, f"## {verdictSymbols[verdict]} {commentHeading}", ""]
+    lines = [
+        commentMarker,
+        f"## {verdictSymbols[verdict]} {commentHeading}",
+        "",
+        renderSummary(results),
+        "",
+    ]
     # A list rather than a table, because a table reads badly in a narrow window
     # and in an email, which is where a notification of this comment arrives.
     for result in results:
@@ -80,6 +86,28 @@ def renderComment(
     commit = facts.headSha[:12] or "an unknown commit"
     lines += [f"_Checked {formatTimestamp(moment)} against commit {commit}_"]
     return "\n".join(lines) + "\n"
+
+
+def renderSummary(results: list[CheckResult]) -> str:
+    """Count the checks in one line, which is what a reader takes from the top."""
+    counts = {status: sum(1 for r in results if r.status == status) for status in
+              (passed, failed, attention, skipped)}
+    skips = counts[skipped]
+    trailing = "" if not skips else f" with {skips} skip" + ("" if skips == 1 else "s")
+    if not counts[failed] and not counts[attention]:
+        return f"All checks passed{trailing}"
+    parts = []
+    if counts[passed]:
+        checkWord = "check" if counts[passed] == 1 else "checks"
+        parts.append(f"{counts[passed]} {checkWord} passed")
+    if counts[failed]:
+        parts.append(f"{counts[failed]} failed")
+    if counts[attention]:
+        needs = "needs" if counts[attention] == 1 else "need"
+        parts.append(f"{counts[attention]} {needs} a decision")
+    if skips:
+        parts.append(f"{skips} skip" + ("" if skips == 1 else "s"))
+    return ", ".join(parts)
 
 
 def renderAnnotations(results: list[CheckResult]) -> list[str]:

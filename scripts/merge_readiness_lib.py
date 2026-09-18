@@ -207,6 +207,8 @@ def checkPreflight(conclusion: str) -> CheckResult:
         return CheckResult("Preflight", passed, "The preflight passed")
     if conclusion in ("skipped", ""):
         return CheckResult("Preflight", skipped, "The preflight did not run")
+    if conclusion == "failure":
+        return CheckResult("Preflight", failed, "The preflight failed")
     return CheckResult("Preflight", failed, f"The preflight ended as {conclusion}")
 
 
@@ -398,14 +400,15 @@ def checkDependencies(facts: BranchFacts) -> CheckResult:
     advisories = readAdvisories(watched)
     yanked = readYankedPackages(watched)
     if advisories or yanked:
-        parts = [
-            f"{package} carries {', '.join(ids)}" for package, ids in advisories.items()
+        # One line per package, because a run of them in a sentence hides the second.
+        lines = [
+            f"- {package} has advisory {formatList(ids)}"
+            for package, ids in sorted(advisories.items())
         ]
-        parts += [f"PyPI has withdrawn {package}" for package in yanked]
-        return CheckResult("Dependencies", failed, ". ".join(parts))
+        lines += [f"- {package} is withdrawn from PyPI" for package in sorted(yanked)]
+        return CheckResult("Dependencies", failed, "\n".join(lines))
+    packages = "package" if len(watched) == 1 else "packages"
     return CheckResult(
         "Dependencies", passed,
-        f"No advisory against the {len(watched)} "
-        f"{'package' if len(watched) == 1 else 'packages'} a fresh install resolved, "
-        "and PyPI has withdrawn none of them",
+        f"{len(watched)} resolved {packages}, no advisories, none withdrawn",
     )

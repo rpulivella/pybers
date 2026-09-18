@@ -57,7 +57,7 @@ def testAFailingPreflightCheckFailsAndSaysWhatItConcluded() -> None:
     result = checks.checkPreflight("failure")
 
     assert result.status == checks.failed
-    assert "failure" in result.detail
+    assert result.detail == "The preflight failed"
 
 
 def testAPreflightThatNeverRanIsSkippedRatherThanFailed() -> None:
@@ -227,6 +227,39 @@ def testTheHeadingCarriesTheWorstVerdictAndASkipNeverColoursIt() -> None:
     assert heading(skippedOnly) == f"## ✅ {presenter.commentHeading}"
     assert heading(withDecision) == f"## ⚠️ {presenter.commentHeading}"
     assert heading(withFailure) == f"## ❌ {presenter.commentHeading}"
+
+
+def testEachTroubledPackageGetsItsOwnLine() -> None:
+    results = [checks.CheckResult(
+        "Dependencies", checks.failed,
+        "- rich 15.0.0 has advisory GHSA-abcd\n- protobuf 7.0.0 is withdrawn from PyPI",
+    )]
+
+    body = presenter.renderComment(results, buildFacts(), datetime.now(UTC))
+
+    assert "- rich 15.0.0 has advisory GHSA-abcd" in body.splitlines()
+    assert "- protobuf 7.0.0 is withdrawn from PyPI" in body.splitlines()
+
+
+def testTheSummaryCountsTheChecksInOneLine() -> None:
+    def summarize(*statuses: str) -> str:
+        return presenter.renderSummary(
+            [checks.CheckResult(f"Check {n}", status, "") for n, status in
+             enumerate(statuses)]
+        )
+
+    assert summarize(checks.passed, checks.passed) == "All checks passed"
+    assert summarize(checks.passed, checks.skipped) == "All checks passed with 1 skip"
+    assert summarize(checks.passed, checks.skipped, checks.skipped) == (
+        "All checks passed with 2 skips"
+    )
+    assert summarize(checks.passed, checks.failed, checks.skipped) == (
+        "1 check passed, 1 failed, 1 skip"
+    )
+    assert summarize(checks.passed, checks.passed, checks.attention) == (
+        "2 checks passed, 1 needs a decision"
+    )
+    assert summarize(checks.failed, checks.skipped) == "1 failed, 1 skip"
 
 
 def testADetailReachesTheCommentWhateverPunctuationItCarries() -> None:
