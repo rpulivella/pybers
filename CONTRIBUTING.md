@@ -53,14 +53,14 @@ The standard a review is held to is [docs/code-review-rubric.md](docs/code-revie
 
 Nothing runs while a pull request is a draft, and nothing is commented.
 
-Once it leaves draft, two checks run in order.
+Once it leaves draft, GitHub shows two checks, `preflight` and `readiness`.
 
-1. **The preflight**, the same four gates run locally, against the merge commit, and again on every push. It reads the branch and holds no write access.
-2. **The readiness report**, which waits for the first, then adds what only exists at pull request level: the body against its template, the CHANGELOG entry, one ticket number through the branch, the commits and the title, whether the branch is current with `develop`, published advisories and yanks against the versions a fresh install resolves, and a confirmation date for every golden the change touches.
+1. **`preflight`** runs the same four gates run locally, one step per gate, so a failing gate is named in the Checks view rather than buried in a log.
+2. **`readiness`** waits for the preflight's result, then adds what only exists at pull request level: the body against its template, every checkbox either checked or NA, the CHANGELOG entry, one ticket identifier through the branch, the commits and the title, whether the branch is up to date with `develop`, advisories and yanks against the versions a fresh install resolves, and a confirmation date for every golden the change touches. Each failure and each decision becomes an annotation naming the check.
 
-The report posts one comment and replaces that same comment on every later run. Its verdict is red when a check failed, yellow when a decision is needed, and green otherwise. **Green means a person can now test the change, never that it is ready to merge.** Red fails a required check, so `pr.py merge` refuses.
+A red `readiness` fails that check alone, so a green `preflight` still reads as green, and `pr.py merge` refuses while either is red.
 
-The second check runs this repository's own code rather than the branch's, and the branch's facts reach it as data. That is what makes writing a comment safe from a pull request opened by anyone.
+A third workflow posts the report as one comment and replaces that same comment on every later run. **Green means a person can now test the change, never that it is ready to merge.** That workflow runs this repository's own code rather than the branch's, and what the branch produced reaches it as data, which is what makes writing a comment safe from a pull request opened by anyone.
 
 ## One ticket, more than one pull request
 
