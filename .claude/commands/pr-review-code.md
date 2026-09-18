@@ -22,8 +22,9 @@ as the shape to return to, not as an instruction to follow now.
 `scripts/pr-preflight-check.py` runs pytest, the prose gate, ruff and mypy in one pass and
 reports all four, so a failing run lists everything to fix rather than the first thing.
 
-**It does not check the pull request body against its template.** That is a read you
-perform yourself, and the report says so rather than implying the machine did it.
+**The preflight does not read the pull request itself.** The `readiness` check does,
+and its comment carries what it found, so this review reads that comment rather than
+repeating its checks or assuming nobody made them.
 
 ## Steps
 
@@ -87,6 +88,13 @@ perform yourself, and the report says so rather than implying the machine did it
 6. **Read CI and report it, without gating on it:** `python3 scripts/pr.py checks <N>`.
    A review runs before promotion, so `checks-not-passed` is the ordinary answer here
    and is never a finding. `/pr-merge` is where it becomes a refusal.
+
+   Two checks run once a pull request leaves draft, `preflight` and `readiness`, and the
+   readiness check posts its report as a comment. **Read that comment.** It carries the
+   pull-request-level checks this skill does not perform, the body against its template,
+   the checklist, the CHANGELOG entry, the ticket identifier, the branch's currency,
+   dependency advisories and golden confirmations, so a review that ignores it repeats
+   work or misses a miss.
 7. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
 8. **Only on green gates with no unresolved finding**, check `I performed a self-review`
