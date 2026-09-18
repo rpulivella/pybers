@@ -204,10 +204,10 @@ def checkPreflight(conclusion: str) -> CheckResult:
     that goes stale against a gate list this repository means to grow.
     """
     if conclusion == "success":
-        return CheckResult("Preflight", passed, "the preflight passed")
+        return CheckResult("Preflight", passed, "The preflight passed")
     if conclusion in ("skipped", ""):
-        return CheckResult("Preflight", skipped, "the preflight did not run")
-    return CheckResult("Preflight", failed, f"the preflight {conclusion}")
+        return CheckResult("Preflight", skipped, "The preflight did not run")
+    return CheckResult("Preflight", failed, f"The preflight ended as {conclusion}")
 
 
 def readChangelogException(body: str) -> str:
@@ -219,22 +219,22 @@ def readChangelogException(body: str) -> str:
 def checkChangelog(facts: BranchFacts, body: str = "") -> CheckResult:
     """Report whether an entry was added, or why an exception was made instead."""
     if not facts.ticket:
-        return CheckResult(changelogCheckName, skipped, "this branch names no ticket")
+        return CheckResult(changelogCheckName, skipped, "This branch names no ticket")
     if facts.ticket in facts.changelogTickets:
         return CheckResult(
             changelogCheckName, passed,
-            f"the Unreleased list names PYB-{facts.ticket}",
+            f"The Unreleased list names PYB-{facts.ticket}",
         )
     excepted = readChangelogException(body)
     if excepted:
         return CheckResult(
             changelogCheckName, attention,
-            f"the Unreleased list names no entry, and the reason given is {excepted}",
+            f"The Unreleased list names no entry, and the reason given is {excepted}",
         )
     return CheckResult(
         changelogCheckName, failed,
-        f"the Unreleased list names no entry for PYB-{facts.ticket}, and this pull "
-        "request gives no reason",
+        f"The Unreleased list names no entry for PYB-{facts.ticket}, and this PR "
+        "gives no reason",
     )
 
 
@@ -242,7 +242,7 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     """Report whether one ticket number runs through every place that names one."""
     if not facts.ticket:
         return CheckResult(
-            ticketCheckName, skipped, "this branch names no ticket"
+            ticketCheckName, skipped, "This branch names no ticket"
         )
     disagreeing: list[str] = []
     subjects = {
@@ -265,7 +265,7 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     if disagreeing:
         return CheckResult(
             ticketCheckName, failed,
-            f"the branch names PYB-{facts.ticket}, but " + formatList(disagreeing),
+            f"The branch names PYB-{facts.ticket}, but " + formatList(disagreeing),
         )
     return CheckResult(
         ticketCheckName, passed,
@@ -276,7 +276,7 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
 def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
     """Report whether every golden this change touches carries a confirmation date."""
     if not facts.goldensTouched:
-        return CheckResult("Goldens", skipped, "this change touches no golden")
+        return CheckResult("Goldens", skipped, "This change touches no golden")
     missing = sorted(set(facts.goldensTouched) - set(facts.goldensConfirmed))
     if missing:
         return CheckResult(
@@ -285,7 +285,7 @@ def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
         )
     return CheckResult(
         "Goldens", passed,
-        f"this change touches {len(set(facts.goldensTouched))} goldens, each "
+        f"This change touches {len(set(facts.goldensTouched))} goldens, each "
         "confirmed in Numbers",
     )
 
@@ -293,18 +293,18 @@ def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
 def checkBranchCurrent(behind: int, base: str) -> CheckResult:
     """Report whether the branch has fallen behind the base it will merge into."""
     if behind == 0:
-        current = f"this branch is up to date with {base}"
+        current = f"This branch is up to date with {base}"
         return CheckResult(baseCheckName, passed, current)
     return CheckResult(
         baseCheckName, attention,
-        f"this branch is {behind} commits behind {base}",
+        f"This branch is {behind} commits behind {base}",
     )
 
 
 def checkTemplate(findings: list[str]) -> CheckResult:
     """Report whether the body still matches .github/pull_request_template.md."""
     if not findings:
-        return CheckResult(templateCheckName, passed, "this body matches the template")
+        return CheckResult(templateCheckName, passed, "This PR matches the template")
     return CheckResult(templateCheckName, failed, ". ".join(findings))
 
 
@@ -326,7 +326,7 @@ def checkChecklist(body: str) -> CheckResult:
             "Checklist", failed,
             f"{len(waiting)} {subject} neither checked nor NA: " + formatList(waiting),
         )
-    return CheckResult("Checklist", passed, "every checkbox is checked or NA")
+    return CheckResult("Checklist", passed, "Every checkbox is checked or NA")
 
 
 def readVerdict(results: list[CheckResult]) -> str:
@@ -370,7 +370,7 @@ def readAdvisories(packages: list[list[str]]) -> dict[str, list[str]]:
 
 
 def readYankedPackages(packages: list[list[str]]) -> list[str]:
-    """Return each resolved version PyPI has yanked, which no install should keep."""
+    """Return each resolved version PyPI has withdrawn, which a fresh install avoids."""
     yanked: list[str] = []
     for name, version in packages:
         quoted = f"{urllib.parse.quote(name)}/{urllib.parse.quote(version)}"
@@ -393,7 +393,7 @@ def checkDependencies(facts: BranchFacts) -> CheckResult:
     ]
     if not watched:
         return CheckResult(
-            "Dependencies", skipped, "this install resolved no declared dependency"
+            "Dependencies", skipped, "This install resolved no declared dependency"
         )
     advisories = readAdvisories(watched)
     yanked = readYankedPackages(watched)
@@ -401,10 +401,11 @@ def checkDependencies(facts: BranchFacts) -> CheckResult:
         parts = [
             f"{package} carries {', '.join(ids)}" for package, ids in advisories.items()
         ]
-        parts += [f"PyPI has yanked {package}" for package in yanked]
+        parts += [f"PyPI has withdrawn {package}" for package in yanked]
         return CheckResult("Dependencies", failed, ". ".join(parts))
     return CheckResult(
         "Dependencies", passed,
-        f"no advisory or yank against the {len(watched)} packages a fresh install "
-        "resolved",
+        f"No advisory against the {len(watched)} "
+        f"{'package' if len(watched) == 1 else 'packages'} a fresh install resolved, "
+        "and PyPI has withdrawn none of them",
     )

@@ -74,7 +74,7 @@ def renderComment(
         symbol = verdictSymbols.get(result.status, verdictSymbols[skipped])
         lines += [f"{checkHeadingLevel} {symbol} {result.name}", "", result.detail, ""]
     commit = facts.headSha[:12] or "an unknown commit"
-    lines += [f"_Checked {formatTimestamp(moment)} against commit {commit}._"]
+    lines += [f"_Checked {formatTimestamp(moment)} against commit {commit}_"]
     return "\n".join(lines) + "\n"
 
 

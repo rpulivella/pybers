@@ -111,10 +111,17 @@ def waitForPreflight(token: str, sha: str) -> str:
     )
     for attempt in range(preflightAttempts):
         runs = ticket.requestJson(url, token, apiVersion="2022-11-28")["check_runs"]
-        named = [run for run in runs if run["name"] == preflightCheckName]
-        finished = [run for run in named if run["status"] == "completed"]
-        if finished:
-            return str(finished[-1]["conclusion"] or "")
+        # A commit carries its skipped draft run beside the real one, and taking
+        # that as the answer reports a preflight that never ran while it is running.
+        decided = [
+            run for run in runs
+            if run["name"] == preflightCheckName
+            and run["status"] == "completed"
+            and run["conclusion"] not in (None, "skipped")
+        ]
+        if decided:
+            newest = max(decided, key=lambda run: str(run["started_at"]))
+            return str(newest["conclusion"])
         if attempt < preflightAttempts - 1:
             time.sleep(preflightPauseSeconds)
     return ""
