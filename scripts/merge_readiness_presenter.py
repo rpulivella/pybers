@@ -43,9 +43,10 @@ verdictSymbols: dict[str, str] = {
     passed: "✅", failed: "❌", attention: "⚠️", skipped: "—",
 }
 verdictLines: dict[str, str] = {
-    passed: "✅ **Ready for a person to test.** Every check passed.",
-    attention: "⚠️ **A decision is required.** Read the checks below first.",
-    failed: "❌ **Not ready.** A check failed, and merging is refused until it passes.",
+    passed: "✅ Every check passed, so a person can now test this change.",
+    attention: "⚠️ A decision is required, and the checks below name what needs one.",
+    failed: "❌ A check failed, so `pr.py merge` refuses this change "
+            "until that check passes.",
 }
 consoleColors: dict[str, str] = {
     passed: "green", failed: "red", attention: "yellow", skipped: "dim",
@@ -61,21 +62,14 @@ def renderComment(
     results: list[CheckResult], facts: BranchFacts, verdict: str, moment: datetime
 ) -> str:
     """Render the whole comment, marker first, from results and nothing else."""
-    lines = [
-        commentMarker,
-        commentHeading,
-        "",
-        verdictLines[verdict],
-        "",
-        "| Check | Result | Detail |",
-        "| --- | --- | --- |",
-    ]
+    lines = [commentMarker, commentHeading, "", verdictLines[verdict], ""]
+    # A list rather than a table, because a table reads badly in a narrow window
+    # and in an email, which is where a notification of this comment arrives.
     for result in results:
         symbol = verdictSymbols.get(result.status, verdictSymbols[skipped])
-        detail = result.detail.replace("|", "\\|")
-        lines.append(f"| {result.name} | {symbol} | {detail} |")
+        lines += [f"**{symbol} {result.name}**", "", result.detail, ""]
     commit = facts.headSha[:12] or "an unknown commit"
-    lines += ["", f"_Checked {formatTimestamp(moment)} against {commit}._"]
+    lines += [f"_Checked {formatTimestamp(moment)} against {commit}._"]
     return "\n".join(lines) + "\n"
 
 

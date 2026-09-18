@@ -180,9 +180,9 @@ def testTheCommentCarriesEveryCheckItsVerdictAndTheMomentItRan() -> None:
         results, buildFacts(), checks.failed, datetime(2026, 9, 17, 18, 54, tzinfo=UTC)
     )
 
-    assert "| preflight | ✅ | four gates |" in body
-    assert "| goldens | — | none touched |" in body
-    assert "| changelog | ❌ | no entry |" in body
+    assert "**✅ preflight**\n\nfour gates" in body
+    assert "**— goldens**\n\nnone touched" in body
+    assert "**❌ changelog**\n\nno entry" in body
     assert "2026-09-17 18:54 UTC" in body
     assert "abc123def456" in body
 
@@ -193,15 +193,14 @@ def testAGreenCommentNeverSaysAChangeIsReadyToMerge() -> None:
         buildFacts(), checks.passed, datetime.now(UTC),
     )
 
-    assert "ready for a person to test" in body.lower()
+    assert "a person can now test this change" in body.lower()
     assert "ready to merge" not in body.lower()
 
 
-def testADetailCarryingAPipeCannotBreakTheTable() -> None:
+def testADetailReachesTheCommentWhateverPunctuationItCarries() -> None:
     body = presenter.renderComment(
         [checks.CheckResult("dependencies", checks.failed, "rich 1.0 | yanked")],
         buildFacts(), checks.failed, datetime.now(UTC),
     )
 
-    row = next(line for line in body.splitlines() if line.startswith("| dependencies"))
-    assert r"rich 1.0 \| yanked" in row
+    assert "rich 1.0 | yanked" in body
