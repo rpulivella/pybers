@@ -88,6 +88,7 @@ __usage__ = "python3 scripts/pr.py <command> [options]"
 import argparse
 import re
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any, TypedDict
@@ -115,6 +116,16 @@ validMergeMethods: tuple[str, ...] = (
     "merge",
     "squash",
 )
+
+# Where a ticket goes back to when a merge does not complete it. The closing
+# keyword stays in every body, because it is what links a pull request to its
+# ticket, so a ticket carried by more than one pull request is reopened instead.
+inProgressStatus: str = "In Progress"
+
+# How long to watch for GitHub to act on the closing keyword, which it does
+# seconds after the merge rather than with it.
+ticketCloseAttempts: int = 10
+ticketClosePauseSeconds: float = 3.0
 
 # Exit codes are distinguished because a skill reads them and acts. Collapsing
 # "there is no pull request" into "something went wrong" made a missing token
@@ -995,6 +1006,64 @@ def runReady(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def readTicketFromSubject(subject: str) -> int | None:
+    """Return the ticket number a merge subject carries, in the house `[34]` form."""
+    matched = re.match(r"^\[(\d+)\]", subject)
+    return int(matched.group(1)) if matched else None
+
+
+def waitForTicketClosed(token: str, number: int) -> bool:
+    """Wait for GitHub to act on the closing keyword, and say whether it did.
+
+    GitHub closes the ticket some seconds after the merge, so reopening at once
+    races it and loses: the reopen lands first and the close undoes it. Watching
+    for the close is what makes the correction reliable.
+    """
+    for attempt in range(ticketCloseAttempts):
+        if ticket.readTicket(token, number)["state"] == "closed":
+            return True
+        if attempt < ticketCloseAttempts - 1:
+            time.sleep(ticketClosePauseSeconds)
+    return False
+
+
+def reopenTicketAfterMerge(token: str, subject: str, status: str) -> bool:
+    """Reopen the ticket this merge closed, and restore the Status the board moved.
+
+    The closing keyword stays in every body because it is the link, so a merge that
+    does not complete its ticket corrects the close rather than avoiding it. A
+    failure here is loud: the merge landed and the ticket now reads as delivered.
+    """
+    number = readTicketFromSubject(subject)
+    if number is None:
+        console.print(
+            "[red]The merge landed, but its subject names no ticket to reopen.[/] "
+            "Reopen it by hand, and set its Status back."
+        )
+        return False
+    if not waitForTicketClosed(token, number):
+        console.print(
+            f"[yellow]{ticket.formatTicketRef(number)} is still open[/], so the merge "
+            "closed nothing and there was nothing to reopen"
+        )
+        return True
+    try:
+        ticket.reopenTicket(token, number)
+        ticket.moveTicketStatus(token, number, status)
+    except Exception as exc:
+        console.print(
+            f"[red]The merge landed, but {ticket.formatTicketRef(number)} could not be "
+            "reopened, so it reads as delivered.[/]"
+        )
+        console.print(f"  [dim]{escape(str(exc))}[/]")
+        return False
+    console.print(
+        f"[green]{ticket.formatTicketRef(number)}[/] stays open at [cyan]{status}[/], "
+        "because this merge does not complete it"
+    )
+    return True
+
+
 def runMerge(arguments: argparse.Namespace) -> int:
     """Merge a pull request and delete its branch."""
     if arguments.method not in validMergeMethods:
@@ -1032,6 +1101,17 @@ def runMerge(arguments: argparse.Namespace) -> int:
                 else f"would delete {summary['head']}"
             )
         )
+        number = readTicketFromSubject(arguments.subject)
+        reference = ticket.formatTicketRef(number) if number else "the ticket"
+        console.print(
+            "ticket:  "
+            + (
+                f"would close {reference}, then reopen it at "
+                f"[cyan]{arguments.ticketStatus}[/]"
+                if arguments.ticketStaysOpen
+                else f"would close {reference}, which the keyword does"
+            )
+        )
         return 0
 
     # `except Exception`, not `except RuntimeError`, and deliberately so. urllib does
@@ -1063,6 +1143,11 @@ def runMerge(arguments: argparse.Namespace) -> int:
         f"[green]Merged[/] [bold cyan]{formatPullRequestRef(summary['number'])}[/] "
         f"by [cyan]{arguments.method}[/] as [dim]{sha[:12]}[/]"
     )
+
+    if arguments.ticketStaysOpen and not reopenTicketAfterMerge(
+        token, arguments.subject, arguments.ticketStatus
+    ):
+        return partialSuccessExitCode
 
     if arguments.keepBranch:
         return 0
@@ -1249,6 +1334,20 @@ def buildParser() -> argparse.ArgumentParser:
         dest="keepBranch",
         action="store_true",
         help="leave the source branch in place instead of deleting it",
+    )
+    mergeParser.add_argument(
+        "--ticket-stays-open",
+        dest="ticketStaysOpen",
+        action="store_true",
+        help="this merge does not complete the ticket, so reopen it and restore "
+             "the Status it held",
+    )
+    mergeParser.add_argument(
+        "--ticket-status",
+        dest="ticketStatus",
+        default=inProgressStatus,
+        help="the Status to restore with --ticket-stays-open, "
+             f"default {inProgressStatus}",
     )
     mergeParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     mergeParser.set_defaults(handler=runMerge)

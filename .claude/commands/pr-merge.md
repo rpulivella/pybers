@@ -26,10 +26,16 @@ trigger sitting on it.
 3. **Compose the subject** in the house format from the ticket,
    `[<N>] <prefix>: <summary>`, by the same rules `/commit` states. `--subject` is
    required exactly so that GitHub's generated default never lands.
-4. **Merge.**
+4. **Ask whether this merge completes the ticket**, and merge with the answer.
    ```
    python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
+   python3 scripts/pr.py merge <N> --subject "..." --ticket-stays-open
    ```
+   **Completing it is the default**, and the first form is the ordinary one. A ticket
+   carried by more than one pull request takes the second: the body's closing keyword
+   still closes the ticket, because that keyword is what links a pull request to its
+   ticket, and the tool then reopens it and restores the Status it held. Ask the user
+   rather than inferring it, because only they know whether more pull requests are coming.
    The source branch is deleted unless `--keep-branch` is passed. `pr.py` refuses a draft,
    so a pull request that never went through `/pr-review-code` cannot arrive here, and it
    refuses any CI state other than passed, including a state it could not read. Neither
@@ -61,13 +67,15 @@ squashing destroys which change was which. **`--method squash` is the exception*
 it fits only when the branch is one logical change whose history is fixup churn rather
 than separable steps. Say in the report why it was chosen.
 
-## The board moves itself
+## The board follows the ticket
 
-The Project's `Pull request merged` workflow sets Status to Done server-side the moment
-the pull request lands, so **run no command to move it**. `close --reason completed`
-after a merge only restates what already happened. Those workflows are configured in the
-Project and are invisible from the repository, which is what makes that stale instruction
-easy to re-add.
+The Project's `Item closed` workflow sets Status to Done server-side when the ticket
+closes, so **run no command to move it**. `close --reason completed` after a merge only
+restates what the keyword already did. The `Pull request merged` workflow is disabled
+deliberately, because it moved a ticket to Done on the first of its pull requests.
+
+Those workflows are configured in the Project and are invisible from the repository,
+which is what makes a stale instruction here easy to re-add.
 
 ## Hard rules
 

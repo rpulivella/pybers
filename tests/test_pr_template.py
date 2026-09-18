@@ -179,3 +179,14 @@ def testABodyUnderTheCeilingIsAccepted(template: str) -> None:
     """A body may say twice what the template does before it is too long."""
     module = loadPrTool()
     assert module.findBodyFindings(template + "\nOne short sentence.\n", template) == []
+
+
+# ── The ticket a merge subject names, for the merge that does not complete it ──
+
+
+def testAMergeSubjectNamesItsTicket() -> None:
+    assert loadPrTool().readTicketFromSubject("[76] feat: a thing") == 76
+
+
+def testAHotfixSubjectNamesNoTicketToReopen() -> None:
+    assert loadPrTool().readTicketFromSubject("[hotfix] docs: a fix") is None

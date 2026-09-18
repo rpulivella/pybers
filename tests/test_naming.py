@@ -8,6 +8,8 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-09-17  `wait` added for PYB-76, which waits for GitHub to close a ticket.
+2026-09-17  `reopen` added for PYB-76, which reopens a ticket a merge closed.
 2026-09-17  `hold` added for PYB-94, which holds the display awake through a run.
 2026-09-17  Written for PYB-98.
 """
@@ -37,10 +39,10 @@ leadingVerbs: frozenset[str] = frozenset({
     "load",
     "map", "mark", "measure", "merge", "move", "open", "order", "parse", "patch",
     "place", "post", "print", "qualify", "quote", "read", "reduce", "refuse",
-    "register", "release", "remap", "remove", "render", "report", "request",
+    "register", "release", "remap", "remove", "render", "reopen", "report", "request",
     "resolve", "retype", "rewrite", "run", "save", "select", "set", "shape", "show",
     "split", "summarize", "survey", "to", "tokenize", "unquote", "unwrap", "update",
-    "verify", "walk", "write",
+    "verify", "wait", "walk", "write",
 })
 
 # `main` is looked up by name, and a fixture's name is the value a test receives.
