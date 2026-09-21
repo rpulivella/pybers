@@ -7,7 +7,7 @@ table = "Table 1"
 cell = "A1"
 value = "Hello"
 formula = ""
-human = ["no cell in row 1 is merged"]
+qa = ["no cell in row 1 is merged"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -35,4 +35,4 @@ sheet = "Sheet 1"
 table = "Table 1"
 cell = "L1"
 formula = "=J1"
-human = ["L1 shows what its label in L2 predicts"]
+qa = ["L1 shows what its label in L2 predicts"]

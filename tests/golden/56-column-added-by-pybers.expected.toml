@@ -22,7 +22,7 @@ table = "Table 1"
 cell = "B12"
 value = 5
 formula = "=F11"
-human = ["column E is new and empty"]
+qa = ["column E is new and empty"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -44,7 +44,7 @@ table = "Table 1"
 cell = "G12"
 value = 33
 formula = "=SUM(C11:I11)"
-human = ["merges read C1:D1, C2:D3, C8:D8, D5:G5 and G7:H7", "row 9 and column I are hidden"]
+qa = ["merges read C1:D1, C2:D3, C8:D8, D5:G5 and G7:H7", "row 9 and column I are hidden"]
 
 [[cell]]
 sheet = "Sheet 1"

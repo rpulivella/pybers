@@ -30,6 +30,7 @@ so the log is purged with the ticket's folder that holds the run it explains.
 Requires rich, and the Xcode command line tools for `helper-build`.
 
 UPDATES
+2026-09-21  A check a person makes is QA's rather than a human's, for PYB-17.
 2026-09-17  Written for PYB-94.
 """
 from __future__ import annotations
@@ -82,7 +83,7 @@ goldenDirectory: Path = repositoryRoot / "tests" / "golden"
 reportRoot: Path = repositoryRoot / "workarea" / "golden-confirm"
 expectedSuffix: str = ".expected.toml"
 expectedKeys: frozenset[str] = frozenset({
-    "sheet", "table", "cell", "value", "formula", "format", "dataFormat", "human",
+    "sheet", "table", "cell", "value", "formula", "format", "dataFormat", "qa",
 })
 maxCaptures: int = 40
 damageCheckGolden: str = "11-text-written-and-retyped.numbers"
@@ -119,12 +120,12 @@ class ExpectedCell:
     formula: str | None
     formatKind: str | None
     dataFormat: dict[str, str]
-    human: tuple[str, ...]
+    qa: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class Check:
-    """One check of a run: passed, failed, or left for a human, with its screenshot."""
+    """One check of a run: passed, failed, or left for QA, with its screenshot."""
 
     status: str
     subject: str
@@ -391,7 +392,7 @@ def readExpectedCells(golden: Path) -> list[ExpectedCell]:
             formatKind=entry.get("format"),
             dataFormat={str(key): str(value) for key, value in
                         entry.get("dataFormat", {}).items()},
-            human=tuple(entry.get("human", ())),
+            qa=tuple(entry.get("qa", ())),
         ))
     if not cells:
         raise GoldenConfirmError(f"{path.name} names no [[cell]] to check")
@@ -490,8 +491,8 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
     for label, wanted in expected.dataFormat.items():
         name = label if label == "Data Format" else f"Data Format {label}"
         record(name, settings.get(label) == wanted, wanted, repr(settings.get(label)))
-    for question in expected.human:
-        checks.append(Check("human", subject, question, evidence))
+    for question in expected.qa:
+        checks.append(Check("qa", subject, question, evidence))
     return checks
 
 
@@ -617,18 +618,18 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
             run.checks.extend(checkCell(expected, reading))
         for capture in result.get("sheetCaptures", []):
             run.checks.append(Check(
-                "human", capture["sheet"], "the sheet as Numbers displays it",
+                "qa", capture["sheet"], "the sheet as Numbers displays it",
                 Path(capture["path"]).name))
         if result.get("savedCopy") and saved.is_file():
             differences = readSavedCopyDifferences(golden, saved)
             run.archiveDifferences.extend(differences)
             run.checks.append(Check(
-                "human", "saved copy",
+                "qa", "saved copy",
                 f"{len(differences)} members or archives differ once Numbers saves it",
                 "report.md"))
     for sheet, image in renderQuickLook(golden, outputDirectory):
         run.checks.append(Check(
-            "human", f"Quick Look {sheet}",
+            "qa", f"Quick Look {sheet}",
             "what pybers stored, before Numbers recalculates", image.name))
     unchanged = readFileHash(golden) == goldenHash
     run.checks.append(Check(
@@ -636,6 +637,18 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
         "byte-identical after the run" if unchanged else "CHANGED during the run"))
     writeReport(run)
     return run
+
+
+def summarizeChecks(status: str, count: int, checked: int) -> str:
+    """Return the line under a heading, as the merge-readiness comment reads.
+
+    A QA check is not one Numbers answered, so it is counted on its own rather
+    than against the checks the run made.
+    """
+    checks = "check" if checked == 1 else "checks"
+    if status == "qa":
+        return f"Left {count} {'check' if count == 1 else 'checks'} for QA."
+    return f"{status.capitalize()} {count} of {checked} {checks}."
 
 
 def writeReport(run: GoldenRun) -> Path:
@@ -649,11 +662,17 @@ def writeReport(run: GoldenRun) -> Path:
     ]
     for problem in run.problems:
         lines += [f"- **{problem.kind}**: {problem.detail}. {problem.remedy}"]
-    for status in ("failed", "human", "passed"):
+    checked = sum(1 for check in run.checks if check.status in ("passed", "failed"))
+    for status, heading in (
+        ("failed", "Failed"), ("qa", "Left for QA"), ("passed", "Passed"),
+    ):
         chosen = [check for check in run.checks if check.status == status]
         if not chosen:
             continue
-        lines += ["", f"## {status.capitalize()} ({len(chosen)})", ""]
+        lines += [
+            "", f"## {heading}", "",
+            summarizeChecks(status, len(chosen), checked), "",
+        ]
         for check in chosen:
             link = f" [{check.evidence}]({check.evidence})" if check.evidence else ""
             lines.append(f"- {check.subject}: {check.detail}{link}")
@@ -775,7 +794,7 @@ def runRun(arguments: argparse.Namespace) -> int:
         return 0
     reportProblems(run.problems)
     counts = {status: sum(1 for c in run.checks if c.status == status)
-              for status in ("passed", "failed", "human")}
+              for status in ("passed", "failed", "qa")}
     for check in run.checks:
         if check.status == "failed":
             console.print(
@@ -783,7 +802,7 @@ def runRun(arguments: argparse.Namespace) -> int:
             )
     console.print(
         f"[green]{counts['passed']} passed[/], [red]{counts['failed']} failed[/], "
-        f"[yellow]{counts['human']} left for a human[/]"
+        f"[yellow]{counts['qa']} left for QA[/]"
     )
     console.print(f"report: {escape(str(run.outputDirectory / 'report.md'))}")
     return 1 if counts["failed"] or run.problems else 0

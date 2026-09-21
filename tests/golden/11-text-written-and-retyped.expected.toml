@@ -31,7 +31,7 @@ cell = "F1"
 value = "text over a control"
 format = "automatic"
 dataFormat = { "Data Format" = "Automatic" }
-human = ["F1 shows plain text, with no star rating left behind"]
+qa = ["F1 shows plain text, with no star rating left behind"]
 
 [[cell]]
 sheet = "Sheet 1"

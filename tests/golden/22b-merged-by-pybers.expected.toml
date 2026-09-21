@@ -7,7 +7,7 @@ table = "Table 1"
 cell = "A1"
 value = "Hello"
 formula = ""
-human = ["row 1 shows the five merges its row 2 labels describe"]
+qa = ["row 1 shows the five merges its row 2 labels describe"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -35,4 +35,4 @@ sheet = "Sheet 1"
 table = "Table 1"
 cell = "L1"
 formula = "=J1"
-human = ["L1 shows the reference error its label in L2 predicts"]
+qa = ["L1 shows the reference error its label in L2 predicts"]

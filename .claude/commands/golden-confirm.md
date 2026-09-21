@@ -9,9 +9,9 @@ Open a temporary copy of a golden in running Numbers, check every cell its expec
 file names, and write a report. The report turns confirming a golden into reading one
 page, rather than a manual session in Numbers.
 
-**It does not replace the human confirmation.** Only Numbers can confirm a golden, and
+**It does not replace QA's confirmation.** Only Numbers can confirm a golden, and
 only a person can confirm what the screenshots show. A run that passes means Numbers read
-what the expected-values file says. The checks it leaves for a human remain yours.
+what the expected-values file says. The checks it leaves for QA remain yours.
 
 ## Steps
 
@@ -35,9 +35,9 @@ what the expected-values file says. The checks it leaves for a human remain your
    ```
    Numbers opens a copy hidden, and shows on screen for about a second. The run survives
    switching desktops and full-screen apps, so the developer can keep working.
-4. **Relay the result:** the passed, failed and left-for-a-human counts, every failure
+4. **Relay the result:** the passed, failed and left-for-QA counts, every failure
    verbatim, and the report path
-   `workarea/golden-confirm/PYB-<N>/<golden>/report.md`. Name each check left for a human
+   `workarea/golden-confirm/PYB-<N>/<golden>/report.md`. Name each check left for QA
    with the screenshot that answers it.
 5. **A failure is a finding, not a retry.** Decide whether the expected value, the tool
    or the golden is wrong, and say which before changing anything. An expected value is
@@ -57,7 +57,7 @@ can hang or crash it.
 
 - **Never open a golden itself in Numbers**, only the copy the tool makes. Numbers
   rewrites what it opens.
-- **Never claim a golden confirmed** on a passing run alone. The human checks and the
+- **Never claim a golden confirmed** on a passing run alone. The QA checks and the
   record in `tests/golden/README.md` still follow the confirmation rules in `CLAUDE.md`.
 - **Nothing in the preflight, CI or the test suite runs this**, and nothing under `src/`
   or `tests/` imports it. It needs a logged-in Mac with Numbers.

@@ -14,7 +14,7 @@ sheet = "Sheet 1"
 table = "Table 1"
 cell = "B12"
 formula = "=#REF!"
-human = ["B12 shows a reference error"]
+qa = ["B12 shows a reference error"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -36,7 +36,7 @@ table = "Table 1"
 cell = "E12"
 value = 28
 formula = "=SUM(C11:G11)"
-human = ["merges read C1:D1, C2:D3, C8:D8, D5:E5 and E7:F7", "row 9 and column G are hidden"]
+qa = ["merges read C1:D1, C2:D3, C8:D8, D5:E5 and E7:F7", "row 9 and column G are hidden"]
 
 [[cell]]
 sheet = "Sheet 1"

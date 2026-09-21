@@ -7,7 +7,7 @@ table = "45-row-offsets-32bit"
 cell = "KI7"
 value = "r6c295"
 formula = ""
-human = ["KI7:KJ7 is merged holding r6c295"]
+qa = ["KI7:KJ7 is merged holding r6c295"]
 
 [[cell]]
 sheet = "Sheet 1"

@@ -21,4 +21,4 @@ table = "Table 1"
 cell = "A11"
 value = 55
 formula = "=SUM(A1:A10)"
-human = ["the sheet tabs read Sheet 1, Inserted, Sheet 2, Appended"]
+qa = ["the sheet tabs read Sheet 1, Inserted, Sheet 2, Appended"]

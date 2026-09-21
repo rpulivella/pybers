@@ -5,7 +5,7 @@
 sheet = "Sheet 1"
 table = "Table 1"
 cell = "L3"
-human = ["L3:M3 is merged and keeps row 3's fill"]
+qa = ["L3:M3 is merged and keeps row 3's fill"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -33,7 +33,7 @@ sheet = "Sheet 1"
 table = "Table 1"
 cell = "L1"
 formula = "=J1"
-human = ["L1 shows the reference error its label predicts"]
+qa = ["L1 shows the reference error its label predicts"]
 
 [[cell]]
 sheet = "Sheet 1"

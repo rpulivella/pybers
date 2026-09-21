@@ -8,7 +8,7 @@ table = "Table 1"
 cell = "B1"
 value = 55
 formula = "=SUM(A1:A11)"
-human = ["rows 1 and 2 are unchanged and row 3 is new and empty"]
+qa = ["rows 1 and 2 are unchanged and row 3 is new and empty"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -93,7 +93,7 @@ table = "Table 1"
 cell = "F13"
 value = 33
 formula = "=SUM(C12:H12)"
-human = ["merges read C1:D1, C2:D4, C9:D9, D6:F6 and F8:G8, each anchor naming its original extent", "row 10 and column H are hidden, so the row numbers skip 10 and the letters skip H"]
+qa = ["merges read C1:D1, C2:D4, C9:D9, D6:F6 and F8:G8, each anchor naming its original extent", "row 10 and column H are hidden, so the row numbers skip 10 and the letters skip H"]
 
 [[cell]]
 sheet = "Sheet 1"
