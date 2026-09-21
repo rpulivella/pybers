@@ -87,6 +87,7 @@ archiveTypes: dict[int, type[Message]] = {
     6247: tst.TableStyleNetworkArchive,  # the styles a table style preset names
     6267: tst.ColumnRowUIDMapArchive,  # row and column UIDs, and their order
     6305: tst.StrokeSidecarArchive,  # the table's stroke layers
+    6306: tst.StrokeLayerArchive,   # one row's or column's borders, as runs
     6316: tst.SummaryModelArchive,  # the summary rows categories and pivots add
     6317: tst.SummaryCellVendorArchive,
     6318: tst.CategoryOrderArchive,

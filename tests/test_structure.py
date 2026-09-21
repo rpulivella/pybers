@@ -30,6 +30,7 @@ import pybers
 from conftest import findDocumentPath
 from pybers._engine import findCalculationEngine, readTableOwnerEntries
 from pybers._generated import TNArchives_pb2 as tn
+from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import chooseOffsetUnit, decodeRow, readPackage
 from pybers._persistence.difference import listPackageDifferences
@@ -86,6 +87,49 @@ def reduceModel(document: pybers.Document) -> dict[str, object]:
     return reduced
 
 
+def readStrokeLayers(
+    index: ArchiveIndex, model: tst.TableModelArchive
+) -> dict[str, list[object]]:
+    """Return every border of a table, as the layer and run Numbers stores."""
+    sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
+    described: dict[str, list[object]] = {}
+    for label, references in (
+        ("left", sidecar.left_column_stroke_layers),
+        ("right", sidecar.right_column_stroke_layers),
+        ("top", sidecar.top_row_stroke_layers),
+        ("bottom", sidecar.bottom_row_stroke_layers),
+    ):
+        described[label] = [
+            (
+                layer.row_column_index,
+                [
+                    (run.origin, run.length, round(run.stroke.width, 3))
+                    for run in layer.stroke_runs
+                ],
+            )
+            for layer in (
+                index.resolve(reference, tst.StrokeLayerArchive)
+                for reference in references
+            )
+        ]
+    return described
+
+
+def readVolatileCells(
+    dependencies: tsce.FormulaOwnerDependenciesArchive,
+) -> dict[str, list[tuple[int, int]]]:
+    """Return every cell the engine recalculates on its own, per kind."""
+    volatile = dependencies.volatile_dependencies
+    found: dict[str, list[tuple[int, int]]] = {}
+    for name in ("volatile_time_cells", "volatile_random_cells"):
+        found[name] = sorted(
+            (extent.range_begin, entry.column)
+            for entry in getattr(volatile, name).column_entries
+            for extent in entry.row_set.entries
+        )
+    return found
+
+
 def readTableFacts(path: Path) -> dict[str, dict[str, object]]:
     """Return what every archive indexed by a line says, per table.
 
@@ -132,6 +176,10 @@ def readTableFacts(path: Path) -> dict[str, dict[str, object]]:
                      order.index(readUuidValue(state.row_or_column_uid)))
                     for state in extent.base_hidden_states
                 )
+        tiles = [
+            (entry.tileid, index.resolve(entry.tile, tst.Tile).numrows)
+            for entry in store.tiles.tiles
+        ]
         rowBucket = index.resolve(store.rowHeaders.buckets[0], tst.HeaderStorageBucket)
         columnBucket = index.resolve(store.columnHeaders, tst.HeaderStorageBucket)
         sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
@@ -140,7 +188,23 @@ def readTableFacts(path: Path) -> dict[str, dict[str, object]]:
             "size": (model.number_of_rows, model.number_of_columns),
             "sidecar": (sidecar.row_count, sidecar.column_count),
             "records": records,
+            "tiles": tiles,
+            "rowTileTree": [
+                (node.key, node.value) for node in store.rowTileTree.nodes
+            ],
+            "nextRowStripID": store.nextRowStripID,
             "rowHeaders": [(h.index, h.numberOfCells) for h in rowBucket.headers],
+            "bands": (
+                model.number_of_header_rows, model.number_of_header_columns,
+                model.number_of_footer_rows,
+            ),
+            "strokes": readStrokeLayers(index, model),
+            "spills": [
+                (spill.coordinate.row, spill.coordinate.column,
+                 spill.spill_size.num_rows, spill.spill_size.num_columns)
+                for spill in dependencies.spill_range_sizes.spills
+            ],
+            "volatile": readVolatileCells(dependencies),
             "columnHeaders": [(h.index, h.numberOfCells) for h in columnBucket.headers],
             "hidden": sorted(hidden),
             "merges": sorted(
@@ -313,28 +377,77 @@ def testRowsCrossTileBoundariesInALargeTable(tmp_path: Path) -> None:
     assert reopened.cell(row=1, col=1).value is None
 
 
-def testARowNeedingATileTheFileLacksIsRefused(tmp_path: Path) -> None:
-    """Creating a tile is unmeasured, so a save that would need one refuses."""
+@pytest.mark.parametrize(
+    ("name", "edit"),
+    [
+        ("27b-rows-inserted-into-a-new-tile",
+         lambda table: table.rowAdd(100, 60)),
+        ("27c-rows-deleted-emptying-a-tile",
+         lambda table: table.rowRemove(1, 300)),
+    ],
+)
+def testTilesAreCreatedAndDroppedAsNumbersDoes(
+    name: str, edit: Callable[[pybers.Table], object], tmp_path: Path
+) -> None:
+    """`27-big-table` spans eight tiles, and an edit crossing them moves every row."""
     document = pybers.open(findDocumentPath("27-big-table"))
-    document.sheets[0].tables[0].rowAdd(1, 100)
-    with pytest.raises(WriteError, match="tile the file does not hold"):
+    edit(document.sheets[0].tables[0])
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    ours = readTableFacts(target)["Table 1"]
+    theirs = readTableFacts(findDocumentPath(name))["Table 1"]
+    for key in (
+        "size", "sidecar", "records", "rowHeaders", "columnHeaders",
+        "tiles", "rowTileTree", "nextRowStripID",
+    ):
+        assert ours[key] == theirs[key], key
+
+
+# One edit each against the table of `57-structure-refusals-base` it belongs to,
+# with the measurement Numbers made of the same edit.
+refusalMeasurements: dict[str, tuple[str, Callable[[pybers.Table], object]]] = {
+    "57-borders-row-inserted": ("Borders", lambda table: table.rowAdd(3)),
+    "57-borders-row-deleted": ("Borders", lambda table: table.rowRemove(3)),
+    "57-borders-column-inserted": ("Borders", lambda table: table.columnAdd(3)),
+    "57-borders-column-deleted": ("Borders", lambda table: table.columnRemove(3)),
+    "57-bands-header-row-inserted": ("Bands", lambda table: table.rowAdd(2)),
+    "57-bands-header-row-deleted": ("Bands", lambda table: table.rowRemove(1)),
+    "57-bands-row-inserted-before-footer": ("Bands", lambda table: table.rowAdd(8)),
+    "57-bands-footer-row-deleted": ("Bands", lambda table: table.rowRemove(8)),
+    "57-bands-column-inserted-before-header": (
+        "Bands", lambda table: table.columnAdd(1)
+    ),
+    "57-bands-header-column-deleted": ("Bands", lambda table: table.columnRemove(1)),
+}
+
+
+@pytest.mark.parametrize("name", sorted(refusalMeasurements))
+def testBordersBandsAndSpillsFollowTheEdit(name: str, tmp_path: Path) -> None:
+    """PYB-17: the state that has no cells of its own, against Numbers' own edit."""
+    table, edit = refusalMeasurements[name]
+    document = pybers.open(findDocumentPath("57-structure-refusals-base"))
+    edit(document.sheet(1).table(table))
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    ours = readTableFacts(target)[table]
+    theirs = readTableFacts(findDocumentPath(name))[table]
+    for key in ("size", "sidecar", "bands", "strokes", "records", "spills"):
+        assert ours[key] == theirs[key], key
+
+
+def testATableHoldingASpillIsRefused(tmp_path: Path) -> None:
+    """Numbers re-flows a spill rather than moving it, which means evaluating it."""
+    document = pybers.open(findDocumentPath("57-structure-refusals-base"))
+    document.sheet(1).table("Engine").rowAdd(2)
+    with pytest.raises(WriteError, match="spills into the cells under it"):
         document.save(tmp_path / "refused.numbers")
-    assert not (tmp_path / "refused.numbers").exists()
 
 
-def testAnEditInsideAHeaderBandIsRefused(tmp_path: Path) -> None:
-    """What Numbers does to a band under an edit is unmeasured."""
-    document = pybers.open(findDocumentPath("40-table-bands"))
-    document.sheets[0].tables[0].rowAdd(1)
-    with pytest.raises(WriteError, match="header or footer band"):
-        document.save(tmp_path / "refused.numbers")
-
-
-def testATableWithBordersIsRefused(tmp_path: Path) -> None:
-    """Borders are stored by line, and moving them is unmeasured."""
-    document = pybers.open(findDocumentPath("29-style-border"))
-    document.sheets[0].tables[0].rowAdd(1)
-    with pytest.raises(WriteError, match="borders"):
+def testATableWithConditionalHighlightingIsRefused(tmp_path: Path) -> None:
+    """Numbers rewrites the rules themselves, which no ticket has covered."""
+    document = pybers.open(findDocumentPath("57-structure-refusals-base"))
+    document.sheet(1).table("Conditions").rowAdd(3)
+    with pytest.raises(WriteError, match="conditional highlighting"):
         document.save(tmp_path / "refused.numbers")
 
 

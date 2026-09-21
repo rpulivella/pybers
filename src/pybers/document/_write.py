@@ -209,10 +209,10 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             if maps.changed:
                 registered = listRegisteredFormulas(entry.dependencies)
                 applyGridStructure(
-                    index, owners, table, tableInfo, tableReference.identifier,
-                    model, maps,
+                    index, registry, owners, table, tableInfo,
+                    tableReference.identifier, model, maps,
                 )
-                remapOwnerCoordinates(entry.dependencies, maps, table.name)
+                remapOwnerCoordinates(entry.dependencies, table, maps)
 
             # Only a merge being ADDED clears its covered positions. One already
             # in the file may carry a style-only record at each of them, which an
@@ -224,7 +224,9 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 for reference in merge.extent
                 if reference != merge.anchor
             )
-            edits = applyTableEdits(index, owners, table, model, swallowed, maps)
+            edits = applyTableEdits(
+                index, owners, table, model, swallowed, maps, registry
+            )
             moved = applyMerges(
                 table, model, entry.dependencies.formula_owner_uid
             )

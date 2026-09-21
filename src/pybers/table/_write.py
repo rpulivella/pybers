@@ -55,6 +55,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from .._generated import TSCEArchives_pb2 as tsce
+from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, chooseOffsetUnit, decodeRecord, decodeRow
@@ -76,6 +77,8 @@ from .._persistence.index import (
     wordBits,
     wordMask,
 )
+from .._persistence.iwa import Archive, createArchive
+from .._persistence.metadata import PackageRegistry
 from ..addressing import CellReference
 from ..errors import WriteError
 from ..formula._write import (
@@ -816,22 +819,22 @@ def rewriteRow(
 
 
 def moveGridRecords(
-    tiles: list[tuple[int, tst.Tile]],
-    tileSize: int,
+    store: tst.DataStore,
+    tiles: dict[int, tst.Tile],
     maps: GridMaps,
     table: Table,
     release: Callable[[CellRecord, CellReference], bool],
-) -> None:
+) -> set[int]:
     """Move every stored row and record to its new line, releasing the removed ones.
 
     A row keeps its bytes and only its index changes, so a record moved rather than
-    edited is the record Numbers wrote. Rows are dealt back to tiles by the new row
-    number, which refuses a destination tile the file lacks or one counting its
-    offsets differently, since neither has been measured.
+    edited is the record Numbers wrote. Rows are dealt back to tiles by their new
+    row number, which is what carries a row over a tile boundary. Returns the tile
+    ids left holding nothing.
     """
-    byTile = dict(tiles)
+    tileSize = store.tiles.tile_size
     moved: list[tuple[int, tst.TileRowInfo, tst.Tile]] = []
-    for tileid, tile in tiles:
+    for tileid, tile in tiles.items():
         for rowInfo in tile.rowInfos:
             stored = tileid * tileSize + rowInfo.tile_row_index
             row = maps.rows.lineMap(stored)
@@ -856,27 +859,121 @@ def moveGridRecords(
                 )
             moved.append((row, rowInfo, tile))
 
-    copies: dict[int, list[tst.TileRowInfo]] = {tileid: [] for tileid in byTile}
+    copies: dict[int, list[tst.TileRowInfo]] = {tileid: [] for tileid in tiles}
     for row, rowInfo, source in moved:
-        destination = byTile.get(row // tileSize)
-        if destination is None or (
-            destination.should_use_wide_rows != source.should_use_wide_rows
-        ):
+        destination = tiles[row // tileSize]
+        if destination.should_use_wide_rows != source.should_use_wide_rows:
             raise WriteError(
                 f"Row {row + originOffset} of {table.name!r} would move into a tile "
-                "the file does not hold, or one counting its offsets differently, "
-                "and neither has been measured."
+                "counting its offsets differently, which has not been measured."
             )
         copy = tst.TileRowInfo()
         copy.CopyFrom(rowInfo)
         copy.tile_row_index = row % tileSize
         copies[row // tileSize].append(copy)
-    for tileid, tile in tiles:
+    for tileid, tile in tiles.items():
         del tile.rowInfos[:]
         tile.rowInfos.extend(
             sorted(copies[tileid], key=lambda rowInfo: rowInfo.tile_row_index)
         )
         tile.numrows = len(tile.rowInfos)
+    return {
+        tileid for tileid in tiles
+        if tileid * tileSize >= table.rowCount and not copies[tileid]
+    }
+
+
+def buildTileArchive(
+    registry: PackageRegistry, sibling: Archive, tile: tst.Tile
+) -> Archive:
+    """Return a created tile archive, shaped like one the table already holds.
+
+    The archive info is the sibling's, which carries the message version and the
+    field infos this library does not model, with a fresh identifier in its place.
+    """
+    info = tspArchive.ArchiveInfo()
+    info.ParseFromString(sibling.infoBytes)
+    info.identifier = registry.identifierAllocate()
+    del info.message_infos[1:]
+    return createArchive(info, [tile.SerializeToString()])
+
+
+def buildTileRange(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    owners: dict[int, IWAFile],
+    store: tst.DataStore,
+    table: Table,
+) -> dict[int, tst.Tile]:
+    """Return every tile the table's rows now need, creating any the file lacks.
+
+    A table grown past its last tile gains one, as `27b` gained a ninth for row
+    2048. A created tile takes its shape from the last one, since a tile's own
+    fields say nothing about which rows it holds.
+    """
+    tileSize = store.tiles.tile_size
+    held = {
+        entry.tileid: index.resolve(entry.tile, tst.Tile)
+        for entry in store.tiles.tiles
+    }
+    wanted = range((table.rowCount + tileSize - 1) // tileSize)
+    missing = [tileid for tileid in wanted if tileid not in held]
+    if not missing:
+        return held
+    last = max(held)
+    sibling = index.archive(
+        next(entry.tile.identifier for entry in store.tiles.tiles
+             if entry.tileid == last)
+    )
+    for tileid in missing:
+        created = tst.Tile()
+        created.maxColumn = 0
+        created.maxRow = 0
+        created.numCells = 0
+        created.numrows = 0
+        created.storage_version = held[last].storage_version
+        created.last_saved_in_BNC = held[last].last_saved_in_BNC
+        created.should_use_wide_rows = held[last].should_use_wide_rows
+        archive = buildTileArchive(registry, sibling, created)
+        registry.archiveAdd(registry.componentOf[sibling.identifier], archive)
+        owners[archive.identifier] = registry.componentMember(
+            registry.componentOf[archive.identifier]
+        )
+        index.byIdentifier[archive.identifier] = archive
+        entry = store.tiles.tiles.add()
+        entry.tileid = tileid
+        entry.tile.identifier = archive.identifier
+        held[tileid] = created
+    return held
+
+
+def writeTileRange(
+    registry: PackageRegistry,
+    store: tst.DataStore,
+    tiles: dict[int, tst.Tile],
+    spent: set[int],
+) -> None:
+    """Rewrite the tile list and the row tree, dropping a tile holding nothing.
+
+    `rowTileTree` maps each tile's first row to its id, and `nextRowStripID` counts
+    the tiles, both measured rising in `27b` and falling in `27c`.
+    """
+    tileSize = store.tiles.tile_size
+    identifiers = {entry.tileid: entry.tile.identifier for entry in store.tiles.tiles}
+    kept = sorted(tileid for tileid in tiles if tileid not in spent)
+    del store.tiles.tiles[:]
+    for tileid in kept:
+        entry = store.tiles.tiles.add()
+        entry.tileid = tileid
+        entry.tile.identifier = identifiers[tileid]
+    del store.rowTileTree.nodes[:]
+    for tileid in kept:
+        node = store.rowTileTree.nodes.add()
+        node.key = tileid * tileSize
+        node.value = tileid
+    store.nextRowStripID = len(kept)
+    for tileid in spent:
+        registry.archiveRemove(identifiers[tileid])
 
 
 def rewriteRowColumns(
@@ -953,6 +1050,7 @@ def applyTableEdits(
     model: tst.TableModelArchive,
     swallowed: frozenset[tuple[int, int]] = frozenset(),
     maps: GridMaps | None = None,
+    registry: PackageRegistry | None = None,
 ) -> TableEdits:
     """Write every changed cell of one table back into the tiles it came from.
 
@@ -1030,20 +1128,29 @@ def applyTableEdits(
 
     # Resolved once, because resolving parses afresh and the structural move below
     # has to be what the walk after it sees.
+    restructured = maps is not None and maps.changed
+    if maps is not None and restructured:
+        if registry is None:
+            raise WriteError(
+                f"{table.name!r} has rows or columns added or removed, and writing "
+                "that needs the package registry the document writer holds."
+            )
+        covered = buildTileRange(index, registry, owners, store, table)
+        writeTileRange(
+            registry, store, covered,
+            moveGridRecords(store, covered, maps, table, releaseRecord),
+        )
+    # Resolved once, because resolving parses afresh and the structural move above
+    # has to be what the walk below sees.
     tileArchives = [
         (
             entry,
             index.archive(entry.tile.identifier),
-            index.resolve(entry.tile, tst.Tile),
+            covered[entry.tileid] if restructured
+            else index.resolve(entry.tile, tst.Tile),
         )
         for entry in store.tiles.tiles
     ]
-    restructured = maps is not None and maps.changed
-    if maps is not None and restructured:
-        moveGridRecords(
-            [(entry.tileid, tile) for entry, _, tile in tileArchives],
-            tileSize, maps, table, releaseRecord,
-        )
 
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []

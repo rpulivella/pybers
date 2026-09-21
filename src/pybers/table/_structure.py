@@ -37,9 +37,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .._generated import TSCEArchives_pb2 as tsce
+from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
 from .._persistence.index import ArchiveIndex, originOffset, readUuidValue
+from .._persistence.iwa import createArchive
+from .._persistence.metadata import PackageRegistry
 from ..errors import WriteError
 from ._create import assignUids
 from ._read import readLineIdentities
@@ -124,85 +127,227 @@ def buildGridMaps(
     )
 
 
-def listTouchedLines(lines: LineMap) -> list[tuple[int, bool]]:
-    """Return each stored line removed, and each stored line additions went before.
-
-    An addition after the last line names the line count. Each carries whether it
-    was a removal.
-    """
-    touched = [(line, True) for line, moved in enumerate(lines.lines) if moved is None]
-    expected = 0
-    for line, moved in enumerate(lines.lines):
-        if moved is None:
-            continue
-        if moved != expected:
-            touched.append((line, False))
-        expected = moved + 1
-    if expected != lines.count:
-        touched.append((len(lines.lines), False))
-    return touched
+def findDisplacedLine(lines: LineMap, line: int) -> int | None:
+    """Return the stored line an added line took the place of, or None at the end."""
+    for stored, moved in enumerate(lines.lines):
+        if moved is not None and moved > line:
+            return stored
+    return None
 
 
-def refuseBandEdit(
-    lines: LineMap, leading: int, trailing: int, axis: str, name: str
-) -> None:
-    """Refuse an edit touching a header or footer band, which is unmeasured.
+def listAddedLines(lines: LineMap) -> list[int]:
+    """Return every new line the edit added, as its index afterward."""
+    held = {moved for moved in lines.lines if moved is not None}
+    return [line for line in range(lines.count) if line not in held]
 
-    `leading` bands sit at the start of the axis and `trailing` at its end. Adding
-    lines right after a leading band, or right before a trailing one, is body.
+
+def countBands(lines: LineMap, leading: int, trailing: int) -> tuple[int, int]:
+    """Return what a leading and a trailing band hold after the edit.
+
+    A band covers a stretch of lines rather than a count, so a line added inside
+    one grows it and a line removed from one shrinks it. A line added at the
+    trailing band's own first line lands inside it, measured 2026-09-21 in
+    `57-bands-row-inserted-before-footer`, where a footer of one became two.
     """
     held = len(lines.lines)
-    for line, removed in listTouchedLines(lines):
-        inLeading = line < leading
-        inTrailing = trailing > 0 and (
-            line >= held - trailing if removed else line > held - trailing
-        )
-        if inLeading or inTrailing:
-            raise WriteError(
-                f"{name!r} has {axis} added or removed inside a header or footer "
-                "band, and what Numbers does to a band then is not measured."
-            )
+    removedLeading = sum(
+        1 for line in range(leading) if lines.lines[line] is None
+    )
+    removedTrailing = sum(
+        1 for line in range(held - trailing, held) if lines.lines[line] is None
+    )
+    addedLeading = addedTrailing = 0
+    for line in listAddedLines(lines):
+        displaced = findDisplacedLine(lines, line)
+        boundary = held if displaced is None else displaced
+        addedLeading += boundary < leading
+        addedTrailing += trailing > 0 and boundary >= held - trailing
+    return (
+        leading - removedLeading + addedLeading,
+        trailing - removedTrailing + addedTrailing,
+    )
+
+
+def applyBandCounts(model: tst.TableModelArchive, maps: GridMaps) -> None:
+    """Grow or shrink each band by the lines the edit added to or took from it.
+
+    A count is written only when it changed, because a field set to the zero it
+    already held is a byte a table without bands never carried.
+    """
+    headerRows, footerRows = countBands(
+        maps.rows, model.number_of_header_rows, model.number_of_footer_rows
+    )
+    headerColumns = countBands(
+        maps.columns, model.number_of_header_columns, 0
+    )[0]
+    for name, count in (
+        ("number_of_header_rows", headerRows),
+        ("number_of_footer_rows", footerRows),
+        ("number_of_header_columns", headerColumns),
+    ):
+        if getattr(model, name) != count:
+            setattr(model, name, count)
 
 
 def refuseUnmovableState(
-    index: ArchiveIndex, model: tst.TableModelArchive, table: Table, maps: GridMaps
+    index: ArchiveIndex, model: tst.TableModelArchive, table: Table
 ) -> None:
-    """Refuse a structural edit on a table holding state keyed by a line index.
+    """Refuse a structural edit on a table holding state this cannot move.
 
-    Borders live in stroke layers by row and column, and conditional highlighting
-    carries rules that name cells. Moving either is unmeasured, so a table holding
-    one is left alone rather than saved with it pointing at the wrong lines.
+    Conditional highlighting is the one left. Numbers rewrites the rules
+    themselves under an edit rather than moving them: an added line takes a copy
+    of its neighbor's rule, and removing the cell a rule READS splits one shared
+    rule into a separate one per cell, measured in `57-conditions-*`. Writing that
+    means creating rule archives, which no ticket has covered.
     """
-    refuseBandEdit(
-        maps.rows, model.number_of_header_rows, model.number_of_footer_rows,
-        "rows", table.name,
-    )
-    refuseBandEdit(
-        maps.columns, model.number_of_header_columns, 0, "columns", table.name
-    )
     store = model.base_data_store
-    sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    layers = (
-        sidecar.left_column_stroke_layers, sidecar.right_column_stroke_layers,
-        sidecar.top_row_stroke_layers, sidecar.bottom_row_stroke_layers,
-    )
-    if any(len(layer) for layer in layers):
-        raise WriteError(
-            f"{table.name!r} carries borders, which are stored by row and column, "
-            "and moving them in a structural edit is not measured."
-        )
     if store.HasField("conditionalstyletable"):
         conditions = index.resolve(store.conditionalstyletable, tst.TableDataList)
         if len(conditions.entries):
             raise WriteError(
-                f"{table.name!r} carries conditional highlighting, whose rules name "
-                "cells, and moving them in a structural edit is not measured."
+                f"{table.name!r} carries conditional highlighting, whose rules "
+                "Numbers rewrites under a structural edit, and writing that is not "
+                "covered yet."
             )
     if len(store.rowHeaders.buckets) != 1:
         raise WriteError(
             f"{table.name!r} keeps its row headers in {len(store.rowHeaders.buckets)} "
             "buckets, and only one has been measured."
         )
+
+
+def mapStrokeRuns(
+    layer: tst.StrokeLayerArchive, lines: LineMap
+) -> list[tst.StrokeLayerArchive.StrokeRunArchive]:
+    """Return one layer's runs after the edit, split where a removed line sat.
+
+    **A removal splits a run rather than shortening it**, measured in
+    `57-borders-row-deleted`: one run over six rows became two, of two lines and
+    three, carrying the same stroke. Lines added inside a run are covered by it,
+    which is how an inserted row takes the border of the run it fell into.
+    """
+    mapped: list[tst.StrokeLayerArchive.StrokeRunArchive] = []
+    segment: list[int] = []
+    for run in layer.stroke_runs:
+        segment = []
+        for line in range(run.origin, run.origin + run.length):
+            if lines.lineMap(line) is None:
+                if segment:
+                    mapped.append(buildStrokeRun(run, segment, lines))
+                segment = []
+                continue
+            segment.append(line)
+        if segment:
+            mapped.append(buildStrokeRun(run, segment, lines))
+    return mapped
+
+
+def buildStrokeRun(
+    run: tst.StrokeLayerArchive.StrokeRunArchive,
+    segment: list[int],
+    lines: LineMap,
+) -> tst.StrokeLayerArchive.StrokeRunArchive:
+    """Return one run of a layer, covering where a stretch of lines landed."""
+    first, last = lines.lineMap(segment[0]), lines.lineMap(segment[-1])
+    assert first is not None and last is not None
+    moved = tst.StrokeLayerArchive.StrokeRunArchive()
+    moved.CopyFrom(run)
+    moved.origin = first
+    moved.length = last - first + 1
+    return moved
+
+
+def applyStrokeLayers(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    owners: dict[int, IWAFile],
+    sidecar: tst.StrokeSidecarArchive,
+    maps: GridMaps,
+) -> None:
+    """Move every border with the line it belongs to, as `57-borders-*` measured.
+
+    A layer belongs to one row or column and holds runs along the other axis, so
+    each list follows one map by its index and the other inside its runs. An added
+    line takes a copy of the layer of the line it displaced, which is how an
+    inserted column arrived carrying its neighbor's border.
+    """
+    lists = (
+        (sidecar.left_column_stroke_layers, maps.columns, maps.rows),
+        (sidecar.right_column_stroke_layers, maps.columns, maps.rows),
+        (sidecar.top_row_stroke_layers, maps.rows, maps.columns),
+        (sidecar.bottom_row_stroke_layers, maps.rows, maps.columns),
+    )
+    for references, keys, runs in lists:
+        if not len(references):
+            continue
+        stored = {}
+        for reference in references:
+            layer = index.resolve(reference, tst.StrokeLayerArchive)
+            stored[layer.row_column_index] = (reference.identifier, layer)
+        placed: dict[int, tuple[int, tst.StrokeLayerArchive]] = {}
+        for line, (identifier, layer) in stored.items():
+            moved = keys.lineMap(line)
+            if moved is None:
+                registry.archiveRemove(identifier)
+                continue
+            layer.row_column_index = moved
+            placed[moved] = (identifier, layer)
+        sibling = next(iter(stored.values()))[0]
+        for line in listAddedLines(keys):
+            displaced = findDisplacedLine(keys, line)
+            copied = tst.StrokeLayerArchive()
+            if displaced is not None:
+                copied.CopyFrom(stored[displaced][1])
+            copied.row_column_index = line
+            placed[line] = (
+                createStrokeLayer(index, registry, owners, sibling, copied), copied
+            )
+        for identifier, layer in placed.values():
+            rewritten = mapStrokeRuns(layer, runs)
+            del layer.stroke_runs[:]
+            layer.stroke_runs.extend(rewritten)
+            owners[identifier].messageReplace(
+                identifier, 0, layer.SerializeToString()
+            )
+        del references[:]
+        for line in sorted(placed):
+            references.add(identifier=placed[line][0])
+
+
+def createStrokeLayer(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    owners: dict[int, IWAFile],
+    sibling: int,
+    layer: tst.StrokeLayerArchive,
+) -> int:
+    """Register a created stroke layer beside a sibling, and return its identifier.
+
+    The sibling's archive info carries the message version and whatever else this
+    library does not model, so a created layer is shaped from it rather than built.
+    """
+    info = tspArchive.ArchiveInfo()
+    info.ParseFromString(index.archive(sibling).infoBytes)
+    info.identifier = registry.identifierAllocate()
+    del info.message_infos[1:]
+    archive = createArchive(info, [layer.SerializeToString()])
+    componentId = registry.componentOf[sibling]
+    registry.archiveAdd(componentId, archive)
+    owners[archive.identifier] = registry.componentMember(componentId)
+    index.byIdentifier[archive.identifier] = archive
+    return archive.identifier
+
+
+def listStrokeLayers(sidecar: tst.StrokeSidecarArchive) -> list[int]:
+    """Return every layer the sidecar points at, which is what it declares."""
+    return [
+        reference.identifier
+        for references in (
+            sidecar.left_column_stroke_layers, sidecar.right_column_stroke_layers,
+            sidecar.top_row_stroke_layers, sidecar.bottom_row_stroke_layers,
+        )
+        for reference in references
+    ]
 
 
 def countSurvivingCells(
@@ -323,6 +468,7 @@ def remapMergeStore(model: tst.TableModelArchive, maps: GridMaps) -> None:
 
 def applyGridStructure(
     index: ArchiveIndex,
+    registry: PackageRegistry,
     owners: dict[int, IWAFile],
     table: Table,
     info: tst.TableInfoArchive,
@@ -335,7 +481,7 @@ def applyGridStructure(
     The table model and its info are mutated for the caller to serialize, and the
     archives it points at are written here.
     """
-    refuseUnmovableState(index, model, table, maps)
+    refuseUnmovableState(index, model, table)
     store = model.base_data_store
     rowCounts, columnCounts = countSurvivingCells(index, store, maps)
 
@@ -354,13 +500,20 @@ def applyGridStructure(
         owners, store.columnHeaders.identifier, columnBucket.SerializeToString()
     )
 
+    # Resolved once, because the layer pass rewrites this archive and a second
+    # copy would carry the list of layers as it was before that.
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
+    applyStrokeLayers(index, registry, owners, sidecar, maps)
     sidecar.row_count = table.rowCount
     sidecar.column_count = table.colCount
-    writeArchive(owners, model.stroke_sidecar.identifier, sidecar.SerializeToString())
+    writeArchive(
+        owners, model.stroke_sidecar.identifier, sidecar.SerializeToString(),
+        listStrokeLayers(sidecar),
+    )
 
     model.number_of_rows = table.rowCount
     model.number_of_columns = table.colCount
+    applyBandCounts(model, maps)
     removeHiddenStates(model, table)
     remapMergeStore(model, maps)
 
@@ -372,33 +525,83 @@ def applyGridStructure(
     writeArchive(owners, infoIdentifier, info.SerializeToString())
 
 
-def writeArchive(owners: dict[int, IWAFile], identifier: int, data: bytes) -> None:
-    """Write one archive's first message back into the file holding it."""
-    owners[identifier].messageReplace(identifier, 0, data)
+def writeArchive(
+    owners: dict[int, IWAFile],
+    identifier: int,
+    data: bytes,
+    references: list[int] | None = None,
+) -> None:
+    """Write one archive's first message back into the file holding it.
+
+    `references` replaces what the archive declares it points at. A body that
+    loses or gains one has to say so, because the registry registers what a
+    component reaches from those declarations rather than from the body.
+    """
+    owners[identifier].messageReplace(identifier, 0, data, references)
 
 
 def refuseUnmovableEngineState(
     dependencies: tsce.FormulaOwnerDependenciesArchive, name: str
 ) -> None:
     """Refuse engine state keyed by cell that a structural edit does not move."""
-    volatile = dependencies.volatile_dependencies
-    held = [
-        volatile.volatile_time_cells, volatile.volatile_random_cells,
-        volatile.volatile_locale_cells, volatile.volatile_sheet_table_name_cells,
-        volatile.volatile_remote_data_cells, volatile.volatile_geometry_cell_refs,
-        dependencies.whole_owner_dependencies.dependent_cells,
-        dependencies.spill_range_sizes,
-    ]
-    if any(part.ByteSize() for part in held):
+    if dependencies.whole_owner_dependencies.dependent_cells.ByteSize():
         raise WriteError(
-            f"{name!r} holds a formula that recalculates on its own, reads the whole "
-            "table, or spills, and moving what the engine records for those is not "
-            "measured."
+            f"{name!r} holds a formula the engine records as reading the whole "
+            "table, and moving that record is not measured."
+        )
+
+
+def remapCoordinateSet(
+    coordinates: tsce.CellCoordSetArchive, maps: GridMaps
+) -> None:
+    """Move every cell a set names, dropping those whose line is gone.
+
+    The set is columns, each holding row ranges, which is how `NOW()` and `RAND()`
+    are recorded in `57-structure-refusals-base`.
+    """
+    moved: dict[int, set[int]] = {}
+    for entry in coordinates.column_entries:
+        column = maps.columns.lineMap(entry.column)
+        if column is None:
+            continue
+        for extent in entry.row_set.entries:
+            begin = extent.range_begin
+            last = extent.range_end if extent.HasField("range_end") else begin
+            for stored in range(begin, last + 1):
+                row = maps.rows.lineMap(stored)
+                if row is not None:
+                    moved.setdefault(column, set()).add(row)
+    del coordinates.column_entries[:]
+    for column in sorted(moved):
+        entry = coordinates.column_entries.add()
+        entry.column = column
+        for row in sorted(moved[column]):
+            entry.row_set.entries.add(range_begin=row)
+
+
+def refuseSpills(
+    dependencies: tsce.FormulaOwnerDependenciesArchive, name: str
+) -> None:
+    """Refuse an edit to a table holding a spill, which Numbers re-flows.
+
+    A spill fills the cells under its formula, so an edit inside one moves nothing:
+    Numbers recomputes which cells it covers. Measured 2026-09-21 in
+    `57-engine-row-inserted`, where a row added inside `SEQUENCE(3)` left the
+    spilled cells where they were and moved the row below them instead. Following
+    that means evaluating the formula, which this library never does.
+    """
+    if dependencies.spill_range_sizes.ByteSize():
+        raise WriteError(
+            f"{name!r} holds a formula that spills into the cells under it, and "
+            "Numbers re-flows a spill rather than moving it, which means "
+            "evaluating the formula."
         )
 
 
 def remapOwnerCoordinates(
-    dependencies: tsce.FormulaOwnerDependenciesArchive, maps: GridMaps, name: str
+    dependencies: tsce.FormulaOwnerDependenciesArchive,
+    table: Table,
+    maps: GridMaps,
 ) -> None:
     """Move the engine's cell-keyed records that no formula registration rewrites.
 
@@ -406,7 +609,14 @@ def remapOwnerCoordinates(
     extent follows its size. The errors' text is left for the recalculation every
     moved formula is marked for.
     """
-    refuseUnmovableEngineState(dependencies, name)
+    refuseUnmovableEngineState(dependencies, table.name)
+    volatile = dependencies.volatile_dependencies
+    for name in (
+        "volatile_time_cells", "volatile_random_cells", "volatile_locale_cells",
+        "volatile_sheet_table_name_cells", "volatile_remote_data_cells",
+    ):
+        remapCoordinateSet(getattr(volatile, name), maps)
+    refuseSpills(dependencies, table.name)
     for spanning in (
         dependencies.spanning_column_dependencies,
         dependencies.spanning_row_dependencies,
