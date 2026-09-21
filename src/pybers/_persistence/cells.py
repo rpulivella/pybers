@@ -20,6 +20,7 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-09-21  A row's offsets are read by the row's own width flag, for PYB-17.
 2026-09-16  Byte 6's chosen-format bit moved here from the writer, for PYB-83.
 2026-09-10  The formula key's position is computed from the attributes a
             cell carries, for #65. Reading a fixed slot lost 416 formulas in
@@ -225,13 +226,17 @@ def carriesChosenFormat(record: CellRecord) -> bool:
 
 
 def chooseOffsetUnit(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:
-    """Return what one row's offsets count, from the archive's own two flags.
+    """Return what one row's offsets count, which the row's own flag decides.
 
-    The parameters carry Apple's spelling because they are Apple's fields:
-    `TileRowInfo.has_wide_offsets` and `Tile.should_use_wide_rows`. Both are set
-    together in every document measured, and either alone is honored.
+    `TileRowInfo.has_wide_offsets` is the row's, `Tile.should_use_wide_rows` the
+    tile's. **The tile's flag does not describe the rows already in it**: a table
+    grown to 65,536 rows had it set on a tile whose rows kept byte offsets,
+    measured 2026-09-21 in `58-buckets-at-limit`, and reading those as words put
+    every record past the end of its buffer. The tile's flag is kept in the call
+    so that every caller still names both.
     """
-    return offsetUnitWord if hasWideOffsets or tileUsesWideRows else offsetUnitByte
+    del tileUsesWideRows
+    return offsetUnitWord if hasWideOffsets else offsetUnitByte
 
 
 def decodeRow(
