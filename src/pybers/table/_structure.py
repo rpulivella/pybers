@@ -190,22 +190,6 @@ def applyBandCounts(model: tst.TableModelArchive, maps: GridMaps) -> None:
             setattr(model, name, count)
 
 
-def refuseUnmovableState(
-    index: ArchiveIndex, model: tst.TableModelArchive, table: Table
-) -> None:
-    """Refuse a structural edit on a table keeping row headers in several buckets.
-
-    Every table measured keeps them in one, and how rows spread over more is not
-    known, so a table that does is left alone rather than written wrongly.
-    """
-    store = model.base_data_store
-    if len(store.rowHeaders.buckets) != 1:
-        raise WriteError(
-            f"{table.name!r} keeps its row headers in {len(store.rowHeaders.buckets)} "
-            "buckets, and only one has been measured."
-        )
-
-
 def mapStrokeRuns(
     layer: tst.StrokeLayerArchive, lines: LineMap
 ) -> list[tst.StrokeLayerArchive.StrokeRunArchive]:
@@ -365,28 +349,36 @@ def countSurvivingCells(
     return rows, columns
 
 
+# The rows one bucket of row headers holds, measured 2026-09-21: in a table of
+# 100,000 rows, row 65,536 sits in the first bucket and row 65,537 in the second.
+rowsPerBucket: int = 65536
+
+
 def remapHeaders(
-    bucket: tst.HeaderStorageBucket, lines: LineMap, counts: Counter[int]
+    buckets: list[tst.HeaderStorageBucket], lines: LineMap, counts: Counter[int]
 ) -> None:
-    """Move each line's header to its new index, and recount the cells it holds.
+    """Move each line's header to its new index and bucket, recounting its cells.
 
     A line added carries no header, which is how Numbers writes one at the default
-    size, and a removed line's header goes with it.
+    size, and a removed line's header goes with it. A header lands in the bucket
+    its index falls in, and a table keeping one bucket keeps every header there:
+    rows added past 65,536 left `58-buckets-created` with one bucket, where setting
+    the row count had created sixteen.
     """
-    kept = []
-    for header in bucket.headers:
-        moved = lines.lineMap(header.index)
-        if moved is None:
-            continue
-        header.index = moved
-        header.numberOfCells = counts[moved]
-        kept.append(header)
-    kept.sort(key=lambda header: header.index)
-    copies = [tst.HeaderStorageBucket.Header() for _ in kept]
-    for copy, header in zip(copies, kept, strict=True):
-        copy.CopyFrom(header)
-    del bucket.headers[:]
-    bucket.headers.extend(copies)
+    placed: list[list[tst.HeaderStorageBucket.Header]] = [[] for _ in buckets]
+    for bucket in buckets:
+        for header in bucket.headers:
+            moved = lines.lineMap(header.index)
+            if moved is None:
+                continue
+            copy = tst.HeaderStorageBucket.Header()
+            copy.CopyFrom(header)
+            copy.index = moved
+            copy.numberOfCells = counts[moved]
+            placed[min(moved // rowsPerBucket, len(buckets) - 1)].append(copy)
+    for bucket, headers in zip(buckets, placed, strict=True):
+        del bucket.headers[:]
+        bucket.headers.extend(sorted(headers, key=lambda header: header.index))
 
 
 def removeHiddenStates(model: tst.TableModelArchive, table: Table) -> None:
@@ -471,7 +463,6 @@ def applyGridStructure(
     The table model and its info are mutated for the caller to serialize, and the
     archives it points at are written here.
     """
-    refuseUnmovableState(index, model, table)
     store = model.base_data_store
     rowCounts, columnCounts = countSurvivingCells(index, store, maps)
     # Read before the UID map is rewritten, since a broken rule records the lines
@@ -486,12 +477,15 @@ def applyGridStructure(
     assignUids(uids, table)
     writeArchive(owners, uidReference.identifier, uids.SerializeToString())
 
-    rowBucketReference = store.rowHeaders.buckets[0]
-    rowBucket = index.resolve(rowBucketReference, tst.HeaderStorageBucket)
-    remapHeaders(rowBucket, maps.rows, rowCounts)
-    writeArchive(owners, rowBucketReference.identifier, rowBucket.SerializeToString())
+    rowBuckets = [
+        index.resolve(reference, tst.HeaderStorageBucket)
+        for reference in store.rowHeaders.buckets
+    ]
+    remapHeaders(rowBuckets, maps.rows, rowCounts)
+    for reference, bucket in zip(store.rowHeaders.buckets, rowBuckets, strict=True):
+        writeArchive(owners, reference.identifier, bucket.SerializeToString())
     columnBucket = index.resolve(store.columnHeaders, tst.HeaderStorageBucket)
-    remapHeaders(columnBucket, maps.columns, columnCounts)
+    remapHeaders([columnBucket], maps.columns, columnCounts)
     writeArchive(
         owners, store.columnHeaders.identifier, columnBucket.SerializeToString()
     )
@@ -576,23 +570,63 @@ def remapCoordinateSet(
             entry.row_set.entries.add(range_begin=row)
 
 
-def refuseSpills(
-    dependencies: tsce.FormulaOwnerDependenciesArchive, name: str
-) -> None:
-    """Refuse an edit to a table holding a spill, which Numbers re-flows.
+def checkSpanCut(lines: LineMap, begin: int, end: int) -> bool:
+    """Report whether an edit removes a line of a span or adds one inside it.
 
-    A spill fills the cells under its formula, so an edit inside one moves nothing:
-    Numbers recomputes which cells it covers. Measured 2026-09-21 in
-    `57-engine-row-inserted`, where a row added inside `SEQUENCE(3)` left the
-    spilled cells where they were and moved the row below them instead. Following
-    that means evaluating the formula, which this library never does.
+    A line added before the span's first line moves the whole span, and one added
+    after its last line leaves it alone, so neither cuts it.
     """
-    if dependencies.spill_range_sizes.ByteSize():
-        raise WriteError(
-            f"{name!r} holds a formula that spills into the cells under it, and "
-            "Numbers re-flows a spill rather than moving it, which means "
-            "evaluating the formula."
+    if any(lines.lineMap(line) is None for line in range(begin, end + 1)):
+        return True
+    return any(
+        begin < (len(lines.lines) if displaced is None else displaced) <= end
+        for displaced in (
+            findDisplacedLine(lines, added) for added in listAddedLines(lines)
         )
+    )
+
+
+def remapSpills(
+    dependencies: tsce.FormulaOwnerDependenciesArchive, maps: GridMaps, name: str
+) -> None:
+    """Move each spill with its formula, refusing an edit that lands inside one.
+
+    **Numbers re-flows a spill cut by an edit**, measured 2026-09-21 in
+    `57-engine-row-inserted`: a row added inside `SEQUENCE(3)` left the spilled
+    cells where they were and moved the row below instead. Following that means
+    evaluating the formula. An edit outside a spill moves it whole, as
+    `57-engine-column-inserted` moved `C4:D4` to `D4:E4`, which is ordinary movement.
+    """
+    for spill in dependencies.spill_range_sizes.spills:
+        row, column = spill.coordinate.row, spill.coordinate.column
+        rows = spill.spill_size.num_rows or 1
+        columns = spill.spill_size.num_columns or 1
+        if checkSpanCut(maps.rows, row, row + rows - 1) or checkSpanCut(
+            maps.columns, column, column + columns - 1
+        ):
+            raise WriteError(
+                f"{name!r} has a row or column added or removed inside a formula's "
+                "spill, and Numbers re-flows a spill rather than moving it, which "
+                "means evaluating the formula."
+            )
+    # A moved spill is listed first, as Numbers listed it in both measurements
+    # where one moved and one stayed.
+    moved: list[tsce.CellSpillSizesArchive.SpillForCell] = []
+    stayed: list[tsce.CellSpillSizesArchive.SpillForCell] = []
+    for spill in dependencies.spill_range_sizes.spills:
+        movedRow = maps.rows.lineMap(spill.coordinate.row)
+        movedColumn = maps.columns.lineMap(spill.coordinate.column)
+        assert movedRow is not None and movedColumn is not None
+        copy = tsce.CellSpillSizesArchive.SpillForCell()
+        copy.CopyFrom(spill)
+        copy.coordinate.row = movedRow
+        copy.coordinate.column = movedColumn
+        unchanged = (movedRow, movedColumn) == (
+            spill.coordinate.row, spill.coordinate.column
+        )
+        (stayed if unchanged else moved).append(copy)
+    del dependencies.spill_range_sizes.spills[:]
+    dependencies.spill_range_sizes.spills.extend(moved + stayed)
 
 
 def remapOwnerCoordinates(
@@ -613,7 +647,7 @@ def remapOwnerCoordinates(
         "volatile_sheet_table_name_cells", "volatile_remote_data_cells",
     ):
         remapCoordinateSet(getattr(volatile, name), maps)
-    refuseSpills(dependencies, table.name)
+    remapSpills(dependencies, maps, table.name)
     for spanning in (
         dependencies.spanning_column_dependencies,
         dependencies.spanning_row_dependencies,

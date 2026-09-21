@@ -31,6 +31,7 @@ from conftest import findDocumentPath
 from pybers._engine import findCalculationEngine, readTableOwnerEntries
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
+from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import chooseOffsetUnit, decodeRow, readPackage
 from pybers._persistence.difference import listPackageDifferences
@@ -181,7 +182,14 @@ def readTableFacts(path: Path) -> dict[str, dict[str, object]]:
             (entry.tileid, index.resolve(entry.tile, tst.Tile).numrows)
             for entry in store.tiles.tiles
         ]
-        rowBucket = index.resolve(store.rowHeaders.buckets[0], tst.HeaderStorageBucket)
+        declaredInfo = tspArchive.ArchiveInfo()
+        declaredInfo.ParseFromString(index.archive(info.tableModel.identifier).infoBytes)
+        declared = list(declaredInfo.message_infos[0].object_references)
+        tileIdentifiers = [entry.tile.identifier for entry in store.tiles.tiles]
+        rowBuckets = [
+            index.resolve(reference, tst.HeaderStorageBucket)
+            for reference in store.rowHeaders.buckets
+        ]
         columnBucket = index.resolve(store.columnHeaders, tst.HeaderStorageBucket)
         sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
         dependencies = owners[drawable.identifier].dependencies
@@ -194,7 +202,14 @@ def readTableFacts(path: Path) -> dict[str, dict[str, object]]:
                 (node.key, node.value) for node in store.rowTileTree.nodes
             ],
             "nextRowStripID": store.nextRowStripID,
-            "rowHeaders": [(h.index, h.numberOfCells) for h in rowBucket.headers],
+            "declared": (
+                [identifier in declared for identifier in tileIdentifiers],
+                [target for target in declared if target not in tileIdentifiers],
+            ),
+            "rowHeaders": [
+                [(h.index, h.numberOfCells) for h in bucket.headers]
+                for bucket in rowBuckets
+            ],
             "bands": (
                 model.number_of_header_rows, model.number_of_header_columns,
                 model.number_of_footer_rows,
@@ -379,6 +394,34 @@ def testRowsCrossTileBoundariesInALargeTable(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    ("name", "source", "edit"),
+    [
+        ("58-buckets-row-inserted", "58-buckets-base",
+         lambda table: table.rowAdd(1)),
+        ("58-buckets-row-deleted", "58-buckets-base",
+         lambda table: table.rowRemove(1)),
+        ("58-buckets-created", "58-buckets-at-limit",
+         lambda table: table.rowAdd(1)),
+    ],
+)
+def testRowHeadersSpreadOverTheirBucketsAsNumbersSpreadsThem(
+    name: str, source: str, edit: Callable[[pybers.Table], object], tmp_path: Path
+) -> None:
+    """A sparse table keeps its sixteen buckets, and tiles only where rows are."""
+    document = pybers.open(findDocumentPath(source))
+    edit(document.sheets[0].tables[0])
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    ours = readTableFacts(target)["Table 1"]
+    theirs = readTableFacts(findDocumentPath(name))["Table 1"]
+    for key in (
+        "size", "records", "rowHeaders", "tiles", "rowTileTree", "nextRowStripID",
+        "declared",
+    ):
+        assert ours[key] == theirs[key], key
+
+
+@pytest.mark.parametrize(
     ("name", "edit"),
     [
         ("27b-rows-inserted-into-a-new-tile",
@@ -399,7 +442,7 @@ def testTilesAreCreatedAndDroppedAsNumbersDoes(
     theirs = readTableFacts(findDocumentPath(name))["Table 1"]
     for key in (
         "size", "sidecar", "records", "rowHeaders", "columnHeaders",
-        "tiles", "rowTileTree", "nextRowStripID",
+        "tiles", "rowTileTree", "nextRowStripID", "declared",
     ):
         assert ours[key] == theirs[key], key
 
@@ -419,6 +462,7 @@ refusalMeasurements: dict[str, tuple[str, Callable[[pybers.Table], object]]] = {
         "Bands", lambda table: table.columnAdd(1)
     ),
     "57-bands-header-column-deleted": ("Bands", lambda table: table.columnRemove(1)),
+    "57-engine-column-inserted": ("Engine", lambda table: table.columnAdd(3)),
 }
 
 
@@ -432,15 +476,25 @@ def testBordersBandsAndSpillsFollowTheEdit(name: str, tmp_path: Path) -> None:
     document.save(target)
     ours = readTableFacts(target)[table]
     theirs = readTableFacts(findDocumentPath(name))[table]
-    for key in ("size", "sidecar", "bands", "strokes", "records", "spills"):
+    for key in ("size", "sidecar", "bands", "strokes", "records", "spills", "volatile"):
         assert ours[key] == theirs[key], key
 
 
-def testATableHoldingASpillIsRefused(tmp_path: Path) -> None:
-    """Numbers re-flows a spill rather than moving it, which means evaluating it."""
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda table: table.rowAdd(2),
+        lambda table: table.rowRemove(2),
+        lambda table: table.columnRemove(4),
+    ],
+)
+def testAnEditInsideASpillIsRefused(
+    edit: Callable[[pybers.Table], object], tmp_path: Path
+) -> None:
+    """Numbers re-flows a spill an edit cuts, which means evaluating the formula."""
     document = pybers.open(findDocumentPath("57-structure-refusals-base"))
-    document.sheet(1).table("Engine").rowAdd(2)
-    with pytest.raises(WriteError, match="spills into the cells under it"):
+    edit(document.sheet(1).table("Engine"))
+    with pytest.raises(WriteError, match="inside a formula's spill"):
         document.save(tmp_path / "refused.numbers")
 
 

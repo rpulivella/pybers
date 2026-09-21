@@ -232,8 +232,12 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 table, model, entry.dependencies.formula_owner_uid
             )
             if moved or swallowed or maps.changed:
+                # A structural edit can create and remove tiles and buckets, which
+                # the model has to declare as it points at them.
                 owners[modelArchive.identifier].messageReplace(
-                    modelArchive.identifier, 0, model.SerializeToString()
+                    modelArchive.identifier, 0, model.SerializeToString(),
+                    registry.referencesReconcile(modelArchive, model)
+                    if maps.changed else None,
                 )
             # The engine's register of formula-bearing cells, which is a separate
             # fact from a cell having moved and is what makes a newly attached
