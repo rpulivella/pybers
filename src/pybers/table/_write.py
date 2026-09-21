@@ -861,13 +861,15 @@ def moveGridRecords(
                     release(record, reference)
             if row is None:
                 continue
+            # Rules first, while each record still sits where it was stored, since a
+            # relative rule is worked out from the cell it colors.
+            if plan is not None:
+                rewriteConditionalRow(rowInfo, unit, stored, plan)
             if maps.columns.changed:
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRowColumns(
                     rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit,
                     maps.columns, table.colCount,
                 )
-            if plan is not None:
-                rewriteConditionalRow(rowInfo, unit, plan)
             rowInfo.cell_count = len(
                 decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
             )
@@ -897,12 +899,12 @@ def moveGridRecords(
 
 
 def rewriteConditionalRow(
-    rowInfo: tst.TileRowInfo, unit: int, plan: ConditionalPlan
+    rowInfo: tst.TileRowInfo, unit: int, row: int, plan: ConditionalPlan
 ) -> None:
-    """Point every record of one row at the rule its old rule became."""
+    """Point every record of one stored row at the rule its old rule became."""
     replacements = {}
     for record in decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit):
-        rewritten = rewriteConditionalRecord(record, plan)
+        rewritten = rewriteConditionalRecord(record, row, plan)
         if rewritten is not None:
             replacements[record.column] = rewritten
     if replacements:
@@ -927,11 +929,15 @@ def addInheritedRecords(
     inherited: dict[tuple[int, int], bytes] = {}
     for row in listAddedLines(maps.rows):
         displaced = findDisplacedLine(maps.rows, row)
-        for record in storedRecords.get(displaced, []) if displaced is not None else []:
+        if displaced is None:
+            continue
+        for record in storedRecords.get(displaced, []):
             key = findSlotValue(record, conditionalSlot)
             column = maps.columns.lineMap(record.column)
             if key is not None and column is not None:
-                inherited[(row, column)] = buildInheritedRecord(plan.keyFor(key))
+                inherited[(row, column)] = buildInheritedRecord(
+                    plan.keyFor(key, displaced, record.column)[0]
+                )
     for column in listAddedLines(maps.columns):
         displaced = findDisplacedLine(maps.columns, column)
         if displaced is None:
@@ -944,7 +950,7 @@ def addInheritedRecords(
                 key = findSlotValue(record, conditionalSlot)
                 if record.column == displaced and key is not None:
                     inherited[(movedRow, column)] = buildInheritedRecord(
-                        plan.keyFor(key)
+                        plan.keyFor(key, stored, displaced)[0]
                     )
     byRow: dict[int, dict[int, bytes]] = {}
     for (row, column), raw in inherited.items():

@@ -15,8 +15,9 @@ three things happen to it under an edit:
 - **A line added takes the rules of the line it displaced**, as empty records
   naming the rule and caching no match.
 
-A rule reading a cell relative to the one it colors is refused: every measured
-rule reads a locked cell or a literal. So is a spanning reference.
+Each axis of an operand follows the formula rule: locked, it holds a stored line;
+unlocked, an offset from the cell the rule colors. A whole-column operand is a
+column alone, and breaks with a zero identity for its row.
 
 Private. Reached from the structural pass in `_structure` and the tile pass in
 `_write`.
@@ -47,7 +48,6 @@ from .._persistence.cells import CellRecord
 from .._persistence.index import ArchiveIndex, assignUuid
 from .._persistence.iwa import createArchive
 from .._persistence.metadata import PackageRegistry
-from ..errors import WriteError
 
 if TYPE_CHECKING:
     # Guarded because the structural pass imports this module to plan the rules.
@@ -76,26 +76,48 @@ brokenReferenceNodeType: int = 46
 
 @dataclass
 class ConditionalPlan:
-    """What happens to each of a table's rule sets, and the entries it creates.
+    """What happens to each rule set a table holds, decided cell by cell.
 
-    `moved` maps an old key to the key of the rule it became. `broken` maps an old
-    key to the broken form, which each cell naming it receives a copy of.
+    A relative operand is an offset from the cell a rule colors, so two cells
+    sharing a rule can land on different rules after an edit. Each cell's result is
+    worked out alone, and cells with the same result share one new entry, as the
+    twelve cells of `59-conditions-relative-column-inserted` do. A broken result is
+    never shared, which is how Numbers wrote every broken rule measured.
     """
 
     index: ArchiveIndex
+    maps: GridMaps
     registry: PackageRegistry
     owners: dict[int, IWAFile]
     dataList: tst.TableDataList
     listIdentifier: int
-    moved: dict[int, int] = field(default_factory=dict)
-    broken: dict[int, tst.ConditionalStyleSetArchive] = field(default_factory=dict)
+    rowIdentities: Sequence[int]
+    columnIdentities: Sequence[int]
+    name: str
+    rules: dict[int, tst.ConditionalStyleSetArchive] = field(default_factory=dict)
     siblings: dict[int, int] = field(default_factory=dict)
+    shared: dict[tuple[int, bytes], int] = field(default_factory=dict)
 
-    def keyFor(self, key: int) -> int:
-        """Return the key a cell naming `key` names after the edit."""
-        if key in self.broken:
-            return self.entryCreate(self.broken[key], self.siblings[key])
-        return self.moved.get(key, key)
+    def keyFor(self, key: int, row: int, column: int) -> tuple[int, bool]:
+        """Return the key the cell stored at `row` and `column` names after the edit.
+
+        Also says whether its rule broke, since a broken rule caches no match.
+        """
+        rules = self.rules.get(key)
+        if rules is None:
+            return key, False
+        outcome, changed = mapRuleSet(
+            rules, row, column, self.maps,
+            self.rowIdentities, self.columnIdentities, self.name,
+        )
+        if outcome == "same":
+            return key, False
+        if outcome == "broken":
+            return self.entryCreate(changed, self.siblings[key]), True
+        result = (key, changed.SerializeToString(deterministic=True))
+        if result not in self.shared:
+            self.shared[result] = self.entryCreate(changed, self.siblings[key])
+        return self.shared[result], False
 
     def entryCreate(self, rules: tst.ConditionalStyleSetArchive, sibling: int) -> int:
         """Add a rule set to the table's list, as a new archive, and return its key."""
@@ -143,105 +165,176 @@ def listRuleFormulas(
 
 def mapRuleSet(
     rules: tst.ConditionalStyleSetArchive,
+    row: int,
+    column: int,
     maps: GridMaps,
     rowIdentities: Sequence[int],
     columnIdentities: Sequence[int],
     name: str,
 ) -> tuple[str, tst.ConditionalStyleSetArchive]:
-    """Return what an edit does to one rule set: `same`, `moved` or `broken`.
+    """Return what an edit does to one cell's rule set: `same`, `moved` or `broken`.
 
-    The operand naming the colored cell itself is an offset of zero, unlocked, and
-    never moves. Every other operand has to be a locked cell, whose offsets are
-    then its stored row and column.
+    Each axis of an operand follows the formula rule, measured across the
+    `59-conditions-relative-*` documents: a locked axis holds a stored line, and
+    an unlocked one an offset from the colored cell. A whole-column operand has no
+    row, and a whole-row one no column.
     """
     changed = tst.ConditionalStyleSetArchive()
     changed.CopyFrom(rules)
     outcome = "same"
+    movedRow, movedColumn = maps.rows.lineMap(row), maps.columns.lineMap(column)
+    assert movedRow is not None and movedColumn is not None
     for operand in listRuleOperands(changed):
         reference = operand.relative_cell_ref
-        if reference.is_spanning_column or reference.is_spanning_row:
-            raise WriteError(
-                f"{name!r} carries a highlighting rule reading a whole row or column, "
-                "and moving one is not measured."
-            )
-        locked = reference.preserve_row and reference.preserve_column
-        if not locked:
-            if reference.relative_row_offset or reference.relative_column_offset:
-                raise WriteError(
-                    f"{name!r} carries a highlighting rule reading a cell relative to "
-                    "the one it colors, and moving one is not measured."
-                )
-            continue
-        row, column = reference.relative_row_offset, reference.relative_column_offset
-        movedRow, movedColumn = maps.rows.lineMap(row), maps.columns.lineMap(column)
-        if movedRow is None or movedColumn is None:
+        axes = []
+        if not reference.is_spanning_row:
+            axes.append(("column", reference.preserve_column, column, movedColumn,
+                         maps.columns, reference.relative_column_offset))
+        if not reference.is_spanning_column:
+            axes.append(("row", reference.preserve_row, row, movedRow,
+                         maps.rows, reference.relative_row_offset))
+        values: dict[str, int] = {}
+        lost: dict[str, int] = {}
+        for axis, locked, host, movedHost, lines, value in axes:
+            target = value if locked else host + value
+            moved = lines.lineMap(target)
+            if moved is None:
+                lost[axis] = target
+                continue
+            values[axis] = moved if locked else moved - movedHost
+        if lost:
             rewriteBrokenOperand(
-                changed, operand, row, column,
-                rowIdentities[row], columnIdentities[column],
+                changed, operand,
+                findLostIdentity(reference, row, "row", lost, rowIdentities),
+                findLostIdentity(reference, column, "column", lost, columnIdentities),
             )
             outcome = "broken"
             continue
-        if (movedRow, movedColumn) == (row, column):
+        old = (reference.relative_row_offset, reference.relative_column_offset)
+        new = (values.get("row", old[0]), values.get("column", old[1]))
+        if new == old:
             continue
-        reference.relative_row_offset = movedRow
-        reference.relative_column_offset = movedColumn
-        for formula in listRuleFormulas(changed):
-            for node in formula.AST_node_array.AST_node:
-                if (
-                    node.AST_node_type == referenceNodeType
-                    and node.AST_column.column == column
-                    and node.AST_row.row == row
-                ):
-                    node.AST_column.column = movedColumn
-                    node.AST_row.row = movedRow
+        rewriteReferenceNodes(changed, reference, new)
+        # Only the axes an operand has, since a whole-column one stores no row.
+        if not reference.is_spanning_column:
+            reference.relative_row_offset = new[0]
+        if not reference.is_spanning_row:
+            reference.relative_column_offset = new[1]
         if outcome == "same":
             outcome = "moved"
     return outcome, changed
 
 
+def findLostIdentity(
+    reference: tsce.RelativeCellRefArchive,
+    host: int,
+    axis: str,
+    lost: dict[str, int],
+    identities: Sequence[int],
+) -> int:
+    """Return the identity of the line a broken operand named on one axis.
+
+    A whole-column operand names no row, and Numbers records a zero identity for
+    it, measured in `59-conditions-relative-column-a-deleted`.
+    """
+    spanning = (
+        reference.is_spanning_column if axis == "row" else reference.is_spanning_row
+    )
+    if spanning:
+        return 0
+    if axis in lost:
+        return identities[lost[axis]]
+    locked = reference.preserve_row if axis == "row" else reference.preserve_column
+    value = (
+        reference.relative_row_offset if axis == "row"
+        else reference.relative_column_offset
+    )
+    return identities[value if locked else host + value]
+
+
+def checkReferenceNode(
+    node: tsce.ASTNodeArrayArchive.ASTNodeArchive,
+    reference: tsce.RelativeCellRefArchive,
+) -> bool:
+    """Report whether a formula node spells the operand a rule holds."""
+    if node.AST_node_type != referenceNodeType:
+        return False
+    if not reference.is_spanning_row and (
+        node.AST_column.column != reference.relative_column_offset
+        or node.AST_column.absolute != reference.preserve_column
+    ):
+        return False
+    return reference.is_spanning_column or (
+        node.AST_row.row == reference.relative_row_offset
+        and node.AST_row.absolute == reference.preserve_row
+    )
+
+
+def rewriteReferenceNodes(
+    rules: tst.ConditionalStyleSetArchive,
+    reference: tsce.RelativeCellRefArchive,
+    moved: tuple[int, int],
+) -> None:
+    """Move the formula nodes spelling an operand, in both copies of the formula."""
+    for formula in listRuleFormulas(rules):
+        for node in formula.AST_node_array.AST_node:
+            if not checkReferenceNode(node, reference):
+                continue
+            if not reference.is_spanning_column:
+                node.AST_row.row = moved[0]
+            if not reference.is_spanning_row:
+                node.AST_column.column = moved[1]
+
+
 def rewriteBrokenOperand(
     rules: tst.ConditionalStyleSetArchive,
     operand: tst.FormulaPredArgArchive,
-    row: int,
-    column: int,
     rowIdentity: int,
     columnIdentity: int,
 ) -> None:
-    """Rewrite a locked operand whose cell is gone, as `57-conditions-column-deleted`.
+    """Rewrite an operand whose cell is gone, as Numbers wrote each one measured.
 
-    The reference keeps its lock and takes the lost lines as a tract, while the
-    operand drops its own copy of the lock. Each formula copy turns the matching
-    reference into `#REF!` carrying the same tract.
-    Only the beginning of each axis is marked locked, which is how Numbers writes a
-    single locked cell.
+    The formula nodes spelling it become `#REF!` whose sentinels carry each axis's
+    lock, and whose sticky bits mark the beginning of a locked axis only. The
+    operand takes the lost lines as a tract, drops its own copy of the lock, and
+    marks its reference preserved on both axes, locked or not.
     """
-    operand.arg_type = brokenReferenceArgument
-    operand.ClearField("preserve_row")
-    operand.ClearField("preserve_column")
-    operand.relative_cell_ref.relative_row_offset = 0
-    operand.relative_cell_ref.relative_column_offset = 0
-    writeLostTract(operand.uid_tract_list, rowIdentity, columnIdentity)
+    reference = operand.relative_cell_ref
+    rowLocked, columnLocked = reference.preserve_row, reference.preserve_column
     for formula in listRuleFormulas(rules):
         for node in formula.AST_node_array.AST_node:
-            if not (
-                node.AST_node_type == referenceNodeType
-                and node.AST_column.column == column
-                and node.AST_row.row == row
-            ):
+            if not checkReferenceNode(node, reference):
                 continue
             node.AST_node_type = brokenReferenceNodeType  # type: ignore[assignment]
             node.AST_column.column = brokenColumnSentinel
-            node.AST_column.absolute = True
+            node.AST_column.absolute = columnLocked
             node.AST_row.row = brokenRowSentinel
-            node.AST_row.absolute = True
-            markBeginLocked(node.AST_sticky_bits)
-            writeLostTract(node.AST_tract_list, rowIdentity, columnIdentity)
+            node.AST_row.absolute = rowLocked
+            markBeginLocked(node.AST_sticky_bits, rowLocked, columnLocked)
+            writeLostTract(
+                node.AST_tract_list, rowIdentity, columnIdentity,
+                rowLocked, columnLocked,
+            )
+    operand.arg_type = brokenReferenceArgument
+    operand.ClearField("preserve_row")
+    operand.ClearField("preserve_column")
+    reference.relative_row_offset = 0
+    reference.relative_column_offset = 0
+    reference.preserve_row = True
+    reference.preserve_column = True
+    reference.is_spanning_column = False
+    reference.is_spanning_row = False
+    writeLostTract(
+        operand.uid_tract_list, rowIdentity, columnIdentity, rowLocked, columnLocked
+    )
 
 
-def markBeginLocked(bits: tsce.ASTNodeArrayArchive.ASTStickyBits) -> None:
-    """Mark the beginning of both axes locked and the end not, as a broken cell is."""
-    bits.begin_row_is_absolute = True
-    bits.begin_column_is_absolute = True
+def markBeginLocked(
+    bits: tsce.ASTNodeArrayArchive.ASTStickyBits, rowLocked: bool, columnLocked: bool
+) -> None:
+    """Mark the beginning of each locked axis, and never the end, as a broken cell."""
+    bits.begin_row_is_absolute = rowLocked
+    bits.begin_column_is_absolute = columnLocked
     bits.end_row_is_absolute = False
     bits.end_column_is_absolute = False
 
@@ -250,6 +343,8 @@ def writeLostTract(
     tracts: tsce.ASTNodeArrayArchive.ASTUidTractList,
     rowIdentity: int,
     columnIdentity: int,
+    rowLocked: bool,
+    columnLocked: bool,
 ) -> None:
     """Record one lost cell's row and column, the tract every broken reference holds."""
     tracts.ClearField("tract")
@@ -259,7 +354,7 @@ def writeLostTract(
     tract.is_range_ref = False
     tract.purpose = tsce.ASTNodeArrayArchive.UIDS_INCLUDED
     tract.preserve_rectangular = True
-    markBeginLocked(tracts.sticky_bits)
+    markBeginLocked(tracts.sticky_bits, rowLocked, columnLocked)
 
 
 def buildConditionalPlan(
@@ -272,7 +367,7 @@ def buildConditionalPlan(
     columnIdentities: Sequence[int],
     name: str,
 ) -> ConditionalPlan | None:
-    """Decide what the edit does to every rule set, creating the moved ones now.
+    """Gather a table's rule sets for the tile pass to rewrite cell by cell.
 
     `rowIdentities` and `columnIdentities` are the lines as stored, which is what a
     broken rule records.
@@ -283,20 +378,15 @@ def buildConditionalPlan(
     if not len(dataList.entries):
         return None
     plan = ConditionalPlan(
-        index, registry, owners, dataList, store.conditionalstyletable.identifier
+        index, maps, registry, owners, dataList,
+        store.conditionalstyletable.identifier,
+        rowIdentities, columnIdentities, name,
     )
-    for entry in list(dataList.entries):
-        rules = index.resolve(entry.reference, tst.ConditionalStyleSetArchive)
-        outcome, changed = mapRuleSet(
-            rules, maps, rowIdentities, columnIdentities, name
+    for entry in dataList.entries:
+        plan.rules[int(entry.key)] = index.resolve(
+            entry.reference, tst.ConditionalStyleSetArchive
         )
         plan.siblings[int(entry.key)] = entry.reference.identifier
-        if outcome == "moved":
-            plan.moved[int(entry.key)] = plan.entryCreate(
-                changed, entry.reference.identifier
-            )
-        elif outcome == "broken":
-            plan.broken[int(entry.key)] = changed
     return plan
 
 
@@ -329,20 +419,23 @@ def buildInheritedRecord(key: int) -> bytes:
     )
 
 
-def rewriteConditionalRecord(record: CellRecord, plan: ConditionalPlan) -> bytes | None:
+def rewriteConditionalRecord(
+    record: CellRecord, row: int, plan: ConditionalPlan
+) -> bytes | None:
     """Return a record naming the rule its old one became, or None when unchanged.
 
-    A cell whose rule broke caches no match, as every one did in `57-conditions-
-    column-deleted`; one whose rule only moved keeps what it cached.
+    `row` is where the record was stored. A cell whose rule broke caches no match,
+    as every one did in the measurements; one whose rule moved keeps its cache.
     """
     key = findSlotValue(record, conditionalSlot)
-    if key is None:
+    # A record on a removed column goes with it, so it names no rule afterward.
+    if key is None or plan.maps.columns.lineMap(record.column) is None:
         return None
-    moved = plan.keyFor(key)
+    moved, broken = plan.keyFor(key, row, record.column)
     if moved == key:
         return None
     raw = patchSlotValue(record.raw, conditionalSlot, moved)
-    if key in plan.broken and findSlotValue(record, matchSlot) is not None:
+    if broken and findSlotValue(record, matchSlot) is not None:
         raw = patchSlotValue(raw, matchSlot, noMatch)
     return raw
 

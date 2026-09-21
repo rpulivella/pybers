@@ -543,11 +543,43 @@ def readConditionalRules(path: Path, tableName: str) -> tuple[object, object]:
     raise AssertionError(f"{path.name} holds no table {tableName!r}")
 
 
-conditionalMeasurements: dict[str, Callable[[pybers.Table], object]] = {
-    "57-conditions-row-inserted": lambda table: table.rowAdd(3),
-    "57-conditions-row-deleted": lambda table: table.rowRemove(3),
-    "57-conditions-column-inserted": lambda table: table.columnAdd(2),
-    "57-conditions-column-deleted": lambda table: table.columnRemove(3),
+conditionalMeasurements: dict[
+    str, tuple[str, str, Callable[[pybers.Table], object]]
+] = {
+    "57-conditions-row-inserted": (
+        "57-structure-refusals-base", "Conditions", lambda table: table.rowAdd(3)
+    ),
+    "57-conditions-row-deleted": (
+        "57-structure-refusals-base", "Conditions", lambda table: table.rowRemove(3)
+    ),
+    "57-conditions-column-inserted": (
+        "57-structure-refusals-base", "Conditions", lambda table: table.columnAdd(2)
+    ),
+    "57-conditions-column-deleted": (
+        "57-structure-refusals-base", "Conditions",
+        lambda table: table.columnRemove(3),
+    ),
+    "59-conditions-relative-row-inserted": (
+        "59-conditions-relative-base", "Relative", lambda table: table.rowAdd(3)
+    ),
+    "59-conditions-relative-row-deleted": (
+        "59-conditions-relative-base", "Relative", lambda table: table.rowRemove(3)
+    ),
+    "59-conditions-relative-column-inserted": (
+        "59-conditions-relative-base", "Relative", lambda table: table.columnAdd(2)
+    ),
+    "59-conditions-relative-column-b-deleted": (
+        "59-conditions-relative-base", "Relative",
+        lambda table: table.columnRemove(2),
+    ),
+    "59-conditions-relative-column-a-deleted": (
+        "59-conditions-relative-base", "Relative",
+        lambda table: table.columnRemove(1),
+    ),
+    "59-conditions-relative-column-c-deleted": (
+        "59-conditions-relative-base", "Relative",
+        lambda table: table.columnRemove(3),
+    ),
 }
 
 
@@ -556,12 +588,13 @@ def testConditionalHighlightingIsRewrittenAsNumbersRewritesIt(
     name: str, tmp_path: Path
 ) -> None:
     """A moved rule is renewed, a broken one copied per cell, an added line inherits."""
-    document = pybers.open(findDocumentPath("57-structure-refusals-base"))
-    conditionalMeasurements[name](document.sheet(1).table("Conditions"))
+    source, tableName, edit = conditionalMeasurements[name]
+    document = pybers.open(findDocumentPath(source))
+    edit(document.sheet(1).table(tableName))
     target = tmp_path / f"{name}.numbers"
     document.save(target)
-    assert readConditionalRules(target, "Conditions") == readConditionalRules(
-        findDocumentPath(name), "Conditions"
+    assert readConditionalRules(target, tableName) == readConditionalRules(
+        findDocumentPath(name), tableName
     )
 
 
