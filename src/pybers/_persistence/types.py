@@ -80,6 +80,7 @@ archiveTypes: dict[int, type[Message]] = {
     6004: tst.CellStyleArchive,     # a cell's resolved appearance
     6005: tst.TableDataList,        # the pooled strings, styles and formulas
     6006: tst.HeaderStorageBucket,  # per-row and per-column sizes of a data store
+    6010: tst.ConditionalStyleSetArchive,  # one cell's conditional highlighting rules
     6008: tstStyles.TableStylePresetArchive,  # one table style in the theme
     6204: tst.HiddenStateFormulaOwnerArchive,  # the formula owner of hidden rows
     6218: tst.RichTextPayloadArchive,

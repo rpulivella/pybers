@@ -206,9 +206,10 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             # not read as one the caller added.
             maps = buildGridMaps(index, model, table)
             registered: list[tuple[int, int]] = []
+            plan = None
             if maps.changed:
                 registered = listRegisteredFormulas(entry.dependencies)
-                applyGridStructure(
+                plan = applyGridStructure(
                     index, registry, owners, table, tableInfo,
                     tableReference.identifier, model, maps,
                 )
@@ -225,7 +226,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 if reference != merge.anchor
             )
             edits = applyTableEdits(
-                index, owners, table, model, swallowed, maps, registry
+                index, owners, table, model, swallowed, maps, registry, plan
             )
             moved = applyMerges(
                 table, model, entry.dependencies.formula_owner_uid

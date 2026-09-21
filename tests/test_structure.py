@@ -37,6 +37,7 @@ from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.index import ArchiveIndex, findRoot, readUuidValue
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.errors import WriteError
+from pybers.table._conditions import conditionalSlot, findSlotValue, matchSlot
 
 baseFixture: Path = findDocumentPath("56-structure-base")
 
@@ -443,12 +444,71 @@ def testATableHoldingASpillIsRefused(tmp_path: Path) -> None:
         document.save(tmp_path / "refused.numbers")
 
 
-def testATableWithConditionalHighlightingIsRefused(tmp_path: Path) -> None:
-    """Numbers rewrites the rules themselves, which no ticket has covered."""
+def readConditionalRules(path: Path, tableName: str) -> tuple[object, object]:
+    """Return each cell's rule, whether its rule matched, and every rule's refcount.
+
+    A rule is compared by its content rather than its key, since Numbers numbers
+    the copies of a broken rule in no order the cells follow.
+    """
+    index = ArchiveIndex(readPackage(path))
+    for sheet in findRoot(index).sheets:
+        for drawable in index.resolve(sheet, tn.SheetArchive).drawable_infos:
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if model.table_name != tableName:
+                continue
+            store = model.base_data_store
+            rules = {
+                entry.key: (
+                    entry.refcount,
+                    index.resolve(
+                        entry.reference, tst.ConditionalStyleSetArchive
+                    ).SerializeToString(deterministic=True),
+                )
+                for entry in index.resolve(
+                    store.conditionalstyletable, tst.TableDataList
+                ).entries
+            }
+            cells = {}
+            for entry in store.tiles.tiles:
+                tile = index.resolve(entry.tile, tst.Tile)
+                for rowInfo in tile.rowInfos:
+                    unit = chooseOffsetUnit(
+                        rowInfo.has_wide_offsets, tile.should_use_wide_rows
+                    )
+                    for record in decodeRow(
+                        rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+                    ):
+                        key = findSlotValue(record, conditionalSlot)
+                        cells[(rowInfo.tile_row_index, record.column)] = (
+                            record.typeByte,
+                            rules[key][1] if key in rules else key,
+                            findSlotValue(record, matchSlot),
+                        )
+            return cells, sorted(rules.values())
+    raise AssertionError(f"{path.name} holds no table {tableName!r}")
+
+
+conditionalMeasurements: dict[str, Callable[[pybers.Table], object]] = {
+    "57-conditions-row-inserted": lambda table: table.rowAdd(3),
+    "57-conditions-row-deleted": lambda table: table.rowRemove(3),
+    "57-conditions-column-inserted": lambda table: table.columnAdd(2),
+    "57-conditions-column-deleted": lambda table: table.columnRemove(3),
+}
+
+
+@pytest.mark.parametrize("name", sorted(conditionalMeasurements))
+def testConditionalHighlightingIsRewrittenAsNumbersRewritesIt(
+    name: str, tmp_path: Path
+) -> None:
+    """A moved rule is renewed, a broken one copied per cell, an added line inherits."""
     document = pybers.open(findDocumentPath("57-structure-refusals-base"))
-    document.sheet(1).table("Conditions").rowAdd(3)
-    with pytest.raises(WriteError, match="conditional highlighting"):
-        document.save(tmp_path / "refused.numbers")
+    conditionalMeasurements[name](document.sheet(1).table("Conditions"))
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    assert readConditionalRules(target, "Conditions") == readConditionalRules(
+        findDocumentPath(name), "Conditions"
+    )
 
 
 @pytest.mark.parametrize(

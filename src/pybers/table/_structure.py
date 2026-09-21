@@ -44,6 +44,7 @@ from .._persistence.index import ArchiveIndex, originOffset, readUuidValue
 from .._persistence.iwa import createArchive
 from .._persistence.metadata import PackageRegistry
 from ..errors import WriteError
+from ._conditions import ConditionalPlan, buildConditionalPlan
 from ._create import assignUids
 from ._read import readLineIdentities
 from .cells import Table
@@ -192,23 +193,12 @@ def applyBandCounts(model: tst.TableModelArchive, maps: GridMaps) -> None:
 def refuseUnmovableState(
     index: ArchiveIndex, model: tst.TableModelArchive, table: Table
 ) -> None:
-    """Refuse a structural edit on a table holding state this cannot move.
+    """Refuse a structural edit on a table keeping row headers in several buckets.
 
-    Conditional highlighting is the one left. Numbers rewrites the rules
-    themselves under an edit rather than moving them: an added line takes a copy
-    of its neighbor's rule, and removing the cell a rule READS splits one shared
-    rule into a separate one per cell, measured in `57-conditions-*`. Writing that
-    means creating rule archives, which no ticket has covered.
+    Every table measured keeps them in one, and how rows spread over more is not
+    known, so a table that does is left alone rather than written wrongly.
     """
     store = model.base_data_store
-    if store.HasField("conditionalstyletable"):
-        conditions = index.resolve(store.conditionalstyletable, tst.TableDataList)
-        if len(conditions.entries):
-            raise WriteError(
-                f"{table.name!r} carries conditional highlighting, whose rules "
-                "Numbers rewrites under a structural edit, and writing that is not "
-                "covered yet."
-            )
     if len(store.rowHeaders.buckets) != 1:
         raise WriteError(
             f"{table.name!r} keeps its row headers in {len(store.rowHeaders.buckets)} "
@@ -475,7 +465,7 @@ def applyGridStructure(
     infoIdentifier: int,
     model: tst.TableModelArchive,
     maps: GridMaps,
-) -> None:
+) -> ConditionalPlan | None:
     """Carry a structural edit into every archive of the table indexed by a line.
 
     The table model and its info are mutated for the caller to serialize, and the
@@ -484,6 +474,12 @@ def applyGridStructure(
     refuseUnmovableState(index, model, table)
     store = model.base_data_store
     rowCounts, columnCounts = countSurvivingCells(index, store, maps)
+    # Read before the UID map is rewritten, since a broken rule records the lines
+    # as they were stored.
+    storedRows, storedColumns = readLineIdentities(index, model)
+    plan = buildConditionalPlan(
+        index, registry, owners, store, maps, storedRows, storedColumns, table.name
+    )
 
     uidReference = model.base_column_row_uids
     uids = index.resolve(uidReference, tst.ColumnRowUIDMapArchive)
@@ -523,6 +519,7 @@ def applyGridStructure(
     del cache.rows_fitting_entries[:]
     cache.columns_count = table.colCount
     writeArchive(owners, infoIdentifier, info.SerializeToString())
+    return plan
 
 
 def writeArchive(

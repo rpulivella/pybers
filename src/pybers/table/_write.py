@@ -90,13 +90,21 @@ from ..formula._write import (
     patchFormulaKey,
     readFormulaPool,
 )
+from ._conditions import (
+    ConditionalPlan,
+    buildInheritedRecord,
+    conditionalSlot,
+    findSlotValue,
+    rewriteConditionalRecord,
+    writeConditionalCounts,
+)
 from ._read import (
     readMerges,
     readRichTextTable,
     readStringTable,
     resolveValue,
 )
-from ._structure import GridMaps, LineMap
+from ._structure import GridMaps, LineMap, findDisplacedLine, listAddedLines
 from .cells import Cell, MergeRange, Table
 
 # `TST.Tile` and the type bytes a numeric record may carry. 2 is a plain number
@@ -824,6 +832,7 @@ def moveGridRecords(
     maps: GridMaps,
     table: Table,
     release: Callable[[CellRecord, CellReference], bool],
+    plan: ConditionalPlan | None = None,
 ) -> set[int]:
     """Move every stored row and record to its new line, releasing the removed ones.
 
@@ -834,12 +843,14 @@ def moveGridRecords(
     """
     tileSize = store.tiles.tile_size
     moved: list[tuple[int, tst.TileRowInfo, tst.Tile]] = []
+    storedRecords: dict[int, list[CellRecord]] = {}
     for tileid, tile in tiles.items():
         for rowInfo in tile.rowInfos:
             stored = tileid * tileSize + rowInfo.tile_row_index
             row = maps.rows.lineMap(stored)
             unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
             records = decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
+            storedRecords[stored] = records
             for record in records:
                 column = maps.columns.lineMap(record.column)
                 if row is None or column is None:
@@ -854,9 +865,11 @@ def moveGridRecords(
                     rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit,
                     maps.columns, table.colCount,
                 )
-                rowInfo.cell_count = len(
-                    decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
-                )
+            if plan is not None:
+                rewriteConditionalRow(rowInfo, unit, plan)
+            rowInfo.cell_count = len(
+                decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
+            )
             moved.append((row, rowInfo, tile))
 
     copies: dict[int, list[tst.TileRowInfo]] = {tileid: [] for tileid in tiles}
@@ -877,10 +890,83 @@ def moveGridRecords(
             sorted(copies[tileid], key=lambda rowInfo: rowInfo.tile_row_index)
         )
         tile.numrows = len(tile.rowInfos)
+    if plan is not None:
+        addInheritedRecords(tiles, tileSize, maps, storedRecords, plan)
     return {
         tileid for tileid in tiles
         if tileid * tileSize >= table.rowCount and not copies[tileid]
     }
+
+
+def rewriteConditionalRow(
+    rowInfo: tst.TileRowInfo, unit: int, plan: ConditionalPlan
+) -> None:
+    """Point every record of one row at the rule its old rule became."""
+    replacements = {}
+    for record in decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit):
+        rewritten = rewriteConditionalRecord(record, plan)
+        if rewritten is not None:
+            replacements[record.column] = rewritten
+    if replacements:
+        rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit, replacements
+        )
+
+
+def addInheritedRecords(
+    tiles: dict[int, tst.Tile],
+    tileSize: int,
+    maps: GridMaps,
+    storedRecords: dict[int, list[CellRecord]],
+    plan: ConditionalPlan,
+) -> None:
+    """Give each added line the highlighting of the line it displaced.
+
+    The added cells take empty records naming the displaced cells' rules, which is
+    what `57-conditions-row-inserted` and `-column-inserted` hold. A cell whose
+    displaced neighbor names no rule receives nothing.
+    """
+    inherited: dict[tuple[int, int], bytes] = {}
+    for row in listAddedLines(maps.rows):
+        displaced = findDisplacedLine(maps.rows, row)
+        for record in storedRecords.get(displaced, []) if displaced is not None else []:
+            key = findSlotValue(record, conditionalSlot)
+            column = maps.columns.lineMap(record.column)
+            if key is not None and column is not None:
+                inherited[(row, column)] = buildInheritedRecord(plan.keyFor(key))
+    for column in listAddedLines(maps.columns):
+        displaced = findDisplacedLine(maps.columns, column)
+        if displaced is None:
+            continue
+        for stored, records in storedRecords.items():
+            movedRow = maps.rows.lineMap(stored)
+            if movedRow is None:
+                continue
+            for record in records:
+                key = findSlotValue(record, conditionalSlot)
+                if record.column == displaced and key is not None:
+                    inherited[(movedRow, column)] = buildInheritedRecord(
+                        plan.keyFor(key)
+                    )
+    byRow: dict[int, dict[int, bytes]] = {}
+    for (row, column), raw in inherited.items():
+        byRow.setdefault(row, {})[column] = raw
+    for row, placed in sorted(byRow.items()):
+        tile = tiles[row // tileSize]
+        if not any(held.tile_row_index == row % tileSize for held in tile.rowInfos):
+            createRowStorage(tile, row % tileSize)
+        # Found again rather than taken from the creation, because a repeated field
+        # stores a copy of what is inserted into it.
+        rowInfo = next(
+            held for held in tile.rowInfos if held.tile_row_index == row % tileSize
+        )
+        unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+        rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit, placed
+        )
+        rowInfo.cell_count = len(
+            decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
+        )
 
 
 def buildTileArchive(
@@ -1051,6 +1137,7 @@ def applyTableEdits(
     swallowed: frozenset[tuple[int, int]] = frozenset(),
     maps: GridMaps | None = None,
     registry: PackageRegistry | None = None,
+    plan: ConditionalPlan | None = None,
 ) -> TableEdits:
     """Write every changed cell of one table back into the tiles it came from.
 
@@ -1138,7 +1225,7 @@ def applyTableEdits(
         covered = buildTileRange(index, registry, owners, store, table)
         writeTileRange(
             registry, store, covered,
-            moveGridRecords(store, covered, maps, table, releaseRecord),
+            moveGridRecords(store, covered, maps, table, releaseRecord, plan),
         )
     # Resolved once, because resolving parses afresh and the structural move above
     # has to be what the walk below sees.
@@ -1319,6 +1406,9 @@ def applyTableEdits(
             owners[archive.identifier].messageReplace(
                 archive.identifier, 0, tile.SerializeToString()
             )
+
+    if plan is not None and restructured:
+        writeConditionalCounts(plan, tiles)
 
     if formatList is not None and formatsMoved:
         removeSpentEntries(
