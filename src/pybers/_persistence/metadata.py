@@ -15,6 +15,7 @@ stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.
 
 UPDATES
+2026-09-21  An archive nothing points at any more is removed, for PYB-17.
 2026-09-14  Written for PYB-63.
 """
 from __future__ import annotations
@@ -136,6 +137,16 @@ class PackageRegistry:
         """Place a created archive in a component's member."""
         self.componentMember(componentId).archiveAdd(archive)
         self.componentOf[archive.identifier] = componentId
+        self.gained.add(componentId)
+        self.changed = True
+
+    def archiveRemove(self, identifier: int) -> None:
+        """Remove an archive nothing points at any more, from the member holding it."""
+        componentId = self.componentOf.get(identifier)
+        if componentId is None:
+            raise MetadataError(f"Archive {identifier} belongs to no component.")
+        self.componentMember(componentId).archiveRemove(identifier)
+        del self.componentOf[identifier]
         self.gained.add(componentId)
         self.changed = True
 

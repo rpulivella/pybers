@@ -26,6 +26,7 @@ archives. Those two paths are chosen by `IWAFile.modified`, which only
 as though it had never happened.
 
 UPDATES
+2026-09-21  An archive nothing points at any more is removed, for PYB-17.
 2026-09-14  An archive can be created and added to a member, for PYB-63.
 2026-08-16  Written. Verified against empty-1/2/3.numbers: every archive stream
             ends exactly on the final byte of its payload.
@@ -176,6 +177,20 @@ class IWAFile:
                 "archives cannot share an identifier."
             )
         self.archives.append(archive)
+        self.modified = True
+
+    def archiveRemove(self, identifier: int) -> None:
+        """Drop one archive this member holds, and mark the member rewritten.
+
+        For an archive nothing points at any more, such as the tile of a row range
+        a table no longer covers, which Numbers removes rather than leaves behind.
+        """
+        kept = [held for held in self.archives if held.identifier != identifier]
+        if len(kept) == len(self.archives):
+            raise IWAError(
+                f"{self.name} holds no archive with identifier {identifier}."
+            )
+        self.archives = kept
         self.modified = True
 
 
