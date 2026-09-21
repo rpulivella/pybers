@@ -460,8 +460,6 @@ def testATableWithConditionalHighlightingIsRefused(tmp_path: Path) -> None:
         (lambda table: table.rowAdd(True), "named by a number"),
         (lambda table: table.rowRemove(12, 2), "cannot be removed"),
         (lambda table: table.rowRemove(1, 12), "would leave none"),
-        (lambda table: table.rowRemove(2), "anchor of the merge C2:D3"),
-        (lambda table: table.columnRemove("D"), "one cell"),
         (lambda table: table.columnAdd("LEDGER"), "past column"),
         (lambda table: table.rowAdd(1, 1000000), "past the 1000000"),
     ],
@@ -477,12 +475,38 @@ def testARefusedEditLeavesTheDocumentAsItWas(
     assert reduceModel(document) == before
 
 
-def testRemovingALineThatLeavesAMergeOneCellIsRefused() -> None:
-    """A merge cannot be one cell, and Numbers' answer here is unmeasured."""
-    table = pybers.Table("Merged", rowCount=3, colCount=3)
-    table.mergeAdd("A2:A3")
-    with pytest.raises(CellReferenceError, match="one cell"):
-        table.rowRemove(3)
+# The two edits AppleScript cannot make, because Numbers widens a selected row or
+# column over the merges it touches. Each was made from one selected cell.
+mergeMeasurements: dict[str, tuple[str, Callable[[pybers.Table], object]]] = {
+    "57-anchors-anchor-row-deleted": ("Anchors", lambda table: table.rowRemove(2)),
+    "57-anchors-anchor-column-deleted": (
+        "Anchors", lambda table: table.columnRemove(2)
+    ),
+    "57-collapse-row-deleted": ("Collapse", lambda table: table.rowRemove(3)),
+    "57-collapse-column-deleted": ("Collapse", lambda table: table.columnRemove(3)),
+}
+
+
+@pytest.mark.parametrize("name", sorted(mergeMeasurements))
+def testAMergeLosingItsAnchorOrItsSecondCell(name: str, tmp_path: Path) -> None:
+    """PYB-17 AC 3: the merged value outlives its anchor, and one cell unmerges."""
+    tableName, edit = mergeMeasurements[name]
+    document = pybers.open(findDocumentPath("57-structure-refusals-base"))
+    edit(document.sheet(1).table(tableName))
+    ours = document.sheet(1).table(tableName)
+    theirs = pybers.open(findDocumentPath(name)).sheet(1).table(tableName)
+    assert [str(merge.extent) for merge in ours.mergeRanges] == [
+        str(merge.extent) for merge in theirs.mergeRanges
+    ]
+    assert {str(reference): cell.value for reference, cell in ours.cells.items()} == {
+        str(reference): cell.value for reference, cell in theirs.cells.items()
+    }
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    for key in ("size", "records", "merges"):
+        assert readTableFacts(target)[tableName][key] == readTableFacts(
+            findDocumentPath(name)
+        )[tableName][key], key
 
 
 def testATableAddedAndEditedBeforeItsFirstSaveWritesItsIdentities(

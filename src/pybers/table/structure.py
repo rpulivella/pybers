@@ -16,6 +16,9 @@ line, measured in `56f-row-inserted-in-merge`. Numbers widens a selection until 
 covers whole merges, so an edit made from a selected row never cuts one: only a
 single selected cell does, which is what `56f` and `56g` were made from.
 
+**A merged value outlives the line its anchor sat on**, and a merge left one cell
+is unmerged rather than kept, both measured in `57-anchors-*` and `57-collapse-*`.
+
 UPDATES
 2026-09-18  Written for PYB-17.
 """
@@ -116,11 +119,11 @@ def mapCell(reference: CellReference, edit: GridEdit) -> CellReference | None:
 
 
 def mapMerge(merge: MergeRange, edit: GridEdit) -> MergeRange | None:
-    """Return where a merge lands, or None when the edit removes all of it.
+    """Return where a merge lands, or None when it stops being a merge.
 
-    Refused rather than guessed: a removal leaving one cell, which Numbers cannot
-    hold as a merge, and one taking the anchor's line while the merge survives,
-    which would move the merged value somewhere unmeasured.
+    **A merge left one cell is unmerged, and keeps its value**, measured
+    2026-09-21 in `57-collapse-row-deleted`. So is one losing every line it
+    covered.
     """
     from pybers.table.cells import MergeRange
 
@@ -129,22 +132,41 @@ def mapMerge(merge: MergeRange, edit: GridEdit) -> MergeRange | None:
     mapped = edit.spanMap(begin, end)
     if mapped is None:
         return None
-    if edit.removing and edit.at <= begin <= edit.last:
-        raise ReferenceError(
-            f"Removing that line takes the anchor of the merge {merge.extent} and "
-            "leaves the rest of it. What Numbers does with the merged value then is "
-            "not measured, so unmerge it first."
-        )
     if edit.rows:
         extent = CellRange(mapped[0], startCol, mapped[1], endCol)
     else:
         extent = CellRange(startRow, mapped[0], endRow, mapped[1])
     if extent.start == extent.end:
-        raise ReferenceError(
-            f"Removing that line leaves the merge {merge.extent} one cell, which a "
-            "merge cannot be. Unmerge it first."
-        )
+        return None
     return MergeRange(extent)
+
+
+def findMergeAnchorMoves(
+    table: Table, edit: GridEdit
+) -> dict[CellReference, CellReference]:
+    """Return where each merge whose anchor line goes carries its value.
+
+    **The merged value survives its anchor's line**, measured 2026-09-21 in
+    `57-anchors-anchor-row-deleted`, where deleting the row the anchor sat on left
+    the merge one row shorter, still holding its text at the top of what remained.
+    """
+    moves: dict[CellReference, CellReference] = {}
+    if not edit.removing:
+        return moves
+    for merge in table.mergeRanges:
+        startRow, startCol, endRow, endCol = merge.bounds
+        begin, end = (startRow, endRow) if edit.rows else (startCol, endCol)
+        if not edit.at <= begin <= edit.last:
+            continue
+        mapped = edit.spanMap(begin, end)
+        if mapped is None:
+            continue
+        anchor = (
+            CellReference(mapped[0], startCol) if edit.rows
+            else CellReference(startRow, mapped[0])
+        )
+        moves[merge.anchor] = anchor
+    return moves
 
 
 def countBrokenReferences(formula: Formula | None) -> int:
@@ -203,9 +225,10 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
             if countBrokenReferences(rewritten) > countBrokenReferences(cell.formula):
                 broken.append(cell)
 
+    carried = findMergeAnchorMoves(table, edit)
     cells: dict[CellReference, Cell] = {}
     for reference, cell in table.cells.items():
-        moved = mapCell(reference, edit)
+        moved = carried.get(reference) or mapCell(reference, edit)
         if moved is not None:
             cells[moved] = cell
 
