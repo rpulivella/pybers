@@ -15,6 +15,7 @@ stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.
 
 UPDATES
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Built on the save's one index, which every change passes through, and
             an archive's component found from it rather than kept beside it, for
             PYB-109.
@@ -40,9 +41,7 @@ from ..errors import PybersError
 from .container import indexPrefix, iwaSuffix
 from .index import ArchiveIndex
 from .iwa import Archive, IWAFile, createArchive
-from .types import readArchiveTypeId
-
-packageMetadataTypeId: int = 11006
+from .types import findArchiveTypeId, readArchiveTypeId
 
 # The component every document roots at, whose version and save token a created
 # component copies.
@@ -73,7 +72,8 @@ class PackageRegistry:
         self.package = index.package
         found = [
             archive for archive in index.byIdentifier.values()
-            if readArchiveTypeId(archive) == packageMetadataTypeId
+            if readArchiveTypeId(archive)
+            == findArchiveTypeId(tspArchive.PackageMetadata)
         ]
         if len(found) != 1:
             raise MetadataError(

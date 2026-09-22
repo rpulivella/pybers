@@ -4,15 +4,18 @@ A table's rows and columns added or removed, carried into every archive indexed 
 
 The orchestration of one structural edit's archives, from the line maps `_lines`
 derives. Here: the UID map, the header buckets and their counts, the bands,
-hidden state, the declared counts, the layout cache and the merge store. Borders
-move in `_strokes`, conditional highlighting in `_conditions`, and tiles in the
-tile pass of `_write`, where the lists a removed record releases are already
-open. The calculation engine is re-registered by the document writer, which
-knows what every formula reads.
+hidden state, the declared counts and the layout cache. Borders move in
+`_strokes`, conditional highlighting in `_conditions`, the merge store in
+`_merges`, and tiles in the tile pass of `_edits`, where the lists a removed
+record releases are already open. The calculation engine is re-registered by the
+table save in `_write`, which knows what every formula reads.
 
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-09-22  The merge store moves in `_merges`, for PYB-113.
+2026-09-22  Nothing is imported from table creation: the UID map is written by `_lines`,
+            for PYB-113.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Line maps and borders moved to `_lines` and `_strokes`.
 2026-09-18  Written for PYB-17.
@@ -35,13 +38,14 @@ from .._persistence.index import ArchiveIndex, readUuidValue
 from .._persistence.metadata import PackageRegistry
 from ..addressing.reference import originOffset
 from ._conditions import ConditionalPlan, buildConditionalPlan
-from ._create import assignUids
 from ._lines import (
     GridMaps,
     LineMap,
+    assignUids,
     findDisplacedLine,
     listAddedLines,
 )
+from ._merges import remapMergeStore
 from ._read import readLineIdentities
 from ._strokes import applyStrokeLayers, listStrokeLayers
 from .cells import Table
@@ -174,49 +178,6 @@ def removeHiddenStates(model: tst.TableModelArchive, table: Table) -> None:
                 copy.CopyFrom(state)
             del extent.base_hidden_states[:]
             extent.base_hidden_states.extend(copies)
-
-
-def remapMergeStore(model: tst.TableModelArchive, maps: GridMaps) -> None:
-    """Move each stored merge with its lines, as Numbers rewrote them in `23`.
-
-    Kept in place rather than rebuilt, so a merge the edit only moved keeps its
-    formula index and is not then mistaken for one the caller added.
-    """
-    if not model.HasField("merge_owner"):
-        return
-    store = model.merge_owner.formula_store
-    kept = []
-    for pair in store.formulas:
-        tracts = [
-            node.AST_colon_tract for node in pair.formula.AST_node_array.AST_node
-            if node.HasField("AST_colon_tract")
-        ]
-        survives = True
-        for tract in tracts:
-            for axis, lines in (
-                (tract.absolute_row, maps.rows), (tract.absolute_column, maps.columns)
-            ):
-                for span in axis:
-                    begin = span.range_begin
-                    end = span.range_end if span.HasField("range_end") else begin
-                    mapped = lines.spanMap(begin, end)
-                    if mapped is None:
-                        survives = False
-                        continue
-                    span.range_begin = mapped[0]
-                    if mapped[1] != mapped[0]:
-                        span.range_end = mapped[1]
-                    else:
-                        span.ClearField("range_end")
-        if survives:
-            kept.append(pair)
-    if len(kept) == len(store.formulas):
-        return
-    copies = [tst.FormulaStoreArchive.FormulaStorePair() for _ in kept]
-    for copy, pair in zip(copies, kept, strict=True):
-        copy.CopyFrom(pair)
-    del store.formulas[:]
-    store.formulas.extend(copies)
 
 
 def applyGridStructure(

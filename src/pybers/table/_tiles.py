@@ -4,7 +4,7 @@ A table's tiles: the rows they store, and rows moved between them by an edit.
 
 A tile holds 256 rows, and a row's storage is an offset array over a buffer of
 cell records. This is where a row is created, rebuilt, and dealt to the tile its
-new number falls in. Cell values are patched in `_write`, which uses the row
+new number falls in. Cell values are patched in `_edits`, which uses the row
 primitives here.
 
 **Tiles are sparse.** Only tiles holding rows exist, measured 2026-09-21 in a
@@ -14,6 +14,7 @@ when it empties.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-22  The tile pass that uses these primitives is named `_edits`, for PYB-113.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Split out of `_write` for PYB-17.
 """

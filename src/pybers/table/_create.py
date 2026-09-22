@@ -8,12 +8,15 @@ calculation-engine owners and their two dependency tiles. Every name in it is re
 and each owner keeps its offset from the table's base UUID, as Numbers writes it. See
 findings-10-creation.md.
 
-Its styles are the reset in docs/decisions.md. The table style and the cell style are
-variations of the theme's first table style preset, written as `52-table-reset-styled`
-wrote them, and every text slot names `pybers-base`, the named paragraph style of
-`53-paragraph-style-named`, created once per document and found again by name.
+Its styles are the reset in docs/decisions.md, created by `_reset`.
 
 UPDATES
+2026-09-22  The reset's styles moved to `_reset`, for PYB-113.
+2026-09-22  A random UUID comes from the index module, shared with sheet creation, for
+            PYB-113.
+2026-09-22  The UID map is written by `_lines`, as a structural edit writes it, for
+            PYB-113.
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Created on the save's one index, for PYB-109.
 2026-09-14  Written for PYB-63.
 """
@@ -29,7 +32,6 @@ __date__ = "2026/09/14"
 
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from google.protobuf.message import Message
@@ -39,15 +41,13 @@ from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
-from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
-from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
-from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import createArchive
 from .._persistence.index import (
     ArchiveIndex,
     assignUuid,
     findRoot,
+    generateUuid,
     readUuidValue,
     wordBits,
     wordMask,
@@ -60,25 +60,29 @@ from .._persistence.template import (
     copyTemplates,
     readTemplates,
 )
-from .._persistence.types import readArchiveTypeId, tableInfoTypeId
+from .._persistence.types import findArchiveTypeId
 from ..errors import WriteError
 from ..geometry import Position
+from ._lines import assignUids
+from ._reset import (
+    DocumentStyles,
+    ResetStyles,
+    bindStyles,
+    createResetStyles,
+    findDocumentStyles,
+    templateDirectory,
+)
 from .cells import Table, generateOwnerIdentity
 
 if TYPE_CHECKING:
     # Guarded because the document feature imports this one to create its tables.
     from ..document.sheets import Document, Sheet
 
-templateDirectory: Path = Path(__file__).resolve().parent / "_templates"
 
 # The objects the templates name that belong to the document rather than to the
 # table, as `48-table-inserted` numbered them.
 templateSheet: int = 904532
 templatePreset: int = 904099
-templateStylesheet: int = 905039
-templateListStyle: int = 903872
-templateTableStyle: int = 904074
-templateCellStyle: int = 904075
 
 # The table template's base owner UUID, which its owner of kind 1 carries. Every other
 # owner UUID in the template is this plus the owner's kind, and kinds reach 35.
@@ -88,14 +92,8 @@ ownerKindLimit: int = 0x100
 # A UUID this small is a fixed value such as a root group, never an identity.
 fixedUuidLimit: int = 1 << 32
 
-
-ownerTypeId: int = 4008
-paragraphStyleTypeId: int = 2022
-treeNodeTypeId: int = 205
 treeNodeVersion: tuple[int, ...] = (1, 0, 5)
 
-baseStyleName: str = "pybers-base"
-namedStyleKey: str = "text-{}-paragraphstyle"
 resetRowHeight: float = 24.0
 resetColumnWidth: float = 72.0
 tableGap: float = resetRowHeight
@@ -194,209 +192,6 @@ def remapOwnerIds(message: Message, mapping: dict[int, int]) -> None:
         items = list(value) if descriptor.is_repeated else [value]
         for item in items:
             remapOwnerIds(item, mapping)
-
-
-def assignUids(uidMap: tst.ColumnRowUIDMapArchive, table: Table) -> None:
-    """Write a table's row and column identities, in the order Numbers keeps.
-
-    The UIDs are sorted by value, upper half first, and each index list is the
-    permutation between that order and the table's own. Measured from `48`.
-    """
-    for axis, uids in (
-        ("column", table._columnIdentities), ("row", table._rowIdentities)
-    ):
-        ordered = sorted(range(len(uids)), key=lambda position: uids[position])
-        sortedField = getattr(uidMap, f"sorted_{axis}_uids")
-        indexForUid = getattr(uidMap, f"{axis}_index_for_uid")
-        uidForIndex = getattr(uidMap, f"{axis}_uid_for_index")
-        del sortedField[:]
-        del indexForUid[:]
-        del uidForIndex[:]
-        for position in ordered:
-            assignUuid(sortedField.add(), uids[position])
-        indexForUid.extend(ordered)
-        rank = {position: slot for slot, position in enumerate(ordered)}
-        uidForIndex.extend(rank[position] for position in range(len(uids)))
-
-
-@dataclass(frozen=True, slots=True)
-class DocumentStyles:
-    """The theme's first table style preset, its network, and its stylesheet."""
-
-    preset: int
-    network: tst.TableStyleNetworkArchive
-    stylesheet: int
-
-
-@dataclass(frozen=True, slots=True)
-class ResetStyles:
-    """The three styles every text, cell and table slot of a created table names."""
-
-    tableStyle: int
-    cellStyle: int
-    textStyle: int
-
-
-def findTheme(index: ArchiveIndex) -> tuple[int, tn.ThemeArchive]:
-    """Return the document's theme archive and its identifier."""
-    root = findRoot(index)
-    return root.theme.identifier, index.resolve(root.theme, tn.ThemeArchive)
-
-
-def findDocumentStyles(index: ArchiveIndex) -> DocumentStyles:
-    """Return the theme's first table style preset and the network it names."""
-    _, theme = findTheme(index)
-    presets = theme.super.Extensions[tstStyles.ThemePresetsArchive.extension]
-    if not presets.table_style_presets:
-        raise WriteError("This document's theme carries no table style preset.")
-    presetReference = presets.table_style_presets[0]
-    preset = index.resolve(presetReference, tstStyles.TableStylePresetArchive)
-    network = index.resolve(preset.style_network, tst.TableStyleNetworkArchive)
-    stylesheet = index.resolve(network.table_style, tst.TableStyleArchive)
-    return DocumentStyles(
-        preset=presetReference.identifier,
-        network=network,
-        stylesheet=stylesheet.super.stylesheet.identifier,
-    )
-
-
-def findNamedStyle(index: ArchiveIndex, stylesheetId: int) -> int | None:
-    """Return the `pybers-base` paragraph style this document already holds, if any."""
-    stylesheet = index.resolve(
-        tsp.Reference(identifier=stylesheetId), tss.StylesheetArchive
-    )
-    for reference in stylesheet.styles:
-        archive = index.byIdentifier.get(reference.identifier)
-        if archive is None or readArchiveTypeId(archive) != paragraphStyleTypeId:
-            continue
-        style = index.resolve(reference, tswp.ParagraphStyleArchive)
-        if style.super.name == baseStyleName:
-            return int(reference.identifier)
-    return None
-
-
-def createResetStyles(
-    index: ArchiveIndex, registry: PackageRegistry, styles: DocumentStyles
-) -> ResetStyles:
-    """Create the reset's two variations, and `pybers-base` unless it exists."""
-    network = styles.network
-    bodyText = index.resolve(network.body_text_style, tswp.ParagraphStyleArchive)
-    templates = readTemplates(templateDirectory / "styles")
-    existing = findNamedStyle(index, styles.stylesheet)
-    if existing is not None:
-        templates = [
-            template for template in templates if template.role != "text-style"
-        ]
-    copies = copyTemplates(
-        registry,
-        templates,
-        {
-            templateStylesheet: styles.stylesheet,
-            templateTableStyle: network.table_style.identifier,
-            templateCellStyle: network.body_cell_style.identifier,
-            templateListStyle: bodyText.para_properties.list_style.identifier,
-        },
-    )
-    stylesheet = index.resolve(
-        tsp.Reference(identifier=styles.stylesheet), tss.StylesheetArchive
-    )
-    keys = {entry.identifier for entry in stylesheet.identifier_to_style_map}
-    if existing is None:
-        textCopy = copies["text-style"]
-        key = next(
-            namedStyleKey.format(number)
-            for number in range(len(keys) + 1)
-            if namedStyleKey.format(number) not in keys
-        )
-        body = textCopy.body
-        if not isinstance(body, tswp.ParagraphStyleArchive):
-            raise WriteError("The text style template is not a paragraph style.")
-        body.super.style_identifier = key
-        stylesheet.identifier_to_style_map.add(
-            identifier=key, style=tsp.Reference(identifier=textCopy.identifier)
-        )
-    reset = ResetStyles(
-        tableStyle=copies["table-style"].identifier,
-        cellStyle=copies["cell-style"].identifier,
-        textStyle=copies["text-style"].identifier if existing is None else existing,
-    )
-
-    componentId = registry.componentRequire(styles.stylesheet)
-    copies.place(registry, {"DocumentStylesheet": componentId})
-    created = [copy.identifier for copy in copies.copies.values()]
-    for identifier in created:
-        stylesheet.styles.add(identifier=identifier)
-        registry.objectUuidAdd(componentId, identifier, generateUuid())
-    for parent, child in (
-        (network.table_style.identifier, reset.tableStyle),
-        (network.body_cell_style.identifier, reset.cellStyle),
-    ):
-        entry = next(
-            (
-                entry for entry in stylesheet.parent_to_children_style_map
-                if entry.parent.identifier == parent
-            ),
-            None,
-        )
-        if entry is None:
-            entry = stylesheet.parent_to_children_style_map.add()
-            entry.parent.identifier = parent
-        entry.children.add(identifier=child)
-    references = registry.strongReferencesOf(styles.stylesheet)
-    references.extend(
-        identifier for identifier in created if identifier not in references
-    )
-    registry.archiveReplace(
-        styles.stylesheet, stylesheet, references
-    )
-
-    if existing is None:
-        themeId, theme = findTheme(index)
-        presets = theme.super.Extensions[tswp.ThemePresetsArchive.extension]
-        presets.paragraph_style_presets.add(identifier=reset.textStyle)
-        themeReferences = registry.strongReferencesOf(themeId)
-        themeReferences.append(reset.textStyle)
-        registry.archiveReplace(themeId, theme, themeReferences)
-    return reset
-
-
-def generateUuid() -> tsp.UUID:
-    """Return a random UUID in the two-halves form the file stores."""
-    message = tsp.UUID()
-    assignUuid(message, uuid.uuid4().int)
-    return message
-
-
-def bindStyles(
-    template: ArchiveTemplate, styles: DocumentStyles, reset: ResetStyles
-) -> dict[int, int]:
-    """Bind every style the table model template names to what the reset puts there.
-
-    The table style, every cell style and every text style but the title's take the
-    reset. The title's two styles take the theme's own, since a title stays hidden.
-    """
-    bindings: dict[int, int] = {}
-    for descriptor in tst.TableStyleNetworkArchive.DESCRIPTOR.fields:
-        if descriptor.message_type is None:
-            continue
-        name = descriptor.name
-        if not template.body.HasField(name):
-            continue
-        if name == "table_style":
-            target = reset.tableStyle
-        elif name in ("table_name_style", "table_name_shape_style"):
-            target = getattr(styles.network, name).identifier
-        elif name.endswith("_text_style"):
-            target = reset.textStyle
-        else:
-            target = reset.cellStyle
-        source = getattr(template.body, name).identifier
-        if bindings.setdefault(source, target) != target:
-            raise WriteError(
-                f"The table template names style {source} in two slots the reset "
-                "fills differently."
-            )
-    return bindings
 
 
 @dataclass(slots=True)
@@ -502,7 +297,8 @@ def createTable(
     renewal = UuidRenewal(base=base)
     owners = [
         copy for copy in copies.copies.values()
-        if copy.template.info.message_infos[0].type == ownerTypeId
+        if copy.template.info.message_infos[0].type
+        == findArchiveTypeId(tsce.FormulaOwnerDependenciesArchive)
     ]
     registered = [
         entry.internal_owner_id
@@ -605,7 +401,9 @@ def addSidebarNodes(
         for tableId in tableIds:
             identifier = registry.identifierAllocate()
             info = tspArchive.ArchiveInfo(identifier=identifier)
-            message = info.message_infos.add(type=treeNodeTypeId, length=0)
+            message = info.message_infos.add(
+                type=findArchiveTypeId(tsk.TreeNode), length=0
+            )
             message.version.extend(treeNodeVersion)
             message.object_references.append(tableId)
             child = tsk.TreeNode()
@@ -640,7 +438,7 @@ def findPendingTables(
         )
         stored = [
             reference.identifier for reference in sheetArchive.drawable_infos
-            if index.typeOf(reference) == tableInfoTypeId
+            if index.typeOf(reference) == findArchiveTypeId(tst.TableInfoArchive)
         ]
         kept = [
             table._identifier for table in sheet.tables
@@ -689,7 +487,7 @@ def createTables(document: Document, registry: PackageRegistry) -> None:
                 )
                 + tableGap
                 for reference in sheetArchive.drawable_infos
-                if index.typeOf(reference) == tableInfoTypeId
+                if index.typeOf(reference) == findArchiveTypeId(tst.TableInfoArchive)
             ),
             default=0.0,
         )

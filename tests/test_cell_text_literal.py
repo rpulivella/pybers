@@ -30,7 +30,7 @@ import pybers
 from conftest import findDocumentPath
 from pybers._persistence import readPackage
 from pybers._persistence.cells import carriesChosenFormat, listReferenceSlots
-from pybers.table._write import textFormatSlot
+from pybers.table._refcounts import textFormatSlot
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 

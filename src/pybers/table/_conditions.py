@@ -20,9 +20,10 @@ by the same machinery as a cell's formula, and each operand then takes the
 coordinates of the formula node it indexes.
 
 Private. Reached from the structural pass in `_structure` and the tile pass in
-`_write`.
+`_edits`.
 
 UPDATES
+2026-09-22  The tile pass that reaches this is named `_edits`, for PYB-113.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Rules mapped by the formula machinery rather than a copy of it.
 2026-09-21  Written for PYB-17.

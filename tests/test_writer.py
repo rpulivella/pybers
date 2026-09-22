@@ -54,17 +54,19 @@ from pybers._persistence import (
 from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.types import (
     archiveTypes,
-    calculationEngineTypeId,
+    findArchiveTypeId,
     parseArchive,
     readArchiveTypeId,
-    tableInfoTypeId,
 )
 from pybers.addressing import toCellReference
 from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
 from pybers.table._read import readMerges
-from pybers.table._write import countFormatClaims
+from pybers.table._refcounts import countFormatClaims
+
+tableInfoTypeId: int = findArchiveTypeId(tst.TableInfoArchive)
+calculationEngineTypeId: int = findArchiveTypeId(tsce.CalculationEngineArchive)
 
 
 def readNumericRecords(path: Path) -> list[CellRecord]:
@@ -957,7 +959,6 @@ def readFormatEntries(
 ) -> list[tuple[int, int | None]]:
     """Return one table's format list as key and kind, for asserting on references."""
     from pybers._persistence.index import ArchiveIndex
-    from pybers._persistence.types import tableInfoTypeId
     from pybers.document._read import findRoot
 
     index = ArchiveIndex(readPackage(path))
@@ -983,7 +984,6 @@ def readFormatEntries(
 def findTile(path: Path, tableName: str) -> tst.Tile:
     """Return the one tile of a named table, for asserting on row storage."""
     from pybers._persistence.index import ArchiveIndex
-    from pybers._persistence.types import tableInfoTypeId
     from pybers.document._read import findRoot
 
     index = ArchiveIndex(readPackage(path))
@@ -1117,7 +1117,6 @@ def readStringEntries(path: Path, tableName: str) -> dict[int, object]:
         readDataList,
         stringListType,
     )
-    from pybers._persistence.types import tableInfoTypeId
     from pybers.document._read import findRoot
 
     index = ArchiveIndex(readPackage(path))
@@ -1140,7 +1139,6 @@ def readRecordAt(
 ) -> CellRecord:
     """Return the raw cell record at an address, in the first table or a named one."""
     from pybers._persistence.index import ArchiveIndex
-    from pybers._persistence.types import tableInfoTypeId
     from pybers.addressing import toCellReference
     from pybers.document._read import findRoot
 

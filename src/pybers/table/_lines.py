@@ -9,6 +9,8 @@ comparing the two gives the whole mapping from stored lines to new ones.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-22  The UID map is written here, by creation and by a structural edit alike, for
+            PYB-113.
 2026-09-21  Split out of `_structure` for PYB-17.
 """
 from __future__ import annotations
@@ -25,7 +27,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence.index import ArchiveIndex
+from .._persistence.index import ArchiveIndex, assignUuid
 from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._read import readLineIdentities
@@ -149,6 +151,29 @@ def buildGridMaps(
     )
 
 
+def assignUids(uidMap: tst.ColumnRowUIDMapArchive, table: Table) -> None:
+    """Write a table's row and column identities, in the order Numbers keeps.
+
+    The UIDs are sorted by value, upper half first, and each index list is the
+    permutation between that order and the table's own. Measured from `48`.
+    """
+    for axis, uids in (
+        ("column", table._columnIdentities), ("row", table._rowIdentities)
+    ):
+        ordered = sorted(range(len(uids)), key=lambda position: uids[position])
+        sortedField = getattr(uidMap, f"sorted_{axis}_uids")
+        indexForUid = getattr(uidMap, f"{axis}_index_for_uid")
+        uidForIndex = getattr(uidMap, f"{axis}_uid_for_index")
+        del sortedField[:]
+        del indexForUid[:]
+        del uidForIndex[:]
+        for position in ordered:
+            assignUuid(sortedField.add(), uids[position])
+        indexForUid.extend(ordered)
+        rank = {position: slot for slot, position in enumerate(ordered)}
+        uidForIndex.extend(rank[position] for position in range(len(uids)))
+
+
 def findDisplacedLine(lines: LineMap, line: int) -> int | None:
     """Return the stored line an added line took the place of, or None at the end."""
     for stored, moved in enumerate(lines.lines):
@@ -167,6 +192,7 @@ __all__ = [
     "GridMaps",
     "LineMap",
     "ModelLines",
+    "assignUids",
     "buildGridMaps",
     "findDisplacedLine",
     "listAddedLines",

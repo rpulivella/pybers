@@ -36,6 +36,7 @@ UPDATES
             for #45, and a table carries the identity formulas name it by.
 2026-09-14  A sheet carries the identifier of the archive it was read from,
             for PYB-63.
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 """
 from __future__ import annotations
 
@@ -57,7 +58,7 @@ from .._persistence import (
     readPackage,
 )
 from .._persistence.index import ArchiveIndex, findRoot
-from .._persistence.types import tableInfoTypeId
+from .._persistence.types import findArchiveTypeId
 from ..errors import ReadError
 from ..table._read import readTable
 from .sheets import Document, Sheet
@@ -78,7 +79,7 @@ def readSheet(
     sheetArchive = index.resolve(tsp.Reference(identifier=identifier), tn.SheetArchive)
     sheet = Sheet(name=sheetArchive.name, _identifier=identifier)
     for reference in sheetArchive.drawable_infos:
-        if index.typeOf(reference) != tableInfoTypeId:
+        if index.typeOf(reference) != findArchiveTypeId(tst.TableInfoArchive):
             continue
         table = readTable(
             index,

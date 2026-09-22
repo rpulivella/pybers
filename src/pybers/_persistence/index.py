@@ -15,6 +15,8 @@ member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-09-22  A random UUID is generated here, where both creators find it, for PYB-113.
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Every write, addition and removal within one save passes through the
             index, which hands out one parsed message per archive, for PYB-109.
 2026-09-22  The origin offset and the type identifiers moved to the modules that
@@ -34,6 +36,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+import uuid
+
 from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
@@ -42,7 +46,7 @@ from .._generated import TSTArchives_pb2 as tst
 from ..errors import ReadError
 from .container import NumbersPackage
 from .iwa import Archive, IWAFile
-from .types import documentTypeId, parseArchive, readArchiveTypeId
+from .types import findArchiveTypeId, parseArchive, readArchiveTypeId
 
 # A `TSP.UUID` is two 64-bit halves and a formula's table identifier is four 32-bit
 # words, so the same value is spelled two ways and has to be converted between them.
@@ -185,6 +189,13 @@ def assignUuid(message: tsp.UUID, value: int) -> None:
     message.upper = value >> halfBits
 
 
+def generateUuid() -> tsp.UUID:
+    """Return a random UUID in the two-halves form the file stores."""
+    message = tsp.UUID()
+    assignUuid(message, uuid.uuid4().int)
+    return message
+
+
 def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
     """Return the document's root `TN.DocumentArchive`.
 
@@ -195,7 +206,7 @@ def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
     """
     roots = [
         archive for archive in index.byIdentifier.values()
-        if readArchiveTypeId(archive) == documentTypeId
+        if readArchiveTypeId(archive) == findArchiveTypeId(tn.DocumentArchive)
     ]
     if len(roots) != 1:
         raise ReadError(

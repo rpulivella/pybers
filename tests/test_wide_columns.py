@@ -41,13 +41,16 @@ from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import chooseOffsetUnit, offsetUnitByte, offsetUnitWord
 from pybers._persistence.difference import listPackageDifferences
+from pybers._persistence.types import findArchiveTypeId
 from pybers.addressing.reference import CellReference, originOffset
 from pybers.errors import ReadError, WriteError
-from pybers.table._write import rewriteRow, tileTypeId
+from pybers.table._tiles import rewriteRow
 
 wideFixture: Path = findDocumentPath("45-columns-over-255")
 narrowMeasurement: Path = findDocumentPath("11-value-types-noformats")
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
+
+tileTypeId: int = findArchiveTypeId(tst.Tile)
 
 # The four cells cleared from the last row of the wide fixture.
 clearedCells: tuple[str, ...] = ("B7", "E7", "DV7", "KM7")
