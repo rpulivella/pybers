@@ -75,7 +75,7 @@ Requires Python 3.14 or newer. The only runtime dependency is `protobuf`.
 
 | Path | What lives here |
 | --- | --- |
-| `src/pybers/` | The library, laid out by concern. A directory per feature, `_persistence/` and `_engine.py` beneath them, and `protos/` and `_generated/` for the extracted iWork schemas with their type stubs. A leading underscore means a caller has no business there. |
+| `src/pybers/` | The library, laid out by concern. A directory per feature, `_persistence/` and `_engine/` beneath them, and `protos/` and `_generated/` for the extracted iWork schemas with their type stubs. A leading underscore means a caller has no business there. |
 | `tests/` | The pytest suite, plus `fixtures/` (origins), `measurements/` (one change from an origin) and `golden/` (files pybers wrote, confirmed in Numbers). |
 | `docs/` | Settled decisions, and `findings/`, what the real files established about the format. |
 | `scripts/` | Repository tooling, including the schema extractor and the writing gate. See `scripts/README.md`. |
