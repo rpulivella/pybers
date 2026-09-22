@@ -26,6 +26,7 @@ import pytest
 from conftest import findDocumentPath
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._persistence import PackageRegistry, readPackage
+from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.template import (
     TemplateError,
     copyTemplates,
@@ -50,7 +51,8 @@ documentBindings: dict[int, int] = {
 
 def readRegistry() -> PackageRegistry:
     """Return the registry of `49-sheet-inserted`, the sheet templates' source."""
-    return PackageRegistry(readPackage(findDocumentPath("49-sheet-inserted")))
+    path = findDocumentPath("49-sheet-inserted")
+    return PackageRegistry(ArchiveIndex(readPackage(path)))
 
 
 def testTheSheetTemplatesReadAsOneSheetAndItsSevenParts() -> None:

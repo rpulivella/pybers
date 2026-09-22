@@ -148,7 +148,9 @@ def testTheTileMatchesTheOneNumbersCreatedApartFromEdges(tmp_path: Path) -> None
 
 
 def testTheCreatedTileFollowsTheRegistryRules(tmp_path: Path) -> None:
-    registry = PackageRegistry(readPackage(saveWithFormulas(tmp_path)))
+    registry = PackageRegistry(
+        ArchiveIndex(readPackage(saveWithFormulas(tmp_path)))
+    )
 
     for identifier, component in registry.components.items():
         stored = {

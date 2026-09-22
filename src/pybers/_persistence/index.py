@@ -15,6 +15,8 @@ member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-09-22  Every write, addition and removal within one save passes through the
+            index, which hands out one parsed message per archive, for PYB-109.
 2026-09-18  A UUID's value read and assigned here, for PYB-17.
 2026-09-08  Moved into the persistence layer for #58. It was `pybers.archives`,
             which put the word back at the top level after PYB-2 had retired it.
@@ -37,7 +39,7 @@ from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
 from ..errors import ReadError
 from .container import NumbersPackage
-from .iwa import Archive
+from .iwa import Archive, IWAFile
 from .types import parseArchive, readArchiveTypeId
 
 # The stored format counts rows and columns from zero. The model counts from
@@ -85,7 +87,11 @@ class ArchiveIndex:
 
     A `TSP.Reference` carries only an identifier, with no hint of which member
     holds the target, so resolving one means having the whole package indexed
-    first. Built once per read.
+    first. Built once per read, and once per save.
+
+    **Within one save the index is the only path to an archive, read or written.**
+    Every archive resolves to one parsed message, so a pass that changes it hands
+    the change to every later reader, and a write keeps that same message.
     """
 
     def __init__(self, package: NumbersPackage) -> None:
@@ -95,19 +101,44 @@ class ArchiveIndex:
         holds its target, so a lazy index would have to scan every member on the
         first miss anyway.
         """
+        self.package = package
         self.byIdentifier: dict[int, Archive] = {}
+        self.owners: dict[int, IWAFile] = {}
+        self.parsed: dict[int, Message] = {}
+        self.removed: set[int] = set()
         for iwaFile in package.iwaFiles:
             for archive in iwaFile.archives:
                 self.byIdentifier[archive.identifier] = archive
+                self.owners[archive.identifier] = iwaFile
 
     def archive(self, identifier: int) -> Archive:
         """Return the archive with this identifier, or raise naming it."""
         found = self.byIdentifier.get(identifier)
         if found is None:
+            if identifier in self.removed:
+                raise ReadError(
+                    f"Reference to archive {identifier}, which this save removed."
+                )
             raise ReadError(
                 f"Reference to archive {identifier}, which is not in this document."
             )
         return found
+
+    def identifierResolve[ArchiveT: Message](
+        self, identifier: int, expected: type[ArchiveT]
+    ) -> ArchiveT:
+        """Return the one parsed message of an archive, as the class named."""
+        message = self.parsed.get(identifier)
+        if message is None:
+            message = parseArchive(self.archive(identifier))
+            self.parsed[identifier] = message
+        if not isinstance(message, expected):
+            raise ReadError(
+                f"Archive {identifier} is a "
+                f"{type(message).DESCRIPTOR.full_name}, but a "
+                f"{expected.DESCRIPTOR.full_name} was expected here."
+            )
+        return message
 
     # Every resolve names the archive class it expects, so the expectation is
     # checked rather than assumed, and Message bounds it because only a generated
@@ -115,7 +146,7 @@ class ArchiveIndex:
     def resolve[ArchiveT: Message](
         self, reference: tsp.Reference, expected: type[ArchiveT]
     ) -> ArchiveT:
-        """Parse the archive a `TSP.Reference` points at, as the class named.
+        """Return the archive a `TSP.Reference` points at, as the class named.
 
         The expected class is required rather than inferred, and it is checked.
         A reference is a bare identifier with no type on it, so following the
@@ -123,14 +154,7 @@ class ArchiveIndex:
         model as a tile would produce a plausible empty table rather than an
         error. Naming the expectation turns that into a stop.
         """
-        message = parseArchive(self.archive(reference.identifier))
-        if not isinstance(message, expected):
-            raise ReadError(
-                f"Archive {reference.identifier} is a "
-                f"{type(message).DESCRIPTOR.full_name}, but a "
-                f"{expected.DESCRIPTOR.full_name} was expected here."
-            )
-        return message
+        return self.identifierResolve(reference.identifier, expected)
 
     def typeOf(self, reference: tsp.Reference) -> int:
         """Return a reference target's type without parsing it.
@@ -140,6 +164,38 @@ class ArchiveIndex:
         so they have to be recognized and skipped rather than parsed and refused.
         """
         return readArchiveTypeId(self.archive(reference.identifier))
+
+    def archiveWrite(
+        self, identifier: int, body: Message, references: list[int] | None = None
+    ) -> None:
+        """Write an archive's own message, which every later read then returns.
+
+        `references` replaces the strong references it declares, which a body
+        gaining or losing one has to state.
+        """
+        self.archive(identifier)
+        self.byIdentifier[identifier] = self.owners[identifier].messageReplace(
+            identifier, 0, body.SerializeToString(), references
+        )
+        self.parsed[identifier] = body
+
+    def archiveAdd(
+        self, member: IWAFile, archive: Archive, body: Message | None = None
+    ) -> None:
+        """Place a created archive in a member, `body` being its parsed message."""
+        member.archiveAdd(archive)
+        self.byIdentifier[archive.identifier] = archive
+        self.owners[archive.identifier] = member
+        if body is not None:
+            self.parsed[archive.identifier] = body
+
+    def archiveRemove(self, identifier: int) -> None:
+        """Drop an archive from its member, so a later read raises naming it."""
+        self.archive(identifier)
+        self.owners.pop(identifier).archiveRemove(identifier)
+        del self.byIdentifier[identifier]
+        self.parsed.pop(identifier, None)
+        self.removed.add(identifier)
 
 
 def readUuidValue(message: tsp.UUID) -> int:
@@ -169,10 +225,7 @@ def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
         raise ReadError(
             f"Expected exactly one TN.DocumentArchive, found {len(roots)}."
         )
-    root = parseArchive(roots[0])
-    if not isinstance(root, tn.DocumentArchive):
-        raise ReadError(f"The root archive parsed as {type(root).__name__}.")
-    return root
+    return index.identifierResolve(roots[0].identifier, tn.DocumentArchive)
 
 
 def readDataList(

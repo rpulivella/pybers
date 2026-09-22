@@ -1315,7 +1315,7 @@ def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
 
 
 def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
-    """`ArchiveIndex.resolve` parses afresh, so a second copy takes the edits with it.
+    """An entry added to the format list reaches the file with the key cells name.
 
     Found reviewing #61. The entry was added to a throwaway, the key came back real,
     and the cells named a format the table did not hold. Numbers accepted the golden

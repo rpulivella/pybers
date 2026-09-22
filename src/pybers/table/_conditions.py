@@ -23,6 +23,7 @@ Private. Reached from the structural pass in `_structure` and the tile pass in
 `_write`.
 
 UPDATES
+2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Rules mapped by the formula machinery rather than a copy of it.
 2026-09-21  Written for PYB-17.
 """
@@ -42,7 +43,7 @@ from dataclasses import dataclass, field
 
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
+from .._persistence import chooseOffsetUnit, decodeRow
 from .._persistence.cells import (
     CellRecord,
     conditionalSlot,
@@ -87,7 +88,6 @@ class ConditionalPlan:
     maps: GridMaps
     change: FormulaRestructure
     registry: PackageRegistry
-    owners: dict[int, IWAFile]
     dataList: tst.TableDataList
     listIdentifier: int
     rules: dict[int, tst.ConditionalStyleSetArchive] = field(default_factory=dict)
@@ -118,8 +118,7 @@ class ConditionalPlan:
         entry.key = self.dataList.nextListID
         entry.refcount = 0
         entry.reference.identifier = createSiblingArchive(
-            self.registry, self.index, self.owners, sibling,
-            rules.SerializeToString(),
+            self.registry, sibling, rules
         )
         self.dataList.nextListID += 1
         return int(entry.key)
@@ -224,7 +223,6 @@ def rewriteRuleOperands(rules: tst.ConditionalStyleSetArchive) -> None:
 def buildConditionalPlan(
     index: ArchiveIndex,
     registry: PackageRegistry,
-    owners: dict[int, IWAFile],
     store: tst.DataStore,
     maps: GridMaps,
     identity: str,
@@ -251,7 +249,7 @@ def buildConditionalPlan(
         columnIdentities=columnIdentities,
     )
     plan = ConditionalPlan(
-        index, maps, change, registry, owners, dataList,
+        index, maps, change, registry, dataList,
         store.conditionalstyletable.identifier,
     )
     for entry in dataList.entries:
@@ -320,8 +318,8 @@ def writeConditionalCounts(plan: ConditionalPlan, tiles: Iterable[tst.Tile]) -> 
         copy.CopyFrom(entry)
     del plan.dataList.entries[:]
     plan.dataList.entries.extend(copies)
-    plan.owners[plan.listIdentifier].messageReplace(
-        plan.listIdentifier, 0, plan.dataList.SerializeToString(),
+    plan.index.archiveWrite(
+        plan.listIdentifier, plan.dataList,
         [int(entry.reference.identifier) for entry in plan.dataList.entries],
     )
 

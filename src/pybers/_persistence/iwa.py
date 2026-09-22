@@ -21,11 +21,12 @@ than being re-encoded. That makes the no-change round trip exact by construction
 rather than by hoping a compressor matches Apple's.
 
 A member that was genuinely edited takes the other path and is rebuilt from its
-archives. Those two paths are chosen by `IWAFile.modified`, which only
-`messageReplace` sets, so an edit cannot reach `originalBytes` and be written back
-as though it had never happened.
+archives. Those two paths are chosen by `IWAFile.modified`, which every change
+to a member sets, so an edit cannot reach `originalBytes` and be written back as
+though it had never happened.
 
 UPDATES
+2026-09-22  A replaced archive is returned, for the index to hold, for PYB-109.
 2026-09-21  An archive nothing points at any more is removed, for PYB-17.
 2026-09-14  An archive can be created and added to a member, for PYB-63.
 2026-08-16  Written. Verified against empty-1/2/3.numbers: every archive stream
@@ -118,8 +119,8 @@ class IWAFile:
     to keep.
 
     `modified` is what decides between the two paths, and it is set only by
-    `messageReplace`. Writing through that method rather than reaching into
-    `archives` is what keeps an edit from being silently dropped at save time.
+    `messageReplace`, `archiveAdd` and `archiveRemove`. A save reaches those
+    through `ArchiveIndex`, which is what keeps a later read in step with them.
     """
 
     name: str
@@ -133,12 +134,12 @@ class IWAFile:
         index: int,
         data: bytes,
         references: list[int] | None = None,
-    ) -> None:
-        """Swap the body of one message of one archive, and mark the member rewritten.
+    ) -> Archive:
+        """Swap the body of one message of one archive, and return the archive placed.
 
-        The only sanctioned way to change an IWA member. `references` replaces the
-        message's strong object references, which a body gaining one has to declare.
-        `Archive` is frozen, so the replacement is a new archive in the old one's place.
+        `references` replaces the message's strong object references, which a body
+        gaining one has to declare. `Archive` is frozen, so the replacement is a new
+        archive in the old one's place.
         """
         for position, archive in enumerate(self.archives):
             if archive.identifier != identifier:
@@ -158,11 +159,10 @@ class IWAFile:
                 del info.message_infos[index].object_references[:]
                 info.message_infos[index].object_references.extend(references)
                 infoBytes = info.SerializeToString()
-            self.archives[position] = replace(
-                archive, messages=tuple(messages), infoBytes=infoBytes
-            )
+            placed = replace(archive, messages=tuple(messages), infoBytes=infoBytes)
+            self.archives[position] = placed
             self.modified = True
-            return
+            return placed
         raise IWAError(f"{self.name} holds no archive with identifier {identifier}.")
 
     def archiveAdd(self, archive: Archive) -> None:

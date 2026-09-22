@@ -196,7 +196,7 @@ def testAnAddedSheetSharesTheStyleOfTheFirstSheet(tmp_path: Path) -> None:
 
 def testAnAddedSheetFollowsTheRegistryRules(tmp_path: Path) -> None:
     path = saveWithSheets(tmp_path)
-    registry = PackageRegistry(readPackage(path))
+    registry = PackageRegistry(ArchiveIndex(readPackage(path)))
     _, added = findSheetArchive(path, "Inserted")
 
     uuids = {

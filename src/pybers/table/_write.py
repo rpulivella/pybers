@@ -16,6 +16,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Tiles and the row primitives moved to `_tiles`, for PYB-17.
 2026-09-18  Rows and records move to their new lines, and a removed one releases
             what it named as a merge-swallowed one does, for PYB-17.
@@ -58,7 +59,7 @@ from decimal import Decimal
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import IWAFile, chooseOffsetUnit, decodeRecord, decodeRow
+from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
 from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
@@ -400,12 +401,6 @@ def findFormatKey(dataList: tst.TableDataList, formatType: int) -> int:
     A `260` entry carries nothing but its kind, so creating one states no more than
     the documents do. Counts nothing: `moveFormatReferences` counts the record that
     names the key, so looking a format up once for many cells counts every cell.
-
-    **Takes the resolved list rather than resolving one.** `ArchiveIndex.resolve`
-    parses the archive afresh on every call, so a function that resolved its own
-    copy would add an entry to a throwaway: the key came back real, the entry never
-    reached the file, and cells named a format the table did not hold. Found
-    reviewing #61, in a golden Numbers had already accepted.
     """
     for entry in dataList.entries:
         if entry.HasField("format") and entry.format.format_type == formatType:
@@ -760,7 +755,6 @@ def applyFormulaEdit(
 
 def applyTableEdits(
     index: ArchiveIndex,
-    owners: dict[int, IWAFile],
     table: Table,
     model: tst.TableModelArchive,
     swallowed: frozenset[tuple[int, int]] = frozenset(),
@@ -789,8 +783,7 @@ def applyTableEdits(
     richText = readRichTextTable(index, store)
     pool = readFormulaPool(index, store)
     textPool = readStringPool(index, store)
-    # Resolved ONCE, because resolving parses afresh and a second copy would take
-    # the edits with it. Rewritten only when a written record moved a count.
+    # Rewritten only when a written record moved a count.
     formatList = (
         index.resolve(store.format_table, tst.TableDataList)
         if store.format_table.identifier else None
@@ -842,8 +835,6 @@ def applyTableEdits(
             return True
         return False
 
-    # Resolved once, because resolving parses afresh and the structural move below
-    # has to be what the walk after it sees.
     restructured = maps is not None and maps.changed
     if maps is not None and restructured:
         if registry is None:
@@ -851,21 +842,9 @@ def applyTableEdits(
                 f"{table.name!r} has rows or columns added or removed, and writing "
                 "that needs the package registry the document writer holds."
             )
-        covered = buildTileRange(index, registry, owners, store)
+        covered = buildTileRange(index, registry, store)
         spent = moveGridRecords(store, covered, maps, table, releaseRecord, plan)
         writeTileRange(registry, store, covered.tiles, spent)
-    # Resolved once, because resolving parses afresh and the structural move above
-    # has to be what the walk below sees.
-    tileArchives = [
-        (
-            entry,
-            index.archive(entry.tile.identifier),
-            covered.tiles[entry.tileid] if restructured
-            else index.resolve(entry.tile, tst.Tile),
-        )
-        for entry in store.tiles.tiles
-    ]
-
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
@@ -894,7 +873,8 @@ def applyTableEdits(
                 f"stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
             )
 
-    for entry, archive, tile in tileArchives:
+    for entry in store.tiles.tiles:
+        tile = index.resolve(entry.tile, tst.Tile)
         tiles.append(tile)
         firstRow = entry.tileid * tileSize
         touched = restructured
@@ -1030,9 +1010,7 @@ def applyTableEdits(
             touched = True
 
         if touched:
-            owners[archive.identifier].messageReplace(
-                archive.identifier, 0, tile.SerializeToString()
-            )
+            index.archiveWrite(entry.tile.identifier, tile)
 
     if plan is not None and restructured:
         writeConditionalCounts(plan, tiles)
@@ -1042,38 +1020,23 @@ def applyTableEdits(
             formatList, formatsMoved, tiles,
             lambda record: countFormatClaims(record.raw).keys(),
         )
-        formatId = store.format_table.identifier
-        owners[formatId].messageReplace(
-            formatId, 0, formatList.SerializeToString()
-        )
+        index.archiveWrite(store.format_table.identifier, formatList)
 
     if styleList is not None and stylesMoved:
-        styleId = store.styleTable.identifier
-        owners[styleId].messageReplace(
-            styleId, 0, styleList.SerializeToString()
-        )
+        index.archiveWrite(store.styleTable.identifier, styleList)
 
     if richTextList is not None and richTextMoved:
-        richTextId = store.rich_text_table.identifier
-        owners[richTextId].messageReplace(
-            richTextId, 0, richTextList.SerializeToString()
-        )
+        index.archiveWrite(store.rich_text_table.identifier, richTextList)
 
     if textPool is not None and textPool.touched:
         for key in removeSpentEntries(
             textPool.dataList, textPool.released, tiles, listStringClaims
         ):
             textPool.stored.pop(key, None)
-        textId = store.stringTable.identifier
-        owners[textId].messageReplace(
-            textId, 0, textPool.dataList.SerializeToString()
-        )
+        index.archiveWrite(store.stringTable.identifier, textPool.dataList)
 
     if pool is not None and pool.touched:
-        poolId = store.formula_table.identifier
-        owners[poolId].messageReplace(
-            poolId, 0, pool.dataList.SerializeToString()
-        )
+        index.archiveWrite(store.formula_table.identifier, pool.dataList)
     return TableEdits(written, formulaAdded, formulaRemoved)
 
 

@@ -28,6 +28,7 @@ from conftest import allDocuments, findDocumentPath, readArchiveBodies
 from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.container import ContainerError
+from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.iwa import IWAError, createArchive
 from pybers._persistence.metadata import (
     MetadataError,
@@ -41,7 +42,7 @@ documentComponent: int = 1
 
 def readRegistry(name: str = "00-baseline") -> PackageRegistry:
     """Return the registry of a freshly read document."""
-    return PackageRegistry(readPackage(findDocumentPath(name)))
+    return PackageRegistry(ArchiveIndex(readPackage(findDocumentPath(name))))
 
 
 def buildTileInfo(identifier: int, references: list[int]) -> tspArchive.ArchiveInfo:
@@ -55,7 +56,7 @@ def buildTileInfo(identifier: int, references: list[int]) -> tspArchive.ArchiveI
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testEveryStrongExternalReferenceIsWhatTheArchivesReference(path: Path) -> None:
-    found = PackageRegistry(readPackage(path))
+    found = PackageRegistry(ArchiveIndex(readPackage(path)))
 
     for identifier, component in found.components.items():
         stored = {
@@ -69,7 +70,7 @@ def testEveryStrongExternalReferenceIsWhatTheArchivesReference(path: Path) -> No
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testEveryArchiveOutsideTheRegistryBelongsToAComponent(path: Path) -> None:
     package = readPackage(path)
-    found = PackageRegistry(package)
+    found = PackageRegistry(ArchiveIndex(package))
 
     unplaced = [
         (iwaFile.name, archive.identifier)
@@ -102,7 +103,7 @@ def testACreatedComponentSurvivesBeingWrittenAndRead(tmp_path: Path) -> None:
     destination = tmp_path / "created.numbers"
     writePackage(found.package, destination)
 
-    reread = PackageRegistry(readPackage(destination))
+    reread = PackageRegistry(ArchiveIndex(readPackage(destination)))
     component = reread.components[identifier]
     assert component.locator == f"Tables/Tile-{identifier}"
     assert reread.componentOf[identifier] == identifier

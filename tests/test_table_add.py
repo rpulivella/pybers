@@ -377,7 +377,9 @@ def testEveryCreatedTableGetsItsOwnHeaderNameSlot(tmp_path: Path) -> None:
 
 
 def testACreatedTableFollowsTheRegistryRules(tmp_path: Path) -> None:
-    registry = PackageRegistry(readPackage(saveWithTables(tmp_path)))
+    registry = PackageRegistry(
+        ArchiveIndex(readPackage(saveWithTables(tmp_path)))
+    )
 
     for identifier, component in registry.components.items():
         stored = {
