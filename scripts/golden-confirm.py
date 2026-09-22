@@ -2,9 +2,9 @@
 """\
 pybers golden confirmation tool
 
-Opens a temporary copy of a golden in running Numbers, checks the cells a golden's
-expected-values file names, and writes a report a developer reads in place of a manual
-session in Numbers. Backs the /golden-confirm skill (PYB-94).
+Opens a temporary copy of a golden in running Numbers, checks the cells and tables a
+golden's expected-values file names, and writes a report a developer reads in place of a
+manual session in Numbers. Backs the /golden-confirm skill (PYB-94).
 
 Everything that needs Accessibility, Screen Recording or control of Numbers happens in
 pybersdev-golden-confirm.app, built from scripts/golden-confirm-helper/ by the
@@ -30,6 +30,7 @@ so the log is purged with the ticket's folder that holds the run it explains.
 Requires rich, and the Xcode command line tools for `helper-build`.
 
 UPDATES
+2026-09-22  Checks a table's size and merges, for PYB-111.
 2026-09-21  A check a person makes is QA's rather than a human's, for PYB-17.
 2026-09-17  Written for PYB-94.
 """
@@ -85,6 +86,9 @@ expectedSuffix: str = ".expected.toml"
 expectedKeys: frozenset[str] = frozenset({
     "sheet", "table", "cell", "value", "formula", "format", "dataFormat", "qa",
 })
+expectedTableKeys: frozenset[str] = frozenset({
+    "sheet", "table", "rows", "columns", "merges",
+})
 # A run launches a closed Numbers itself, so its permissions check does not refuse one.
 numbersNotRunningKind: str = "numbersNotRunning"
 maxCaptures: int = 40
@@ -123,6 +127,25 @@ class ExpectedCell:
     formatKind: str | None
     dataFormat: dict[str, str]
     qa: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ExpectedTable:
+    """One table an expected-values file names, with its size and merged ranges."""
+
+    sheet: str
+    table: str
+    rows: int | None
+    columns: int | None
+    merges: frozenset[str] | None
+
+
+@dataclass(frozen=True)
+class ExpectedValues:
+    """Everything an expected-values file says Numbers should show."""
+
+    cells: list[ExpectedCell]
+    tables: list[ExpectedTable]
 
 
 @dataclass(frozen=True)
@@ -378,39 +401,89 @@ def readTicketKey() -> str:
     return f"{prefix}-{match.group(1)}"
 
 
-def readExpectedCells(golden: Path) -> list[ExpectedCell]:
-    """Read the cells to check and what each should show, from beside the golden."""
+def readExpectedValues(golden: Path) -> ExpectedValues:
+    """Read the cells and tables to check and what each should show, from the golden."""
     path = golden.with_name(f"{golden.stem}{expectedSuffix}")
     if not path.is_file():
         raise GoldenConfirmError(f"{path.name} does not exist beside {golden.name}")
     try:
         with path.open("rb") as handle:
-            entries = tomllib.load(handle).get("cell", [])
+            document = tomllib.load(handle)
     except tomllib.TOMLDecodeError as exc:
         raise GoldenConfirmError(f"{path.name} is not valid TOML: {exc}") from exc
-    cells: list[ExpectedCell] = []
-    for position, entry in enumerate(entries, start=1):
-        unknown = set(entry) - expectedKeys
-        missing = {"sheet", "table", "cell"} - set(entry)
-        if unknown or missing:
-            raise GoldenConfirmError(
-                f"{path.name} cell {position}: unknown keys {sorted(unknown)}, "
-                f"missing keys {sorted(missing)}"
-            )
-        cells.append(ExpectedCell(
-            sheet=entry["sheet"], table=entry["table"], cell=entry["cell"],
-            value=entry.get("value"), formula=entry.get("formula"),
-            formatKind=entry.get("format"),
-            dataFormat={str(key): str(value) for key, value in
-                        entry.get("dataFormat", {}).items()},
-            qa=tuple(entry.get("qa", ())),
-        ))
-    if not cells:
-        raise GoldenConfirmError(f"{path.name} names no [[cell]] to check")
+    cells = [readExpectedCell(path, position, entry)
+             for position, entry in enumerate(document.get("cell", []), start=1)]
+    tables = [readExpectedTable(path, position, entry)
+              for position, entry in enumerate(document.get("table", []), start=1)]
+    if not cells and not tables:
+        raise GoldenConfirmError(f"{path.name} names no [[cell]] or [[table]] to check")
     addresses = [(cell.sheet, cell.table, cell.cell) for cell in cells]
     if len(set(addresses)) != len(addresses):
         raise GoldenConfirmError(f"{path.name} names the same cell twice")
-    return cells
+    named = [(table.sheet, table.table) for table in tables]
+    if len(set(named)) != len(named):
+        raise GoldenConfirmError(f"{path.name} names the same table twice")
+    return ExpectedValues(cells, tables)
+
+
+def checkEntryKeys(
+    path: Path, label: str, entry: dict[str, Any], allowed: frozenset[str],
+    required: set[str],
+) -> None:
+    """Refuse an entry holding a key the tool does not read or missing one it needs."""
+    unknown = set(entry) - allowed
+    missing = required - set(entry)
+    if unknown or missing:
+        raise GoldenConfirmError(
+            f"{path.name} {label}: unknown keys {sorted(unknown)}, "
+            f"missing keys {sorted(missing)}"
+        )
+
+
+def readExpectedCell(path: Path, position: int, entry: dict[str, Any]) -> ExpectedCell:
+    """Read one [[cell]] entry, refusing a key the tool does not read."""
+    label = f"cell {position}"
+    checkEntryKeys(path, label, entry, expectedKeys, {"sheet", "table", "cell"})
+    return ExpectedCell(
+        sheet=entry["sheet"], table=entry["table"], cell=entry["cell"],
+        value=entry.get("value"), formula=entry.get("formula"),
+        formatKind=entry.get("format"),
+        dataFormat={str(key): str(value) for key, value in
+                    entry.get("dataFormat", {}).items()},
+        qa=tuple(entry.get("qa", ())),
+    )
+
+
+def readExpectedTable(
+    path: Path, position: int, entry: dict[str, Any]
+) -> ExpectedTable:
+    """Read one [[table]] entry, its merges spelled as pybers spells a merge."""
+    from pybers import CellRange, MergeRange, PybersError
+
+    label = f"table {position}"
+    checkEntryKeys(path, label, entry, expectedTableKeys, {"sheet", "table"})
+    if not {"rows", "columns", "merges"} & set(entry):
+        raise GoldenConfirmError(
+            f"{path.name} {label}: states none of rows, columns and merges")
+    for key in ("rows", "columns"):
+        count = entry.get(key)
+        if count is not None and (type(count) is not int or count < 1):
+            raise GoldenConfirmError(
+                f"{path.name} {label}: {key} {count!r} is not a positive whole number")
+    merges: frozenset[str] | None = None
+    if "merges" in entry:
+        try:
+            extents = [MergeRange(CellRange.parse(text)).extent
+                       for text in entry["merges"]]
+        except (PybersError, TypeError) as exc:
+            raise GoldenConfirmError(f"{path.name} {label}: {exc}") from exc
+        merges = frozenset(str(extent) for extent in extents)
+        if len(merges) != len(extents):
+            raise GoldenConfirmError(f"{path.name} {label}: names a merge twice")
+    return ExpectedTable(
+        sheet=entry["sheet"], table=entry["table"], rows=entry.get("rows"),
+        columns=entry.get("columns"), merges=merges,
+    )
 
 
 def readFileHash(path: Path) -> str:
@@ -507,6 +580,50 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
     return checks
 
 
+def readMerges(cellNames: list[list[str]]) -> frozenset[str]:
+    """Find each merge in Numbers' cell names, where a covered cell names its anchor."""
+    from pybers import CellRange, CellReference
+
+    corners: dict[str, tuple[int, int]] = {}
+    for row, names in enumerate(cellNames, start=1):
+        for column, name in enumerate(names, start=1):
+            if name != CellReference(row, column).asReference():
+                lastRow, lastColumn = corners.get(name, (row, column))
+                corners[name] = (max(lastRow, row), max(lastColumn, column))
+    return frozenset(
+        str(CellRange.fromReferences(
+            CellReference.parse(anchor), CellReference(*corner)))
+        for anchor, corner in corners.items()
+    )
+
+
+def checkTable(expected: ExpectedTable, reading: dict[str, Any]) -> list[Check]:
+    """Compare a table's size and merges with what Numbers read, one check per merge."""
+    subject = f"{expected.sheet} / {expected.table}"
+    checks: list[Check] = []
+    for axis, wanted, found in (
+        ("row", expected.rows, reading["rowCount"]),
+        ("column", expected.columns, reading["columnCount"]),
+    ):
+        if wanted is None:
+            continue
+        passed = found == wanted
+        detail = f"{found} {axis}{'' if found == 1 else 's'}"
+        detail += "" if passed else f", expected {wanted}"
+        checks.append(Check("passed" if passed else "failed", subject, detail))
+    if expected.merges is not None:
+        found = readMerges(reading["cellNames"])
+        for merge in sorted(expected.merges | found):
+            if merge not in found:
+                checks.append(Check("failed", subject, f"{merge} is not merged"))
+            elif merge not in expected.merges:
+                checks.append(
+                    Check("failed", subject, f"{merge} is merged, unexpectedly"))
+            else:
+                checks.append(Check("passed", subject, f"{merge} is merged"))
+    return checks
+
+
 def renderQuickLook(golden: Path, outputDirectory: Path) -> list[tuple[str, Path]]:
     """Render each sheet of the golden's Quick Look preview sharply, as it was stored.
 
@@ -556,7 +673,7 @@ def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
 def runGoldenConfirm(golden: Path, dryRun: bool) -> GoldenRun:
     """Confirm one golden in running Numbers and return every check it made."""
     ticket = readTicketKey()
-    expectedCells = readExpectedCells(golden)
+    expectedCells = readExpectedValues(golden).cells
     sheets = list(dict.fromkeys(cell.sheet for cell in expectedCells))
     captureCount = len(sheets) + len(expectedCells)
     if captureCount > maxCaptures:
@@ -575,7 +692,7 @@ def runGoldenConfirm(golden: Path, dryRun: bool) -> GoldenRun:
 
 def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
     """Drive the helper over one golden, with the display held awake around it."""
-    expectedCells = readExpectedCells(golden)
+    expected = readExpectedValues(golden)
     outputDirectory = run.outputDirectory
     checkHelperCanRun()
     if outputDirectory.exists():
@@ -592,7 +709,8 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
             "savedCopyPath": str(saved),
             "captureDirectory": str(outputDirectory),
             "cells": [{"sheet": c.sheet, "table": c.table, "cell": c.cell}
-                      for c in expectedCells],
+                      for c in expected.cells],
+            "tables": [{"sheet": t.sheet, "table": t.table} for t in expected.tables],
             "maxCaptures": maxCaptures,
         }, deadlineSeconds=inspectDeadlineSeconds,
             logPath=outputDirectory / "helper.log")
@@ -614,15 +732,28 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
             (r["address"]["sheet"], r["address"]["table"], r["address"]["cell"]): r
             for r in result.get("cells", [])
         }
-        for expected in expectedCells:
-            reading = readings.get((expected.sheet, expected.table, expected.cell))
+        for cell in expected.cells:
+            reading = readings.get((cell.sheet, cell.table, cell.cell))
             if reading is None:
                 if opened == "opened":
-                    subject = f"{expected.sheet} / {expected.table} / {expected.cell}"
+                    subject = f"{cell.sheet} / {cell.table} / {cell.cell}"
                     run.checks.append(Check(
                         "failed", subject, "the helper returned no reading for it"))
                 continue
-            run.checks.extend(checkCell(expected, reading))
+            run.checks.extend(checkCell(cell, reading))
+        tableReadings = {
+            (r["address"]["sheet"], r["address"]["table"]): r
+            for r in result.get("tables", [])
+        }
+        for table in expected.tables:
+            tableReading = tableReadings.get((table.sheet, table.table))
+            if tableReading is None:
+                if opened == "opened":
+                    run.checks.append(Check(
+                        "failed", f"{table.sheet} / {table.table}",
+                        "the helper returned no reading for it"))
+                continue
+            run.checks.extend(checkTable(table, tableReading))
         for capture in result.get("sheetCaptures", []):
             run.checks.append(Check(
                 "qa", capture["sheet"], "the sheet as Numbers displays it",

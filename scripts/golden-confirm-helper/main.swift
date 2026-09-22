@@ -10,6 +10,7 @@
 // and the only values a request places into one are paths and cell names it escapes.
 //
 // UPDATES
+// 2026-09-22  Reads a table's size and cell names, and names a closed Numbers, for PYB-111.
 // 2026-09-17  Written for PYB-94.
 
 import AppKit
@@ -47,6 +48,11 @@ struct CellAddress: Codable {
     let cell: String
 }
 
+struct TableAddress: Codable {
+    let sheet: String
+    let table: String
+}
+
 struct HelperRequest: Codable {
     let operation: HelperOperation
     let resultPath: String
@@ -55,6 +61,7 @@ struct HelperRequest: Codable {
     var savedCopyPath: String?
     var captureDirectory: String?
     var cells: [CellAddress]?
+    var tables: [TableAddress]?
     var maxCaptures: Int?
     var freshNumbers: Bool?
 }
@@ -87,6 +94,14 @@ struct CellReading: Codable {
     var inspectorCapture: String?
 }
 
+// A covered cell answers with its anchor's name, which is how the script finds merges.
+struct TableReading: Codable {
+    let address: TableAddress
+    let rowCount: Int
+    let columnCount: Int
+    let cellNames: [[String]]
+}
+
 struct SheetCapture: Codable {
     let sheet: String
     let path: String
@@ -101,6 +116,7 @@ struct HelperResult: Codable {
     var openOutcome: String?
     var alertText: [String] = []
     var cells: [CellReading] = []
+    var tables: [TableReading] = []
     var sheetCaptures: [SheetCapture] = []
     var savedCopy: Bool?
 }
@@ -730,8 +746,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         result.numbersVersion = try? runAppleScript("get version").stringValue
         try inspectDocument(
             documentPath: documentPath, savedCopyPath: savedCopyPath,
-            captureDirectory: captureDirectory, cells: cells, sheets: sheets,
-            numbers: numbers, result: &result)
+            captureDirectory: captureDirectory, cells: cells, tables: request.tables ?? [],
+            sheets: sheets, numbers: numbers, result: &result)
     } catch let failure as HelperFailure {
         result.problems.append(failure.problem)
     } catch let failure as AppleScriptError {
@@ -748,8 +764,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
 
 func inspectDocument(
     documentPath: String, savedCopyPath: String, captureDirectory: String,
-    cells: [CellAddress], sheets: [String], numbers: NSRunningApplication,
-    result: inout HelperResult
+    cells: [CellAddress], tables: [TableAddress], sheets: [String],
+    numbers: NSRunningApplication, result: inout HelperResult
 ) throws {
     let documentId: String
     let existingWindows = readNumbersWindows(pid: numbers.processIdentifier)
@@ -845,6 +861,10 @@ func inspectDocument(
         result.cells.append(reading)
     }
 
+    for address in tables {
+        result.tables.append(try readTable(address, documentId: documentId))
+    }
+
     _ = try runAppleScript("save \(document) in (POSIX file \(quoteAppleScript(savedCopyPath)))")
     result.savedCopy = FileManager.default.fileExists(atPath: savedCopyPath)
 }
@@ -874,6 +894,26 @@ func findDocumentWindow(documentId: String, pid: pid_t) throws -> (Int32, AXUIEl
         kind: "window",
         detail: "the opened document's window \(seen.isEmpty ? "never appeared" : "'\(seen)' was not reachable through Accessibility")",
         remedy: "keep the Numbers window out of full screen and not minimized, then rerun"))
+}
+
+// Row by row, so each name's position in the grid is explicit rather than inferred from order.
+func readTable(_ address: TableAddress, documentId: String) throws -> TableReading {
+    let facts = try runAppleScript(
+        "set t to table \(quoteAppleScript(address.table)) of sheet \(quoteAppleScript(address.sheet)) "
+            + "of document id \(quoteAppleScript(documentId))\n"
+            + "set names to {}\n"
+            + "repeat with r in rows of t\n"
+            + "set end of names to name of cells of r\n"
+            + "end repeat\n"
+            + "return {row count of t, column count of t, names}")
+    let rows = facts.atIndex(3)
+    let cellNames = (0..<(rows?.numberOfItems ?? 0)).map { row in
+        let names = rows?.atIndex(row + 1)
+        return (0..<(names?.numberOfItems ?? 0)).map { names?.atIndex($0 + 1)?.stringValue ?? "" }
+    }
+    return TableReading(
+        address: address, rowCount: Int(facts.atIndex(1)?.int32Value ?? 0),
+        columnCount: Int(facts.atIndex(2)?.int32Value ?? 0), cellNames: cellNames)
 }
 
 func selectCell(_ address: CellAddress, documentId: String) throws {
