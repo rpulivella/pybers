@@ -79,6 +79,7 @@ diff against its origin shows where that change lives. Origins are in
 | `56e-column-deleted` | `56-structure-base` | Delete Column E through AppleScript, widened to columns C to G | [structure](../../docs/findings/findings-03-structure.md) |
 | `56f-row-inserted-in-merge` | `56-structure-base` | `A3` selected alone, then Add Row Above, cutting through `C2:D3` | [structure](../../docs/findings/findings-03-structure.md) |
 | `56g-row-deleted-in-merge` | `56-structure-base` | `A3` selected alone, then Delete Row, cutting through `C2:D3` | [structure](../../docs/findings/findings-03-structure.md) |
+| `56h-row-8-deleted` | `56-structure-base` | Delete Row 8 through AppleScript, which breaks the locked `$A$8` and the unlocked `A8` | [structure](../../docs/findings/findings-03-structure.md) |
 | `27b-rows-inserted-into-a-new-tile` | `27-big-table` | 60 rows added above row 100 through AppleScript, which pushes the last rows into a ninth tile | [structure](../../docs/findings/findings-03-structure.md) |
 | `27c-rows-deleted-emptying-a-tile` | `27-big-table` | rows 1 to 300 deleted through AppleScript, which leaves the last tile empty | [structure](../../docs/findings/findings-03-structure.md) |
 | `57-structure-refusals-base` | `00-baseline` | six tables, one per kind of state a structural edit has to carry: borders, conditional highlighting, bands, volatile formulas and spills, and merges to cut. Built by `workarea/fixture-build/build57.py`, then the borders and the highlighting added by hand | [structure](../../docs/findings/findings-03-structure.md) |

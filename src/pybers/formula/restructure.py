@@ -174,15 +174,17 @@ def findReferenceLoss(
 ) -> FormulaReference:
     """Return the broken reference a lost one becomes, naming every line it covered.
 
-    A broken range names its own table even from inside it, as `56c` wrote one.
+    A broken range names its own table even from inside it, as `56c` wrote one. An
+    axis the reference never named breaks as locked, as a whole-column rule's row
+    did in `59-conditions-relative-column-a-deleted`.
     """
     if isinstance(content, FormulaRange):
         rows = findLineIdentities(content.rows, host.row, change.rowIdentities)
         columns = findLineIdentities(content.columns, host.col, change.columnIdentities)
         loss = FormulaReferenceLoss(
             columns, rows, True,
-            content.columns is not None and content.columns.absolute,
-            content.rows is not None and content.rows.absolute,
+            content.columns is None or content.columns.absolute,
+            content.rows is None or content.rows.absolute,
         )
         tableId = content.tableId or change.hostIdentity
         return FormulaReference(tableId=tableId, broken=True, loss=loss)
@@ -190,18 +192,24 @@ def findReferenceLoss(
     columns = findLineIdentity(content.column, host.col, change.columnIdentities)
     loss = FormulaReferenceLoss(
         columns, rows, False,
-        content.column is not None and content.column.absolute,
-        content.row is not None and content.row.absolute,
+        content.column is None or content.column.absolute,
+        content.row is None or content.row.absolute,
     )
     return FormulaReference(tableId=content.tableId, broken=True, loss=loss)
+
+
+# The identity a broken reference records for an axis it never named, as a
+# whole-column highlighting rule recorded its row in
+# `59-conditions-relative-column-a-deleted`.
+unnamedLineIdentity: int = 0
 
 
 def findLineIdentity(
     coordinate: Coordinate | None, hostLine: int, identities: Sequence[int]
 ) -> tuple[int, ...]:
-    """Return the identity of the line a coordinate names, or none when unbounded."""
+    """Return the identity of the line a coordinate names, or a zero when unbounded."""
     if coordinate is None:
-        return ()
+        return (unnamedLineIdentity,)
     return (identities[coordinate.resolve(hostLine) - 1],)
 
 

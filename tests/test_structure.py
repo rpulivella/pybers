@@ -52,6 +52,7 @@ measuredEdits: dict[str, Callable[[pybers.Table], object]] = {
     "56e-column-deleted": lambda table: table.columnRemove("C", 5),
     "56f-row-inserted-in-merge": lambda table: table.rowAdd(3),
     "56g-row-deleted-in-merge": lambda table: table.rowRemove(3),
+    "56h-row-8-deleted": lambda table: table.rowRemove(8),
 }
 
 # Where Numbers stored a newly broken formula as an error and pybers keeps the
@@ -60,6 +61,7 @@ measuredEdits: dict[str, Callable[[pybers.Table], object]] = {
 recomputedOnOpen: dict[str, set[tuple[str, int, int]]] = {
     "56c-row-deleted": {("Table 1", 7, 1)},
     "56e-column-deleted": {("Table 1", 11, 1), ("Table 2", 2, 0)},
+    "56h-row-8-deleted": {("Table 1", 4, 1), ("Table 1", 5, 1), ("Table 2", 0, 0)},
 }
 
 
@@ -283,6 +285,27 @@ def testASavedEditWritesTheArchivesNumbersWrote(name: str, tmp_path: Path) -> No
                 }, tableName
                 continue
             assert ours[tableName][key] == value, (tableName, key)
+
+
+def testABrokenReferenceIsWrittenAsNumbersWritesIt(tmp_path: Path) -> None:
+    """`B5` reads `$A$8` and `B6` reads `A8`, and deleting row 8 breaks both.
+
+    A locked axis marks its sentinel absolute and sets its begin bit only, which
+    an unmeasured rule had written as both ends and no sentinel lock.
+    """
+    document = openBase()
+    document.sheet(1).table("Table 1").rowRemove(8)
+    target = tmp_path / "row-8.numbers"
+    document.save(target)
+    ours = pybers.open(target).sheet(1).table("Table 1")
+    theirs = pybers.open(findDocumentPath("56h-row-8-deleted")).sheet(1).table(
+        "Table 1"
+    )
+    for address in ("B5", "B6"):
+        ourFormula = ours.cell(address).formula
+        theirFormula = theirs.cell(address).formula
+        assert ourFormula is not None and theirFormula is not None
+        assert [node.raw for node in ourFormula] == [node.raw for node in theirFormula]
 
 
 def testARangeGrowingPastTheInsertionMovesOnlyItsFarEnd() -> None:

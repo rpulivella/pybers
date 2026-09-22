@@ -16,6 +16,8 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-09-21  A broken reference's sentinels and sticky bits carry each axis's
+            lock, the end bits never set, for PYB-17.
 2026-09-18  A broken reference writes the lines it lost, for PYB-17.
 2026-09-11  A bracket is written back as the list node it was read from,
             for #67.
@@ -205,10 +207,11 @@ def encodeFormulaReference(
     """
     encodeTableIdentity(archive, reference.tableId)
     if reference.broken:
+        locks = reference.loss or FormulaReferenceLoss()
         archive.AST_column.column = brokenColumnSentinel
-        archive.AST_column.absolute = False
+        archive.AST_column.absolute = locks.columnsAbsolute
         archive.AST_row.row = brokenRowSentinel
-        archive.AST_row.absolute = False
+        archive.AST_row.absolute = locks.rowsAbsolute
         if reference.loss is not None:
             encodeReferenceLoss(archive, reference.loss)
         return
@@ -231,14 +234,21 @@ def encodeReferenceLoss(
 ) -> None:
     """Write the lines a broken reference lost, as the one tract Numbers writes.
 
-    Its locking is stated twice, on the node and on the tract list, both measured
-    all false on the three references `56c` and `56e` broke.
+    The node's sticky bits mark the beginning of a locked axis only, never the
+    end, and the tract's stay clear: measured on `$A$8` and `A8` broken in
+    `56h-row-8-deleted`. A highlighting rule repeats the lock in the tract, which
+    the rule's own writer adds.
     """
-    for bits in (archive.AST_sticky_bits, archive.AST_tract_list.sticky_bits):
-        bits.begin_column_is_absolute = loss.columnsAbsolute
-        bits.end_column_is_absolute = loss.columnsAbsolute
-        bits.begin_row_is_absolute = loss.rowsAbsolute
-        bits.end_row_is_absolute = loss.rowsAbsolute
+    bits = archive.AST_sticky_bits
+    bits.begin_column_is_absolute = loss.columnsAbsolute
+    bits.end_column_is_absolute = False
+    bits.begin_row_is_absolute = loss.rowsAbsolute
+    bits.end_row_is_absolute = False
+    clear = archive.AST_tract_list.sticky_bits
+    clear.begin_column_is_absolute = False
+    clear.end_column_is_absolute = False
+    clear.begin_row_is_absolute = False
+    clear.end_row_is_absolute = False
     archive.AST_tract_list.ClearField("tract")
     tract = archive.AST_tract_list.tract.add()
     for value in loss.columns:

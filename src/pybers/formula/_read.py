@@ -187,7 +187,8 @@ def readReferenceLoss(
     if not node.HasField("AST_tract_list") or len(node.AST_tract_list.tract) != 1:
         return None
     tract = node.AST_tract_list.tract[0]
-    bits = node.AST_tract_list.sticky_bits
+    # The node's own bits carry the lock; a cell formula leaves the tract's clear.
+    bits = node.AST_sticky_bits
     return FormulaReferenceLoss(
         columns=tuple(readUuidValue(uid) for uid in tract.columnUids.uid),
         rows=tuple(readUuidValue(uid) for uid in tract.rowUids.uid),
