@@ -46,12 +46,11 @@ from pybers._persistence.cells import (
 from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.types import findArchiveTypeId
 from pybers.errors import WriteError
-from pybers.table._write import (
-    borrowShape,
+from pybers.table._records import borrowShape, displayedKindSlot
+from pybers.table._refcounts import (
     countedFormatSlots,
     countedStyleSlots,
     countFormatClaims,
-    displayedKindSlot,
     listRichTextClaims,
     listStringClaims,
     textFormatSlot,

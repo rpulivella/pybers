@@ -44,7 +44,7 @@ from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.types import findArchiveTypeId
 from pybers.addressing.reference import CellReference, originOffset
 from pybers.errors import ReadError, WriteError
-from pybers.table._write import rewriteRow
+from pybers.table._tiles import rewriteRow
 
 wideFixture: Path = findDocumentPath("45-columns-over-255")
 narrowMeasurement: Path = findDocumentPath("11-value-types-noformats")

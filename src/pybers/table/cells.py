@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-22  A range reaching outside the grid is refused in one place (PYB-113).
 2026-09-18  Rows and columns are added and removed, and each line carries the
             identity Numbers keys hidden state by (PYB-17).
 2026-09-16  A cell holds text Numbers will not interpret, and says whether its
@@ -148,6 +149,19 @@ def toCellReferenceNamed(
         "A cell is named by an address such as 'E3', or by row= and col= together "
         f"as numbers, and was given row={row!r}, col={col!r}."
     )
+
+
+def refuseRangeOutside(table: Table, item: CellRange) -> None:
+    """Refuse a bounded range with a corner outside a table's declared grid."""
+    extent = table.extent
+    if extent is None or not all(
+        corner is not None and extent.covers(corner)
+        for corner in (item.start, item.end)
+    ):
+        raise ReferenceError(
+            f"{item} reaches outside {table.name!r}, which is {table.rowCount} "
+            f"rows by {table.colCount} columns."
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -451,16 +465,8 @@ class Table:
                 item = item.boundedBy(extent)
             # Checked whole and up front, rather than left to the first cell that
             # falls off the end, which would name an interior address the caller
-            # never wrote. Both corners exist here because an unbounded axis was
-            # filled in above.
-            corners = [item.start, item.end]
-            if extent is None or not all(
-                corner is not None and extent.covers(corner) for corner in corners
-            ):
-                raise ReferenceError(
-                    f"{item} reaches outside {self.name!r}, which is "
-                    f"{self.rowCount} rows by {self.colCount} columns."
-                )
+            # never wrote.
+            refuseRangeOutside(self, item)
             found.extend(
                 self.cell(reference)
                 for reference in item
@@ -577,15 +583,7 @@ class Table:
             raise ReferenceError(
                 f"{item} is unbounded, and a {action} covers a fixed block of cells."
             )
-        extent = self.extent
-        corners = [item.start, item.end]
-        if extent is None or not all(
-            corner is not None and extent.covers(corner) for corner in corners
-        ):
-            raise ReferenceError(
-                f"{item} reaches outside {self.name!r}, which is {self.rowCount} "
-                f"rows by {self.colCount} columns."
-            )
+        refuseRangeOutside(self, item)
         return item
 
     def mergeCovering(self, address: CellAddress) -> MergeRange | None:

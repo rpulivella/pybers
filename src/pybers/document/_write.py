@@ -6,9 +6,10 @@ The mirror of `pybers.document._read`. `Document.save` reaches it through a
 function-local import, so that importing the model never drags in the persistence
 layer. See CLAUDE.md, "Document is the single handle".
 
-Formulas are in `pybers.writeformula` and the calculation engine's three registers
-in `pybers.writeengine`. What is left here is the cell records, the tiles they sit
-in, and staging a package on disk.
+Each table is saved by the table feature's own entry point, `TableSave`, and the
+calculation engine's registers live in `pybers._engine`. What is left here is the
+walk over sheets and tables, the recalculation request, and staging a package on
+disk.
 
 **Saving mutates the archives that were read rather than building new ones.** A
 document holds far more than this model represents yet, and every one of those
@@ -29,6 +30,8 @@ UPDATES
             and the edited table's formulas are registered afresh, for PYB-17.
 2026-09-22  One index serves the whole save, creation included, for PYB-109.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
+2026-09-22  Only the walk is left: every table is saved through the table feature's one
+            entry point, for PYB-113.
 """
 from __future__ import annotations
 
@@ -43,22 +46,7 @@ __date__ = "2026/09/02"
 import tempfile
 from pathlib import Path
 
-from .._engine import (
-    CellEdge,
-    FormulaDependencies,
-    RangeEdge,
-    SpanEdge,
-    TableOwner,
-    findCalculationEngine,
-    findOwnerEntry,
-    listRegisteredCells,
-    readTableIdentities,
-    readTableOwnerEntries,
-    readTableOwnerIds,
-    registerFormulaCells,
-    remapOwnerCoordinates,
-    requestRecalculation,
-)
+from .._engine import requestRecalculation
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import (
@@ -68,85 +56,11 @@ from .._persistence import (
 )
 from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
-from ..addressing.reference import originOffset
 from ..errors import WriteError
-from ..formula.precedents import resolveFormulaPrecedents
-from ..table._create import createTables
-from ..table._lines import buildGridMaps
-from ..table._structure import applyGridStructure, listModelFormulas
-from ..table._write import applyMerges, applyTableEdits, findAddedMerges
+from ..table._write import openTableSave
 from ..table.cells import Table
 from ._create import createSheets
 from .sheets import Document, Sheet
-
-
-def collectFormulaDependencies(
-    table: Table,
-    entry: TableOwner,
-    added: list[tuple[int, int]],
-    ownerIds: dict[str, int],
-) -> dict[tuple[int, int], FormulaDependencies]:
-    """Return what each newly attached formula reads, in the engine's own terms.
-
-    The formula says which table by identity and where by offset; the engine wants
-    an internal owner id and an absolute coordinate, so this is where the two meet.
-    """
-    host = entry.dependencies.internal_formula_owner_id
-
-    def owner(identity: str | None) -> int:
-        if identity is None:
-            return host
-        found = ownerIds.get(identity)
-        if found is None:
-            raise WriteError(
-                f"A formula in {table.name!r} reads table {identity}, which this "
-                "document's calculation engine does not register, so what the "
-                "formula depends on cannot be recorded."
-            )
-        return found
-
-    dependencies: dict[tuple[int, int], FormulaDependencies] = {}
-    for row, column in added:
-        cell = table.cell(row=row + originOffset, col=column + originOffset)
-        if cell.formula is None:
-            raise WriteError(
-                f"{table.name!r} reports a formula at row {row + originOffset}, "
-                f"column {column + originOffset} that the model does not hold."
-            )
-        reads = resolveFormulaPrecedents(cell.formula, cell.reference)
-        dependencies[(row, column)] = FormulaDependencies(
-            cells=tuple(
-                CellEdge(
-                    row=precedent.row,
-                    column=precedent.column,
-                    owner=(
-                        None if precedent.tableId is None
-                        else owner(precedent.tableId)
-                    ),
-                )
-                for precedent in reads.cells
-            ),
-            ranges=tuple(
-                RangeEdge(
-                    top=extent.top,
-                    left=extent.left,
-                    bottom=extent.bottom,
-                    right=extent.right,
-                    owner=owner(extent.tableId),
-                )
-                for extent in reads.ranges
-            ),
-            spans=tuple(
-                SpanEdge(
-                    begin=span.begin,
-                    end=span.end,
-                    columns=span.columns,
-                    owner=owner(span.tableId),
-                )
-                for span in reads.spans
-            ),
-        )
-    return dependencies
 
 
 def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
@@ -159,19 +73,9 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     index = ArchiveIndex(package)
     registry = PackageRegistry(index)
     createSheets(document, registry)
-    createTables(document, registry)
+    tables = openTableSave(document, registry)
     root = findRoot(index)
-    written: dict[int, list[tuple[int, int]]] = {}
-    engine = findCalculationEngine(index)
-    entries = readTableOwnerEntries(index, engine)
-    # A formula names the table it reads by identity, and the engine by internal
-    # owner id, so declaring what a formula reads needs both halves in hand.
-    internalIds = readTableOwnerIds(index, engine)
-    ownerIds = {
-        identity: internalIds[identifier]
-        for identifier, identity in readTableIdentities(index).items()
-        if identifier in internalIds
-    }
+    tableInfoTypeId = findArchiveTypeId(tst.TableInfoArchive)
 
     # Strict, because `createSheets` has made the two lists one list, and a plain
     # `zip` would stop at the shorter side in silence if that ever stopped holding.
@@ -179,7 +83,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
         sheetArchive = index.resolve(reference, tn.SheetArchive)
         tableReferences = [
             drawable for drawable in sheetArchive.drawable_infos
-            if index.typeOf(drawable) == findArchiveTypeId(tst.TableInfoArchive)
+            if index.typeOf(drawable) == tableInfoTypeId
         ]
         if len(sheet.tables) != len(tableReferences):
             raise WriteError(
@@ -188,75 +92,11 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 "supported."
             )
         for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
-            tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
-            modelIdentifier = tableInfo.tableModel.identifier
-            model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
-            entry = findOwnerEntry(entries, tableReference.identifier, table.name)
+            tables.tableWrite(table, tableReference)
 
-            # Before the merges are compared, since a merge the edit only moved must
-            # not read as one the caller added.
-            maps = buildGridMaps(index, model, table)
-            registered: list[tuple[int, int]] = []
-            plan = None
-            if maps.changed:
-                registered = listRegisteredCells(entry.dependencies)
-                plan = applyGridStructure(
-                    index, registry, table, tableInfo,
-                    tableReference.identifier, model, maps,
-                )
-                remapOwnerCoordinates(
-                    entry.dependencies, maps.rows, maps.columns, table.name
-                )
-
-            # Only a merge being ADDED clears its covered positions. One already
-            # in the file may carry a style-only record at each of them, which an
-            # XLSX import writes and Numbers then keeps forever, and stripping
-            # those would rewrite a document the caller only asked to save.
-            swallowed = frozenset(
-                (reference.row - originOffset, reference.col - originOffset)
-                for merge in findAddedMerges(table, model)
-                for reference in merge.extent
-                if reference != merge.anchor
-            )
-            edits = applyTableEdits(
-                index, table, model, swallowed, maps, registry, plan
-            )
-            moved = applyMerges(
-                table, model, entry.dependencies.formula_owner_uid
-            )
-            if moved or swallowed or maps.changed:
-                # A structural edit can create and remove tiles and buckets, which
-                # the model has to declare as it points at them.
-                index.archiveWrite(
-                    modelIdentifier, model,
-                    registry.referencesReconcile(modelIdentifier, model)
-                    if maps.changed else None,
-                )
-            # The engine's register of formula-bearing cells, which is a separate
-            # fact from a cell having moved and is what makes a newly attached
-            # formula evaluate at all, and recompute afterward. A structural edit
-            # moves every formula, so every one is registered afresh.
-            added = edits.formulaAdded
-            removed = edits.formulaRemoved
-            if maps.changed:
-                added = listModelFormulas(table)
-                removed = registered + removed
-            registerFormulaCells(
-                index,
-                registry,
-                entry,
-                collectFormulaDependencies(table, entry, added, ownerIds),
-                removed,
-            )
-            recalculated = added if maps.changed else []
-            if edits.written or moved or recalculated:
-                written[tableReference.identifier] = (
-                    edits.written + sorted(moved) + recalculated
-                )
-
-    requestRecalculation(index, written)
+    requestRecalculation(index, tables.written)
     registry.save()
-    return sum(len(cells) for cells in written.values())
+    return sum(len(cells) for cells in tables.written.values())
 
 
 def resolveSaveTarget(document: Document, path: Path | str | None) -> Path:

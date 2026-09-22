@@ -63,7 +63,7 @@ from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
 from pybers.table._read import readMerges
-from pybers.table._write import countFormatClaims
+from pybers.table._refcounts import countFormatClaims
 
 tableInfoTypeId: int = findArchiveTypeId(tst.TableInfoArchive)
 calculationEngineTypeId: int = findArchiveTypeId(tsce.CalculationEngineArchive)

@@ -126,7 +126,7 @@ def testAMergePybersMakesStillClearsItsCoveredPositions(tmp_path: Path) -> None:
 
 def testAMergeAlreadyInTheFileIsNotTreatedAsAdded() -> None:
     """The distinction the writer turns on, checked without writing anything."""
-    from pybers.document._write import findAddedMerges
+    from pybers.table._merges import findAddedMerges
 
     index = ArchiveIndex(readPackage(importedFixture))
     document = pybers.open(importedFixture)
