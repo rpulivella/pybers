@@ -25,10 +25,12 @@ import pytest
 
 import pybers
 from conftest import allDocuments, findDocumentPath
+from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.index import ArchiveIndex
+from pybers._persistence.iwa import createArchive
 from pybers._persistence.metadata import PackageRegistry, createSiblingArchive
 from pybers._persistence.types import parseArchive, readArchiveTypeId
 from pybers.errors import ReadError
@@ -133,6 +135,21 @@ def testACreatedArchiveReadsAsTheBodyItWasCreatedWith() -> None:
     )
 
     assert index.resolve(tsp.Reference(identifier=created), tst.Tile) is body
+
+
+def testACreatedComponentRootReadsAsTheBodyItWasCreatedWith() -> None:
+    index = ArchiveIndex(readPackage(findDocumentPath("00-baseline")))
+    registry = PackageRegistry(index)
+    identifier = registry.identifierAllocate()
+    body = tst.Tile(maxColumn=0, maxRow=0, numCells=0, numrows=0)
+    info = tspArchive.ArchiveInfo(identifier=identifier)
+    info.message_infos.add(type=tileTypeId, length=0)
+
+    registry.componentAdd(
+        createArchive(info, [body.SerializeToString()]), "Tables/Tile", body
+    )
+
+    assert index.resolve(tsp.Reference(identifier=identifier), tst.Tile) is body
 
 
 def testACreatedArchiveReadsLikeAnyOtherAfterASave(tmp_path: Path) -> None:

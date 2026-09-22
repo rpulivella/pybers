@@ -121,7 +121,9 @@ class PackageRegistry:
             findMemberName(component.locator or component.preferred_locator)
         )
 
-    def componentAdd(self, root: Archive, preferredLocator: str) -> IWAFile:
+    def componentAdd(
+        self, root: Archive, preferredLocator: str, body: Message | None = None
+    ) -> IWAFile:
         """Create a component whose root is an archive, in a member of its own.
 
         The locator carries the root's identifier, which no other member can, since
@@ -141,7 +143,7 @@ class PackageRegistry:
         component.save_token = document.save_token
         self.components[root.identifier] = component
         member = self.package.iwaFileAdd(findMemberName(locator))
-        self.archiveAdd(root.identifier, root)
+        self.archiveAdd(root.identifier, root, body)
         return member
 
     def archiveAdd(
