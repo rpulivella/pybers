@@ -15,6 +15,7 @@ member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-09-22  A random UUID is generated here, where both creators find it, for PYB-113.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Every write, addition and removal within one save passes through the
             index, which hands out one parsed message per archive, for PYB-109.
@@ -34,6 +35,8 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
+
+import uuid
 
 from google.protobuf.message import Message
 
@@ -184,6 +187,13 @@ def assignUuid(message: tsp.UUID, value: int) -> None:
     """Set a UUID's two halves from a value."""
     message.lower = value & halfMask
     message.upper = value >> halfBits
+
+
+def generateUuid() -> tsp.UUID:
+    """Return a random UUID in the two-halves form the file stores."""
+    message = tsp.UUID()
+    assignUuid(message, uuid.uuid4().int)
+    return message
 
 
 def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:

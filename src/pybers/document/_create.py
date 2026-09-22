@@ -10,6 +10,8 @@ background is the document's own sheet style, because Numbers can make no sheet
 without one. See docs/decisions.md.
 
 UPDATES
+2026-09-22  A random UUID comes from the index module, shared with table creation, for
+            PYB-113.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Created on the save's one index, for PYB-109.
 2026-09-14  Written for PYB-63.
@@ -24,16 +26,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/14"
 
-import uuid
 from pathlib import Path
 
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
-from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import createArchive
-from .._persistence.index import ArchiveIndex, findRoot
+from .._persistence.index import ArchiveIndex, findRoot, generateUuid
 from .._persistence.metadata import PackageRegistry, documentComponentId
 from .._persistence.template import ArchiveTemplate, copyTemplates, readTemplates
 from .._persistence.types import findArchiveTypeId
@@ -62,12 +62,6 @@ uuidRoles: tuple[str, ...] = (
     "footer-center",
     "footer-right",
 )
-
-
-def generateUuid() -> tsp.UUID:
-    """Return a random UUID in the two-halves form the file stores."""
-    value = uuid.uuid4().int
-    return tsp.UUID(lower=value & 0xFFFFFFFFFFFFFFFF, upper=value >> 64)
 
 
 def bindSheetObjects(index: ArchiveIndex, root: tn.DocumentArchive) -> dict[int, int]:

@@ -14,6 +14,8 @@ wrote them, and every text slot names `pybers-base`, the named paragraph style o
 `53-paragraph-style-named`, created once per document and found again by name.
 
 UPDATES
+2026-09-22  A random UUID comes from the index module, shared with sheet creation, for
+            PYB-113.
 2026-09-22  The UID map is written by `_lines`, as a structural edit writes it, for
             PYB-113.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
@@ -51,6 +53,7 @@ from .._persistence.index import (
     ArchiveIndex,
     assignUuid,
     findRoot,
+    generateUuid,
     readUuidValue,
     wordBits,
     wordMask,
@@ -338,13 +341,6 @@ def createResetStyles(
         themeReferences.append(reset.textStyle)
         registry.archiveReplace(themeId, theme, themeReferences)
     return reset
-
-
-def generateUuid() -> tsp.UUID:
-    """Return a random UUID in the two-halves form the file stores."""
-    message = tsp.UUID()
-    assignUuid(message, uuid.uuid4().int)
-    return message
 
 
 def bindStyles(
