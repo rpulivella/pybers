@@ -27,6 +27,7 @@ and nothing here knows a model type: the one thing that did was the merge formul
 which went to the feature that owns merges.
 
 UPDATES
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Every archive it writes is written through the save's index, and the
             table owner kind lives here, for PYB-109.
 2026-09-21  The engine's cell-keyed records follow a structural edit, for PYB-17.
@@ -58,7 +59,7 @@ from ._generated import TSPArchiveMessages_pb2 as tspArchive
 from ._generated import TSPMessages_pb2 as tsp
 from ._persistence import PackageRegistry, createArchive
 from ._persistence.index import ArchiveIndex, wordBits, wordMask
-from ._persistence.types import calculationEngineTypeId, readArchiveTypeId
+from ._persistence.types import findArchiveTypeId, readArchiveTypeId
 from .errors import ReadError, WriteError
 
 # The `owner_kind` a table's dependency entry carries, as against the other owners
@@ -75,7 +76,8 @@ def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
     """
     found = [
         archive for archive in index.byIdentifier.values()
-        if readArchiveTypeId(archive) == calculationEngineTypeId
+        if readArchiveTypeId(archive)
+        == findArchiveTypeId(tsce.CalculationEngineArchive)
     ]
     if len(found) != 1:
         raise ReadError(
@@ -170,12 +172,11 @@ sumFunctionIndex: int = 168
 # zero, so the row extent of a tile is not established and is never assumed here.
 dependencyTileColumns: int = 32
 
-# The type and version of the tile Numbers created in `55-table-inserted-formula`.
-cellRecordTileTypeId: int = 4009
+# The version of the tile Numbers created in `55-table-inserted-formula`.
 cellRecordTileVersion: tuple[int, ...] = (1, 0, 5)
 
-# The tile mirroring the range half of the register, as `20-formula-shapes` holds it.
-rangePrecedentsTileTypeId: int = 4010
+# The version of the tile mirroring the range half of the register, as
+# `20-formula-shapes` holds it.
 rangePrecedentsTileVersion: tuple[int, ...] = (1, 0, 5)
 
 # A rectangle's size counts from one, and Numbers omits an axis of one line.
@@ -396,7 +397,7 @@ def rewriteRangeTiles(
         if identifier in created:
             info = tspArchive.ArchiveInfo(identifier=identifier)
             message = info.message_infos.add(
-                type=rangePrecedentsTileTypeId, length=0
+                type=findArchiveTypeId(tsce.RangePrecedentsTileArchive), length=0
             )
             message.version.extend(rangePrecedentsTileVersion)
             registry.archiveAdd(
@@ -484,7 +485,9 @@ def registerFormulaCells(
         rewriteCellRecords(tile.cell_records, inTile, outTile)
         if identifier == createdTile:
             info = tspArchive.ArchiveInfo(identifier=identifier)
-            message = info.message_infos.add(type=cellRecordTileTypeId, length=0)
+            message = info.message_infos.add(
+                type=findArchiveTypeId(tsce.CellRecordTileArchive), length=0
+            )
             message.version.extend(cellRecordTileVersion)
             registry.archiveAdd(
                 componentId, createArchive(info, [tile.SerializeToString()]), tile

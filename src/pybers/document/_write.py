@@ -28,6 +28,7 @@ UPDATES
 2026-09-18  Rows and columns added or removed reach every archive indexed by one,
             and the edited table's formulas are registered afresh, for PYB-17.
 2026-09-22  One index serves the whole save, creation included, for PYB-109.
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 """
 from __future__ import annotations
 
@@ -66,7 +67,7 @@ from .._persistence import (
     writePackage,
 )
 from .._persistence.index import ArchiveIndex, findRoot
-from .._persistence.types import tableInfoTypeId
+from .._persistence.types import findArchiveTypeId
 from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula.precedents import resolveFormulaPrecedents
@@ -178,7 +179,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
         sheetArchive = index.resolve(reference, tn.SheetArchive)
         tableReferences = [
             drawable for drawable in sheetArchive.drawable_infos
-            if index.typeOf(drawable) == tableInfoTypeId
+            if index.typeOf(drawable) == findArchiveTypeId(tst.TableInfoArchive)
         ]
         if len(sheet.tables) != len(tableReferences):
             raise WriteError(

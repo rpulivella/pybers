@@ -44,7 +44,7 @@ from pybers._persistence.cells import (
     listReferenceSlots,
 )
 from pybers._persistence.index import ArchiveIndex, findRoot
-from pybers._persistence.types import tableInfoTypeId
+from pybers._persistence.types import findArchiveTypeId
 from pybers.errors import WriteError
 from pybers.table._write import (
     borrowShape,
@@ -58,6 +58,8 @@ from pybers.table._write import (
 )
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
+
+tableInfoTypeId: int = findArchiveTypeId(tst.TableInfoArchive)
 
 numberFormatType: int = 256
 textFormatType: int = 260

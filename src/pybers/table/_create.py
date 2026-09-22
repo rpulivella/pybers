@@ -14,6 +14,7 @@ wrote them, and every text slot names `pybers-base`, the named paragraph style o
 `53-paragraph-style-named`, created once per document and found again by name.
 
 UPDATES
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Created on the save's one index, for PYB-109.
 2026-09-14  Written for PYB-63.
 """
@@ -60,7 +61,7 @@ from .._persistence.template import (
     copyTemplates,
     readTemplates,
 )
-from .._persistence.types import readArchiveTypeId, tableInfoTypeId
+from .._persistence.types import findArchiveTypeId, readArchiveTypeId
 from ..errors import WriteError
 from ..geometry import Position
 from .cells import Table, generateOwnerIdentity
@@ -89,9 +90,6 @@ ownerKindLimit: int = 0x100
 fixedUuidLimit: int = 1 << 32
 
 
-ownerTypeId: int = 4008
-paragraphStyleTypeId: int = 2022
-treeNodeTypeId: int = 205
 treeNodeVersion: tuple[int, ...] = (1, 0, 5)
 
 baseStyleName: str = "pybers-base"
@@ -267,7 +265,9 @@ def findNamedStyle(index: ArchiveIndex, stylesheetId: int) -> int | None:
     )
     for reference in stylesheet.styles:
         archive = index.byIdentifier.get(reference.identifier)
-        if archive is None or readArchiveTypeId(archive) != paragraphStyleTypeId:
+        if archive is None or readArchiveTypeId(archive) != findArchiveTypeId(
+            tswp.ParagraphStyleArchive
+        ):
             continue
         style = index.resolve(reference, tswp.ParagraphStyleArchive)
         if style.super.name == baseStyleName:
@@ -502,7 +502,8 @@ def createTable(
     renewal = UuidRenewal(base=base)
     owners = [
         copy for copy in copies.copies.values()
-        if copy.template.info.message_infos[0].type == ownerTypeId
+        if copy.template.info.message_infos[0].type
+        == findArchiveTypeId(tsce.FormulaOwnerDependenciesArchive)
     ]
     registered = [
         entry.internal_owner_id
@@ -605,7 +606,9 @@ def addSidebarNodes(
         for tableId in tableIds:
             identifier = registry.identifierAllocate()
             info = tspArchive.ArchiveInfo(identifier=identifier)
-            message = info.message_infos.add(type=treeNodeTypeId, length=0)
+            message = info.message_infos.add(
+                type=findArchiveTypeId(tsk.TreeNode), length=0
+            )
             message.version.extend(treeNodeVersion)
             message.object_references.append(tableId)
             child = tsk.TreeNode()
@@ -640,7 +643,7 @@ def findPendingTables(
         )
         stored = [
             reference.identifier for reference in sheetArchive.drawable_infos
-            if index.typeOf(reference) == tableInfoTypeId
+            if index.typeOf(reference) == findArchiveTypeId(tst.TableInfoArchive)
         ]
         kept = [
             table._identifier for table in sheet.tables
@@ -689,7 +692,7 @@ def createTables(document: Document, registry: PackageRegistry) -> None:
                 )
                 + tableGap
                 for reference in sheetArchive.drawable_infos
-                if index.typeOf(reference) == tableInfoTypeId
+                if index.typeOf(reference) == findArchiveTypeId(tst.TableInfoArchive)
             ),
             default=0.0,
         )

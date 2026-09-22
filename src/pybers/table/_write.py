@@ -16,6 +16,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Tiles and the row primitives moved to `_tiles`, for PYB-17.
 2026-09-18  Rows and records move to their new lines, and a removed one releases
@@ -110,9 +111,8 @@ from ._tiles import (
 )
 from .cells import Cell, MergeRange, Table
 
-# `TST.Tile` and the type bytes a numeric record may carry. 2 is a plain number
-# and 10 is currency, which is the same encoding under a different type.
-tileTypeId: int = 6002
+# The type bytes a numeric record may carry. 2 is a plain number and 10 is
+# currency, which is the same encoding under a different type.
 numericTypeBytes: tuple[int, ...] = (2, 10)
 
 # A record's value is patched in place, leaving the twelve-byte header and the
