@@ -18,6 +18,7 @@ conversion between nodes and text takes that cell, and why one stored archive
 serves every cell a formula was dragged into.
 
 UPDATES
+2026-09-21  FormulaReferenceLoss re-exported, for PYB-17.
 2026-09-08  Made a package of its own for #58, gathering the model, the text and
             both archive halves that were spread across three directories.
 """
@@ -52,6 +53,7 @@ from pybers.formula.nodes import (
     FormulaNode,
     FormulaRange,
     FormulaReference,
+    FormulaReferenceLoss,
     FormulaUnknownCall,
     FormulaVariable,
     NodeContent,
@@ -73,6 +75,7 @@ __all__ = [
     "FormulaNode",
     "FormulaRange",
     "FormulaReference",
+    "FormulaReferenceLoss",
     "FormulaSyntaxError",
     "FormulaUnknownCall",
     "FormulaVariable",
