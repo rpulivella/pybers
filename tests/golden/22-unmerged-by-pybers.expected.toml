@@ -7,7 +7,6 @@ table = "Table 1"
 cell = "A1"
 value = "Hello"
 formula = ""
-qa = ["no cell in row 1 is merged"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -36,3 +35,10 @@ table = "Table 1"
 cell = "L1"
 formula = "=J1"
 qa = ["L1 shows what its label in L2 predicts"]
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 1"
+rows = 2
+columns = 13
+merges = []

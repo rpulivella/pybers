@@ -7,7 +7,6 @@ table = "Table 1"
 cell = "A1"
 value = 2
 formula = "=1+1"
-qa = ["A1:B1 renders as one merged cell showing 2"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -50,3 +49,10 @@ table = "Table 1"
 cell = "A2"
 value = "1+1"
 formula = ""
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 1"
+rows = 2
+columns = 8
+merges = ["A1:B1"]

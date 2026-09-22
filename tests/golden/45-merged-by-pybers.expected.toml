@@ -7,7 +7,6 @@ table = "45-row-offsets-32bit"
 cell = "KI7"
 value = "r6c295"
 formula = ""
-qa = ["KI7:KJ7 is merged holding r6c295"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -36,3 +35,10 @@ table = "45-row-offsets-32bit"
 cell = "KN7"
 value = "r6c300"
 formula = ""
+
+[[table]]
+sheet = "Sheet 1"
+table = "45-row-offsets-32bit"
+rows = 7
+columns = 300
+merges = ["KI7:KJ7"]

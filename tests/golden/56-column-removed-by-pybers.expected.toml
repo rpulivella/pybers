@@ -36,7 +36,7 @@ table = "Table 1"
 cell = "E12"
 value = 28
 formula = "=SUM(C11:G11)"
-qa = ["merges read C1:D1, C2:D3, C8:D8, D5:E5 and E7:F7", "row 9 and column G are hidden"]
+qa = ["row 9 and column G are hidden"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -51,3 +51,17 @@ table = "Table 2"
 cell = "A3"
 value = 7
 formula = "=Table 1::F11"
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 1"
+rows = 12
+columns = 7
+merges = ["C1:D1", "C2:D3", "C8:D8", "D5:E5", "E7:F7"]
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 2"
+rows = 3
+columns = 1
+merges = []
