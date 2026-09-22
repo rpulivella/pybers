@@ -16,6 +16,7 @@ error, which is why each is handled here and not left to a caller:
   ordinary numbers they name a cell far outside the table and raise nothing.
 
 UPDATES
+2026-09-18  A broken reference reads the lines it lost, for PYB-17.
 2026-09-11  The list node's one field is read, for #67.
 2026-09-10  A key the pool does not hold is refused rather than read as no
             formula at all, for #65, because a save then removed it.
@@ -45,6 +46,7 @@ from .._persistence.index import (
     formulaListType,
     originOffset,
     readDataList,
+    readUuidValue,
 )
 from ..errors import ReadError
 from .nodes import (
@@ -57,6 +59,7 @@ from .nodes import (
     FormulaNode,
     FormulaRange,
     FormulaReference,
+    FormulaReferenceLoss,
     FormulaUnknownCall,
     FormulaVariable,
     NodeContent,
@@ -167,8 +170,32 @@ def readFormulaReference(
         and node.AST_row.row == brokenRowSentinel
     )
     if broken:
-        return FormulaReference(tableId=tableId, broken=True)
+        return FormulaReference(
+            tableId=tableId, broken=True, loss=readReferenceLoss(node)
+        )
     return FormulaReference(column=column, row=row, tableId=tableId)
+
+
+def readReferenceLoss(
+    node: tsce.ASTNodeArrayArchive.ASTNodeArchive,
+) -> FormulaReferenceLoss | None:
+    """Return the lines a broken reference lost, or None unless it names one tract.
+
+    Every broken reference measured carries exactly one. Any other count is left
+    to the node's bytes, which carry it through a rewrite untouched.
+    """
+    if not node.HasField("AST_tract_list") or len(node.AST_tract_list.tract) != 1:
+        return None
+    tract = node.AST_tract_list.tract[0]
+    # The node's own bits carry the lock; a cell formula leaves the tract's clear.
+    bits = node.AST_sticky_bits
+    return FormulaReferenceLoss(
+        columns=tuple(readUuidValue(uid) for uid in tract.columnUids.uid),
+        rows=tuple(readUuidValue(uid) for uid in tract.rowUids.uid),
+        range=tract.is_range_ref,
+        columnsAbsolute=bits.begin_column_is_absolute,
+        rowsAbsolute=bits.begin_row_is_absolute,
+    )
 
 
 def readFormulaRange(

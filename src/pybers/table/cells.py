@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-18  Rows and columns are added and removed, and each line carries the
+            identity Numbers keys hidden state by (PYB-17).
 2026-09-16  A cell holds text Numbers will not interpret, and says whether its
             format was chosen rather than decided (PYB-83).
 2026-09-15  A fresh table identity is a version 4 UUID in file byte order (PYB-86).
@@ -62,6 +64,11 @@ from pybers.formula.render import renderFormula
 from pybers.geometry import Position
 from pybers.style import Style
 from pybers.table.rows import TableRows
+from pybers.table.structure import (
+    buildGridEdit,
+    editGrid,
+    generateLineIdentities,
+)
 
 if TYPE_CHECKING:
     # Guarded because `sheet` imports this module, and the link back is a type
@@ -325,6 +332,54 @@ class Table:
     document: Document | None = field(
         default=None, repr=False, compare=False, kw_only=True
     )
+    # Each row's and column's identity, in order, which Numbers keys hidden state by
+    # and a broken reference names. Fresh for a table built rather than read.
+    _rowIdentities: list[int] = field(
+        default_factory=list, repr=False, compare=False, kw_only=True
+    )
+    _columnIdentities: list[int] = field(
+        default_factory=list, repr=False, compare=False, kw_only=True
+    )
+
+    def __post_init__(self) -> None:
+        """Identify every line of a table that arrived without identities."""
+        if not self._rowIdentities:
+            self._rowIdentities = generateLineIdentities(self.rowCount)
+        if not self._columnIdentities:
+            self._columnIdentities = generateLineIdentities(self.colCount)
+
+    def rowAdd(self, row: int, count: int = 1) -> None:
+        """Insert empty rows so the first is row `row`, moving the rest down.
+
+        Every formula in the document follows, and a range growing past `row` moves
+        only its far end. A merge the rows land inside grows.
+        """
+        editGrid(self, buildGridEdit(self, row, count, rows=True, removing=False))
+
+    def rowRemove(self, row: int, count: int = 1) -> list[Cell]:
+        """Delete rows starting at `row`, and return each cell left reading `#REF!`.
+
+        A range losing some of its rows shrinks, and one losing all of them breaks,
+        as Numbers does. A merge losing its anchor's row is refused.
+        """
+        return editGrid(self, buildGridEdit(self, row, count, rows=True, removing=True))
+
+    def columnAdd(self, column: int | str, count: int = 1) -> None:
+        """Insert empty columns so the first is `column`, a number or `"C"`.
+
+        Every formula in the document follows, and a merge the columns land inside
+        grows, exactly as `rowAdd` does sideways.
+        """
+        editGrid(self, buildGridEdit(self, column, count, rows=False, removing=False))
+
+    def columnRemove(self, column: int | str, count: int = 1) -> list[Cell]:
+        """Delete columns starting at `column`, returning each cell left `#REF!`.
+
+        The sideways counterpart of `rowRemove`, with the same refusals.
+        """
+        return editGrid(
+            self, buildGridEdit(self, column, count, rows=False, removing=True)
+        )
 
     def cell(
         self,

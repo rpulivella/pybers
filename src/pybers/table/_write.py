@@ -16,6 +16,9 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-21  Tiles and the row primitives moved to `_tiles`, for PYB-17.
+2026-09-18  Rows and records move to their new lines, and a removed one releases
+            what it named as a merge-swallowed one does, for PYB-17.
 2026-09-16  A record carries the chosen-format bit its cell holds, so literal
             text opens as Text, for PYB-83.
 2026-09-16  A formula swapped for another is reported as added, so the engine
@@ -64,7 +67,10 @@ from .._persistence.cells import (
     chosenFormatOffset,
     emptyOffset,
     findFormulaKeySlot,
+    listReferenceSlots,
     offsetWidth,
+    referenceWidth,
+    slotOrder,
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128, encodedLength
@@ -74,6 +80,7 @@ from .._persistence.index import (
     wordBits,
     wordMask,
 )
+from .._persistence.metadata import PackageRegistry
 from ..addressing import CellReference
 from ..errors import WriteError
 from ..formula._write import (
@@ -85,11 +92,24 @@ from ..formula._write import (
     patchFormulaKey,
     readFormulaPool,
 )
+from ._conditions import (
+    ConditionalPlan,
+    writeConditionalCounts,
+)
+from ._lines import GridMaps
 from ._read import (
     readMerges,
     readRichTextTable,
     readStringTable,
     resolveValue,
+)
+from ._tiles import (
+    buildTileRange,
+    createRowStorage,
+    moveGridRecords,
+    narrowRowSlots,
+    rewriteRow,
+    writeTileRange,
 )
 from .cells import Cell, MergeRange, Table
 
@@ -108,9 +128,6 @@ valueEnd: int = valueOffset + encodedLength
 # decimal128, so changing between them moves every trailing reference.
 stringTypeByte: int = 3
 stringKeyWidth: int = 4
-
-# Every trailing reference is a little-endian uint32.
-referenceWidth: int = 4
 
 # Byte 8's LOW nibble names what the value is, one value per type with no
 # exception in 11,760 records: 1 is decimal128, 8 is a pooled string key. Its high
@@ -376,24 +393,6 @@ automaticNegativeStyle: int = 0
 plainNumberRecord: bytes = bytes.fromhex(
     "0502000000000000013000002a0000000000000000000000000040300100000001000000"
 )
-
-# A first row written into an empty tile carries 255 narrow offset slots, measured in
-# `01-text-plain`, `11-value-types-noformats` and `18-formula-literals` alike.
-narrowRowSlots: int = 255
-
-# Every bit that contributes one trailing reference, in the order the references
-# appear. Byte 8's low nibble names the value and carries none.
-slotOrder: tuple[tuple[int, int], ...] = (
-    *((8, bit) for bit in (0x20, 0x40, 0x80)),
-    *((9, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
-    *((10, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
-)
-
-
-def listReferenceSlots(raw: bytes) -> list[tuple[int, int]]:
-    """Return the slots this record's trailing references fill, in their order."""
-    return [(at, bit) for at, bit in slotOrder if raw[at] & bit]
-
 
 def findFormatKey(dataList: tst.TableDataList, formatType: int) -> int:
     """Return a key naming a format of this kind, creating one when there is none.
@@ -718,100 +717,6 @@ def findRowsNeedingStorage(
     return sorted(wanted)
 
 
-def createRowStorage(tile: tst.Tile, tileRowIndex: int) -> tst.TileRowInfo:
-    """Add an empty row to a tile, shaped like the rows already in it.
-
-    The offset array's length is copied from a sibling rather than computed: a
-    narrow row carries a fixed 255 slots whatever the column count, and the one
-    wide row measured carries one slot per column, so a rule fitted to that single
-    sample would be a guess. A tile holding no row takes the narrow shape Numbers
-    writes for a first row, which the caller allows only where 255 slots suffice.
-
-    `numrows` is corrected because Numbers keeps it accurate, and `numCells`,
-    `maxRow` and `maxColumn` are left alone because Numbers writes zero in all
-    three on tiles full of data.
-    """
-    sibling = tile.rowInfos[0] if tile.rowInfos else None
-    slots = (
-        len(sibling.cell_offsets) // offsetWidth if sibling is not None
-        else narrowRowSlots
-    )
-    empty = emptyOffset.to_bytes(offsetWidth, "little") * slots
-    created = tst.TileRowInfo()
-    created.tile_row_index = tileRowIndex
-    created.cell_count = 0
-    created.cell_storage_buffer_pre_bnc = b""
-    created.cell_offsets_pre_bnc = empty
-    created.storage_version = (
-        sibling.storage_version if sibling is not None else tile.storage_version
-    )
-    created.cell_storage_buffer = b""
-    created.cell_offsets = empty
-    if sibling is not None and sibling.has_wide_offsets:
-        created.has_wide_offsets = True
-
-    at = len(tile.rowInfos)
-    for position, existing in enumerate(tile.rowInfos):
-        if existing.tile_row_index > tileRowIndex:
-            at = position
-            break
-    tile.rowInfos.insert(at, created)
-    tile.numrows = len(tile.rowInfos)
-    return created
-
-
-def rewriteRow(
-    offsets: bytes,
-    buffer: bytes,
-    offsetUnit: int,
-    replacements: dict[int, bytes],
-    removals: frozenset[int] = frozenset(),
-) -> tuple[bytes, bytes]:
-    """Rebuild one row's offset array and storage buffer, replacing and dropping.
-
-    The whole row is rebuilt rather than patched in place because a record's offset
-    is where the previous ones ended, so a record that changes length moves every
-    record after it. Untouched records are re-emitted from the bytes they were read
-    from, so a row with one edit differs in exactly one record.
-
-    A dropped column takes the same empty offset a column that never held anything
-    takes, which is what a cell swallowed by a merge looks like in the file: no
-    record at all rather than an empty one.
-    """
-    slots = len(offsets) // offsetWidth
-    existing = {
-        record.column: record for record in decodeRow(offsets, buffer, offsetUnit)
-    }
-
-    rebuiltOffsets = bytearray()
-    rebuiltBuffer = bytearray()
-    for column in range(slots):
-        record = existing.get(column)
-        body = replacements.get(column)
-        if body is None and record is not None:
-            body = record.raw
-        # A replacement for a column with no record CREATES one, which is how a
-        # formula reaches a cell that was empty. The offset array already carries a
-        # slot for every column, so nothing grows.
-        if body is None or column in removals:
-            rebuiltOffsets += emptyOffset.to_bytes(offsetWidth, "little")
-            continue
-        # A row counting offsets in words can only name a position the unit
-        # divides, so a record of any other length would silently move every
-        # record after it. Refuse rather than write a row that reads back wrong.
-        if len(rebuiltBuffer) % offsetUnit:
-            raise WriteError(
-                f"Column {column} would start at byte {len(rebuiltBuffer)} of the "
-                f"row buffer, which is not a multiple of the {offsetUnit}-byte "
-                "unit this row counts its offsets in."
-            )
-        rebuiltOffsets += (len(rebuiltBuffer) // offsetUnit).to_bytes(
-            offsetWidth, "little"
-        )
-        rebuiltBuffer += body
-    return bytes(rebuiltOffsets), bytes(rebuiltBuffer)
-
-
 @dataclass(frozen=True, slots=True)
 class TableEdits:
     """What one table's write changed, in the terms the engine has to be told.
@@ -859,6 +764,9 @@ def applyTableEdits(
     table: Table,
     model: tst.TableModelArchive,
     swallowed: frozenset[tuple[int, int]] = frozenset(),
+    maps: GridMaps | None = None,
+    registry: PackageRegistry | None = None,
+    plan: ConditionalPlan | None = None,
 ) -> TableEdits:
     """Write every changed cell of one table back into the tiles it came from.
 
@@ -918,6 +826,46 @@ def applyTableEdits(
                 moveFormatReferences(formatList, before, after, str(where))
             )
 
+    def releaseRecord(record: CellRecord, reference: CellReference) -> bool:
+        """Release every list entry a removed record names, reporting a formula."""
+        nonlocal stylesMoved, richTextMoved
+        formatsCount(record.raw, None, reference)
+        if textPool is not None:
+            for key in listStringClaims(record):
+                textPool.release(key)
+        if styleList is not None:
+            stylesMoved |= releaseEntries(styleList, listStyleClaims(record))
+        if richTextList is not None:
+            richTextMoved |= releaseEntries(richTextList, listRichTextClaims(record))
+        if pool is not None and carriesFormula(record):
+            pool.release(record.references[findFormulaKeySlot(record)])
+            return True
+        return False
+
+    # Resolved once, because resolving parses afresh and the structural move below
+    # has to be what the walk after it sees.
+    restructured = maps is not None and maps.changed
+    if maps is not None and restructured:
+        if registry is None:
+            raise WriteError(
+                f"{table.name!r} has rows or columns added or removed, and writing "
+                "that needs the package registry the document writer holds."
+            )
+        covered = buildTileRange(index, registry, owners, store)
+        spent = moveGridRecords(store, covered, maps, table, releaseRecord, plan)
+        writeTileRange(registry, store, covered.tiles, spent)
+    # Resolved once, because resolving parses afresh and the structural move above
+    # has to be what the walk below sees.
+    tileArchives = [
+        (
+            entry,
+            index.archive(entry.tile.identifier),
+            covered.tiles[entry.tileid] if restructured
+            else index.resolve(entry.tile, tst.Tile),
+        )
+        for entry in store.tiles.tiles
+    ]
+
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
@@ -946,12 +894,10 @@ def applyTableEdits(
                 f"stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
             )
 
-    for entry in store.tiles.tiles:
-        archive = index.archive(entry.tile.identifier)
-        tile = index.resolve(entry.tile, tst.Tile)
+    for entry, archive, tile in tileArchives:
         tiles.append(tile)
         firstRow = entry.tileid * tileSize
-        touched = False
+        touched = restructured
 
         # Rows the file stores nothing for, materialized before the walk below,
         # which only ever sees a row that already has storage. Doing it here rather
@@ -989,20 +935,7 @@ def applyTableEdits(
                     row + originOffset, record.column + originOffset
                 )
                 if (row, record.column) in swallowed:
-                    formatsCount(record.raw, None, reference)
-                    if textPool is not None:
-                        for key in listStringClaims(record):
-                            textPool.release(key)
-                    if styleList is not None:
-                        stylesMoved |= releaseEntries(
-                            styleList, listStyleClaims(record)
-                        )
-                    if richTextList is not None:
-                        richTextMoved |= releaseEntries(
-                            richTextList, listRichTextClaims(record)
-                        )
-                    if pool is not None and carriesFormula(record):
-                        pool.release(record.references[findFormulaKeySlot(record)])
+                    if releaseRecord(record, reference):
                         formulaRemoved.append((row, record.column))
                     continue
                 cell = table.cells.get(reference)
@@ -1100,6 +1033,9 @@ def applyTableEdits(
             owners[archive.identifier].messageReplace(
                 archive.identifier, 0, tile.SerializeToString()
             )
+
+    if plan is not None and restructured:
+        writeConditionalCounts(plan, tiles)
 
     if formatList is not None and formatsMoved:
         removeSpentEntries(

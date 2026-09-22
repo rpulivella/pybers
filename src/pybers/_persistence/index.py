@@ -15,6 +15,7 @@ member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-09-18  A UUID's value read and assigned here, for PYB-17.
 2026-09-08  Moved into the persistence layer for #58. It was `pybers.archives`,
             which put the word back at the top level after PYB-2 had retired it.
 2026-09-08  Split out of `pybers.document._read` for #45, unchanged.
@@ -60,6 +61,8 @@ tableOwnerKind: int = 1
 # words, so the same value is spelled two ways and has to be converted between them.
 wordBits: int = 32
 wordMask: int = 0xFFFFFFFF
+halfBits: int = 64
+halfMask: int = (1 << halfBits) - 1
 
 # `TST.TableDataList.ListType` values, restated so that reading this file does not
 # require the generated enum in hand.
@@ -139,6 +142,17 @@ class ArchiveIndex:
         return readArchiveTypeId(self.archive(reference.identifier))
 
 
+def readUuidValue(message: tsp.UUID) -> int:
+    """Return a UUID's value from its two halves."""
+    return (message.upper << halfBits) | message.lower
+
+
+def assignUuid(message: tsp.UUID, value: int) -> None:
+    """Set a UUID's two halves from a value."""
+    message.lower = value & halfMask
+    message.upper = value >> halfBits
+
+
 def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
     """Return the document's root `TN.DocumentArchive`.
 
@@ -177,4 +191,4 @@ def readDataList(
     return {entry.key: entry for entry in dataList.entries}
 
 
-__all__ = ["ArchiveIndex", "findRoot", "readDataList"]
+__all__ = ["ArchiveIndex", "assignUuid", "findRoot", "readDataList", "readUuidValue"]

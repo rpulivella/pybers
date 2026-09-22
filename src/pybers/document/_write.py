@@ -25,6 +25,8 @@ UPDATES
 2026-09-08  Formulas and the engine moved to modules of their own, for #45.
 2026-09-14  A sheet or table the model gained is created before anything else is
             written, for PYB-63.
+2026-09-18  Rows and columns added or removed reach every archive indexed by one,
+            and the edited table's formulas are registered afresh, for PYB-17.
 """
 from __future__ import annotations
 
@@ -47,10 +49,12 @@ from .._engine import (
     TableOwner,
     findCalculationEngine,
     findOwnerEntry,
+    listRegisteredCells,
     readTableIdentities,
     readTableOwnerEntries,
     readTableOwnerIds,
     registerFormulaCells,
+    remapOwnerCoordinates,
     requestRecalculation,
 )
 from .._generated import TNArchives_pb2 as tn
@@ -69,6 +73,8 @@ from .._persistence.index import (
 from ..errors import WriteError
 from ..formula.precedents import resolveFormulaPrecedents
 from ..table._create import createTables
+from ..table._lines import buildGridMaps
+from ..table._structure import applyGridStructure, listModelFormulas
 from ..table._write import applyMerges, applyTableEdits, findAddedMerges
 from ..table.cells import Table
 from ._create import createSheets
@@ -193,6 +199,21 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
             entry = findOwnerEntry(entries, tableReference.identifier, table.name)
 
+            # Before the merges are compared, since a merge the edit only moved must
+            # not read as one the caller added.
+            maps = buildGridMaps(index, model, table)
+            registered: list[tuple[int, int]] = []
+            plan = None
+            if maps.changed:
+                registered = listRegisteredCells(entry.dependencies)
+                plan = applyGridStructure(
+                    index, registry, owners, table, tableInfo,
+                    tableReference.identifier, model, maps,
+                )
+                remapOwnerCoordinates(
+                    entry.dependencies, maps.rows, maps.columns, table.name
+                )
+
             # Only a merge being ADDED clears its covered positions. One already
             # in the file may carry a style-only record at each of them, which an
             # XLSX import writes and Numbers then keeps forever, and stripping
@@ -203,27 +224,41 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 for reference in merge.extent
                 if reference != merge.anchor
             )
-            edits = applyTableEdits(index, owners, table, model, swallowed)
+            edits = applyTableEdits(
+                index, owners, table, model, swallowed, maps, registry, plan
+            )
             moved = applyMerges(
                 table, model, entry.dependencies.formula_owner_uid
             )
-            if moved or swallowed:
+            if moved or swallowed or maps.changed:
+                # A structural edit can create and remove tiles and buckets, which
+                # the model has to declare as it points at them.
                 owners[modelArchive.identifier].messageReplace(
-                    modelArchive.identifier, 0, model.SerializeToString()
+                    modelArchive.identifier, 0, model.SerializeToString(),
+                    registry.referencesReconcile(modelArchive, model)
+                    if maps.changed else None,
                 )
             # The engine's register of formula-bearing cells, which is a separate
             # fact from a cell having moved and is what makes a newly attached
-            # formula evaluate at all, and recompute afterward.
+            # formula evaluate at all, and recompute afterward. A structural edit
+            # moves every formula, so every one is registered afresh in one call:
+            # a second would read the tiles this one rewrote as they were.
+            added = edits.formulaAdded
+            removed = edits.formulaRemoved
+            if maps.changed:
+                added = listModelFormulas(table)
+                removed = registered + removed
             registerFormulaCells(
                 index,
                 registry,
                 entry,
-                collectFormulaDependencies(table, entry, edits.formulaAdded, ownerIds),
-                edits.formulaRemoved,
+                collectFormulaDependencies(table, entry, added, ownerIds),
+                removed,
             )
-            if edits.written or moved:
+            recalculated = added if maps.changed else []
+            if edits.written or moved or recalculated:
                 written[tableReference.identifier] = (
-                    edits.written + sorted(moved)
+                    edits.written + sorted(moved) + recalculated
                 )
 
     requestRecalculation(index, owners, written)

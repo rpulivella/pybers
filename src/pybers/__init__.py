@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-09-21  FormulaReferenceLoss re-exported, for PYB-17.
 2026-09-14  TableRow and TableRows re-exported (PYB-62).
 2026-09-08  ReferenceLocation re-exported (#13).
 2026-09-02  SelectionError re-exported (#14).
@@ -58,6 +59,7 @@ from pybers.formula import (
     FormulaNode,
     FormulaRange,
     FormulaReference,
+    FormulaReferenceLoss,
     FormulaSyntaxError,
     FormulaUnknownCall,
     FormulaVariable,
@@ -89,6 +91,7 @@ __all__ = [
     "FormulaFunctionCall",
     "FormulaGroup",
     "FormulaReference",
+    "FormulaReferenceLoss",
     "FormulaRange",
     "PybersError",
     "ReadError",

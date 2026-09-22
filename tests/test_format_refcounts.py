@@ -41,6 +41,7 @@ from pybers._persistence.cells import (
     chooseOffsetUnit,
     decodeRow,
     findFormulaKeySlot,
+    listReferenceSlots,
 )
 from pybers._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
 from pybers.errors import WriteError
@@ -50,7 +51,6 @@ from pybers.table._write import (
     countedStyleSlots,
     countFormatClaims,
     displayedKindSlot,
-    listReferenceSlots,
     listRichTextClaims,
     listStringClaims,
     textFormatSlot,

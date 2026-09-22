@@ -15,6 +15,8 @@ stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.
 
 UPDATES
+2026-09-21  An archive's declared references follow its body, for PYB-17.
+2026-09-21  An archive nothing points at any more is removed, for PYB-17.
 2026-09-14  Written for PYB-63.
 """
 from __future__ import annotations
@@ -27,11 +29,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/14"
 
+from google.protobuf.message import Message
+
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from ..errors import PybersError
 from .container import NumbersPackage, indexPrefix, iwaSuffix
-from .iwa import Archive, IWAFile
+from .index import ArchiveIndex
+from .iwa import Archive, IWAFile, createArchive
 from .types import readArchiveTypeId
 
 packageMetadataTypeId: int = 11006
@@ -139,6 +144,16 @@ class PackageRegistry:
         self.gained.add(componentId)
         self.changed = True
 
+    def archiveRemove(self, identifier: int) -> None:
+        """Remove an archive nothing points at any more, from the member holding it."""
+        componentId = self.componentOf.get(identifier)
+        if componentId is None:
+            raise MetadataError(f"Archive {identifier} belongs to no component.")
+        self.componentMember(componentId).archiveRemove(identifier)
+        del self.componentOf[identifier]
+        self.gained.add(componentId)
+        self.changed = True
+
     def componentNamed(self, preferredLocator: str) -> int:
         """Return the one component a preferred locator names, or refuse."""
         found = [
@@ -179,6 +194,29 @@ class PackageRegistry:
                 info.ParseFromString(archive.infoBytes)
                 return list(info.message_infos[0].object_references)
         raise MetadataError(f"No member holds archive {identifier}.")
+
+    def referencesReconcile(self, archive: Archive, body: Message) -> list[int]:
+        """Return what an archive should declare once its body points elsewhere.
+
+        A reference the body gained is added, after the ones it kept in their
+        order, and one to an archive this package no longer holds is dropped. A
+        reference the body already held undeclared stays undeclared, since
+        Numbers leaves some out on purpose. A created tile that went undeclared was
+        a difference from what Numbers writes, measured 2026-09-21 against
+        `27b-rows-inserted-into-a-new-tile`.
+        """
+        info = tspArchive.ArchiveInfo()
+        info.ParseFromString(archive.infoBytes)
+        declared = list(info.message_infos[0].object_references)
+        stored = type(body)()
+        stored.ParseFromString(archive.messages[0].data)
+        held = set(listMessageReferences(stored))
+        kept = [target for target in declared if target in self.componentOf]
+        gained = [
+            target for target in listMessageReferences(body)
+            if target not in held and target not in kept
+        ]
+        return kept + gained
 
     def weakReferenceAdd(self, componentId: int, target: int) -> None:
         """Record a weak reference from a component to an object in another."""
@@ -259,4 +297,54 @@ class PackageRegistry:
         )
 
 
-__all__ = ["MetadataError", "PackageRegistry", "findMemberName"]
+def createSiblingArchive(
+    registry: PackageRegistry,
+    index: ArchiveIndex,
+    owners: dict[int, IWAFile],
+    sibling: int,
+    body: bytes,
+) -> int:
+    """Create an archive shaped like an existing one, beside it, and return its id.
+
+    The sibling's archive info carries the message version and the field infos
+    this library does not model, so a created archive takes it with a fresh
+    identifier rather than building one. It joins the sibling's component, and is
+    registered where the writers look archives up.
+    """
+    info = tspArchive.ArchiveInfo()
+    info.ParseFromString(index.archive(sibling).infoBytes)
+    info.identifier = registry.identifierAllocate()
+    del info.message_infos[1:]
+    archive = createArchive(info, [body])
+    componentId = registry.componentOf[sibling]
+    registry.archiveAdd(componentId, archive)
+    owners[archive.identifier] = registry.componentMember(componentId)
+    index.byIdentifier[archive.identifier] = archive
+    return archive.identifier
+
+
+def listMessageReferences(message: Message) -> list[int]:
+    """Return every archive a message points at, in the order its fields hold them."""
+    found: list[int] = []
+    for descriptor, value in message.ListFields():
+        if descriptor.message_type is None:
+            continue
+        for item in (list(value) if descriptor.is_repeated else [value]):
+            if item.DESCRIPTOR.full_name == "TSP.Reference":
+                if item.identifier not in found:
+                    found.append(item.identifier)
+                continue
+            found.extend(
+                target for target in listMessageReferences(item)
+                if target not in found
+            )
+    return found
+
+
+__all__ = [
+    "MetadataError",
+    "PackageRegistry",
+    "createSiblingArchive",
+    "findMemberName",
+    "listMessageReferences",
+]

@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-09-18  Each row and column reads its identity from the UID map, for PYB-17.
 2026-09-16  A cell reads whether its format was chosen, for PYB-83.
 2026-09-08  Split out of `pybers.document._read` for #58, unchanged.
 """
@@ -43,6 +44,7 @@ from .._persistence.index import (
     ArchiveIndex,
     originOffset,
     readDataList,
+    readUuidValue,
     richTextListType,
     stringListType,
 )
@@ -132,6 +134,23 @@ def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
     return merges
 
 
+def readLineIdentities(
+    index: ArchiveIndex, model: tst.TableModelArchive
+) -> tuple[list[int], list[int]]:
+    """Return each row's and column's identity, in the table's own order.
+
+    `*_uid_for_index` is a permutation into the sorted list, so reading that list
+    positionally names the wrong line. See findings-03-structure.md.
+    """
+    uids = index.resolve(model.base_column_row_uids, tst.ColumnRowUIDMapArchive)
+    rows = [readUuidValue(uids.sorted_row_uids[at]) for at in uids.row_uid_for_index]
+    columns = [
+        readUuidValue(uids.sorted_column_uids[at])
+        for at in uids.column_uid_for_index
+    ]
+    return rows, columns
+
+
 def readTable(
     index: ArchiveIndex,
     tableInfo: tst.TableInfoArchive,
@@ -144,6 +163,7 @@ def readTable(
     strings = readStringTable(index, dataStore)
     richText = readRichTextTable(index, dataStore)
     formulas = readFormulaTable(index, dataStore)
+    rowIdentities, columnIdentities = readLineIdentities(index, model)
 
     # The grid size is declared by the table, never inferred from which cells hold
     # something. Seven of the documents' tables declare more rows or columns than
@@ -154,6 +174,8 @@ def readTable(
         colCount=model.number_of_columns,
         mergeRanges=readMerges(model),
         identifier=identifier,
+        _rowIdentities=rowIdentities,
+        _columnIdentities=columnIdentities,
     )
     tileSize = dataStore.tiles.tile_size
 

@@ -72,6 +72,29 @@ diff against its origin shows where that change lives. Origins are in
 | `54b-format-star-rating-released` | `54-format-star-rating` | the control's format set to Text, and the label retyped | [values](../../docs/findings/findings-01-values.md) |
 | `54c-format-star-rating-cleared` | `54-format-star-rating` | Clear All on `A1:A2` | [values](../../docs/findings/findings-01-values.md) |
 | `55-table-inserted-formula` | `48-table-inserted` | `2` in `A1` and `=A1*3` in `B1` | [creation](../../docs/findings/findings-10-creation.md) |
+| `56-structure-base` | `00-baseline` | labeled formulas, five merges, a second table reading the first, built by `workarea/fixture-build/build56.py`, then row 9 and column H hidden by hand | [structure](../../docs/findings/findings-03-structure.md) |
+| `56b-row-inserted` | `56-structure-base` | Add Row Above row 3 through AppleScript, which Numbers widened to two rows over the merge `C2:D3` | [structure](../../docs/findings/findings-03-structure.md) |
+| `56c-row-deleted` | `56-structure-base` | Delete Row 3 through AppleScript, widened to rows 2 and 3 | [structure](../../docs/findings/findings-03-structure.md) |
+| `56d-column-inserted` | `56-structure-base` | Add Column Before column E through AppleScript, widened to five columns over the merges | [structure](../../docs/findings/findings-03-structure.md) |
+| `56e-column-deleted` | `56-structure-base` | Delete Column E through AppleScript, widened to columns C to G | [structure](../../docs/findings/findings-03-structure.md) |
+| `56f-row-inserted-in-merge` | `56-structure-base` | `A3` selected alone, then Add Row Above, cutting through `C2:D3` | [structure](../../docs/findings/findings-03-structure.md) |
+| `56g-row-deleted-in-merge` | `56-structure-base` | `A3` selected alone, then Delete Row, cutting through `C2:D3` | [structure](../../docs/findings/findings-03-structure.md) |
+| `56h-row-8-deleted` | `56-structure-base` | Delete Row 8 through AppleScript, which breaks the locked `$A$8` and the unlocked `A8` | [structure](../../docs/findings/findings-03-structure.md) |
+| `27b-rows-inserted-into-a-new-tile` | `27-big-table` | 60 rows added above row 100 through AppleScript, which pushes the last rows into a ninth tile | [structure](../../docs/findings/findings-03-structure.md) |
+| `27c-rows-deleted-emptying-a-tile` | `27-big-table` | rows 1 to 300 deleted through AppleScript, which leaves the last tile empty | [structure](../../docs/findings/findings-03-structure.md) |
+| `57-structure-refusals-base` | `00-baseline` | six tables, one per kind of state a structural edit has to carry: borders, conditional highlighting, bands, volatile formulas and spills, and merges to cut. Built by `workarea/fixture-build/build57.py`, then the borders and the highlighting added by hand | [structure](../../docs/findings/findings-03-structure.md) |
+| `57-borders-*` | `57-structure-refusals-base` | a row and a column added and removed in `Borders`, which carries a border on every edge | [structure](../../docs/findings/findings-03-structure.md) |
+| `57-conditions-*` | `57-structure-refusals-base` | the same four edits in `Conditions`, whose second rule reads `$C$1`, the cell the column deletion takes | [structure](../../docs/findings/findings-03-structure.md) |
+| `57-bands-*` | `57-structure-refusals-base` | six edits in `Bands`, inside and beside its two header rows, its header column and its footer | [structure](../../docs/findings/findings-03-structure.md) |
+| `57-engine-*` | `57-structure-refusals-base` | four edits in `Engine`, which holds `NOW()`, `RAND()` and two spills | [structure](../../docs/findings/findings-03-structure.md) |
+| `57-anchors-*`, `57-collapse-*` | `57-structure-refusals-base` | a merge losing its anchor's line, and one left a single cell, each from a single selected cell so Numbers does not widen the selection | [structure](../../docs/findings/findings-03-structure.md) |
+| `58-buckets-base` | `27-big-table` | the row count set to 100,000 through AppleScript and values written at twelve rows either side of 65,536, giving sixteen row-header buckets and a sparse run of tiles | [structure](../../docs/findings/findings-03-structure.md) |
+| `58-buckets-row-inserted` | `58-buckets-base` | a row added above row 1, which carries row 65,536 into the second bucket | [structure](../../docs/findings/findings-03-structure.md) |
+| `58-buckets-row-deleted` | `58-buckets-base` | row 1 deleted, which carries row 65,537 back into the first bucket | [structure](../../docs/findings/findings-03-structure.md) |
+| `58-buckets-at-limit` | `27-big-table` | the row count set to 65,536, the most one bucket holds. Numbers marks the tile wide and leaves its rows narrow | [structure](../../docs/findings/findings-03-structure.md) |
+| `58-buckets-created` | `58-buckets-at-limit` | a row added above row 1, which leaves 65,537 rows in the one bucket where setting the count would have made sixteen | [structure](../../docs/findings/findings-03-structure.md) |
+| `59-conditions-relative-base` | `00-baseline` | column A rising, B falling and C constant, built by `workarea/fixture-build/build59.py`, then three highlighting rules added by hand: A reading `B1` unlocked, B reading `$C1`, and D reading the whole column A | [structure](../../docs/findings/findings-03-structure.md) |
+| `59-conditions-relative-*` | `59-conditions-relative-base` | a row added and removed, a column added before B, and columns A, B and C each removed, which moves or breaks each rule in turn | [structure](../../docs/findings/findings-03-structure.md) |
 
 `tile-pattern.png` and `orientation-test.png` are the source images, generated by
 `workarea/make-tile.py` and `workarea/make-image.py`.

@@ -20,7 +20,7 @@ sheet = "Sheet 1"
 table = "Table 1"
 cell = "D1"
 formula = "=ROUND(2.5)"
-human = ["D1 shows the error its label in D2 predicts"]
+qa = ["D1 shows the error its label in D2 predicts"]
 
 [[cell]]
 sheet = "Sheet 1"

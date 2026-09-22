@@ -39,6 +39,7 @@ from pybers import (
     FormulaFunctionCall,
     FormulaGroup,
     FormulaNode,
+    FormulaReference,
     FormulaSyntaxError,
     FormulaUnknownCall,
     parseFormula,
@@ -89,11 +90,15 @@ def dropTypedWhitespace(formula: Formula) -> list[tuple[int, object]]:
 
     Types 32 and 33 carry where the space bar was pressed, which no reading of the
     text recovers and which retyping the formula in Numbers drops as well. See
-    findings-08-formula-text.md.
+    findings-08-formula-text.md. A broken reference keeps only what `#REF!` says,
+    since the text names neither its table nor the lines it lost.
     """
     return [
-        pair for pair in reduceFormulaShape(formula)
-        if pair[0] not in (appendWhitespaceNodeType, prependWhitespaceNodeType)
+        (nodeType, FormulaReference(broken=True))
+        if isinstance(content, FormulaReference) and content.broken
+        else (nodeType, content)
+        for nodeType, content in reduceFormulaShape(formula)
+        if nodeType not in (appendWhitespaceNodeType, prependWhitespaceNodeType)
     ]
 
 

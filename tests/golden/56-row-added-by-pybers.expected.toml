@@ -1,0 +1,117 @@
+# What Numbers shows for 56-row-added-by-pybers.numbers, `56-structure-base` with
+# row 3 inserted with `rowAdd(3)`, checked by
+# `python3 scripts/golden-confirm.py run 56-row-added-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B1"
+value = 55
+formula = "=SUM(A1:A11)"
+qa = ["rows 1 and 2 are unchanged and row 3 is new and empty"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B2"
+value = 55
+formula = "=SUM($A$1:$A$11)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B4"
+value = 3
+formula = "=A4"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B5"
+value = 1
+formula = "=A1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B6"
+value = 8
+formula = "=$A$9"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B7"
+value = 8
+formula = "=A9"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B8"
+value = 40
+formula = '=SUMIFS(A1:A11,A1:A11,">5")'
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B9"
+value = 55
+formula = "=SUM(A)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B10"
+value = 7
+formula = "=SUM(A4:A5)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B11"
+value = 5
+formula = "=SUM(A2:A4)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B13"
+value = 5
+formula = "=E12"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D13"
+value = 7
+formula = "=G12"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F13"
+value = 33
+formula = "=SUM(C12:H12)"
+qa = ["merges read C1:D1, C2:D4, C9:D9, D6:F6 and F8:G8, each anchor naming its original extent", "row 10 and column H are hidden, so the row numbers skip 10 and the letters skip H"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A1"
+value = 8
+formula = "=Table 1::A9"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A2"
+value = 55
+formula = "=SUM(Table 1::A1:A11)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A3"
+value = 7
+formula = "=Table 1::G12"

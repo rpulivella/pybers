@@ -38,6 +38,16 @@ from pybers._persistence.compression import compressRaw, decompressRaw
 from pybers._persistence.iwa import splitFrames
 
 
+def readEveryCompressedFrame(path: Path) -> list[bytes]:
+    """Return every IWA frame of a document as Apple compressed it."""
+    frames: list[bytes] = []
+    with zipfile.ZipFile(path) as archive:
+        for info in archive.infolist():
+            if info.filename.endswith(".iwa"):
+                frames.extend(splitFrames(archive.read(info.filename)))
+    return frames
+
+
 def readEveryFrame(path: Path) -> list[bytes]:
     """Return every IWA frame of a document, already decompressed."""
     payloads: list[bytes] = []
@@ -106,22 +116,27 @@ def test_everyFrameOfEveryDocumentReEncodesToItself(path: Path) -> None:
 # ── Size: the reason this is a matcher and not a literal emitter ─────────────
 
 def test_theEncoderKeepsEmittingBackReferences() -> None:
-    """Guard the ratio, so a regression to literals is caught rather than shipped.
+    """Guard the ratio against Apple's own, so a regression to literals is caught.
 
-    Measured across every document on 2026-09-01: Apple 0.183x, pybers 0.182x.
-    An all-literal encoder measures 1.001x, which is what this exists to exclude.
-    The bound is deliberately loose, because the encoder is free to change how it
-    matches and is not free to stop matching.
+    Measured against Apple on the same payloads rather than a fixed bound, because
+    the ratio depends on what the documents hold: a table of 100,000 rows carries
+    as many random row identities, which compress to 0.59x for both encoders. On
+    2026-09-21 Apple reached 0.318x across every document and pybers 0.316x. An
+    all-literal encoder measures 1.001x, which is what this exists to exclude.
     """
     original = 0
+    apple = 0
     encoded = 0
     for path in allDocuments:
-        for payload in readEveryFrame(path):
+        for frame in readEveryCompressedFrame(path):
+            payload = decompressRaw(frame)
             original += len(payload)
+            apple += len(frame)
             encoded += len(compressRaw(payload))
 
     assert original > 10_000_000, "the documents shrank; this bound means nothing now"
-    assert encoded / original < 0.30, (
-        f"the encoder reached {encoded / original:.3f}x, well above the 0.182x "
-        "measured when it was written. It has stopped emitting back-references."
+    assert encoded / original < apple / original * 1.10, (
+        f"the encoder reached {encoded / original:.3f}x where Apple reaches "
+        f"{apple / original:.3f}x on the same payloads. It has stopped emitting "
+        "back-references."
     )

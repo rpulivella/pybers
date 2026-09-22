@@ -71,12 +71,22 @@ def findFirstTable(document: pybers.Document) -> pybers.Table:
     return document.sheets[0].tables[0]
 
 
-def testOffsetsCountWordsOnlyWhenTheArchiveSaysTheRowIsWide() -> None:
-    """Either of Apple's two flags selects the word unit, and neither means byte."""
+def testOffsetsCountWordsOnlyWhenTheRowSaysItIsWide() -> None:
+    """The row's own flag decides, and the tile's says nothing about its rows."""
     assert chooseOffsetUnit(False, False) == offsetUnitByte
     assert chooseOffsetUnit(True, False) == offsetUnitWord
-    assert chooseOffsetUnit(False, True) == offsetUnitWord
+    assert chooseOffsetUnit(False, True) == offsetUnitByte
     assert chooseOffsetUnit(True, True) == offsetUnitWord
+
+
+def testATileMarkedWideWhoseRowsAreNarrowOpens() -> None:
+    """`58-buckets-at-limit` sets the tile's flag over rows that keep byte offsets.
+
+    Reading those by the tile's flag put every record past the end of its buffer.
+    """
+    table = findFirstTable(pybers.open(findDocumentPath("58-buckets-at-limit")))
+    assert table.rowCount == 65536
+    assert table.cell(row=1, col=1).value is not None
 
 
 def testATableWiderThanTwoHundredFiftyFiveColumnsOpens() -> None:
@@ -125,8 +135,8 @@ def testANarrowTableStillReadsAsItDid() -> None:
 def testARowWhoseOffsetsFallOutsideItsBufferNamesWhereItIs(tmp_path: Path) -> None:
     """A byte count alone gives no way to find the row that carries it.
 
-    Built by telling a narrow tile its rows are wide, which multiplies every
-    offset by four and is the exact shape of the defect this ticket fixes.
+    Built by telling each narrow row it is wide, which multiplies every offset by
+    four and is the exact shape of the defect the wide-row ticket fixed.
     """
     package = readPackage(narrowMeasurement)
     for iwaFile in package.iwaFiles:
@@ -135,7 +145,8 @@ def testARowWhoseOffsetsFallOutsideItsBufferNamesWhereItIs(tmp_path: Path) -> No
                 continue
             tile = tst.Tile()
             tile.ParseFromString(archive.messages[0].data)
-            tile.should_use_wide_rows = True
+            for rowInfo in tile.rowInfos:
+                rowInfo.has_wide_offsets = True
             iwaFile.messageReplace(archive.identifier, 0, tile.SerializeToString())
 
     target = tmp_path / "mislabeled.numbers"
