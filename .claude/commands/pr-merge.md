@@ -26,16 +26,19 @@ trigger sitting on it.
 3. **Compose the subject** in the house format from the ticket,
    `[<N>] <prefix>: <summary>`, by the same rules `/commit` states. `--subject` is
    required exactly so that GitHub's generated default never lands.
-4. **Ask whether this merge completes the ticket**, and merge with the answer.
+4. **Merge, completing the ticket unless the work was planned across pull requests.**
    ```
    python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
    python3 scripts/pr.py merge <N> --subject "..." --ticket-stays-open
    ```
-   **Completing it is the default**, and the first form is the ordinary one. A ticket
-   carried by more than one pull request takes the second: the body's closing keyword
-   still closes the ticket, because that keyword is what links a pull request to its
-   ticket, and the tool then reopens it and restores the Status it held. Ask the user
-   rather than inferring it, because only they know whether more pull requests are coming.
+   **A merge completes its ticket**, and the first form is the ordinary one. The second
+   is for exactly two cases, both decided before the merge: the work was split across
+   pull requests, or the pull requests cascade, such as a dev workflow change that a
+   later pull request has to exercise. Nothing else keeps a ticket open, so the decision
+   comes from the work and is never a question put to the user. In the second form the
+   body's closing keyword still closes the ticket, because that keyword is what links a
+   pull request to its ticket, and the tool then reopens it and restores the Status it
+   held.
    The source branch is deleted unless `--keep-branch` is passed. `pr.py` refuses a draft,
    so a pull request that never went through `/pr-review-code` cannot arrive here, and it
    refuses any CI state other than passed, including a state it could not read. Neither
@@ -57,8 +60,9 @@ trigger sitting on it.
    `/golden-confirm` writes every report, screenshot and log for a ticket into that one
    folder, so a folder still present for a merged ticket is stale. Leave every other
    `PYB-` folder alone, because it belongs to work still open.
-7. **Report** the merge commit, whether the branch was deleted, the state of `develop`,
-   and whether a golden-confirm folder was purged.
+7. **Report** the merge commit, whether the ticket closed or stayed open and why,
+   whether the branch was deleted, the state of `develop`, and whether a golden-confirm
+   folder was purged.
 
 ## A real merge is the default
 
