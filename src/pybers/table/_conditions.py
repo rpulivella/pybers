@@ -41,7 +41,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from .._generated import TSCEArchives_pb2 as tsce
-from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
 from .._persistence.cells import (
@@ -53,8 +52,7 @@ from .._persistence.cells import (
     patchSlotValue,
 )
 from .._persistence.index import ArchiveIndex, assignUuid
-from .._persistence.iwa import createArchive
-from .._persistence.metadata import PackageRegistry
+from .._persistence.metadata import PackageRegistry, createSiblingArchive
 
 if TYPE_CHECKING:
     # Guarded because the structural pass imports this module to plan the rules.
@@ -121,19 +119,13 @@ class ConditionalPlan:
 
     def entryCreate(self, rules: tst.ConditionalStyleSetArchive, sibling: int) -> int:
         """Add a rule set to the table's list, as a new archive, and return its key."""
-        info = tspArchive.ArchiveInfo()
-        info.ParseFromString(self.index.archive(sibling).infoBytes)
-        info.identifier = self.registry.identifierAllocate()
-        del info.message_infos[1:]
-        archive = createArchive(info, [rules.SerializeToString()])
-        componentId = self.registry.componentOf[sibling]
-        self.registry.archiveAdd(componentId, archive)
-        self.owners[archive.identifier] = self.registry.componentMember(componentId)
-        self.index.byIdentifier[archive.identifier] = archive
         entry = self.dataList.entries.add()
         entry.key = self.dataList.nextListID
         entry.refcount = 0
-        entry.reference.identifier = archive.identifier
+        entry.reference.identifier = createSiblingArchive(
+            self.registry, self.index, self.owners, sibling,
+            rules.SerializeToString(),
+        )
         self.dataList.nextListID += 1
         return int(entry.key)
 

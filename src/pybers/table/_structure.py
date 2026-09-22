@@ -37,12 +37,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .._generated import TSCEArchives_pb2 as tsce
-from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
 from .._persistence.index import ArchiveIndex, originOffset, readUuidValue
-from .._persistence.iwa import createArchive
-from .._persistence.metadata import PackageRegistry
+from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ..errors import WriteError
 from ._conditions import ConditionalPlan, buildConditionalPlan
 from ._create import assignUids
@@ -274,7 +272,10 @@ def applyStrokeLayers(
                 copied.CopyFrom(stored[displaced][1])
             copied.row_column_index = line
             placed[line] = (
-                createStrokeLayer(index, registry, owners, sibling, copied), copied
+                createSiblingArchive(
+                    registry, index, owners, sibling, copied.SerializeToString()
+                ),
+                copied,
             )
         for identifier, layer in placed.values():
             rewritten = mapStrokeRuns(layer, runs)
@@ -286,30 +287,6 @@ def applyStrokeLayers(
         del references[:]
         for line in sorted(placed):
             references.add(identifier=placed[line][0])
-
-
-def createStrokeLayer(
-    index: ArchiveIndex,
-    registry: PackageRegistry,
-    owners: dict[int, IWAFile],
-    sibling: int,
-    layer: tst.StrokeLayerArchive,
-) -> int:
-    """Register a created stroke layer beside a sibling, and return its identifier.
-
-    The sibling's archive info carries the message version and whatever else this
-    library does not model, so a created layer is shaped from it rather than built.
-    """
-    info = tspArchive.ArchiveInfo()
-    info.ParseFromString(index.archive(sibling).infoBytes)
-    info.identifier = registry.identifierAllocate()
-    del info.message_infos[1:]
-    archive = createArchive(info, [layer.SerializeToString()])
-    componentId = registry.componentOf[sibling]
-    registry.archiveAdd(componentId, archive)
-    owners[archive.identifier] = registry.componentMember(componentId)
-    index.byIdentifier[archive.identifier] = archive
-    return archive.identifier
 
 
 def listStrokeLayers(sidecar: tst.StrokeSidecarArchive) -> list[int]:

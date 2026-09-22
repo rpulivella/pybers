@@ -35,7 +35,8 @@ from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from ..errors import PybersError
 from .container import NumbersPackage, indexPrefix, iwaSuffix
-from .iwa import Archive, IWAFile
+from .index import ArchiveIndex
+from .iwa import Archive, IWAFile, createArchive
 from .types import readArchiveTypeId
 
 packageMetadataTypeId: int = 11006
@@ -296,6 +297,32 @@ class PackageRegistry:
         )
 
 
+def createSiblingArchive(
+    registry: PackageRegistry,
+    index: ArchiveIndex,
+    owners: dict[int, IWAFile],
+    sibling: int,
+    body: bytes,
+) -> int:
+    """Create an archive shaped like an existing one, beside it, and return its id.
+
+    The sibling's archive info carries the message version and the field infos
+    this library does not model, so a created archive takes it with a fresh
+    identifier rather than building one. It joins the sibling's component, and is
+    registered where the writers look archives up.
+    """
+    info = tspArchive.ArchiveInfo()
+    info.ParseFromString(index.archive(sibling).infoBytes)
+    info.identifier = registry.identifierAllocate()
+    del info.message_infos[1:]
+    archive = createArchive(info, [body])
+    componentId = registry.componentOf[sibling]
+    registry.archiveAdd(componentId, archive)
+    owners[archive.identifier] = registry.componentMember(componentId)
+    index.byIdentifier[archive.identifier] = archive
+    return archive.identifier
+
+
 def listMessageReferences(message: Message) -> list[int]:
     """Return every archive a message points at, in the order its fields hold them."""
     found: list[int] = []
@@ -317,6 +344,7 @@ def listMessageReferences(message: Message) -> list[int]:
 __all__ = [
     "MetadataError",
     "PackageRegistry",
+    "createSiblingArchive",
     "findMemberName",
     "listMessageReferences",
 ]

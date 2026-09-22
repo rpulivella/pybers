@@ -55,7 +55,6 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from .._generated import TSCEArchives_pb2 as tsce
-from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, chooseOffsetUnit, decodeRecord, decodeRow
@@ -82,8 +81,7 @@ from .._persistence.index import (
     wordBits,
     wordMask,
 )
-from .._persistence.iwa import Archive, createArchive
-from .._persistence.metadata import PackageRegistry
+from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ..addressing import CellReference
 from ..errors import WriteError
 from ..formula._write import (
@@ -959,21 +957,6 @@ def addInheritedRecords(
         )
 
 
-def buildTileArchive(
-    registry: PackageRegistry, sibling: Archive, tile: tst.Tile
-) -> Archive:
-    """Return a created tile archive, shaped like one the table already holds.
-
-    The archive info is the sibling's, which carries the message version and the
-    field infos this library does not model, with a fresh identifier in its place.
-    """
-    info = tspArchive.ArchiveInfo()
-    info.ParseFromString(sibling.infoBytes)
-    info.identifier = registry.identifierAllocate()
-    del info.message_infos[1:]
-    return createArchive(info, [tile.SerializeToString()])
-
-
 @dataclass
 class TileRange:
     """A table's tiles, creating one only when a row lands where none exists.
@@ -1007,14 +990,12 @@ class TileRange:
         created.storage_version = self.tiles[last].storage_version
         created.last_saved_in_BNC = self.tiles[last].last_saved_in_BNC
         created.should_use_wide_rows = self.tiles[last].should_use_wide_rows
-        archive = buildTileArchive(self.registry, sibling, created)
-        componentId = self.registry.componentOf[sibling.identifier]
-        self.registry.archiveAdd(componentId, archive)
-        self.owners[archive.identifier] = self.registry.componentMember(componentId)
-        self.index.byIdentifier[archive.identifier] = archive
         entry = self.store.tiles.tiles.add()
         entry.tileid = tileid
-        entry.tile.identifier = archive.identifier
+        entry.tile.identifier = createSiblingArchive(
+            self.registry, self.index, self.owners, sibling.identifier,
+            created.SerializeToString(),
+        )
         self.tiles[tileid] = created
         return created
 
