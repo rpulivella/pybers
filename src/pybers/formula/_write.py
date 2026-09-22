@@ -45,6 +45,7 @@ from .._persistence.cells import (
     findFormulaKeySlot,
     formulaFlagBit,
     formulaFlagOffset,
+    referenceWidth,
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128
@@ -68,9 +69,6 @@ from .nodes import (
     brokenColumnSentinel,
     brokenRowSentinel,
 )
-
-# Every trailing reference in a cell record is a little-endian uint32.
-referenceWidth: int = 4
 
 # Byte 0 of every cell record in the documents. A created record carries it too.
 storageVersion: int = 5

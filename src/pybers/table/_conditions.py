@@ -44,7 +44,14 @@ from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
-from .._persistence.cells import CellRecord
+from .._persistence.cells import (
+    CellRecord,
+    conditionalSlot,
+    findSlotValue,
+    matchSlot,
+    noMatch,
+    patchSlotValue,
+)
 from .._persistence.index import ArchiveIndex, assignUuid
 from .._persistence.iwa import createArchive
 from .._persistence.metadata import PackageRegistry
@@ -52,13 +59,6 @@ from .._persistence.metadata import PackageRegistry
 if TYPE_CHECKING:
     # Guarded because the structural pass imports this module to plan the rules.
     from ._structure import GridMaps
-
-# The slot naming a cell's rule set, and the slot caching which rule matched. The
-# cache holds the matching rule's index, or 15 when none did, measured against the
-# values each cell of `57-structure-refusals-base` holds.
-conditionalSlot: tuple[int, int] = (8, 0x80)
-matchSlot: tuple[int, int] = (9, 0x01)
-noMatch: int = 15
 
 # An operand that is a cell reference, and the form Numbers gives one it broke.
 cellReferenceArgument: int = 4
@@ -390,26 +390,6 @@ def buildConditionalPlan(
     return plan
 
 
-def findSlotValue(record: CellRecord, slot: tuple[int, int]) -> int | None:
-    """Return the reference one slot of a record holds, or None when it is empty."""
-    from ._write import listReferenceSlots
-
-    slots = listReferenceSlots(record.raw)
-    if slot not in slots:
-        return None
-    return int(record.references[slots.index(slot)])
-
-
-def patchSlotValue(raw: bytes, slot: tuple[int, int], value: int) -> bytes:
-    """Return a record with one filled slot holding a different reference."""
-    from ._write import listReferenceSlots, referenceWidth
-
-    slots = listReferenceSlots(raw)
-    at = len(raw) - (len(slots) - slots.index(slot)) * referenceWidth
-    encoded = value.to_bytes(referenceWidth, "little")
-    return raw[:at] + encoded + raw[at + referenceWidth:]
-
-
 def buildInheritedRecord(key: int) -> bytes:
     """Return the empty record a line added beside a highlighted cell receives."""
     return (
@@ -477,7 +457,6 @@ def writeConditionalCounts(plan: ConditionalPlan, tiles: Iterable[tst.Tile]) -> 
 __all__ = [
     "ConditionalPlan",
     "buildInheritedRecord",
-    "findSlotValue",
     "buildConditionalPlan",
     "rewriteConditionalRecord",
     "writeConditionalCounts",

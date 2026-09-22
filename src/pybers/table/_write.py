@@ -65,9 +65,14 @@ from .._persistence.cells import (
     carriesFormula,
     chosenFormatBit,
     chosenFormatOffset,
+    conditionalSlot,
     emptyOffset,
     findFormulaKeySlot,
+    findSlotValue,
+    listReferenceSlots,
     offsetWidth,
+    referenceWidth,
+    slotOrder,
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128, encodedLength
@@ -93,8 +98,6 @@ from ..formula._write import (
 from ._conditions import (
     ConditionalPlan,
     buildInheritedRecord,
-    conditionalSlot,
-    findSlotValue,
     rewriteConditionalRecord,
     writeConditionalCounts,
 )
@@ -122,9 +125,6 @@ valueEnd: int = valueOffset + encodedLength
 # decimal128, so changing between them moves every trailing reference.
 stringTypeByte: int = 3
 stringKeyWidth: int = 4
-
-# Every trailing reference is a little-endian uint32.
-referenceWidth: int = 4
 
 # Byte 8's LOW nibble names what the value is, one value per type with no
 # exception in 11,760 records: 1 is decimal128, 8 is a pooled string key. Its high
@@ -394,20 +394,6 @@ plainNumberRecord: bytes = bytes.fromhex(
 # A first row written into an empty tile carries 255 narrow offset slots, measured in
 # `01-text-plain`, `11-value-types-noformats` and `18-formula-literals` alike.
 narrowRowSlots: int = 255
-
-# Every bit that contributes one trailing reference, in the order the references
-# appear. Byte 8's low nibble names the value and carries none.
-slotOrder: tuple[tuple[int, int], ...] = (
-    *((8, bit) for bit in (0x20, 0x40, 0x80)),
-    *((9, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
-    *((10, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
-)
-
-
-def listReferenceSlots(raw: bytes) -> list[tuple[int, int]]:
-    """Return the slots this record's trailing references fill, in their order."""
-    return [(at, bit) for at, bit in slotOrder if raw[at] & bit]
-
 
 def findFormatKey(dataList: tst.TableDataList, formatType: int) -> int:
     """Return a key naming a format of this kind, creating one when there is none.

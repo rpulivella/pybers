@@ -20,6 +20,8 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-09-21  The trailing-reference slots and the conditional ones, gathered here
+            from the writers that each kept a copy, for PYB-17.
 2026-09-21  A row's offsets are read by the row's own width flag, for PYB-17.
 2026-09-16  Byte 6's chosen-format bit moved here from the writer, for PYB-83.
 2026-09-10  The formula key's position is computed from the attributes a
@@ -223,6 +225,46 @@ def carriesChosenFormat(record: CellRecord) -> bool:
         len(record.raw) > chosenFormatOffset
         and bool(record.raw[chosenFormatOffset] & chosenFormatBit)
     )
+
+
+# Every trailing reference is a little-endian uint32.
+referenceWidth: int = 4
+
+# Every bit that contributes one trailing reference, in the order the references
+# appear. Byte 8's low nibble names the value and carries none.
+slotOrder: tuple[tuple[int, int], ...] = (
+    *((8, bit) for bit in (0x20, 0x40, 0x80)),
+    *((9, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
+    *((10, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
+)
+
+# The slot naming a cell's conditional highlighting, and the slot caching which of
+# its rules matched: the rule's index, or 15 when none did. Measured against the
+# values every highlighted cell of `57-structure-refusals-base` holds.
+conditionalSlot: tuple[int, int] = (8, 0x80)
+matchSlot: tuple[int, int] = (9, 0x01)
+noMatch: int = 15
+
+
+def listReferenceSlots(raw: bytes) -> list[tuple[int, int]]:
+    """Return the slots a record's trailing references fill, in their order."""
+    return [(at, bit) for at, bit in slotOrder if raw[at] & bit]
+
+
+def findSlotValue(record: CellRecord, slot: tuple[int, int]) -> int | None:
+    """Return the reference one slot of a record holds, or None when it is empty."""
+    slots = listReferenceSlots(record.raw)
+    if slot not in slots:
+        return None
+    return int(record.references[slots.index(slot)])
+
+
+def patchSlotValue(raw: bytes, slot: tuple[int, int], value: int) -> bytes:
+    """Return a record with one filled slot holding a different reference."""
+    slots = listReferenceSlots(raw)
+    at = len(raw) - (len(slots) - slots.index(slot)) * referenceWidth
+    encoded = value.to_bytes(referenceWidth, "little")
+    return raw[:at] + encoded + raw[at + referenceWidth:]
 
 
 def chooseOffsetUnit(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:

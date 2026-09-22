@@ -34,11 +34,11 @@ from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import chooseOffsetUnit, decodeRow, readPackage
+from pybers._persistence.cells import conditionalSlot, findSlotValue, matchSlot
 from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.index import ArchiveIndex, findRoot, readUuidValue
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 from pybers.errors import WriteError
-from pybers.table._conditions import conditionalSlot, findSlotValue, matchSlot
 
 baseFixture: Path = findDocumentPath("56-structure-base")
 
