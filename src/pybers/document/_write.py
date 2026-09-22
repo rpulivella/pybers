@@ -65,12 +65,9 @@ from .._persistence import (
     PackageRegistry,
     writePackage,
 )
-from .._persistence.index import (
-    ArchiveIndex,
-    findRoot,
-    originOffset,
-    tableInfoTypeId,
-)
+from .._persistence.index import ArchiveIndex, findRoot
+from .._persistence.types import tableInfoTypeId
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula.precedents import resolveFormulaPrecedents
 from ..table._create import createTables

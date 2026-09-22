@@ -41,8 +41,7 @@ from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import chooseOffsetUnit, offsetUnitByte, offsetUnitWord
 from pybers._persistence.difference import listPackageDifferences
-from pybers._persistence.index import originOffset
-from pybers.addressing.reference import CellReference
+from pybers.addressing.reference import CellReference, originOffset
 from pybers.errors import ReadError, WriteError
 from pybers.table._write import rewriteRow, tileTypeId
 

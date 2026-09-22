@@ -75,14 +75,10 @@ from .._persistence.cells import (
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128, encodedLength
-from .._persistence.index import (
-    ArchiveIndex,
-    originOffset,
-    wordBits,
-    wordMask,
-)
+from .._persistence.index import ArchiveIndex, wordBits, wordMask
 from .._persistence.metadata import PackageRegistry
 from ..addressing import CellReference
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula._write import (
     FormulaPool,

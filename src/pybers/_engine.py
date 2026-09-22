@@ -27,8 +27,8 @@ and nothing here knows a model type: the one thing that did was the merge formul
 which went to the feature that owns merges.
 
 UPDATES
-2026-09-22  Every archive it writes is written through the save's index, for
-            PYB-109.
+2026-09-22  Every archive it writes is written through the save's index, and the
+            table owner kind lives here, for PYB-109.
 2026-09-21  The engine's cell-keyed records follow a structural edit, for PYB-17.
 2026-09-16  A formula declares the cells, rectangles and whole lines it reads, in
             three registers kept twice each, for PYB-86.
@@ -57,15 +57,13 @@ from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPArchiveMessages_pb2 as tspArchive
 from ._generated import TSPMessages_pb2 as tsp
 from ._persistence import PackageRegistry, createArchive
-from ._persistence.index import (
-    ArchiveIndex,
-    calculationEngineTypeId,
-    tableOwnerKind,
-    wordBits,
-    wordMask,
-)
-from ._persistence.types import readArchiveTypeId
+from ._persistence.index import ArchiveIndex, wordBits, wordMask
+from ._persistence.types import calculationEngineTypeId, readArchiveTypeId
 from .errors import ReadError, WriteError
+
+# The `owner_kind` a table's dependency entry carries, as against the other owners
+# the calculation engine tracks.
+tableOwnerKind: int = 1
 
 
 def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
@@ -366,7 +364,7 @@ def rewriteRangeTiles(
         created.add(identifier)
 
     dropping = set(removed) | set(added)
-    componentId = registry.componentOf[owner.identifier]
+    componentId = registry.componentRequire(owner.identifier)
     for identifier, tile in tiles.items():
         kept = [
             entry for entry in tile.from_to_range
@@ -455,7 +453,7 @@ def registerFormulaCells(
             "Creating a tile beyond column 0 has never been measured."
         )
 
-    componentId = registry.componentOf[owner.identifier]
+    componentId = registry.componentRequire(owner.identifier)
     createdTile: int | None = None
     gained: list[int] = []
     if firstTile:

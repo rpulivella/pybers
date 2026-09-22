@@ -21,6 +21,7 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-09-22  The type identifiers found by scanning live here, for PYB-109.
 2026-09-14  The package metadata, the sidebar tree, and every type a created
             sheet, table or reset style holds, for PYB-63.
 2026-09-02  The three TSCE types the write path needs to request a recalculation,
@@ -99,6 +100,13 @@ archiveTypes: dict[int, type[Message]] = {
     12009: tn.ThemeArchive,         # the theme and its style presets
     11006: tspArchive.PackageMetadata,  # every component and its external references
 }
+
+
+# The types found by scanning rather than by following a reference. Named rather
+# than written as literals at the point of use, because a bare 6000 says nothing.
+documentTypeId: int = 1
+tableInfoTypeId: int = 6000
+calculationEngineTypeId: int = 4000
 
 
 class ArchiveTypeError(PybersError, RuntimeError):

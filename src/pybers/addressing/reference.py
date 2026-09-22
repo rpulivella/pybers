@@ -16,6 +16,7 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-09-22  The offset between stored and model coordinates lives here, for PYB-109.
 2026-09-13  An address past the far end of either axis is refused, for #67.
             `Ledger` read as column 144,936,576 and raised nothing.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
@@ -37,11 +38,14 @@ from dataclasses import dataclass, field
 from pybers.errors import PybersError
 
 # Rows and columns count from ONE throughout the model, because that is what
-# Numbers shows and what a caller means by "row 1". The file counts from zero,
-# and the two meet only in `pybers.document._read`. Nothing here ever holds a stored
+# Numbers shows and what a caller means by "row 1". Nothing here ever holds a stored
 # coordinate.
 firstRow: int = 1
 firstColumn: int = 1
+
+# The file counts rows and columns from zero, so an archive half subtracts this
+# from a model coordinate and adds it to a stored one, and nowhere else converts.
+originOffset: int = 1
 
 # The far end of each axis, so a label nothing could have addressed is refused
 # instead of becoming a coordinate. `LEDGER` is a valid base-26 label and reads as

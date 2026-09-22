@@ -52,9 +52,10 @@ from .._persistence.cells import (
     noMatch,
     patchSlotValue,
 )
-from .._persistence.index import ArchiveIndex, originOffset
+from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ..addressing import CellReference
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula._read import readFormula
 from ..formula._write import encodeFormula

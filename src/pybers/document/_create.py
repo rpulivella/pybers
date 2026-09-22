@@ -32,9 +32,10 @@ from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import createArchive
-from .._persistence.index import ArchiveIndex, documentTypeId, findRoot
+from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.metadata import PackageRegistry, documentComponentId
 from .._persistence.template import ArchiveTemplate, copyTemplates, readTemplates
+from .._persistence.types import documentTypeId
 from ..errors import WriteError
 from .sheets import Document, Sheet
 

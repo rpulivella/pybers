@@ -39,9 +39,10 @@ from .._persistence.cells import (
     findSlotValue,
     offsetWidth,
 )
-from .._persistence.index import ArchiveIndex, originOffset
+from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ..addressing import CellReference
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._conditions import (
     ConditionalPlan,

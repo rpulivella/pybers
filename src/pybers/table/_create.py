@@ -49,7 +49,6 @@ from .._persistence.index import (
     assignUuid,
     findRoot,
     readUuidValue,
-    tableInfoTypeId,
     wordBits,
     wordMask,
 )
@@ -61,7 +60,7 @@ from .._persistence.template import (
     copyTemplates,
     readTemplates,
 )
-from .._persistence.types import readArchiveTypeId
+from .._persistence.types import readArchiveTypeId, tableInfoTypeId
 from ..errors import WriteError
 from ..geometry import Position
 from .cells import Table, generateOwnerIdentity
@@ -322,7 +321,7 @@ def createResetStyles(
         textStyle=copies["text-style"].identifier if existing is None else existing,
     )
 
-    componentId = registry.componentOf[styles.stylesheet]
+    componentId = registry.componentRequire(styles.stylesheet)
     copies.place(registry, {"DocumentStylesheet": componentId})
     created = [copy.identifier for copy in copies.copies.values()]
     for identifier in created:
@@ -612,7 +611,7 @@ def addSidebarNodes(
             child = tsk.TreeNode()
             child.object.identifier = tableId
             registry.archiveAdd(
-                registry.componentOf[reference.identifier],
+                registry.componentRequire(reference.identifier),
                 createArchive(info, [child.SerializeToString()]),
                 child,
             )

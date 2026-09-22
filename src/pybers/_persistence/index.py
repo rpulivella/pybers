@@ -17,6 +17,8 @@ package indexed up front, which is why the index is built eagerly and in full.
 UPDATES
 2026-09-22  Every write, addition and removal within one save passes through the
             index, which hands out one parsed message per archive, for PYB-109.
+2026-09-22  The origin offset and the type identifiers moved to the modules that
+            own them, for PYB-109.
 2026-09-18  A UUID's value read and assigned here, for PYB-17.
 2026-09-08  Moved into the persistence layer for #58. It was `pybers.archives`,
             which put the word back at the top level after PYB-2 had retired it.
@@ -40,24 +42,7 @@ from .._generated import TSTArchives_pb2 as tst
 from ..errors import ReadError
 from .container import NumbersPackage
 from .iwa import Archive, IWAFile
-from .types import parseArchive, readArchiveTypeId
-
-# The stored format counts rows and columns from zero. The model counts from
-# one, because that is what Numbers shows and what a caller means by "row 1". The
-# two systems meet HERE and nowhere else: a stored coordinate never reaches the
-# model, and a model coordinate never reaches a decoder. A design keeping both in
-# one object is how a reader comes to be off by one in only some places.
-originOffset: int = 1
-
-# The registry identifiers this module navigates by. Named rather than written as
-# literals at the point of use, because a bare 6000 in a conditional says nothing.
-documentTypeId: int = 1
-tableInfoTypeId: int = 6000
-calculationEngineTypeId: int = 4000
-
-# The `owner_kind` a table's dependency entry carries, as against the other owners
-# the calculation engine tracks.
-tableOwnerKind: int = 1
+from .types import documentTypeId, parseArchive, readArchiveTypeId
 
 # A `TSP.UUID` is two 64-bit halves and a formula's table identifier is four 32-bit
 # words, so the same value is spelled two ways and has to be converted between them.
@@ -71,15 +56,6 @@ halfMask: int = (1 << halfBits) - 1
 stringListType: int = 1
 formulaListType: int = 3
 richTextListType: int = 8
-
-# A formula-backed cell names its formula in the FIRST of its trailing
-# references. Established on 2026-09-03 by reproducing declared refcounts: in all
-# nine tables in the documents that declare formulas, counting the cells that name
-# each key through slot 0 equals the refcount the table declares, and no other
-# slot does so in any table. Value matching alone could not settle it, because
-# formula keys and style indices are both small integers and several slots
-# coincide by chance. An error cell consumes no value, so byte 12 is at once its
-# value slot and this slot, which is why one rule covers both.
 
 
 class ArchiveIndex:

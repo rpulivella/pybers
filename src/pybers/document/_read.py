@@ -56,11 +56,8 @@ from .._generated import TSTArchives_pb2 as tst
 from .._persistence import (
     readPackage,
 )
-from .._persistence.index import (
-    ArchiveIndex,
-    findRoot,
-    tableInfoTypeId,
-)
+from .._persistence.index import ArchiveIndex, findRoot
+from .._persistence.types import tableInfoTypeId
 from ..errors import ReadError
 from ..table._read import readTable
 from .sheets import Document, Sheet

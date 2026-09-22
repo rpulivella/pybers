@@ -25,7 +25,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence.index import ArchiveIndex, originOffset
+from .._persistence.index import ArchiveIndex
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._read import readLineIdentities
 from .cells import Table

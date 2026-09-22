@@ -31,8 +31,9 @@ from collections import Counter
 
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import chooseOffsetUnit, decodeRow
-from .._persistence.index import ArchiveIndex, originOffset, readUuidValue
+from .._persistence.index import ArchiveIndex, readUuidValue
 from .._persistence.metadata import PackageRegistry
+from ..addressing.reference import originOffset
 from ._conditions import ConditionalPlan, buildConditionalPlan
 from ._create import assignUids
 from ._lines import (
