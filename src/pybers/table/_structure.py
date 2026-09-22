@@ -13,6 +13,7 @@ knows what every formula reads.
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Line maps and borders moved to `_lines` and `_strokes`.
 2026-09-18  Written for PYB-17.
 """
@@ -29,9 +30,10 @@ __date__ = "2026/09/18"
 from collections import Counter
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
-from .._persistence.index import ArchiveIndex, originOffset, readUuidValue
+from .._persistence import chooseOffsetUnit, decodeRow
+from .._persistence.index import ArchiveIndex, readUuidValue
 from .._persistence.metadata import PackageRegistry
+from ..addressing.reference import originOffset
 from ._conditions import ConditionalPlan, buildConditionalPlan
 from ._create import assignUids
 from ._lines import (
@@ -220,7 +222,6 @@ def remapMergeStore(model: tst.TableModelArchive, maps: GridMaps) -> None:
 def applyGridStructure(
     index: ArchiveIndex,
     registry: PackageRegistry,
-    owners: dict[int, IWAFile],
     table: Table,
     info: tst.TableInfoArchive,
     infoIdentifier: int,
@@ -238,14 +239,14 @@ def applyGridStructure(
     # as they were stored.
     storedRows, storedColumns = readLineIdentities(index, model)
     plan = buildConditionalPlan(
-        index, registry, owners, store, maps, table.identifier,
+        index, registry, store, maps, table.identifier,
         storedRows, storedColumns,
     )
 
     uidReference = model.base_column_row_uids
     uids = index.resolve(uidReference, tst.ColumnRowUIDMapArchive)
     assignUids(uids, table)
-    writeArchive(owners, uidReference.identifier, uids.SerializeToString())
+    index.archiveWrite(uidReference.identifier, uids)
 
     rowBuckets = [
         index.resolve(reference, tst.HeaderStorageBucket)
@@ -253,22 +254,17 @@ def applyGridStructure(
     ]
     remapHeaders(rowBuckets, maps.rows, rowCounts)
     for reference, bucket in zip(store.rowHeaders.buckets, rowBuckets, strict=True):
-        writeArchive(owners, reference.identifier, bucket.SerializeToString())
+        index.archiveWrite(reference.identifier, bucket)
     columnBucket = index.resolve(store.columnHeaders, tst.HeaderStorageBucket)
     remapHeaders([columnBucket], maps.columns, columnCounts)
-    writeArchive(
-        owners, store.columnHeaders.identifier, columnBucket.SerializeToString()
-    )
+    index.archiveWrite(store.columnHeaders.identifier, columnBucket)
 
-    # Resolved once, because the layer pass rewrites this archive and a second
-    # copy would carry the list of layers as it was before that.
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    applyStrokeLayers(index, registry, owners, sidecar, maps)
+    applyStrokeLayers(index, registry, sidecar, maps)
     sidecar.row_count = table.rowCount
     sidecar.column_count = table.colCount
-    writeArchive(
-        owners, model.stroke_sidecar.identifier, sidecar.SerializeToString(),
-        listStrokeLayers(sidecar),
+    index.archiveWrite(
+        model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
     )
 
     model.number_of_rows = table.rowCount
@@ -282,23 +278,8 @@ def applyGridStructure(
     cache = info.layout_engine.width_height_cache
     del cache.rows_fitting_entries[:]
     cache.columns_count = table.colCount
-    writeArchive(owners, infoIdentifier, info.SerializeToString())
+    index.archiveWrite(infoIdentifier, info)
     return plan
-
-
-def writeArchive(
-    owners: dict[int, IWAFile],
-    identifier: int,
-    data: bytes,
-    references: list[int] | None = None,
-) -> None:
-    """Write one archive's first message back into the file holding it.
-
-    `references` replaces what the archive declares it points at. A body that
-    loses or gains one has to say so, because the registry registers what a
-    component reaches from those declarations rather than from the body.
-    """
-    owners[identifier].messageReplace(identifier, 0, data, references)
 
 
 def listModelFormulas(table: Table) -> list[tuple[int, int]]:

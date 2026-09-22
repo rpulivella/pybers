@@ -27,6 +27,8 @@ and nothing here knows a model type: the one thing that did was the merge formul
 which went to the feature that owns merges.
 
 UPDATES
+2026-09-22  Every archive it writes is written through the save's index, and the
+            table owner kind lives here, for PYB-109.
 2026-09-21  The engine's cell-keyed records follow a structural edit, for PYB-17.
 2026-09-16  A formula declares the cells, rectangles and whole lines it reads, in
             three registers kept twice each, for PYB-86.
@@ -54,16 +56,14 @@ from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 from ._generated import TSCEArchives_pb2 as tsce
 from ._generated import TSPArchiveMessages_pb2 as tspArchive
 from ._generated import TSPMessages_pb2 as tsp
-from ._persistence import IWAFile, PackageRegistry, createArchive
-from ._persistence.index import (
-    ArchiveIndex,
-    calculationEngineTypeId,
-    tableOwnerKind,
-    wordBits,
-    wordMask,
-)
-from ._persistence.types import parseArchive, readArchiveTypeId
+from ._persistence import PackageRegistry, createArchive
+from ._persistence.index import ArchiveIndex, wordBits, wordMask
+from ._persistence.types import calculationEngineTypeId, readArchiveTypeId
 from .errors import ReadError, WriteError
+
+# The `owner_kind` a table's dependency entry carries, as against the other owners
+# the calculation engine tracks.
+tableOwnerKind: int = 1
 
 
 def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
@@ -83,13 +83,9 @@ def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
             "Without it a table has no identity, and neither a merge nor a "
             "recalculation request can be written."
         )
-    engine = parseArchive(found[0])
-    if not isinstance(engine, tsce.CalculationEngineArchive):
-        raise ReadError(
-            f"Archive {found[0].identifier} carries the calculation engine's type "
-            f"but parsed as {type(engine).__name__}."
-        )
-    return engine
+    return index.identifierResolve(
+        found[0].identifier, tsce.CalculationEngineArchive
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -368,7 +364,7 @@ def rewriteRangeTiles(
         created.add(identifier)
 
     dropping = set(removed) | set(added)
-    componentId = registry.componentOf[owner.identifier]
+    componentId = registry.componentRequire(owner.identifier)
     for identifier, tile in tiles.items():
         kept = [
             entry for entry in tile.from_to_range
@@ -404,12 +400,10 @@ def rewriteRangeTiles(
             )
             message.version.extend(rangePrecedentsTileVersion)
             registry.archiveAdd(
-                componentId, createArchive(info, [tile.SerializeToString()])
+                componentId, createArchive(info, [tile.SerializeToString()]), tile
             )
             continue
-        registry.componentMember(registry.componentOf[identifier]).messageReplace(
-            identifier, 0, tile.SerializeToString()
-        )
+        index.archiveWrite(identifier, tile)
     return sorted(created)
 
 
@@ -459,7 +453,7 @@ def registerFormulaCells(
             "Creating a tile beyond column 0 has never been measured."
         )
 
-    componentId = registry.componentOf[owner.identifier]
+    componentId = registry.componentRequire(owner.identifier)
     createdTile: int | None = None
     gained: list[int] = []
     if firstTile:
@@ -493,15 +487,11 @@ def registerFormulaCells(
             message = info.message_infos.add(type=cellRecordTileTypeId, length=0)
             message.version.extend(cellRecordTileVersion)
             registry.archiveAdd(
-                componentId, createArchive(info, [tile.SerializeToString()])
+                componentId, createArchive(info, [tile.SerializeToString()]), tile
             )
             continue
-        registry.componentMember(registry.componentOf[identifier]).messageReplace(
-            identifier, 0, tile.SerializeToString()
-        )
-    registry.componentMember(componentId).messageReplace(
-        owner.identifier, 0, owner.dependencies.SerializeToString(), ownerReferences
-    )
+        index.archiveWrite(identifier, tile)
+    index.archiveWrite(owner.identifier, owner.dependencies, ownerReferences)
 
 
 class LineMapping(Protocol):
@@ -727,9 +717,7 @@ def readTableOwnerIds(
 
 
 def requestRecalculation(
-    index: ArchiveIndex,
-    owners: dict[int, IWAFile],
-    written: dict[int, list[tuple[int, int]]],
+    index: ArchiveIndex, written: dict[int, list[tuple[int, int]]]
 ) -> int:
     """Tell Numbers which cells moved, so it recalculates whatever depends on them.
 
@@ -741,25 +729,7 @@ def requestRecalculation(
     """
     if not written:
         return 0
-    engineArchive = next(
-        (
-            archive for archive in index.byIdentifier.values()
-            if readArchiveTypeId(archive) == calculationEngineTypeId
-        ),
-        None,
-    )
-    if engineArchive is None:
-        raise WriteError(
-            "This document has no TSCE.CalculationEngineArchive, so Numbers cannot "
-            "be asked to recalculate and the saved file would display stale formula "
-            "results. Every document in the documents carries one."
-        )
-    engine = parseArchive(engineArchive)
-    if not isinstance(engine, tsce.CalculationEngineArchive):
-        raise WriteError(
-            f"Archive {engineArchive.identifier} carries the calculation engine's "
-            f"type but parsed as {type(engine).__name__}."
-        )
+    engine = findCalculationEngine(index)
     if not engine.HasField("refs_to_dirty"):
         raise WriteError(
             "The calculation engine carries no refs_to_dirty reference, so the cells "
@@ -779,8 +749,7 @@ def requestRecalculation(
             )
         edits.setdefault(ownerId, []).extend(cells)
 
-    target = engine.refs_to_dirty.identifier
-    owners[target].messageReplace(target, 0, buildDirtySet(edits).SerializeToString())
+    index.archiveWrite(engine.refs_to_dirty.identifier, buildDirtySet(edits))
     return sum(len(cells) for cells in edits.values())
 
 

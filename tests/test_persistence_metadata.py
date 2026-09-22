@@ -28,6 +28,7 @@ from conftest import allDocuments, findDocumentPath, readArchiveBodies
 from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.container import ContainerError
+from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.iwa import IWAError, createArchive
 from pybers._persistence.metadata import (
     MetadataError,
@@ -41,7 +42,7 @@ documentComponent: int = 1
 
 def readRegistry(name: str = "00-baseline") -> PackageRegistry:
     """Return the registry of a freshly read document."""
-    return PackageRegistry(readPackage(findDocumentPath(name)))
+    return PackageRegistry(ArchiveIndex(readPackage(findDocumentPath(name))))
 
 
 def buildTileInfo(identifier: int, references: list[int]) -> tspArchive.ArchiveInfo:
@@ -55,7 +56,7 @@ def buildTileInfo(identifier: int, references: list[int]) -> tspArchive.ArchiveI
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testEveryStrongExternalReferenceIsWhatTheArchivesReference(path: Path) -> None:
-    found = PackageRegistry(readPackage(path))
+    found = PackageRegistry(ArchiveIndex(readPackage(path)))
 
     for identifier, component in found.components.items():
         stored = {
@@ -69,21 +70,21 @@ def testEveryStrongExternalReferenceIsWhatTheArchivesReference(path: Path) -> No
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testEveryArchiveOutsideTheRegistryBelongsToAComponent(path: Path) -> None:
     package = readPackage(path)
-    found = PackageRegistry(package)
+    found = PackageRegistry(ArchiveIndex(package))
 
     unplaced = [
         (iwaFile.name, archive.identifier)
         for iwaFile in package.iwaFiles
         if iwaFile is not found.metadataFile
         for archive in iwaFile.archives
-        if archive.identifier not in found.componentOf
+        if found.componentFind(archive.identifier) is None
     ]
     assert unplaced == []
 
 
 def testAnAllocatedIdentifierIsNewAndTheNextIsHigher() -> None:
     found = readRegistry()
-    used = set(found.componentOf) | {found.metadata.last_object_identifier}
+    used = set(found.index.byIdentifier) | {found.metadata.last_object_identifier}
 
     first = found.identifierAllocate()
     second = found.identifierAllocate()
@@ -102,10 +103,10 @@ def testACreatedComponentSurvivesBeingWrittenAndRead(tmp_path: Path) -> None:
     destination = tmp_path / "created.numbers"
     writePackage(found.package, destination)
 
-    reread = PackageRegistry(readPackage(destination))
+    reread = PackageRegistry(ArchiveIndex(readPackage(destination)))
     component = reread.components[identifier]
     assert component.locator == f"Tables/Tile-{identifier}"
-    assert reread.componentOf[identifier] == identifier
+    assert reread.componentFind(identifier) == identifier
     assert reread.metadata.last_object_identifier == identifier
     assert reread.strongReferencesDerive(identifier) == {(documentComponent, 0)}
     assert [
@@ -151,7 +152,7 @@ def testAnArchiveAddedToAnExistingComponentIsRegisteredThere() -> None:
     found.archiveAdd(engine, createArchive(buildTileInfo(identifier, [tile]), [b""]))
     found.save()
 
-    assert found.componentOf[identifier] == engine
+    assert found.componentFind(identifier) == engine
     assert (tile, 0) in {
         (reference.component_identifier, reference.object_identifier)
         for reference in found.components[engine].external_references
@@ -165,8 +166,9 @@ def testAWeakReferenceIsRecordedWeakAndNamesTheObject() -> None:
         if component.preferred_locator == "CalculationEngine"
     )
     sheet = next(
-        identifier for identifier, component in found.componentOf.items()
-        if component == documentComponent and identifier != documentComponent
+        identifier for identifier in found.index.byIdentifier
+        if found.componentFind(identifier) == documentComponent
+        and identifier != documentComponent
     )
 
     found.weakReferenceAdd(engine, sheet)

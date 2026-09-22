@@ -14,6 +14,7 @@ wrote them, and every text slot names `pybers-base`, the named paragraph style o
 `53-paragraph-style-named`, created once per document and found again by name.
 
 UPDATES
+2026-09-22  Created on the save's one index, for PYB-109.
 2026-09-14  Written for PYB-63.
 """
 from __future__ import annotations
@@ -42,13 +43,12 @@ from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import NumbersPackage, createArchive
+from .._persistence import createArchive
 from .._persistence.index import (
     ArchiveIndex,
     assignUuid,
     findRoot,
     readUuidValue,
-    tableInfoTypeId,
     wordBits,
     wordMask,
 )
@@ -60,7 +60,7 @@ from .._persistence.template import (
     copyTemplates,
     readTemplates,
 )
-from .._persistence.types import readArchiveTypeId
+from .._persistence.types import readArchiveTypeId, tableInfoTypeId
 from ..errors import WriteError
 from ..geometry import Position
 from .cells import Table, generateOwnerIdentity
@@ -321,7 +321,7 @@ def createResetStyles(
         textStyle=copies["text-style"].identifier if existing is None else existing,
     )
 
-    componentId = registry.componentOf[styles.stylesheet]
+    componentId = registry.componentRequire(styles.stylesheet)
     copies.place(registry, {"DocumentStylesheet": componentId})
     created = [copy.identifier for copy in copies.copies.values()]
     for identifier in created:
@@ -347,7 +347,7 @@ def createResetStyles(
         identifier for identifier in created if identifier not in references
     )
     registry.archiveReplace(
-        styles.stylesheet, stylesheet.SerializeToString(), references
+        styles.stylesheet, stylesheet, references
     )
 
     if existing is None:
@@ -356,7 +356,7 @@ def createResetStyles(
         presets.paragraph_style_presets.add(identifier=reset.textStyle)
         themeReferences = registry.strongReferencesOf(themeId)
         themeReferences.append(reset.textStyle)
-        registry.archiveReplace(themeId, theme.SerializeToString(), themeReferences)
+        registry.archiveReplace(themeId, theme, themeReferences)
     return reset
 
 
@@ -611,13 +611,14 @@ def addSidebarNodes(
             child = tsk.TreeNode()
             child.object.identifier = tableId
             registry.archiveAdd(
-                registry.componentOf[reference.identifier],
+                registry.componentRequire(reference.identifier),
                 createArchive(info, [child.SerializeToString()]),
+                child,
             )
             node.children.add(identifier=identifier)
             references.append(identifier)
         registry.archiveReplace(
-            reference.identifier, node.SerializeToString(), references
+            reference.identifier, node, references
         )
         return
     raise WriteError(f"The sidebar lists no sheet {sheetId} to place a table under.")
@@ -669,11 +670,9 @@ def findPendingTables(
     return pending
 
 
-def createTables(
-    document: Document, package: NumbersPackage, registry: PackageRegistry
-) -> None:
+def createTables(document: Document, registry: PackageRegistry) -> None:
     """Create every table the model gained, on every sheet, once the sheets exist."""
-    index = ArchiveIndex(package)
+    index = registry.index
     pending = findPendingTables(index, document)
     if not pending:
         return
@@ -709,7 +708,7 @@ def createTables(
         addSidebarNodes(index, registry, sheetId, tableIds)
         references = registry.strongReferencesOf(sheetId)
         references.extend(tableIds)
-        registry.archiveReplace(sheetId, sheetArchive.SerializeToString(), references)
+        registry.archiveReplace(sheetId, sheetArchive, references)
 
     tracker = state.engine.dependency_tracker
     engineReferences = registry.strongReferencesOf(state.identifier)
@@ -718,14 +717,14 @@ def createTables(
         if reference.identifier not in engineReferences
     )
     registry.archiveReplace(
-        state.identifier, state.engine.SerializeToString(), engineReferences
+        state.identifier, state.engine, engineReferences
     )
     for identifier, message in (
         (state.engine.header_name_manager.identifier, state.headerNames),
         (state.headerOwnerId, state.headerOwner),
         (state.headerTileId, state.headerTile),
     ):
-        registry.archiveReplace(identifier, message.SerializeToString())
+        registry.archiveReplace(identifier, message)
 
 
 def readSheetIdentifier(sheet: Sheet) -> int:

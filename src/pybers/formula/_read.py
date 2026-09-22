@@ -44,10 +44,10 @@ from .._persistence.decimal128 import Decimal128
 from .._persistence.index import (
     ArchiveIndex,
     formulaListType,
-    originOffset,
     readDataList,
     readUuidValue,
 )
+from ..addressing.reference import originOffset
 from ..errors import ReadError
 from .nodes import (
     Coordinate,

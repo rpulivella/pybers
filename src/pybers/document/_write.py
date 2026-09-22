@@ -27,6 +27,7 @@ UPDATES
             written, for PYB-63.
 2026-09-18  Rows and columns added or removed reach every archive indexed by one,
             and the edited table's formulas are registered afresh, for PYB-17.
+2026-09-22  One index serves the whole save, creation included, for PYB-109.
 """
 from __future__ import annotations
 
@@ -64,12 +65,9 @@ from .._persistence import (
     PackageRegistry,
     writePackage,
 )
-from .._persistence.index import (
-    ArchiveIndex,
-    findRoot,
-    originOffset,
-    tableInfoTypeId,
-)
+from .._persistence.index import ArchiveIndex, findRoot
+from .._persistence.types import tableInfoTypeId
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula.precedents import resolveFormulaPrecedents
 from ..table._create import createTables
@@ -157,15 +155,10 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
     A caller assigns to `Cell.value` directly, so there is no hook to record a
     change, and a comparison cannot go stale the way a dirty flag can.
     """
-    registry = PackageRegistry(package)
-    createSheets(document, package, registry)
-    createTables(document, package, registry)
     index = ArchiveIndex(package)
-    owners = {
-        archive.identifier: iwaFile
-        for iwaFile in package.iwaFiles
-        for archive in iwaFile.archives
-    }
+    registry = PackageRegistry(index)
+    createSheets(document, registry)
+    createTables(document, registry)
     root = findRoot(index)
     written: dict[int, list[tuple[int, int]]] = {}
     engine = findCalculationEngine(index)
@@ -195,7 +188,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             )
         for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
             tableInfo = index.resolve(tableReference, tst.TableInfoArchive)
-            modelArchive = index.archive(tableInfo.tableModel.identifier)
+            modelIdentifier = tableInfo.tableModel.identifier
             model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
             entry = findOwnerEntry(entries, tableReference.identifier, table.name)
 
@@ -207,7 +200,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             if maps.changed:
                 registered = listRegisteredCells(entry.dependencies)
                 plan = applyGridStructure(
-                    index, registry, owners, table, tableInfo,
+                    index, registry, table, tableInfo,
                     tableReference.identifier, model, maps,
                 )
                 remapOwnerCoordinates(
@@ -225,7 +218,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                 if reference != merge.anchor
             )
             edits = applyTableEdits(
-                index, owners, table, model, swallowed, maps, registry, plan
+                index, table, model, swallowed, maps, registry, plan
             )
             moved = applyMerges(
                 table, model, entry.dependencies.formula_owner_uid
@@ -233,16 +226,15 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             if moved or swallowed or maps.changed:
                 # A structural edit can create and remove tiles and buckets, which
                 # the model has to declare as it points at them.
-                owners[modelArchive.identifier].messageReplace(
-                    modelArchive.identifier, 0, model.SerializeToString(),
-                    registry.referencesReconcile(modelArchive, model)
+                index.archiveWrite(
+                    modelIdentifier, model,
+                    registry.referencesReconcile(modelIdentifier, model)
                     if maps.changed else None,
                 )
             # The engine's register of formula-bearing cells, which is a separate
             # fact from a cell having moved and is what makes a newly attached
             # formula evaluate at all, and recompute afterward. A structural edit
-            # moves every formula, so every one is registered afresh in one call:
-            # a second would read the tiles this one rewrote as they were.
+            # moves every formula, so every one is registered afresh.
             added = edits.formulaAdded
             removed = edits.formulaRemoved
             if maps.changed:
@@ -261,7 +253,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
                     edits.written + sorted(moved) + recalculated
                 )
 
-    requestRecalculation(index, owners, written)
+    requestRecalculation(index, written)
     registry.save()
     return sum(len(cells) for cells in written.values())
 

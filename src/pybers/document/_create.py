@@ -10,6 +10,7 @@ background is the document's own sheet style, because Numbers can make no sheet
 without one. See docs/decisions.md.
 
 UPDATES
+2026-09-22  Created on the save's one index, for PYB-109.
 2026-09-14  Written for PYB-63.
 """
 from __future__ import annotations
@@ -30,10 +31,11 @@ from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import NumbersPackage, createArchive
-from .._persistence.index import ArchiveIndex, documentTypeId, findRoot
+from .._persistence import createArchive
+from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.metadata import PackageRegistry, documentComponentId
 from .._persistence.template import ArchiveTemplate, copyTemplates, readTemplates
+from .._persistence.types import documentTypeId
 from ..errors import WriteError
 from .sheets import Document, Sheet
 
@@ -125,20 +127,18 @@ def createSidebarNode(registry: PackageRegistry, sheetIdentifier: int) -> int:
     node = tsk.TreeNode()
     node.object.identifier = sheetIdentifier
     registry.archiveAdd(
-        documentComponentId, createArchive(info, [node.SerializeToString()])
+        documentComponentId, createArchive(info, [node.SerializeToString()]), node
     )
     return identifier
 
 
-def createSheets(
-    document: Document, package: NumbersPackage, registry: PackageRegistry
-) -> None:
+def createSheets(document: Document, registry: PackageRegistry) -> None:
     """Create every sheet the model gained, and list each where the model has it.
 
     A sheet removed or moved is refused before anything is written, since neither
     is supported. The tables a created sheet holds are created afterward.
     """
-    index = ArchiveIndex(package)
+    index = registry.index
     root = findRoot(index)
     stored = [reference.identifier for reference in root.sheets]
     kept = [
@@ -187,14 +187,14 @@ def createSheets(
     rootReferences.extend(
         identifier for identifier in order if identifier not in rootReferences
     )
-    registry.archiveReplace(rootIdentifier, root.SerializeToString(), rootReferences)
+    registry.archiveReplace(rootIdentifier, root, rootReferences)
 
     del sidebar.children[:]
     for identifier in order:
         sidebar.children.add(identifier=nodeFor[identifier])
     registry.archiveReplace(
         root.sidebar_order.identifier,
-        sidebar.SerializeToString(),
+        sidebar,
         [nodeFor[identifier] for identifier in order],
     )
 

@@ -43,7 +43,8 @@ from pybers._persistence.cells import (
     findFormulaKeySlot,
     listReferenceSlots,
 )
-from pybers._persistence.index import ArchiveIndex, findRoot, tableInfoTypeId
+from pybers._persistence.index import ArchiveIndex, findRoot
+from pybers._persistence.types import tableInfoTypeId
 from pybers.errors import WriteError
 from pybers.table._write import (
     borrowShape,

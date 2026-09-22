@@ -9,6 +9,7 @@ inside it. Measured 2026-09-21 in the four `57-borders-*` documents.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Split out of `_structure` for PYB-17.
 """
 from __future__ import annotations
@@ -22,7 +23,6 @@ __status__ = "Development"
 __date__ = "2026/09/21"
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import IWAFile
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ._lines import GridMaps, LineMap, findDisplacedLine, listAddedLines
@@ -72,7 +72,6 @@ def buildStrokeRun(
 def applyStrokeLayers(
     index: ArchiveIndex,
     registry: PackageRegistry,
-    owners: dict[int, IWAFile],
     sidecar: tst.StrokeSidecarArchive,
     maps: GridMaps,
 ) -> None:
@@ -112,18 +111,14 @@ def applyStrokeLayers(
                 copied.CopyFrom(stored[displaced][1])
             copied.row_column_index = line
             placed[line] = (
-                createSiblingArchive(
-                    registry, index, owners, sibling, copied.SerializeToString()
-                ),
+                createSiblingArchive(registry, sibling, copied),
                 copied,
             )
         for identifier, layer in placed.values():
             rewritten = mapStrokeRuns(layer, runs)
             del layer.stroke_runs[:]
             layer.stroke_runs.extend(rewritten)
-            owners[identifier].messageReplace(
-                identifier, 0, layer.SerializeToString()
-            )
+            index.archiveWrite(identifier, layer)
         del references[:]
         for line in sorted(placed):
             references.add(identifier=placed[line][0])

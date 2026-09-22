@@ -51,13 +51,14 @@ from pybers._persistence import (
     decodeRow,
     readPackage,
 )
-from pybers._persistence.index import (
-    ArchiveIndex,
+from pybers._persistence.index import ArchiveIndex, findRoot
+from pybers._persistence.types import (
+    archiveTypes,
     calculationEngineTypeId,
-    findRoot,
+    parseArchive,
+    readArchiveTypeId,
     tableInfoTypeId,
 )
-from pybers._persistence.types import archiveTypes, parseArchive, readArchiveTypeId
 from pybers.addressing import toCellReference
 from pybers.document import Document
 from pybers.document._write import writeDocument
@@ -956,8 +957,8 @@ def readFormatEntries(
 ) -> list[tuple[int, int | None]]:
     """Return one table's format list as key and kind, for asserting on references."""
     from pybers._persistence.index import ArchiveIndex
+    from pybers._persistence.types import tableInfoTypeId
     from pybers.document._read import findRoot
-    from pybers.document._write import tableInfoTypeId
 
     index = ArchiveIndex(readPackage(path))
     for reference in findRoot(index).sheets:
@@ -982,8 +983,8 @@ def readFormatEntries(
 def findTile(path: Path, tableName: str) -> tst.Tile:
     """Return the one tile of a named table, for asserting on row storage."""
     from pybers._persistence.index import ArchiveIndex
+    from pybers._persistence.types import tableInfoTypeId
     from pybers.document._read import findRoot
-    from pybers.document._write import tableInfoTypeId
 
     index = ArchiveIndex(readPackage(path))
     for reference in findRoot(index).sheets:
@@ -1116,8 +1117,8 @@ def readStringEntries(path: Path, tableName: str) -> dict[int, object]:
         readDataList,
         stringListType,
     )
+    from pybers._persistence.types import tableInfoTypeId
     from pybers.document._read import findRoot
-    from pybers.document._write import tableInfoTypeId
 
     index = ArchiveIndex(readPackage(path))
     for reference in findRoot(index).sheets:
@@ -1139,9 +1140,9 @@ def readRecordAt(
 ) -> CellRecord:
     """Return the raw cell record at an address, in the first table or a named one."""
     from pybers._persistence.index import ArchiveIndex
+    from pybers._persistence.types import tableInfoTypeId
     from pybers.addressing import toCellReference
     from pybers.document._read import findRoot
-    from pybers.document._write import tableInfoTypeId
 
     wanted = toCellReference(address)
     index = ArchiveIndex(readPackage(path))
@@ -1315,7 +1316,7 @@ def test_writingIntoAnEmptyCellLeavesTheCellItsShapeCameFrom(
 
 
 def test_aCreatedFormatEntryReachesTheFile(tmp_path: Path) -> None:
-    """`ArchiveIndex.resolve` parses afresh, so a second copy takes the edits with it.
+    """An entry added to the format list reaches the file with the key cells name.
 
     Found reviewing #61. The entry was added to a throwaway, the key came back real,
     and the cells named a format the table did not hold. Numbers accepted the golden

@@ -148,7 +148,9 @@ def testTheTileMatchesTheOneNumbersCreatedApartFromEdges(tmp_path: Path) -> None
 
 
 def testTheCreatedTileFollowsTheRegistryRules(tmp_path: Path) -> None:
-    registry = PackageRegistry(readPackage(saveWithFormulas(tmp_path)))
+    registry = PackageRegistry(
+        ArchiveIndex(readPackage(saveWithFormulas(tmp_path)))
+    )
 
     for identifier, component in registry.components.items():
         stored = {
@@ -162,7 +164,7 @@ def testTheCreatedTileFollowsTheRegistryRules(tmp_path: Path) -> None:
         for iwaFile in registry.package.iwaFiles
         if iwaFile is not registry.metadataFile
         for archive in iwaFile.archives
-        if archive.identifier not in registry.componentOf
+        if registry.componentFind(archive.identifier) is None
     ]
     assert unplaced == []
 

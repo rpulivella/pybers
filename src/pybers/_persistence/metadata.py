@@ -15,6 +15,9 @@ stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.
 
 UPDATES
+2026-09-22  Built on the save's one index, which every change passes through, and
+            an archive's component found from it rather than kept beside it, for
+            PYB-109.
 2026-09-21  An archive's declared references follow its body, for PYB-17.
 2026-09-21  An archive nothing points at any more is removed, for PYB-17.
 2026-09-14  Written for PYB-63.
@@ -34,7 +37,7 @@ from google.protobuf.message import Message
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from ..errors import PybersError
-from .container import NumbersPackage, indexPrefix, iwaSuffix
+from .container import indexPrefix, iwaSuffix
 from .index import ArchiveIndex
 from .iwa import Archive, IWAFile, createArchive
 from .types import readArchiveTypeId
@@ -60,16 +63,16 @@ class PackageRegistry:
 
     Registrations accumulate and are written by `save`, because a created archive
     may reference another created after it, and its external references can only
-    be derived once both are placed.
+    be derived once both are placed. It changes every archive through the save's
+    one index.
     """
 
-    def __init__(self, package: NumbersPackage) -> None:
-        """Find the registry, and map every archive to the component holding it."""
-        self.package = package
+    def __init__(self, index: ArchiveIndex) -> None:
+        """Find the registry, and map every member to the component it holds."""
+        self.index = index
+        self.package = index.package
         found = [
-            (iwaFile, archive)
-            for iwaFile in package.iwaFiles
-            for archive in iwaFile.archives
+            archive for archive in index.byIdentifier.values()
             if readArchiveTypeId(archive) == packageMetadataTypeId
         ]
         if len(found) != 1:
@@ -77,30 +80,41 @@ class PackageRegistry:
                 f"Expected exactly one TSP.PackageMetadata, found {len(found)}, so a "
                 "created archive would have no component to belong to."
             )
-        self.metadataFile, archive = found[0]
-        self.metadataIdentifier = archive.identifier
-        self.metadata = tspArchive.PackageMetadata()
-        self.metadata.ParseFromString(archive.messages[0].data)
+        self.metadataIdentifier = found[0].identifier
+        self.metadata = index.identifierResolve(
+            self.metadataIdentifier, tspArchive.PackageMetadata
+        )
         self.components = {
             component.identifier: component for component in self.metadata.components
         }
-        byMember = {
+        self.componentsByMember = {
             findMemberName(component.locator or component.preferred_locator):
                 component.identifier
             for component in self.metadata.components
         }
-        self.componentOf: dict[int, int] = {
-            held.identifier: byMember[iwaFile.name]
-            for iwaFile in package.iwaFiles
-            if iwaFile.name in byMember
-            for held in iwaFile.archives
-        }
         self.gained: set[int] = set()
         self.changed = False
 
+    @property
+    def metadataFile(self) -> IWAFile:
+        """Return the IWA member holding the registry itself."""
+        return self.index.owners[self.metadataIdentifier]
+
+    def componentFind(self, identifier: int) -> int | None:
+        """Return the component holding an archive, or None when none holds it."""
+        member = self.index.owners.get(identifier)
+        return None if member is None else self.componentsByMember.get(member.name)
+
+    def componentRequire(self, identifier: int) -> int:
+        """Return the component holding an archive, or refuse naming it."""
+        componentId = self.componentFind(identifier)
+        if componentId is None:
+            raise MetadataError(f"Archive {identifier} belongs to no component.")
+        return componentId
+
     def identifierAllocate(self) -> int:
         """Return an object identifier no archive in this package has used."""
-        highest = max(self.metadata.last_object_identifier, *self.componentOf)
+        highest = max(self.metadata.last_object_identifier, *self.index.byIdentifier)
         self.metadata.last_object_identifier = highest + 1
         self.changed = True
         return self.metadata.last_object_identifier
@@ -114,7 +128,9 @@ class PackageRegistry:
             findMemberName(component.locator or component.preferred_locator)
         )
 
-    def componentAdd(self, root: Archive, preferredLocator: str) -> IWAFile:
+    def componentAdd(
+        self, root: Archive, preferredLocator: str, body: Message | None = None
+    ) -> IWAFile:
         """Create a component whose root is an archive, in a member of its own.
 
         The locator carries the root's identifier, which no other member can, since
@@ -134,23 +150,22 @@ class PackageRegistry:
         component.save_token = document.save_token
         self.components[root.identifier] = component
         member = self.package.iwaFileAdd(findMemberName(locator))
-        self.archiveAdd(root.identifier, root)
+        self.componentsByMember[member.name] = root.identifier
+        self.archiveAdd(root.identifier, root, body)
         return member
 
-    def archiveAdd(self, componentId: int, archive: Archive) -> None:
-        """Place a created archive in a component's member."""
-        self.componentMember(componentId).archiveAdd(archive)
-        self.componentOf[archive.identifier] = componentId
+    def archiveAdd(
+        self, componentId: int, archive: Archive, body: Message | None = None
+    ) -> None:
+        """Place a created archive in a component's member, `body` its message."""
+        self.index.archiveAdd(self.componentMember(componentId), archive, body)
         self.gained.add(componentId)
         self.changed = True
 
     def archiveRemove(self, identifier: int) -> None:
         """Remove an archive nothing points at any more, from the member holding it."""
-        componentId = self.componentOf.get(identifier)
-        if componentId is None:
-            raise MetadataError(f"Archive {identifier} belongs to no component.")
-        self.componentMember(componentId).archiveRemove(identifier)
-        del self.componentOf[identifier]
+        componentId = self.componentRequire(identifier)
+        self.index.archiveRemove(identifier)
         self.gained.add(componentId)
         self.changed = True
 
@@ -168,34 +183,26 @@ class PackageRegistry:
         return found[0]
 
     def archiveReplace(
-        self, identifier: int, body: bytes, references: list[int] | None = None
+        self, identifier: int, body: Message, references: list[int] | None = None
     ) -> None:
         """Replace an existing archive's body, and its strong references if given.
 
         The component holding it is re-derived on `save`, since a body gaining a
         reference into another component has to be registered there.
         """
-        componentId = self.componentOf.get(identifier)
-        if componentId is None:
-            raise MetadataError(f"Archive {identifier} belongs to no component.")
-        member = self.componentMember(componentId)
-        member.messageReplace(identifier, 0, body, references)
+        componentId = self.componentRequire(identifier)
+        self.index.archiveWrite(identifier, body, references)
         self.gained.add(componentId)
         self.changed = True
 
     def strongReferencesOf(self, identifier: int) -> list[int]:
         """Return the strong references an existing archive declares."""
-        componentId = self.componentOf.get(identifier)
-        if componentId is None:
-            raise MetadataError(f"Archive {identifier} belongs to no component.")
-        for archive in self.componentMember(componentId).archives:
-            if archive.identifier == identifier:
-                info = tspArchive.ArchiveInfo()
-                info.ParseFromString(archive.infoBytes)
-                return list(info.message_infos[0].object_references)
-        raise MetadataError(f"No member holds archive {identifier}.")
+        self.componentRequire(identifier)
+        info = tspArchive.ArchiveInfo()
+        info.ParseFromString(self.index.archive(identifier).infoBytes)
+        return list(info.message_infos[0].object_references)
 
-    def referencesReconcile(self, archive: Archive, body: Message) -> list[int]:
+    def referencesReconcile(self, identifier: int, body: Message) -> list[int]:
         """Return what an archive should declare once its body points elsewhere.
 
         A reference the body gained is added, after the ones it kept in their
@@ -205,13 +212,16 @@ class PackageRegistry:
         a difference from what Numbers writes, measured 2026-09-21 against
         `27b-rows-inserted-into-a-new-tile`.
         """
+        archive = self.index.archive(identifier)
         info = tspArchive.ArchiveInfo()
         info.ParseFromString(archive.infoBytes)
         declared = list(info.message_infos[0].object_references)
         stored = type(body)()
         stored.ParseFromString(archive.messages[0].data)
         held = set(listMessageReferences(stored))
-        kept = [target for target in declared if target in self.componentOf]
+        kept = [
+            target for target in declared if self.componentFind(target) is not None
+        ]
         gained = [
             target for target in listMessageReferences(body)
             if target not in held and target not in kept
@@ -248,7 +258,7 @@ class PackageRegistry:
 
     def externalFor(self, target: int) -> tuple[int, int]:
         """Return how another component names an object, as (component, object)."""
-        targetComponent = self.componentOf.get(target)
+        targetComponent = self.componentFind(target)
         if targetComponent is None:
             raise MetadataError(
                 f"Object {target} belongs to no component, so a reference to it "
@@ -292,34 +302,25 @@ class PackageRegistry:
             for pair in sorted(self.strongReferencesDerive(componentId)):
                 self.referencePairRecord(componentId, pair, weak=False)
         self.gained.clear()
-        self.metadataFile.messageReplace(
-            self.metadataIdentifier, 0, self.metadata.SerializeToString()
-        )
+        self.index.archiveWrite(self.metadataIdentifier, self.metadata)
 
 
 def createSiblingArchive(
-    registry: PackageRegistry,
-    index: ArchiveIndex,
-    owners: dict[int, IWAFile],
-    sibling: int,
-    body: bytes,
+    registry: PackageRegistry, sibling: int, body: Message
 ) -> int:
     """Create an archive shaped like an existing one, beside it, and return its id.
 
     The sibling's archive info carries the message version and the field infos
     this library does not model, so a created archive takes it with a fresh
-    identifier rather than building one. It joins the sibling's component, and is
-    registered where the writers look archives up.
+    identifier rather than building one. It joins the sibling's component, and
+    `body` is what a later read of it returns.
     """
     info = tspArchive.ArchiveInfo()
-    info.ParseFromString(index.archive(sibling).infoBytes)
+    info.ParseFromString(registry.index.archive(sibling).infoBytes)
     info.identifier = registry.identifierAllocate()
     del info.message_infos[1:]
-    archive = createArchive(info, [body])
-    componentId = registry.componentOf[sibling]
-    registry.archiveAdd(componentId, archive)
-    owners[archive.identifier] = registry.componentMember(componentId)
-    index.byIdentifier[archive.identifier] = archive
+    archive = createArchive(info, [body.SerializeToString()])
+    registry.archiveAdd(registry.componentRequire(sibling), archive, body)
     return archive.identifier
 
 

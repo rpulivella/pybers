@@ -28,8 +28,7 @@ __date__ = "2026/09/16"
 
 from dataclasses import dataclass
 
-from pybers._persistence.index import originOffset
-from pybers.addressing.reference import CellReference
+from pybers.addressing.reference import CellReference, originOffset
 from pybers.formula.nodes import Formula, FormulaRange, FormulaReference
 
 

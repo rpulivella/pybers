@@ -14,6 +14,7 @@ that is neither is refused, since it names an object the target document may not
 have.
 
 UPDATES
+2026-09-22  A placed copy reads back as the body it was placed with, for PYB-109.
 2026-09-14  Written for PYB-63.
 """
 from __future__ import annotations
@@ -183,9 +184,11 @@ class TemplateCopies:
                 message.object_references.extend(remapped)
             archive = createArchive(info, [copy.body.SerializeToString()])
             if componentId is None:
-                registry.componentAdd(archive, component[len(newComponentPrefix):])
+                registry.componentAdd(
+                    archive, component[len(newComponentPrefix):], copy.body
+                )
             else:
-                registry.archiveAdd(componentId, archive)
+                registry.archiveAdd(componentId, archive, copy.body)
 
 
 def copyTemplates(

@@ -51,7 +51,8 @@ from .._persistence.cells import (
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128
-from .._persistence.index import ArchiveIndex, assignUuid, originOffset
+from .._persistence.index import ArchiveIndex, assignUuid
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._read import ColonTractAxis, decimalHalfFormat, readFormulaTable
 from .nodes import (

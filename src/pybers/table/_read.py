@@ -42,13 +42,13 @@ from .._persistence import CellDecodeError, chooseOffsetUnit, decodeRow
 from .._persistence.cells import CellRecord, carriesChosenFormat
 from .._persistence.index import (
     ArchiveIndex,
-    originOffset,
     readDataList,
     readUuidValue,
     richTextListType,
     stringListType,
 )
 from ..addressing import CellRange, CellReference
+from ..addressing.reference import originOffset
 from ..errors import ReadError
 from ..formula._read import readFormulaTable, resolveFormula
 from .cells import CellValue, MergeRange, Table

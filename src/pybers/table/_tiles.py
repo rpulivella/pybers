@@ -14,6 +14,7 @@ when it empties.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Split out of `_write` for PYB-17.
 """
 from __future__ import annotations
@@ -30,7 +31,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
+from .._persistence import chooseOffsetUnit, decodeRow
 from .._persistence.cells import (
     CellRecord,
     conditionalSlot,
@@ -38,9 +39,10 @@ from .._persistence.cells import (
     findSlotValue,
     offsetWidth,
 )
-from .._persistence.index import ArchiveIndex, originOffset
+from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ..addressing import CellReference
+from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._conditions import (
     ConditionalPlan,
@@ -307,7 +309,6 @@ class TileRange:
 
     index: ArchiveIndex
     registry: PackageRegistry
-    owners: dict[int, IWAFile]
     store: tst.DataStore
     tiles: dict[int, tst.Tile] = field(default_factory=dict)
 
@@ -331,8 +332,7 @@ class TileRange:
         entry = self.store.tiles.tiles.add()
         entry.tileid = tileid
         entry.tile.identifier = createSiblingArchive(
-            self.registry, self.index, self.owners, sibling.identifier,
-            created.SerializeToString(),
+            self.registry, sibling.identifier, created
         )
         self.tiles[tileid] = created
         return created
@@ -341,12 +341,11 @@ class TileRange:
 def buildTileRange(
     index: ArchiveIndex,
     registry: PackageRegistry,
-    owners: dict[int, IWAFile],
     store: tst.DataStore,
 ) -> TileRange:
     """Return a table's tiles as stored, ready to create any a moved row needs."""
     return TileRange(
-        index, registry, owners, store,
+        index, registry, store,
         {
             entry.tileid: index.resolve(entry.tile, tst.Tile)
             for entry in store.tiles.tiles
