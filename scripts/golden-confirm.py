@@ -123,7 +123,7 @@ class ExpectedCell:
     table: str
     cell: str
     value: object
-    empty: bool | None
+    empty: bool
     formula: str | None
     formatKind: str | None
     dataFormat: dict[str, str]
@@ -445,11 +445,11 @@ def readExpectedCell(path: Path, position: int, entry: dict[str, Any]) -> Expect
     """Read one [[cell]] entry, refusing an emptiness that contradicts its value."""
     label = f"cell {position}"
     checkEntryKeys(path, label, entry, expectedKeys, {"sheet", "table", "cell"})
-    empty = entry.get("empty")
-    if empty is not None and not isinstance(empty, bool):
-        raise GoldenConfirmError(
-            f"{path.name} {label}: empty {empty!r} is not a boolean")
-    if empty is not None and "value" in entry:
+    empty = entry.get("empty", False)
+    # Only true, since "not empty" would pass a cell the helper never read.
+    if "empty" in entry and empty is not True:
+        raise GoldenConfirmError(f"{path.name} {label}: empty {empty!r} is not true")
+    if empty and "value" in entry:
         raise GoldenConfirmError(f"{path.name} {label}: states both empty and a value")
     return ExpectedCell(
         sheet=entry["sheet"], table=entry["table"], cell=entry["cell"],
@@ -572,9 +572,8 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
     if expected.value is not None:
         record("value", checkValue(expected.value, value), expected.value,
                shown + repr(reading.get("formattedValue")))
-    if expected.empty is not None:
-        record("value", (value["kind"] == "empty") == expected.empty,
-               "empty" if expected.empty else "not empty",
+    if expected.empty:
+        record("value", value["kind"] == "empty", "empty",
                shown + repr(reading.get("formattedValue")))
     if expected.formula is not None:
         found = readFormulaText(reading.get("formula") or "")
@@ -591,9 +590,9 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
     return checks
 
 
-def readMerges(cellNames: list[list[str]]) -> frozenset[str]:
+def readMerges(subject: str, cellNames: list[list[str]]) -> list[str]:
     """Find each merge in Numbers' cell names, where a covered cell names its anchor."""
-    from pybers import CellRange, CellReference
+    from pybers import CellRange, CellReference, PybersError
 
     corners: dict[str, tuple[int, int]] = {}
     for row, names in enumerate(cellNames, start=1):
@@ -601,11 +600,23 @@ def readMerges(cellNames: list[list[str]]) -> frozenset[str]:
             if name != CellReference(row, column).asReference():
                 lastRow, lastColumn = corners.get(name, (row, column))
                 corners[name] = (max(lastRow, row), max(lastColumn, column))
-    return frozenset(
-        str(CellRange.fromReferences(
-            CellReference.parse(anchor), CellReference(*corner)))
-        for anchor, corner in corners.items()
-    )
+    try:
+        merges = [CellRange.fromReferences(CellReference.parse(anchor),
+                                           CellReference(*corner))
+                  for anchor, corner in corners.items()]
+    except PybersError as exc:
+        raise GoldenConfirmError(
+            f"{subject}: Numbers named a cell in a way that is not a cell reference: "
+            f"{exc}") from exc
+    return sorted((str(merge) for merge in merges), key=readMergeOrder)
+
+
+def readMergeOrder(merge: str) -> tuple[int | None, ...]:
+    """Order a merge by its rows, then its columns, rather than as text."""
+    from pybers import CellRange
+
+    extent = CellRange.parse(merge)
+    return (extent.startRow, extent.startCol, extent.endRow, extent.endCol)
 
 
 def checkTable(expected: ExpectedTable, reading: dict[str, Any]) -> list[Check]:
@@ -623,8 +634,9 @@ def checkTable(expected: ExpectedTable, reading: dict[str, Any]) -> list[Check]:
         detail += "" if passed else f", expected {wanted}"
         checks.append(Check("passed" if passed else "failed", subject, detail))
     if expected.merges is not None:
-        found = readMerges(reading["cellNames"])
-        for merge in sorted(expected.merges | found):
+        found = readMerges(subject, reading["cellNames"])
+        unexpected = [merge for merge in found if merge not in expected.merges]
+        for merge in [*sorted(expected.merges, key=readMergeOrder), *unexpected]:
             if merge not in found:
                 checks.append(Check("failed", subject, f"{merge} is not merged"))
             elif merge not in expected.merges:
