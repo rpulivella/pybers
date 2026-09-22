@@ -11,6 +11,7 @@
 //
 // UPDATES
 // 2026-09-22  Reads a table's size and cell names, and names a closed Numbers, for PYB-111.
+// 2026-09-22  Waits for the Data Format section and for a capture stream to recover.
 // 2026-09-17  Written for PYB-94.
 
 import AppKit
@@ -30,6 +31,9 @@ let connectionInvalidError = -609
 let processNotFoundError: OSStatus = -600
 let quitTimeoutSeconds = 10
 let retryPauseSeconds = 0.5
+// A capture stream that failed to start stayed failed through 11 s of 0.5 s retries, 2026-09-22.
+let streamRetryPauseSeconds = 2.0
+let streamStartFailedError = -3811
 // The Numbers this run launched, which the deadline force-quits because nothing else will.
 nonisolated(unsafe) var numbersLaunchedByRun: NSRunningApplication?
 // The four-character code AppleScript uses for missing value, which Swift does not import.
@@ -466,20 +470,39 @@ func openCellTab(in window: AXUIElement) throws {
     Thread.sleep(forTimeInterval: 0.5)
 }
 
-func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
-    let elements = collectElements(window)
-    // The format-kind popup sits before its own "Data Format" heading, so the walk starts at the tabs.
+// The format-kind popup sits before its own "Data Format" heading, so the walk starts at the tabs.
+func findDataFormatStart(_ elements: [AXUIElement]) -> Int? {
     guard let start = elements.firstIndex(where: {
         readText($0, kAXRoleAttribute) == kAXRadioButtonRole
             && readText($0, kAXDescriptionAttribute) == "Arrange"
     }), elements[start...].contains(where: {
         readText($0, kAXRoleAttribute) == kAXStaticTextRole
             && readText($0, kAXValueAttribute) == "Data Format"
-    }) else {
+    }) else { return nil }
+    return start
+}
+
+// The Cell tab can fill in after its press returns, so its section is awaited rather than assumed.
+func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
+    var elements = collectElements(window)
+    var rereads = 0
+    while findDataFormatStart(elements) == nil, rereads < windowAttempts {
+        Thread.sleep(forTimeInterval: retryPauseSeconds)
+        rereads += 1
+        elements = collectElements(window)
+    }
+    if rereads > 0 { writeLog("Data Format section read again \(rereads) times") }
+    guard let start = findDataFormatStart(elements) else {
+        if let locked = findSessionProblems().first { throw HelperFailure(problem: locked) }
+        let texts = elements.filter { readText($0, kAXRoleAttribute) == kAXStaticTextRole }
+            .map { readText($0, kAXValueAttribute) }.filter { !$0.isEmpty }
+        writeLog("no Data Format section; the window's texts begin " + texts.prefix(20).joined(separator: " | "))
+        // The Cell tab was found by its English name, so a missing section is not a language problem.
         throw HelperFailure(problem: HelperProblem(
-            kind: "language",
-            detail: "the Cell tab shows no Data Format section",
-            remedy: "set Numbers to English, then rerun"))
+            kind: "inspector",
+            detail: "the Cell tab showed no Data Format section within "
+                + "\(Int(Double(windowAttempts) * retryPauseSeconds)) seconds",
+            remedy: "rerun, then read helper.log"))
     }
     var section: [InspectorElement] = []
     for element in elements[(start + 1)...] {
@@ -515,9 +538,10 @@ func readFrame(_ element: AXUIElement) -> CGRect? {
 
 // Captured at the display's own pixels and kept lossless, so graphical detail stays sharp.
 // ScreenCaptureKit captures one window whether it is hidden or covered, which `screencapture -l` cannot.
-func captureWindowImage(id windowId: Int) -> (CGImage?, String) {
+func captureWindowImage(id windowId: Int) -> (CGImage?, String, Bool) {
     var image: CGImage?
     var said = ""
+    var streamFailed = false
     let done = DispatchSemaphore(value: 0)
     SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: false) { content, error in
         guard let window = content?.windows.first(where: { Int($0.windowID) == windowId }) else {
@@ -534,11 +558,14 @@ func captureWindowImage(id windowId: Int) -> (CGImage?, String) {
         SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { captured, error in
             image = captured
             said = error.map { "\($0)" } ?? "window on screen \(window.isOnScreen)"
+            streamFailed = (error as NSError?).map {
+                $0.domain == SCStreamErrorDomain && $0.code == streamStartFailedError
+            } ?? false
             done.signal()
         }
     }
     done.wait()
-    return (image, said)
+    return (image, said, streamFailed)
 }
 
 func captureWindow(
@@ -546,11 +573,12 @@ func captureWindow(
 ) throws {
     var captured: CGImage?
     var said = ""
+    var streamFailed = false
     // A window not yet drawn captures on a later try.
     for _ in 0..<windowAttempts {
-        (captured, said) = captureWindowImage(id: windowId)
+        (captured, said, streamFailed) = captureWindowImage(id: windowId)
         if captured != nil { break }
-        Thread.sleep(forTimeInterval: retryPauseSeconds)
+        Thread.sleep(forTimeInterval: streamFailed ? streamRetryPauseSeconds : retryPauseSeconds)
     }
     let counts = countNumbersWindows(pid: pid)
     let hidden = NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
