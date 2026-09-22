@@ -45,6 +45,26 @@ class LineMap:
             line != moved for line, moved in enumerate(self.lines)
         )
 
+    @property
+    def growth(self) -> int:
+        """Return how many lines the edit added, less how many it removed."""
+        return self.count - len(self.lines)
+
+    def spanCut(self, begin: int, end: int) -> bool:
+        """Report whether the edit removes a line of a span or adds one inside it.
+
+        A line added before the span's first line moves the whole span, and one
+        added after its last line leaves it alone, so neither cuts it.
+        """
+        if any(self.lineMap(line) is None for line in range(begin, end + 1)):
+            return True
+        return any(
+            begin < (len(self.lines) if displaced is None else displaced) <= end
+            for displaced in (
+                findDisplacedLine(self, added) for added in listAddedLines(self)
+            )
+        )
+
     def lineMap(self, line: int) -> int | None:
         """Return where one stored line lands, or None when it was removed."""
         return self.lines[line] if line < len(self.lines) else None

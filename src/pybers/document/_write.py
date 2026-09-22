@@ -49,10 +49,12 @@ from .._engine import (
     TableOwner,
     findCalculationEngine,
     findOwnerEntry,
+    listRegisteredCells,
     readTableIdentities,
     readTableOwnerEntries,
     readTableOwnerIds,
     registerFormulaCells,
+    remapOwnerCoordinates,
     requestRecalculation,
 )
 from .._generated import TNArchives_pb2 as tn
@@ -72,12 +74,7 @@ from ..errors import WriteError
 from ..formula.precedents import resolveFormulaPrecedents
 from ..table._create import createTables
 from ..table._lines import buildGridMaps
-from ..table._structure import (
-    applyGridStructure,
-    listModelFormulas,
-    listRegisteredFormulas,
-    remapOwnerCoordinates,
-)
+from ..table._structure import applyGridStructure, listModelFormulas
 from ..table._write import applyMerges, applyTableEdits, findAddedMerges
 from ..table.cells import Table
 from ._create import createSheets
@@ -208,12 +205,14 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
             registered: list[tuple[int, int]] = []
             plan = None
             if maps.changed:
-                registered = listRegisteredFormulas(entry.dependencies)
+                registered = listRegisteredCells(entry.dependencies)
                 plan = applyGridStructure(
                     index, registry, owners, table, tableInfo,
                     tableReference.identifier, model, maps,
                 )
-                remapOwnerCoordinates(entry.dependencies, table, maps)
+                remapOwnerCoordinates(
+                    entry.dependencies, maps.rows, maps.columns, table.name
+                )
 
             # Only a merge being ADDED clears its covered positions. One already
             # in the file may carry a style-only record at each of them, which an
