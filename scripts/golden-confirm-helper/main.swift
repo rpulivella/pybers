@@ -10,6 +10,8 @@
 // and the only values a request places into one are paths and cell names it escapes.
 //
 // UPDATES
+// 2026-09-22  Reads a table's size and cell names, and names a closed Numbers, for PYB-111.
+// 2026-09-22  Waits for the Data Format section and for a capture stream to recover.
 // 2026-09-17  Written for PYB-94.
 
 import AppKit
@@ -25,8 +27,13 @@ let appleScriptTimeoutSeconds = 60
 let windowAttempts = 20
 let otherDesktopAttempts = 3
 let connectionInvalidError = -609
+// What Automation's permission check answers for an app that is not running.
+let processNotFoundError: OSStatus = -600
 let quitTimeoutSeconds = 10
 let retryPauseSeconds = 0.5
+// A capture stream that failed to start stayed failed through 11 s of 0.5 s retries, 2026-09-22.
+let streamRetryPauseSeconds = 2.0
+let streamStartFailedError = -3811
 // The Numbers this run launched, which the deadline force-quits because nothing else will.
 nonisolated(unsafe) var numbersLaunchedByRun: NSRunningApplication?
 // The four-character code AppleScript uses for missing value, which Swift does not import.
@@ -45,6 +52,11 @@ struct CellAddress: Codable {
     let cell: String
 }
 
+struct TableAddress: Codable {
+    let sheet: String
+    let table: String
+}
+
 struct HelperRequest: Codable {
     let operation: HelperOperation
     let resultPath: String
@@ -53,6 +65,7 @@ struct HelperRequest: Codable {
     var savedCopyPath: String?
     var captureDirectory: String?
     var cells: [CellAddress]?
+    var tables: [TableAddress]?
     var maxCaptures: Int?
     var freshNumbers: Bool?
 }
@@ -85,6 +98,14 @@ struct CellReading: Codable {
     var inspectorCapture: String?
 }
 
+// A covered cell answers with its anchor's name, which is how the script finds merges.
+struct TableReading: Codable {
+    let address: TableAddress
+    let rowCount: Int
+    let columnCount: Int
+    let cellNames: [[String]]
+}
+
 struct SheetCapture: Codable {
     let sheet: String
     let path: String
@@ -99,6 +120,7 @@ struct HelperResult: Codable {
     var openOutcome: String?
     var alertText: [String] = []
     var cells: [CellReading] = []
+    var tables: [TableReading] = []
     var sheetCaptures: [SheetCapture] = []
     var savedCopy: Bool?
 }
@@ -170,18 +192,30 @@ func findGrantProblems() -> [HelperProblem] {
     return problems
 }
 
-func checkAutomationPermission() throws {
+func findAutomationProblem() -> HelperProblem? {
     let target = NSAppleEventDescriptor(bundleIdentifier: numbersBundleIdentifier)
     // Asking is the only way macOS offers to grant Automation; Settings cannot add it.
     let status = AEDeterminePermissionToAutomateTarget(
         target.aeDesc, typeWildCard, typeWildCard, true)
-    guard status == noErr else {
-        throw HelperFailure(problem: HelperProblem(
+    switch status {
+    case noErr:
+        return nil
+    case processNotFoundError:
+        return HelperProblem(
+            kind: "numbersNotRunning",
+            detail: "Numbers is not running, so whether the helper may control it is unknown",
+            remedy: "open Numbers, then rerun")
+    default:
+        return HelperProblem(
             kind: "automation",
             detail: "pybersdev-golden-confirm may not control Numbers (status \(status))",
             remedy: "System Settings, Privacy & Security, Automation: enable Numbers "
-                + "under pybersdev-golden-confirm"))
+                + "under pybersdev-golden-confirm")
     }
+}
+
+func checkAutomationPermission() throws {
+    if let problem = findAutomationProblem() { throw HelperFailure(problem: problem) }
 }
 
 // A damaged golden can crash Numbers, which would take unsaved work in other documents with it.
@@ -436,20 +470,39 @@ func openCellTab(in window: AXUIElement) throws {
     Thread.sleep(forTimeInterval: 0.5)
 }
 
-func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
-    let elements = collectElements(window)
-    // The format-kind popup sits before its own "Data Format" heading, so the walk starts at the tabs.
+// The format-kind popup sits before its own "Data Format" heading, so the walk starts at the tabs.
+func findDataFormatStart(_ elements: [AXUIElement]) -> Int? {
     guard let start = elements.firstIndex(where: {
         readText($0, kAXRoleAttribute) == kAXRadioButtonRole
             && readText($0, kAXDescriptionAttribute) == "Arrange"
     }), elements[start...].contains(where: {
         readText($0, kAXRoleAttribute) == kAXStaticTextRole
             && readText($0, kAXValueAttribute) == "Data Format"
-    }) else {
+    }) else { return nil }
+    return start
+}
+
+// The Cell tab can fill in after its press returns, so its section is awaited rather than assumed.
+func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
+    var elements = collectElements(window)
+    var rereads = 0
+    while findDataFormatStart(elements) == nil, rereads < windowAttempts {
+        Thread.sleep(forTimeInterval: retryPauseSeconds)
+        rereads += 1
+        elements = collectElements(window)
+    }
+    if rereads > 0 { writeLog("Data Format section read again \(rereads) times") }
+    guard let start = findDataFormatStart(elements) else {
+        if let locked = findSessionProblems().first { throw HelperFailure(problem: locked) }
+        let texts = elements.filter { readText($0, kAXRoleAttribute) == kAXStaticTextRole }
+            .map { readText($0, kAXValueAttribute) }.filter { !$0.isEmpty }
+        writeLog("no Data Format section; the window's texts begin " + texts.prefix(20).joined(separator: " | "))
+        // The Cell tab was found by its English name, so a missing section is not a language problem.
         throw HelperFailure(problem: HelperProblem(
-            kind: "language",
-            detail: "the Cell tab shows no Data Format section",
-            remedy: "set Numbers to English, then rerun"))
+            kind: "inspector",
+            detail: "the Cell tab showed no Data Format section within "
+                + "\(Int(Double(windowAttempts) * retryPauseSeconds)) seconds",
+            remedy: "rerun, then read helper.log"))
     }
     var section: [InspectorElement] = []
     for element in elements[(start + 1)...] {
@@ -485,9 +538,10 @@ func readFrame(_ element: AXUIElement) -> CGRect? {
 
 // Captured at the display's own pixels and kept lossless, so graphical detail stays sharp.
 // ScreenCaptureKit captures one window whether it is hidden or covered, which `screencapture -l` cannot.
-func captureWindowImage(id windowId: Int) -> (CGImage?, String) {
+func captureWindowImage(id windowId: Int) -> (CGImage?, String, Bool) {
     var image: CGImage?
     var said = ""
+    var streamFailed = false
     let done = DispatchSemaphore(value: 0)
     SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: false) { content, error in
         guard let window = content?.windows.first(where: { Int($0.windowID) == windowId }) else {
@@ -504,11 +558,14 @@ func captureWindowImage(id windowId: Int) -> (CGImage?, String) {
         SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { captured, error in
             image = captured
             said = error.map { "\($0)" } ?? "window on screen \(window.isOnScreen)"
+            streamFailed = (error as NSError?).map {
+                $0.domain == SCStreamErrorDomain && $0.code == streamStartFailedError
+            } ?? false
             done.signal()
         }
     }
     done.wait()
-    return (image, said)
+    return (image, said, streamFailed)
 }
 
 func captureWindow(
@@ -516,11 +573,12 @@ func captureWindow(
 ) throws {
     var captured: CGImage?
     var said = ""
+    var streamFailed = false
     // A window not yet drawn captures on a later try.
     for _ in 0..<windowAttempts {
-        (captured, said) = captureWindowImage(id: windowId)
+        (captured, said, streamFailed) = captureWindowImage(id: windowId)
         if captured != nil { break }
-        Thread.sleep(forTimeInterval: retryPauseSeconds)
+        Thread.sleep(forTimeInterval: streamFailed ? streamRetryPauseSeconds : retryPauseSeconds)
     }
     let counts = countNumbersWindows(pid: pid)
     let hidden = NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
@@ -574,6 +632,7 @@ func formatCaptureName(_ parts: [String]) -> String {
 func runPermissionsCheck(_ request: HelperRequest) -> HelperResult {
     var result = HelperResult(sourceHash: readSourceHash(), operation: request.operation.rawValue)
     result.problems = findSessionProblems() + findGrantProblems()
+    if let automation = findAutomationProblem() { result.problems.append(automation) }
     return result
 }
 
@@ -715,8 +774,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         result.numbersVersion = try? runAppleScript("get version").stringValue
         try inspectDocument(
             documentPath: documentPath, savedCopyPath: savedCopyPath,
-            captureDirectory: captureDirectory, cells: cells, sheets: sheets,
-            numbers: numbers, result: &result)
+            captureDirectory: captureDirectory, cells: cells, tables: request.tables ?? [],
+            sheets: sheets, numbers: numbers, result: &result)
     } catch let failure as HelperFailure {
         result.problems.append(failure.problem)
     } catch let failure as AppleScriptError {
@@ -733,8 +792,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
 
 func inspectDocument(
     documentPath: String, savedCopyPath: String, captureDirectory: String,
-    cells: [CellAddress], sheets: [String], numbers: NSRunningApplication,
-    result: inout HelperResult
+    cells: [CellAddress], tables: [TableAddress], sheets: [String],
+    numbers: NSRunningApplication, result: inout HelperResult
 ) throws {
     let documentId: String
     let existingWindows = readNumbersWindows(pid: numbers.processIdentifier)
@@ -830,6 +889,10 @@ func inspectDocument(
         result.cells.append(reading)
     }
 
+    for address in tables {
+        result.tables.append(try readTable(address, documentId: documentId))
+    }
+
     _ = try runAppleScript("save \(document) in (POSIX file \(quoteAppleScript(savedCopyPath)))")
     result.savedCopy = FileManager.default.fileExists(atPath: savedCopyPath)
 }
@@ -859,6 +922,26 @@ func findDocumentWindow(documentId: String, pid: pid_t) throws -> (Int32, AXUIEl
         kind: "window",
         detail: "the opened document's window \(seen.isEmpty ? "never appeared" : "'\(seen)' was not reachable through Accessibility")",
         remedy: "keep the Numbers window out of full screen and not minimized, then rerun"))
+}
+
+// Row by row, so each name's position in the grid is explicit rather than inferred from order.
+func readTable(_ address: TableAddress, documentId: String) throws -> TableReading {
+    let facts = try runAppleScript(
+        "set t to table \(quoteAppleScript(address.table)) of sheet \(quoteAppleScript(address.sheet)) "
+            + "of document id \(quoteAppleScript(documentId))\n"
+            + "set names to {}\n"
+            + "repeat with r in rows of t\n"
+            + "set end of names to name of cells of r\n"
+            + "end repeat\n"
+            + "return {row count of t, column count of t, names}")
+    let rows = facts.atIndex(3)
+    let cellNames = (0..<(rows?.numberOfItems ?? 0)).map { row in
+        let names = rows?.atIndex(row + 1)
+        return (0..<(names?.numberOfItems ?? 0)).map { names?.atIndex($0 + 1)?.stringValue ?? "" }
+    }
+    return TableReading(
+        address: address, rowCount: Int(facts.atIndex(1)?.int32Value ?? 0),
+        columnCount: Int(facts.atIndex(2)?.int32Value ?? 0), cellNames: cellNames)
 }
 
 func selectCell(_ address: CellAddress, documentId: String) throws {

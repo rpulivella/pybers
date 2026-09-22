@@ -79,7 +79,7 @@ table = "Table 1"
 cell = "F11"
 value = 33
 formula = "=SUM(C10:H10)"
-qa = ["merges read C1:D1, C2:D3, D5:F5 and F7:G7, and merge C8:D8 is gone with its row", "row 8 and column H are hidden"]
+qa = ["row 8 and column H are hidden"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -101,3 +101,17 @@ table = "Table 2"
 cell = "A3"
 value = 7
 formula = "=Table 1::G10"
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 1"
+rows = 11
+columns = 8
+merges = ["C1:D1", "C2:D3", "D5:F5", "F7:G7"]
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 2"
+rows = 3
+columns = 1
+merges = []

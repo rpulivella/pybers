@@ -8,7 +8,7 @@ table = "Table 1"
 cell = "B1"
 value = 55
 formula = "=SUM(A1:A11)"
-qa = ["rows 1 and 2 are unchanged and row 3 is new and empty"]
+qa = ["rows 1 and 2 are unchanged"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -93,7 +93,7 @@ table = "Table 1"
 cell = "F13"
 value = 33
 formula = "=SUM(C12:H12)"
-qa = ["merges read C1:D1, C2:D4, C9:D9, D6:F6 and F8:G8, each anchor naming its original extent", "row 10 and column H are hidden, so the row numbers skip 10 and the letters skip H"]
+qa = ["row 10 and column H are hidden, so the row numbers skip 10 and the letters skip H"]
 
 [[cell]]
 sheet = "Sheet 1"
@@ -115,3 +115,53 @@ table = "Table 2"
 cell = "A3"
 value = 7
 formula = "=Table 1::G12"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A3"
+empty = true
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B3"
+empty = true
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E3"
+empty = true
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F3"
+empty = true
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G3"
+empty = true
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H3"
+empty = true
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 1"
+rows = 13
+columns = 8
+merges = ["C1:D1", "C2:D4", "C9:D9", "D6:F6", "F8:G8"]
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 2"
+rows = 3
+columns = 1
+merges = []

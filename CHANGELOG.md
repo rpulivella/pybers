@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-111] Check table size, merges and empty cells in golden-confirm
 - [PYB-109] Read an archive as last written within one save
 - [PYB-17] Add and delete rows and columns
 - [PYB-76] Report merge readiness as one comment on the pull request
