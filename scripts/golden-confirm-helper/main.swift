@@ -25,6 +25,8 @@ let appleScriptTimeoutSeconds = 60
 let windowAttempts = 20
 let otherDesktopAttempts = 3
 let connectionInvalidError = -609
+// What Automation's permission check answers for an app that is not running.
+let processNotFoundError: OSStatus = -600
 let quitTimeoutSeconds = 10
 let retryPauseSeconds = 0.5
 // The Numbers this run launched, which the deadline force-quits because nothing else will.
@@ -170,18 +172,30 @@ func findGrantProblems() -> [HelperProblem] {
     return problems
 }
 
-func checkAutomationPermission() throws {
+func findAutomationProblem() -> HelperProblem? {
     let target = NSAppleEventDescriptor(bundleIdentifier: numbersBundleIdentifier)
     // Asking is the only way macOS offers to grant Automation; Settings cannot add it.
     let status = AEDeterminePermissionToAutomateTarget(
         target.aeDesc, typeWildCard, typeWildCard, true)
-    guard status == noErr else {
-        throw HelperFailure(problem: HelperProblem(
+    switch status {
+    case noErr:
+        return nil
+    case processNotFoundError:
+        return HelperProblem(
+            kind: "numbersNotRunning",
+            detail: "Numbers is not running, so whether the helper may control it is unknown",
+            remedy: "open Numbers, then rerun")
+    default:
+        return HelperProblem(
             kind: "automation",
             detail: "pybersdev-golden-confirm may not control Numbers (status \(status))",
             remedy: "System Settings, Privacy & Security, Automation: enable Numbers "
-                + "under pybersdev-golden-confirm"))
+                + "under pybersdev-golden-confirm")
     }
+}
+
+func checkAutomationPermission() throws {
+    if let problem = findAutomationProblem() { throw HelperFailure(problem: problem) }
 }
 
 // A damaged golden can crash Numbers, which would take unsaved work in other documents with it.
@@ -574,6 +588,7 @@ func formatCaptureName(_ parts: [String]) -> String {
 func runPermissionsCheck(_ request: HelperRequest) -> HelperResult {
     var result = HelperResult(sourceHash: readSourceHash(), operation: request.operation.rawValue)
     result.problems = findSessionProblems() + findGrantProblems()
+    if let automation = findAutomationProblem() { result.problems.append(automation) }
     return result
 }
 

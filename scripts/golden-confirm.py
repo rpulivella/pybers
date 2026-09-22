@@ -85,6 +85,8 @@ expectedSuffix: str = ".expected.toml"
 expectedKeys: frozenset[str] = frozenset({
     "sheet", "table", "cell", "value", "formula", "format", "dataFormat", "qa",
 })
+# A run launches a closed Numbers itself, so its permissions check does not refuse one.
+numbersNotRunningKind: str = "numbersNotRunning"
 maxCaptures: int = 40
 damageCheckGolden: str = "11-text-written-and-retyped.numbers"
 quickLookScale: float = 3.0
@@ -339,6 +341,15 @@ def checkPermissions() -> list[HelperProblem]:
     return readProblems(result)
 
 
+def checkHelperCanRun() -> None:
+    """Refuse a run the helper cannot make, allowing a closed Numbers it launches."""
+    problems = [p for p in checkPermissions() if p.kind != numbersNotRunningKind]
+    if problems:
+        raise GoldenConfirmError("the helper cannot run:\n" + "\n".join(
+            f"  {p.kind}: {p.detail}. {p.remedy}" for p in problems
+        ))
+
+
 def findGolden(argument: str) -> Path:
     """Resolve a golden named on the command line, refusing one outside tests/golden."""
     candidate = Path(argument)
@@ -566,11 +577,7 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
     """Drive the helper over one golden, with the display held awake around it."""
     expectedCells = readExpectedCells(golden)
     outputDirectory = run.outputDirectory
-    problems = checkPermissions()
-    if problems:
-        raise GoldenConfirmError("the helper cannot run:\n" + "\n".join(
-            f"  {p.kind}: {p.detail}. {p.remedy}" for p in problems
-        ))
+    checkHelperCanRun()
     if outputDirectory.exists():
         shutil.rmtree(outputDirectory)
     outputDirectory.mkdir(parents=True)
@@ -739,11 +746,7 @@ def writeDamagedCopies(golden: Path, work: Path) -> dict[str, Path]:
 def checkDamagedCopies(golden: Path) -> list[Check]:
     """Open each damaged copy and check that the run fails and says why (AC 3)."""
     ticket = readTicketKey()
-    problems = checkPermissions()
-    if problems:
-        raise GoldenConfirmError("the helper cannot run:\n" + "\n".join(
-            f"  {p.kind}: {p.detail}. {p.remedy}" for p in problems
-        ))
+    checkHelperCanRun()
     outputDirectory = reportRoot / ticket / "damage-check"
     if outputDirectory.exists():
         shutil.rmtree(outputDirectory)
