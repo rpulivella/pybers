@@ -13,6 +13,8 @@ knows what every formula reads.
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-09-22  Nothing is imported from table creation: the UID map is written by `_lines`,
+            for PYB-113.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Line maps and borders moved to `_lines` and `_strokes`.
 2026-09-18  Written for PYB-17.
@@ -35,10 +37,10 @@ from .._persistence.index import ArchiveIndex, readUuidValue
 from .._persistence.metadata import PackageRegistry
 from ..addressing.reference import originOffset
 from ._conditions import ConditionalPlan, buildConditionalPlan
-from ._create import assignUids
 from ._lines import (
     GridMaps,
     LineMap,
+    assignUids,
     findDisplacedLine,
     listAddedLines,
 )

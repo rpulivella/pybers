@@ -14,6 +14,8 @@ wrote them, and every text slot names `pybers-base`, the named paragraph style o
 `53-paragraph-style-named`, created once per document and found again by name.
 
 UPDATES
+2026-09-22  The UID map is written by `_lines`, as a structural edit writes it, for
+            PYB-113.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Created on the save's one index, for PYB-109.
 2026-09-14  Written for PYB-63.
@@ -64,6 +66,7 @@ from .._persistence.template import (
 from .._persistence.types import findArchiveTypeId, readArchiveTypeId
 from ..errors import WriteError
 from ..geometry import Position
+from ._lines import assignUids
 from .cells import Table, generateOwnerIdentity
 
 if TYPE_CHECKING:
@@ -192,29 +195,6 @@ def remapOwnerIds(message: Message, mapping: dict[int, int]) -> None:
         items = list(value) if descriptor.is_repeated else [value]
         for item in items:
             remapOwnerIds(item, mapping)
-
-
-def assignUids(uidMap: tst.ColumnRowUIDMapArchive, table: Table) -> None:
-    """Write a table's row and column identities, in the order Numbers keeps.
-
-    The UIDs are sorted by value, upper half first, and each index list is the
-    permutation between that order and the table's own. Measured from `48`.
-    """
-    for axis, uids in (
-        ("column", table._columnIdentities), ("row", table._rowIdentities)
-    ):
-        ordered = sorted(range(len(uids)), key=lambda position: uids[position])
-        sortedField = getattr(uidMap, f"sorted_{axis}_uids")
-        indexForUid = getattr(uidMap, f"{axis}_index_for_uid")
-        uidForIndex = getattr(uidMap, f"{axis}_uid_for_index")
-        del sortedField[:]
-        del indexForUid[:]
-        del uidForIndex[:]
-        for position in ordered:
-            assignUuid(sortedField.add(), uids[position])
-        indexForUid.extend(ordered)
-        rank = {position: slot for slot, position in enumerate(ordered)}
-        uidForIndex.extend(rank[position] for position in range(len(uids)))
 
 
 @dataclass(frozen=True, slots=True)
