@@ -12,6 +12,8 @@ its first rows when a row goes in at 10. A reference whose lines are all removed
 becomes `#REF!` and records the lines it lost, as Numbers does.
 
 UPDATES
+2026-09-21  Both axes follow a mapping, so several edits combined are followed
+            too, which is what the archive half holds, for PYB-17.
 2026-09-18  Written for PYB-17.
 """
 from __future__ import annotations
@@ -27,7 +29,7 @@ __date__ = "2026/09/18"
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from pybers.addressing.lines import GridEdit
+from pybers.addressing.lines import LineMapping
 from pybers.addressing.reference import CellReference
 from pybers.formula.nodes import (
     Coordinate,
@@ -43,15 +45,17 @@ from pybers.formula.nodes import (
 
 @dataclass(frozen=True, slots=True)
 class FormulaRestructure:
-    """One structural edit, as a formula anywhere in the document has to see it.
+    """A structural change to one table, as a formula anywhere has to see it.
 
-    `hostEdited` says the formula lives in the edited table, and `targetTable`
-    names that table the way a reference does, so a local reference matches it
-    only from inside. The identities are the edited table's lines
-    before the edit, which is what a broken reference records.
+    `rows` and `columns` say where each line of the edited table lands, one edit
+    or several combined. `hostEdited` says the formula lives in that table, and
+    `targetTable` names it the way a reference does, so a local reference matches
+    it only from inside. The identities are its lines before the change, which is
+    what a broken reference records.
     """
 
-    edit: GridEdit
+    rows: LineMapping
+    columns: LineMapping
     hostEdited: bool
     hostIdentity: str
     targetTable: str
@@ -102,11 +106,18 @@ def mapFormulaNode(
     return FormulaNode(node.nodeType, moved, node.raw)
 
 
-def mapHostLine(line: int, change: FormulaRestructure) -> int:
+class LineLost:
+    """The marker for a line an edit removed, as against one it left in place."""
+
+
+lineLost: LineLost = LineLost()
+
+
+def mapHostLine(line: int, lines: LineMapping, change: FormulaRestructure) -> int:
     """Return where the formula's own row or column lands."""
     if not change.hostEdited:
         return line
-    moved = change.edit.lineMap(line)
+    moved = lines.lineMap(line)
     if moved is None:
         raise RuntimeError(
             f"Line {line} is removed, and a removed cell has no formula to move."
@@ -114,57 +125,81 @@ def mapHostLine(line: int, change: FormulaRestructure) -> int:
     return moved
 
 
+def mapCoordinate(
+    coordinate: Coordinate | None,
+    hostLine: int,
+    lines: LineMapping,
+    reaches: bool,
+    change: FormulaRestructure,
+) -> Coordinate | LineLost | None:
+    """Return one axis of a reference after the change, or `lineLost`.
+
+    The axis is resolved to a real line, that line is mapped when the reference
+    reaches the changed table, and the result is stored in the form it came in.
+    """
+    if coordinate is None:
+        return None
+    target = coordinate.resolve(hostLine)
+    if reaches:
+        mapped = lines.lineMap(target)
+        if mapped is None:
+            return lineLost
+        target = mapped
+    newHost = mapHostLine(hostLine, lines, change)
+    value = target if coordinate.absolute else target - newHost
+    if value == coordinate.value:
+        return coordinate
+    return Coordinate(value, coordinate.absolute)
+
+
 def mapFormulaReference(
     reference: FormulaReference, host: CellReference, change: FormulaRestructure
 ) -> FormulaReference | None:
-    """Return a single-cell reference after the edit, None when its cell is gone."""
-    edit = change.edit
-    coordinate = reference.row if edit.rows else reference.column
-    if coordinate is None:
+    """Return a single-cell reference after the change, None when its cell is gone."""
+    reaches = change.targets(reference.tableId)
+    column = mapCoordinate(reference.column, host.col, change.columns, reaches, change)
+    row = mapCoordinate(reference.row, host.row, change.rows, reaches, change)
+    if isinstance(column, LineLost) or isinstance(row, LineLost):
+        return None
+    if column is reference.column and row is reference.row:
         return reference
-    hostLine = host.row if edit.rows else host.col
-    target = coordinate.resolve(hostLine)
-    if change.targets(reference.tableId):
-        mapped = edit.lineMap(target)
+    return FormulaReference(column, row, reference.tableId)
+
+
+def mapSpan(
+    span: Span | None,
+    hostLine: int,
+    lines: LineMapping,
+    reaches: bool,
+    change: FormulaRestructure,
+) -> Span | LineLost | None:
+    """Return one axis of a range after the change, each end moving alone."""
+    if span is None:
+        return None
+    begin, end = span.resolve(hostLine)
+    if reaches:
+        mapped = lines.spanMap(begin, end)
         if mapped is None:
-            return None
-        target = mapped
-    newHost = mapHostLine(hostLine, change)
-    value = target if coordinate.absolute else target - newHost
-    if value == coordinate.value:
-        return reference
-    moved = Coordinate(value, coordinate.absolute)
-    if edit.rows:
-        return FormulaReference(reference.column, moved, reference.tableId)
-    return FormulaReference(moved, reference.row, reference.tableId)
+            return lineLost
+        begin, end = mapped
+    shift = 0 if span.absolute else mapHostLine(hostLine, lines, change)
+    # A span of one line omits its end, as `56g` stores the range it shrank to one.
+    moved = Span(begin - shift, None if begin == end else end - shift, span.absolute)
+    return span if moved == span else moved
 
 
 def mapFormulaRange(
     extent: FormulaRange, host: CellReference, change: FormulaRestructure
 ) -> FormulaRange | None:
-    """Return a range after the edit, each end moving alone, None when all is gone."""
-    edit = change.edit
-    span = extent.rows if edit.rows else extent.columns
-    if span is None:
+    """Return a range after the change, None when it loses every line."""
+    reaches = change.targets(extent.tableId)
+    columns = mapSpan(extent.columns, host.col, change.columns, reaches, change)
+    rows = mapSpan(extent.rows, host.row, change.rows, reaches, change)
+    if isinstance(columns, LineLost) or isinstance(rows, LineLost):
+        return None
+    if columns is extent.columns and rows is extent.rows:
         return extent
-    hostLine = host.row if edit.rows else host.col
-    begin, end = span.resolve(hostLine)
-    if change.targets(extent.tableId):
-        mapped = edit.spanMap(begin, end)
-        if mapped is None:
-            return None
-        begin, end = mapped
-    newHost = mapHostLine(hostLine, change)
-    shift = 0 if span.absolute else newHost
-    # A span of one line omits its end, as `56g` stores the range it shrank to one.
-    moved = Span(
-        begin - shift, None if begin == end else end - shift, span.absolute
-    )
-    if moved == span:
-        return extent
-    if edit.rows:
-        return FormulaRange(extent.columns, moved, extent.tableId)
-    return FormulaRange(moved, extent.rows, extent.tableId)
+    return FormulaRange(columns, rows, extent.tableId)
 
 
 def findReferenceLoss(

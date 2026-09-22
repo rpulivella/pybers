@@ -34,7 +34,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from pybers.addressing.lines import GridEdit
+from pybers.addressing.lines import GridEdit, LineMapping, LinesUnchanged
 from pybers.addressing.ranges import (
     AxisBound,
     CellRange,
@@ -70,6 +70,8 @@ __all__ = [
     "CellRangeList",
     "CellReference",
     "GridEdit",
+    "LineMapping",
+    "LinesUnchanged",
     "RangeAddress",
     "RangeEndpoint",
     "ReferenceError",

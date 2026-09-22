@@ -25,7 +25,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence.index import ArchiveIndex
+from .._persistence.index import ArchiveIndex, originOffset
 from ..errors import WriteError
 from ._read import readLineIdentities
 from .cells import Table
@@ -78,6 +78,25 @@ class LineMap:
         if not kept:
             return None
         return (min(kept), max(kept))
+
+
+@dataclass(frozen=True, slots=True)
+class ModelLines:
+    """A stored line map read in the model's counting, from one, as a formula needs."""
+
+    stored: LineMap
+
+    def lineMap(self, line: int) -> int | None:
+        """Return where a line counted from one lands, or None when it was removed."""
+        moved = self.stored.lineMap(line - originOffset)
+        return None if moved is None else moved + originOffset
+
+    def spanMap(self, begin: int, end: int) -> tuple[int, int] | None:
+        """Return where a span counted from one lands, None when it lost every line."""
+        mapped = self.stored.spanMap(begin - originOffset, end - originOffset)
+        if mapped is None:
+            return None
+        return (mapped[0] + originOffset, mapped[1] + originOffset)
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +165,7 @@ def listAddedLines(lines: LineMap) -> list[int]:
 __all__ = [
     "GridMaps",
     "LineMap",
+    "ModelLines",
     "buildGridMaps",
     "findDisplacedLine",
     "listAddedLines",

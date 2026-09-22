@@ -238,7 +238,8 @@ def applyGridStructure(
     # as they were stored.
     storedRows, storedColumns = readLineIdentities(index, model)
     plan = buildConditionalPlan(
-        index, registry, owners, store, maps, storedRows, storedColumns, table.name
+        index, registry, owners, store, maps, table.identifier,
+        storedRows, storedColumns,
     )
 
     uidReference = model.base_column_row_uids

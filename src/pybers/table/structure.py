@@ -205,8 +205,10 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
     formulas: dict[int, Formula] = {}
     broken: list[Cell] = []
     for host in tables:
+        rows, columns = edit.axisMaps()
         change = FormulaRestructure(
-            edit=edit,
+            rows=rows,
+            columns=columns,
             hostEdited=host is table,
             hostIdentity=host.identifier,
             targetTable=table.identifier,
