@@ -122,8 +122,8 @@ def mapMerge(merge: MergeRange, edit: GridEdit) -> MergeRange | None:
     """Return where a merge lands, or None when it stops being a merge.
 
     **A merge left one cell is unmerged, and keeps its value**, measured
-    2026-09-21 in `57-collapse-row-deleted`. So is one losing every line it
-    covered.
+    2026-09-21 in `57-collapse-row-deleted`, and one losing every line it
+    covered is unmerged as well.
     """
     from pybers.table.cells import MergeRange
 

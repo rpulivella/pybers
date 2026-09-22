@@ -4,7 +4,7 @@
 **A structural edit moves locked references too.** Locking pins a reference
 against being dragged, not against the grid changing under it: inserting two rows
 above row 2 turned `$A$1:$A$10` into `$A$1:$A$12` and `$A$8` into `$A$10`, measured
-2026-09-18 in `56b-row-inserted`. So every reference is resolved to real lines,
+2026-09-18 in `56b-row-inserted`. Every reference is therefore resolved to real lines,
 those lines are mapped, and the result is stored back in the form it came in.
 
 **A range moves each end on its own**, which is what keeps `C3:C25` from losing

@@ -195,6 +195,66 @@ go stale; a created table carries that cache empty, which Numbers accepts.
 than a rectangle. A formula newly broken is stored as an error cell with an error
 entry, which pybers leaves to the recalculation it asks for.
 
+## What else a structural edit carries, and what Numbers does to each
+
+From the `57`, `58` and `59` measurements and `27b` and `27c`, measured 2026-09-21
+for PYB-17. Each is one edit Numbers made to a document built for it.
+
+**A merged value outlives its anchor's line.** Deleting the row a merge's anchor
+sat on left the merge one row shorter, still holding its value at the top of what
+remained. A merge left one cell is unmerged, and keeps its value.
+
+**Bands cover lines, not counts.** A line added inside the header grows it, one
+removed shrinks it, and a line added at the footer's own first line lands inside
+the footer rather than in the body.
+
+**Borders are layers of runs.** Each row and each column owns one stroke layer,
+holding runs along the other axis. A run spanning an insertion grows, and a run
+beyond it shifts. **A deletion splits a run at the seam** rather than shortening
+it: one run over six rows became two, carrying the same stroke. A line added takes
+a copy of the layer of the line it displaced, so an inserted column arrives with
+its neighbor's border.
+
+**Tiles are sparse.** Only tiles holding rows exist: a table of 100,000 rows with
+values scattered through it held tiles 0 to 7, then 15, 16, 24 and on. A tile is
+created where a row lands, and removed when it empties. `rowTileTree` lists only
+the tiles that exist, and `nextRowStripID` is the highest tile id plus one, not
+the tile count.
+
+**Row headers are kept in buckets of 65,536 rows.** A table holds one bucket
+until its row count is SET past 65,536, when it holds sixteen, and it keeps
+sixteen after shrinking back. **Adding rows never creates buckets**: rows added to
+a table of 65,536 left 65,537 rows in its one bucket. A header lands in the bucket
+its index falls in, or in the only bucket there is.
+
+**A tile's width flag says nothing about its rows.** Numbers set
+`should_use_wide_rows` on a tile when its table reached 65,536 rows, over rows that
+kept byte offsets. The row's own `has_wide_offsets` decides.
+
+**An archive declares what it points at.** A created tile has to be added to the
+table model's declared references, and a removed one dropped, or the model no
+longer matches what Numbers writes. A reference the body already held undeclared
+stays so, since Numbers leaves some out.
+
+**Conditional highlighting is rewritten, not moved.** A rule is a rule set a cell
+names by key, and its operands follow the formula rule axis by axis. A locked axis
+holds a stored line, an unlocked one holds an offset from the cell the rule colors,
+and a whole-column operand holds a column alone. Three things follow:
+
+- A rule whose operand moves becomes a new rule under a new key, and the old
+  entry is removed. Cells landing on the same result share it.
+- A rule whose operand is removed breaks once per cell, never shared: the operand
+  becomes `#REF!` carrying the lost lines, each axis's sentinel and sticky bit
+  carrying that axis's lock, and a whole-column operand recording a zero identity
+  for its row. The cell's cached match becomes 15, none.
+- A line added takes empty records naming the rules of the line it displaced.
+
+**A spill is re-flowed, not moved.** A row added inside `SEQUENCE(3)` left the
+spilled cells where they were and moved the row below them instead. Following
+that means evaluating the formula, so pybers refuses an edit that cuts a spill.
+One wholly outside a spill moves it as a block, which is ordinary movement, and a
+moved spill is listed first.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:
