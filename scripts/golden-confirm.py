@@ -30,7 +30,7 @@ so the log is purged with the ticket's folder that holds the run it explains.
 Requires rich, and the Xcode command line tools for `helper-build`.
 
 UPDATES
-2026-09-22  Checks a table's size and merges, for PYB-111.
+2026-09-22  Checks a table's size and merges and an empty cell, for PYB-111.
 2026-09-21  A check a person makes is QA's rather than a human's, for PYB-17.
 2026-09-17  Written for PYB-94.
 """
@@ -84,7 +84,7 @@ goldenDirectory: Path = repositoryRoot / "tests" / "golden"
 reportRoot: Path = repositoryRoot / "workarea" / "golden-confirm"
 expectedSuffix: str = ".expected.toml"
 expectedKeys: frozenset[str] = frozenset({
-    "sheet", "table", "cell", "value", "formula", "format", "dataFormat", "qa",
+    "sheet", "table", "cell", "value", "empty", "formula", "format", "dataFormat", "qa",
 })
 expectedTableKeys: frozenset[str] = frozenset({
     "sheet", "table", "rows", "columns", "merges",
@@ -123,6 +123,7 @@ class ExpectedCell:
     table: str
     cell: str
     value: object
+    empty: bool | None
     formula: str | None
     formatKind: str | None
     dataFormat: dict[str, str]
@@ -441,12 +442,18 @@ def checkEntryKeys(
 
 
 def readExpectedCell(path: Path, position: int, entry: dict[str, Any]) -> ExpectedCell:
-    """Read one [[cell]] entry, refusing a key the tool does not read."""
+    """Read one [[cell]] entry, refusing an emptiness that contradicts its value."""
     label = f"cell {position}"
     checkEntryKeys(path, label, entry, expectedKeys, {"sheet", "table", "cell"})
+    empty = entry.get("empty")
+    if empty is not None and not isinstance(empty, bool):
+        raise GoldenConfirmError(
+            f"{path.name} {label}: empty {empty!r} is not a boolean")
+    if empty is not None and "value" in entry:
+        raise GoldenConfirmError(f"{path.name} {label}: states both empty and a value")
     return ExpectedCell(
         sheet=entry["sheet"], table=entry["table"], cell=entry["cell"],
-        value=entry.get("value"), formula=entry.get("formula"),
+        value=entry.get("value"), empty=empty, formula=entry.get("formula"),
         formatKind=entry.get("format"),
         dataFormat={str(key): str(value) for key, value in
                     entry.get("dataFormat", {}).items()},
@@ -559,11 +566,15 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
         status = "passed" if passed else "failed"
         checks.append(Check(status, subject, detail, evidence))
 
+    value = reading.get("value") or {"kind": "missing", "text": ""}
+    # The formatted value follows region settings, so it is shown, never compared.
+    shown = f"{value['kind']} {value['text']!r}, shown as "
     if expected.value is not None:
-        value = reading.get("value") or {"kind": "missing", "text": ""}
-        # The formatted value follows region settings, so it is shown, never compared.
-        shown = f"{value['kind']} {value['text']!r}, shown as "
         record("value", checkValue(expected.value, value), expected.value,
+               shown + repr(reading.get("formattedValue")))
+    if expected.empty is not None:
+        record("value", (value["kind"] == "empty") == expected.empty,
+               "empty" if expected.empty else "not empty",
                shown + repr(reading.get("formattedValue")))
     if expected.formula is not None:
         found = readFormulaText(reading.get("formula") or "")
