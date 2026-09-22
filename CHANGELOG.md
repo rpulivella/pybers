@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-17] Add and delete rows and columns
 - [PYB-76] Report merge readiness as one comment on the pull request
 - [PYB-94] Confirm a golden in running Numbers from one skill
 - [PYB-98] Give every module-level function a leading verb
