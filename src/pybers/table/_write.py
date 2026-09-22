@@ -99,13 +99,13 @@ from ._conditions import (
     rewriteConditionalRecord,
     writeConditionalCounts,
 )
+from ._lines import GridMaps, LineMap, findDisplacedLine, listAddedLines
 from ._read import (
     readMerges,
     readRichTextTable,
     readStringTable,
     resolveValue,
 )
-from ._structure import GridMaps, LineMap, findDisplacedLine, listAddedLines
 from .cells import Cell, MergeRange, Table
 
 # `TST.Tile` and the type bytes a numeric record may carry. 2 is a plain number

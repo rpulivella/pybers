@@ -2,24 +2,18 @@
 """\
 A table's rows and columns added or removed, carried into every archive indexed by one.
 
-**The edit is derived, never recorded.** The stored UID map says which line held
-which identity, and the model says where each identity is now, so comparing the
-two gives the whole mapping from stored lines to new ones. That is the same
-comparison against what is stored that merges and cell values already use.
-
-What follows the mapping here: the UID map, the header buckets and their counts,
-hidden state, the declared counts, the stroke sidecar's counts, the layout cache,
-and the merge store. Tiles move in `_write`, where the lists a removed record
-releases are already open, and the calculation engine is re-registered by the
-document writer, which knows what every formula reads.
-
-**Refused, not guessed:** an edit inside a header or footer band, a table with
-borders or conditional highlighting, and engine state keyed by cell that nothing
-here moves. None of those appears in `56-structure-base`, so none is measured.
+The orchestration of one structural edit's archives, from the line maps `_lines`
+derives. Here: the UID map, the header buckets and their counts, the bands,
+hidden state, the declared counts, the layout cache and the merge store. Borders
+move in `_strokes`, conditional highlighting in `_conditions`, and tiles in the
+tile pass of `_write`, where the lists a removed record releases are already
+open. The calculation engine is re-registered by the document writer, which
+knows what every formula reads.
 
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-09-21  Line maps and borders moved to `_lines` and `_strokes`.
 2026-09-18  Written for PYB-17.
 """
 from __future__ import annotations
@@ -33,111 +27,24 @@ __status__ = "Development"
 __date__ = "2026/09/18"
 
 from collections import Counter
-from collections.abc import Sequence
-from dataclasses import dataclass
 
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import IWAFile, chooseOffsetUnit, decodeRow
 from .._persistence.index import ArchiveIndex, originOffset, readUuidValue
-from .._persistence.metadata import PackageRegistry, createSiblingArchive
+from .._persistence.metadata import PackageRegistry
 from ..errors import WriteError
 from ._conditions import ConditionalPlan, buildConditionalPlan
 from ._create import assignUids
+from ._lines import (
+    GridMaps,
+    LineMap,
+    findDisplacedLine,
+    listAddedLines,
+)
 from ._read import readLineIdentities
+from ._strokes import applyStrokeLayers, listStrokeLayers
 from .cells import Table
-
-
-@dataclass(frozen=True, slots=True)
-class LineMap:
-    """Where each stored line of one axis lands, counted from zero, None if removed."""
-
-    lines: tuple[int | None, ...]
-    count: int
-
-    @property
-    def changed(self) -> bool:
-        """Report whether any line moved, went, or arrived."""
-        return self.count != len(self.lines) or any(
-            line != moved for line, moved in enumerate(self.lines)
-        )
-
-    def lineMap(self, line: int) -> int | None:
-        """Return where one stored line lands, or None when it was removed."""
-        return self.lines[line] if line < len(self.lines) else None
-
-    def spanMap(self, begin: int, end: int) -> tuple[int, int] | None:
-        """Return where a span lands, its first and last surviving lines kept."""
-        kept = [
-            moved for moved in (self.lineMap(line) for line in range(begin, end + 1))
-            if moved is not None
-        ]
-        if not kept:
-            return None
-        return (min(kept), max(kept))
-
-
-@dataclass(frozen=True, slots=True)
-class GridMaps:
-    """Both axes of one table's structural change, stored lines to new ones."""
-
-    rows: LineMap
-    columns: LineMap
-
-    @property
-    def changed(self) -> bool:
-        """Report whether either axis changed."""
-        return self.rows.changed or self.columns.changed
-
-
-def buildLineMap(
-    stored: Sequence[int], wanted: Sequence[int], axis: str, name: str
-) -> LineMap:
-    """Return where each stored line went, refusing lines that changed order.
-
-    Added and removed lines are the only edits this library makes, so every line
-    both sides hold keeps its order, and an identity only the model holds is new.
-    """
-    position = {identity: at for at, identity in enumerate(wanted)}
-    lines = tuple(position.get(identity) for identity in stored)
-    kept = [line for line in lines if line is not None]
-    if kept != sorted(kept):
-        raise WriteError(
-            f"The {axis} of {name!r} are in a different order from the file's, and "
-            "only adding and removing them is written."
-        )
-    return LineMap(lines, len(wanted))
-
-
-def buildGridMaps(
-    index: ArchiveIndex, model: tst.TableModelArchive, table: Table
-) -> GridMaps:
-    """Return how the model's rows and columns relate to the stored ones."""
-    rows, columns = readLineIdentities(index, model)
-    if len(rows) != model.number_of_rows or len(columns) != model.number_of_columns:
-        raise WriteError(
-            f"{table.name!r} declares {model.number_of_rows} by "
-            f"{model.number_of_columns} and its UID map holds {len(rows)} by "
-            f"{len(columns)}, so which line is which cannot be told."
-        )
-    return GridMaps(
-        buildLineMap(rows, table._rowIdentities, "rows", table.name),
-        buildLineMap(columns, table._columnIdentities, "columns", table.name),
-    )
-
-
-def findDisplacedLine(lines: LineMap, line: int) -> int | None:
-    """Return the stored line an added line took the place of, or None at the end."""
-    for stored, moved in enumerate(lines.lines):
-        if moved is not None and moved > line:
-            return stored
-    return None
-
-
-def listAddedLines(lines: LineMap) -> list[int]:
-    """Return every new line the edit added, as its index afterward."""
-    held = {moved for moved in lines.lines if moved is not None}
-    return [line for line in range(lines.count) if line not in held]
 
 
 def countBands(lines: LineMap, leading: int, trailing: int) -> tuple[int, int]:
@@ -186,119 +93,6 @@ def applyBandCounts(model: tst.TableModelArchive, maps: GridMaps) -> None:
     ):
         if getattr(model, name) != count:
             setattr(model, name, count)
-
-
-def mapStrokeRuns(
-    layer: tst.StrokeLayerArchive, lines: LineMap
-) -> list[tst.StrokeLayerArchive.StrokeRunArchive]:
-    """Return one layer's runs after the edit, split where a removed line sat.
-
-    **A removal splits a run rather than shortening it**, measured in
-    `57-borders-row-deleted`: one run over six rows became two, of two lines and
-    three, carrying the same stroke. Lines added inside a run are covered by it,
-    which is how an inserted row takes the border of the run it fell into.
-    """
-    mapped: list[tst.StrokeLayerArchive.StrokeRunArchive] = []
-    segment: list[int] = []
-    for run in layer.stroke_runs:
-        segment = []
-        for line in range(run.origin, run.origin + run.length):
-            if lines.lineMap(line) is None:
-                if segment:
-                    mapped.append(buildStrokeRun(run, segment, lines))
-                segment = []
-                continue
-            segment.append(line)
-        if segment:
-            mapped.append(buildStrokeRun(run, segment, lines))
-    return mapped
-
-
-def buildStrokeRun(
-    run: tst.StrokeLayerArchive.StrokeRunArchive,
-    segment: list[int],
-    lines: LineMap,
-) -> tst.StrokeLayerArchive.StrokeRunArchive:
-    """Return one run of a layer, covering where a stretch of lines landed."""
-    first, last = lines.lineMap(segment[0]), lines.lineMap(segment[-1])
-    assert first is not None and last is not None
-    moved = tst.StrokeLayerArchive.StrokeRunArchive()
-    moved.CopyFrom(run)
-    moved.origin = first
-    moved.length = last - first + 1
-    return moved
-
-
-def applyStrokeLayers(
-    index: ArchiveIndex,
-    registry: PackageRegistry,
-    owners: dict[int, IWAFile],
-    sidecar: tst.StrokeSidecarArchive,
-    maps: GridMaps,
-) -> None:
-    """Move every border with the line it belongs to, as `57-borders-*` measured.
-
-    A layer belongs to one row or column and holds runs along the other axis, so
-    each list follows one map by its index and the other inside its runs. An added
-    line takes a copy of the layer of the line it displaced, which is how an
-    inserted column arrived carrying its neighbor's border.
-    """
-    lists = (
-        (sidecar.left_column_stroke_layers, maps.columns, maps.rows),
-        (sidecar.right_column_stroke_layers, maps.columns, maps.rows),
-        (sidecar.top_row_stroke_layers, maps.rows, maps.columns),
-        (sidecar.bottom_row_stroke_layers, maps.rows, maps.columns),
-    )
-    for references, keys, runs in lists:
-        if not len(references):
-            continue
-        stored = {}
-        for reference in references:
-            layer = index.resolve(reference, tst.StrokeLayerArchive)
-            stored[layer.row_column_index] = (reference.identifier, layer)
-        placed: dict[int, tuple[int, tst.StrokeLayerArchive]] = {}
-        for line, (identifier, layer) in stored.items():
-            moved = keys.lineMap(line)
-            if moved is None:
-                registry.archiveRemove(identifier)
-                continue
-            layer.row_column_index = moved
-            placed[moved] = (identifier, layer)
-        sibling = next(iter(stored.values()))[0]
-        for line in listAddedLines(keys):
-            displaced = findDisplacedLine(keys, line)
-            copied = tst.StrokeLayerArchive()
-            if displaced is not None:
-                copied.CopyFrom(stored[displaced][1])
-            copied.row_column_index = line
-            placed[line] = (
-                createSiblingArchive(
-                    registry, index, owners, sibling, copied.SerializeToString()
-                ),
-                copied,
-            )
-        for identifier, layer in placed.values():
-            rewritten = mapStrokeRuns(layer, runs)
-            del layer.stroke_runs[:]
-            layer.stroke_runs.extend(rewritten)
-            owners[identifier].messageReplace(
-                identifier, 0, layer.SerializeToString()
-            )
-        del references[:]
-        for line in sorted(placed):
-            references.add(identifier=placed[line][0])
-
-
-def listStrokeLayers(sidecar: tst.StrokeSidecarArchive) -> list[int]:
-    """Return every layer the sidecar points at, which is what it declares."""
-    return [
-        reference.identifier
-        for references in (
-            sidecar.left_column_stroke_layers, sidecar.right_column_stroke_layers,
-            sidecar.top_row_stroke_layers, sidecar.bottom_row_stroke_layers,
-        )
-        for reference in references
-    ]
 
 
 def countSurvivingCells(
@@ -673,10 +467,7 @@ def listModelFormulas(table: Table) -> list[tuple[int, int]]:
 
 
 __all__ = [
-    "GridMaps",
-    "LineMap",
     "applyGridStructure",
-    "buildGridMaps",
     "listModelFormulas",
     "listRegisteredFormulas",
     "remapOwnerCoordinates",

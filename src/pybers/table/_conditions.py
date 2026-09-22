@@ -38,7 +38,6 @@ __date__ = "2026/09/21"
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSTArchives_pb2 as tst
@@ -53,10 +52,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex, assignUuid
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
-
-if TYPE_CHECKING:
-    # Guarded because the structural pass imports this module to plan the rules.
-    from ._structure import GridMaps
+from ._lines import GridMaps
 
 # An operand that is a cell reference, and the form Numbers gives one it broke.
 cellReferenceArgument: int = 4

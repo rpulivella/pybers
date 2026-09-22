@@ -71,9 +71,9 @@ from .._persistence.index import (
 from ..errors import WriteError
 from ..formula.precedents import resolveFormulaPrecedents
 from ..table._create import createTables
+from ..table._lines import buildGridMaps
 from ..table._structure import (
     applyGridStructure,
-    buildGridMaps,
     listModelFormulas,
     listRegisteredFormulas,
     remapOwnerCoordinates,
