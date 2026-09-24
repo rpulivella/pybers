@@ -271,6 +271,23 @@ def testABlockMovedAcrossTilesBesideAnInsertionKeepsItsValues(
     assert [cell.value for cell in reopened.range("A1:B2")] == [None] * 4
 
 
+@pytest.mark.parametrize("rule", list(FormulaReferenceRelocation))
+def testTwoMovesBeforeASaveWriteWhatOneMoveWrites(
+    rule: FormulaReferenceRelocation, tmp_path: Path
+) -> None:
+    """Each cell's origin is where the file holds it, however often it moved since."""
+    chained, table = openTable("61-move-styles-base")
+    table.cellsMove("B2:D5", "E2", references=rule)
+    table.cellsMove("E2:G5", "F8", references=rule)
+    chained.save(tmp_path / "chained.numbers")
+    direct, table = openTable("61-move-styles-base")
+    table.cellsMove("B2:D5", "F8", references=rule)
+    direct.save(tmp_path / "direct.numbers")
+    assert readTableFacts(tmp_path / "chained.numbers") == readTableFacts(
+        tmp_path / "direct.numbers"
+    )
+
+
 def testASecondSaveAfterAMoveChangesNothing(tmp_path: Path) -> None:
     """Each cell records where the first save put it, so the next finds no move."""
     document, table = openTable("61-move-styles-base")
