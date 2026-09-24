@@ -14,6 +14,7 @@ carries nothing else, as Numbers left them in `61b-move-styles-cut-pasted`.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-24  A moved merge carries the records an import left under it.
 2026-09-24  A highlighting rule whose conditions a move changed is rebuilt.
 2026-09-23  Written for PYB-18.
 """
@@ -62,7 +63,8 @@ def findCellMoves(table: Table, maps: GridMaps) -> CellMoves:
     """Return every cell whose record sits elsewhere than the cell, after any edit.
 
     A cell whose stored line an edit removed has no record left to move, which is
-    how a merged value carried off its anchor's line is written afresh.
+    how a merged value carried off its anchor's line is written afresh. A position
+    holding no record moves nothing, so a merge's covered cells cost nothing.
     """
     moves: CellMoves = {}
     for reference, cell in table.cells.items():
@@ -74,8 +76,20 @@ def findCellMoves(table: Table, maps: GridMaps) -> CellMoves:
         if row is None or column is None:
             continue
         landed = (reference.row - originOffset, reference.col - originOffset)
-        if (row, column) != landed:
-            moves[(row, column)] = landed
+        if (row, column) == landed:
+            continue
+        moves[(row, column)] = landed
+        # An imported merge keeps a record under each covered cell, which the model
+        # never holds, so the merge its anchor carries brings them along.
+        merge = cell.mergeAnchored
+        if merge is None:
+            continue
+        for covered in merge.extent:
+            down, across = covered.row - reference.row, covered.col - reference.col
+            if down or across:
+                moves[(row + down, column + across)] = (
+                    landed[0] + down, landed[1] + across
+                )
     return moves
 
 

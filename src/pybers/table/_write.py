@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-24  A moved merge keeps the records it carries, for PYB-18.
 2026-09-23  Cells moved as a block are found and carried, for PYB-18.
 2026-09-22  The entry point for one table's save, gathered from the document
             writer for PYB-113. Records, refcounts, merges and the tile pass
@@ -132,7 +133,8 @@ class TableSave:
         if moves:
             moveOwnerCoordinates(entry.dependencies, moves, table.name)
 
-        swallowed = listSwallowedPositions(table, model)
+        # A moved merge reads as an added one, and the records it carries are kept.
+        swallowed = listSwallowedPositions(table, model) - frozenset(moves.values())
         edits = applyTableEdits(
             index, table, model, swallowed, maps, self.registry, plan, moves
         )
