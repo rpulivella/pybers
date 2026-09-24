@@ -161,10 +161,10 @@ interpreted, since a formula is shared state that other cells depend on.
 
 **Superseded 2026-09-23 for PYB-18: a move rewrites references under one of two rules.**
 The two paragraphs above hold only for a move under `PRESERVE_RELATIVE_POSITION`, which
-rewrites nothing because a locked axis stores an index. A move under
-`PRESERVE_NAMED_CELL` rewrites every relative offset that leaves the block, and every
-locked index that points into it. The caller names one of the two, and neither is a
-default.
+rewrites nothing but a range reaching past its table, clamped to the edge, because a
+locked axis stores an index. A move under `PRESERVE_NAMED_CELL` rewrites every relative
+offset that leaves the block, and every locked index that points into it. The caller
+names one of the two, and neither is a default.
 
 ### Cross-table references are relative offsets plus a table UUID
 

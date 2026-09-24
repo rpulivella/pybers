@@ -288,6 +288,17 @@ border on `C3` moved to `G9` with no layer left behind. The highlighting rule wa
 rebuilt as a new archive with identical contents, its operand still one column left,
 because the cell it reads moved with it. No record remains at a vacated position.
 
+**Superseded 2026-09-24: cut and paste does rewrite one kind of formula.** The paragraph
+above says no formula is rewritten. A moved range that would reach past its table's edge
+is clamped to it: `SUM(A1:A12)` pasted six rows lower in a twelve row table was stored as
+`SUM(E7:E12)`, not `SUM(E7:E18)`. The engine registers every range the same way, bounded
+by the table it reads, whether or not anything moved.
+
+**A drag rewrites highlighting as it rewrites formulas**, measured 2026-09-24 in
+`62b-move-rules-dragged`. The rule on `C2` reading `A1` kept reading `A1` from `G8`, and
+the rule on `E2` reading `C2`, outside the block, now reads `G8`. Each cell kept its
+cached match. Numbers reused the two list keys, where a structural edit issues new ones.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:
