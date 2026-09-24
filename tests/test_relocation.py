@@ -379,6 +379,29 @@ def testAMovedImportedMergeCarriesTheRecordsItCovers(tmp_path: Path) -> None:
     assert not {(0, 0), (0, 1)} & records.keys()
 
 
+goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
+
+
+@pytest.mark.parametrize(
+    ("name", "rule"),
+    [("60-move-cut-pasted-by-pybers", relative), ("60-move-dragged-by-pybers", named)],
+)
+def testTheMoveGoldensMatchWhatThisLibraryProduces(
+    name: str, rule: FormulaReferenceRelocation, tmp_path: Path
+) -> None:
+    """PYB-18 AC 7: each move again, against the file Numbers confirmed."""
+    document, table = openTable("60-move-base")
+    table.cellsMove("B2:D5", "F8", references=rule)
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    differences = listPackageDifferences(
+        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
+    )
+    assert [
+        difference for difference in differences if difference.identifier is not None
+    ] == []
+
+
 def testAScriptAuthorMovesABlockAndSaves(tmp_path: Path) -> None:
     """The few lines a script writes: open, move, save, and read it back."""
     document = pybers.open(findDocumentPath("61-move-styles-base"))
