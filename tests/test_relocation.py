@@ -28,11 +28,13 @@ from structurefacts import readConditionalRules, readTableFacts
 import pybers
 from conftest import findDocumentPath
 from pybers import FormulaReferenceRelocation
+from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
 from pybers.addressing.reference import ReferenceError as CellReferenceError
 
 relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
+named = FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 
 # Where pybers deliberately differs from Numbers' cut and paste, named so a further
 # difference fails: Numbers leaves the empty source merge behind, and stores the
@@ -40,6 +42,15 @@ relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
 cutPasteDifferences: dict[str, dict[str, object]] = {
     "60b-move-cut-pasted": {"merges": None, "records": {(9, 7), (10, 7)}},
     "61b-move-styles-cut-pasted": {},
+}
+
+# Numbers' drags, as the base, the anchor, and the cached results Numbers
+# recomputes on open: `E7` reads `B6`, where the drag in `60d` put the merge.
+dragged: dict[str, tuple[str, str, set[tuple[int, int]]]] = {
+    "60c-move-dragged": ("60-move-base", "F8", set()),
+    "60d-move-overlapping": ("60-move-base", "B3", {(6, 4)}),
+    "61c-move-styles-dragged": ("61-move-styles-base", "F8", set()),
+    "62b-move-rules-dragged": ("62-move-rules-base", "F8", set()),
 }
 
 
@@ -97,6 +108,89 @@ def testACutAndPasteMoveWritesTheArchivesNumbersWrote(
                 assert {k: v for k, v in mine.items() if k not in skipped} == value
                 continue
             assert ours[tableName][key] == value, (tableName, key)
+
+
+@pytest.mark.parametrize("name", sorted(dragged))
+def testADragWritesTheArchivesNumbersWrote(name: str, tmp_path: Path) -> None:
+    """PYB-18 AC 2.i and 3: a named-cell move saved as Numbers saved the drag."""
+    base, anchor, recomputed = dragged[name]
+    document, table = openTable(base)
+    table.cellsMove("B2:D5", anchor, references=named)
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    ours = readTableFacts(target)
+    theirs = readTableFacts(findDocumentPath(name))
+    for tableName, facts in theirs.items():
+        for key, value in facts.items():
+            mine = ours[tableName][key]
+            if key == "records":
+                assert isinstance(value, dict) and isinstance(mine, dict)
+                assert {k: v for k, v in mine.items() if k not in recomputed} == {
+                    k: v for k, v in value.items() if k not in recomputed
+                }
+                continue
+            assert mine == value, (tableName, key)
+
+
+@pytest.mark.parametrize("name", ["60c-move-dragged", "60d-move-overlapping"])
+def testANamedCellMoveRewritesFormulasAsADragDoes(name: str) -> None:
+    """PYB-18 AC 2.i and 3: inside the block, out of it, and from another table."""
+    base, anchor, _ = dragged[name]
+    document, table = openTable(base)
+    table.cellsMove("B2:D5", anchor, references=named)
+    theirs = pybers.open(findDocumentPath(name))
+    for tableName in ("Table 1", "Table 2"):
+        mine = document.sheet(1).table(tableName)
+        for reference, cell in theirs.sheet(1).table(tableName).cells.items():
+            if cell.formula is not None:
+                assert mine.cell(reference).formulaText == cell.formulaText, reference
+
+
+def testAConditionFollowsARowAddedAboveIt() -> None:
+    """A structural edit moves a highlighting condition as it moves a formula."""
+    _, table = openTable("62-move-rules-base")
+    table.rowAdd(1)
+    (condition,) = table.cell("C3")._conditions
+    (reference,) = condition.references
+    assert reference.resolve(table.cell("C3").reference) == pybers.CellReference(2, 1)
+
+
+def readRuleConditions(path: Path) -> dict[tuple[int, int], object]:
+    """Return each highlighted cell's kind, rule references and cached match.
+
+    A rule is read as the references its conditions hold, since Numbers rebuilds a
+    moved rule with fresh style archives and numbers its keys as it likes.
+    """
+    cells, _ = readConditionalRules(path, "Table 1")
+    assert isinstance(cells, dict)
+    found: dict[tuple[int, int], object] = {}
+    for position, (kind, rules, match) in cells.items():
+        if not isinstance(rules, bytes):
+            continue
+        archive = tst.ConditionalStyleSetArchive()
+        archive.ParseFromString(rules)
+        found[position] = (
+            kind,
+            [
+                (node.AST_column.column, node.AST_row.row)
+                for rule in archive.rules.rule
+                for node in rule.predicate.formula.AST_node_array.AST_node
+                if node.HasField("AST_column")
+            ],
+            match,
+        )
+    return found
+
+
+def testADragRewritesHighlightingAsNumbersDid(tmp_path: Path) -> None:
+    """PYB-18 AC 2.i and 3: a moved rule keeps reading `A1`, and `E2`'s follows `C2`."""
+    document, table = openTable("62-move-rules-base")
+    table.cellsMove("B2:D5", "F8", references=named)
+    target = tmp_path / "ruled.numbers"
+    document.save(target)
+    assert readRuleConditions(target) == readRuleConditions(
+        findDocumentPath("62b-move-rules-dragged")
+    )
 
 
 def testMovedHighlightingKeepsItsRuleAndItsMatch(tmp_path: Path) -> None:
@@ -264,6 +358,15 @@ def testAScriptAuthorMovesABlockAndSaves(tmp_path: Path) -> None:
     document.save(tmp_path / "scripted.numbers")
     table = pybers.open(tmp_path / "scripted.numbers").sheet(1).table("Table 1")
     assert table.cell("G9").value == Decimal("32")
+
+
+def testACommandLineDragsABlockWithTheRuleAsTyped() -> None:
+    """A CLI passes `--references named-cell`, and a formula elsewhere follows."""
+    arguments = ["Table 1", "B2:D5", "F8", "named-cell"]
+    document = pybers.open(findDocumentPath("60-move-base"))
+    table = document.sheet(1).table(arguments[0])
+    table.cellsMove(arguments[1], arguments[2], references=arguments[3])  # type: ignore[arg-type]
+    assert table.cell("E9").formulaText == "=SUM(F8:H11)"
 
 
 def testACommandLineMovesABlockWithTheRuleAsTyped() -> None:

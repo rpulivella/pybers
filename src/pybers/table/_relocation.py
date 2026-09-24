@@ -14,6 +14,7 @@ carries nothing else, as Numbers left them in `61b-move-styles-cut-pasted`.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-24  A highlighting rule whose conditions a move changed is rebuilt.
 2026-09-23  Written for PYB-18.
 """
 from __future__ import annotations
@@ -32,11 +33,21 @@ from dataclasses import dataclass
 
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence import chooseOffsetUnit, decodeRow
-from .._persistence.cells import CellRecord, carriesFormula, offsetWidth
+from .._persistence.cells import (
+    CellRecord,
+    carriesFormula,
+    conditionalSlot,
+    findSlotValue,
+    offsetWidth,
+    patchSlotValue,
+)
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
+from ..addressing import CellReference
 from ..addressing.reference import originOffset
 from ..errors import WriteError
+from ..formula._read import readFormula
+from ._conditions import readConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
 from ._strokes import listStrokeLayers, moveStrokeEdges
 from ._structure import rowsPerBucket
@@ -159,6 +170,60 @@ def moveCellRecords(
     )
 
 
+def applyConditionChanges(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    store: tst.DataStore,
+    table: Table,
+) -> None:
+    """Point each record at a rule holding the conditions its cell now holds.
+
+    A cell holding no conditions keeps whatever rule its record names, since the
+    model says nothing about it. Used after a move, where a condition that keeps its
+    named cell has to change while the rule it came from stays for other cells.
+    """
+    plan = readConditionalPlan(index, registry, store)
+    if plan is None or not plan.rules:
+        return
+    tileSize = store.tiles.tile_size
+    tiles = []
+    changed = False
+    for entry in store.tiles.tiles:
+        tile = index.resolve(entry.tile, tst.Tile)
+        tiles.append(tile)
+        for rowInfo in tile.rowInfos:
+            row = entry.tileid * tileSize + rowInfo.tile_row_index
+            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            replacements = {}
+            for record in decodeRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+            ):
+                key = findSlotValue(record, conditionalSlot)
+                cell = table.cells.get(
+                    CellReference(row + originOffset, record.column + originOffset)
+                )
+                if key is None or key not in plan.rules or cell is None:
+                    continue
+                stored = tuple(
+                    readFormula(rule.predicate.formula)
+                    for rule in plan.rules[key].rules.rule
+                )
+                if not cell._conditions or cell._conditions == stored:
+                    continue
+                moved = plan.keyForConditions(key, cell._conditions)
+                replacements[record.column] = patchSlotValue(
+                    record.raw, conditionalSlot, moved
+                )
+            if replacements:
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
+                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit,
+                    replacements,
+                )
+                changed = True
+    if changed:
+        writeConditionalCounts(plan, tiles)
+
+
 def countLineRecords(
     index: ArchiveIndex, store: tst.DataStore
 ) -> tuple[Counter[int], Counter[int]]:
@@ -237,4 +302,10 @@ def applyCellMoves(
     return moved
 
 
-__all__ = ["CellMoves", "RecordMoves", "applyCellMoves", "findCellMoves"]
+__all__ = [
+    "CellMoves",
+    "RecordMoves",
+    "applyCellMoves",
+    "applyConditionChanges",
+    "findCellMoves",
+]

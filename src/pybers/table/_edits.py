@@ -95,7 +95,7 @@ from ._refcounts import (
     removeSpentEntries,
     stringTypeByte,
 )
-from ._relocation import CellMoves, applyCellMoves
+from ._relocation import CellMoves, applyCellMoves, applyConditionChanges
 from ._tiles import (
     buildTileRange,
     createRowStorage,
@@ -260,6 +260,7 @@ def applyTableEdits(
     formulaRemoved: list[tuple[int, int]] = []
     if moves:
         carried = applyCellMoves(index, registry, model, moves)
+        applyConditionChanges(index, registry, store, table)
         # A structural edit registers every formula afresh, so only a move alone
         # names the formulas it carried.
         if not restructured:

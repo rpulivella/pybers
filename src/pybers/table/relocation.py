@@ -32,7 +32,13 @@ from pybers.addressing.reference import (
     ReferenceError,
     toCellReference,
 )
-from pybers.formula.relocation import FormulaReferenceRelocation, clampFormulaRanges
+from pybers.formula.nodes import Formula
+from pybers.formula.relocation import (
+    FormulaBlockMove,
+    FormulaReferenceRelocation,
+    clampFormulaRanges,
+    relocateFormula,
+)
 
 if TYPE_CHECKING:
     from pybers.table.cells import Cell, Table
@@ -127,6 +133,41 @@ def refuseOccupied(table: Table, move: CellsMove) -> None:
             )
 
 
+def findNamedCellRewrites(
+    table: Table, move: CellsMove
+) -> dict[int, tuple[Cell, tuple[Formula | None, tuple[Formula, ...]]]]:
+    """Return every formula and condition in the document rewritten to keep its cells.
+
+    Worked out before any cell moves, from where each formula sits now. Only this
+    table's highlighting is rewritten, since a rule reads only its own table.
+    """
+    top, left, bottom, right = move.bounds
+    blockMove = FormulaBlockMove(
+        table.identifier, top, left, bottom, right, move.rowShift, move.columnShift
+    )
+    tables = (
+        [table] if table.document is None
+        else [other for sheet in table.document.sheets for other in sheet.tables]
+    )
+    rewritten: dict[int, tuple[Cell, tuple[Formula | None, tuple[Formula, ...]]]] = {}
+    for host in tables:
+        inside = host is table
+        for reference, cell in host.cells.items():
+            landed = move.cellMap(reference) if inside else reference
+            formula = cell.formula and relocateFormula(
+                cell.formula, reference, landed, blockMove, inside
+            )
+            conditions = cell._conditions
+            if inside:
+                conditions = tuple(
+                    relocateFormula(condition, reference, landed, blockMove, True)
+                    for condition in conditions
+                )
+            if formula != cell.formula or conditions != cell._conditions:
+                rewritten[id(cell)] = (cell, (formula, conditions))
+    return rewritten
+
+
 def moveCells(
     table: Table,
     source: RangeAddress,
@@ -146,8 +187,10 @@ def moveCells(
         return []
     refuseMergeCut(table, move)
     refuseOccupied(table, move)
-    if rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL:
-        raise NotImplementedError("PRESERVE_NAMED_CELL lands in the next layer.")
+    rewritten = (
+        findNamedCellRewrites(table, move)
+        if rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL else {}
+    )
 
     moving = [
         cell for reference, cell in table.cells.items() if extent.covers(reference)
@@ -159,10 +202,13 @@ def moveCells(
     for cell in moving:
         cell.reference = move.cellMap(cell.reference)
         table.cells[cell.reference] = cell
-        if cell.formula is not None:
+        if cell.formula is not None and not rewritten:
             cell.formula = clampFormulaRanges(
                 cell.formula, cell.reference, table.rowCount, table.colCount
             )
+    for cell, (formula, conditions) in rewritten.values():
+        cell.formula = formula
+        cell._conditions = conditions
     table.mergeRanges = [
         MergeRange(CellRange.fromReferences(
             move.cellMap(merge.anchor), move.cellMap(merge.extent.end or merge.anchor)
