@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-23  Cells moved as a block are found and carried, for PYB-18.
 2026-09-22  The entry point for one table's save, gathered from the document
             writer for PYB-113. Records, refcounts, merges and the tile pass
             moved to modules of their own.
@@ -40,6 +41,7 @@ from .._engine import (
     findCalculationEngine,
     findOwnerEntry,
     listRegisteredCells,
+    moveOwnerCoordinates,
     readTableIdentities,
     readTableOwnerEntries,
     readTableOwnerIds,
@@ -57,6 +59,7 @@ from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
+from ._relocation import findCellMoves
 from ._structure import applyGridStructure, listModelFormulas
 from .cells import Table
 
@@ -66,9 +69,14 @@ if TYPE_CHECKING:
 
 
 def collectFormulaDependencies(
-    table: Table, hostOwner: int, added: list[tuple[int, int]], ownerIds: dict[str, int]
+    table: Table,
+    hostOwner: int,
+    added: list[tuple[int, int]],
+    ownerIds: dict[str, int],
+    extents: dict[str | None, tuple[int, int]],
 ) -> dict[tuple[int, int], FormulaDependencies]:
     """Return what each newly attached formula reads, in the engine's own terms."""
+    extents = {**extents, None: (table.rowCount, table.colCount)}
     dependencies: dict[tuple[int, int], FormulaDependencies] = {}
     for row, column in added:
         cell = table.cell(row=row + originOffset, col=column + originOffset)
@@ -78,7 +86,7 @@ def collectFormulaDependencies(
                 f"column {column + originOffset} that the model does not hold."
             )
         dependencies[(row, column)] = resolveFormulaDependencies(
-            cell.formula, cell.reference, hostOwner, ownerIds, table.name
+            cell.formula, cell.reference, hostOwner, ownerIds, table.name, extents
         )
     return dependencies
 
@@ -95,6 +103,7 @@ class TableSave:
     registry: PackageRegistry
     entries: dict[int, TableOwner]
     ownerIds: dict[str, int]
+    extents: dict[str | None, tuple[int, int]]
     written: dict[int, list[tuple[int, int]]] = field(default_factory=dict)
 
     def tableWrite(self, table: Table, reference: tsp.Reference) -> None:
@@ -119,19 +128,22 @@ class TableSave:
             remapOwnerCoordinates(
                 entry.dependencies, maps.rows, maps.columns, table.name
             )
+        moves = findCellMoves(table, maps)
+        if moves:
+            moveOwnerCoordinates(entry.dependencies, moves, table.name)
 
         swallowed = listSwallowedPositions(table, model)
         edits = applyTableEdits(
-            index, table, model, swallowed, maps, self.registry, plan
+            index, table, model, swallowed, maps, self.registry, plan, moves
         )
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
-        if moved or swallowed or maps.changed:
-            # A structural edit can create and remove tiles and buckets, which
-            # the model has to declare as it points at them.
+        if moved or swallowed or maps.changed or moves:
+            # A structural edit or a moved block can create and remove tiles and
+            # buckets, which the model has to declare as it points at them.
             index.archiveWrite(
                 modelIdentifier, model,
                 self.registry.referencesReconcile(modelIdentifier, model)
-                if maps.changed else None,
+                if maps.changed or moves else None,
             )
         # The engine's register of formula-bearing cells, which is a separate
         # fact from a cell having moved and is what makes a newly attached
@@ -148,7 +160,7 @@ class TableSave:
             entry,
             collectFormulaDependencies(
                 table, entry.dependencies.internal_formula_owner_id,
-                added, self.ownerIds,
+                added, self.ownerIds, self.extents,
             ),
             removed,
         )
@@ -180,6 +192,10 @@ def openTableSave(document: Document, registry: PackageRegistry) -> TableSave:
         registry=registry,
         entries=readTableOwnerEntries(index, engine),
         ownerIds=ownerIds,
+        extents={
+            table.identifier: (table.rowCount, table.colCount)
+            for sheet in document.sheets for table in sheet.tables
+        },
     )
 
 

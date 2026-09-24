@@ -18,6 +18,7 @@ conversion between nodes and text takes that cell, and why one stored archive
 serves every cell a formula was dragged into.
 
 UPDATES
+2026-09-23  FormulaReferenceRelocation re-exported, for PYB-18.
 2026-09-21  FormulaReferenceLoss re-exported, for PYB-17.
 2026-09-08  Made a package of its own for #58, gathering the model, the text and
             both archive halves that were spread across three directories.
@@ -60,6 +61,7 @@ from pybers.formula.nodes import (
     Span,
 )
 from pybers.formula.parse import parseFormula
+from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.formula.render import renderFormula
 from pybers.formula.syntax import FormulaSyntaxError
 
@@ -76,6 +78,7 @@ __all__ = [
     "FormulaRange",
     "FormulaReference",
     "FormulaReferenceLoss",
+    "FormulaReferenceRelocation",
     "FormulaSyntaxError",
     "FormulaUnknownCall",
     "FormulaVariable",

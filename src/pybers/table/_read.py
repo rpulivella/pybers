@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-09-23  A cell records where its record sits, for PYB-18.
 2026-09-18  Each row and column reads its identity from the UID map, for PYB-17.
 2026-09-16  A cell reads whether its format was chosen, for PYB-83.
 2026-09-08  Split out of `pybers.document._read` for #58, unchanged.
@@ -222,6 +223,7 @@ def readTable(
                 cell.formula = resolveFormula(record, formulas)
                 cell.errored = record.typeByte == formulaErrorType
                 cell._formatChosen = carriesChosenFormat(record)
+                cell._origin = reference
     return table
 
 

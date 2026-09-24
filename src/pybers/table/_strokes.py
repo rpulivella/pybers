@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-A table's borders carried through rows and columns added or removed.
+A table's borders carried through rows and columns added or removed, or cells moved.
 
 Each row and each column owns one stroke layer, holding runs along the other
 axis, so one map moves a layer by its index and the other moves the runs
@@ -9,6 +9,7 @@ inside it. Measured 2026-09-21 in the four `57-borders-*` documents.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-23  Borders follow cells moved as a block, for PYB-18.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Split out of `_structure` for PYB-17.
 """
@@ -22,6 +23,9 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/21"
 
+from collections.abc import Iterable, Mapping
+
+from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
@@ -124,6 +128,119 @@ def applyStrokeLayers(
             references.add(identifier=placed[line][0])
 
 
+# A stroke run as it applies to one cell edge: the run with its span cleared.
+type StrokeEdges = dict[tuple[int, int], tst.StrokeLayerArchive.StrokeRunArchive]
+
+
+def readStrokeEdges(
+    index: ArchiveIndex, references: Iterable[tsp.Reference]
+) -> StrokeEdges:
+    """Return each cell edge a layer list strokes, keyed by (line, position)."""
+    edges: StrokeEdges = {}
+    for reference in references:
+        layer = index.resolve(reference, tst.StrokeLayerArchive)
+        for run in layer.stroke_runs:
+            for position in range(run.origin, run.origin + run.length):
+                edge = tst.StrokeLayerArchive.StrokeRunArchive()
+                edge.CopyFrom(run)
+                edge.ClearField("origin")
+                edge.ClearField("length")
+                edges[(layer.row_column_index, position)] = edge
+    return edges
+
+
+def buildEdgeRuns(
+    edges: StrokeEdges, line: int
+) -> list[tst.StrokeLayerArchive.StrokeRunArchive]:
+    """Return one line's edges as runs, joining neighbors that draw the same stroke."""
+    runs: list[tst.StrokeLayerArchive.StrokeRunArchive] = []
+    for position in sorted(held for owner, held in edges if owner == line):
+        edge = edges[(line, position)]
+        last = runs[-1] if runs else None
+        if last is not None and last.origin + last.length == position:
+            probe = tst.StrokeLayerArchive.StrokeRunArchive()
+            probe.CopyFrom(last)
+            probe.ClearField("origin")
+            probe.ClearField("length")
+            if probe.SerializeToString(deterministic=True) == edge.SerializeToString(
+                deterministic=True
+            ):
+                last.length += 1
+                continue
+        run = tst.StrokeLayerArchive.StrokeRunArchive()
+        run.CopyFrom(edge)
+        run.origin = position
+        run.length = 1
+        runs.append(run)
+    return runs
+
+
+def moveStrokeEdges(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    sidecar: tst.StrokeSidecarArchive,
+    moves: Mapping[tuple[int, int], tuple[int, int]],
+) -> None:
+    """Carry each moved cell's four edges to where it landed, as `61-move-*` measured.
+
+    `moves` maps a stored (row, column) to its new one. A column's layers key
+    their edges by (column, row) and a row's by (row, column). A layer left with
+    no edge is removed, as Numbers left none behind at the vacated border.
+    """
+    lists = (
+        (sidecar.left_column_stroke_layers, True),
+        (sidecar.right_column_stroke_layers, True),
+        (sidecar.top_row_stroke_layers, False),
+        (sidecar.bottom_row_stroke_layers, False),
+    )
+    sibling = next(
+        (reference.identifier for references, _ in lists for reference in references),
+        None,
+    )
+    spent: list[int] = []
+    for references, byColumn in lists:
+        keyed = {
+            ((column, row) if byColumn else (row, column)):
+            ((newColumn, newRow) if byColumn else (newRow, newColumn))
+            for (row, column), (newRow, newColumn) in moves.items()
+        }
+        edges = readStrokeEdges(index, references)
+        lifted = {key: edges.pop(key) for key in keyed if key in edges}
+        if not lifted:
+            continue
+        for key, edge in lifted.items():
+            edges[keyed[key]] = edge
+        touched = {line for line, _ in lifted} | {keyed[key][0] for key in lifted}
+        layers = {
+            index.resolve(reference, tst.StrokeLayerArchive).row_column_index:
+            reference.identifier
+            for reference in references
+        }
+        emptied = []
+        for line in sorted(touched):
+            runs = buildEdgeRuns(edges, line)
+            identifier = layers.get(line)
+            if not runs:
+                if identifier is not None:
+                    emptied.append(line)
+                continue
+            layer = tst.StrokeLayerArchive()
+            layer.row_column_index = line
+            layer.stroke_runs.extend(runs)
+            if identifier is None:
+                assert sibling is not None
+                layers[line] = createSiblingArchive(registry, sibling, layer)
+            else:
+                index.archiveWrite(identifier, layer)
+        spent.extend(layers.pop(line) for line in emptied)
+        del references[:]
+        for line in sorted(layers):
+            references.add(identifier=layers[line])
+    # Removed only after every created layer has copied its sibling's info.
+    for identifier in spent:
+        registry.archiveRemove(identifier)
+
+
 def listStrokeLayers(sidecar: tst.StrokeSidecarArchive) -> list[int]:
     """Return every layer the sidecar points at, which is what it declares."""
     return [
@@ -136,4 +253,4 @@ def listStrokeLayers(sidecar: tst.StrokeSidecarArchive) -> list[int]:
     ]
 
 
-__all__ = ["applyStrokeLayers", "listStrokeLayers"]
+__all__ = ["applyStrokeLayers", "listStrokeLayers", "moveStrokeEdges"]
