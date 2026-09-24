@@ -349,6 +349,36 @@ def testASavedMoveLeavesNoMergeBehind(tmp_path: Path) -> None:
     assert table.cell("C5").value is None
 
 
+@pytest.mark.parametrize(
+    ("rule", "anchor", "expected"),
+    [
+        (named, "F8", ["E4", "E8"]),
+        (named, "B3", ["E4", "E8"]),
+        (relative, "F8", ["E2", "E3", "E4", "E5", "E8", "E9", "A2", "A3"]),
+    ],
+)
+def testAMoveReturnsEveryFormulaReadingAVacatedCell(
+    rule: FormulaReferenceRelocation, anchor: str, expected: list[str]
+) -> None:
+    """PYB-18 AC 8: a partial range under either rule, the old address under one."""
+    _, table = openTable("60-move-base")
+    stranded = table.cellsMove("B2:D5", anchor, references=rule)
+    assert [str(cell.reference) for cell in stranded] == expected
+
+
+def testAMovedImportedMergeCarriesTheRecordsItCovers(tmp_path: Path) -> None:
+    """An imported merge keeps a record under `B1`, and it goes with the merge."""
+    document = pybers.open(findDocumentPath("22e-merge-imported"))
+    table = document.sheets[0].tables[0]
+    table.cellsMove("A1:B1", "A5", references=relative)
+    target = tmp_path / "imported.numbers"
+    document.save(target)
+    records = readTableFacts(target)[table.name]["records"]
+    assert isinstance(records, dict)
+    assert {(4, 0), (4, 1)} <= records.keys()
+    assert not {(0, 0), (0, 1)} & records.keys()
+
+
 def testAScriptAuthorMovesABlockAndSaves(tmp_path: Path) -> None:
     """The few lines a script writes: open, move, save, and read it back."""
     document = pybers.open(findDocumentPath("61-move-styles-base"))
@@ -375,5 +405,10 @@ def testACommandLineMovesABlockWithTheRuleAsTyped() -> None:
     document = pybers.open(findDocumentPath("60-move-base"))
     table = document.sheet(1).table(arguments[0])
     stranded = table.cellsMove(arguments[1], arguments[2], references=arguments[3])  # type: ignore[arg-type]
-    assert stranded == []
     assert table.cell("H8").formulaText == "=F8+G8"
+    assert [
+        f"{cell.table.name}::{cell.reference}" for cell in stranded if cell.table
+    ] == [
+        "Table 1::E2", "Table 1::E3", "Table 1::E4", "Table 1::E5", "Table 1::E8",
+        "Table 1::E9", "Table 2::A2", "Table 2::A3",
+    ]

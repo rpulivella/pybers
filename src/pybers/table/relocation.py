@@ -10,6 +10,7 @@ on without asking, measured 2026-09-23 in `60e-move-overwrite`, and pybers refus
 instead, since that discards a value nobody asked to lose.
 
 UPDATES
+2026-09-24  A move returns every formula left reading a cell it emptied.
 2026-09-23  Written for PYB-18.
 """
 from __future__ import annotations
@@ -32,7 +33,7 @@ from pybers.addressing.reference import (
     ReferenceError,
     toCellReference,
 )
-from pybers.formula.nodes import Formula
+from pybers.formula.nodes import Formula, FormulaRange, FormulaReference
 from pybers.formula.relocation import (
     FormulaBlockMove,
     FormulaReferenceRelocation,
@@ -168,6 +169,61 @@ def findNamedCellRewrites(
     return rewritten
 
 
+def isFormulaReadingVacated(
+    formula: Formula, host: CellReference, inside: bool, table: Table,
+    vacated: list[CellReference],
+) -> bool:
+    """Report whether a formula reads any position of `table` the move emptied."""
+    for node in formula.nodes:
+        content = node.content
+        if not isinstance(content, FormulaReference | FormulaRange):
+            continue
+        if isinstance(content, FormulaReference) and (
+            content.broken or content.row is None or content.column is None
+        ):
+            continue
+        tableId = content.tableId
+        if not (inside if tableId is None else tableId == table.identifier):
+            continue
+        try:
+            target = content.resolve(host)
+        except ReferenceError:
+            continue
+        if isinstance(target, CellReference):
+            if target.asUnlocked() in vacated:
+                return True
+        elif any(target.covers(position) for position in vacated):
+            return True
+    return False
+
+
+def findStrandedCells(table: Table, move: CellsMove) -> list[Cell]:
+    """Return every cell whose formula reads a position the move left empty.
+
+    That covers a formula left on the old address and a range covering only part
+    of the block, each of which now loses a value without raising anything.
+    """
+    vacated = [
+        reference for reference in move.source
+        if not move.destination.covers(reference)
+    ]
+    tables = (
+        [table] if table.document is None
+        else [other for sheet in table.document.sheets for other in sheet.tables]
+    )
+    return [
+        cell
+        for host in tables
+        for reference, cell in sorted(
+            host.cells.items(), key=lambda item: (item[0].row, item[0].col)
+        )
+        if cell.formula is not None
+        and isFormulaReadingVacated(
+            cell.formula, reference, host is table, table, vacated
+        )
+    ]
+
+
 def moveCells(
     table: Table,
     source: RangeAddress,
@@ -187,10 +243,8 @@ def moveCells(
         return []
     refuseMergeCut(table, move)
     refuseOccupied(table, move)
-    rewritten = (
-        findNamedCellRewrites(table, move)
-        if rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL else {}
-    )
+    named = rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
+    rewritten = findNamedCellRewrites(table, move) if named else {}
 
     moving = [
         cell for reference, cell in table.cells.items() if extent.covers(reference)
@@ -202,7 +256,7 @@ def moveCells(
     for cell in moving:
         cell.reference = move.cellMap(cell.reference)
         table.cells[cell.reference] = cell
-        if cell.formula is not None and not rewritten:
+        if cell.formula is not None and not named:
             cell.formula = clampFormulaRanges(
                 cell.formula, cell.reference, table.rowCount, table.colCount
             )
@@ -215,7 +269,7 @@ def moveCells(
         )) if extent.covers(merge.anchor) else merge
         for merge in table.mergeRanges
     ]
-    return []
+    return findStrandedCells(table, move)
 
 
 __all__ = ["CellsMove", "moveCells"]

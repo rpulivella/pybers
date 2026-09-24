@@ -390,8 +390,8 @@ class Table:
     ) -> list[Cell]:
         """Move a block so its top-left lands on `anchor`, carrying merges and styles.
 
-        `references` has no default: the caller says whether each reference keeps
-        the cell it named or its offset. Occupied destinations and cut merges raise.
+        `references` has no default. Returns each cell whose formula now reads a
+        cell the move emptied. Occupied destinations and cut merges raise.
         """
         return moveCells(self, source, anchor, references)
 
