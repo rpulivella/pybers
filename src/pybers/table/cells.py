@@ -57,6 +57,7 @@ from pybers.addressing.reference import (
     firstColumn,
     firstRow,
     toCellReference,
+    toCellReferenceNamed,
 )
 from pybers.errors import WriteError
 from pybers.formula.nodes import Formula
@@ -122,33 +123,6 @@ def generateOwnerIdentity() -> str:
     """
     value = int.from_bytes(uuid.uuid4().bytes, "little") & ownerBaseMask
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
-
-
-def toCellReferenceNamed(
-    address: CellAddress | None, row: int | None, col: int | None
-) -> CellReference:
-    """Return the cell an address names, or the one `row=` and `col=` name together.
-
-    Refuses both forms at once and a lone axis. A `bool` is refused as a coordinate
-    because Python counts `True` as 1, which no caller writing `row=True` meant.
-    """
-    if address is not None:
-        if row is not None or col is not None:
-            raise ReferenceError(
-                f"A cell is named by {address} or by row and col, and both were given."
-            )
-        return toCellReference(address)
-    if (
-        isinstance(row, int)
-        and isinstance(col, int)
-        and not isinstance(row, bool)
-        and not isinstance(col, bool)
-    ):
-        return CellReference(row, col)
-    raise ReferenceError(
-        "A cell is named by an address such as 'E3', or by row= and col= together "
-        f"as numbers, and was given row={row!r}, col={col!r}."
-    )
 
 
 def refuseRangeOutside(table: Table, item: CellRange) -> None:

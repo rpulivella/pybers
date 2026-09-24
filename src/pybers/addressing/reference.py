@@ -16,6 +16,7 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-09-23  `toCellReferenceNamed` moved here from the table model, for PYB-18.
 2026-09-22  The offset between stored and model coordinates lives here, for PYB-109.
 2026-09-13  An address past the far end of either axis is refused, for #67.
             `Ledger` read as column 144,936,576 and raised nothing.
@@ -229,3 +230,30 @@ def toCellReference(address: CellAddress) -> CellReference:
     if isinstance(address, str):
         return CellReference.parse(address)
     return address
+
+
+def toCellReferenceNamed(
+    address: CellAddress | None, row: int | None, col: int | None
+) -> CellReference:
+    """Return the cell an address names, or the one `row=` and `col=` name together.
+
+    Refuses both forms at once and a lone axis. A `bool` is refused as a coordinate
+    because Python counts `True` as 1, which no caller writing `row=True` meant.
+    """
+    if address is not None:
+        if row is not None or col is not None:
+            raise ReferenceError(
+                f"A cell is named by {address} or by row and col, and both were given."
+            )
+        return toCellReference(address)
+    if (
+        isinstance(row, int)
+        and isinstance(col, int)
+        and not isinstance(row, bool)
+        and not isinstance(col, bool)
+    ):
+        return CellReference(row, col)
+    raise ReferenceError(
+        "A cell is named by an address such as 'E3', or by row= and col= together "
+        f"as numbers, and was given row={row!r}, col={col!r}."
+    )
