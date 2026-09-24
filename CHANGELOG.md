@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-18] Relocate a block of cells as a unit
 - [PYB-113] Give every write-path concern one module
 - [PYB-111] Check table size, merges and empty cells in golden-confirm
 - [PYB-109] Read an archive as last written within one save
