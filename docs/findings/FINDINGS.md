@@ -34,6 +34,10 @@ language to parse or emit, moving a cell needs no reference rewriting, and `$` i
 boolean rather than punctuation. The regex-based range shifting recorded as a defect in
 `CLAUDE.md` was treating structure as text., [formulas](findings-02-formulas.md)
 
+**Superseded 2026-09-23 for PYB-18: a move rewrites references under one of two rules.**
+Numbers' cut and paste rewrites nothing, and dragging a block keeps every reference on the
+cell it named, which rewrites offsets., [structure](findings-03-structure.md)
+
 **Merges are stored as formulas**, in a formula store beside the cells, and **Numbers rewrites
 them on structural edits**. Reading is safe; writing is not, a row insert that ignores the
 merge store leaves a merge pointing at the wrong row, which is exactly the phantom merge
