@@ -57,6 +57,7 @@ from .registration import (
 )
 from .remapping import (
     LineMapping,
+    moveOwnerCoordinates,
     remapOwnerCoordinates,
 )
 
@@ -74,6 +75,7 @@ __all__ = [
     "readTableOwnerEntries",
     "readTableOwnerIds",
     "registerFormulaCells",
+    "moveOwnerCoordinates",
     "remapOwnerCoordinates",
     "requestRecalculation",
 ]
