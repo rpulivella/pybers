@@ -9,6 +9,7 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-23  Cells moved as a block carry their records first, for PYB-18.
 2026-09-22  Split out of the table writer for PYB-113: records, refcounts and
             merges went to modules of their own.
 2026-09-22  Archives written through the save's index, for PYB-109.
@@ -94,6 +95,7 @@ from ._refcounts import (
     removeSpentEntries,
     stringTypeByte,
 )
+from ._relocation import CellMoves, applyCellMoves, applyConditionChanges
 from ._tiles import (
     buildTileRange,
     createRowStorage,
@@ -173,6 +175,7 @@ def applyTableEdits(
     maps: GridMaps,
     registry: PackageRegistry,
     plan: ConditionalPlan | None,
+    moves: CellMoves,
 ) -> TableEdits:
     """Write every changed cell of one table back into the tiles it came from.
 
@@ -255,6 +258,15 @@ def applyTableEdits(
     written: list[tuple[int, int]] = []
     formulaAdded: list[tuple[int, int]] = []
     formulaRemoved: list[tuple[int, int]] = []
+    if moves:
+        carried = applyCellMoves(index, registry, model, moves)
+        applyConditionChanges(index, registry, store, table)
+        # A structural edit registers every formula afresh, so only a move alone
+        # names the formulas it carried.
+        if not restructured:
+            formulaRemoved.extend(stored for stored, _ in carried.formulas)
+            formulaAdded.extend(landed for _, landed in carried.formulas)
+        written.extend(sorted(set(moves) | set(moves.values())))
 
     # A row belongs to the tile covering its index, and a tile that holds nothing
     # may be absent. No table in the 46 documents has such a gap, so this refuses
@@ -284,7 +296,7 @@ def applyTableEdits(
         tile = index.resolve(entry.tile, tst.Tile)
         tiles.append(tile)
         firstRow = entry.tileid * tileSize
-        touched = restructured
+        touched = restructured or bool(moves)
 
         # Rows the file stores nothing for, materialized before the walk below,
         # which only ever sees a row that already has storage. Doing it here rather

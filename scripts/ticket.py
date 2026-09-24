@@ -38,6 +38,8 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-24  A comment and a wholly italic line keep their own lines, found on
+            PR #133, where both were joined onto the line below.
 2026-09-14  A bold label keeps its own line, and a title carrying square
             brackets prints as filed rather than being eaten by rich.
 2026-08-27  Set projectNumber to the real board (3), and corrected the 404 story, which
@@ -258,6 +260,9 @@ listOpener = re.compile(r"^([-*+] |\d+[.)] |\d+\.[a-z] )")
 # each is a statement rather than part of a paragraph.
 standaloneLines: tuple[str, ...] = ("Link:", "Closes ")
 
+# A line italic from end to end is a statement of its own, as `_Closes #34_` is.
+wholeItalic = re.compile(r"^_[^_].*_$")
+
 # Every separator `str.splitlines` breaks on, verified against it rather than listed
 # from memory. `\r\n` comes first because a line ending in one also ends in `\n`, so
 # the shorter match would strand a `\r` on the content for `strip` to delete. Named
@@ -340,6 +345,7 @@ def unwrapParagraphs(body: str) -> BodyChanges:
     inFence = False
     inCode = False
     inList = False
+    inComment = False
 
     def flush() -> None:
         # A joined paragraph already reports the whitespace it destroyed, so only a
@@ -370,6 +376,13 @@ def unwrapParagraphs(body: str) -> BodyChanges:
             out.append(line)
             continue
 
+        # A comment is invisible when rendered, so joining it swallows the line below.
+        if inComment or stripped.startswith("<!--"):
+            flush()
+            inComment = "-->" not in stripped
+            out.append(line)
+            continue
+
         if inCode:
             # A blank line belongs to the block; a non-blank one inside the margin
             # closes it and is then dispatched normally below.
@@ -384,7 +397,11 @@ def unwrapParagraphs(body: str) -> BodyChanges:
             out.append(line)
             continue
 
-        if not stripped or stripped.startswith(standaloneLines):
+        if (
+            not stripped
+            or stripped.startswith(standaloneLines)
+            or wholeItalic.match(stripped)
+        ):
             flush()
             out.append(line)
             continue

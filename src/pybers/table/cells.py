@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-23  A block of cells moves to a new anchor, and a cell remembers where
+            its record sits so a save can tell (PYB-18).
 2026-09-22  A range reaching outside the grid is refused in one place (PYB-113).
 2026-09-18  Rows and columns are added and removed, and each line carries the
             identity Numbers keys hidden state by (PYB-17).
@@ -57,13 +59,16 @@ from pybers.addressing.reference import (
     firstColumn,
     firstRow,
     toCellReference,
+    toCellReferenceNamed,
 )
 from pybers.errors import WriteError
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
+from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.formula.render import renderFormula
 from pybers.geometry import Position
 from pybers.style import Style
+from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
 from pybers.table.structure import (
     buildGridEdit,
@@ -122,33 +127,6 @@ def generateOwnerIdentity() -> str:
     """
     value = int.from_bytes(uuid.uuid4().bytes, "little") & ownerBaseMask
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
-
-
-def toCellReferenceNamed(
-    address: CellAddress | None, row: int | None, col: int | None
-) -> CellReference:
-    """Return the cell an address names, or the one `row=` and `col=` name together.
-
-    Refuses both forms at once and a lone axis. A `bool` is refused as a coordinate
-    because Python counts `True` as 1, which no caller writing `row=True` meant.
-    """
-    if address is not None:
-        if row is not None or col is not None:
-            raise ReferenceError(
-                f"A cell is named by {address} or by row and col, and both were given."
-            )
-        return toCellReference(address)
-    if (
-        isinstance(row, int)
-        and isinstance(col, int)
-        and not isinstance(row, bool)
-        and not isinstance(col, bool)
-    ):
-        return CellReference(row, col)
-    raise ReferenceError(
-        "A cell is named by an address such as 'E3', or by row= and col= together "
-        f"as numbers, and was given row={row!r}, col={col!r}."
-    )
 
 
 def refuseRangeOutside(table: Table, item: CellRange) -> None:
@@ -231,6 +209,14 @@ class Cell:
     style: Style = field(default_factory=Style)
     # Set only by the reader and `textLiteralSet`, so a write chooses only text.
     _formatChosen: bool = field(default=False, kw_only=True)
+    # Where the file stores this cell's record, so a save can tell that it moved.
+    _origin: CellReference | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
+    # The conditions of its highlighting rules, one per rule, hosted here.
+    _conditions: tuple[Formula, ...] = field(
+        default=(), repr=False, compare=False, kw_only=True
+    )
     # The table this belongs to, so that reading or writing a formula as text needs
     # neither the cell's own address nor the names of the other tables passed in.
     # Excluded from equality and `repr` for the reason `Document._package` is: it is
@@ -394,6 +380,20 @@ class Table:
         return editGrid(
             self, buildGridEdit(self, column, count, rows=False, removing=True)
         )
+
+    def cellsMove(
+        self,
+        source: RangeAddress,
+        anchor: CellAddress,
+        *,
+        references: FormulaReferenceRelocation,
+    ) -> list[Cell]:
+        """Move a block so its top-left lands on `anchor`, carrying merges and styles.
+
+        `references` has no default. Returns each cell whose formula now reads a
+        cell the move emptied. Occupied destinations and cut merges raise.
+        """
+        return moveCells(self, source, anchor, references)
 
     def cell(
         self,

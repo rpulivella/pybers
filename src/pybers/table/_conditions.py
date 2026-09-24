@@ -23,6 +23,8 @@ Private. Reached from the structural pass in `_structure` and the tile pass in
 `_edits`.
 
 UPDATES
+2026-09-24  A rule is rebuilt from the conditions its cell holds after a move,
+            for PYB-18.
 2026-09-22  The tile pass that reaches this is named `_edits`, for PYB-113.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Rules mapped by the formula machinery rather than a copy of it.
@@ -60,7 +62,7 @@ from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula._read import readFormula
 from ..formula._write import encodeFormula
-from ..formula.nodes import brokenReferenceNodeType
+from ..formula.nodes import Formula, FormulaNode, brokenReferenceNodeType
 from ..formula.restructure import FormulaRestructure, mapFormula
 from ._lines import GridMaps, ModelLines
 from .structure import countBrokenReferences
@@ -87,8 +89,8 @@ class ConditionalPlan:
     """
 
     index: ArchiveIndex
-    maps: GridMaps
-    change: FormulaRestructure
+    maps: GridMaps | None
+    change: FormulaRestructure | None
     registry: PackageRegistry
     dataList: tst.TableDataList
     listIdentifier: int
@@ -102,7 +104,7 @@ class ConditionalPlan:
         Also says whether its rule broke, since a broken rule caches no match.
         """
         rules = self.rules.get(key)
-        if rules is None:
+        if rules is None or self.change is None:
             return key, False
         outcome, changed = mapRuleSet(rules, row, column, self.change)
         if outcome == "same":
@@ -113,6 +115,37 @@ class ConditionalPlan:
         if result not in self.shared:
             self.shared[result] = self.entryCreate(changed, self.siblings[key])
         return self.shared[result], False
+
+    def keyForConditions(self, key: int, conditions: tuple[Formula, ...]) -> int:
+        """Return the key of a rule set holding these conditions, sharing equal ones."""
+        changed = tst.ConditionalStyleSetArchive()
+        changed.CopyFrom(self.rules[key])
+        if len(conditions) != len(changed.rules.rule):
+            raise WriteError(
+                f"A cell names {len(changed.rules.rule)} highlighting rules and "
+                f"holds {len(conditions)} conditions for them."
+            )
+        for number, condition in enumerate(conditions):
+            copies = [changed.rules.rule[number].predicate.formula]
+            if number < len(changed.rules_prepivot):
+                copies.append(changed.rules_prepivot[number].predicate.formula)
+            for formula in copies:
+                stored = readFormula(formula)
+                if len(stored) != len(condition):
+                    raise WriteError(
+                        "A highlighting condition changed shape in a move, which "
+                        "rewrites only where its references point."
+                    )
+                placed = Formula(tuple(
+                    FormulaNode(old.nodeType, new.content, old.raw)
+                    for old, new in zip(stored.nodes, condition.nodes, strict=True)
+                ))
+                formula.AST_node_array.CopyFrom(encodeFormula(placed).AST_node_array)
+        rewriteRuleOperands(changed)
+        result = (key, changed.SerializeToString(deterministic=True))
+        if result not in self.shared:
+            self.shared[result] = self.entryCreate(changed, self.siblings[key])
+        return self.shared[result]
 
     def entryCreate(self, rules: tst.ConditionalStyleSetArchive, sibling: int) -> int:
         """Add a rule set to the table's list, as a new archive, and return its key."""
@@ -262,6 +295,24 @@ def buildConditionalPlan(
     return plan
 
 
+def readConditionalPlan(
+    index: ArchiveIndex, registry: PackageRegistry, store: tst.DataStore
+) -> ConditionalPlan | None:
+    """Gather a table's rule sets with no structural edit to follow."""
+    if not store.HasField("conditionalstyletable"):
+        return None
+    dataList = index.resolve(store.conditionalstyletable, tst.TableDataList)
+    plan = ConditionalPlan(
+        index, None, None, registry, dataList, store.conditionalstyletable.identifier
+    )
+    for entry in dataList.entries:
+        plan.rules[int(entry.key)] = index.resolve(
+            entry.reference, tst.ConditionalStyleSetArchive
+        )
+        plan.siblings[int(entry.key)] = entry.reference.identifier
+    return plan
+
+
 def buildInheritedRecord(key: int) -> bytes:
     """Return the empty record a line added beside a highlighted cell receives."""
     return (
@@ -280,6 +331,7 @@ def rewriteConditionalRecord(
     as every one did in the measurements; one whose rule moved keeps its cache.
     """
     key = findSlotValue(record, conditionalSlot)
+    assert plan.maps is not None
     # A record on a removed column goes with it, so it names no rule afterward.
     if key is None or plan.maps.columns.lineMap(record.column) is None:
         return None
@@ -328,6 +380,7 @@ def writeConditionalCounts(plan: ConditionalPlan, tiles: Iterable[tst.Tile]) -> 
 
 __all__ = [
     "ConditionalPlan",
+    "readConditionalPlan",
     "buildInheritedRecord",
     "buildConditionalPlan",
     "rewriteConditionalRecord",

@@ -32,6 +32,8 @@ UPDATES
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Only the walk is left: every table is saved through the table feature's one
             entry point, for PYB-113.
+2026-09-23  A successful save records where each cell's record now sits, for
+            PYB-18.
 """
 from __future__ import annotations
 
@@ -181,6 +183,20 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
             if id(item) not in identified:
                 item._identifier = None
         raise
+    updateCellOrigins(document)
+
+
+def updateCellOrigins(document: Document) -> None:
+    """Record where each saved cell's record now sits, since the save moved it there."""
+    for sheet in document.sheets:
+        for table in sheet.tables:
+            for cell in table.cells.values():
+                if (
+                    cell._origin is not None
+                    or cell.value is not None
+                    or cell.formula is not None
+                ):
+                    cell._origin = cell.reference
 
 
 # `Document.save` reaches `writeDocument` and nothing else, and no other module in

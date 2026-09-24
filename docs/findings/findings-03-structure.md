@@ -255,6 +255,50 @@ that means evaluating the formula, so pybers refuses an edit that cuts a spill.
 One wholly outside a spill moves it as a block, which is ordinary movement, and a
 moved spill is listed first.
 
+## Moving a block of cells: dragging and cut and paste are two different rules
+
+From `60-move-base`, which holds `B2:D5` with formulas pointing inside it, out of it,
+locked, mixed and across tables, and `61-move-styles-base`, which holds a fill, a bold
+face, a border and a highlighting rule in the same block. Each copy is one move made by
+hand in Numbers 15.3.1, measured 2026-09-23 for PYB-18.
+
+**Dragging preserves the cell each reference names.** A reference inside the block to
+another cell in it follows, `=B2+C2` becoming `=F8+G8`. One leaving the block keeps its
+target, `=A3` staying `=A3` and `=$B2` becoming `=$F8`. A formula elsewhere naming cells
+wholly inside the block follows it, from another table too: `=SUM(B2:D5)` became
+`=SUM(F8:H11)` and `Table 2::C2` became `Table 2::G8`.
+
+**Cut and paste preserves each reference's position relative to its formula.** No
+formula anywhere is rewritten. `=A3` became `=E9`, the locked axis of `=$B2` stayed so it
+became `=$B8`, and a formula elsewhere kept naming the address the block left, reading
+empty cells. An offset landing outside a table is stored as it is, `=I7` in an eight
+column table and `Table 2::E7` in a one column table, and shows an error.
+
+**Under both, a range covering only part of the block stays put**, so `SUM(B1:B6)` lost
+the rows that moved. A reference to a destination cell keeps its address and reads what
+arrived, never `#REF!`.
+
+**A merge moves with a drag. Cut and paste copies it and leaves the empty source merge
+behind**, which pybers does not reproduce, since a covered cell there then refuses a
+write. Dragging onto occupied cells, `60e`, overwrote them without asking.
+
+**Styles, borders and highlighting travel with their cells under both.** The records
+kept pointing at the same style archives while Numbers renumbered the list keys. The
+border on `C3` moved to `G9` with no layer left behind. The highlighting rule was
+rebuilt as a new archive with identical contents, its operand still one column left,
+because the cell it reads moved with it. No record remains at a vacated position.
+
+**Superseded 2026-09-24: cut and paste does rewrite one kind of formula.** The paragraph
+above says no formula is rewritten. A moved range that would reach past its table's edge
+is clamped to it: `SUM(A1:A12)` pasted six rows lower in a twelve row table was stored as
+`SUM(E7:E12)`, not `SUM(E7:E18)`. The engine registers every range the same way, bounded
+by the table it reads, whether or not anything moved.
+
+**A drag rewrites highlighting as it rewrites formulas**, measured 2026-09-24 in
+`62b-move-rules-dragged`. The rule on `C2` reading `A1` kept reading `A1` from `G8`, and
+the rule on `E2` reading `C2`, outside the block, now reads `G8`. Each cell kept its
+cached match. Numbers reused the two list keys, where a structural edit issues new ones.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:

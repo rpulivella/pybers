@@ -20,6 +20,7 @@ single selected cell does, which is what `56f` and `56g` were made from.
 is unmerged rather than kept, both measured in `57-anchors-*` and `57-collapse-*`.
 
 UPDATES
+2026-09-24  A cell's highlighting conditions follow the edit too, for PYB-18.
 2026-09-18  Written for PYB-17.
 """
 from __future__ import annotations
@@ -203,6 +204,7 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
         else [other for sheet in table.document.sheets for other in sheet.tables]
     )
     formulas: dict[int, Formula] = {}
+    conditions: dict[int, tuple[Formula, ...]] = {}
     broken: list[Cell] = []
     for host in tables:
         rows, columns = edit.axisMaps()
@@ -216,9 +218,14 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
             columnIdentities=columnIdentities,
         )
         for reference, cell in host.cells.items():
-            if cell.formula is None:
-                continue
             if host is table and mapCell(reference, edit) is None:
+                continue
+            if host is table and cell._conditions:
+                conditions[id(cell)] = tuple(
+                    mapFormula(condition, reference, change)
+                    for condition in cell._conditions
+                )
+            if cell.formula is None:
                 continue
             rewritten = mapFormula(cell.formula, reference, change)
             if rewritten is cell.formula:
@@ -238,6 +245,8 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
         for cell in host.cells.values():
             if id(cell) in formulas:
                 cell.formula = formulas[id(cell)]
+            if id(cell) in conditions:
+                cell._conditions = conditions[id(cell)]
     for reference, cell in cells.items():
         cell.reference = reference
     table.cells = cells
