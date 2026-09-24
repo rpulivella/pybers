@@ -209,10 +209,13 @@ class Cell:
     style: Style = field(default_factory=Style)
     # Set only by the reader and `textLiteralSet`, so a write chooses only text.
     _formatChosen: bool = field(default=False, kw_only=True)
-    # Where the file stores this cell's record, so a save tells a moved cell from a
-    # new one. Excluded from equality and `repr` for the reason `table` is.
+    # Where the file stores this cell's record, so a save can tell that it moved.
     _origin: CellReference | None = field(
         default=None, repr=False, compare=False, kw_only=True
+    )
+    # The conditions of its highlighting rules, one per rule, hosted here.
+    _conditions: tuple[Formula, ...] = field(
+        default=(), repr=False, compare=False, kw_only=True
     )
     # The table this belongs to, so that reading or writing a formula as text needs
     # neither the cell's own address nor the names of the other tables passed in.

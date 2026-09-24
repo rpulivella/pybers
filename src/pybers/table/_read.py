@@ -19,7 +19,8 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
-2026-09-23  A cell records where its record sits, for PYB-18.
+2026-09-23  A cell records where its record sits, and reads the conditions of
+            its highlighting rules, for PYB-18.
 2026-09-18  Each row and column reads its identity from the UID map, for PYB-17.
 2026-09-16  A cell reads whether its format was chosen, for PYB-83.
 2026-09-08  Split out of `pybers.document._read` for #58, unchanged.
@@ -40,7 +41,12 @@ from typing import cast
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import CellDecodeError, chooseOffsetUnit, decodeRow
-from .._persistence.cells import CellRecord, carriesChosenFormat
+from .._persistence.cells import (
+    CellRecord,
+    carriesChosenFormat,
+    conditionalSlot,
+    findSlotValue,
+)
 from .._persistence.index import (
     ArchiveIndex,
     readDataList,
@@ -51,7 +57,8 @@ from .._persistence.index import (
 from ..addressing import CellRange, CellReference
 from ..addressing.reference import originOffset
 from ..errors import ReadError
-from ..formula._read import readFormulaTable, resolveFormula
+from ..formula._read import readFormula, readFormulaTable, resolveFormula
+from ..formula.nodes import Formula
 from .cells import CellValue, MergeRange, Table
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
@@ -152,6 +159,28 @@ def readLineIdentities(
     return rows, columns
 
 
+def readConditionFormulas(
+    index: ArchiveIndex, dataStore: tst.DataStore
+) -> dict[int, tuple[Formula, ...]]:
+    """Return each highlighting rule set's conditions, keyed as records name them.
+
+    One condition per rule, hosted on the cell the rule colors, which is what lets
+    a move rewrite them exactly as it rewrites a formula.
+    """
+    if not dataStore.HasField("conditionalstyletable"):
+        return {}
+    dataList = index.resolve(dataStore.conditionalstyletable, tst.TableDataList)
+    return {
+        int(entry.key): tuple(
+            readFormula(rule.predicate.formula)
+            for rule in index.resolve(
+                entry.reference, tst.ConditionalStyleSetArchive
+            ).rules.rule
+        )
+        for entry in dataList.entries
+    }
+
+
 def readTable(
     index: ArchiveIndex,
     tableInfo: tst.TableInfoArchive,
@@ -164,6 +193,7 @@ def readTable(
     strings = readStringTable(index, dataStore)
     richText = readRichTextTable(index, dataStore)
     formulas = readFormulaTable(index, dataStore)
+    conditions = readConditionFormulas(index, dataStore)
     rowIdentities, columnIdentities = readLineIdentities(index, model)
 
     # The grid size is declared by the table, never inferred from which cells hold
@@ -224,6 +254,9 @@ def readTable(
                 cell.errored = record.typeByte == formulaErrorType
                 cell._formatChosen = carriesChosenFormat(record)
                 cell._origin = reference
+                key = findSlotValue(record, conditionalSlot)
+                if key is not None:
+                    cell._conditions = conditions.get(key, ())
     return table
 
 
