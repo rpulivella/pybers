@@ -17,6 +17,8 @@ credential, which makes them the one piece of that tooling worth pinning before
 PYB-11 decides what testing repo scripts should look like.
 
 UPDATES
+2026-09-24  A comment and a wholly italic line keep their own lines, found on
+            PR #133.
 2026-09-14  A bold label opening a line is its own block, found on PR #77.
 2026-09-11  Indentation, the trim report, and `BodyChanges` in place of a tuple,
             for #74.
@@ -310,3 +312,27 @@ def testABoldRunInsideASentenceIsStillProseAndStillJoins() -> None:
         "a wrapped line mentioning **this**: and continuing on a second line\n"
     )
     assert changes.joined == 1
+
+
+def testACommentKeepsTheLineAfterItOnItsOwnLine() -> None:
+    """PR #133: `<!-- ... -->` and the `None` below it posted as one line."""
+    body = "## Heading\n<!-- If none, write None. -->\nNone\n"
+    assert ticket.unwrapParagraphs(body).text == body
+
+
+def testAMultiLineCommentPassesThroughUntouched() -> None:
+    """A wrapped comment is the template's own text, and joining it gains nothing."""
+    body = "<!-- one line\n     and its continuation -->\nprose after\n"
+    assert ticket.unwrapParagraphs(body).text == body
+
+
+def testAWhollyItalicLineKeepsItsOwnLine() -> None:
+    """PR #133: `_Closes #18_` joined onto the comment above it, so it never parsed."""
+    body = "None\n_Closes #18_\n_Part of #18, with more to follow_\n"
+    assert ticket.unwrapParagraphs(body).text == body
+
+
+def testAnItalicRunInsideASentenceIsStillProseAndStillJoins() -> None:
+    """Only a line italic from end to end stands alone."""
+    changes = ticket.unwrapParagraphs("a _stressed_ word\nand its continuation\n")
+    assert changes.text == "a _stressed_ word and its continuation\n"
