@@ -28,7 +28,8 @@ means fetching the current body, changing part of it, and writing the whole thin
    - `python3 scripts/ticket.py show <N>`, to **read** it yourself. Rendered, wrapped,
      prefixed.
    - `python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"`
-, to **edit**. The body byte for byte, which is what gets revised and written back.
+, to **edit**. The body as GitHub stores it, save a backslash ending each line GitHub
+     shows as a break, which is what gets revised and written back.
    - `python3 scripts/ticket.py export-as-source <N> --title`, whenever the revision
      keeps any part of the existing title. `show` prints it as `PYB-<N> <title>` and wraps
      at eighty columns, so a long title taken from there comes back with the number glued
