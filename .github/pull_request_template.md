@@ -26,7 +26,9 @@ None
 ## Breaking Changes
 <!-- Write None after each heading if not applicable, otherwise a short list. -->
 **CI / automation / build**:
+
 **Object model (public dataclass fields)**: any change to a public dataclass's field names/types
+
 **Archive round-trip**: any change to what a written `.numbers` file looks like on disk
 
 ## Checklist (before requesting review)
