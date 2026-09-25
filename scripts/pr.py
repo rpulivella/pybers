@@ -37,6 +37,8 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-25  Bodies post and export through `ticket.py`'s shared handling, for
+            PYB-134.
 2026-09-01  Added `export-as-source`, matching ticket.py's command of the same name
             down to the flags and the handler name. `edit` replaces the WHOLE body
             and GitHub has no conflict detection, so a revision drafted from memory
@@ -430,20 +432,6 @@ def confirmChecksPassed(runs: list[CheckRun]) -> bool:
     return any(run["conclusion"] == "success" for run in runs)
 
 
-def printBodyAsRawString(body: str) -> None:
-    """Write a pull request body to stdout byte for byte, so it can be sent back.
-
-    Nothing here passes through rich, and that is the whole point. rich hard-wraps
-    to the terminal width, expands tabs, substitutes emoji shortcodes, and reads
-    square brackets as style markup, so a body carrying `[#14]` or `[hotfix]` loses
-    those words silently. A pull request body is full of both.
-
-    Without this the only way to fetch an editable body is to reach around the tool,
-    which is forbidden. If a future operation is not covered here, add a subcommand.
-    """
-    sys.stdout.write(body)
-
-
 def printTitleAsRawString(summary: PullRequestSummary) -> None:
     """Write a pull request title to stdout with nothing added but its own newline.
 
@@ -690,9 +678,11 @@ def runCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    changes = ticket.readBodyFile(bodyPath)
-    body = changes.text
-    ticket.reportUnwrapping(changes)
+    posted = ticket.readBodyFile(bodyPath)
+    if posted is None:
+        return 1
+    body = posted.text
+    ticket.reportTidying(posted)
     if refuseBody(body):
         return errorExitCode
 
@@ -814,17 +804,19 @@ def runChecks(arguments: argparse.Namespace) -> int:
 
 
 def runExportAsSource(arguments: argparse.Namespace) -> int:
-    """Emit one field of a pull request verbatim, for a skill that will send it back.
+    """Emit one field of a pull request for editing, for a skill that will send it back.
 
     Separate from `find` because displaying and round-tripping are different actions
-    with incompatible contracts: `find` may decorate freely, this must never
-    transform a byte. `edit` replaces the WHOLE body and GitHub has no conflict
-    detection, so a revision drafted from memory silently discards whatever changed
-    in between. This is what makes drafting one against the current text possible.
+    with incompatible contracts: `find` may decorate freely, and this changes nothing
+    but a backslash ending each line GitHub shows as a break. `edit` replaces the
+    WHOLE body and GitHub has no conflict detection, so a revision drafted from
+    memory silently discards whatever changed in between. This is what makes
+    drafting one against the current text possible.
     """
     token = ticket.resolveToken()
     if arguments.body:
-        printBodyAsRawString(readPullRequestBody(token, arguments.number))
+        body = readPullRequestBody(token, arguments.number)
+        return 0 if ticket.writeBodyForEditing(body) else 1
     else:
         printTitleAsRawString(readPullRequest(token, arguments.number))
     return 0
@@ -836,8 +828,10 @@ def runComment(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    changes = ticket.readBodyFile(bodyPath)
-    body = changes.text
+    posted = ticket.readBodyFile(bodyPath)
+    if posted is None:
+        return 1
+    body = posted.text
     if arguments.dryRun:
         console.print(
             f"[yellow]Dry run[/] comment on {formatPullRequestRef(arguments.number)}:"
@@ -846,7 +840,7 @@ def runComment(arguments: argparse.Namespace) -> int:
         return 0
     token = ticket.resolveToken()
     comment = ticket.postComment(token, arguments.number, body)
-    ticket.reportUnwrapping(changes)
+    ticket.reportTidying(posted)
     console.print(
         "[green]Commented on[/] "
         f"[bold cyan]{formatPullRequestRef(arguments.number)}[/] "
@@ -870,11 +864,9 @@ def runCommentList(arguments: argparse.Namespace) -> int:
 
 
 def runCommentExport(arguments: argparse.Namespace) -> int:
-    """Emit one comment's body verbatim, for a caller that will send it back."""
-    ticket.printCommentAsRawString(
-        ticket.readComment(ticket.resolveToken(), arguments.commentId)
-    )
-    return 0
+    """Emit one comment's body for editing, for a caller that will send it back."""
+    comment = ticket.readComment(ticket.resolveToken(), arguments.commentId)
+    return 0 if ticket.writeBodyForEditing(comment["body"]) else 1
 
 
 def runCommentEdit(arguments: argparse.Namespace) -> int:
@@ -887,15 +879,17 @@ def runCommentEdit(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    changes = ticket.readBodyFile(bodyPath)
-    body = changes.text
+    posted = ticket.readBodyFile(bodyPath)
+    if posted is None:
+        return 1
+    body = posted.text
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
         console.print(body, markup=False, highlight=False)
         return 0
     token = ticket.resolveToken()
     comment = ticket.updateComment(token, arguments.commentId, body)
-    ticket.reportUnwrapping(changes)
+    ticket.reportTidying(posted)
     console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
     return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
 
@@ -935,9 +929,11 @@ def runEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return errorExitCode
-        changes = ticket.readBodyFile(bodyPath)
-        body = changes.text
-        ticket.reportUnwrapping(changes)
+        posted = ticket.readBodyFile(bodyPath)
+        if posted is None:
+            return 1
+        body = posted.text
+        ticket.reportTidying(posted)
         if refuseBody(body):
             return errorExitCode
 
@@ -1246,15 +1242,17 @@ def buildParser() -> argparse.ArgumentParser:
 
     exportParser = subparsers.add_parser(
         "export-as-source",
-        help="The SOURCE, byte for byte, nothing rendered: the form to edit and send "
-        "back to `edit`. Contrast `find`, which renders.",
+        help="The SOURCE, nothing rendered, each line GitHub shows as a break ending "
+        "in a backslash: the form to edit and send back to `edit`. Contrast "
+        "`find`, which renders.",
     )
     exportParser.add_argument("number", type=parsePullRequestNumber)
     # Mutually exclusive and required, because these never compose: each is a whole
     # output, not a modifier on a shared one. Same shape as ticket.py's.
     fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
     fieldGroup.add_argument(
-        "--body", action="store_true", help="the body, byte for byte, nothing rendered"
+        "--body", action="store_true",
+        help="the body, as a file means it, nothing rendered",
     )
     fieldGroup.add_argument(
         "--title", action="store_true", help="the title, with nothing added"
@@ -1292,8 +1290,8 @@ def buildParser() -> argparse.ArgumentParser:
 
     commentExportParser = subparsers.add_parser(
         "comment-export",
-        help="The SOURCE of one comment, byte for byte: the form to revise and "
-        "send back to `comment-edit`.",
+        help="The SOURCE of one comment, as `export-as-source` gives a body: the "
+        "form to revise and send back to `comment-edit`.",
     )
     commentExportParser.add_argument("commentId", type=int)
     commentExportParser.set_defaults(handler=runCommentExport)

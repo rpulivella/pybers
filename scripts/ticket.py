@@ -38,6 +38,8 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-25  Bodies are formatted by `github_body` on the way out and marked for editing
+            on the way back, replacing the unwrapper, for PYB-134.
 2026-09-24  A comment and a wholly italic line keep their own lines, found on
             PR #133, where both were joined onto the line below.
 2026-09-14  A bold label keeps its own line, and a title carrying square
@@ -95,16 +97,19 @@ __usage__ = "python3 scripts/ticket.py <command> [options]"
 import argparse
 import json
 import os
-import re
 import sys
 import tomllib
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from rich.console import Console
+
+if TYPE_CHECKING:
+    # Imported where used, since the job posting the readiness comment installs rich
+    # alone and imports this module without ever formatting a body.
+    from github_body import PostedBody
 from rich.markup import escape
 
 console = Console()
@@ -234,233 +239,45 @@ class GitHubHttpError(RuntimeError):
         self.statusCode = statusCode
 
 
-# A markdown block opens only when a space follows its marker, so `**bold**:` is
-# ordinary prose rather than a bullet. Getting this wrong splits a bolded paragraph
-# across two lines, which is the exact defect this whole mechanism exists to stop.
-#
-# A LABEL is the exception, and it earned its place on PR #77: a line that is only
-# `**Something**:` and its value is a heading in prose clothing, and the pull
-# request template puts three of them on consecutive lines under Breaking Changes.
-# Joining those gave one run-on paragraph. Matched only when the bold run opens the
-# line, so `see **this**: here` inside a sentence is still prose.
-blockOpener = re.compile(r"^(#{1,6} |> |\||```|~~~|:{3}|\*\*[^*]+\*\*:)")
+def readBodyFile(path: Path) -> PostedBody | None:
+    """Read a drafted body and format it for GitHub, or say why it cannot be posted.
 
-# A list item is the one block whose wrapped continuation belongs to it rather than
-# standing alone, so it is matched separately from the openers above.
-#
-# The third alternative is the SUPERSEDED sub-criterion form, `1.a` and `4.b`, which
-# carries no space after the period and so is invisible to the ordinary list patterns.
-# Sub-criteria are an indented ordered list now, matched by the second alternative, but
-# tickets filed before 2026-09-02 still carry the old form and it stays matched here.
-# Without it a sub-criterion is read as prose and joined onto its parent, which silently
-# collapses a nested acceptance criterion into the one above it.
-listOpener = re.compile(r"^([-*+] |\d+[.)] |\d+\.[a-z] )")
-
-# The two lines of a ticket body that GitHub links, kept on their own lines because
-# each is a statement rather than part of a paragraph.
-standaloneLines: tuple[str, ...] = ("Link:", "Closes ")
-
-# A line italic from end to end is a statement of its own, as `_Closes #34_` is.
-wholeItalic = re.compile(r"^_[^_].*_$")
-
-# Every separator `str.splitlines` breaks on, verified against it rather than listed
-# from memory. `\r\n` comes first because a line ending in one also ends in `\n`, so
-# the shorter match would strand a `\r` on the content for `strip` to delete. Named
-# because splitting on these and rejoining with `\n` rewrites a line ending the author
-# chose, and inside a fenced code block that is their code rather than their formatting.
-lineSeparators: tuple[str, ...] = (
-    "\r\n", "\n", "\r", "\v", "\f", "\x1c", "\x1d", "\x1e",
-    "\x85", "\u2028", "\u2029",
-)
-
-
-def readLineEnding(line: str) -> str:
-    """Return the separator one line from `splitlines(keepends=True)` carries.
-
-    The empty string for the last line of a body that does not end in one.
+    Read with `newline=""`, so a line ending the author chose reaches the formatter
+    untranslated. None after printing the refusal, which names the lines whose
+    rendering would change.
     """
-    for separator in lineSeparators:
-        if line.endswith(separator):
-            return separator
-    return ""
+    from github_body import BodyRenderingError, formatBodyForPosting
+
+    try:
+        return formatBodyForPosting(path.read_text(encoding="utf-8", newline=""))
+    except BodyRenderingError as exc:
+        console.print(f"[red]{escape(str(exc))}[/]")
+        return None
 
 
-# CommonMark makes four columns of indentation a code block needing no fence, a tab
-# advancing to the next stop. A construct identified by its indentation is invisible
-# to a pattern matched against the stripped line, which is how a pasted block arrived
-# at GitHub as a sentence. See #74.
-codeIndent: int = 4
-
-
-def measureLeadingWidth(content: str) -> int:
-    """Return how many columns a line is indented before its first other character."""
-    width = 0
-    for character in content:
-        if character == " ":
-            width += 1
-        elif character == "\t":
-            width += codeIndent - (width % codeIndent)
-        else:
-            break
-    return width
-
-
-@dataclass(frozen=True, slots=True)
-class BodyChanges:
-    """A drafted body as it will be posted, and every change made on the way there.
-
-    A dataclass rather than a `TypedDict` like its neighbors, which each mirror a
-    GitHub payload. This is computed here and never parsed from one.
-    """
-
-    text: str
-    joined: int
-    trimmed: int
-
-
-def unwrapParagraphs(body: str) -> BodyChanges:
-    """Join every hard-wrapped paragraph onto one line, and say how many were joined.
-
-    **GitHub renders an issue, pull request or comment body with GFM hard line breaks
-    turned on**, so a single newline inside a paragraph becomes a `<br>` rather than
-    reflowing. Text wrapped at eighty-eight columns therefore reproduces its own wrap
-    points on screen, at any window width, and a wrapped continuation under a list
-    item breaks the item apart. A `.md` file committed to the repository has the
-    opposite behavior, which is why the same habit is right in `CLAUDE.md` and wrong
-    the moment the text is posted. Both are markdown and both end in `.md`, and that
-    is why this went unnoticed for eighteen tickets.
-
-    Only prose is joined. Headings, list items, tables, block quotes and fenced code
-    are emitted exactly as given, because a newline is meaningful in every one of
-    them. Returning the count keeps the transformation visible: a caller reports it
-    rather than rewriting the author's text in silence.
-    """
-    lines = body.splitlines(keepends=True)
-    out: list[str] = []
-    paragraph: list[str] = []
-    paragraphEnding = ""
-    paragraphTrims = 0
-    joined = 0
-    trimmed = 0
-    inFence = False
-    inCode = False
-    inList = False
-    inComment = False
-
-    def flush() -> None:
-        # A joined paragraph already reports the whitespace it destroyed, so only a
-        # paragraph of one line has a trim left to report on its own.
-        nonlocal joined, trimmed, paragraphTrims
-        if paragraph:
-            if len(paragraph) > 1:
-                joined += len(paragraph) - 1
-            else:
-                trimmed += paragraphTrims
-            out.append(" ".join(paragraph) + paragraphEnding)
-            paragraph.clear()
-        paragraphTrims = 0
-
-    for line in lines:
-        ending = readLineEnding(line)
-        content = line[: len(line) - len(ending)]
-        stripped = content.strip()
-        indent = measureLeadingWidth(content)
-
-        if stripped.startswith(("```", "~~~")):
-            flush()
-            inFence = not inFence
-            inList = False
-            out.append(line)
-            continue
-        if inFence:
-            out.append(line)
-            continue
-
-        # A comment is invisible when rendered, so joining it swallows the line below.
-        if inComment or stripped.startswith("<!--"):
-            flush()
-            inComment = "-->" not in stripped
-            out.append(line)
-            continue
-
-        if inCode:
-            # A blank line belongs to the block; a non-blank one inside the margin
-            # closes it and is then dispatched normally below.
-            if not stripped or indent >= codeIndent:
-                out.append(line)
-                continue
-            inCode = False
-        elif stripped and indent >= codeIndent and not inList and not paragraph:
-            # Indented code cannot interrupt a paragraph, and inside a list the same
-            # indentation is a continuation rather than a block.
-            inCode = True
-            out.append(line)
-            continue
-
-        if (
-            not stripped
-            or stripped.startswith(standaloneLines)
-            or wholeItalic.match(stripped)
-        ):
-            flush()
-            out.append(line)
-            continue
-
-        if listOpener.match(stripped):
-            # A list item opens a paragraph of its own, so its wrapped continuation
-            # joins the item rather than becoming a stray line outside the list.
-            flush()
-            item = content.rstrip()
-            if item != content:
-                paragraphTrims += 1
-            paragraph.append(item)
-            paragraphEnding = ending
-            inList = True
-            continue
-
-        if indent == 0:
-            inList = False
-
-        if blockOpener.match(stripped):
-            flush()
-            out.append(line)
-            continue
-
-        if stripped != content:
-            paragraphTrims += 1
-        paragraph.append(stripped)
-        paragraphEnding = ending
-    flush()
-
-    return BodyChanges(text="".join(out), joined=joined, trimmed=trimmed)
-
-
-def readBodyFile(path: Path) -> BodyChanges:
-    """Read a drafted body and unwrap it, because it is bound for GitHub.
-
-    Every body this tool posts is destined for GitHub and nowhere else, so it is
-    normalized on the way out rather than left to whoever drafted it to remember.
-
-    **Read with `newline=""`, which turns universal newlines OFF.** The default
-    translates `\r\n` and a bare `\r` to `\n` before any of this code sees the
-    text, so a carriage return inside a fenced code block was gone before
-    `unwrapParagraphs` could preserve it, and nothing reported the change.
-    """
-    return unwrapParagraphs(path.read_text(encoding="utf-8", newline=""))
-
-
-def reportUnwrapping(changes: BodyChanges) -> None:
-    """Say what was changed, so the normalization is never a silent rewrite."""
-    if changes.joined:
+def reportTidying(posted: PostedBody) -> None:
+    """Say how many lines formatting changed, so it is never a silent rewrite."""
+    if posted.tidied:
         console.print(
-            f"[dim]unwrapped {changes.joined} hard-wrapped line(s); GitHub renders a "
-            f"newline inside a paragraph as a line break[/]"
+            f"[dim]tidied {posted.tidied} line(s) for GitHub, "
+            "which renders them as the file reads[/]"
         )
-    if changes.trimmed:
-        console.print(
-            f"[dim]trimmed the indent or the trailing spaces from "
-            f"{changes.trimmed} line(s)[/]"
-        )
+
+
+def writeBodyForEditing(body: str) -> bool:
+    """Write a body to stdout as a file means it, or say why it cannot be exported.
+
+    Never through rich, which hard-wraps, expands tabs, substitutes emoji shortcodes
+    and reads square brackets as markup, so `[hotfix]` would vanish silently.
+    """
+    from github_body import BodyRenderingError, convertBodyForEditing
+
+    try:
+        sys.stdout.write(convertBodyForEditing(body))
+    except BodyRenderingError as exc:
+        console.print(f"[red]{escape(str(exc))}[/]")
+        return False
+    return True
 
 
 def readTokenFromSecretsFile() -> str | None:
@@ -986,16 +803,6 @@ def deleteComment(token: str, commentId: int) -> None:
     requestJson(url, token, method="DELETE")
 
 
-def printCommentAsRawString(comment: CommentSummary) -> None:
-    """Write one comment's body to stdout byte for byte, for revising and sending back.
-
-    Same contract and same reason as `printBodyAsRawString`: rich hard-wraps,
-    expands tabs and reads square brackets as markup, so anything that passes
-    through it is unusable for round-tripping.
-    """
-    sys.stdout.write(comment["body"])
-
-
 def showComments(comments: list[CommentSummary]) -> None:
     """Print comments for a human reader, never for round-tripping.
 
@@ -1013,25 +820,6 @@ def showComments(comments: list[CommentSummary]) -> None:
         )
         console.print(comment["body"], markup=False, highlight=False)
         console.print(f"[dim]{comment['url']}[/]\n")
-
-
-def printBodyAsRawString(summary: TicketSummary) -> None:
-    """Write a ticket body to stdout byte for byte, so it can be edited and sent back.
-
-    Anything that passes through rich is unusable for that. rich hard-wraps to the
-    terminal width, expands tabs to spaces, substitutes emoji shortcodes (`:warning:`
-    becomes a glyph), and reads square brackets as style markup, a body containing
-    `[bold]`, `[red]` or `[hotfix]` loses those words SILENTLY, with no error.
-    Measured 2026-08-13: "use [bold] tags and [red] markers, plus [88] and [hotfix]"
-    renders as "use  tags and  markers, plus [88] and ". Passing markup=False,
-    highlight=False and soft_wrap=True narrows this but never eliminates it; tab
-    expansion and emoji substitution survive every flag.
-
-    Without this, the only way to fetch an editable body is to curl the API directly,
-    which is forbidden. If a future operation is not covered here, add a subcommand
-    rather than reaching around the tool.
-    """
-    sys.stdout.write(summary["body"])
 
 
 def printTitleAsRawString(summary: TicketSummary) -> None:
@@ -1081,7 +869,7 @@ def showTicket(summary: TicketSummary) -> None:
         # highlight=False stops it recoloring numbers and URLs inside prose it does
         # not own. Wrapping stays ON: this is the human-reading path and
         # terminal-width wrapping is wanted here. It is also why this cannot
-        # round-trip, for that use printBodyAsRawString(), which touches nothing.
+        # round-trip, for that use writeBodyForEditing().
         console.print(summary["body"], markup=False, highlight=False)
 
 
@@ -1096,9 +884,11 @@ def runCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
-    changes = readBodyFile(bodyPath)
-    body = changes.text
-    reportUnwrapping(changes)
+    posted = readBodyFile(bodyPath)
+    if posted is None:
+        return 1
+    body = posted.text
+    reportTidying(posted)
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was filed.[/]")
@@ -1148,16 +938,16 @@ def runShow(arguments: argparse.Namespace) -> int:
 
 
 def runExportAsSource(arguments: argparse.Namespace) -> int:
-    """Emit one field of a ticket verbatim, for a skill that will send it back.
+    """Emit one field of a ticket for editing, for a skill that will send it back.
 
     Separate from `show` because displaying and round-tripping are different actions
-    with incompatible contracts: `show` may reformat freely, `export-as-source` must
-    never transform a single byte. Both of them "read" a ticket, which is why neither is
-    called that, the name has to say what comes out.
+    with incompatible contracts: `show` may reformat freely, and `export-as-source`
+    changes nothing but a backslash ending each line GitHub shows as a break. Both of
+    them "read" a ticket, which is why neither is called that.
     """
     summary = readTicket(resolveToken(), arguments.number)
     if arguments.body:
-        printBodyAsRawString(summary)
+        return 0 if writeBodyForEditing(summary["body"]) else 1
     else:
         printTitleAsRawString(summary)
     return 0
@@ -1210,9 +1000,11 @@ def runEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return 1
-        changes = readBodyFile(bodyPath)
-        body = changes.text
-        reportUnwrapping(changes)
+        posted = readBodyFile(bodyPath)
+        if posted is None:
+            return 1
+        body = posted.text
+        reportTidying(posted)
 
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
@@ -1300,8 +1092,10 @@ def runComment(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
-    changes = readBodyFile(bodyPath)
-    body = changes.text
+    posted = readBodyFile(bodyPath)
+    if posted is None:
+        return 1
+    body = posted.text
     if arguments.dryRun:
         console.print(
             f"[yellow]Dry run[/] comment on {formatTicketRef(arguments.number)}:"
@@ -1310,7 +1104,7 @@ def runComment(arguments: argparse.Namespace) -> int:
         return 0
     token = resolveToken()
     comment = postComment(token, arguments.number, body)
-    reportUnwrapping(changes)
+    reportTidying(posted)
     console.print(
         f"[green]Commented on[/] [bold cyan]{formatTicketRef(arguments.number)}[/] "
         f"as comment [bold cyan]{comment['id']}[/]"
@@ -1319,14 +1113,14 @@ def runComment(arguments: argparse.Namespace) -> int:
 
 
 def runCommentExport(arguments: argparse.Namespace) -> int:
-    """Emit one comment's body verbatim, for a caller that will send it back.
+    """Emit one comment's body for editing, for a caller that will send it back.
 
     Separate from `comment-list` for the reason `export-as-source` is separate from
     `show`: displaying and round-tripping are different actions with incompatible
     contracts.
     """
-    printCommentAsRawString(readComment(resolveToken(), arguments.commentId))
-    return 0
+    comment = readComment(resolveToken(), arguments.commentId)
+    return 0 if writeBodyForEditing(comment["body"]) else 1
 
 
 def runCommentEdit(arguments: argparse.Namespace) -> int:
@@ -1335,15 +1129,17 @@ def runCommentEdit(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return 1
-    changes = readBodyFile(bodyPath)
-    body = changes.text
+    posted = readBodyFile(bodyPath)
+    if posted is None:
+        return 1
+    body = posted.text
     if arguments.dryRun:
         console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
         console.print(body, markup=False, highlight=False)
         return 0
     token = resolveToken()
     comment = updateComment(token, arguments.commentId, body)
-    reportUnwrapping(changes)
+    reportTidying(posted)
     console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
     return 0 if verifyCommentBody(token, comment, body) else 1
 
@@ -1635,15 +1431,17 @@ def buildParser() -> argparse.ArgumentParser:
 
     exportParser = subparsers.add_parser(
         "export-as-source",
-        help="The SOURCE, byte for byte, nothing rendered: the form to edit and send "
-        "back to `edit`. Contrast `show`, which renders.",
+        help="The SOURCE, nothing rendered, each line GitHub shows as a break ending "
+        "in a backslash: the form to edit and send back to `edit`. Contrast "
+        "`show`, which renders.",
     )
     exportParser.add_argument("number", type=parseTicketNumber)
     # Mutually exclusive and required, because these never compose: each is a whole
     # output, not a modifier on a shared one.
     fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
     fieldGroup.add_argument(
-        "--body", action="store_true", help="the body, byte for byte, nothing rendered"
+        "--body", action="store_true",
+        help="the body, as a file means it, nothing rendered",
     )
     fieldGroup.add_argument(
         "--title", action="store_true", help="the title, with nothing added"
@@ -1681,8 +1479,8 @@ def buildParser() -> argparse.ArgumentParser:
 
     commentExportParser = subparsers.add_parser(
         "comment-export",
-        help="The SOURCE of one comment, byte for byte: the form to revise and "
-        "send back to `comment-edit`.",
+        help="The SOURCE of one comment, as `export-as-source` gives a body: the "
+        "form to revise and send back to `comment-edit`.",
     )
     commentExportParser.add_argument("commentId", type=int)
     commentExportParser.set_defaults(handler=runCommentExport)
