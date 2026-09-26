@@ -22,7 +22,7 @@ the tag alone records exactly what shipped.
 4. **Update `CHANGELOG.md`** before a `final` tag. List what shipped and reconcile it
    against the `## Unreleased` entries:
    ```
-   python3 scripts/ticket.py list --status Done
+   .venv/bin/python3 scripts/ticket.py list --status Done
    ```
    Run `/changelog-add` for any ticket missing a line, or confirm none are missing.
 5. Create the tag: `git tag <tag>`.

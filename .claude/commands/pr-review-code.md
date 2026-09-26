@@ -29,7 +29,7 @@ repeating its checks or assuming nobody made them.
 ## Steps
 
 1. Get the pull request from `$ARGUMENTS` (`PR #42`, `#42`, `42`, URL) or the branch
-   (`python3 scripts/pr.py find --number-only`). **Read what it printed.** One of three
+   (`.venv/bin/python3 scripts/pr.py find --number-only`). **Read what it printed.** One of three
    things:
    - a bare number. That is the PR;
    - `no-open-pull-request`, there genuinely is none for this branch and base; stop and
@@ -50,7 +50,7 @@ repeating its checks or assuming nobody made them.
    friendlier. The one exception is a waiver. See below.
 3. **Move the card, before reviewing anything:**
    ```
-   python3 scripts/ticket.py status <ticket> --set "Code Review"
+   .venv/bin/python3 scripts/ticket.py status <ticket> --set "Code Review"
    ```
    Set when a review starts, not when it passes, so a review that stops on a finding
    still leaves the board saying what is happening. Re-setting it is harmless.
@@ -59,7 +59,7 @@ repeating its checks or assuming nobody made them.
    ```
    git diff develop...HEAD --stat
    git diff develop...HEAD
-   python3 scripts/ticket.py show <ticket>
+   .venv/bin/python3 scripts/ticket.py show <ticket>
    ```
 5. **Review against the rubric.** Read `docs/code-review-rubric.md` and answer its six
    questions for this change, yourself. **The delegation below is suspended pending PYB-12**,
@@ -85,7 +85,7 @@ repeating its checks or assuming nobody made them.
      dataclass or other new type.
 
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
-6. **Read CI and report it, without gating on it:** `python3 scripts/pr.py checks <N>`.
+6. **Read CI and report it, without gating on it:** `.venv/bin/python3 scripts/pr.py checks <N>`.
    A review runs before promotion, so `checks-not-passed` is the ordinary answer here
    and is never a finding. `/pr-merge` is where it becomes a refusal.
 
@@ -100,7 +100,7 @@ repeating its checks or assuming nobody made them.
 8. **Only on green gates with no unresolved finding**, check `I performed a self-review`
    in the body, because this review stands in for that human check, through the
    mechanism `/pr-draft edit <N>` owns. Then promote it:
-   `python3 scripts/pr.py ready <N>`. Until PYB-3 lands, "green gates" means the two
+   `.venv/bin/python3 scripts/pr.py ready <N>`. Until PYB-3 lands, "green gates" means the two
    commands above run clean, and the report says that is what was run.
 
    Promotion is the review's outcome; step 3 is its beginning. What draft should mean

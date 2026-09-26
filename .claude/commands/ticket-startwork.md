@@ -12,7 +12,7 @@ into `workarea/session-tasks.md`.
 ## Steps
 
 1. Get the ticket from `$ARGUMENTS`: `PYB-42`, `42`, `#42` or the URL. If missing, ask.
-2. Fetch it: `python3 scripts/ticket.py show <N> --comments`. **Always the flag.**
+2. Fetch it: `.venv/bin/python3 scripts/ticket.py show <N> --comments`. **Always the flag.**
    A ticket carries in its comments what the body cannot: why it was closed, what a
    review found, what a previous attempt settled. Starting without reading them
    repeats work already done.
@@ -53,7 +53,7 @@ into `workarea/session-tasks.md`.
    holds `feat:` commits. Those are two different axes; see `CONTRIBUTING.md`.
 5. **Set Status In Progress and assign:**
    ```
-   python3 scripts/ticket.py start <N>
+   .venv/bin/python3 scripts/ticket.py start <N>
    ```
 6. **Update `workarea/session-tasks.md` for the new ticket.** This file is the **literal
    replacement** for the removed Claude Code Task/Todo tool. Same purpose, same shape, only
@@ -122,7 +122,7 @@ into `workarea/session-tasks.md`.
 The tool is the only sanctioned path. Never hand-run the GitHub API.
 
 ```
-python3 scripts/ticket.py close <N> --reason not-planned   # abandoned; Status -> Done, closed unplanned
+.venv/bin/python3 scripts/ticket.py close <N> --reason not-planned   # abandoned; Status -> Done, closed unplanned
 ```
 
 `--dry-run` is accepted here and everywhere else the tool is used.
