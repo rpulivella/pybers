@@ -239,6 +239,19 @@ class GitHubHttpError(RuntimeError):
         self.statusCode = statusCode
 
 
+def isFormatterPresent() -> bool:
+    """Report whether this interpreter can format a body, saying what it lacks."""
+    try:
+        import github_body  # noqa: F401
+    except ModuleNotFoundError as exc:
+        console.print(
+            f"[red]{escape(sys.executable)} lacks {exc.name}, which carrying a body "
+            "to or from GitHub needs. It is one of this repository's dev extras.[/]"
+        )
+        return False
+    return True
+
+
 def readBodyFile(path: Path) -> PostedBody | None:
     """Read a drafted body and format it for GitHub, or say why it cannot be posted.
 
@@ -246,6 +259,8 @@ def readBodyFile(path: Path) -> PostedBody | None:
     untranslated. None after printing the refusal, which names the lines whose
     rendering would change.
     """
+    if not isFormatterPresent():
+        return None
     from github_body import BodyRenderingError, formatBodyForPosting
 
     try:
@@ -270,6 +285,8 @@ def writeBodyForEditing(body: str) -> bool:
     Never through rich, which hard-wraps, expands tabs, substitutes emoji shortcodes
     and reads square brackets as markup, so `[hotfix]` would vanish silently.
     """
+    if not isFormatterPresent():
+        return False
     from github_body import BodyRenderingError, convertBodyForEditing
 
     try:

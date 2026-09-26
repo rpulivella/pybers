@@ -164,6 +164,18 @@ def testReadingABodyFileFormatsIt(tmp_path: Path) -> None:
     assert posted.tidied == 2
 
 
+def testAnInterpreterLackingTheFormatterSaysSoAndPostsNothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The system interpreter lacks the dev extras, and a post there must not crash."""
+    monkeypatch.delitem(sys.modules, "github_body")
+    monkeypatch.setitem(sys.modules, "mdformat", None)
+    path = tmp_path / "body.md"
+    path.write_text("a body\n", encoding="utf-8")
+    assert ticket.readBodyFile(path) is None
+    assert "lacks mdformat" in " ".join(capsys.readouterr().out.split())
+
+
 def testImportingPybersLoadsNoneOfTheFormatter() -> None:
     """PYB-134 AC 8."""
     loaded = subprocess.run(
