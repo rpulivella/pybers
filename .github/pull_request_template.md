@@ -2,8 +2,7 @@
 
 [PYB-<N>](https://github.com/rpulivella/pybers/issues/<N>)
 
-_Describe what this PR achieves in 2-3 sentences. Borrow from the ticket. Nothing goes
-above the line before this one: GitHub already shows the title and the linked issue._
+_Describe what this PR achieves in 2-3 sentences. Borrow from the ticket. Nothing goes above the line before this one: GitHub already shows the title and the linked issue._
 
 ## Detail your changes
 <!-- Remove any checkbox that does not apply. Do not leave irrelevant unchecked boxes. -->
@@ -15,8 +14,7 @@ above the line before this one: GitHub already shows the title and the linked is
 - [ ] Archive round-trip behavior changed (new golden-file test attached)
 
 ## Known issues
-<!-- Write None, or one bullet per issue: a few words and the ticket tracking it, such as
-     "- Created tables undercount format refcounts, PYB-89". Bullets only, no prose. -->
+<!-- Write None, or one bullet per issue: a few words and the ticket tracking it, such as "- Created tables undercount format refcounts, PYB-89". Bullets only, no prose. -->
 None
 
 ## Preconditions / setup for testing
@@ -32,10 +30,7 @@ None
 **Archive round-trip**: any change to what a written `.numbers` file looks like on disk
 
 ## Checklist (before requesting review)
-<!-- An unchecked box means NOT DONE. For an item that cannot apply at all, move the line
-     to the end of this list and replace its checkbox with NA, so the record shows it was
-     considered rather than skipped. Deleting it would lose that. Say why in the body when
-     the reason is worth knowing. -->
+<!-- An unchecked box means NOT DONE. For an item that cannot apply at all, move the line to the end of this list and replace its checkbox with NA, so the record shows it was considered rather than skipped. Deleting it would lose that. Say why in the body when the reason is worth knowing. -->
 - [ ] I performed a self-review
 - [ ] The CHANGELOG.md Unreleased entry is in this PR (`/changelog-add`)
 - [ ] I added or updated pytest tests covering the change
