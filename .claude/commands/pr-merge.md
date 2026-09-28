@@ -12,7 +12,7 @@ trigger sitting on it.
 ## Steps
 
 1. **Resolve the pull request** from `$ARGUMENTS` (`PR #42`, `#42`, `42`, URL), or with
-   `python3 scripts/pr.py find --number-only`. **Read what it printed.** A bare number
+   `.venv/bin/python3 scripts/pr.py find --number-only`. **Read what it printed.** A bare number
    is the PR, `no-open-pull-request` means there is none, and anything else means the
    question could not be asked at all. Those are three different facts, and only one of
    them is "no pull request".
@@ -28,8 +28,8 @@ trigger sitting on it.
    required exactly so that GitHub's generated default never lands.
 4. **Merge, completing the ticket unless the work was planned across pull requests.**
    ```
-   python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
-   python3 scripts/pr.py merge <N> --subject "..." --ticket-stays-open
+   .venv/bin/python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
+   .venv/bin/python3 scripts/pr.py merge <N> --subject "..." --ticket-stays-open
    ```
    **A merge completes its ticket**, and the first form is the ordinary one. The second
    is for exactly two cases, both decided before the merge: the work was split across

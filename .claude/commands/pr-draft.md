@@ -22,8 +22,8 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    A golden row this branch confirms records the Numbers version, never asked for:
    `mdls -raw -name kMDItemVersion "$(mdfind 'kMDItemCFBundleIdentifier == com.apple.Numbers' | head -1)"`
 4. Fetch the issue. The title is used **verbatim** in step 5, so read it verbatim:
-   - `python3 scripts/ticket.py export-as-source <N> --title` for the title.
-   - `python3 scripts/ticket.py show <N>` for the ACs, which you are reading, not copying.
+   - `.venv/bin/python3 scripts/ticket.py export-as-source <N> --title` for the title.
+   - `.venv/bin/python3 scripts/ticket.py show <N>` for the ACs, which you are reading, not copying.
 5. **Read `.github/pull_request_template.md`** and fill it, writing the result to
    `$TMPDIR/pybers-pr-body-<N>.md`, the OS temp directory, which is per-user and cleaned
    by the system. **Never write a PR body inside the repository**, not even into
@@ -46,7 +46,7 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    before they read the diff.
 7. Create the PR as **draft**:
    ```
-   python3 scripts/pr.py create --title "[PYB-<N>] <title>" --body-file "$TMPDIR/pybers-pr-body-<N>.md"
+   .venv/bin/python3 scripts/pr.py create --title "[PYB-<N>] <title>" --body-file "$TMPDIR/pybers-pr-body-<N>.md"
    ```
    Head is the checked-out branch and base is `develop`, both by default. `--dry-run`
    first prints the body without opening anything. Pass the body as a **file**. Never
@@ -78,8 +78,8 @@ still govern**, so the template still decides what a body may say and `/standard
 gates it.
 
 ```
-python3 scripts/pr.py export-as-source <N> --body > "$TMPDIR/pybers-pr-body-<N>.md"
-python3 scripts/pr.py edit <N> --body-file "$TMPDIR/pybers-pr-body-<N>.md"
+.venv/bin/python3 scripts/pr.py export-as-source <N> --body > "$TMPDIR/pybers-pr-body-<N>.md"
+.venv/bin/python3 scripts/pr.py edit <N> --body-file "$TMPDIR/pybers-pr-body-<N>.md"
 ```
 
 Fetch immediately before drafting and never from memory: `edit` replaces the WHOLE body and

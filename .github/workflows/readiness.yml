@@ -13,8 +13,9 @@ on:
     # checks read the body, so an edited body can change this verdict.
     types: [opened, synchronize, reopened, ready_for_review, edited]
 
+# Keyed by draft too, so a late draft run cannot cancel the run promotion fired.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.draft }}
   cancel-in-progress: true
 
 permissions:

@@ -25,11 +25,12 @@ means fetching the current body, changing part of it, and writing the whole thin
 
    Three different reads, and using the wrong one is a silent corruption rather than an
    error:
-   - `python3 scripts/ticket.py show <N>`, to **read** it yourself. Rendered, wrapped,
+   - `.venv/bin/python3 scripts/ticket.py show <N>`, to **read** it yourself. Rendered, wrapped,
      prefixed.
-   - `python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"`
-, to **edit**. The body byte for byte, which is what gets revised and written back.
-   - `python3 scripts/ticket.py export-as-source <N> --title`, whenever the revision
+   - `.venv/bin/python3 scripts/ticket.py export-as-source <N> --body > "$TMPDIR/ticket-<N>-body.md"`
+, to **edit**. The body as GitHub stores it, save a backslash ending each line GitHub
+     shows as a break, which is what gets revised and written back.
+   - `.venv/bin/python3 scripts/ticket.py export-as-source <N> --title`, whenever the revision
      keeps any part of the existing title. `show` prints it as `PYB-<N> <title>` and wraps
      at eighty columns, so a long title taken from there comes back with the number glued
      on and split across lines.
@@ -52,9 +53,9 @@ means fetching the current body, changing part of it, and writing the whole thin
    spec-in touchpoint `/ticket-create` has; a revision re-opens it.
 6. On approval, apply it:
    ```
-   python3 scripts/ticket.py edit <N> --body-file <draft>
-   python3 scripts/ticket.py edit <N> --title "<new title>"
-   python3 scripts/ticket.py edit <N> --label <label>
+   .venv/bin/python3 scripts/ticket.py edit <N> --body-file <draft>
+   .venv/bin/python3 scripts/ticket.py edit <N> --title "<new title>"
+   .venv/bin/python3 scripts/ticket.py edit <N> --label <label>
    ```
    Flags combine, and `--dry-run` previews any of them. `edit` reads the ticket back and
    verifies what landed against what was sent, so a write that lost a concurrent change
@@ -97,7 +98,7 @@ means fetching the current body, changing part of it, and writing the whole thin
 - **The title is the branch slug, the PR title, and the CHANGELOG entry.** Retitling a
   ticket that is already `In Progress` orphans its branch name.
 - **Dropping scope is a status change, not an edit.** A ticket whose spec turns out to be
-  inadequate goes back to `Concept`, `python3 scripts/ticket.py status <N> --set
+  inadequate goes back to `Concept`, `.venv/bin/python3 scripts/ticket.py status <N> --set
   Concept`, and that is a deliberate signal that a human is needed again.
 
 ## Hard rules

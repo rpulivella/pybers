@@ -13,8 +13,9 @@ on:
   # after the merge could only report what is already known.
 
 # Pushing three commits in a row cancels the two superseded runs.
+# Keyed by draft too, so a late draft run cannot cancel the run promotion fired.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.draft }}
   cancel-in-progress: true
 
 permissions:

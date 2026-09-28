@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-134] Fix body round trips changing what GitHub renders
 - [PYB-18] Relocate a block of cells as a unit
 - [PYB-113] Give every write-path concern one module
 - [PYB-111] Check table size, merges and empty cells in golden-confirm

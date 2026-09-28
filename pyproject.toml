@@ -43,6 +43,11 @@ dev = [
     "pytest>=9.1.1",
     "rich>=15.0.0",
     "rich_argparse>=1.8.0",
+    # Bodies posted to GitHub by scripts/ are formatted and checked by these, never pybers.
+    "mdformat>=1.0.0",
+    "mdformat-gfm>=1.0.0",
+    "markdown-it-py>=4.2.0",
+    "mdit-py-plugins>=0.6.1",
     "ruff>=0.16.5",
     "mypy>=2.3.1",
     "types-protobuf>=7.35.1.20260827",

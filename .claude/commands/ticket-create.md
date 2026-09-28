@@ -43,8 +43,8 @@ Pass `--status Concept` when filing; `Todo` is the default.
 6. Decide the starting Status. See [Concept or Todo](#concept-or-todo--the-spec-in-decision).
 7. On approval, file it:
    ```
-   python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft>
-   python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft> --status Concept
+   .venv/bin/python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft>
+   .venv/bin/python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft> --status Concept
    ```
 8. Report the issue URL the tool prints.
 

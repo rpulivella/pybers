@@ -55,6 +55,7 @@ line of this script, eg:
 /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-09-28  The body snapshot is skipped, for PYB-134.
 2026-09-14  `.github` and `tools` are in the default scope.
 2026-09-01  Fixed a hole in the banned-phrase check that had been open since the
             list was written: every separator was a literal space, so a phrase a
@@ -149,6 +150,8 @@ skipSubstrings: tuple[str, ...] = (
     "src/pybers/protos/",
     "workarea/",
     ".venv/",
+    # Bodies already on GitHub, frozen as test data, which a fix would corrupt.
+    "tests/github-bodies/",
 )
 # NOTE tests/fixtures/ and tests/measurements/ are deliberately NOT here. The
 # extension filter already excludes their .numbers files, and excluding either
