@@ -1,0 +1,221 @@
+# What Numbers shows for 61-cells-filled-by-pybers.numbers, `61-move-styles-base` with
+# `B2:D3` filled across `B2:H7` by `cellsFill` under `PRESERVE_RELATIVE_POSITION`, so
+# the block repeats from `B2` and each filled cell reads its block cell's value. The
+# block itself is unchanged and not listed. Checked by
+# `python3 scripts/golden-confirm.py run 61-cells-filled-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E2"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F2"
+value = 22
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G2"
+value = 23
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H2"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E3"
+value = 31
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F3"
+value = 32
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G3"
+value = 33
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H3"
+value = 31
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B4"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C4"
+value = 22
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D4"
+value = 23
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E4"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F4"
+value = 22
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G4"
+value = 23
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H4"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B5"
+value = 31
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C5"
+value = 32
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D5"
+value = 33
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E5"
+value = 31
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F5"
+value = 32
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G5"
+value = 33
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H5"
+value = 31
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B6"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C6"
+value = 22
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D6"
+value = 23
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E6"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F6"
+value = 22
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G6"
+value = 23
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H6"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B7"
+value = 31
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C7"
+value = 32
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D7"
+value = 33
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E7"
+value = 31
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F7"
+value = 32
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G7"
+value = 33
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H7"
+value = 31

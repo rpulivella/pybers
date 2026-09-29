@@ -1,0 +1,450 @@
+#!/usr/bin/env python3
+"""\
+A block of cells filled across a range, under the two rules its caller names.
+
+What a fill writes into the model, the records a save duplicates and the entries
+they claim, the refusals that leave a table as it was, and the few lines a script
+or a command line writes to fill a block.
+
+UPDATES
+2026-09-29  Written for PYB-118, taking over the fill tests of `formulaFill`.
+"""
+from __future__ import annotations
+
+__author__ = "Richard P Ulivella"
+__copyright__ = "Copyright 2026 Richard P Ulivella"
+__license__ = "Apache-2.0"
+__version__ = "0.1.0"
+__email__ = "pybers@richardulivella.com"
+__status__ = "Development"
+__date__ = "2026/09/29"
+
+from collections import Counter
+from collections.abc import Callable, Iterable
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+import pybers
+from conftest import findDocumentPath
+from pybers import CellValueFill, FormulaReferenceRelocation
+from pybers._generated import TNArchives_pb2 as tn
+from pybers._generated import TSPMessages_pb2 as tsp
+from pybers._generated import TSTArchives_pb2 as tst
+from pybers._persistence import chooseOffsetUnit, decodeRow, readPackage
+from pybers._persistence.cells import (
+    CellRecord,
+    carriesFormula,
+    findFormulaKeySlot,
+)
+from pybers._persistence.difference import listPackageDifferences
+from pybers._persistence.index import ArchiveIndex, findRoot
+from pybers.addressing.reference import ReferenceError as CellReferenceError
+from pybers.table._refcounts import (
+    countFormatClaims,
+    listStringClaims,
+    listStyleClaims,
+)
+
+relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
+named = FormulaReferenceRelocation.PRESERVE_NAMED_CELL
+repeat = CellValueFill.REPEAT_SOURCE_VALUE
+
+type Ledger = dict[str, tuple[dict[int, int], Counter[int]]]
+
+
+def openTable(name: str) -> tuple[pybers.Document, pybers.Table]:
+    """Return a fresh copy of a document and the first table of its first sheet."""
+    document = pybers.open(findDocumentPath(name))
+    return document, document.sheets[0].tables[0]
+
+
+def readTableState(table: pybers.Table) -> tuple[object, ...]:
+    """Return what a refused fill must leave alone: every cell and every merge."""
+    return (
+        {
+            reference: (cell.formulaText or cell.value, cell._copiedFrom)
+            for reference, cell in table.cells.items()
+        },
+        list(table.mergeRanges),
+    )
+
+
+def resolveTableStore(path: Path, tableName: str) -> tuple[ArchiveIndex, tst.DataStore]:
+    """Return the index of a saved package and one table's data store in it."""
+    index = ArchiveIndex(readPackage(path))
+    for sheet in findRoot(index).sheets:
+        for drawable in index.resolve(sheet, tn.SheetArchive).drawable_infos:
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if model.table_name == tableName:
+                return index, model.base_data_store
+    raise AssertionError(f"{tableName!r} is not in {path.name}")
+
+
+def readRecords(path: Path, tableName: str) -> dict[tuple[int, int], CellRecord]:
+    """Return every record of one table by its stored (row, column)."""
+    index, store = resolveTableStore(path, tableName)
+    records: dict[tuple[int, int], CellRecord] = {}
+    for entry in store.tiles.tiles:
+        tile = index.resolve(entry.tile, tst.Tile)
+        for rowInfo in tile.rowInfos:
+            row = entry.tileid * store.tiles.tile_size + rowInfo.tile_row_index
+            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+            for record in decodeRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
+            ):
+                records[(row, record.column)] = record
+    return records
+
+
+def listFormulaClaims(record: CellRecord) -> list[int]:
+    """Return the formula key a record names, if it carries one."""
+    if not carriesFormula(record):
+        return []
+    return [record.references[findFormulaKeySlot(record)]]
+
+
+def readLedger(path: Path, tableName: str) -> Ledger:
+    """Return, per list, each entry's declared refcount and how often cells name it."""
+    index, store = resolveTableStore(path, tableName)
+    records = list(readRecords(path, tableName).values())
+    lists: dict[str, tuple[tsp.Reference, Callable[[CellRecord], Iterable[int]]]] = {
+        "strings": (store.stringTable, listStringClaims),
+        "styles": (store.styleTable, listStyleClaims),
+        "formats": (
+            store.format_table, lambda record: countFormatClaims(record.raw).elements()
+        ),
+        "formulas": (store.formula_table, listFormulaClaims),
+    }
+    ledger: Ledger = {}
+    for name, (reference, claims) in lists.items():
+        declared: dict[int, int] = {}
+        if reference.identifier:
+            entries = index.resolve(reference, tst.TableDataList).entries
+            declared = {int(entry.key): int(entry.refcount) for entry in entries}
+        named: Counter[int] = Counter()
+        for record in records:
+            named.update(claims(record))
+        ledger[name] = (declared, named)
+    return ledger
+
+
+def assertClaimsCounted(before: Ledger, after: Ledger) -> None:
+    """Assert every refcount moved by exactly as much as the cells naming it moved."""
+    for name, (declaredAfter, namedAfter) in after.items():
+        declaredBefore, namedBefore = before[name]
+        for key in set(declaredAfter) | set(declaredBefore):
+            declaredChange = declaredAfter.get(key, 0) - declaredBefore.get(key, 0)
+            namedChange = namedAfter[key] - namedBefore[key]
+            assert declaredChange == namedChange, (name, key)
+
+
+def fillAndSave(
+    name: str, source: str, through: str, rule: FormulaReferenceRelocation,
+    target: Path,
+) -> None:
+    """Fill a block of a document's first table and save it to `target`."""
+    document, table = openTable(name)
+    table.cellsFill(source, through, references=rule, values=repeat)
+    document.save(target)
+
+
+def testAFillNamingNoReferenceRuleIsATypeError() -> None:
+    """PYB-118 AC 1: the reference rule has no default, so leaving it out cannot run."""
+    _, table = openTable("20-formula-shapes")
+    with pytest.raises(TypeError, match="references"):
+        table.cellsFill("A11", "A11:D11", values=repeat)  # type: ignore[call-arg]
+
+
+def testAFillNamingNoValueRuleIsATypeError() -> None:
+    """PYB-118 AC 1: the value rule has no default either."""
+    _, table = openTable("20-formula-shapes")
+    with pytest.raises(TypeError, match="values"):
+        table.cellsFill("A11", "A11:D11", references=relative)  # type: ignore[call-arg]
+
+
+def testARelativeFillSharesOneStoredFormula(tmp_path: Path) -> None:
+    """PYB-118 AC 2: four cells, one entry, each resolving against its own column."""
+    target = tmp_path / "relative.numbers"
+    fillAndSave("20-formula-shapes", "A11", "A11:D11", relative, target)
+    table = pybers.open(target).sheets[0].tables[0]
+    for reference, expected in (("A11", "A1:A10"), ("B11", "B1:B10"),
+                                ("C11", "C1:C10"), ("D11", "D1:D10")):
+        cell = table.cell(reference)
+        assert cell.formula is not None
+        assert str(cell.formula.ranges[0].resolve(cell.reference)) == expected
+    records = readRecords(target, "Table 1")
+    keys = {listFormulaClaims(records[(10, column)])[0] for column in range(4)}
+    assert len(keys) == 1
+
+
+def testARelativeFillKeepsEachLockedAxis() -> None:
+    """PYB-118 AC 2: `$B2` keeps column B and follows the row it lands in."""
+    _, table = openTable("60-move-base")
+    table.cellsFill("D3", "D3:F4", references=relative, values=repeat)
+    assert table.cell("D4").formulaText == "=$B3"
+    assert table.cell("F3").formulaText == "=$B2"
+    assert table.cell("F4").formulaText == "=$B3"
+
+
+def testANamedCellFillNamesTheSourceCellsFromEveryCell() -> None:
+    """PYB-118 AC 3: every filled cell reads exactly what the source reads."""
+    _, table = openTable("60-move-base")
+    table.cellsFill("D2", "D2:F4", references=named, values=repeat)
+    for name in ("D3", "D4", "E2", "F4"):
+        assert table.cell(name).formulaText == "=B2+C2", name
+
+
+def testANamedCellFillGivesEachCellAFormulaOfItsOwn(tmp_path: Path) -> None:
+    """PYB-118 AC 3: the stored formulas differ per cell, and read back unchanged."""
+    target = tmp_path / "named.numbers"
+    fillAndSave("60-move-base", "D2", "D2:D4", named, target)
+    table = pybers.open(target).sheet(1).table("Table 1")
+    assert [table.cell(name).formulaText for name in ("D2", "D3", "D4")] == [
+        "=B2+C2", "=B2+C2", "=B2+C2"
+    ]
+    records = readRecords(target, "Table 1")
+    keys = [listFormulaClaims(records[(row, 3)])[0] for row in (1, 2, 3)]
+    assert len(set(keys)) == 3
+
+
+def testAFillSkipsWhatAMergeCoversAndCountsWhatItFilled() -> None:
+    """PYB-118 AC 4: `C5` is covered by `B5:C5`, so three of four positions fill."""
+    _, table = openTable("60-move-base")
+    assert table.cellsFill("E1", "A5:D5", references=relative, values=repeat) == 4 - 1
+    assert table.cell("B5").value == Decimal(7)
+    assert pybers.CellReference.parse("C5") not in table.cells
+
+
+@pytest.mark.parametrize(
+    ("fill", "message"),
+    [
+        (lambda table: table.cellsFill(
+            "D3", "D3:D13", references=relative, values=repeat), "reaches outside"),
+        (lambda table: table.cellsFill(
+            "B5:C5", "B6:C7", references=relative, values=repeat), "a fill copies no"),
+        (lambda table: table.cellsFill(
+            "A:A", "B1:B3", references=relative, values=repeat), "unbounded"),
+        (lambda table: table.cellsFill(
+            "D3", "D4", references="sideways", values=repeat), "not a reference rule"),
+        (lambda table: table.cellsFill(
+            "D3", "D4", references=relative, values="upward"), "not a value rule"),
+        (lambda table: table.cellsFill(
+            "D3", "D4", references=relative, values=CellValueFill.CONTINUE_SERIES),
+         "not supported yet"),
+    ],
+)
+def testARefusedFillLeavesTheTableAsItWas(
+    fill: Callable[[pybers.Table], object], message: str
+) -> None:
+    """PYB-118 AC 5 and 9: outside the grid, a merge, unbounded, and each bad rule."""
+    _, table = openTable("60-move-base")
+    before = readTableState(table)
+    with pytest.raises(CellReferenceError, match=message):
+        fill(table)
+    assert readTableState(table) == before
+
+
+def testABlockRepeatsFromItsOwnCorner() -> None:
+    """PYB-118 AC 7: each filled cell takes the block cell at the matching position."""
+    _, table = openTable("61-move-styles-base")
+    assert table.cellsFill("B2:D3", "A1:H7", references=relative, values=repeat) == (
+        7 * 8 - 6
+    )
+    assert [str(table.cell(name).value) for name in ("F6", "H7", "A1", "B4")] == [
+        "22", "31", "33", "21"
+    ]
+
+
+def testAFilledRecordIsTheRecordItCopied(tmp_path: Path) -> None:
+    """PYB-118 AC 7: a fill, a bold face and highlighting fill with their values."""
+    target = tmp_path / "styles.numbers"
+    fillAndSave("61-move-styles-base", "B2:D3", "B2:H7", relative, target)
+    base = readRecords(findDocumentPath("61-move-styles-base"), "Table 1")
+    ours = readRecords(target, "Table 1")
+    for row in range(1, 7):
+        for column in range(1, 8):
+            source = (1 + (row - 1) % 2, 1 + (column - 1) % 3)
+            assert ours[(row, column)].raw == base[source].raw, (row, column)
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "through", "rule"),
+    [
+        ("61-move-styles-base", "B2:D3", "B2:H7", relative),
+        ("20-formula-shapes", "A11", "A11:H11", relative),
+        ("20-formula-shapes", "A11", "A11:D11", named),
+        ("20-formula-shapes", "A12", "A12:C12", relative),
+        ("60-move-base", "D2:E4", "D2:H4", named),
+    ],
+)
+def testEveryEntryAFillNamesIsCounted(
+    name: str, source: str, through: str, rule: FormulaReferenceRelocation,
+    tmp_path: Path,
+) -> None:
+    """PYB-118 AC 7: strings, styles, formats and formulas claimed and released."""
+    target = tmp_path / "counted.numbers"
+    fillAndSave(name, source, through, rule, target)
+    assertClaimsCounted(
+        readLedger(findDocumentPath(name), "Table 1"), readLedger(target, "Table 1")
+    )
+
+
+def testRepeatedValuesReadBackExactly(tmp_path: Path) -> None:
+    """PYB-118 AC 8: a number and a text fill read back equal to their sources."""
+    document, table = openTable("20-formula-shapes")
+    table.cellsFill("A12", "A12:C12", references=relative, values=repeat)
+    table.cellsFill("A10", "A10:C10", references=relative, values=repeat)
+    target = tmp_path / "values.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    assert [saved.cell(name).value for name in ("B10", "C10")] == [Decimal("10")] * 2
+    assert [saved.cell(name).value for name in ("B12", "C12")] == [
+        "Typed directly: SUM(A1:A10)"
+    ] * 2
+
+
+def testFillingFromAnEmptyCellEmptiesTheRange(tmp_path: Path) -> None:
+    """A source holding nothing leaves each filled position holding nothing."""
+    target = tmp_path / "emptied.numbers"
+    fillAndSave("61-move-styles-base", "F2", "B2:D2", relative, target)
+    assert not {(1, 1), (1, 2), (1, 3)} & readRecords(target, "Table 1").keys()
+    assertClaimsCounted(
+        readLedger(findDocumentPath("61-move-styles-base"), "Table 1"),
+        readLedger(target, "Table 1"),
+    )
+
+
+def testAFillFromAFilledCellCopiesWhatThatCellCopied(tmp_path: Path) -> None:
+    """Two fills before a save write what one fill from the first source writes."""
+    document, table = openTable("61-move-styles-base")
+    table.cellsFill("C2", "F2", references=relative, values=repeat)
+    table.cellsFill("F2", "G2:H2", references=relative, values=repeat)
+    target = tmp_path / "chained.numbers"
+    document.save(target)
+    records = readRecords(target, "Table 1")
+    assert records[(1, 6)].raw == records[(1, 7)].raw == records[(1, 2)].raw
+
+
+def testASecondSaveAfterAFillChangesNothing(tmp_path: Path) -> None:
+    """A filled cell forgets its source once saved, so saving again copies nothing."""
+    document, table = openTable("61-move-styles-base")
+    table.cellsFill("B2:D3", "B2:H7", references=relative, values=repeat)
+    first, second = tmp_path / "first.numbers", tmp_path / "second.numbers"
+    document.save(first)
+    document.save(second)
+    differences = listPackageDifferences(readPackage(first), readPackage(second))
+    assert [
+        difference for difference in differences if difference.identifier is not None
+    ] == []
+
+
+def testAFillAfterARowIsAddedCopiesTheShiftedRecord(tmp_path: Path) -> None:
+    """A structural edit before the fill moves the source, and the copy follows it."""
+    document, table = openTable("20-formula-shapes")
+    table.rowAdd(1)
+    table.cellsFill("A13", "B13", references=relative, values=repeat)
+    target = tmp_path / "shifted.numbers"
+    document.save(target)
+    records = readRecords(target, "Table 1")
+    assert records[(12, 1)].raw == records[(12, 0)].raw
+    saved = pybers.open(target).sheets[0].tables[0]
+    assert saved.cell("B13").value == "Typed directly: SUM(A1:A10)"
+
+
+def testCopyingRichTextIsRefusedAndNothingIsWritten(tmp_path: Path) -> None:
+    """Two cells sharing one rich-text entry is unmeasured, so no copy makes them."""
+    document, table = openTable("02-text-rich")
+    table.rowAdd(2)
+    table.cellsFill("A1", "A2", references=relative, values=repeat)
+    target = tmp_path / "rich.numbers"
+    with pytest.raises(pybers.WriteError, match="rich text"):
+        document.save(target)
+    assert not target.exists()
+
+
+def testCopyingARecordNamingAnUncountedEntryIsRefused(tmp_path: Path) -> None:
+    """The star rating at `F1` names a control through a slot no copy can count."""
+    document, table = openTable("11-value-types-noformats")
+    table.cellsFill("F1", "J1", references=relative, values=repeat)
+    with pytest.raises(pybers.WriteError, match="not identified|could not be counted"):
+        document.save(tmp_path / "control.numbers")
+
+
+goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
+
+
+@pytest.mark.parametrize(
+    ("name", "base", "source", "through", "rule"),
+    [
+        ("20-cells-filled-relative-by-pybers", "20-formula-shapes", "A11", "A11:D11",
+         relative),
+        ("20-cells-filled-named-by-pybers", "20-formula-shapes", "A11", "A11:D11",
+         named),
+        ("61-cells-filled-by-pybers", "61-move-styles-base", "B2:D3", "B2:H7",
+         relative),
+    ],
+)
+def testTheFillGoldensMatchWhatThisLibraryProduces(
+    name: str, base: str, source: str, through: str,
+    rule: FormulaReferenceRelocation, tmp_path: Path,
+) -> None:
+    """PYB-118 AC 6: each fill again, against the file Numbers confirmed."""
+    target = tmp_path / f"{name}.numbers"
+    fillAndSave(base, source, through, rule, target)
+    differences = listPackageDifferences(
+        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
+    )
+    assert [
+        difference for difference in differences if difference.identifier is not None
+    ] == []
+
+
+def testTheFillGoldensHoldWhatTheyClaimTo() -> None:
+    """Guard the guard: a golden replaced by an unedited copy would pass above."""
+    relativeTable = pybers.open(
+        goldenDirectory / "20-cells-filled-relative-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert relativeTable.cell("D11").formulaText == "=SUM(D1:D10)"
+    namedTable = pybers.open(
+        goldenDirectory / "20-cells-filled-named-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert namedTable.cell("D11").formulaText == "=SUM(A1:A10)"
+    styled = pybers.open(
+        goldenDirectory / "61-cells-filled-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert styled.cell("H7").value == Decimal(31)
+
+
+def testFormulaFillNoLongerExists() -> None:
+    """PYB-118 AC 10: one fill, for any content, and nothing kept beside it."""
+    assert not hasattr(pybers.Table, "formulaFill")
+
+
+def testAScriptAuthorFillsABlockAndSaves(tmp_path: Path) -> None:
+    """The few lines a script writes: open, fill, save, and read it back."""
+    document = pybers.open(findDocumentPath("61-move-styles-base"))
+    document.sheet(1).table("Table 1").cellsFill(
+        "B2:D2", "B2:D5",
+        references=FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION,
+        values=CellValueFill.REPEAT_SOURCE_VALUE,
+    )
+    document.save(tmp_path / "scripted.numbers")
+    table = pybers.open(tmp_path / "scripted.numbers").sheet(1).table("Table 1")
+    assert table.cell("C5").value == Decimal("22")
+
+
+def testACommandLineFillsWithTheRulesAsTyped() -> None:
+    """A CLI passes `--references named-cell --values source-value` as it read them."""
+    arguments = ["Table 1", "D2", "D2:D4", "named-cell", "source-value"]
+    document = pybers.open(findDocumentPath("60-move-base"))
+    table = document.sheet(1).table(arguments[0])
+    filled = table.cellsFill(
+        arguments[1], arguments[2],
+        references=arguments[3],  # type: ignore[arg-type]
+        values=arguments[4],  # type: ignore[arg-type]
+    )
+    assert filled == 2
+    assert table.cell("D4").formulaText == "=B2+C2"
