@@ -354,6 +354,17 @@ def testAFillAfterARowIsAddedCopiesTheShiftedRecord(tmp_path: Path) -> None:
     assert saved.cell("B13").value == "Typed directly: SUM(A1:A10)"
 
 
+def testAFillWhoseSourceWasRemovedIsRefusedAtSave(tmp_path: Path) -> None:
+    """Removing the source row before saving leaves no record to copy, so none is."""
+    document, table = openTable("20-formula-shapes")
+    table.cellsFill("A11", "A12", references=relative, values=repeat)
+    table.rowRemove(11)
+    target = tmp_path / "orphaned.numbers"
+    with pytest.raises(pybers.WriteError, match="no longer in"):
+        document.save(target)
+    assert not target.exists()
+
+
 def testCopyingRichTextIsRefusedAndNothingIsWritten(tmp_path: Path) -> None:
     """Two cells sharing one rich-text entry is unmeasured, so no copy makes them."""
     document, table = openTable("02-text-rich")
