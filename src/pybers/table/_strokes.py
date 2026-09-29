@@ -9,6 +9,8 @@ inside it. Measured 2026-09-21 in the four `57-borders-*` documents.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-29  A line added beside one holding no border gains none, rather than
+            raising, found by PYB-118.
 2026-09-23  Borders follow cells moved as a block, for PYB-18.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Split out of `_structure` for PYB-17.
@@ -110,6 +112,9 @@ def applyStrokeLayers(
         sibling = next(iter(stored.values()))[0]
         for line in listAddedLines(keys):
             displaced = findDisplacedLine(keys, line)
+            # Only a line holding a border stores a layer, so this one has none to copy.
+            if displaced is not None and displaced not in stored:
+                continue
             copied = tst.StrokeLayerArchive()
             if displaced is not None:
                 copied.CopyFrom(stored[displaced][1])
