@@ -8,6 +8,7 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-09-29  `claim`, `fill` and `recount` added to the verbs, for PYB-118.
 2026-09-25  `convert` added to the verbs, for PYB-134.
 2026-09-23  `clamp` and `relocate` added to the verbs, for PYB-18.
 2026-09-17  `wait` added for PYB-76, which waits for GitHub to close a ticket.
@@ -34,15 +35,18 @@ checkedDirectories: tuple[str, ...] = ("src", "tests", "scripts")
 
 leadingVerbs: frozenset[str] = frozenset({
     "add", "apply", "assert", "assign", "attach", "author", "bind", "blank",
-    "borrow", "build", "carries", "check", "choose", "clamp", "classify", "close",
+    "borrow", "build", "carries", "check", "choose", "claim", "clamp", "classify",
+    "close",
     "collect",
     "compress", "confirm", "convert", "copy", "count", "create", "decode",
     "decompress",
     "delete", "detach", "drop", "edit", "emit", "encode", "expand", "extract",
-    "find", "forge", "format", "generate", "hold", "index", "is", "iterate", "list",
+    "fill", "find", "forge", "format", "generate", "hold", "index", "is", "iterate",
+    "list",
     "load",
     "map", "mark", "measure", "merge", "move", "open", "order", "parse", "patch",
-    "place", "post", "print", "qualify", "quote", "read", "reduce", "refuse",
+    "place", "post", "print", "qualify", "quote", "read", "recount", "reduce",
+    "refuse",
     "register", "release", "relocate", "remap", "remove", "render", "reopen",
     "report", "request",
     "resolve", "retype", "rewrite", "run", "save", "select", "set", "shape", "show",

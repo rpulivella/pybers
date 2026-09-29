@@ -12,6 +12,8 @@ was stored as `SUM(E7:E12)`, not `SUM(E7:E18)`. A single reference past the edge
 kept, and shows an error.
 
 UPDATES
+2026-09-29  A formula keeps its named cells from a new host with no block moved,
+            which is how a fill copies one, for PYB-118.
 2026-09-23  Written for PYB-18.
 """
 from __future__ import annotations
@@ -92,7 +94,7 @@ def relocateReference(
     reference: FormulaReference,
     host: CellReference,
     landed: CellReference,
-    move: FormulaBlockMove,
+    move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> FormulaReference:
     """Return a reference naming the cell it named, from a formula now at `landed`."""
@@ -101,7 +103,7 @@ def relocateReference(
     row = None if reference.row is None else reference.row.resolve(host.row)
     column = None if reference.column is None else reference.column.resolve(host.col)
     if (
-        row is not None and column is not None
+        move is not None and row is not None and column is not None
         and move.reaches(reference.tableId, hostInTarget)
         and move.covers(row, column)
     ):
@@ -122,7 +124,7 @@ def relocateRange(
     extent: FormulaRange,
     host: CellReference,
     landed: CellReference,
-    move: FormulaBlockMove,
+    move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> FormulaRange:
     """Return a range following the block only when it lies wholly inside it."""
@@ -130,7 +132,7 @@ def relocateRange(
     columns = None if extent.columns is None else extent.columns.resolve(host.col)
     rowShift = columnShift = 0
     if (
-        rows is not None and columns is not None
+        move is not None and rows is not None and columns is not None
         and move.reaches(extent.tableId, hostInTarget)
         and move.covers(rows[0], columns[0]) and move.covers(rows[1], columns[1])
     ):
@@ -150,14 +152,15 @@ def relocateFormula(
     formula: Formula,
     host: CellReference,
     landed: CellReference,
-    move: FormulaBlockMove,
+    move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> Formula:
     """Return a formula whose references name the cells they named before the move.
 
     `host` is where the formula sat and `landed` where it sits now. A reference
     into the block follows it, and a range follows only when wholly inside, as
-    `60c-move-dragged` left `SUM(B1:B6)` where it was.
+    `60c-move-dragged` left `SUM(B1:B6)` where it was. With no `move`, every
+    reference keeps the cell it named.
     """
     nodes = []
     for node in formula.nodes:

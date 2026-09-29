@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-29  Filled cells are found and carried after any move, for PYB-118.
 2026-09-24  A moved merge keeps the records it carries, for PYB-18.
 2026-09-23  Cells moved as a block are found and carried, for PYB-18.
 2026-09-22  The entry point for one table's save, gathered from the document
@@ -60,7 +61,7 @@ from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
-from ._relocation import findCellMoves
+from ._relocation import findCellCopies, findCellMoves
 from ._structure import applyGridStructure, listModelFormulas
 from .cells import Table
 
@@ -132,20 +133,21 @@ class TableSave:
         moves = findCellMoves(table, maps)
         if moves:
             moveOwnerCoordinates(entry.dependencies, moves, table.name)
+        copies = findCellCopies(table)
 
         # A moved merge reads as an added one, and the records it carries are kept.
         swallowed = listSwallowedPositions(table, model) - frozenset(moves.values())
         edits = applyTableEdits(
-            index, table, model, swallowed, maps, self.registry, plan, moves
+            index, table, model, swallowed, maps, self.registry, plan, moves, copies
         )
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
-        if moved or swallowed or maps.changed or moves:
+        if moved or swallowed or maps.changed or moves or copies:
             # A structural edit or a moved block can create and remove tiles and
             # buckets, which the model has to declare as it points at them.
             index.archiveWrite(
                 modelIdentifier, model,
                 self.registry.referencesReconcile(modelIdentifier, model)
-                if maps.changed or moves else None,
+                if maps.changed or moves or copies else None,
             )
         # The engine's register of formula-bearing cells, which is a separate
         # fact from a cell having moved and is what makes a newly attached

@@ -92,7 +92,8 @@ def toRelocationRule(references: str) -> FormulaReferenceRelocation:
     except ValueError as exc:
         spelled = ", ".join(repr(rule.value) for rule in FormulaReferenceRelocation)
         raise ReferenceError(
-            f"{references!r} is not a reference rule. A move names one of {spelled}."
+            f"{references!r} is not a reference rule. A relocation names one of "
+            f"{spelled}."
         ) from exc
 
 

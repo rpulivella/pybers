@@ -16,6 +16,7 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-09-29  A copied record claims the formula it names, for PYB-118.
 2026-09-21  A broken reference's sentinels and sticky bits carry each axis's
             lock, the end bits never set, for PYB-17.
 2026-09-18  A broken reference writes the lines it lost, for PYB-17.
@@ -391,6 +392,16 @@ class FormulaPool:
         self.dataList.nextListID += 1
         self.stored[fresh.key] = formula
         return fresh.key
+
+    def claim(self, key: int) -> None:
+        """Add one cell's claim on a stored formula, as a copied record makes."""
+        entry = self.entryFor(key)
+        if entry is None:
+            raise WriteError(
+                f"A copied record names formula {key}, which is not stored."
+            )
+        self.touched = True
+        entry.refcount += 1
 
     def release(self, key: int) -> None:
         """Give up one cell's claim on a stored formula.

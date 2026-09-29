@@ -119,6 +119,12 @@ plainNumberRecord: bytes = bytes.fromhex(
 )
 
 
+def patchRichTextKey(raw: bytes, key: int) -> bytes:
+    """Return a rich-text record naming a different rich-text entry."""
+    encoded = key.to_bytes(stringKeyWidth, "little")
+    return raw[:valueOffset] + encoded + raw[valueOffset + stringKeyWidth:]
+
+
 def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
     """Refuse to write a value over a cell a formula backs, and say why.
 
@@ -417,6 +423,7 @@ __all__ = [
     "buildFreshRecord",
     "buildWrittenRecord",
     "displayedKindSlot",
+    "patchRichTextKey",
     "findFormatKey",
     "findTemplateRecord",
     "numericTypeBytes",

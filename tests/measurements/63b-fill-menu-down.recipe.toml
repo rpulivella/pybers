@@ -1,0 +1,17 @@
+# How Numbers made 63b-fill-menu-down: `63-fill-base` with `B2:D7` selected and
+# Table, Autofill Cells, Autofill Down pressed, which repeats the top row only. Made by
+# `python3 scripts/golden-confirm.py measure 63b-fill-menu-down`.
+
+base = "63-fill-base"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2:D7"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "autofillDown"

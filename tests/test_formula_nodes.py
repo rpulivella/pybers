@@ -18,6 +18,7 @@ and nowhere else.
 
 UPDATES
 2026-09-03  Written for #41.
+2026-09-29  The fill tests moved to `test_fill.py` with `cellsFill`, for PYB-118.
 """
 from __future__ import annotations
 
@@ -877,64 +878,3 @@ def testACreatedFormulaStoresNoResultOfItsOwn(tmp_path: Path) -> None:
     after = pybers.open(working).sheets[0].tables[0].cell("H1")
     assert after.value is None, "no result is stored, because none was computed"
     assert after.errored, "which is the pending state, not a failure"
-
-
-# ── AC 4: one formula, filled ────────────────────────────────────────────────
-
-
-def testFillGivesEveryCellTheSameStoredFormula(tmp_path: Path) -> None:
-    """AC 4. Four cells, ONE entry, and each resolving against its own column.
-
-    This is what dragging does in Numbers, reproduced by doing the same thing
-    rather than by simulating it. An implementation writing a formula per row
-    would pass every other assertion here and fail the refcount.
-    """
-    working = Path(shutil.copy(findDocumentPath("20-formula-shapes"),
-                               tmp_path / "20.numbers"))
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    assert table.formulaFill("A11", through="A11:D11") == 3
-    document.save()
-
-    after = pybers.open(working).sheets[0].tables[0]
-    for reference, expected in (("A11", "A1:A10"), ("B11", "B1:B10"),
-                                ("C11", "C1:C10"), ("D11", "D1:D10")):
-        cell = after.cell(reference)
-        assert str(cell.formula.ranges[0].resolve(cell.reference)) == expected
-
-    keys = {
-        key for row, column, key in readFormulaRecords(working, "Table 1")
-        if row == 10 and column < 4
-    }
-    assert len(keys) == 1, "all four cells name ONE stored formula"
-
-
-def testFillLeavesEveryCellOutsideTheRangeAlone(tmp_path: Path) -> None:
-    """Guard the guard: a fill that reached too far would still pass the above.
-
-    `E11` through `H11` include a cross-table and a cross-sheet reference, which
-    are the ones a careless range walk would take with it.
-    """
-    working = Path(shutil.copy(findDocumentPath("20-formula-shapes"),
-                               tmp_path / "20.numbers"))
-    before = {
-        reference: cell.formula
-        for reference, cell in
-        pybers.open(working).sheets[0].tables[0].cells.items()
-    }
-    document = pybers.open(working)
-    document.sheets[0].tables[0].formulaFill("A11", through="A11:D11")
-    document.save()
-
-    after = pybers.open(working).sheets[0].tables[0]
-    for name in ("E11", "F11", "G11", "H11"):
-        reference = pybers.CellReference.parse(name)
-        assert after.cells[reference].formula == before[reference], name
-    assert after.cell("G11").formula.references[0].crossTable
-
-
-def testFillRefusesWhenTheSourceHoldsNoFormula() -> None:
-    """A no-op must report accurately rather than filling nothing in silence."""
-    table = openFirstTable("20-formula-shapes")
-    with pytest.raises(pybers.ReferenceError, match="no formula"):
-        table.formulaFill("A1", through="A1:D1")

@@ -20,6 +20,7 @@ Usage:
     python3 scripts/golden-confirm.py helper-build
     python3 scripts/golden-confirm.py helper-build --identity <SHA-1> --dry-run
     python3 scripts/golden-confirm.py permissions
+    python3 scripts/golden-confirm.py measure 63b-fill-dragged-down
 
 A run holds `caffeinate` while it drives Numbers, because the screen lock that follows
 display sleep stops it.
@@ -30,6 +31,8 @@ so the log is purged with the ticket's folder that holds the run it explains.
 Requires rich, and the Xcode command line tools for `helper-build`.
 
 UPDATES
+2026-09-29  `measure` makes a measurement in Numbers from the recipe beside it, for
+            PYB-118.
 2026-09-22  Checks a table's size and merges and an empty cell, for PYB-111.
 2026-09-21  A check a person makes is QA's rather than a human's, for PYB-17.
 2026-09-17  Written for PYB-94.
@@ -81,6 +84,14 @@ helperInstallDirectory: Path = Path.home() / "Library/Application Support/pybers
 helperBundle: Path = helperInstallDirectory / f"{helperName}.app"
 helperSourceHashKey: str = "PybersSourceHash"
 goldenDirectory: Path = repositoryRoot / "tests" / "golden"
+documentDirectories: tuple[Path, ...] = (
+    repositoryRoot / "tests" / "fixtures", repositoryRoot / "tests" / "measurements",
+)
+measurementDirectory: Path = repositoryRoot / "tests" / "measurements"
+recipeSuffix: str = ".recipe.toml"
+recipeStepKeys: frozenset[str] = frozenset({
+    "action", "document", "sheet", "table", "range", "menuItem", "format",
+})
 reportRoot: Path = repositoryRoot / "workarea" / "golden-confirm"
 expectedSuffix: str = ".expected.toml"
 expectedKeys: frozenset[str] = frozenset({
@@ -96,6 +107,7 @@ damageCheckGolden: str = "11-text-written-and-retyped.numbers"
 quickLookScale: float = 3.0
 numbersOperators: dict[int, str] = str.maketrans({"×": "*", "÷": "/", "−": "-"})
 inspectDeadlineSeconds: float = 300.0
+editDeadlineSeconds: float = 300.0
 
 # Slack beyond the helper's own deadline, for `open` to start it and write the result.
 helperLaunchSlackSeconds: float = 30.0
@@ -171,6 +183,15 @@ class GoldenRun:
     problems: list[HelperProblem] = field(default_factory=list)
     archiveDifferences: list[str] = field(default_factory=list)
     numbersVersion: str | None = None
+
+
+@dataclass(frozen=True)
+class MeasurementRecipe:
+    """How Numbers makes one measurement: the documents it opens and its steps."""
+
+    base: str
+    documents: list[str]
+    steps: list[dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -386,6 +407,38 @@ def findGolden(argument: str) -> Path:
     if not golden.is_file():
         raise GoldenConfirmError(f"{golden} does not exist")
     return golden
+
+
+def findDocument(stem: str) -> Path:
+    """Return the one fixture or measurement named `stem`, refusing none or two."""
+    found = [
+        directory / f"{stem}.numbers" for directory in documentDirectories
+        if (directory / f"{stem}.numbers").is_file()
+    ]
+    if len(found) != 1:
+        raise GoldenConfirmError(
+            f"{stem}.numbers is in {len(found)} of tests/fixtures and "
+            "tests/measurements"
+        )
+    return found[0]
+
+
+def readMeasurementRecipe(name: str) -> MeasurementRecipe:
+    """Read the recipe a measurement is made from, refusing a key the helper lacks."""
+    path = measurementDirectory / f"{name}{recipeSuffix}"
+    if not path.is_file():
+        raise GoldenConfirmError(f"{path.relative_to(repositoryRoot)} does not exist")
+    with path.open("rb") as handle:
+        recipe = tomllib.load(handle)
+    steps = recipe.get("step", [])
+    for position, step in enumerate(steps, start=1):
+        unknown = set(step) - recipeStepKeys
+        if unknown:
+            raise GoldenConfirmError(
+                f"step {position} of {path.name} holds {', '.join(sorted(unknown))}, "
+                "which no step takes"
+            )
+    return MeasurementRecipe(recipe["base"], recipe.get("documents", []), steps)
 
 
 def readTicketKey() -> str:
@@ -877,6 +930,50 @@ def runPermissions(arguments: argparse.Namespace) -> int:
     return 1
 
 
+def runMeasure(arguments: argparse.Namespace) -> int:
+    """Make one measurement in Numbers from its recipe, refusing to replace one."""
+    recipe = readMeasurementRecipe(arguments.name)
+    target = measurementDirectory / f"{arguments.name}.numbers"
+    if target.exists():
+        raise GoldenConfirmError(f"{target.relative_to(repositoryRoot)} already exists")
+    sources = [findDocument(stem) for stem in [recipe.base, *recipe.documents]]
+    if arguments.dry_run:
+        console.print(f"would make {escape(str(target.relative_to(repositoryRoot)))}")
+        for position, source in enumerate(sources):
+            console.print(f"  document {position}: {escape(source.name)}")
+        console.print(f"  {len(recipe.steps)} steps")
+        return 0
+    checkHelperCanRun()
+    with (
+        holdDisplayAwake(),
+        tempfile.TemporaryDirectory(prefix="pybers-measure-") as work,
+    ):
+        copies = []
+        for position, source in enumerate(sources):
+            copy = Path(work) / f"{position}-{source.name}"
+            shutil.copyfile(source, copy)
+            copies.append(str(copy))
+        saved = Path(work) / target.name
+        result = requestHelper({
+            "operation": "documentEdit",
+            "documentPaths": copies,
+            "savedCopyPath": str(saved),
+            "steps": recipe.steps,
+        }, deadlineSeconds=editDeadlineSeconds, logPath=Path(work) / "helper.log")
+        problems = readProblems(result)
+        if problems or not saved.is_file():
+            console.print(
+                f"[red]stopped after {result.get('stepsDone', 0)} of "
+                f"{len(recipe.steps)} steps[/]"
+            )
+            reportProblems(problems)
+            return 1
+        shutil.copyfile(saved, target)
+    console.print(f"[green]made[/] {escape(str(target.relative_to(repositoryRoot)))} "
+                  f"in Numbers {escape(str(result.get('numbersVersion')))}")
+    return 0
+
+
 def writeDamagedCopies(golden: Path, work: Path) -> dict[str, Path]:
     """Write a truncated copy, and a copy with its first tile archive overwritten."""
     truncated = work / "truncated.numbers"
@@ -995,6 +1092,15 @@ def buildParser() -> argparse.ArgumentParser:
     confirm.add_argument("--dry-run", action="store_true",
                          help="check the golden and its expected values, open nothing")
     confirm.set_defaults(handler=runRun)
+
+    measure = commands.add_parser(
+        "measure", help="make a measurement in Numbers from the recipe beside it",
+        formatter_class=RichHelpFormatter,
+    )
+    measure.add_argument("name", help="a measurement's name, without an extension")
+    measure.add_argument("--dry-run", action="store_true",
+                         help="read the recipe and its documents, open nothing")
+    measure.set_defaults(handler=runMeasure)
 
     damaged = commands.add_parser(
         "damage-check",

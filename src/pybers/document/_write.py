@@ -34,6 +34,8 @@ UPDATES
             entry point, for PYB-113.
 2026-09-23  A successful save records where each cell's record now sits, for
             PYB-18.
+2026-09-29  A filled cell forgets the cell it copied once the save placed its
+            record, for PYB-118.
 """
 from __future__ import annotations
 
@@ -191,10 +193,15 @@ def updateCellOrigins(document: Document) -> None:
     for sheet in document.sheets:
         for table in sheet.tables:
             for cell in table.cells.values():
+                copied = cell._copiedFrom
+                cell._copiedFrom = None
+                if copied is not None and copied._origin is None:
+                    cell._origin = None
                 if (
                     cell._origin is not None
                     or cell.value is not None
                     or cell.formula is not None
+                    or copied is not None and copied._origin is not None
                 ):
                     cell._origin = cell.reference
 
