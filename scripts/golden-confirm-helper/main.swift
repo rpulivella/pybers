@@ -10,6 +10,7 @@
 // and the only values a request places into one are paths and cell names it escapes.
 //
 // UPDATES
+// 2026-09-29  Edits copies of documents through named steps, to make a measurement, for PYB-118.
 // 2026-09-22  Reads a table's size and cell names, and names a closed Numbers, for PYB-111.
 // 2026-09-22  Waits for the Data Format section and for a capture stream to recover.
 // 2026-09-17  Written for PYB-94.
@@ -44,6 +45,43 @@ let missingValueCode: OSType = 0x6D73_6E67
 enum HelperOperation: String, Codable {
     case permissionsCheck
     case documentInspect
+    case documentEdit
+}
+
+// Every menu item a step may press, each spelled here so a request names none of its own.
+enum EditMenuItem: String, Codable {
+    case copy
+    case paste
+    case autofillDown
+
+    var path: [String] {
+        switch self {
+        case .copy: return ["Edit", "Copy"]
+        case .paste: return ["Edit", "Paste"]
+        case .autofillDown: return ["Table", "Autofill Cells", "Autofill Down"]
+        }
+    }
+}
+
+enum EditCellFormat: String, Codable {
+    case checkbox
+}
+
+enum EditAction: String, Codable {
+    case select
+    case menuPress
+    case formatSet
+}
+
+// `document` counts the request's `documentPaths` from zero; the first is the one saved.
+struct EditStep: Codable {
+    let action: EditAction
+    let document: Int
+    var sheet: String?
+    var table: String?
+    var range: String?
+    var menuItem: EditMenuItem?
+    var format: EditCellFormat?
 }
 
 struct CellAddress: Codable {
@@ -68,6 +106,8 @@ struct HelperRequest: Codable {
     var tables: [TableAddress]?
     var maxCaptures: Int?
     var freshNumbers: Bool?
+    var documentPaths: [String]?
+    var steps: [EditStep]?
 }
 
 struct HelperProblem: Codable {
@@ -123,6 +163,7 @@ struct HelperResult: Codable {
     var tables: [TableReading] = []
     var sheetCaptures: [SheetCapture] = []
     var savedCopy: Bool?
+    var stepsDone: Int?
 }
 
 struct HelperFailure: Error {
@@ -790,11 +831,10 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
     return result
 }
 
-func inspectDocument(
-    documentPath: String, savedCopyPath: String, captureDirectory: String,
-    cells: [CellAddress], tables: [TableAddress], sheets: [String],
-    numbers: NSRunningApplication, result: inout HelperResult
-) throws {
+// Opens one document, refusing it and saying why when Numbers crashes, refuses or warns.
+func openDocument(
+    _ documentPath: String, numbers: NSRunningApplication, result: inout HelperResult
+) throws -> String {
     let documentId: String
     let existingWindows = readNumbersWindows(pid: numbers.processIdentifier)
     do {
@@ -847,6 +887,15 @@ func inspectDocument(
     }
     result.openOutcome = "opened"
     writeLog("opened \(documentId)")
+    return documentId
+}
+
+func inspectDocument(
+    documentPath: String, savedCopyPath: String, captureDirectory: String,
+    cells: [CellAddress], tables: [TableAddress], sheets: [String],
+    numbers: NSRunningApplication, result: inout HelperResult
+) throws {
+    let documentId = try openDocument(documentPath, numbers: numbers, result: &result)
     // Opening a document can bring Numbers back into view.
     setNumbersHidden(pid: numbers.processIdentifier, true)
     defer {
@@ -953,6 +1002,141 @@ func selectCell(_ address: CellAddress, documentId: String) throws {
     Thread.sleep(forTimeInterval: 0.5)
 }
 
+// MARK: Editing
+
+// A menu bar lists its items directly, and every other item holds its own inside one AXMenu.
+func listMenuItems(_ element: AXUIElement) -> [AXUIElement] {
+    (readAttribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []).flatMap { child in
+        readText(child, kAXRoleAttribute) == kAXMenuRole
+            ? readAttribute(child, kAXChildrenAttribute) as? [AXUIElement] ?? [] : [child]
+    }
+}
+
+func pressMenuItem(_ item: EditMenuItem, pid: pid_t) throws {
+    guard let bar = readAttribute(AXUIElementCreateApplication(pid), kAXMenuBarAttribute) else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "menu", detail: "Numbers' menu bar was not reachable through Accessibility",
+            remedy: "bring Numbers forward, then rerun"))
+    }
+    var element = bar as! AXUIElement
+    for title in item.path {
+        let items = listMenuItems(element)
+        guard let found = items.first(where: { readText($0, kAXTitleAttribute) == title }) else {
+            let titles = items.map { readText($0, kAXTitleAttribute) }.filter { !$0.isEmpty }
+            throw HelperFailure(problem: HelperProblem(
+                kind: "menu",
+                detail: "no menu item '\(title)' on the way to \(item.path.joined(separator: " > ")), "
+                    + "among: " + titles.joined(separator: ", "),
+                remedy: "correct EditMenuItem.path in the helper, then rebuild it"))
+        }
+        element = found
+    }
+    guard readAttribute(element, kAXEnabledAttribute) as? Bool != false else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "menu", detail: "\(item.path.joined(separator: " > ")) is disabled",
+            remedy: "check the selection the step before it makes"))
+    }
+    AXUIElementPerformAction(element, kAXPressAction as CFString)
+    Thread.sleep(forTimeInterval: 1.0)
+}
+
+func formatRangeReference(_ step: EditStep, documentId: String) throws -> (table: String, range: String) {
+    guard let sheet = step.sheet, let table = step.table, let range = step.range else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "request", detail: "a \(step.action.rawValue) step needs a sheet, a table and a range",
+            remedy: "run the helper only through scripts/golden-confirm.py"))
+    }
+    let document = "document id \(quoteAppleScript(documentId))"
+    return (
+        "table \(quoteAppleScript(table)) of sheet \(quoteAppleScript(sheet)) of \(document)",
+        "range \(quoteAppleScript(range))"
+    )
+}
+
+func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplication) throws {
+    let (_, window) = try findDocumentWindow(documentId: documentId, pid: numbers.processIdentifier)
+    AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+    numbers.activate()
+    Thread.sleep(forTimeInterval: 0.5)
+    switch step.action {
+    case .select:
+        let (table, range) = try formatRangeReference(step, documentId: documentId)
+        _ = try runAppleScript(
+            "set t to \(table)\n"
+                + "set active sheet of document id \(quoteAppleScript(documentId)) to sheet "
+                + "\(quoteAppleScript(step.sheet ?? "")) of document id \(quoteAppleScript(documentId))\n"
+                + "set selection range of t to \(range) of t")
+        Thread.sleep(forTimeInterval: 0.5)
+    case .menuPress:
+        guard let item = step.menuItem else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a menuPress step needs a menuItem",
+                remedy: "run the helper only through scripts/golden-confirm.py"))
+        }
+        try pressMenuItem(item, pid: numbers.processIdentifier)
+    case .formatSet:
+        let (table, range) = try formatRangeReference(step, documentId: documentId)
+        guard let format = step.format else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a formatSet step needs a format",
+                remedy: "run the helper only through scripts/golden-confirm.py"))
+        }
+        _ = try runAppleScript("set t to \(table)\nset format of \(range) of t to \(format.rawValue)")
+    }
+}
+
+// Numbers stays in view, since a menu acts on the frontmost window and its selection.
+func runDocumentEdit(_ request: HelperRequest) -> HelperResult {
+    var result = HelperResult(sourceHash: readSourceHash(), operation: request.operation.rawValue)
+    result.problems = findSessionProblems() + findGrantProblems()
+    guard result.problems.isEmpty else { return result }
+    do {
+        let paths = try (request.documentPaths ?? []).map { try checkTemporaryPath($0, field: "documentPaths") }
+        let savedCopyPath = try checkTemporaryPath(request.savedCopyPath, field: "savedCopyPath")
+        let steps = request.steps ?? []
+        guard !paths.isEmpty, steps.allSatisfy({ paths.indices.contains($0.document) }) else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "every step must name one of the documentPaths",
+                remedy: "run the helper only through scripts/golden-confirm.py"))
+        }
+        let (numbers, launched) = try launchNumbers()
+        if launched { numbersLaunchedByRun = numbers }
+        defer { quitNumbersLaunched(launched, numbers: numbers) }
+        try checkAutomationPermission()
+        try checkNoUnsavedDocuments()
+        result.numbersVersion = try? runAppleScript("get version").stringValue
+        var documentIds: [String] = []
+        defer {
+            for id in documentIds where kill(numbers.processIdentifier, 0) == 0 {
+                _ = try? runAppleScript("close (document id \(quoteAppleScript(id))) saving no")
+            }
+        }
+        for path in paths {
+            documentIds.append(try openDocument(path, numbers: numbers, result: &result))
+        }
+        result.stepsDone = 0
+        for step in steps {
+            writeLog("step \(step.action.rawValue) in document \(step.document)")
+            try runEditStep(step, documentId: documentIds[step.document], numbers: numbers)
+            result.stepsDone = (result.stepsDone ?? 0) + 1
+        }
+        _ = try runAppleScript(
+            "save document id \(quoteAppleScript(documentIds[0])) in (POSIX file \(quoteAppleScript(savedCopyPath)))")
+        result.savedCopy = FileManager.default.fileExists(atPath: savedCopyPath)
+    } catch let failure as HelperFailure {
+        result.problems.append(failure.problem)
+    } catch let failure as AppleScriptError {
+        result.problems.append(HelperProblem(
+            kind: "appleScript",
+            detail: "Numbers answered error \(failure.number): \(failure.message)",
+            remedy: "look at Numbers for a dialog, then rerun"))
+    } catch {
+        result.problems.append(HelperProblem(
+            kind: "helper", detail: String(describing: error), remedy: "rerun, then read the log"))
+    }
+    return result
+}
+
 func runRequest(at requestPath: String) {
     guard let data = FileManager.default.contents(atPath: requestPath),
           let request = try? JSONDecoder().decode(HelperRequest.self, from: data)
@@ -977,6 +1161,8 @@ func runRequest(at requestPath: String) {
         result = runPermissionsCheck(request)
     case .documentInspect:
         result = runDocumentInspect(request)
+    case .documentEdit:
+        result = runDocumentEdit(request)
     }
     writeResult(result, to: request.resultPath)
 }
