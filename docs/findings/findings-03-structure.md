@@ -299,6 +299,36 @@ by the table it reads, whether or not anything moved.
 the rule on `E2` reading `C2`, outside the block, now reads `G8`. Each cell kept its
 cached match. Numbers reused the two list keys, where a structural edit issues new ones.
 
+## Filling a block of cells: what a drag and Autofill Down each write
+
+Measured 2026-09-29 in Numbers 15.3.1 against `63-fill-base`, which
+`golden-confirm.py measure` made from `61-move-styles-base` by pasting the rich text of
+`02-text-rich` into `B3` and giving `D3` a checkbox. `63c` and `63e` are `B2:D3` dragged
+down to row 7 by hand, `63d` is the base with a border added around `D3`, `63f` is `63e`
+with `D5` unchecked, and `63b` is `Table > Autofill Cells > Autofill Down` over `B2:D7`.
+
+**A drag repeats the block from its top-left corner, except a column that begins a
+numeric series.** Column C, 22 over 32, continued as 42, 52, 62 and 72, each cell taking
+`C2`'s record with a new value and a highlighting rule of its own. Columns B and D, a
+number over rich text and a number over a checkbox, repeated with records byte-identical
+to their sources.
+
+**Autofill Down repeats the top row only**, overwriting every row below it, row 3 of the
+block included.
+
+**Neither copies a border.** The border storage of `63e` is identical to `63d`'s, though
+`D3`, which carries one, repeated to `D5` and `D7`.
+
+**A copied checkbox shares its control and keeps its own value.** Three cells name one
+`control_cell_spec_table` entry, counted 3, and unchecking `D5` in `63f` changed only
+`D5`'s record. An entry no cell names any more is removed, as `63b` shows.
+
+**A copied rich-text cell gets an entry, a payload and a storage of its own**, each
+beside the original and sharing its style sheet and styles. An overwritten one is removed
+with its payload, its storage and the character styles only that storage named.
+
+**Styles are shared and counted**, as for any record: both style entries went from 1 to 3.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:

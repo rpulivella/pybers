@@ -508,7 +508,7 @@ class Table:
         self, source: RangeAddress, through: RangeAddress, *,
         references: FormulaReferenceRelocation, values: CellValueFill,
     ) -> int:
-        """Repeat a block of any content across a range, as dragging a fill handle does.
+        """Repeat a block of any content across a range, copying each cell whole.
 
         Neither rule has a default. Positions a merge covers are skipped, and a
         block holding a merge is refused. Returns how many cells were filled.

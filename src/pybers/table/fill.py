@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A block of cells repeated across a range, as dragging a fill handle does.
+"""A block of cells repeated across a range, each filled cell a copy of its source.
 
 The block repeats from its own top-left corner, so a range reaching past the
 block in any direction takes the source cell at the matching position, and the
@@ -7,7 +7,9 @@ block itself keeps what it holds. Everything is checked before any cell changes,
 so a refused fill leaves the table exactly as it was.
 
 Each filled cell names the record of the cell it copied, which a save duplicates
-whole, so a record's style, format and highlighting fill with its value.
+whole, so a record's style, format and highlighting fill with its value. Numbers'
+drag repeats the same way except where a column continues a series, the case
+`CONTINUE_SERIES` covers. See findings-03-structure.md.
 
 UPDATES
 2026-09-29  Written for PYB-118, replacing `Table.formulaFill`.
