@@ -11,8 +11,9 @@ with it, measured 2026-09-23 in `61-move-*`. A row left holding nothing is dropp
 and each line's header counts the records it holds, dropped when it holds none and
 carries nothing else, as Numbers left them in `61b-move-styles-cut-pasted`.
 
-**A copied record is duplicated whole** and claims every entry it names. One naming
-a claim this library cannot count, or rich text, is refused rather than guessed.
+**A copied record is duplicated whole** and claims every entry it names, and rich
+text is given an entry of its own. A record naming an entry this library cannot
+count is refused rather than guessed.
 
 Private. Part of the table feature's archive half.
 
@@ -34,7 +35,7 @@ __status__ = "Development"
 __date__ = "2026/09/23"
 
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from .._generated import TSTArchives_pb2 as tst
@@ -59,8 +60,8 @@ from ..errors import WriteError
 from ..formula._read import readFormula
 from ._conditions import readConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
-from ._records import displayedKindSlot
-from ._refcounts import countedFormatSlots, countedStyleSlots, richTextTypeByte
+from ._records import controlSlot, displayedKindSlot
+from ._refcounts import countedFormatSlots, countedStyleSlots
 from ._strokes import listStrokeLayers, moveStrokeEdges
 from ._structure import rowsPerBucket
 from ._tiles import (
@@ -82,8 +83,11 @@ type CellCopies = dict[tuple[int, int], tuple[int, int] | None]
 # Each slot a duplicated record may carry: counted on copy, or naming no entry.
 copyableSlots: frozenset[tuple[int, int]] = frozenset({
     *countedStyleSlots, *countedFormatSlots, conditionalSlot, matchSlot,
-    (formulaFlagOffset, formulaFlagBit), displayedKindSlot,
+    (formulaFlagOffset, formulaFlagBit), displayedKindSlot, controlSlot,
 })
+
+# Claims every entry a duplicated record names, returning the record to place.
+type RecordClaim = Callable[[CellRecord, CellReference], bytes]
 
 
 def findCellMoves(table: Table, maps: GridMaps) -> CellMoves:
@@ -256,11 +260,6 @@ class RecordCopies:
 
 def refuseUncopyableRecord(record: CellRecord, where: CellReference) -> None:
     """Refuse a record whose duplicate would name an entry nobody counted."""
-    if record.typeByte == richTextTypeByte:
-        raise WriteError(
-            f"{where} holds rich text, and whether two cells may share one rich-text "
-            "entry has not been measured."
-        )
     for at, bit in listReferenceSlots(record.raw):
         if (at, bit) not in copyableSlots:
             raise WriteError(
@@ -274,6 +273,7 @@ def copyCellRecords(
     registry: PackageRegistry,
     store: tst.DataStore,
     copies: CellCopies,
+    claim: RecordClaim,
 ) -> RecordCopies:
     """Duplicate each copied record where its cell was filled, removing what was there.
 
@@ -319,7 +319,8 @@ def copyCellRecords(
     for row, column in displaced:
         removals.setdefault(row, set()).add(column)
     for (row, column), record in placed.items():
-        placements.setdefault(row, {})[column] = record.raw
+        where = CellReference(row + originOffset, column + originOffset)
+        placements.setdefault(row, {})[column] = claim(record, where)
     placeRecords(registry, store, tileRange, removals, placements)
     return RecordCopies(placed, displaced)
 
@@ -452,12 +453,13 @@ def applyCellCopies(
     registry: PackageRegistry,
     store: tst.DataStore,
     copies: CellCopies,
+    claim: RecordClaim,
 ) -> RecordCopies:
     """Carry every filled cell into its records, headers and highlighting counts.
 
-    Borders are not copied, since what a fill does to them has not been measured.
+    Borders are not copied, as Numbers' fill copied none in `63e-fill-border-*`.
     """
-    copied = copyCellRecords(index, registry, store, copies)
+    copied = copyCellRecords(index, registry, store, copies, claim)
     recountLineHeaders(
         index, store, {row for row, _ in copies}, {column for _, column in copies}
     )
@@ -493,6 +495,7 @@ __all__ = [
     "CellCopies",
     "CellMoves",
     "RecordCopies",
+    "RecordClaim",
     "RecordMoves",
     "applyCellCopies",
     "applyCellMoves",

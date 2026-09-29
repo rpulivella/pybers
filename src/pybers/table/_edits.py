@@ -10,7 +10,7 @@ Private. Part of the table feature's archive half.
 
 UPDATES
 2026-09-29  Filled cells take a duplicate of the record they copied, which claims
-            what it names, for PYB-118.
+            what it names, and a removed record releases its control, for PYB-118.
 2026-09-23  Cells moved as a block carry their records first, for PYB-18.
 2026-09-22  Split out of the table writer for PYB-113: records, refcounts and
             merges went to modules of their own.
@@ -59,6 +59,7 @@ from .._persistence.cells import (
     carriesFormula,
     emptyOffset,
     findFormulaKeySlot,
+    findSlotValue,
     offsetWidth,
 )
 from .._persistence.index import ArchiveIndex
@@ -82,12 +83,15 @@ from ._records import (
     applyChosenFormat,
     buildFreshRecord,
     buildWrittenRecord,
+    controlSlot,
     findFormatKey,
     findTemplateRecord,
     numericTypeBytes,
+    patchRichTextKey,
 )
 from ._refcounts import (
     claimEntries,
+    copyRichText,
     countFormatClaims,
     listRichTextClaims,
     listStringClaims,
@@ -96,6 +100,7 @@ from ._refcounts import (
     readStringPool,
     releaseEntries,
     removeSpentEntries,
+    removeSpentRichText,
     stringTypeByte,
 )
 from ._relocation import (
@@ -226,6 +231,13 @@ def applyTableEdits(
         if store.HasField("rich_text_table") else None
     )
     richTextMoved = False
+    controlList = (
+        index.resolve(store.control_cell_spec_table, tst.TableDataList)
+        if store.HasField("control_cell_spec_table") else None
+    )
+    controlsMoved = False
+    controlsReleased: set[int] = set()
+    richTextReleased: set[int] = set()
 
     def formatFor(formatType: int) -> int | None:
         """Return the key naming a format of this kind, caching the lookup."""
@@ -246,7 +258,7 @@ def applyTableEdits(
 
     def releaseRecord(record: CellRecord, reference: CellReference) -> bool:
         """Release every list entry a removed record names, reporting a formula."""
-        nonlocal stylesMoved, richTextMoved
+        nonlocal stylesMoved, richTextMoved, controlsMoved
         formatsCount(record.raw, None, reference)
         if textPool is not None:
             for key in listStringClaims(record):
@@ -255,15 +267,26 @@ def applyTableEdits(
             stylesMoved |= releaseEntries(styleList, listStyleClaims(record))
         if richTextList is not None:
             richTextMoved |= releaseEntries(richTextList, listRichTextClaims(record))
+            richTextReleased.update(listRichTextClaims(record))
+        control = findSlotValue(record, controlSlot)
+        if controlList is not None and control is not None:
+            controlsMoved |= releaseEntries(controlList, [control])
+            controlsReleased.add(control)
         if pool is not None and carriesFormula(record):
             pool.release(record.references[findFormulaKeySlot(record)])
             return True
         return False
 
-    def claimRecord(record: CellRecord, reference: CellReference) -> None:
-        """Claim every list entry a duplicated record names."""
-        nonlocal stylesMoved
-        formatsCount(None, record.raw, reference)
+    def listControlClaims(record: CellRecord) -> list[int]:
+        """Return the control key a record names, if it names one."""
+        control = findSlotValue(record, controlSlot)
+        return [] if control is None else [control]
+
+    def claimRecord(record: CellRecord, reference: CellReference) -> bytes:
+        """Claim every list entry a duplicated record names, and return it to place."""
+        nonlocal stylesMoved, richTextMoved, controlsMoved
+        raw = record.raw
+        formatsCount(None, raw, reference)
         if textPool is not None:
             for key in listStringClaims(record):
                 textPool.claim(key)
@@ -271,6 +294,17 @@ def applyTableEdits(
             stylesMoved |= claimEntries(styleList, listStyleClaims(record))
         if pool is not None and carriesFormula(record):
             pool.claim(record.references[findFormulaKeySlot(record)])
+        control = findSlotValue(record, controlSlot)
+        if controlList is not None and control is not None:
+            controlsMoved |= claimEntries(controlList, [control])
+        if richTextList is not None:
+            for key in listRichTextClaims(record):
+                duplicate = copyRichText(registry, richTextList, key)
+                raw = patchRichTextKey(raw, duplicate)
+                # The tile pass reads values through this table, so it learns the copy.
+                richText[duplicate] = richText[key]
+                richTextMoved = True
+        return raw
 
     restructured = maps.changed
     if restructured:
@@ -290,11 +324,10 @@ def applyTableEdits(
             formulaAdded.extend(landed for _, landed in carried.formulas)
         written.extend(sorted(set(moves) | set(moves.values())))
     if copies:
-        copied = applyCellCopies(index, registry, store, copies)
-        # Claimed before any release, so an entry both name never drops to zero.
+        # Claimed as each is placed, before any release, so an entry both name
+        # never drops to zero.
+        copied = applyCellCopies(index, registry, store, copies, claimRecord)
         for (row, column), record in copied.placed.items():
-            where = CellReference(row + originOffset, column + originOffset)
-            claimRecord(record, where)
             if carriesFormula(record):
                 formulaAdded.append((row, column))
         for (row, column), record in copied.displaced.items():
@@ -484,7 +517,17 @@ def applyTableEdits(
         index.archiveWrite(store.styleTable.identifier, styleList)
 
     if richTextList is not None and richTextMoved:
-        index.archiveWrite(store.rich_text_table.identifier, richTextList)
+        removeSpentRichText(registry, richTextList, richTextReleased, tiles)
+        richTextId = store.rich_text_table.identifier
+        index.archiveWrite(
+            richTextId, richTextList,
+            registry.referencesReconcile(richTextId, richTextList),
+        )
+
+    if controlList is not None and controlsMoved:
+        # Numbers removed the control no cell named, measured in `63b-fill-menu-down`.
+        removeSpentEntries(controlList, controlsReleased, tiles, listControlClaims)
+        index.archiveWrite(store.control_cell_spec_table.identifier, controlList)
 
     if textPool is not None and textPool.touched:
         for key in removeSpentEntries(

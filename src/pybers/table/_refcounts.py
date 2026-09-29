@@ -10,7 +10,9 @@ still names is removed at the end of the save, as Numbers removes it.
 Private. Part of the table feature's archive half.
 
 UPDATES
-2026-09-29  A copied record claims its string and style entries, for PYB-118.
+2026-09-29  A copied record claims its string and style entries, a copied
+            rich-text cell gains an entry of its own, and a spent one is removed
+            with the archives only it held, for PYB-118.
 2026-09-22  Split out of the table writer for PYB-113.
 """
 from __future__ import annotations
@@ -27,10 +29,13 @@ from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
+from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSTArchives_pb2 as tst
+from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
 from .._persistence.cells import CellRecord, listReferenceSlots
 from .._persistence.index import ArchiveIndex
+from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ..errors import WriteError
 from ._read import readStringTable
 
@@ -274,6 +279,81 @@ def claimEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
     return moved
 
 
+def copyRichText(
+    registry: PackageRegistry, dataList: tst.TableDataList, key: int
+) -> int:
+    """Give a copied rich-text cell an entry of its own, and return its key.
+
+    Numbers' fill gave each copy its own payload and storage, beside the original
+    and sharing its style sheet and styles, measured 2026-09-29 in `63e`. Sharing
+    one entry would let an edit to one cell rewrite the other.
+    """
+    index = registry.index
+    source = next((entry for entry in dataList.entries if entry.key == key), None)
+    if source is None:
+        raise WriteError(
+            f"A copied record names rich text {key}, which is not stored."
+        )
+    payload = tst.RichTextPayloadArchive()
+    payload.CopyFrom(
+        index.resolve(source.rich_text_payload, tst.RichTextPayloadArchive)
+    )
+    storage = index.resolve(payload.storage, tswp.StorageArchive)
+    payload.storage.identifier = createSiblingArchive(
+        registry, payload.storage.identifier, storage
+    )
+    identifier = createSiblingArchive(
+        registry, source.rich_text_payload.identifier, payload
+    )
+    index.archiveWrite(identifier, payload, [payload.storage.identifier])
+    entry = dataList.entries.add()
+    entry.key = dataList.nextListID
+    entry.refcount = 1
+    entry.rich_text_payload.identifier = identifier
+    dataList.nextListID += 1
+    return int(entry.key)
+
+
+def isArchiveReferenced(index: ArchiveIndex, target: int) -> bool:
+    """Report whether any archive in the package declares a reference to `target`."""
+    for archive in index.byIdentifier.values():
+        info = tspArchive.ArchiveInfo()
+        info.ParseFromString(archive.infoBytes)
+        if any(target in message.object_references for message in info.message_infos):
+            return True
+    return False
+
+
+def removeSpentRichText(
+    registry: PackageRegistry,
+    dataList: tst.TableDataList,
+    released: set[int],
+    tiles: list[tst.Tile],
+) -> None:
+    """Remove each spent rich-text entry with every archive only it held.
+
+    Numbers removed the entry, its payload, its storage and the character styles
+    only that storage named, keeping styles other cells share, measured 2026-09-29
+    in `63b-fill-menu-down`.
+    """
+    index = registry.index
+    storages = {
+        int(entry.key): index.resolve(
+            entry.rich_text_payload, tst.RichTextPayloadArchive
+        ).storage.identifier
+        for entry in dataList.entries if entry.key in released
+    }
+    payloads = {int(entry.key): entry.rich_text_payload.identifier
+                for entry in dataList.entries}
+    for key in removeSpentEntries(dataList, released, tiles, listRichTextClaims):
+        held = registry.strongReferencesOf(storages[key])
+        registry.archiveRemove(payloads[key])
+        registry.archiveRemove(storages[key])
+        for target in held:
+            if target in index.byIdentifier and not isArchiveReferenced(index, target):
+                registry.archiveRemove(target)
+
+
 def releaseEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
     """Release one reference per key given, and say whether any count moved."""
     named = Counter(keys)
@@ -292,6 +372,7 @@ __all__ = [
     "countFormatClaims",
     "countedFormatSlots",
     "countedStyleSlots",
+    "copyRichText",
     "currencyFormatSlot",
     "dateFormatSlot",
     "durationFormatSlot",
@@ -302,6 +383,7 @@ __all__ = [
     "numberFormatSlot",
     "readStringPool",
     "releaseEntries",
+    "removeSpentRichText",
     "removeSpentEntries",
     "richTextTypeByte",
     "stringTypeByte",

@@ -7,7 +7,8 @@ they claim, the refusals that leave a table as it was, and the few lines a scrip
 or a command line writes to fill a block.
 
 UPDATES
-2026-09-29  Written for PYB-118, taking over the fill tests of `formulaFill`.
+2026-09-29  Written for PYB-118, taking over the fill tests of `formulaFill`, and
+            checked against the fills Numbers made in `63*-fill-*`.
 """
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from structurefacts import readTableFacts
 
 import pybers
 from conftest import findDocumentPath
@@ -365,23 +367,84 @@ def testAFillWhoseSourceWasRemovedIsRefusedAtSave(tmp_path: Path) -> None:
     assert not target.exists()
 
 
-def testCopyingRichTextIsRefusedAndNothingIsWritten(tmp_path: Path) -> None:
-    """Two cells sharing one rich-text entry is unmeasured, so no copy makes them."""
-    document, table = openTable("02-text-rich")
-    table.rowAdd(2)
-    table.cellsFill("A1", "A2", references=relative, values=repeat)
+def readListCounts(path: Path, listName: str) -> list[tuple[int, int]]:
+    """Return one of a table's data lists as (key, refcount) pairs."""
+    index, store = resolveTableStore(path, "Table 1")
+    entries = index.resolve(getattr(store, listName), tst.TableDataList).entries
+    return [(int(entry.key), int(entry.refcount)) for entry in entries]
+
+
+def testAFillWritesTheRecordsNumbersDragWrote(tmp_path: Path) -> None:
+    """Columns B and D, which Numbers repeated rather than continued, match `63e`."""
+    target = tmp_path / "dragged.numbers"
+    fillAndSave("63d-fill-border-base", "B2:D3", "B2:D7", relative, target)
+    theirs = findDocumentPath("63e-fill-border-dragged-down")
+    ours, measured = readRecords(target, "Table 1"), readRecords(theirs, "Table 1")
+    for row in range(1, 7):
+        for column in (1, 3):
+            assert ours[(row, column)].raw == measured[(row, column)].raw, (row, column)
+    assert readTableFacts(target)["Table 1"]["strokes"] == (
+        readTableFacts(theirs)["Table 1"]["strokes"]
+    )
+    for listName in ("rich_text_table", "control_cell_spec_table", "styleTable"):
+        assert readListCounts(target, listName) == readListCounts(theirs, listName)
+
+
+def testATopRowFillWritesWhatNumbersMenuFillWrote(tmp_path: Path) -> None:
+    """Numbers' Autofill Down repeats the top row over row 3, as `63b` measured."""
+    target = tmp_path / "menu.numbers"
+    fillAndSave("63-fill-base", "B2:D2", "B2:D7", relative, target)
+    theirs = findDocumentPath("63b-fill-menu-down")
+    assert {position: record.raw for position, record in readRecords(
+        target, "Table 1").items()} == {
+        position: record.raw for position, record in readRecords(
+            theirs, "Table 1").items()
+    }
+    for listName in ("rich_text_table", "control_cell_spec_table", "styleTable"):
+        assert readListCounts(target, listName) == readListCounts(theirs, listName)
+
+
+def testAnOverwrittenRichTextCellTakesItsArchivesWithIt(tmp_path: Path) -> None:
+    """The payload, storage and four character styles Numbers removed in `63b`."""
+    target = tmp_path / "menu.numbers"
+    fillAndSave("63-fill-base", "B2:D2", "B2:D7", relative, target)
+    held = set(resolveTableStore(findDocumentPath("63-fill-base"), "Table 1")[0]
+               .byIdentifier)
+    kept = set(resolveTableStore(target, "Table 1")[0].byIdentifier)
+    assert sorted(held - kept) == [909660, 909661, 909662, 909663, 909664, 909720]
+
+
+def testACopiedRichTextCellHasAPayloadOfItsOwn(tmp_path: Path) -> None:
+    """Each copy of `B3` names a payload and a storage no other cell names."""
     target = tmp_path / "rich.numbers"
-    with pytest.raises(pybers.WriteError, match="rich text"):
+    fillAndSave("63-fill-base", "B3", "B3:B5", relative, target)
+    index, store = resolveTableStore(target, "Table 1")
+    entries = index.resolve(store.rich_text_table, tst.TableDataList).entries
+    payloads = [
+        index.resolve(entry.rich_text_payload, tst.RichTextPayloadArchive)
+        for entry in entries
+    ]
+    assert len({entry.rich_text_payload.identifier for entry in entries}) == 3
+    assert len({payload.storage.identifier for payload in payloads}) == 3
+    saved = pybers.open(target).sheets[0].tables[0]
+    assert [saved.cell(name).value for name in ("B4", "B5")] == ["Hello", "Hello"]
+
+
+def testAFillOverACheckboxReleasesItsControl(tmp_path: Path) -> None:
+    """`D3` is the one cell naming its control, so Numbers removes it, as in `63b`."""
+    target = tmp_path / "unchecked.numbers"
+    fillAndSave("63-fill-base", "D2", "D2:D3", relative, target)
+    assert readListCounts(target, "control_cell_spec_table") == []
+
+
+def testCopyingARecordNamingAnUnidentifiedEntryIsRefused(tmp_path: Path) -> None:
+    """`B10` names an entry through byte 9 bit 0x08, whose count nobody knows."""
+    document, table = openTable("46-formula-rare-functions")
+    table.cellsFill("B10", "C10", references=relative, values=repeat)
+    target = tmp_path / "unidentified.numbers"
+    with pytest.raises(pybers.WriteError, match="not identified"):
         document.save(target)
     assert not target.exists()
-
-
-def testCopyingARecordNamingAnUncountedEntryIsRefused(tmp_path: Path) -> None:
-    """The star rating at `F1` names a control through a slot no copy can count."""
-    document, table = openTable("11-value-types-noformats")
-    table.cellsFill("F1", "J1", references=relative, values=repeat)
-    with pytest.raises(pybers.WriteError, match="not identified|could not be counted"):
-        document.save(tmp_path / "control.numbers")
 
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
@@ -395,6 +458,8 @@ goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
         ("20-cells-filled-named-by-pybers", "20-formula-shapes", "A11", "A11:D11",
          named),
         ("61-cells-filled-by-pybers", "61-move-styles-base", "B2:D3", "B2:H7",
+         relative),
+        ("63-cells-filled-by-pybers", "63d-fill-border-base", "B2:D3", "B2:D7",
          relative),
     ],
 )
@@ -427,6 +492,10 @@ def testTheFillGoldensHoldWhatTheyClaimTo() -> None:
         goldenDirectory / "61-cells-filled-by-pybers.numbers"
     ).sheets[0].tables[0]
     assert styled.cell("H7").value == Decimal(31)
+    dragged = pybers.open(
+        goldenDirectory / "63-cells-filled-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert [dragged.cell(name).value for name in ("B5", "D7")] == ["Hello", True]
 
 
 def testFormulaFillNoLongerExists() -> None:
