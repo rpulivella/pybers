@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-09-29  CellValueFill re-exported, for PYB-118.
 2026-09-23  FormulaReferenceRelocation re-exported, for PYB-18.
 2026-09-21  FormulaReferenceLoss re-exported, for PYB-17.
 2026-09-14  TableRow and TableRows re-exported (PYB-62).
@@ -77,7 +78,15 @@ from pybers.formula import (
 )
 from pybers.geometry import Position, Size
 from pybers.style import Style
-from pybers.table import Cell, CellValue, MergeRange, Table, TableRow, TableRows
+from pybers.table import (
+    Cell,
+    CellValue,
+    CellValueFill,
+    MergeRange,
+    Table,
+    TableRow,
+    TableRows,
+)
 from pybers.text import Paragraph, RichText, TextRun
 
 __all__ = [
@@ -115,6 +124,7 @@ __all__ = [
     "CellRangeList",
     "CellReference",
     "CellValue",
+    "CellValueFill",
     "RangeAddress",
     "ReferenceError",
     "toColumnLetter",

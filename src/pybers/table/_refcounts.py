@@ -10,6 +10,7 @@ still names is removed at the end of the save, as Numbers removes it.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-29  A copied record claims its string and style entries, for PYB-118.
 2026-09-22  Split out of the table writer for PYB-113.
 """
 from __future__ import annotations
@@ -125,6 +126,16 @@ class StringPool:
         self.dataList.nextListID += 1
         self.stored[fresh.key] = text
         return fresh.key
+
+    def claim(self, key: int) -> None:
+        """Add one cell's claim on a stored string, as a copied record makes."""
+        entry = self.entryFor(key)
+        if entry is None:
+            raise WriteError(
+                f"A copied record names string {key}, which is not stored."
+            )
+        self.touched = True
+        entry.refcount += 1
 
     def release(self, key: int) -> None:
         """Give up one cell's claim on a stored string.
@@ -252,6 +263,17 @@ def listRichTextClaims(record: CellRecord) -> Iterable[int]:
     return ()
 
 
+def claimEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
+    """Add one reference per key given, and say whether any count moved."""
+    named = Counter(keys)
+    moved = False
+    for entry in dataList.entries:
+        if entry.key in named:
+            entry.refcount += named[entry.key]
+            moved = True
+    return moved
+
+
 def releaseEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
     """Release one reference per key given, and say whether any count moved."""
     named = Counter(keys)
@@ -266,6 +288,7 @@ def releaseEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
 __all__ = [
     "StringPool",
     "checkboxFormatSlot",
+    "claimEntries",
     "countFormatClaims",
     "countedFormatSlots",
     "countedStyleSlots",

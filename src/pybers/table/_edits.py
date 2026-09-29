@@ -9,6 +9,8 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-29  Filled cells take a duplicate of the record they copied, which claims
+            what it names, for PYB-118.
 2026-09-23  Cells moved as a block carry their records first, for PYB-18.
 2026-09-22  Split out of the table writer for PYB-113: records, refcounts and
             merges went to modules of their own.
@@ -85,6 +87,7 @@ from ._records import (
     numericTypeBytes,
 )
 from ._refcounts import (
+    claimEntries,
     countFormatClaims,
     listRichTextClaims,
     listStringClaims,
@@ -95,7 +98,13 @@ from ._refcounts import (
     removeSpentEntries,
     stringTypeByte,
 )
-from ._relocation import CellMoves, applyCellMoves, applyConditionChanges
+from ._relocation import (
+    CellCopies,
+    CellMoves,
+    applyCellCopies,
+    applyCellMoves,
+    applyConditionChanges,
+)
 from ._tiles import (
     buildTileRange,
     createRowStorage,
@@ -176,6 +185,7 @@ def applyTableEdits(
     registry: PackageRegistry,
     plan: ConditionalPlan | None,
     moves: CellMoves,
+    copies: CellCopies,
 ) -> TableEdits:
     """Write every changed cell of one table back into the tiles it came from.
 
@@ -250,6 +260,18 @@ def applyTableEdits(
             return True
         return False
 
+    def claimRecord(record: CellRecord, reference: CellReference) -> None:
+        """Claim every list entry a duplicated record names."""
+        nonlocal stylesMoved
+        formatsCount(None, record.raw, reference)
+        if textPool is not None:
+            for key in listStringClaims(record):
+                textPool.claim(key)
+        if styleList is not None:
+            stylesMoved |= claimEntries(styleList, listStyleClaims(record))
+        if pool is not None and carriesFormula(record):
+            pool.claim(record.references[findFormulaKeySlot(record)])
+
     restructured = maps.changed
     if restructured:
         covered = buildTileRange(index, registry, store)
@@ -267,6 +289,23 @@ def applyTableEdits(
             formulaRemoved.extend(stored for stored, _ in carried.formulas)
             formulaAdded.extend(landed for _, landed in carried.formulas)
         written.extend(sorted(set(moves) | set(moves.values())))
+    if copies:
+        copied = applyCellCopies(index, registry, store, copies)
+        # Claimed before any release, so an entry both name never drops to zero.
+        for (row, column), record in copied.placed.items():
+            where = CellReference(row + originOffset, column + originOffset)
+            claimRecord(record, where)
+            if carriesFormula(record):
+                formulaAdded.append((row, column))
+        for (row, column), record in copied.displaced.items():
+            released = releaseRecord(
+                record, CellReference(row + originOffset, column + originOffset)
+            )
+            placed = copied.placed.get((row, column))
+            if released and (placed is None or not carriesFormula(placed)):
+                formulaRemoved.append((row, column))
+        applyConditionChanges(index, registry, store, table)
+        written.extend(sorted(copies))
 
     # A row belongs to the tile covering its index, and a tile that holds nothing
     # may be absent. No table in the 46 documents has such a gap, so this refuses
@@ -296,7 +335,7 @@ def applyTableEdits(
         tile = index.resolve(entry.tile, tst.Tile)
         tiles.append(tile)
         firstRow = entry.tileid * tileSize
-        touched = restructured or bool(moves)
+        touched = restructured or bool(moves) or bool(copies)
 
         # Rows the file stores nothing for, materialized before the walk below,
         # which only ever sees a row that already has storage. Doing it here rather

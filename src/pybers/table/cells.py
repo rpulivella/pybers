@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-29  A block fills a range under the rules its caller names, replacing
+            `formulaFill`, and a filled cell names the cell it copies (PYB-118).
 2026-09-23  A block of cells moves to a new anchor, and a cell remembers where
             its record sits so a save can tell (PYB-18).
 2026-09-22  A range reaching outside the grid is refused in one place (PYB-113).
@@ -68,6 +70,7 @@ from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.formula.render import renderFormula
 from pybers.geometry import Position
 from pybers.style import Style
+from pybers.table.fill import CellValueFill, fillCells
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
 from pybers.table.structure import (
@@ -127,6 +130,23 @@ def generateOwnerIdentity() -> str:
     """
     value = int.from_bytes(uuid.uuid4().bytes, "little") & ownerBaseMask
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
+
+
+def listRangePositions(table: Table, address: RangeAddress) -> list[CellReference]:
+    """Return the positions ranges cover, checking every range before returning any."""
+    extent = table.extent
+    items = []
+    for item in toCellRanges(address):
+        if item.rowsUnbounded or item.colsUnbounded:
+            if extent is None:
+                continue
+            item = item.boundedBy(extent)
+        refuseRangeOutside(table, item)
+        items.append(item)
+    return [
+        reference.asUnlocked() for item in items for reference in item
+        if table.addressable(reference)
+    ]
 
 
 def refuseRangeOutside(table: Table, item: CellRange) -> None:
@@ -216,6 +236,10 @@ class Cell:
     # The conditions of its highlighting rules, one per rule, hosted here.
     _conditions: tuple[Formula, ...] = field(
         default=(), repr=False, compare=False, kw_only=True
+    )
+    # The cell whose stored record a save duplicates here, set by a fill.
+    _copiedFrom: Cell | None = field(
+        default=None, repr=False, compare=False, kw_only=True
     )
     # The table this belongs to, so that reading or writing a formula as text needs
     # neither the cell's own address nor the names of the other tables passed in.
@@ -456,23 +480,7 @@ class Table:
         none, so an unbounded range over one covers nothing. Positions swallowed by a
         merge are skipped, so a merged block yields its anchor once.
         """
-        extent = self.extent
-        found: list[Cell] = []
-        for item in toCellRanges(address):
-            if item.rowsUnbounded or item.colsUnbounded:
-                if extent is None:
-                    continue
-                item = item.boundedBy(extent)
-            # Checked whole and up front, rather than left to the first cell that
-            # falls off the end, which would name an interior address the caller
-            # never wrote.
-            refuseRangeOutside(self, item)
-            found.extend(
-                self.cell(reference)
-                for reference in item
-                if self.addressable(reference)
-            )
-        return found
+        return [self.cell(reference) for reference in listRangePositions(self, address)]
 
     def addressable(self, address: CellAddress) -> bool:
         """Report whether an address names a cell this table can hand over.
@@ -496,25 +504,16 @@ class Table:
             return None
         return CellRange(firstRow, firstColumn, self.rowCount, self.colCount)
 
-    def formulaFill(self, source: CellAddress, through: RangeAddress) -> int:
-        """Give every cell of a range the formula one cell holds, as dragging does.
+    def cellsFill(
+        self, source: RangeAddress, through: RangeAddress, *,
+        references: FormulaReferenceRelocation, values: CellValueFill,
+    ) -> int:
+        """Repeat a block of any content across a range, as dragging a fill handle does.
 
-        Relative references follow each row and locked ones stay put, with no
-        special cases: the file stores ONE formula and every filled cell points at
-        it. Positions a merge swallowed are skipped. Returns how many were filled.
+        Neither rule has a default. Positions a merge covers are skipped, and a
+        block holding a merge is refused. Returns how many cells were filled.
         """
-        origin = self.cell(source)
-        if origin.formula is None:
-            raise ReferenceError(
-                f"{toCellReference(source)} holds no formula to fill from."
-            )
-        filled = 0
-        for cell in self.range(through):
-            if cell.reference == origin.reference:
-                continue
-            cell.formula = origin.formula
-            filled += 1
-        return filled
+        return fillCells(self, source, through, references, values)
 
     def mergeAdd(self, address: RangeAddress) -> MergeRange:
         """Merge a block of cells into one, anchored at its top-left, and return it.
