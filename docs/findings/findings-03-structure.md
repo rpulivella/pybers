@@ -353,6 +353,12 @@ destination, read the copy of `B2` afterward.
 too, and the one around `C3` stayed. The highlighting rule on `C2` was copied to `G8`
 with its operand unchanged, one column left.
 
+**Each destination cell takes exactly its source cell's borders**, removing any it had.
+`64c` pasted `C3` at `G9`, so `G9` held 32 inside a border, and `64e` emptied it with
+Edit, Delete, which removed its record and kept its border. Pasting `B2:D5` at `E8` then
+landed `D3`, which has no border, on `G9`, and `G9` lost its border in both `64d`, from
+`64c`, and `64f`, from `64e`. `F9`, where `C3` landed, gained one.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:
