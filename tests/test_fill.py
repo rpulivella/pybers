@@ -689,3 +689,75 @@ def testAFillOfThreeSeedsAndOfRichTextIsWhatNumbersDragged(tmp_path: Path) -> No
                 savedRecords[(row - 1, column)].typeByte
                 == draggedRecords[(row - 1, column)].typeByte
             ), (letter, row)
+
+
+seedCountsByColumn: dict[str, int] = {
+    "A": 2, "B": 1, "C": 2, "D": 3, "E": 3, "F": 3, "G": 3, "H": 3,
+}
+
+
+def fillSeriesGolden(name: str, target: Path) -> None:
+    """Fill a series golden's base the way the golden was made, and save it."""
+    if name.startswith("67"):
+        document, table = openTable("67-series-rich-base")
+        for letter, count in seedCountsByColumn.items():
+            table.cellsFill(
+                f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+                references=relative, values=series,
+            )
+    else:
+        direction = name.split("-")[3]
+        document, table = openTable(
+            "66-series-vertical-base" if direction in ("down", "up")
+            else "66-series-horizontal-base"
+        )
+        for index in range(20):
+            fillCase(table, direction, index)
+    document.save(target)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "66-series-filled-down-by-pybers",
+        "66-series-filled-up-by-pybers",
+        "66-series-filled-right-by-pybers",
+        "66-series-filled-left-by-pybers",
+        "67-series-filled-by-pybers",
+    ],
+)
+def testTheSeriesGoldensMatchWhatThisLibraryProduces(
+    name: str, tmp_path: Path
+) -> None:
+    """PYB-137 AC 4: each series fill again, against the file to be confirmed."""
+    target = tmp_path / f"{name}.numbers"
+    fillSeriesGolden(name, target)
+    differences = listPackageDifferences(
+        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
+    )
+    assert [
+        difference for difference in differences if difference.identifier is not None
+    ] == []
+
+
+def testTheSeriesGoldensHoldWhatTheyClaimTo() -> None:
+    """Guard the guard: an unfilled copy of a base would pass the match above."""
+    down, up, right, left = (
+        pybers.open(
+            goldenDirectory / f"66-series-filled-{direction}-by-pybers.numbers"
+        ).sheets[0].tables[0]
+        for direction in ("down", "up", "right", "left")
+    )
+    assert [down.cell("A21").value, up.cell("A2").value] == [
+        Decimal("12"), Decimal("-7")
+    ]
+    assert [right.cell("U1").value, left.cell("B1").value] == [
+        Decimal("12"), Decimal("-7")
+    ]
+    assert down.cell("I21").value == "Friday"
+    rich = pybers.open(
+        goldenDirectory / "67-series-filled-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert [rich.cell(name).value for name in ("A13", "D13", "G13")] == [
+        "Item 2", Decimal("23"), "Item 23"
+    ]

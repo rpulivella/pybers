@@ -1,0 +1,124 @@
+# What Numbers shows for 66-series-filled-right-by-pybers.numbers, `66-series-horizontal-base` with every case filled
+# right to column U by `cellsFill` under `CONTINUE_SERIES`. Each expected value is the far end
+# of what Numbers' own drag wrote in `66d-series-right`. Checked by
+# `python3 scripts/golden-confirm.py run 66-series-filled-right-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U1"
+value = 12
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U2"
+value = -17
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U3"
+value = 4
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U4"
+value = 1.2
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U5"
+value = 2026-02-10T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U6"
+value = 2026-12-01T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U7"
+value = 2027-11-30T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U8"
+value = 2037-01-01T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U9"
+value = "Friday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U10"
+value = "Tuesday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U11"
+value = "December"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U12"
+value = "Item 12"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U13"
+value = "Item 23"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U14"
+value = "Item 12"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U15"
+value = "beta"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U16"
+value = 7
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U17"
+value = 2026-03-26T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U18"
+value = "Friday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U19"
+value = "December"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "U20"
+value = "Item 12"

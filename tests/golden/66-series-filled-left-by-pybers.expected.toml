@@ -1,0 +1,124 @@
+# What Numbers shows for 66-series-filled-left-by-pybers.numbers, `66-series-horizontal-base` with every case filled
+# left to column B by `cellsFill` under `CONTINUE_SERIES`. Each expected value is the far end
+# of what Numbers' own drag wrote in `66e-series-left`. Checked by
+# `python3 scripts/golden-confirm.py run 66-series-filled-left-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B1"
+value = -7
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B2"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B3"
+value = 2
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B4"
+value = -0.7
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B5"
+value = 2026-01-22T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B6"
+value = 2025-05-01T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B7"
+value = 2024-09-30T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B8"
+value = 2018-01-01T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B9"
+value = "Sunday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B10"
+value = "Saturday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B11"
+value = "May"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B12"
+value = "Item -7"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B13"
+value = "Item -15"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B14"
+value = "Item -7"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B15"
+value = "alpha"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B16"
+value = 7
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B17"
+value = 2026-03-07T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B18"
+value = "Sunday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B19"
+value = "May"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-horizontal-base"
+cell = "B20"
+value = "Item -7"
