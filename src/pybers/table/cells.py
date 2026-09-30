@@ -490,7 +490,8 @@ class Table:
         """Repeat a block of any content across a range, copying each cell whole.
 
         Neither rule has a default. Positions a merge covers are skipped, and a
-        block holding a merge is refused. Returns how many cells were filled.
+        block holding a merge is refused. `CONTINUE_SERIES` continues each column
+        that begins a series, in any one direction. Returns how many cells were filled.
         """
         return fillCells(self, source, through, references, values)
 

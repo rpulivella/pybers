@@ -7,6 +7,8 @@ they claim, the refusals that leave a table as it was, and the few lines a scrip
 or a command line writes to fill a block.
 
 UPDATES
+2026-09-30  Series continued by `CONTINUE_SERIES`, checked against the drag Numbers
+            made in `65b-series-dragged`, for PYB-137.
 2026-09-29  Written for PYB-118, taking over the fill tests of `formulaFill`, and
             checked against the fills Numbers made in `63*-fill-*`.
 """
@@ -52,6 +54,7 @@ from pybers.table._refcounts import (
 relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
 named = FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 repeat = CellValueFill.REPEAT_SOURCE_VALUE
+series = CellValueFill.CONTINUE_SERIES
 
 type Ledger = dict[str, tuple[dict[int, int], Counter[int]]]
 
@@ -234,8 +237,7 @@ def testAFillSkipsWhatAMergeCoversAndCountsWhatItFilled() -> None:
         (lambda table: table.cellsFill(
             "D3", "D4", references=relative, values="upward"), "not a value rule"),
         (lambda table: table.cellsFill(
-            "D3", "D4", references=relative, values=CellValueFill.CONTINUE_SERIES),
-         "not supported yet"),
+            "A2:A3", "A4:B4", references=relative, values=series), "asks for both"),
     ],
 )
 def testARefusedFillLeavesTheTableAsItWas(
@@ -528,3 +530,133 @@ def testACommandLineFillsWithTheRulesAsTyped() -> None:
     )
     assert filled == 2
     assert table.cell("D4").formulaText == "=B2+C2"
+
+
+seedRows: dict[str, int] = {"D": 4}
+seededColumns: str = "ABCDEFGHIJKLMN"
+
+
+def readColumnValues(table: pybers.Table, column: str, last: int) -> list[object]:
+    """Return a column's values from row 2 down to `last`."""
+    return [table.cell(f"{column}{row}").value for row in range(2, last + 1)]
+
+
+def testADragOfEveryColumnIsWhatCellsFillProducesUnderSeries(tmp_path: Path) -> None:
+    """PYB-137 AC 2: each column of `65b` equals its seeds filled, saved and read."""
+    document, table = openTable("65-series-base")
+    for column in seededColumns:
+        seeds = seedRows.get(column, 3)
+        table.cellsFill(
+            f"{column}2:{column}{seeds}", f"{column}{seeds + 1}:{column}17",
+            references=relative, values=series,
+        )
+    target = tmp_path / "series.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    dragged = pybers.open(findDocumentPath("65b-series-dragged")).sheets[0].tables[0]
+    for column in seededColumns:
+        assert readColumnValues(saved, column, 17) == readColumnValues(
+            dragged, column, 17
+        ), column
+
+
+def testASeriesFillContinuesAColumnBesideOneThatRepeats() -> None:
+    """A block continues the columns that begin a series and repeats the rest."""
+    _, table = openTable("65-series-base")
+    table.cellsFill("A2:B3", "A4:B5", references=relative, values=series)
+    table.cellsFill("I2:J3", "I4:J5", references=relative, values=series)
+    assert [table.cell(name).value for name in ("A5", "B5", "I5", "J5")] == [
+        Decimal("4"), Decimal("40"), "April", "Item 4"
+    ]
+
+
+def testASeriesFillFromAColumnBeginningNoSeriesRepeatsTheBlock() -> None:
+    """`1, 2, 4` and `alpha, beta` begin no series, which the drag repeated whole."""
+    _, table = openTable("65-series-base")
+    table.cellsFill("D2:D4", "D5:D7", references=relative, values=series)
+    table.cellsFill("N2:N3", "N4:N7", references=relative, values=series)
+    assert readColumnValues(table, "D", 7) == [Decimal(n) for n in (1, 2, 4, 1, 2, 4)]
+    assert readColumnValues(table, "N", 7) == ["alpha", "beta"] * 3
+
+
+def testAFormulaInASeriesSourceFillsAsItDoesWhenRepeated() -> None:
+    """PYB-137 AC 3: a column holding a formula repeats, under either reference rule."""
+    for rule in FormulaReferenceRelocation:
+        _, repeated = openTable("60-move-base")
+        _, continued = openTable("60-move-base")
+        repeated.cellsFill("B2:D3", "B4:D4", references=rule, values=repeat)
+        continued.cellsFill("B2:D3", "B4:D4", references=rule, values=series)
+        for name in ("B4", "C4", "D4"):
+            assert continued.cell(name).formulaText == repeated.cell(name).formulaText
+            assert continued.cell(name).value == repeated.cell(name).value
+
+
+def testAScriptContinuesRowNumbersDownAColumn() -> None:
+    """A script numbering rows names the rule as a string, as a command line would."""
+    document = pybers.open(findDocumentPath("65-series-base"))
+    table = document.sheets[0].tables[0]
+    filled = table.cellsFill(
+        "A2:A3", "A4:A12",
+        references="relative-position",  # type: ignore[arg-type]
+        values="series",  # type: ignore[arg-type]
+    )
+    assert filled == 9
+    assert table.cell("A12").value == Decimal("11")
+
+
+directionDocuments: dict[str, str] = {
+    "down": "66b-series-down", "up": "66c-series-up",
+    "right": "66d-series-right", "left": "66e-series-left",
+}
+
+
+def findSeedCount(index: int) -> int:
+    """Return how many seeds case `index` of the `66` bases holds."""
+    return 3 if index == 2 else 1 if index >= 15 else 2
+
+
+def fillCase(table: pybers.Table, direction: str, index: int) -> None:
+    """Fill one case of a `66` base the way its drag was made."""
+    count = findSeedCount(index)
+    if direction in ("down", "up"):
+        letter = chr(65 + index)
+        source = f"{letter}10:{letter}{9 + count}"
+        through = (
+            f"{letter}{10 + count}:{letter}21" if direction == "down"
+            else f"{letter}2:{letter}9"
+        )
+    else:
+        row = index + 1
+        source = f"J{row}:{chr(73 + count)}{row}"
+        through = (
+            f"{chr(74 + count)}{row}:U{row}" if direction == "right"
+            else f"B{row}:I{row}"
+        )
+    table.cellsFill(source, through, references=relative, values=series)
+
+
+@pytest.mark.parametrize("direction", ["down", "up", "right", "left"])
+def testAFillInEachDirectionIsWhatNumbersDragged(
+    direction: str, tmp_path: Path
+) -> None:
+    """PYB-137 AC 2: all twenty cases of `66b` to `66e` equal their seeds filled."""
+    base = (
+        "66-series-vertical-base" if direction in ("down", "up")
+        else "66-series-horizontal-base"
+    )
+    document, table = openTable(base)
+    for index in range(20):
+        fillCase(table, direction, index)
+    target = tmp_path / "series.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    dragged = pybers.open(findDocumentPath(directionDocuments[direction]))
+    dragged = dragged.sheets[0].tables[0]
+    for index in range(20):
+        if direction in ("down", "up"):
+            names = [f"{chr(65 + index)}{row}" for row in range(2, 22)]
+        else:
+            names = [f"{chr(65 + column)}{index + 1}" for column in range(1, 21)]
+        assert [saved.cell(name).value for name in names] == [
+            dragged.cell(name).value for name in names
+        ], (direction, index)

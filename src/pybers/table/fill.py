@@ -9,9 +9,11 @@ so a refused fill leaves the table exactly as it was.
 Each filled cell names the record of the cell it copied, which a save duplicates
 whole, so a record's style, format and highlighting fill with its value. Numbers'
 drag repeats the same way except where a column continues a series, the case
-`CONTINUE_SERIES` covers. See findings-03-structure.md.
+`CONTINUE_SERIES` covers, in any one direction. See findings-03-structure.md.
 
 UPDATES
+2026-09-30  `CONTINUE_SERIES` continues each column that begins a series, for
+            PYB-137.
 2026-09-29  A filled cell's copy says it draws no border, which a paste does,
             for PYB-136.
 2026-09-29  Written for PYB-118, replacing `Table.formulaFill`.
@@ -33,6 +35,7 @@ from pybers.addressing.ranges import CellRange, RangeAddress
 from pybers.addressing.reference import CellReference, ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation, relocateFormula
 from pybers.table.relocation import findBlockCorners, toRelocationRule
+from pybers.table.series import SeedValue, findSeriesContinuation
 
 if TYPE_CHECKING:
     from pybers.table.cells import Cell, Table
@@ -54,11 +57,6 @@ def toValueRule(values: str) -> CellValueFill:
         raise ReferenceError(
             f"{values!r} is not a value rule. A fill names one of {spelled}."
         ) from exc
-    if rule is CellValueFill.CONTINUE_SERIES:
-        raise ReferenceError(
-            f"Continuing a series is not supported yet, so no fill takes "
-            f"{rule.value!r}."
-        )
     return rule
 
 
@@ -79,6 +77,45 @@ def findSourcePosition(extent: CellRange, target: CellReference) -> CellReferenc
     return CellReference(
         top + (target.row - top) % height, left + (target.col - left) % width
     )
+
+
+def findSeriesValues(
+    table: Table, extent: CellRange, targets: list[CellReference]
+) -> dict[CellReference, SeedValue]:
+    """Return each filled cell's continued value, refusing a range not in line with it.
+
+    A block continues down or up its columns, or right or left along its rows, and
+    each line of seeds decides for itself whether it begins a series.
+    """
+    top, left, bottom, right = findBlockCorners(extent)
+    down = all(left <= target.col <= right for target in targets)
+    across = all(top <= target.row <= bottom for target in targets)
+    if not (down or across):
+        raise ReferenceError(
+            f"A series continues down or up the columns of {extent}, or along its "
+            "rows, and the range asks for both."
+        )
+    lines = (
+        [[CellReference(row, column) for row in range(top, bottom + 1)]
+         for column in range(left, right + 1)]
+        if down else
+        [[CellReference(row, column) for column in range(left, right + 1)]
+         for row in range(top, bottom + 1)]
+    )
+    values: dict[CellReference, SeedValue] = {}
+    for line in lines:
+        cells = [table.cell(reference) for reference in line]
+        if any(cell.formula is not None or cell.errored for cell in cells):
+            continue
+        continuation = findSeriesContinuation([cell.value for cell in cells])
+        if continuation is None:
+            continue
+        for target in targets:
+            if down and target.col == line[0].col:
+                values[target] = continuation(target.row - top)
+            elif across and target.row == line[0].row:
+                values[target] = continuation(target.col - left)
+    return values
 
 
 def copyCellContent(
@@ -124,20 +161,27 @@ def fillCells(
     namedCell = (
         toRelocationRule(references) is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
     )
-    toValueRule(values)
+    rule = toValueRule(values)
     extent = table.rangeSingle(source, "fill")
     refuseMergeInBlock(table, extent)
     targets = [
         position for position in listRangePositions(table, through)
         if not extent.covers(position)
     ]
+    continued = (
+        findSeriesValues(table, extent, targets)
+        if rule is CellValueFill.CONTINUE_SERIES else {}
+    )
     for position in targets:
+        cell = table.cell(position)
         copyCellContent(
-            table.cell(position),
+            cell,
             table.cell(findSourcePosition(extent, position)),
             namedCell,
             borders=False,
         )
+        if position in continued:
+            cell.value = continued[position]
     return len(targets)
 
 
