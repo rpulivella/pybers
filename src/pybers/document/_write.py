@@ -36,6 +36,8 @@ UPDATES
             PYB-18.
 2026-09-29  A filled cell forgets the cell it copied once the save placed its
             record, for PYB-118.
+2026-09-29  A copied cell does the same, its copy now saying whether borders go
+            with it, for PYB-136.
 """
 from __future__ import annotations
 
@@ -193,7 +195,8 @@ def updateCellOrigins(document: Document) -> None:
     for sheet in document.sheets:
         for table in sheet.tables:
             for cell in table.cells.values():
-                copied = cell._copiedFrom
+                copy = cell._copiedFrom
+                copied = None if copy is None else copy.source
                 cell._copiedFrom = None
                 if copied is not None and copied._origin is None:
                     cell._origin = None

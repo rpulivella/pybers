@@ -7,6 +7,8 @@ and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
 2026-09-29  `MergeRange` moved to `merges`, keeping this module within its limit.
+2026-09-29  A block of cells is copied to a new anchor, and a copied cell says
+            whether its borders go with it (PYB-136).
 2026-09-29  A block fills a range under the rules its caller names, replacing
             `formulaFill`, and a filled cell names the cell it copies (PYB-118).
 2026-09-23  A block of cells moves to a new anchor, and a cell remembers where
@@ -71,6 +73,7 @@ from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.formula.render import renderFormula
 from pybers.geometry import Position
 from pybers.style import Style
+from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
@@ -164,6 +167,17 @@ def refuseRangeOutside(table: Table, item: CellRange) -> None:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class CellCopy:
+    """The cell whose stored record a save duplicates, and whether its borders go too.
+
+    A fill copies no border and a paste copies all four, as `63e` and `64b` measured.
+    """
+
+    source: Cell
+    borders: bool
+
+
 @dataclass(slots=True)
 class Cell:
     """One cell's value, optional formula, and style, at an address.
@@ -188,8 +202,8 @@ class Cell:
     _conditions: tuple[Formula, ...] = field(
         default=(), repr=False, compare=False, kw_only=True
     )
-    # The cell whose stored record a save duplicates here, set by a fill.
-    _copiedFrom: Cell | None = field(
+    # The cell whose stored record a save duplicates here, set by a fill or a copy.
+    _copiedFrom: CellCopy | None = field(
         default=None, repr=False, compare=False, kw_only=True
     )
     # The table this belongs to, so that reading or writing a formula as text needs
@@ -369,6 +383,20 @@ class Table:
         cell the move emptied. Occupied destinations and cut merges raise.
         """
         return moveCells(self, source, anchor, references)
+
+    def cellsCopy(
+        self,
+        source: RangeAddress,
+        anchor: CellAddress,
+        *,
+        references: FormulaReferenceRelocation,
+    ) -> CellRange:
+        """Copy a block so its top-left lands on `anchor`, with merges and borders.
+
+        `references` has no default. Returns where the copy landed. Occupied
+        destinations, an overlap with the source and cut merges raise.
+        """
+        return copyCells(self, source, anchor, references)
 
     def cell(
         self,

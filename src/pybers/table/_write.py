@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-09-29  A copied cell's borders are drawn after every edit, for PYB-136.
 2026-09-29  Filled cells are found and carried after any move, for PYB-118.
 2026-09-24  A moved merge keeps the records it carries, for PYB-18.
 2026-09-23  Cells moved as a block are found and carried, for PYB-18.
@@ -61,7 +62,12 @@ from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
-from ._relocation import findCellCopies, findCellMoves
+from ._relocation import (
+    applyBorderCopies,
+    findBorderCopies,
+    findCellCopies,
+    findCellMoves,
+)
 from ._structure import applyGridStructure, listModelFormulas
 from .cells import Table
 
@@ -140,6 +146,10 @@ class TableSave:
         edits = applyTableEdits(
             index, table, model, swallowed, maps, self.registry, plan, moves, copies
         )
+        # After the edits, which carry any moved source's borders to where it sits.
+        borderCopies = findBorderCopies(table)
+        if borderCopies:
+            applyBorderCopies(index, self.registry, model, borderCopies)
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
         if moved or swallowed or maps.changed or moves or copies:
             # A structural edit or a moved block can create and remove tiles and
