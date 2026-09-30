@@ -20,7 +20,7 @@ Private. Part of the table feature's archive half.
 UPDATES
 2026-09-29  A copy carries every position of a merge it copies, as a move does,
             so what an import stores under covered cells goes with it, for PYB-136.
-2026-09-29  A copied cell draws its source's borders where it landed, for PYB-136.
+2026-09-29  A copied cell takes exactly its source's borders, for PYB-136.
 2026-09-29  A filled cell's record is duplicated from the cell it copied, and the
             record it replaces is returned for release, for PYB-118.
 2026-09-24  A moved merge carries the records an import left under it.
@@ -529,7 +529,7 @@ def applyBorderCopies(
     model: tst.TableModelArchive,
     copies: CellMoves,
 ) -> None:
-    """Draw every copied cell's borders where it landed, as a paste did in `64b`."""
+    """Give every copied cell exactly its source's borders, as a paste did in `64f`."""
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
     copyStrokeEdges(index, registry, sidecar, copies)
     index.archiveWrite(

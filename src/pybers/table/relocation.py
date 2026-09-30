@@ -278,7 +278,6 @@ def moveCells(
 __all__ = [
     "CellsMove",
     "findBlockCorners",
-    "isCellOccupied",
     "moveCells",
     "refuseMergeCut",
     "refuseOccupied",
