@@ -359,6 +359,11 @@ Edit, Delete, which removed its record and kept its border. Pasting `B2:D5` at `
 landed `D3`, which has no border, on `G9`, and `G9` lost its border in both `64d`, from
 `64c`, and `64f`, from `64e`. `F9`, where `C3` landed, gained one.
 
+**A paste carries every position a merge covers**, whatever sits there. `64g` pasted
+`A1:G2` of `22e-merge-imported` at `A5`, and the style-only records Excel left under
+`B1`, `D1` and `E1` arrived under `B5`, `D5` and `E5`, with the borders drawn around each
+covered cell. Selecting `A1:G1` alone left Paste disabled, so the recipe copies two rows.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:
