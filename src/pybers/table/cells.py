@@ -194,6 +194,11 @@ class Cell:
     style: Style = field(default_factory=Style)
     # Set only by the reader and `textLiteralSet`, so a write chooses only text.
     _formatChosen: bool = field(default=False, kw_only=True)
+    # The text a rich-text record held when read or copied, so a cell is rich only
+    # while its value is still that text.
+    _richText: str | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
     # Where the file stores this cell's record, so a save can tell that it moved.
     _origin: CellReference | None = field(
         default=None, repr=False, compare=False, kw_only=True

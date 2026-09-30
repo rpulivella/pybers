@@ -79,6 +79,11 @@ def findSourcePosition(extent: CellRange, target: CellReference) -> CellReferenc
     )
 
 
+def checkRichTextHeld(cell: Cell) -> bool:
+    """Say whether a cell still holds the rich text its record stores."""
+    return cell._richText is not None and cell.value == cell._richText
+
+
 def findSeriesValues(
     table: Table, extent: CellRange, targets: list[CellReference]
 ) -> dict[CellReference, SeedValue]:
@@ -105,7 +110,10 @@ def findSeriesValues(
     values: dict[CellReference, SeedValue] = {}
     for line in lines:
         cells = [table.cell(reference) for reference in line]
-        if any(cell.formula is not None or cell.errored for cell in cells):
+        if any(
+            cell.formula is not None or cell.errored or checkRichTextHeld(cell)
+            for cell in cells
+        ):
             continue
         continuation = findSeriesContinuation([cell.value for cell in cells])
         if continuation is None:
@@ -128,6 +136,7 @@ def copyCellContent(
     target.errored = source.errored
     target.style = source.style
     target._formatChosen = source._formatChosen
+    target._richText = source._richText if checkRichTextHeld(source) else None
     formula, conditions = source.formula, source._conditions
     if namedCell:
         formula = formula and relocateFormula(

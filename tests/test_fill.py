@@ -660,3 +660,32 @@ def testAFillInEachDirectionIsWhatNumbersDragged(
         assert [saved.cell(name).value for name in names] == [
             dragged.cell(name).value for name in names
         ], (direction, index)
+
+
+def testAFillOfThreeSeedsAndOfRichTextIsWhatNumbersDragged(tmp_path: Path) -> None:
+    """PYB-137 AC 2: `67b` repeats rich text and continues three seeds, types too."""
+    document, table = openTable("67-series-rich-base")
+    seedCounts = {
+        "A": 2, "B": 1, "C": 2, "D": 3, "E": 3, "F": 3, "G": 3, "H": 3,
+    }
+    for letter, count in seedCounts.items():
+        table.cellsFill(
+            f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+            references=relative, values=series,
+        )
+    target = tmp_path / "rich.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    dragged_path = findDocumentPath("67b-series-rich-dragged")
+    dragged = pybers.open(dragged_path).sheets[0].tables[0]
+    savedRecords = readRecords(target, saved.name)
+    draggedRecords = readRecords(dragged_path, dragged.name)
+    for row in range(2, 14):
+        for column, letter in enumerate("ABCDEFGH"):
+            assert saved.cell(f"{letter}{row}").value == dragged.cell(
+                f"{letter}{row}"
+            ).value, (letter, row)
+            assert (
+                savedRecords[(row - 1, column)].typeByte
+                == draggedRecords[(row - 1, column)].typeByte
+            ), (letter, row)

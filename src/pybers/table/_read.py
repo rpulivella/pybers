@@ -247,6 +247,12 @@ def readTable(
                     continue
                 cell = table.cell(reference)
                 cell.value = resolveValue(record, strings, richText)
+                cell._richText = (
+                    cell.value
+                    if record.typeByte == richTextKeyType
+                    and isinstance(cell.value, str)
+                    else None
+                )
                 # Each cell is given its own Formula even where the archive is
                 # shared, so an edit to one cannot reach another. Frozen, so
                 # sharing would be safe anyway; built per cell so that neither
