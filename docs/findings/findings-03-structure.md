@@ -331,29 +331,53 @@ with its payload, its storage and the character styles only that storage named.
 
 ## Filling a series: what a drag continues and what it repeats
 
-Measured 2026-09-30 in Numbers 15.3.1 for PYB-137. `65-series-base` is a new document
-imported from `65-series-base.csv`, fourteen labeled columns of seeds in rows 2 to 4 of a
-17 row table, and `65b-series-dragged` is every column dragged by hand down to row 17.
-Column D was selected over rows 2 to 4, every other column over the seeds it has.
+Measured 2026-09-30 in Numbers 15.3.1 for PYB-137. `65-series-base` is imported from
+`65-series-base.csv` and `65b-series-dragged` is every column of it dragged down by hand.
+`66-series-vertical-base` and `66-series-horizontal-base` are imported from the CSVs that
+`66-series-directions.py` writes, twenty cases each with room on every side. `66b` and
+`66c` are the vertical base dragged down and up, `66d` and `66e` the horizontal base
+dragged right and left. Every case was dragged from its own seeds.
 
-**A constant step continues, in either direction and through zero.** `1, 2` gave 3 to 16,
-`10, 20` gave 30 to 160, and `5, 3` gave 1, -1, -3 down to -25.
+**Every direction continues alike.** Right equals down and left equals up, value for
+value, so a series is a function of the offset from the first seed, negative above or
+left of it.
 
-**Dates step by the interval between the seeds.** `2026-01-30, 2026-01-31` gave one day per
-row across the month end, and `2026-01-01, 2026-02-01` gave one month per row, rolling into
-the next year after December.
+**A constant step continues, negative and fractional included.** `1, 2`, `5, 3` (through
+zero and down to -17) and `0.1, 0.2` (0.3 to 1.2, exact) all continued. Up, `1, 2` gave
+0 and then -1 to -7.
 
-**Weekday and month names continue and wrap.** Monday, Tuesday reached Sunday and began
-again, and January, February passed December into January.
+**Dates step by the interval between the seeds.** `2026-01-30, 2026-01-31` gave one day
+per row across a month end, and `2026-01-01, 2026-02-01` one month, rolling into the next
+year. A yearly pair gave twelve months, `2026-01-01, 2027-01-01` reaching 2037.
 
-**Text ending in a number continues that number.** `Item 1, Item 2` gave `Item 3` to
-`Item 16`, so the count is not limited to one digit.
+**A month step keeps the seed's day and ends a short month early.** `2026-01-31,
+2026-03-31` is two months, and continued 31 May, 31 July, 30 September, 30 November, then
+31 January, so the day is held and clamped to the month rather than carried forward.
+Up, it gave 30 November 2025 and 30 September 2025.
 
-**A source that begins no series repeats whole.** `1, 2, 4` repeated as `1, 2, 4, 1, 2, 4`,
-and `alpha, beta` alternated. Neither is refused.
+**Weekday and month names continue at their own distance and wrap.** `Monday, Tuesday`
+reached Sunday and began again, and `Monday, Wednesday` gave Friday, Sunday, Tuesday.
+`January, February` passed December into January, and up gave December, November.
 
-**A single cell repeats, whatever it holds.** `7`, a date, `Monday` and `Item 1` each
-filled unchanged down to row 17.
+**Text ending in a number continues that number at its own step.** `Item 1, Item 2` gave
+`Item 3` to `Item 12` and `Item 1, Item 3` gave 5, 7, 9. Up, the number goes negative:
+`Item 0`, `Item -1`, `Item -7`.
+
+**A padded number keeps its width, until it goes negative.** `Item 01, Item 02` gave
+`Item 03` to `Item 09` and then `Item 10`. Up, it gave `Item 00` and then `Item -1` to
+`Item -7`, unpadded.
+
+**A source that begins no series repeats whole, in either direction.** `1, 2, 4`
+repeated as `1, 2, 4, 1, 2, 4` and `alpha, beta` alternated, so up, the block ends on its
+own last seed at the row above. Neither is refused.
+
+**A lone cell depends on what it holds.** A number repeats, `7` down to row 21. A date
+steps one day, a weekday and a month name one name, and `Item 1` becomes `Item 2`.
+Up, each steps back: 14 March, Sunday, December, `Item 0`.
+
+**A value over an empty cell repeats the pair.** In `65b`, `7`, a date, `Monday` and
+`Item 1` each selected with the empty cell beneath them gave the value and an empty cell
+alternately. A lone cell in `66b` is a different case, and steps as above.
 
 ## Copying a block of cells: copy and paste keeps each offset and every border
 
