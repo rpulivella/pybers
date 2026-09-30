@@ -336,7 +336,8 @@ Measured 2026-09-30 in Numbers 15.3.1 for PYB-137. `65-series-base` is imported 
 `66-series-vertical-base` and `66-series-horizontal-base` are imported from the CSVs that
 `66-series-directions.py` writes, twenty cases each with room on every side. `66b` and
 `66c` are the vertical base dragged down and up, `66d` and `66e` the horizontal base
-dragged right and left. Every case was dragged from its own seeds.
+dragged right and left. Every case was dragged from its own seeds. `67b-series-rich-dragged` is
+`67-series-rich-base`, which holds rich text and lines of three seeds, dragged down.
 
 **Every direction continues alike.** Right equals down and left equals up, value for
 value, so a series is a function of the offset from the first seed, negative above or
@@ -374,6 +375,13 @@ own last seed at the row above. Neither is refused.
 **A lone cell depends on what it holds.** A number repeats, `7` down to row 21. A date
 steps one day, a weekday and a month name one name, and `Item 1` becomes `Item 2`.
 Up, each steps back: 14 March, Sunday, December, `Item 0`.
+
+**Rich text never continues.** In `67b`, dragged from `67-series-rich-base`, two rich cells
+`Item 1` and `Item 2` alternated, each copy still a type 9 record, and a lone rich `Item 1`
+repeated where a lone plain one steps. A plain pair beside them continued to `Item 12`.
+
+**Three seeds continue at their constant step.** `1, 3, 5`, `Monday, Tuesday, Wednesday`,
+three monthly dates, `Item 1, Item 3, Item 5` and `1, 2, 3` all continued as two seeds do.
 
 **A value over an empty cell repeats the pair.** In `65b`, `7`, a date, `Monday` and
 `Item 1` each selected with the empty cell beneath them gave the value and an empty cell
