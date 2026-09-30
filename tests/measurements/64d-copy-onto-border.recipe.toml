@@ -1,0 +1,30 @@
+# How Numbers made 64d-copy-onto-border: `64c-copy-border-base` with `B2:D5` copied and
+# pasted at `E8`, so `D3`, which has no border, lands on the bordered `G9`, and the
+# bordered `C3` lands on `F9`. Made by
+# `python3 scripts/golden-confirm.py measure 64d-copy-onto-border`.
+
+base = "64c-copy-border-base"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2:D5"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "copy"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E8"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "paste"
