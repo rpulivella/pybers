@@ -39,6 +39,9 @@ named = FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 # The error cells Numbers recalculates on open: `=I7` and `Table 2::E7` read nothing.
 recalculated: set[tuple[int, int]] = {(9, 7), (10, 7)}
 
+goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
+
+
 def openTable(name: str) -> tuple[pybers.Document, pybers.Table]:
     """Return a fresh copy of a measurement and its first table."""
     document = pybers.open(findDocumentPath(name))
@@ -281,6 +284,37 @@ def testCopyTakesTheArgumentsMoveTakes() -> None:
     assert listParameters(pybers.Table.cellsCopy) == listParameters(
         pybers.Table.cellsMove
     )
+
+
+@pytest.mark.parametrize(
+    ("name", "rule"),
+    [("64-cells-copied-relative-by-pybers", relative),
+     ("64-cells-copied-named-by-pybers", named)],
+)
+def testTheCopyGoldensMatchWhatThisLibraryProduces(
+    name: str, rule: FormulaReferenceRelocation, tmp_path: Path
+) -> None:
+    """PYB-136 AC 8: each copy again, against the file Numbers confirmed."""
+    target = tmp_path / f"{name}.numbers"
+    copyAndSave("60-move-base", rule, target)
+    differences = listPackageDifferences(
+        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
+    )
+    assert [
+        difference for difference in differences if difference.identifier is not None
+    ] == []
+
+
+def testTheCopyGoldensHoldWhatTheyClaimTo() -> None:
+    """Guard the guard: a golden replaced by an unedited copy would pass above."""
+    relativeTable = pybers.open(
+        goldenDirectory / "64-cells-copied-relative-by-pybers.numbers"
+    ).sheet(1).table("Table 1")
+    assert relativeTable.cell("H8").formulaText == "=F8+G8"
+    namedTable = pybers.open(
+        goldenDirectory / "64-cells-copied-named-by-pybers.numbers"
+    ).sheet(1).table("Table 1")
+    assert namedTable.cell("H8").formulaText == "=B2+C2"
 
 
 def testAScriptAuthorCopiesABlockAndSaves(tmp_path: Path) -> None:
