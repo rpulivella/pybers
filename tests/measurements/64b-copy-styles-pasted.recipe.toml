@@ -1,0 +1,29 @@
+# How Numbers made 64b-copy-styles-pasted: `61-move-styles-base`, which holds a fill at B2, a highlighting rule at C2, a bold face at D2 and a border around C3, with
+# `B2:D5` copied and pasted at `F8`. Made by
+# `python3 scripts/golden-confirm.py measure 64b-copy-styles-pasted`.
+
+base = "61-move-styles-base"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2:D5"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "copy"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F8"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "paste"

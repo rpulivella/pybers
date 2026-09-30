@@ -1,0 +1,17 @@
+# How Numbers made 64e-copy-border-emptied: `64c-copy-border-base` with `G9` selected
+# and Edit, Delete pressed, so G9 keeps its border and holds nothing else. Made by
+# `python3 scripts/golden-confirm.py measure 64e-copy-border-emptied`.
+
+base = "64c-copy-border-base"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G9"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "delete"

@@ -6,6 +6,9 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-29  `MergeRange` moved to `merges`, keeping this module within its limit.
+2026-09-29  A block of cells is copied to a new anchor, and a copied cell says
+            whether its borders go with it (PYB-136).
 2026-09-29  A block fills a range under the rules its caller names, replacing
             `formulaFill`, and a filled cell names the cell it copies (PYB-118).
 2026-09-23  A block of cells moves to a new anchor, and a cell remembers where
@@ -70,7 +73,9 @@ from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.formula.render import renderFormula
 from pybers.geometry import Position
 from pybers.style import Style
+from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
+from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
 from pybers.table.structure import (
@@ -163,54 +168,14 @@ def refuseRangeOutside(table: Table, item: CellRange) -> None:
 
 
 @dataclass(frozen=True, slots=True)
-class MergeRange:
-    """A rectangular block of cells merged into one, anchored at its top-left cell.
+class CellCopy:
+    """The cell whose stored record a save duplicates, and whether its borders go too.
 
-    A `CellRange` rather than four numbers, so which cells a merge covers has one
-    answer. A merge is always bounded, unlike a range, and that is checked.
+    A fill copies no border and a paste copies all four, as `63e` and `64b` measured.
     """
 
-    extent: CellRange
-
-    def __post_init__(self) -> None:
-        """Reject an unbounded extent, and drop the locking markers of a bounded one."""
-        extent = self.extent
-        if extent.rowsUnbounded or extent.colsUnbounded:
-            raise ReferenceError(
-                f"A merge covers a fixed block of cells, and {extent} is unbounded."
-            )
-        # A marked anchor never equals the unlocked key `Table.cell` files a cell under.
-        object.__setattr__(
-            self,
-            "extent",
-            CellRange(extent.startRow, extent.startCol, extent.endRow, extent.endCol),
-        )
-
-    @property
-    def anchor(self) -> CellReference:
-        """Return the top-left cell, the one that holds the merged region's value."""
-        anchor = self.extent.start
-        if anchor is None:
-            raise ReferenceError(f"{self.extent} has no anchor cell.")
-        return anchor
-
-    @property
-    def bounds(self) -> tuple[int, int, int, int]:
-        """Return the block's corners as (startRow, startCol, endRow, endCol).
-
-        `__post_init__` rejects an unbounded extent, so all four are present. Saying so
-        in the return type spares every caller a re-check: a merge that cannot be
-        unbounded should not look like one that can.
-        """
-        startRow, startCol = self.extent.startRow, self.extent.startCol
-        endRow, endCol = self.extent.endRow, self.extent.endCol
-        if startRow is None or startCol is None or endRow is None or endCol is None:
-            raise ReferenceError(f"{self.extent} is unbounded and bounds no merge.")
-        return (startRow, startCol, endRow, endCol)
-
-    def covers(self, address: CellAddress) -> bool:
-        """Report whether this merge occupies a cell, its anchor included."""
-        return self.extent.covers(address)
+    source: Cell
+    borders: bool
 
 
 @dataclass(slots=True)
@@ -237,8 +202,8 @@ class Cell:
     _conditions: tuple[Formula, ...] = field(
         default=(), repr=False, compare=False, kw_only=True
     )
-    # The cell whose stored record a save duplicates here, set by a fill.
-    _copiedFrom: Cell | None = field(
+    # The cell whose stored record a save duplicates here, set by a fill or a copy.
+    _copiedFrom: CellCopy | None = field(
         default=None, repr=False, compare=False, kw_only=True
     )
     # The table this belongs to, so that reading or writing a formula as text needs
@@ -418,6 +383,20 @@ class Table:
         cell the move emptied. Occupied destinations and cut merges raise.
         """
         return moveCells(self, source, anchor, references)
+
+    def cellsCopy(
+        self,
+        source: RangeAddress,
+        anchor: CellAddress,
+        *,
+        references: FormulaReferenceRelocation,
+    ) -> CellRange:
+        """Copy a block so its top-left lands on `anchor`, with merges and borders.
+
+        `references` has no default. Returns where the copy landed. Occupied
+        destinations, an overlap with the source and cut merges raise.
+        """
+        return copyCells(self, source, anchor, references)
 
     def cell(
         self,

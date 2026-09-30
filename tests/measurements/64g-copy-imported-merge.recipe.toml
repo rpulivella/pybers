@@ -1,0 +1,30 @@
+# How Numbers made 64g-copy-imported-merge: `22e-merge-imported`, whose three merges
+# along row 1 came from Excel and keep a record under covered cells, with `A1:G2`
+# copied and pasted at `A5`. Made by
+# `python3 scripts/golden-confirm.py measure 64g-copy-imported-merge`.
+
+base = "22e-merge-imported"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet1"
+table = "Table 1"
+range = "A1:G2"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "copy"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet1"
+table = "Table 1"
+range = "A5"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "paste"

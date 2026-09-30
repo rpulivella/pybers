@@ -10,6 +10,7 @@ on without asking, measured 2026-09-23 in `60e-move-overwrite`, and pybers refus
 instead, since that discards a value nobody asked to lose.
 
 UPDATES
+2026-09-29  The refusals name the action, so a copy shares them, for PYB-136.
 2026-09-24  A move returns every formula left reading a cell it emptied.
 2026-09-23  Written for PYB-18.
 """
@@ -104,7 +105,7 @@ def isCellOccupied(cell: Cell) -> bool:
     )
 
 
-def refuseMergeCut(table: Table, move: CellsMove) -> None:
+def refuseMergeCut(table: Table, move: CellsMove, action: str) -> None:
     """Refuse a block cutting a merge, or landing on one it does not carry."""
     source, destination = move.source, move.destination
     for merge in table.mergeRanges:
@@ -112,17 +113,17 @@ def refuseMergeCut(table: Table, move: CellsMove) -> None:
         inside = sum(1 for reference in covered if source.covers(reference))
         if 0 < inside < len(covered):
             raise ReferenceError(
-                f"{source} cuts the merge {merge.extent} in two. Move the whole merge "
-                "or none of it."
+                f"{source} cuts the merge {merge.extent} in two. A {action} takes the "
+                "whole merge or none of it."
             )
         if inside == 0 and any(destination.covers(reference) for reference in covered):
             raise ReferenceError(
-                f"{destination} lands on the merge {merge.extent}, which the move "
+                f"{destination} lands on the merge {merge.extent}, which the {action} "
                 "would overwrite."
             )
 
 
-def refuseOccupied(table: Table, move: CellsMove) -> None:
+def refuseOccupied(table: Table, move: CellsMove, action: str) -> None:
     """Refuse a destination holding anything outside the block itself."""
     for reference in move.destination:
         if move.source.covers(reference):
@@ -130,7 +131,7 @@ def refuseOccupied(table: Table, move: CellsMove) -> None:
         cell = table.cells.get(reference)
         if cell is not None and isCellOccupied(cell):
             raise ReferenceError(
-                f"{reference} is occupied, and moving {move.source} onto "
+                f"{reference} is occupied, and a {action} of {move.source} onto "
                 f"{move.destination} would overwrite it."
             )
 
@@ -232,7 +233,8 @@ def moveCells(
     references: FormulaReferenceRelocation,
 ) -> list[Cell]:
     """Move a block so its top-left lands on `anchor`, and return what it strands."""
-    from pybers.table.cells import MergeRange, refuseRangeOutside
+    from pybers.table.cells import refuseRangeOutside
+    from pybers.table.merges import MergeRange
 
     rule = toRelocationRule(references)
     extent = table.rangeSingle(source, "move")
@@ -242,8 +244,8 @@ def moveCells(
     refuseRangeOutside(table, move.destination)
     if move.rowShift == 0 and move.columnShift == 0:
         return []
-    refuseMergeCut(table, move)
-    refuseOccupied(table, move)
+    refuseMergeCut(table, move, "move")
+    refuseOccupied(table, move, "move")
     named = rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
     rewritten = findNamedCellRewrites(table, move) if named else {}
 
@@ -273,4 +275,11 @@ def moveCells(
     return findStrandedCells(table, move)
 
 
-__all__ = ["CellsMove", "moveCells"]
+__all__ = [
+    "CellsMove",
+    "findBlockCorners",
+    "moveCells",
+    "refuseMergeCut",
+    "refuseOccupied",
+    "toRelocationRule",
+]

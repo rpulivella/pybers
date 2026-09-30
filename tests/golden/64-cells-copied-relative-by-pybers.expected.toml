@@ -1,0 +1,201 @@
+# What Numbers shows for 64-cells-copied-relative-by-pybers.numbers, `60-move-base` with `B2:D5` copied to
+# `F8` under `PRESERVE_RELATIVE_POSITION`, which is copy and paste in Numbers. Values are what
+# Numbers itself computed for `64-copy-pasted`.
+# Checked by `python3 scripts/golden-confirm.py run 64-cells-copied-relative-by-pybers.numbers`.
+# The source block and every formula outside the copy read as they did before.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B2"
+value = 100
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C2"
+value = 200
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D2"
+value = 300
+formula = "=B2+C2"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B3"
+value = 3
+formula = "=A3"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C3"
+value = 4
+formula = "=$A$4"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D3"
+value = 100
+formula = "=$B2"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B4"
+value = 300
+formula = "=SUM(B2:C2)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C4"
+value = 78
+formula = "=SUM(A1:A12)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D4"
+value = 7
+formula = "=E1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B5"
+value = "merge B5:C5"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D5"
+value = 5
+formula = "=Table 2::A1"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E6"
+value = 100
+formula = "=F8"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E9"
+value = 1097
+formula = "=SUM(B2:D5)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F8"
+value = 100
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G8"
+value = 200
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H8"
+value = 300
+formula = "=F8+G8"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F9"
+value = 1097
+formula = "=E9"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G9"
+value = 4
+formula = "=$A$4"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H9"
+value = 0
+formula = "=$B8"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F10"
+value = 300
+formula = "=SUM(F8:G8)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G10"
+value = 1399
+formula = "=SUM(E7:E12)"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H10"
+formula = "=#REF!"
+qa = ["Table 1 H10 shows a reference error"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F11"
+value = "merge B5:C5"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H11"
+formula = "=#REF!"
+qa = ["Table 1 H11 shows a reference error"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A1"
+value = 5
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A2"
+value = 200
+formula = "=Table 1::C2"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 2"
+cell = "A3"
+value = 1092
+formula = "=SUM(Table 1::B2:D4)"
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 1"
+rows = 12
+columns = 8
+merges = ["B5:C5", "F11:G11"]
+
+[[table]]
+sheet = "Sheet 1"
+table = "Table 2"
+rows = 3
+columns = 1
+merges = []

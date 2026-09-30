@@ -59,7 +59,8 @@ from ..addressing.reference import originOffset
 from ..errors import ReadError
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
-from .cells import CellValue, MergeRange, Table
+from .cells import CellValue, Table
+from .merges import MergeRange
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
 # rather than the value itself. See `pybers._persistence.cells`.

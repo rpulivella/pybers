@@ -29,7 +29,8 @@ from .._persistence.index import wordBits, wordMask
 from ..addressing.reference import originOffset
 from ._lines import GridMaps
 from ._read import readMerges
-from .cells import MergeRange, Table
+from .cells import Table
+from .merges import MergeRange
 
 # A merge is written as `SUM($A$1:$B$1)`, so it carries SUM's index in Apple's
 # own function table. The number is theirs and is not derivable from the schemas.

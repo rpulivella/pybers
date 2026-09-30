@@ -12,6 +12,8 @@ drag repeats the same way except where a column continues a series, the case
 `CONTINUE_SERIES` covers. See findings-03-structure.md.
 
 UPDATES
+2026-09-29  A filled cell's copy says it draws no border, which a paste does,
+            for PYB-136.
 2026-09-29  Written for PYB-118, replacing `Table.formulaFill`.
 """
 from __future__ import annotations
@@ -79,8 +81,12 @@ def findSourcePosition(extent: CellRange, target: CellReference) -> CellReferenc
     )
 
 
-def copyCellContent(target: Cell, source: Cell, namedCell: bool) -> None:
+def copyCellContent(
+    target: Cell, source: Cell, namedCell: bool, borders: bool
+) -> None:
     """Give a cell everything another holds, its formulas under the rule named."""
+    from pybers.table.cells import CellCopy
+
     target.value = source.value
     target.errored = source.errored
     target.style = source.style
@@ -96,8 +102,13 @@ def copyCellContent(target: Cell, source: Cell, namedCell: bool) -> None:
         )
     target.formula = formula
     target._conditions = conditions
-    # A copy of a pending copy duplicates the record that one will duplicate.
-    target._copiedFrom = source._copiedFrom or source
+    # A copy of a pending copy duplicates the record that one will duplicate, and
+    # draws only the borders that one will draw.
+    pending = source._copiedFrom
+    target._copiedFrom = (
+        CellCopy(source, borders) if pending is None
+        else CellCopy(pending.source, borders and pending.borders)
+    )
 
 
 def fillCells(
@@ -125,6 +136,7 @@ def fillCells(
             table.cell(position),
             table.cell(findSourcePosition(extent, position)),
             namedCell,
+            borders=False,
         )
     return len(targets)
 

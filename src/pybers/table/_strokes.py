@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-A table's borders carried through rows and columns added or removed, or cells moved.
+A table's borders carried through lines added or removed, or cells moved or copied.
 
 Each row and each column owns one stroke layer, holding runs along the other
 axis, so one map moves a layer by its index and the other moves the runs
@@ -9,6 +9,7 @@ inside it. Measured 2026-09-21 in the four `57-borders-*` documents.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-29  A copied cell takes exactly its source's borders, for PYB-136.
 2026-09-29  A line added beside one holding no border gains none, rather than
             raising, found by PYB-118.
 2026-09-23  Borders follow cells moved as a block, for PYB-18.
@@ -188,10 +189,42 @@ def moveStrokeEdges(
 ) -> None:
     """Carry each moved cell's four edges to where it landed, as `61-move-*` measured.
 
-    `moves` maps a stored (row, column) to its new one. A column's layers key
-    their edges by (column, row) and a row's by (row, column). A layer left with
-    no edge is removed, as Numbers left none behind at the vacated border.
+    `moves` maps a stored (row, column) to its new one. A layer left with no edge is
+    removed, as Numbers left none behind at the vacated border.
     """
+    placeStrokeEdges(index, registry, sidecar, moves.items(), keepSource=False)
+
+
+def copyStrokeEdges(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    sidecar: tst.StrokeSidecarArchive,
+    copies: Mapping[tuple[int, int], tuple[int, int]],
+) -> None:
+    """Give each copied cell exactly its source's four edges, as `64b` and `64d` show.
+
+    `copies` maps where a copy landed to the stored (row, column) it copies, so two
+    copies of one cell each draw its edges. An edge the source lacks is removed.
+    """
+    placeStrokeEdges(
+        index, registry, sidecar,
+        [(source, landed) for landed, source in copies.items()], keepSource=True,
+    )
+
+
+def placeStrokeEdges(
+    index: ArchiveIndex,
+    registry: PackageRegistry,
+    sidecar: tst.StrokeSidecarArchive,
+    carries: Iterable[tuple[tuple[int, int], tuple[int, int]]],
+    keepSource: bool,
+) -> None:
+    """Carry each stored (row, column)'s edges to a new one, lifting or keeping them.
+
+    A column's layers key their edges by (column, row) and a row's by (row, column).
+    Keeping them is a copy, which also removes each new edge the source lacks.
+    """
+    carried = list(carries)
     lists = (
         (sidecar.left_column_stroke_layers, True),
         (sidecar.right_column_stroke_layers, True),
@@ -204,18 +237,33 @@ def moveStrokeEdges(
     )
     spent: list[int] = []
     for references, byColumn in lists:
-        keyed = {
-            ((column, row) if byColumn else (row, column)):
-            ((newColumn, newRow) if byColumn else (newRow, newColumn))
-            for (row, column), (newRow, newColumn) in moves.items()
-        }
+        keyed = [
+            (
+                (column, row) if byColumn else (row, column),
+                (newColumn, newRow) if byColumn else (newRow, newColumn),
+            )
+            for (row, column), (newRow, newColumn) in carried
+        ]
         edges = readStrokeEdges(index, references)
-        lifted = {key: edges.pop(key) for key in keyed if key in edges}
-        if not lifted:
+        lifted = {key: edges[key] for key, _ in keyed if key in edges}
+        cleared = [
+            new for key, new in keyed
+            if keepSource and key not in lifted and new in edges
+        ]
+        if not lifted and not cleared:
             continue
-        for key, edge in lifted.items():
-            edges[keyed[key]] = edge
-        touched = {line for line, _ in lifted} | {keyed[key][0] for key in lifted}
+        if not keepSource:
+            for key in lifted:
+                del edges[key]
+        for new in cleared:
+            del edges[new]
+        landed = [(new, lifted[key]) for key, new in keyed if key in lifted]
+        for new, edge in landed:
+            edges[new] = edge
+        touched = (
+            {line for line, _ in lifted} | {line for (line, _), _ in landed}
+            | {line for line, _ in cleared}
+        )
         layers = {
             index.resolve(reference, tst.StrokeLayerArchive).row_column_index:
             reference.identifier
@@ -258,4 +306,6 @@ def listStrokeLayers(sidecar: tst.StrokeSidecarArchive) -> list[int]:
     ]
 
 
-__all__ = ["applyStrokeLayers", "listStrokeLayers", "moveStrokeEdges"]
+__all__ = [
+    "applyStrokeLayers", "copyStrokeEdges", "listStrokeLayers", "moveStrokeEdges",
+]
