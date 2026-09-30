@@ -18,6 +18,8 @@ count is refused rather than guessed.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-29  A copy carries every position of a merge it copies, as a move does,
+            so what an import stores under covered cells goes with it, for PYB-136.
 2026-09-29  A copied cell draws its source's borders where it landed, for PYB-136.
 2026-09-29  A filled cell's record is duplicated from the cell it copied, and the
             record it replaces is returned for release, for PYB-118.
@@ -72,14 +74,28 @@ from ._tiles import (
     rewriteRow,
     writeTileRange,
 )
-from .cells import Table
+from .cells import Cell, Table
 
 # A stored (row, column), counted from zero, mapped to where its cell now sits.
 type CellMoves = dict[tuple[int, int], tuple[int, int]]
 
-# A filled (row, column) mapped to where the record it copies sits, or None when
-# the cell it copied has no record, which leaves the filled position with none.
-type CellCopies = dict[tuple[int, int], tuple[int, int] | None]
+
+
+@dataclass(frozen=True, slots=True)
+class CellCopies:
+    """Each copied (row, column) mapped to where the record it copies sits, or None.
+
+    None leaves the copied position with no record. A position a merge covers is
+    `covered`, since the model cannot say whether a record sits under it, so one
+    absent there is copied as absent rather than refused.
+    """
+
+    records: dict[tuple[int, int], tuple[int, int] | None]
+    covered: frozenset[tuple[int, int]]
+
+    def __bool__(self) -> bool:
+        """Report whether anything is copied."""
+        return bool(self.records)
 
 # Each slot a duplicated record may carry: counted on copy, or naming no entry.
 copyableSlots: frozenset[tuple[int, int]] = frozenset({
@@ -111,18 +127,27 @@ def findCellMoves(table: Table, maps: GridMaps) -> CellMoves:
         if (row, column) == landed:
             continue
         moves[(row, column)] = landed
-        # An imported merge keeps a record under each covered cell, which the model
-        # never holds, so the merge its anchor carries brings them along.
-        merge = cell.mergeAnchored
-        if merge is None:
-            continue
-        for covered in merge.extent:
-            down, across = covered.row - reference.row, covered.col - reference.col
-            if down or across:
-                moves[(row + down, column + across)] = (
-                    landed[0] + down, landed[1] + across
-                )
+        for down, across in listCoveredOffsets(cell):
+            moves[(row + down, column + across)] = (
+                landed[0] + down, landed[1] + across
+            )
     return moves
+
+
+def listCoveredOffsets(cell: Cell) -> list[tuple[int, int]]:
+    """Return each position the merge a cell anchors covers, as an offset from it.
+
+    A block operation carries every position of its rectangle, and a covered one
+    has no model cell, so whatever the file stores there, as an import does, goes
+    with the anchor without the model knowing it is there.
+    """
+    merge = cell.mergeAnchored
+    if merge is None:
+        return []
+    return [
+        (covered.row - cell.reference.row, covered.col - cell.reference.col)
+        for covered in merge.extent if covered != merge.anchor
+    ]
 
 
 def findCellCopies(table: Table) -> CellCopies:
@@ -131,7 +156,8 @@ def findCellCopies(table: Table) -> CellCopies:
     Named by where each source sits in the model, which is where its record sits
     once any move is carried, and copies are carried after moves.
     """
-    copies: CellCopies = {}
+    records: dict[tuple[int, int], tuple[int, int] | None] = {}
+    covered: set[tuple[int, int]] = set()
     for reference, cell in table.cells.items():
         copy = cell._copiedFrom
         if copy is None:
@@ -143,11 +169,13 @@ def findCellCopies(table: Table) -> CellCopies:
                 "so there is no record to copy."
             )
         stored = source.reference
-        copies[(reference.row - originOffset, reference.col - originOffset)] = (
-            None if source._origin is None
-            else (stored.row - originOffset, stored.col - originOffset)
-        )
-    return copies
+        row, column = reference.row - originOffset, reference.col - originOffset
+        top, left = stored.row - originOffset, stored.col - originOffset
+        records[(row, column)] = None if source._origin is None else (top, left)
+        for down, across in listCoveredOffsets(source):
+            records[(row + down, column + across)] = (top + down, left + across)
+            covered.add((row + down, column + across))
+    return CellCopies(records, frozenset(covered))
 
 
 def findBorderCopies(table: Table) -> CellMoves:
@@ -156,14 +184,18 @@ def findBorderCopies(table: Table) -> CellMoves:
     Keyed by where the copy landed, since one source may be copied twice. A source
     holding no record may still hold a border, so every one is named.
     """
-    return {
-        (reference.row - originOffset, reference.col - originOffset): (
-            copy.source.reference.row - originOffset,
-            copy.source.reference.col - originOffset,
-        )
-        for reference, cell in table.cells.items()
-        if (copy := cell._copiedFrom) is not None and copy.borders
-    }
+    copies: CellMoves = {}
+    for reference, cell in table.cells.items():
+        copy = cell._copiedFrom
+        if copy is None or not copy.borders:
+            continue
+        source = copy.source.reference
+        row, column = reference.row - originOffset, reference.col - originOffset
+        top, left = source.row - originOffset, source.col - originOffset
+        copies[(row, column)] = (top, left)
+        for down, across in listCoveredOffsets(copy.source):
+            copies[(row + down, column + across)] = (top + down, left + across)
+    return copies
 
 
 @dataclass(frozen=True, slots=True)
@@ -300,7 +332,10 @@ def copyCellRecords(
     """
     tileSize = store.tiles.tile_size
     tileRange = buildTileRange(index, registry, store)
-    wanted = set(copies) | {stored for stored in copies.values() if stored is not None}
+    records = copies.records
+    wanted = set(records) | {
+        stored for stored in records.values() if stored is not None
+    }
     found: dict[tuple[int, int], CellRecord] = {}
     for tileid, tile in tileRange.tiles.items():
         for rowInfo in tile.rowInfos:
@@ -313,25 +348,25 @@ def copyCellRecords(
                     found[(row, record.column)] = record
 
     missing = [
-        stored for stored in copies.values()
-        if stored is not None and stored not in found
+        stored for landed, stored in records.items()
+        if stored is not None and stored not in found and landed not in copies.covered
     ]
     if missing:
         row, column = min(missing)
         raise WriteError(
-            f"A fill copies the record at "
+            f"A copy names the record at "
             f"{CellReference(row + originOffset, column + originOffset)}, and the file "
             "holds none there."
         )
     placed = {
-        landed: found[stored] for landed, stored in copies.items()
-        if stored is not None
+        landed: found[stored] for landed, stored in records.items()
+        if stored is not None and stored in found
     }
     for (row, column), record in placed.items():
         refuseUncopyableRecord(
             record, CellReference(row + originOffset, column + originOffset)
         )
-    displaced = {landed: found[landed] for landed in copies if landed in found}
+    displaced = {landed: found[landed] for landed in records if landed in found}
     removals: dict[int, set[int]] = {}
     placements: dict[int, dict[int, bytes]] = {}
     for row, column in displaced:
@@ -476,7 +511,8 @@ def applyCellCopies(
     """Carry every copied cell into its records, headers and highlighting counts."""
     copied = copyCellRecords(index, registry, store, copies, claim)
     recountLineHeaders(
-        index, store, {row for row, _ in copies}, {column for _, column in copies}
+        index, store,
+        {row for row, _ in copies.records}, {column for _, column in copies.records},
     )
     plan = readConditionalPlan(index, registry, store)
     if plan is not None and plan.rules:
@@ -532,5 +568,6 @@ __all__ = [
     "applyConditionChanges",
     "findBorderCopies",
     "findCellCopies",
+    "listCoveredOffsets",
     "findCellMoves",
 ]

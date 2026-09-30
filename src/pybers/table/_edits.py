@@ -338,7 +338,7 @@ def applyTableEdits(
             if released and (placed is None or not carriesFormula(placed)):
                 formulaRemoved.append((row, column))
         applyConditionChanges(index, registry, store, table)
-        written.extend(sorted(copies))
+        written.extend(sorted(copies.records))
 
     # A row belongs to the tile covering its index, and a tile that holds nothing
     # may be absent. No table in the 46 documents has such a gap, so this refuses

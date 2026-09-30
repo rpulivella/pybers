@@ -82,28 +82,30 @@ def listLeftEdges(path: Path) -> set[tuple[int, int]]:
 
 
 def copyAndSave(
-    base: str, rule: FormulaReferenceRelocation, target: Path, anchor: str = "F8"
+    base: str, rule: FormulaReferenceRelocation, target: Path, anchor: str = "F8",
+    source: str = "B2:D5",
 ) -> None:
-    """Copy `B2:D5` of a base to an anchor under a rule, and save it."""
+    """Copy a block of a base, `B2:D5` unless named, to an anchor, and save it."""
     document, table = openTable(base)
-    table.cellsCopy("B2:D5", anchor, references=rule)
+    table.cellsCopy(source, anchor, references=rule)
     document.save(target)
 
 
 @pytest.mark.parametrize(
-    ("base", "name", "anchor"),
+    ("base", "name", "source", "anchor"),
     [
-        ("60-move-base", "64-copy-pasted", "F8"),
-        ("61-move-styles-base", "64b-copy-styles-pasted", "F8"),
-        ("64e-copy-border-emptied", "64f-copy-onto-empty-border", "E8"),
+        ("60-move-base", "64-copy-pasted", "B2:D5", "F8"),
+        ("61-move-styles-base", "64b-copy-styles-pasted", "B2:D5", "F8"),
+        ("64e-copy-border-emptied", "64f-copy-onto-empty-border", "B2:D5", "E8"),
+        ("22e-merge-imported", "64g-copy-imported-merge", "A1:G2", "A5"),
     ],
 )
 def testACopyWritesTheArchivesNumbersWrote(
-    base: str, name: str, anchor: str, tmp_path: Path
+    base: str, name: str, source: str, anchor: str, tmp_path: Path
 ) -> None:
-    """PYB-136 AC 1, 2.ii and 3: records, borders, merges, tiles and the engine."""
+    """PYB-136 AC 1, 2.ii, 3 and 9: records, borders, merges, tiles and the engine."""
     target = tmp_path / f"{name}.numbers"
-    copyAndSave(base, relative, target, anchor)
+    copyAndSave(base, relative, target, anchor, source)
     ours = readTableFacts(target)
     for tableName, facts in readTableFacts(findDocumentPath(name)).items():
         for key, value in facts.items():
@@ -180,6 +182,58 @@ def testACopiedBlockCarriesItsMergeAndKeepsTheSource(tmp_path: Path) -> None:
     assert table.cell("F11").value == "merge B5:C5"
 
 
+def listMergedTables(name: str) -> list[tuple[str, str]]:
+    """Return each (sheet, table) of a document holding a merge."""
+    document = pybers.open(findDocumentPath(name))
+    return [
+        (sheet.name, table.name)
+        for sheet in document.sheets for table in sheet.tables if table.mergeRanges
+    ]
+
+
+mergedDocuments: list[str] = [
+    "22c-merge-overpaints", "22d-merge-multi-row", "22e-merge-imported",
+    "57-structure-refusals-base", "60-move-base",
+]
+
+
+@pytest.mark.parametrize(
+    ("name", "sheetName", "tableName"),
+    [
+        (name, sheetName, tableName)
+        for name in mergedDocuments
+        for sheetName, tableName in listMergedTables(name)
+    ],
+)
+@pytest.mark.parametrize("operation", ["cellsCopy", "cellsMove"])
+def testABlockCarriesEveryStoredPositionOfItsMerges(
+    name: str, sheetName: str, tableName: str, operation: str, tmp_path: Path
+) -> None:
+    """PYB-136 AC 9: whatever sits under a merge goes with it, whatever wrote it."""
+    document = pybers.open(findDocumentPath(name))
+    table = document.sheet(sheetName).table(tableName)
+    top = min(merge.bounds[0] for merge in table.mergeRanges)
+    bottom = max(merge.bounds[2] for merge in table.mergeRanges)
+    height, landing = bottom - top + 1, table.rowCount + 1
+    table.rowAdd(landing, height)
+    block = pybers.CellRange(top, 1, bottom, table.colCount)
+    anchor = pybers.CellReference(landing, 1)
+    getattr(table, operation)(block, anchor, references=relative)
+    target = tmp_path / f"{name}.numbers"
+    document.save(target)
+    before = readTableFacts(findDocumentPath(name))[tableName]["records"]
+    after = readTableFacts(target)[tableName]["records"]
+    assert isinstance(before, dict) and isinstance(after, dict)
+    carried = {
+        (row, column): kind for (row, column), kind in before.items()
+        if top - 1 <= row <= bottom - 1
+    }
+    assert {
+        (row - landing + top, column): kind for (row, column), kind in after.items()
+        if row >= landing - 1
+    } == carried
+
+
 def testTwoCopiesOfOneBlockEachDrawItsBorders(tmp_path: Path) -> None:
     """One source copied twice before a save draws its border at both copies."""
     document, table = openTable("61-move-styles-base")
@@ -191,14 +245,14 @@ def testTwoCopiesOfOneBlockEachDrawItsBorders(tmp_path: Path) -> None:
 
 
 def testACopyTakesOffABorderItsSourceLacks(tmp_path: Path) -> None:
-    """`D3` has no border, so `G9` loses the one it had, as Numbers' `64f` shows."""
+    """PYB-136 AC 10: `D3` has no border, so `G9` loses the one it had, as in `64f`."""
     target = tmp_path / "cleared.numbers"
     copyAndSave("64e-copy-border-emptied", relative, target, "E8")
     assert listLeftEdges(target) == {(2, 2), (5, 8)}
 
 
 def testACellHoldingOnlyABorderCopiesIt(tmp_path: Path) -> None:
-    """`G9` holds a border and no record, and its copy draws the border."""
+    """PYB-136 AC 10: `G9` holds a border and no record, and its copy draws it."""
     document, table = openTable("64e-copy-border-emptied")
     table.cellsCopy("G9", "A12", references=relative)
     target = tmp_path / "bordered.numbers"

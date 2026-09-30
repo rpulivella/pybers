@@ -141,8 +141,12 @@ class TableSave:
             moveOwnerCoordinates(entry.dependencies, moves, table.name)
         copies = findCellCopies(table)
 
-        # A moved merge reads as an added one, and the records it carries are kept.
-        swallowed = listSwallowedPositions(table, model) - frozenset(moves.values())
+        # A moved or copied merge reads as an added one, and the records it carries
+        # are kept.
+        swallowed = (
+            listSwallowedPositions(table, model)
+            - frozenset(moves.values()) - copies.covered
+        )
         edits = applyTableEdits(
             index, table, model, swallowed, maps, self.registry, plan, moves, copies
         )
