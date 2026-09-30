@@ -10,6 +10,7 @@
 // and the only values a request places into one are paths and cell names it escapes.
 //
 // UPDATES
+// 2026-09-30  Reads a date at the zone's offset now, which Numbers applies to every date, for PYB-137.
 // 2026-09-29  Edits copies of documents through named steps, to make a measurement, for PYB-118.
 // 2026-09-22  Reads a table's size and cell names, and names a closed Numbers, for PYB-111.
 // 2026-09-22  Waits for the Data Format section and for a capture stream to recover.
@@ -371,6 +372,9 @@ func readCellValue(_ descriptor: NSAppleEventDescriptor) -> CellValue {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        // Numbers hands back a date built at today's offset, so a winter date read at its own
+        // offset comes out an hour early wherever the zone keeps daylight saving time.
+        formatter.timeZone = TimeZone(secondsFromGMT: TimeZone.current.secondsFromGMT())
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         return CellValue(kind: "date", text: descriptor.dateValue.map(formatter.string) ?? "")
     default:
