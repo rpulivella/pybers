@@ -329,6 +329,30 @@ with its payload, its storage and the character styles only that storage named.
 
 **Styles are shared and counted**, as for any record: both style entries went from 1 to 3.
 
+## Copying a block of cells: copy and paste keeps each offset and every border
+
+Measured 2026-09-29 in Numbers 15.3.1 for PYB-136. `64-copy-pasted` is `60-move-base`
+and `64b-copy-styles-pasted` is `61-move-styles-base`, each with `B2:D5` copied and
+pasted at `F8` by `golden-confirm.py measure`.
+
+**Each copied reference keeps its offset from its formula**, as cut and paste does.
+`=B2+C2` became `=F8+G8`, `=A3` became `=E9`, `=$B2` became `=$B8` and `=$A$4` stayed.
+`=E1` became `=I7` in an eight column table and `Table 2::A1` became `Table 2::E7` in a
+one column table, each stored as it is and reading nothing.
+
+**A copied range reaching past the table's edge ends at it**, the rewrite cut and paste
+makes: `SUM(A1:A12)` pasted six rows lower in a twelve row table was stored as
+`SUM(E7:E12)`.
+
+**No formula outside the copy changed**, in either table. `=F8`, which read the empty
+destination, read the copy of `B2` afterward.
+
+**The merge `B5:C5` was copied to `F11:G11`**, and the source merge stayed.
+
+**Borders are copied, unlike a fill's.** The border around `C3` was drawn around `G9`
+too, and the one around `C3` stayed. The highlighting rule on `C2` was copied to `G8`
+with its operand unchanged, one column left.
+
 ## Styles exist per BAND, not per row or column
 
 `TST.TableModelArchive` carries a style reference for each band, and nothing else:
