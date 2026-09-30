@@ -49,7 +49,8 @@ from pybers.formula.nodes import Formula
 from pybers.formula.restructure import FormulaRestructure, mapFormula
 
 if TYPE_CHECKING:
-    from pybers.table.cells import Cell, MergeRange, Table
+    from pybers.table.cells import Cell, Table
+    from pybers.table.merges import MergeRange
 
 
 def generateLineIdentities(count: int) -> list[int]:
@@ -126,7 +127,7 @@ def mapMerge(merge: MergeRange, edit: GridEdit) -> MergeRange | None:
     2026-09-21 in `57-collapse-row-deleted`, and one losing every line it
     covered is unmerged as well.
     """
-    from pybers.table.cells import MergeRange
+    from pybers.table.merges import MergeRange
 
     startRow, startCol, endRow, endCol = merge.bounds
     begin, end = (startRow, endRow) if edit.rows else (startCol, endCol)

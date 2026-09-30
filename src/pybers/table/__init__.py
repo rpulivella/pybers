@@ -31,8 +31,9 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from pybers.table.cells import Cell, CellValue, MergeRange, Table
+from pybers.table.cells import Cell, CellValue, Table
 from pybers.table.fill import CellValueFill
+from pybers.table.merges import MergeRange
 from pybers.table.rows import TableRow, TableRows
 
 __all__ = [

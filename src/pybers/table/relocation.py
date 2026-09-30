@@ -232,7 +232,8 @@ def moveCells(
     references: FormulaReferenceRelocation,
 ) -> list[Cell]:
     """Move a block so its top-left lands on `anchor`, and return what it strands."""
-    from pybers.table.cells import MergeRange, refuseRangeOutside
+    from pybers.table.cells import refuseRangeOutside
+    from pybers.table.merges import MergeRange
 
     rule = toRelocationRule(references)
     extent = table.rangeSingle(source, "move")
