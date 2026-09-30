@@ -52,12 +52,14 @@ enum HelperOperation: String, Codable {
 enum EditMenuItem: String, Codable {
     case copy
     case paste
+    case delete
     case autofillDown
 
     var path: [String] {
         switch self {
         case .copy: return ["Edit", "Copy"]
         case .paste: return ["Edit", "Paste"]
+        case .delete: return ["Edit", "Delete"]
         case .autofillDown: return ["Table", "Autofill Cells", "Autofill Down"]
         }
     }
