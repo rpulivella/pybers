@@ -1,0 +1,29 @@
+# How Numbers made 64-copy-pasted: `60-move-base`, which holds formulas pointing inside, out of, locked, mixed and across tables, with a merge at B5:C5, with
+# `B2:D5` copied and pasted at `F8`. Made by
+# `python3 scripts/golden-confirm.py measure 64-copy-pasted`.
+
+base = "60-move-base"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2:D5"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "copy"
+
+[[step]]
+action = "select"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F8"
+
+[[step]]
+action = "menuPress"
+document = 0
+menuItem = "paste"
