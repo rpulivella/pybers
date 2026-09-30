@@ -329,6 +329,32 @@ with its payload, its storage and the character styles only that storage named.
 
 **Styles are shared and counted**, as for any record: both style entries went from 1 to 3.
 
+## Filling a series: what a drag continues and what it repeats
+
+Measured 2026-09-30 in Numbers 15.3.1 for PYB-137. `65-series-base` is a new document
+imported from `65-series-base.csv`, fourteen labeled columns of seeds in rows 2 to 4 of a
+17 row table, and `65b-series-dragged` is every column dragged by hand down to row 17.
+Column D was selected over rows 2 to 4, every other column over the seeds it has.
+
+**A constant step continues, in either direction and through zero.** `1, 2` gave 3 to 16,
+`10, 20` gave 30 to 160, and `5, 3` gave 1, -1, -3 down to -25.
+
+**Dates step by the interval between the seeds.** `2026-01-30, 2026-01-31` gave one day per
+row across the month end, and `2026-01-01, 2026-02-01` gave one month per row, rolling into
+the next year after December.
+
+**Weekday and month names continue and wrap.** Monday, Tuesday reached Sunday and began
+again, and January, February passed December into January.
+
+**Text ending in a number continues that number.** `Item 1, Item 2` gave `Item 3` to
+`Item 16`, so the count is not limited to one digit.
+
+**A source that begins no series repeats whole.** `1, 2, 4` repeated as `1, 2, 4, 1, 2, 4`,
+and `alpha, beta` alternated. Neither is refused.
+
+**A single cell repeats, whatever it holds.** `7`, a date, `Monday` and `Item 1` each
+filled unchanged down to row 17.
+
 ## Copying a block of cells: copy and paste keeps each offset and every border
 
 Measured 2026-09-29 in Numbers 15.3.1 for PYB-136. `64-copy-pasted` is `60-move-base`
