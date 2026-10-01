@@ -338,6 +338,7 @@ Measured 2026-09-30 in Numbers 15.3.1 for PYB-137. `65-series-base` is imported 
 `66c` are the vertical base dragged down and up, `66d` and `66e` the horizontal base
 dragged right and left. Every case was dragged from its own seeds. `67b-series-rich-dragged` is
 `67-series-rich-base`, which holds rich text and lines of three seeds, dragged down.
+`68b-series-kinds-dragged` is `68-series-kinds-base`, twenty-one further kinds of seed.
 
 **Every direction continues alike.** Right equals down and left equals up, value for
 value, so a series is a function of the offset from the first seed, negative above or
@@ -382,6 +383,25 @@ repeated where a lone plain one steps. A plain pair beside them continued to `It
 
 **Three seeds continue at their constant step.** `1, 3, 5`, `Monday, Tuesday, Wednesday`,
 three monthly dates, `Item 1, Item 3, Item 5` and `1, 2, 3` all continued as two seeds do.
+
+**A formatted number continues as a number.** Percent (`10%, 20%`), currency, scientific
+and fraction seeds each continued their step, and a lone percent repeated.
+
+**A date with a time, and a time alone, step by the interval.** Hourly seeds gave one hour
+per row, and a lone date with a time stepped one day and kept its time.
+
+**Names continue in their own list, whatever their case.** `Mon, Tue` gave `Wed` to `Fri`
+and `Jan, Feb` gave `Mar` to `Dec`, each wrapping. `monday, tuesday` and `MONDAY, TUESDAY`
+both continued as `Wednesday`, so the case is not kept. A lone `Mon` stepped. Quarters
+wrap at four: `Q1, Q2` gave `Q3, Q4, Q1, Q2`. Months in lowercase, a lone quarter and a
+lone `May` were not measured.
+
+**A duration continues at its step.** `1h, 2h` gave 3h to 12h, as a record of its own
+type 7, and a lone duration was not measured.
+
+**Text whose number is not last repeats.** `1st, 2nd`, `1 Item, 2 Item` and `Item 1 of 5,
+Item 2 of 5` repeated as pairs, and a lone `1st` repeated. `A1, A2` and `1, 2` typed as
+text continued, the second staying text.
 
 **A value over an empty cell repeats the pair.** In `65b`, `7`, a date, `Monday` and
 `Item 1` each selected with the empty cell beneath them gave the value and an empty cell
