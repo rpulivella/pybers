@@ -19,6 +19,8 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-10-01  A cell is described by the kind its record stores and the format it
+            shows with, and a save describes it afresh, for PYB-141.
 2026-09-30  A cell notes the text of a rich-text record it read, for PYB-137.
 2026-09-23  A cell records where its record sits, and reads the conditions of
             its highlighting rules, for PYB-18.
@@ -36,6 +38,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
 
@@ -46,6 +49,8 @@ from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
     conditionalSlot,
+    countedFormatSlots,
+    displayedKindSlot,
     findSlotValue,
 )
 from .._persistence.index import (
@@ -60,7 +65,8 @@ from ..addressing.reference import originOffset
 from ..errors import ReadError
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
-from .cells import CellValue, Table
+from .cells import Cell, CellValue, Table
+from .kinds import CellDescription, CellFormat, CellKind, emptyDescription
 from .merges import MergeRange
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
@@ -68,10 +74,36 @@ from .merges import MergeRange
 stringKeyType: int = 3
 richTextKeyType: int = 9
 
-# A cell whose formula failed. It holds no value at all, so byte 12 is where its
-# formula key sits rather than a result, and `decodeCellValue` consuming nothing
-# for this type is what puts that key in the usual slot.
-formulaErrorType: int = 8
+# The kind each measured type byte stores. Type 8 is a failed formula, which holds no
+# value, so its formula key sits where a result would. See findings-01-values.md.
+storedKinds: dict[int, CellKind] = {
+    0: CellKind.EMPTY,
+    2: CellKind.NUMBER,
+    3: CellKind.TEXT,
+    5: CellKind.DATE_TIME,
+    6: CellKind.BOOLEAN,
+    7: CellKind.DURATION,
+    8: CellKind.ERROR,
+    9: CellKind.RICH_TEXT,
+    10: CellKind.CURRENCY,
+}
+
+# The family each measured `format_type` belongs to, every one the documents carry.
+formatFamilies: dict[int, CellFormat] = {
+    256: CellFormat.NUMBER,
+    257: CellFormat.CURRENCY,
+    258: CellFormat.PERCENT,
+    259: CellFormat.SCIENTIFIC,
+    260: CellFormat.TEXT,
+    261: CellFormat.DATE_TIME,
+    262: CellFormat.FRACTION,
+    263: CellFormat.CHECKBOX,
+    267: CellFormat.STAR_RATING,
+    268: CellFormat.DURATION,
+    269: CellFormat.NUMERAL_SYSTEM,
+    270: CellFormat.CUSTOM_NUMBER,
+}
+
 
 def readStringTable(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, str]:
     """Return the table's pooled strings, keyed as the cell records address them."""
@@ -99,6 +131,48 @@ def readRichTextTable(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int
         storage = index.resolve(payload.storage, tswp.StorageArchive)
         text[key] = "".join(storage.text)
     return text
+
+
+def readFormatTypes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, int]:
+    """Return each format entry's `format_type`, keyed as the records name it."""
+    if not dataStore.format_table.identifier:
+        return {}
+    dataList = index.resolve(dataStore.format_table, tst.TableDataList)
+    return {
+        int(entry.key): int(entry.format.format_type)
+        for entry in dataList.entries if entry.HasField("format")
+    }
+
+
+def findDisplayedFormat(
+    record: CellRecord, formatTypes: dict[int, int]
+) -> CellFormat | None:
+    """Return the family of the format a record displays with, or None for none.
+
+    The displayed slot holds a kind, 1 to 6, naming the per-kind slot whose key is
+    the format. A kind, key or type this cannot follow is unknown, never a guess.
+    """
+    displayed = findSlotValue(record, displayedKindSlot)
+    if displayed is None:
+        return None
+    if not 1 <= displayed <= len(countedFormatSlots):
+        return CellFormat.UNKNOWN
+    key = findSlotValue(record, countedFormatSlots[displayed - 1])
+    formatType = None if key is None else formatTypes.get(key)
+    if formatType is None:
+        return CellFormat.UNKNOWN
+    return formatFamilies.get(formatType, CellFormat.UNKNOWN)
+
+
+def readRecordDescription(
+    record: CellRecord, formatTypes: dict[int, int]
+) -> CellDescription:
+    """Return what a record stores beyond its value."""
+    return CellDescription(
+        kind=storedKinds.get(record.typeByte, CellKind.UNKNOWN),
+        format=findDisplayedFormat(record, formatTypes),
+        formatChosen=carriesChosenFormat(record),
+    )
 
 
 def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
@@ -210,8 +284,34 @@ def readTable(
         _rowIdentities=rowIdentities,
         _columnIdentities=columnIdentities,
     )
-    tileSize = dataStore.tiles.tile_size
+    formatTypes = readFormatTypes(index, dataStore)
+    for reference, record in iterateCellRecords(index, model, source):
+        # A merge imported from Excel keeps a style-only record at every covered
+        # position, and the model has no cell there to hold one. The archive
+        # carries it through untouched, so nothing is lost.
+        if not table.addressable(reference):
+            continue
+        cell = table.cell(reference)
+        value = resolveValue(record, strings, richText)
+        setCellDescription(cell, record, value, formatTypes)
+        cell.value = value
+        # Each cell is given its own Formula even where the archive is shared, so
+        # an edit to one cannot reach another. Frozen, so sharing would be safe
+        # anyway; built per cell so that neither guarantee depends on the other.
+        cell.formula = resolveFormula(record, formulas)
+        cell._origin = reference
+        key = findSlotValue(record, conditionalSlot)
+        if key is not None:
+            cell._conditions = conditions.get(key, ())
+    return table
 
+
+def iterateCellRecords(
+    index: ArchiveIndex, model: tst.TableModelArchive, source: Path
+) -> Iterator[tuple[CellReference, CellRecord]]:
+    """Yield every record a table stores, with the cell it belongs to."""
+    dataStore = model.base_data_store
+    tileSize = dataStore.tiles.tile_size
     # The tile LIST is authoritative. Its `tileid` gives the row range, and the
     # archive identifiers are not in row order, so nothing here may iterate
     # archives as found. See findings-03-structure.md.
@@ -238,34 +338,41 @@ def readTable(
                     f"{row + originOffset}: {exc}"
                 ) from exc
             for record in records:
-                reference = CellReference(
-                    row + originOffset, record.column + originOffset
-                )
-                # A merge imported from Excel keeps a style-only record at every
-                # covered position, and the model has no cell there to hold one.
-                # The archive carries it through untouched, so nothing is lost.
-                if not table.addressable(reference):
-                    continue
-                cell = table.cell(reference)
-                cell.value = resolveValue(record, strings, richText)
-                cell._richText = (
-                    cell.value
-                    if record.typeByte == richTextKeyType
-                    and isinstance(cell.value, str)
-                    else None
-                )
-                # Each cell is given its own Formula even where the archive is
-                # shared, so an edit to one cannot reach another. Frozen, so
-                # sharing would be safe anyway; built per cell so that neither
-                # guarantee depends on the other holding.
-                cell.formula = resolveFormula(record, formulas)
-                cell.errored = record.typeByte == formulaErrorType
-                cell._formatChosen = carriesChosenFormat(record)
-                cell._origin = reference
-                key = findSlotValue(record, conditionalSlot)
-                if key is not None:
-                    cell._conditions = conditions.get(key, ())
-    return table
+                column = record.column + originOffset
+                yield CellReference(row + originOffset, column), record
+
+
+def setCellDescription(
+    cell: Cell, record: CellRecord, value: CellValue, formatTypes: dict[int, int]
+) -> None:
+    """Give a cell the description of its record and the value that record holds."""
+    cell._stored = readRecordDescription(record, formatTypes)
+    cell._storedValue = value
+
+
+def updateCellDescriptions(
+    index: ArchiveIndex, tableInfo: tst.TableInfoArchive, table: Table, source: Path
+) -> None:
+    """Describe every cell of a saved table by the record the save left it.
+
+    A cell the save left no record for is empty, as a cell never stored is.
+    """
+    model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
+    dataStore = model.base_data_store
+    strings = readStringTable(index, dataStore)
+    richText = readRichTextTable(index, dataStore)
+    formatTypes = readFormatTypes(index, dataStore)
+    described: set[CellReference] = set()
+    for reference, record in iterateCellRecords(index, model, source):
+        cell = table.cells.get(reference)
+        if cell is None:
+            continue
+        value = resolveValue(record, strings, richText)
+        setCellDescription(cell, record, value, formatTypes)
+        described.add(reference)
+    for reference, cell in table.cells.items():
+        if reference not in described:
+            cell._stored, cell._storedValue = emptyDescription, None
 
 
 def resolveValue(

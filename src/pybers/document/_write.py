@@ -38,6 +38,8 @@ UPDATES
             record, for PYB-118.
 2026-09-29  A copied cell does the same, its copy now saying whether borders go
             with it, for PYB-136.
+2026-10-01  A successful save describes each cell by the record it left, for
+            PYB-141.
 """
 from __future__ import annotations
 
@@ -63,13 +65,13 @@ from .._persistence import (
 from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import WriteError
-from ..table._write import openTableSave
+from ..table._write import TableSave, openTableSave
 from ..table.cells import Table
 from ._create import createSheets
 from .sheets import Document, Sheet
 
 
-def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
+def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave:
     """Write every changed cell of every table back into the package.
 
     The model is compared against the archives rather than tracked as it is edited.
@@ -102,7 +104,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> int:
 
     requestRecalculation(index, tables.written)
     registry.save()
-    return sum(len(cells) for cells in tables.written.values())
+    return tables
 
 
 def resolveSaveTarget(document: Document, path: Path | str | None) -> Path:
@@ -178,9 +180,10 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
     identified = {
         id(item) for item in listIdentifiable(document) if item._identifier is not None
     }
+    target = resolveSaveTarget(document, path)
     try:
-        applyDocumentEdits(document, package)
-        writeAtomically(package, resolveSaveTarget(document, path))
+        tables = applyDocumentEdits(document, package)
+        writeAtomically(package, target)
     except Exception:
         package.restore(snapshot)
         for item in listIdentifiable(document):
@@ -188,6 +191,7 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
                 item._identifier = None
         raise
     updateCellOrigins(document)
+    tables.descriptionsUpdate(target)
 
 
 def updateCellOrigins(document: Document) -> None:

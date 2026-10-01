@@ -10,6 +10,7 @@ still names is removed at the end of the save, as Numbers removes it.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-01  The per-kind format slots moved to `_persistence.cells`, for PYB-141.
 2026-09-29  A copied record claims its string and style entries, a copied
             rich-text cell gains an entry of its own, and a spent one is removed
             with the archives only it held, for PYB-118.
@@ -33,7 +34,7 @@ from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
-from .._persistence.cells import CellRecord, listReferenceSlots
+from .._persistence.cells import CellRecord, countedFormatSlots, listReferenceSlots
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from ..errors import WriteError
@@ -47,26 +48,6 @@ stringTypeByte: int = 3
 # A rich-text cell names its payload by key, and an entry's refcount is how many such
 # records name it, which reproduces all 16 rich-text lists in the documents.
 richTextTypeByte: int = 9
-
-
-# Which bit carries which format reference, measured across the documents: a slot is
-# per format KIND rather than per cell, which is why a number and a string in one
-# table put their format in different places. See findings-01-values.md.
-numberFormatSlot: tuple[int, int] = (9, 0x20)
-currencyFormatSlot: tuple[int, int] = (9, 0x40)
-dateFormatSlot: tuple[int, int] = (9, 0x80)
-durationFormatSlot: tuple[int, int] = (10, 0x01)
-textFormatSlot: tuple[int, int] = (10, 0x02)
-checkboxFormatSlot: tuple[int, int] = (10, 0x04)
-
-
-# A format's refcount is how often its key sits in these slots, which reproduces
-# every format list in the documents. The order is Numbers' own: a kind is its
-# position here counted from 1, which is what `displayedKindSlot` stores.
-countedFormatSlots: tuple[tuple[int, int], ...] = (
-    numberFormatSlot, currencyFormatSlot, dateFormatSlot,
-    durationFormatSlot, textFormatSlot, checkboxFormatSlot,
-)
 
 
 # A style's refcount is how often its key sits in these two slots, which reproduces
@@ -367,25 +348,18 @@ def releaseEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
 
 __all__ = [
     "StringPool",
-    "checkboxFormatSlot",
     "claimEntries",
     "countFormatClaims",
-    "countedFormatSlots",
     "countedStyleSlots",
     "copyRichText",
-    "currencyFormatSlot",
-    "dateFormatSlot",
-    "durationFormatSlot",
     "listRichTextClaims",
     "listStringClaims",
     "listStyleClaims",
     "moveFormatReferences",
-    "numberFormatSlot",
     "readStringPool",
     "releaseEntries",
     "removeSpentRichText",
     "removeSpentEntries",
     "richTextTypeByte",
     "stringTypeByte",
-    "textFormatSlot",
 ]

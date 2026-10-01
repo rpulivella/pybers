@@ -14,6 +14,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-10-01  A save describes each cell it wrote once the package is on disk, for
+            PYB-141.
 2026-09-29  A copied cell's borders are drawn after every edit, for PYB-136.
 2026-09-29  Filled cells are found and carried after any move, for PYB-118.
 2026-09-24  A moved merge keeps the records it carries, for PYB-18.
@@ -36,6 +38,7 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .._engine import (
@@ -62,6 +65,7 @@ from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
+from ._read import updateCellDescriptions
 from ._relocation import (
     applyBorderCopies,
     findBorderCopies,
@@ -113,6 +117,13 @@ class TableSave:
     ownerIds: dict[str, int]
     extents: dict[str | None, tuple[int, int]]
     written: dict[int, list[tuple[int, int]]] = field(default_factory=dict)
+    saved: list[tuple[Table, tsp.Reference]] = field(default_factory=list)
+
+    def descriptionsUpdate(self, source: Path) -> None:
+        """Describe every saved cell by its record, once the package is on disk."""
+        for table, reference in self.saved:
+            tableInfo = self.index.resolve(reference, tst.TableInfoArchive)
+            updateCellDescriptions(self.index, tableInfo, table, source)
 
     def tableWrite(self, table: Table, reference: tsp.Reference) -> None:
         """Write one table back into its archives and tell the engine what moved."""
@@ -121,6 +132,7 @@ class TableSave:
         modelIdentifier = tableInfo.tableModel.identifier
         model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
         entry = findOwnerEntry(self.entries, reference.identifier, table.name)
+        self.saved.append((table, reference))
 
         # Before the merges are compared, since a merge the edit only moved must
         # not read as one the caller added.

@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-141] Describe each cell's stored kind in one frozen record
 - [PYB-137] Continue a series when filling a block of cells
 - [PYB-136] Copy a block of cells to another place in a table
 - [PYB-118] Fill a block of cells with the rules the caller names

@@ -544,7 +544,7 @@ def testErroredCellReportsErroredAndInventsNoKind() -> None:
     table = openFirstTable("21-formula-errors")
     errored = {
         str(reference): cell for reference, cell in table.cells.items()
-        if cell.errored
+        if cell.description.kind is pybers.CellKind.ERROR
     }
     assert errored, "21-formula-errors carries error cells"
     for cell in errored.values():
@@ -559,7 +559,7 @@ def testAnOrdinaryFormulaCellIsNotReportedAsErrored() -> None:
     """Guard the guard: a flag that were always true would pass the test above."""
     cell = openFirstTable("18-formula-literals").cell("A1")
     assert cell.formula is not None
-    assert not cell.errored
+    assert cell.description.kind is not pybers.CellKind.ERROR
 
 
 # ── AC 5: the golden files ───────────────────────────────────────────────────
@@ -877,4 +877,6 @@ def testACreatedFormulaStoresNoResultOfItsOwn(tmp_path: Path) -> None:
 
     after = pybers.open(working).sheets[0].tables[0].cell("H1")
     assert after.value is None, "no result is stored, because none was computed"
-    assert after.errored, "which is the pending state, not a failure"
+    assert after.description.kind is pybers.CellKind.ERROR, (
+        "which is the pending state, not a failure"
+    )

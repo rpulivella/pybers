@@ -20,6 +20,8 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-10-01  The per-kind format slots and the displayed kind, gathered here from
+            the writers, so the reader can follow them, for PYB-141.
 2026-09-21  The trailing-reference slots and the conditional ones, gathered here
             from the writers that each kept a copy, for PYB-17.
 2026-09-21  A row's offsets are read by the row's own width flag, for PYB-17.
@@ -244,6 +246,33 @@ slotOrder: tuple[tuple[int, int], ...] = (
 conditionalSlot: tuple[int, int] = (8, 0x80)
 matchSlot: tuple[int, int] = (9, 0x01)
 noMatch: int = 15
+
+
+# Which bit carries which format reference, measured across the documents: a slot is
+# per format KIND rather than per cell, which is why a number and a string in one
+# table put their format in different places. See findings-01-values.md.
+numberFormatSlot: tuple[int, int] = (9, 0x20)
+currencyFormatSlot: tuple[int, int] = (9, 0x40)
+dateFormatSlot: tuple[int, int] = (9, 0x80)
+durationFormatSlot: tuple[int, int] = (10, 0x01)
+textFormatSlot: tuple[int, int] = (10, 0x02)
+checkboxFormatSlot: tuple[int, int] = (10, 0x04)
+
+
+# A format's refcount is how often its key sits in these slots, which reproduces
+# every format list in the documents. The order is Numbers' own: a kind is its
+# position here counted from 1, which is what `displayedKindSlot` stores.
+countedFormatSlots: tuple[tuple[int, int], ...] = (
+    numberFormatSlot, currencyFormatSlot, dateFormatSlot,
+    durationFormatSlot, textFormatSlot, checkboxFormatSlot,
+)
+
+
+# Which per-kind slot a cell displays with, as a kind rather than a key: 1 number
+# through 6 checkbox. In all 11,581 records the documents carry, it names a kind slot
+# the record holds, and no refcount counts it. Read as a format key until
+# `54-format-star-rating` stored 5 where no list holds a key 5.
+displayedKindSlot: tuple[int, int] = (9, 0x10)
 
 
 def listReferenceSlots(raw: bytes) -> list[tuple[int, int]]:

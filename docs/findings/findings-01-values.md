@@ -88,6 +88,25 @@ The table below is what has been *measured*, with the enum names attached where 
 | 9 | `automaticCellType` | not seen |
 | 10 | *(named by neither enum)* | **decoded, currency.** Value is decimal128 at bytes 12-27, identical to a plain number |
 
+**Superseded 2026-10-01 for PYB-141: types 0, 8 and 9 are all seen**, and type 9 holds
+rich text rather than what `automaticCellType` suggests. Across 73,445 records in 142
+documents, nine type bytes occur:
+
+| value | records | what it stores | `CellKind` |
+|---|---|---|---|
+| 0 | 2,230 | no value: a cell holding only a style, a format or a border | `EMPTY` |
+| 2 | 49,701 | a number | `NUMBER` |
+| 3 | 20,960 | a pooled string key | `TEXT` |
+| 5 | 370 | a date | `DATE_TIME` |
+| 6 | 12 | a boolean | `BOOLEAN` |
+| 7 | 27 | a duration | `DURATION` |
+| 8 | 42 | no value: a formula that failed, or one not yet calculated | `ERROR` |
+| 9 | 80 | a rich-text payload key, not "automatic" | `RICH_TEXT` |
+| 10 | 23 | a currency amount | `CURRENCY` |
+
+No document carries type 1 or 4. pybers reports any byte outside these nine as
+`UNKNOWN` and carries the record through a save unchanged.
+
 ## How many trailing references a record carries, and what byte 8 says about its value
 
 Measured for PYB-61 across every record in the corpus, 11,760 of them spanning all nine
@@ -174,6 +193,43 @@ holds. `54-format-star-rating` settles it, because its text cell stores 5 there 
 data list in that table holds a key 5. The reading above survived because
 `11-value-types-noformats` keys its number format 1 and its text format 5, the same
 numbers as the kinds. `Text` and `Automatic` in the inspector were 5 and 1.
+
+### The family of the format a cell displays with
+
+Measured 2026-10-01 for PYB-141 across 73,445 records in 142 documents. The displayed
+kind names a per-kind slot, that slot's key names a format list entry, and the entry's
+`format_type` is the family. Every one of the twelve families the documents carry is
+named by a fixture whose label states it:
+
+| `format_type` | family | records | named by |
+|---|---|---|---|
+| 256 | number | 49,719 | `13-number-percent` `A1`, "plain number" |
+| 257 | currency | 23 | `12-number-currency` `B1` to `I1` |
+| 258 | percent | 34 | `13-number-percent` `B1` to `G1` |
+| 259 | scientific | 17 | `16-number-scientific-numeralsystems` `B1` to `D1` |
+| 260 | text | 21,052 | every text label |
+| 261 | date and time | 430 | `14-number-date` `A1` to `G1` |
+| 262 | fraction | 14 | `68-series-kinds-base` `D2`, "fraction 1/2 1" |
+| 263 | checkbox | 12 | `11-value-types-noformats` `E1` |
+| 267 | star rating | 2 | `11-value-types-noformats` `F1`, `54-format-star-rating` `A1` |
+| 268 | duration | 27 | `11-value-types-noformats` `D1` |
+| 269 | numeral system | 6 | `16-number-scientific-numeralsystems` `E1` to `J1` |
+| 270 | custom number | 6 | `17-number-custom` `B1` to `G1` |
+
+259, 262, 269 and 270 are named here for the first time; the slot table above saw them
+in number slots without saying what they were. 264 to 266 are not seen, and neither is
+any custom format for text, dates, currency or durations.
+
+**The family follows the format, and the kind follows the type byte**, so the two
+disagree by design: a percentage is a number displayed as a percent, a checkbox is a
+boolean displayed as a checkbox, and a star rating, a slider, a stepper and a pop-up
+menu are all numbers. The slider, stepper and pop-up menu in `11-value-types-noformats`
+display with family 256; what makes them controls is byte 9 `0x04`, not their format.
+
+**2,103 records carry no displayed kind**: 2,061 of type 0 and all 42 of type 8. Every
+other record carries one, and every displayed kind names a slot the record holds whose
+key the format list holds. pybers reports a family it cannot follow, by kind, key or
+type, as `UNKNOWN` rather than guessing one.
 
 **Byte 6 bit `0x80` marks a format a person chose** rather than one Numbers decided.
 4515 text records leave it clear against 108 that set it, and the Data Format inspector

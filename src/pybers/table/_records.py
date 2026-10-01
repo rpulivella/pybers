@@ -11,6 +11,8 @@ and raises nothing on the way.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-01  The format slots moved to `_persistence.cells`, and a cell's chosen
+            format is read from its description, for PYB-141.
 2026-09-30  A date is written over a date and a duration over a duration, for
             PYB-137.
 2026-09-22  Split out of the table writer for PYB-113.
@@ -38,22 +40,20 @@ from .._persistence.cells import (
     carriesFormula,
     chosenFormatBit,
     chosenFormatOffset,
+    countedFormatSlots,
+    displayedKindSlot,
     listReferenceSlots,
+    numberFormatSlot,
     referenceWidth,
     slotOrder,
+    textFormatSlot,
     valueOffset,
 )
 from .._persistence.decimal128 import Decimal128, encodedLength
 from .._persistence.index import ArchiveIndex
 from ..addressing.reference import originOffset
 from ..errors import WriteError
-from ._refcounts import (
-    StringPool,
-    countedFormatSlots,
-    numberFormatSlot,
-    stringTypeByte,
-    textFormatSlot,
-)
+from ._refcounts import StringPool, stringTypeByte
 from .cells import Cell
 
 # The type bytes a numeric record may carry. 2 is a plain number and 10 is
@@ -97,13 +97,6 @@ typeByteOffset: int = 1
 # the value it was built for, so it does not survive that value being replaced: a
 # star rating left on a cell that became text makes Numbers present text as stars.
 controlSlot: tuple[int, int] = (9, 0x04)
-
-
-# Which per-kind slot a cell displays with, as a kind rather than a key: 1 number
-# through 6 checkbox. In all 11,581 records the documents carry, it names a kind slot
-# the record holds, and no refcount counts it. Read as a format key until
-# `54-format-star-rating` stored 5 where no list holds a key 5.
-displayedKindSlot: tuple[int, int] = (9, 0x10)
 
 
 def findSlotKind(slot: tuple[int, int]) -> int:
@@ -243,7 +236,7 @@ def buildWrittenRecord(
 def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:
     """Return a record carrying the chosen-format bit its cell holds."""
     header = bytearray(raw[:valueOffset])
-    if cell.formatChosen:
+    if cell.description.formatChosen:
         header[chosenFormatOffset] |= chosenFormatBit
     else:
         header[chosenFormatOffset] &= ~chosenFormatBit
@@ -475,7 +468,6 @@ __all__ = [
     "borrowShape",
     "buildFreshRecord",
     "buildWrittenRecord",
-    "displayedKindSlot",
     "patchRichTextKey",
     "findFormatKey",
     "findTemplateRecord",
