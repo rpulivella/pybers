@@ -22,6 +22,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/29"
 
+import datetime
 from collections import Counter
 from collections.abc import Callable, Iterable
 from decimal import Decimal
@@ -698,7 +699,16 @@ seedCountsByColumn: dict[str, int] = {
 
 def fillSeriesGolden(name: str, target: Path) -> None:
     """Fill a series golden's base the way the golden was made, and save it."""
-    if name.startswith("67"):
+    if name.startswith("68"):
+        document, table = openTable("68-series-kinds-base")
+        for index in range(21):
+            letter = chr(65 + index)
+            count = 1 if letter in "QRST" else 2
+            table.cellsFill(
+                f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+                references=relative, values=series,
+            )
+    elif name.startswith("67"):
         document, table = openTable("67-series-rich-base")
         for letter, count in seedCountsByColumn.items():
             table.cellsFill(
@@ -724,6 +734,7 @@ def fillSeriesGolden(name: str, target: Path) -> None:
         "66-series-filled-right-by-pybers",
         "66-series-filled-left-by-pybers",
         "67-series-filled-by-pybers",
+        "68-series-filled-by-pybers",
     ],
 )
 def testTheSeriesGoldensMatchWhatThisLibraryProduces(
@@ -755,6 +766,12 @@ def testTheSeriesGoldensHoldWhatTheyClaimTo() -> None:
         Decimal("12"), Decimal("-7")
     ]
     assert down.cell("I21").value == "Friday"
+    kinds = pybers.open(
+        goldenDirectory / "68-series-filled-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert [kinds.cell(name).value for name in ("G13", "L13", "U13")] == [
+        "Fri", "Q4", datetime.timedelta(hours=12)
+    ]
     rich = pybers.open(
         goldenDirectory / "67-series-filled-by-pybers.numbers"
     ).sheets[0].tables[0]

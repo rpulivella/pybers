@@ -1,0 +1,131 @@
+# What Numbers shows for 68-series-filled-by-pybers.numbers, `68-series-kinds-base` with every column
+# filled down to row 13 by `cellsFill` under `CONTINUE_SERIES`: formatted numbers, times,
+# abbreviated and re-cased names, quarters, durations and text that repeats. Each expected
+# value is the last row of what Numbers' own drag wrote in `68b`. Checked by
+# `python3 scripts/golden-confirm.py run 68-series-filled-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "A13"
+value = 1.20000000000000
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "B13"
+value = 12
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "C13"
+value = 120
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "D13"
+value = 6
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "E13"
+value = 2026-01-01T20:00:00
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "F13"
+value = 1899-12-31T20:00:00
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "G13"
+value = "Fri"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "H13"
+value = "Dec"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "I13"
+value = "Friday"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "J13"
+value = "Friday"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "K13"
+value = "2nd"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "L13"
+value = "Q4"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "M13"
+value = "2 Item"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "N13"
+value = "Item 2 of 5"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "O13"
+value = "A12"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "P13"
+value = "12"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "Q13"
+value = 0.100000000000000
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "R13"
+value = 2026-01-12T09:00:00
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "S13"
+value = "Fri"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "T13"
+value = "1st"
+
+[[cell]]
+sheet = "Sheet1"
+table = "Table 1"
+cell = "U13"
+value = 43200
