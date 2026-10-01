@@ -780,3 +780,31 @@ def testRichTextOverwrittenWithPlainTextContinuesAsASeries() -> None:
     assert readColumnValues(table, "A", 5) == [
         "Thing 1", "Thing 2", "Thing 3", "Thing 4"
     ]
+
+
+def testAFillOfEveryKindOfSeedIsWhatNumbersDragged(tmp_path: Path) -> None:
+    """PYB-137 AC 2: `68b` continues or repeats each kind as the fill does."""
+    document, table = openTable("68-series-kinds-base")
+    letters = [chr(65 + index) for index in range(21)]
+    counts = {letter: 1 if letter in "QRST" else 2 for letter in letters}
+    for letter, count in counts.items():
+        table.cellsFill(
+            f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+            references=relative, values=series,
+        )
+    target = tmp_path / "kinds.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    draggedPath = findDocumentPath("68b-series-kinds-dragged")
+    dragged = pybers.open(draggedPath).sheets[0].tables[0]
+    savedRecords = readRecords(target, saved.name)
+    draggedRecords = readRecords(draggedPath, dragged.name)
+    for column, letter in enumerate(letters):
+        for row in range(2, 14):
+            assert saved.cell(f"{letter}{row}").value == dragged.cell(
+                f"{letter}{row}"
+            ).value, (letter, row)
+            assert (
+                savedRecords[(row - 1, column)].typeByte
+                == draggedRecords[(row - 1, column)].typeByte
+            ), (letter, row)

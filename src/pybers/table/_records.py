@@ -11,7 +11,8 @@ and raises nothing on the way.
 Private. Part of the table feature's archive half.
 
 UPDATES
-2026-09-30  A date is written over a date, for PYB-137.
+2026-09-30  A date is written over a date and a duration over a duration, for
+            PYB-137.
 2026-09-22  Split out of the table writer for PYB-113.
 """
 from __future__ import annotations
@@ -63,6 +64,8 @@ numericTypeBytes: tuple[int, ...] = (2, 10)
 # number, so a date over a date patches eight bytes in place.
 dateTypeByte: int = 5
 dateWidth: int = 8
+# A duration is a float64 count of seconds, laid out as a date is.
+durationTypeByte: int = 7
 
 
 # A record's value is patched in place, leaving the twelve-byte header and the
@@ -222,9 +225,18 @@ def buildWrittenRecord(
             )
         return patchDateRecord(record, value)
 
+    if isinstance(value, datetime.timedelta):
+        if record.typeByte != durationTypeByte:
+            raise WriteError(
+                f"{cell.reference} holds a value of type {record.typeByte} and a "
+                "duration was written into it. A duration can only be written over "
+                "a duration so far."
+            )
+        return patchSecondsRecord(record, value.total_seconds())
+
     raise WriteError(
         f"{cell.reference} was set to {type(value).__name__}, and only a Decimal, "
-        "a str or a date can be written so far."
+        "a str, a date or a duration can be written so far."
     )
 
 
@@ -263,14 +275,19 @@ def patchDateRecord(record: CellRecord, value: datetime.datetime) -> bytes:
             f"The date {value} has no time zone, so its seconds since 2001-01-01 UTC "
             "cannot be worked out."
         )
+    return patchSecondsRecord(record, (value - appleEpoch).total_seconds())
+
+
+def patchSecondsRecord(record: CellRecord, seconds: float) -> bytes:
+    """Return one date or duration record with its seconds replaced, all else kept."""
     if len(record.raw) < valueOffset + dateWidth:
         raise WriteError(
             f"The record for column {record.column + originOffset} is "
-            f"{len(record.raw)} bytes, too short to hold a date."
+            f"{len(record.raw)} bytes, too short to hold a date or duration."
         )
-    seconds = struct.pack("<d", (value - appleEpoch).total_seconds())
     return (
-        record.raw[:valueOffset] + seconds + record.raw[valueOffset + dateWidth:]
+        record.raw[:valueOffset] + struct.pack("<d", seconds)
+        + record.raw[valueOffset + dateWidth:]
     )
 
 

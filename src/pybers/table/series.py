@@ -2,10 +2,11 @@
 """The series a line of seed values begins, as Numbers continues one when dragged.
 
 Every rule is one findings-03-structure.md measured, in all four directions: a
-constant numeric step, dates stepping by days or whole months, weekday and month
-names, and text ending in a number. A continuation is a function of the offset from
-the first seed, so a negative offset is a drag up or left and needs no rule of its
-own. Seeds that begin no series return no continuation, and a fill repeats them.
+constant numeric or duration step, dates stepping by days or whole months, names of
+weekdays, months and quarters, and text ending in a number. A continuation is a
+function of the offset from the first seed, so a negative offset is a drag up or left
+and needs no rule of its own. Seeds that begin no series return no continuation, and
+a fill repeats them.
 
 UPDATES
 2026-09-30  Written for PYB-137.
@@ -30,8 +31,14 @@ from itertools import pairwise
 type SeedValue = Decimal | str | bool | datetime.datetime | datetime.timedelta | None
 type SeriesContinuation = Callable[[int], SeedValue]
 
-weekdayNames: tuple[str, ...] = tuple(calendar.day_name)
-monthNames: tuple[str, ...] = tuple(calendar.month_name)[1:]
+# A full name comes before its abbreviation, so a lone `May` continues as `June`.
+nameLists: tuple[tuple[str, ...], ...] = (
+    tuple(calendar.day_name),
+    tuple(calendar.day_abbr),
+    tuple(calendar.month_name)[1:],
+    tuple(calendar.month_abbr)[1:],
+    ("Q1", "Q2", "Q3", "Q4"),
+)
 numberedText = re.compile(r"^(.*?)(\d+)$", re.DOTALL)
 
 
@@ -45,6 +52,17 @@ def findConstantStep[T](
 
 def findNumberContinuation(seeds: Sequence[Decimal]) -> SeriesContinuation | None:
     """Continue a constant step, which may be negative or fractional."""
+    steps = {after - before for before, after in pairwise(seeds)}
+    if len(steps) != 1:
+        return None
+    step = steps.pop()
+    return lambda offset: seeds[0] + step * offset
+
+
+def findDurationContinuation(
+    seeds: Sequence[datetime.timedelta],
+) -> SeriesContinuation | None:
+    """Continue a constant step between durations."""
     steps = {after - before for before, after in pairwise(seeds)}
     if len(steps) != 1:
         return None
@@ -88,7 +106,8 @@ def findNameContinuation(
     seeds: Sequence[str], names: tuple[str, ...]
 ) -> SeriesContinuation | None:
     """Continue names that keep one distance apart, wrapping at either end."""
-    positions = [names.index(seed) for seed in seeds]
+    folded = [name.casefold() for name in names]
+    positions = [folded.index(seed.casefold()) for seed in seeds]
     step = 1 if len(positions) == 1 else findConstantStep(
         positions, lambda before, after: (after - before) % len(names)
     )
@@ -119,9 +138,10 @@ def findNumberedTextContinuation(seeds: Sequence[str]) -> SeriesContinuation | N
 
 
 def findTextContinuation(seeds: Sequence[str]) -> SeriesContinuation | None:
-    """Continue weekday names, month names or numbered text, as the seeds are."""
-    for names in (weekdayNames, monthNames):
-        if all(seed in names for seed in seeds):
+    """Continue a list of names, or numbered text, as the seeds are."""
+    for names in nameLists:
+        folded = {name.casefold() for name in names}
+        if all(seed.casefold() in folded for seed in seeds):
             return findNameContinuation(seeds, names)
     return findNumberedTextContinuation(seeds)
 
@@ -142,6 +162,10 @@ def findSeriesContinuation(seeds: Sequence[SeedValue]) -> SeriesContinuation | N
         return findNumberContinuation(seeds)  # type: ignore[arg-type]
     if kinds == {datetime.datetime}:
         return findDateContinuation(seeds)  # type: ignore[arg-type]
+    if kinds == {datetime.timedelta}:
+        if len(seeds) < 2:
+            return None
+        return findDurationContinuation(seeds)  # type: ignore[arg-type]
     if kinds == {str}:
         return findTextContinuation(seeds)  # type: ignore[arg-type]
     return None
