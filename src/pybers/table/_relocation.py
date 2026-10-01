@@ -18,6 +18,7 @@ count is refused rather than guessed.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-01  The format slots are read from `_persistence.cells`, for PYB-141.
 2026-09-29  A copy carries every position of a merge it copies, as a move does,
             so what an import stores under covered cells goes with it, for PYB-136.
 2026-09-29  A copied cell takes exactly its source's borders, for PYB-136.
@@ -47,6 +48,8 @@ from .._persistence.cells import (
     CellRecord,
     carriesFormula,
     conditionalSlot,
+    countedFormatSlots,
+    displayedKindSlot,
     findSlotValue,
     formulaFlagBit,
     formulaFlagOffset,
@@ -63,8 +66,8 @@ from ..errors import WriteError
 from ..formula._read import readFormula
 from ._conditions import readConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
-from ._records import controlSlot, displayedKindSlot
-from ._refcounts import countedFormatSlots, countedStyleSlots
+from ._records import controlSlot
+from ._refcounts import countedStyleSlots
 from ._strokes import copyStrokeEdges, listStrokeLayers, moveStrokeEdges
 from ._structure import rowsPerBucket
 from ._tiles import (
