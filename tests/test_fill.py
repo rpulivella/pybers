@@ -761,3 +761,22 @@ def testTheSeriesGoldensHoldWhatTheyClaimTo() -> None:
     assert [rich.cell(name).value for name in ("A13", "D13", "G13")] == [
         "Item 2", Decimal("23"), "Item 23"
     ]
+
+
+def testAFilledCopyOfRichTextStillRepeatsWhenFilledAsASeries() -> None:
+    """PYB-137: a copy of rich text is rich text, so its series fill still repeats."""
+    _, table = openTable("67-series-rich-base")
+    table.cellsFill("A2:A3", "A4:A5", references=relative, values=repeat)
+    table.cellsFill("A4:A5", "A6:A7", references=relative, values=series)
+    assert readColumnValues(table, "A", 7)[2:] == ["Item 1", "Item 2"] * 2
+
+
+def testRichTextOverwrittenWithPlainTextContinuesAsASeries() -> None:
+    """PYB-137: a cell holds rich text only while its value is still that text."""
+    _, table = openTable("67-series-rich-base")
+    table.cell("A2").value = "Thing 1"
+    table.cell("A3").value = "Thing 2"
+    table.cellsFill("A2:A3", "A4:A5", references=relative, values=series)
+    assert readColumnValues(table, "A", 5) == [
+        "Thing 1", "Thing 2", "Thing 3", "Thing 4"
+    ]

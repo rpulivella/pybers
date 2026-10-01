@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-30  A cell keeps the rich text its record held, so a fill can tell it, for
+            PYB-137.
 2026-09-29  `MergeRange` moved to `merges`, keeping this module within its limit.
 2026-09-29  A block of cells is copied to a new anchor, and a copied cell says
             whether its borders go with it (PYB-136).

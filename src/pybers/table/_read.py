@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-09-30  A cell notes the text of a rich-text record it read, for PYB-137.
 2026-09-23  A cell records where its record sits, and reads the conditions of
             its highlighting rules, for PYB-18.
 2026-09-18  Each row and column reads its identity from the UID map, for PYB-17.
