@@ -516,6 +516,17 @@ def test_aDateWrittenOverANumberIsRefused(tmp_path: Path) -> None:
         document.save()
 
 
+def test_aDurationWrittenOverANumberIsRefused(tmp_path: Path) -> None:
+    """PYB-137: a duration patches in place over a duration only, others are refused."""
+    working = copyDocument("68-series-kinds-base", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A2").value = table.cell("U2").value
+
+    with pytest.raises(WriteError, match="only be written over a duration"):
+        document.save()
+
+
 def test_aDateWithoutATimeZoneIsRefused(tmp_path: Path) -> None:
     """PYB-137: a naive date has no seconds since 2001-01-01 UTC to write."""
     working = copyDocument("65-series-base", tmp_path)
