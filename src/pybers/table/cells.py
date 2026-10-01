@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-01  A cell describes the kind its record stores and the format it shows
+            with, replacing `errored` and `formatChosen` (PYB-141).
 2026-09-30  A cell keeps the rich text its record held, so a fill can tell it, for
             PYB-137.
 2026-09-29  `MergeRange` moved to `merges`, keeping this module within its limit.
@@ -54,7 +56,7 @@ __date__ = "2026/09/02"
 import datetime
 import uuid
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING
 
@@ -77,6 +79,7 @@ from pybers.geometry import Position
 from pybers.style import Style
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
+from pybers.table.kinds import CellDescription, emptyDescription, findCellKind
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
@@ -185,20 +188,19 @@ class Cell:
     """One cell's value, optional formula, and style, at an address.
 
     `value` is the result Numbers last cached, never derived from `formula`, so the
-    two disagree until it recalculates. `errored` says a formula failed and no more,
-    because the file records no reason, except a broken reference.
+    two disagree until it recalculates. `description` says what the record stores.
     """
 
     reference: CellReference
     value: CellValue = None
     formula: Formula | None = None
-    errored: bool = False
     style: Style = field(default_factory=Style)
-    # Set only by the reader and `textLiteralSet`, so a write chooses only text.
-    _formatChosen: bool = field(default=False, kw_only=True)
-    # The text a rich-text record held when read or copied, so a cell is rich only
-    # while its value is still that text.
-    _richText: str | None = field(
+    # The record as read, copied or saved, its chosen format the one direct edit.
+    _stored: CellDescription = field(
+        default=emptyDescription, repr=False, kw_only=True
+    )
+    # The value that record holds, so an edit since is told from it.
+    _storedValue: CellValue = field(
         default=None, repr=False, compare=False, kw_only=True
     )
     # Where the file stores this cell's record, so a save can tell that it moved.
@@ -253,9 +255,15 @@ class Cell:
         return self.formula
 
     @property
-    def formatChosen(self) -> bool:
-        """Whether Numbers shows a chosen Data Format here rather than Automatic."""
-        return self._formatChosen
+    def description(self) -> CellDescription:
+        """Return the kind this cell stores, its format, and whether that was chosen.
+
+        The kind follows `value`, so text written over rich text reports text.
+        """
+        kind = findCellKind(self.value, self._stored.kind, self._storedValue)
+        if kind is self._stored.kind:
+            return self._stored
+        return CellDescription(kind, None, self._stored.formatChosen)
 
     def textLiteralSet(self, text: str) -> None:
         """Hold text Numbers will not interpret, as a cell formatted Text before typing.
@@ -274,7 +282,7 @@ class Cell:
                 "would discard it. Clear the formula first."
             )
         self.value = text
-        self._formatChosen = True
+        self._stored = replace(self._stored, formatChosen=True)
 
     @property
     def tableNames(self) -> Mapping[str, str]:

@@ -9,6 +9,7 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-01  A cell's chosen format is read from its description, for PYB-141.
 2026-09-29  Filled cells take a duplicate of the record they copied, which claims
             what it names, and a removed record releases its control, for PYB-118.
 2026-09-23  Cells moved as a block carry their records first, for PYB-18.
@@ -414,7 +415,9 @@ def applyTableEdits(
                     continue
                 valueChanged = cell.value != resolveValue(record, strings, richText)
                 edit = classifyFormulaEdit(cell.formula, record, pool)
-                chosenChanged = cell.formatChosen != carriesChosenFormat(record)
+                chosenChanged = (
+                    cell.description.formatChosen != carriesChosenFormat(record)
+                )
                 if not valueChanged and edit == "none" and not chosenChanged:
                     continue
                 patched = record.raw

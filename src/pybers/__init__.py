@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-01  CellKind, CellFormat and CellDescription re-exported, for PYB-141.
 2026-09-29  CellValueFill re-exported, for PYB-118.
 2026-09-23  FormulaReferenceRelocation re-exported, for PYB-18.
 2026-09-21  FormulaReferenceLoss re-exported, for PYB-17.
@@ -80,6 +81,9 @@ from pybers.geometry import Position, Size
 from pybers.style import Style
 from pybers.table import (
     Cell,
+    CellDescription,
+    CellFormat,
+    CellKind,
     CellValue,
     CellValueFill,
     MergeRange,
@@ -120,6 +124,9 @@ __all__ = [
     "Coordinate",
     "Cell",
     "CellAddress",
+    "CellDescription",
+    "CellFormat",
+    "CellKind",
     "CellRange",
     "CellRangeList",
     "CellReference",

@@ -16,6 +16,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-10-01  `CellKind`, `CellFormat` and `CellDescription`, for PYB-141.
 2026-09-30  A fill under `CONTINUE_SERIES` continues a series, for PYB-137.
 2026-09-29  `CellValueFill`, the value rule a fill names, for PYB-118.
 2026-09-14  `TableRows` and `TableRow`, the grid walked row by row, for PYB-62.
@@ -34,11 +35,15 @@ __date__ = "2026/09/08"
 
 from pybers.table.cells import Cell, CellValue, Table
 from pybers.table.fill import CellValueFill
+from pybers.table.kinds import CellDescription, CellFormat, CellKind
 from pybers.table.merges import MergeRange
 from pybers.table.rows import TableRow, TableRows
 
 __all__ = [
     "Cell",
+    "CellDescription",
+    "CellFormat",
+    "CellKind",
     "CellValue",
     "CellValueFill",
     "MergeRange",

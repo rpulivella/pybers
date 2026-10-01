@@ -11,7 +11,8 @@ and raises nothing on the way.
 Private. Part of the table feature's archive half.
 
 UPDATES
-2026-10-01  The format slots moved to `_persistence.cells`, for PYB-141.
+2026-10-01  The format slots moved to `_persistence.cells`, and a cell's chosen
+            format is read from its description, for PYB-141.
 2026-09-30  A date is written over a date and a duration over a duration, for
             PYB-137.
 2026-09-22  Split out of the table writer for PYB-113.
@@ -235,7 +236,7 @@ def buildWrittenRecord(
 def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:
     """Return a record carrying the chosen-format bit its cell holds."""
     header = bytearray(raw[:valueOffset])
-    if cell.formatChosen:
+    if cell.description.formatChosen:
         header[chosenFormatOffset] |= chosenFormatBit
     else:
         header[chosenFormatOffset] &= ~chosenFormatBit

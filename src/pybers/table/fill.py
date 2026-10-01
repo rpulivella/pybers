@@ -12,6 +12,7 @@ drag repeats the same way except where a column continues a series, the case
 `CONTINUE_SERIES` covers, in any one direction. See findings-03-structure.md.
 
 UPDATES
+2026-10-01  A filled cell copies its source's record description, for PYB-141.
 2026-09-30  `CONTINUE_SERIES` continues each column that begins a series, for
             PYB-137.
 2026-09-29  A filled cell's copy says it draws no border, which a paste does,
@@ -34,11 +35,18 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, RangeAddress
 from pybers.addressing.reference import CellReference, ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation, relocateFormula
+from pybers.table.kinds import CellKind
 from pybers.table.relocation import findBlockCorners, toRelocationRule
 from pybers.table.series import SeedValue, findSeriesContinuation
 
 if TYPE_CHECKING:
     from pybers.table.cells import Cell, Table
+
+
+# Numbers repeats rather than continues a line holding either of these.
+seriesBreakingKinds: frozenset[CellKind] = frozenset(
+    {CellKind.ERROR, CellKind.RICH_TEXT}
+)
 
 
 class CellValueFill(StrEnum):
@@ -79,11 +87,6 @@ def findSourcePosition(extent: CellRange, target: CellReference) -> CellReferenc
     )
 
 
-def checkRichTextHeld(cell: Cell) -> bool:
-    """Say whether a cell still holds the rich text its record stores."""
-    return cell._richText is not None and cell.value == cell._richText
-
-
 def findSeriesValues(
     table: Table, extent: CellRange, targets: list[CellReference]
 ) -> dict[CellReference, SeedValue]:
@@ -111,7 +114,7 @@ def findSeriesValues(
     for line in lines:
         cells = [table.cell(reference) for reference in line]
         if any(
-            cell.formula is not None or cell.errored or checkRichTextHeld(cell)
+            cell.formula is not None or cell.description.kind in seriesBreakingKinds
             for cell in cells
         ):
             continue
@@ -133,10 +136,9 @@ def copyCellContent(
     from pybers.table.cells import CellCopy
 
     target.value = source.value
-    target.errored = source.errored
     target.style = source.style
-    target._formatChosen = source._formatChosen
-    target._richText = source._richText if checkRichTextHeld(source) else None
+    target._stored = source._stored
+    target._storedValue = source._storedValue
     formula, conditions = source.formula, source._conditions
     if namedCell:
         formula = formula and relocateFormula(
