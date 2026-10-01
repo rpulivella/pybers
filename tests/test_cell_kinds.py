@@ -311,6 +311,33 @@ def testARowInsertedIsDescribedAsAReopenDescribesIt(tmp_path: Path) -> None:
     } == {str(cell.reference): cell.description for cell in reopened.gridIterate()}
 
 
+def testAFormulaGivenACellWithNoRecordIsAnErrorBeforeTheSave(tmp_path: Path) -> None:
+    """The save stores type 8, uncalculated, so the line before it says so too."""
+    working = copyDocument("18-formula-literals", tmp_path)
+    document = pybers.open(working)
+    cell = document.sheets[0].tables[0].cell("H1")
+    cell.formulaSet("=1+1")
+    before = cell.description
+    document.save()
+
+    reopened = pybers.open(working).sheets[0].tables[0].cell("H1").description
+    assert before.kind is cell.description.kind is reopened.kind is CellKind.ERROR
+
+
+def testAFormulaGivenAStyledEmptyRecordStaysEmpty(tmp_path: Path) -> None:
+    """Attaching a formula keeps the record's type, so only a missing record errs."""
+    working = copyDocument("65-series-base", tmp_path)
+    row, column = findFirstEmptyRecord(working)
+    document = pybers.open(working)
+    cell = document.sheets[0].tables[0].cell(row=row, col=column)
+    cell.formulaSet("=1+1")
+    before = cell.description
+    document.save()
+
+    reopened = pybers.open(working).sheets[0].tables[0].cell(row=row, col=column)
+    assert before.kind is reopened.description.kind is CellKind.EMPTY
+
+
 def testTheDescriptionIsOneFrozenObject() -> None:
     """AC 6."""
     description = openFirstTable("21-formula-errors").cell("B1").description

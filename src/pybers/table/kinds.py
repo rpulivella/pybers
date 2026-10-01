@@ -80,14 +80,17 @@ emptyDescription: CellDescription = CellDescription(CellKind.EMPTY, None, False)
 
 
 def findCellKind(
-    value: CellValue, stored: CellKind, storedValue: CellValue
+    value: CellValue, stored: CellKind, storedValue: CellValue, formulaPending: bool
 ) -> CellKind:
     """Return the kind a cell's value is stored as, following any edit to it.
 
     The stored kind holds while the value is the one stored, which is how rich text
     stays rich and an error stays an error. A number written over currency stays
-    currency, because the writer keeps the record's type.
+    currency, because the writer keeps the record's type. A formula given a cell
+    with no record is saved as type 8, the uncalculated state, so it is an error.
     """
+    if formulaPending and value is None:
+        return CellKind.ERROR
     if type(value) is type(storedValue) and value == storedValue:
         return stored
     if value is None:

@@ -260,7 +260,11 @@ class Cell:
 
         The kind follows `value`, so text written over rich text reports text.
         """
-        kind = findCellKind(self.value, self._stored.kind, self._storedValue)
+        pending = (
+            self.formula is not None and self._origin is None
+            and self._copiedFrom is None
+        )
+        kind = findCellKind(self.value, self._stored.kind, self._storedValue, pending)
         if kind is self._stored.kind:
             return self._stored
         return CellDescription(kind, None, self._stored.formatChosen)
