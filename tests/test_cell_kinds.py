@@ -311,6 +311,24 @@ def testARowInsertedIsDescribedAsAReopenDescribesIt(tmp_path: Path) -> None:
     } == {str(cell.reference): cell.description for cell in reopened.gridIterate()}
 
 
+@pytest.mark.parametrize("operation", ["cellsMove", "cellsCopy"])
+def testABlockMovedOrCopiedIsDescribedAsAReopenDescribesIt(
+    operation: str, tmp_path: Path
+) -> None:
+    """AC 7: a moved cell carries its record, and a copy duplicates its source's."""
+    working = copyDocument("60-move-base", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    getattr(table, operation)("B2:C4", "F2", references=relative)
+    document.save()
+
+    reopened = pybers.open(working).sheets[0].tables[0]
+    assert {
+        str(cell.reference): cell.description for cell in table.gridIterate()
+    } == {str(cell.reference): cell.description for cell in reopened.gridIterate()}
+    assert reopened.cell("F2").description.kind is CellKind.NUMBER
+
+
 def testAFormulaGivenACellWithNoRecordIsAnErrorBeforeTheSave(tmp_path: Path) -> None:
     """The save stores type 8, uncalculated, so the line before it says so too."""
     working = copyDocument("18-formula-literals", tmp_path)
