@@ -329,6 +329,84 @@ with its payload, its storage and the character styles only that storage named.
 
 **Styles are shared and counted**, as for any record: both style entries went from 1 to 3.
 
+## Filling a series: what a drag continues and what it repeats
+
+Measured 2026-09-30 in Numbers 15.3.1 for PYB-137. `65-series-base` is imported from
+`65-series-base.csv` and `65b-series-dragged` is every column of it dragged down by hand.
+`66-series-vertical-base` and `66-series-horizontal-base` are imported from the CSVs that
+`66-series-directions.py` writes, twenty cases each with room on every side. `66b` and
+`66c` are the vertical base dragged down and up, `66d` and `66e` the horizontal base
+dragged right and left. Every case was dragged from its own seeds. `67b-series-rich-dragged` is
+`67-series-rich-base`, which holds rich text and lines of three seeds, dragged down.
+`68b-series-kinds-dragged` is `68-series-kinds-base`, twenty-one further kinds of seed.
+
+**Every direction continues alike.** Right equals down and left equals up, value for
+value, so a series is a function of the offset from the first seed, negative above or
+left of it.
+
+**A constant step continues, negative and fractional included.** `1, 2`, `5, 3` (through
+zero and down to -17) and `0.1, 0.2` (0.3 to 1.2, exact) all continued. Up, `1, 2` gave
+0 and then -1 to -7.
+
+**Dates step by the interval between the seeds.** `2026-01-30, 2026-01-31` gave one day
+per row across a month end, and `2026-01-01, 2026-02-01` one month, rolling into the next
+year. A yearly pair gave twelve months, `2026-01-01, 2027-01-01` reaching 2037.
+
+**A month step keeps the seed's day and ends a short month early.** `2026-01-31,
+2026-03-31` is two months, and continued 31 May, 31 July, 30 September, 30 November, then
+31 January, so the day is held and clamped to the month rather than carried forward.
+Up, it gave 30 November 2025 and 30 September 2025.
+
+**Weekday and month names continue at their own distance and wrap.** `Monday, Tuesday`
+reached Sunday and began again, and `Monday, Wednesday` gave Friday, Sunday, Tuesday.
+`January, February` passed December into January, and up gave December, November.
+
+**Text ending in a number continues that number at its own step.** `Item 1, Item 2` gave
+`Item 3` to `Item 12` and `Item 1, Item 3` gave 5, 7, 9. Up, the number goes negative:
+`Item 0`, `Item -1`, `Item -7`.
+
+**A padded number keeps its width, until it goes negative.** `Item 01, Item 02` gave
+`Item 03` to `Item 09` and then `Item 10`. Up, it gave `Item 00` and then `Item -1` to
+`Item -7`, unpadded.
+
+**A source that begins no series repeats whole, in either direction.** `1, 2, 4`
+repeated as `1, 2, 4, 1, 2, 4` and `alpha, beta` alternated, so up, the block ends on its
+own last seed at the row above. Neither is refused.
+
+**A lone cell depends on what it holds.** A number repeats, `7` down to row 21. A date
+steps one day, a weekday and a month name one name, and `Item 1` becomes `Item 2`.
+Up, each steps back: 14 March, Sunday, December, `Item 0`.
+
+**Rich text never continues.** In `67b`, dragged from `67-series-rich-base`, two rich cells
+`Item 1` and `Item 2` alternated, each copy still a type 9 record, and a lone rich `Item 1`
+repeated where a lone plain one steps. A plain pair beside them continued to `Item 12`.
+
+**Three seeds continue at their constant step.** `1, 3, 5`, `Monday, Tuesday, Wednesday`,
+three monthly dates, `Item 1, Item 3, Item 5` and `1, 2, 3` all continued as two seeds do.
+
+**A formatted number continues as a number.** Percent (`10%, 20%`), currency, scientific
+and fraction seeds each continued their step, and a lone percent repeated.
+
+**A date with a time, and a time alone, step by the interval.** Hourly seeds gave one hour
+per row, and a lone date with a time stepped one day and kept its time.
+
+**Names continue in their own list, whatever their case.** `Mon, Tue` gave `Wed` to `Fri`
+and `Jan, Feb` gave `Mar` to `Dec`, each wrapping. `monday, tuesday` and `MONDAY, TUESDAY`
+both continued as `Wednesday`, so the case is not kept. A lone `Mon` stepped. Quarters
+wrap at four: `Q1, Q2` gave `Q3, Q4, Q1, Q2`. Months in lowercase, a lone quarter and a
+lone `May` were not measured.
+
+**A duration continues at its step.** `1h, 2h` gave 3h to 12h, as a record of its own
+type 7, and a lone duration was not measured.
+
+**Text whose number is not last repeats.** `1st, 2nd`, `1 Item, 2 Item` and `Item 1 of 5,
+Item 2 of 5` repeated as pairs, and a lone `1st` repeated. `A1, A2` and `1, 2` typed as
+text continued, the second staying text.
+
+**A value over an empty cell repeats the pair.** In `65b`, `7`, a date, `Monday` and
+`Item 1` each selected with the empty cell beneath them gave the value and an empty cell
+alternately. A lone cell in `66b` is a different case, and steps as above.
+
 ## Copying a block of cells: copy and paste keeps each offset and every border
 
 Measured 2026-09-29 in Numbers 15.3.1 for PYB-136. `64-copy-pasted` is `60-move-base`

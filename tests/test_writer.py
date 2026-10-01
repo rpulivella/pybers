@@ -495,13 +495,46 @@ def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
 def test_writingSomethingNeitherTextNorANumberIsStillRefused(
     tmp_path: Path,
 ) -> None:
-    """The refusal that remains, since a date or a boolean has no write path yet."""
+    """The refusal that remains, since a boolean has no write path yet."""
     working = copyDocument("11-value-types-noformats", tmp_path)
 
     document = pybers.open(working)
     document.sheets[0].tables[0].cell("A1").value = [1, 2]
 
     with pytest.raises(WriteError, match="only a Decimal"):
+        document.save()
+
+
+def test_aDateWrittenOverANumberIsRefused(tmp_path: Path) -> None:
+    """PYB-137: a date patches in place over a date only, so any other is refused."""
+    working = copyDocument("65-series-base", tmp_path)
+    document = pybers.open(working)
+    date = document.sheets[0].tables[0].cell("E2").value
+    document.sheets[0].tables[0].cell("A2").value = date
+
+    with pytest.raises(WriteError, match="only be written over a date"):
+        document.save()
+
+
+def test_aDurationWrittenOverANumberIsRefused(tmp_path: Path) -> None:
+    """PYB-137: a duration patches in place over a duration only, others are refused."""
+    working = copyDocument("68-series-kinds-base", tmp_path)
+    document = pybers.open(working)
+    table = document.sheets[0].tables[0]
+    table.cell("A2").value = table.cell("U2").value
+
+    with pytest.raises(WriteError, match="only be written over a duration"):
+        document.save()
+
+
+def test_aDateWithoutATimeZoneIsRefused(tmp_path: Path) -> None:
+    """PYB-137: a naive date has no seconds since 2001-01-01 UTC to write."""
+    working = copyDocument("65-series-base", tmp_path)
+    document = pybers.open(working)
+    cell = document.sheets[0].tables[0].cell("E2")
+    cell.value = cell.value.replace(tzinfo=None)
+
+    with pytest.raises(WriteError, match="no time zone"):
         document.save()
 
 

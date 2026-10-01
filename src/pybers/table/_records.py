@@ -11,6 +11,8 @@ and raises nothing on the way.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-09-30  A date is written over a date and a duration over a duration, for
+            PYB-137.
 2026-09-22  Split out of the table writer for PYB-113.
 """
 from __future__ import annotations
@@ -23,6 +25,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/22"
 
+import datetime
+import struct
 from collections.abc import Callable
 from decimal import Decimal
 
@@ -30,6 +34,7 @@ from .._generated import TSTArchives_pb2 as tst
 from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
 from .._persistence.cells import (
     CellRecord,
+    appleEpoch,
     carriesFormula,
     chosenFormatBit,
     chosenFormatOffset,
@@ -54,6 +59,13 @@ from .cells import Cell
 # The type bytes a numeric record may carry. 2 is a plain number and 10 is
 # currency, which is the same encoding under a different type.
 numericTypeBytes: tuple[int, ...] = (2, 10)
+
+# A date is a float64 count of seconds since 2001-01-01 UTC, at the same offset as a
+# number, so a date over a date patches eight bytes in place.
+dateTypeByte: int = 5
+dateWidth: int = 8
+# A duration is a float64 count of seconds, laid out as a date is.
+durationTypeByte: int = 7
 
 
 # A record's value is patched in place, leaving the twelve-byte header and the
@@ -204,9 +216,27 @@ def buildWrittenRecord(
             )
         return patchRecord(record, value)
 
+    if isinstance(value, datetime.datetime):
+        if record.typeByte != dateTypeByte:
+            raise WriteError(
+                f"{cell.reference} holds a value of type {record.typeByte} and a "
+                "date was written into it. A date can only be written over a date "
+                "so far."
+            )
+        return patchDateRecord(record, value)
+
+    if isinstance(value, datetime.timedelta):
+        if record.typeByte != durationTypeByte:
+            raise WriteError(
+                f"{cell.reference} holds a value of type {record.typeByte} and a "
+                "duration was written into it. A duration can only be written over "
+                "a duration so far."
+            )
+        return patchSecondsRecord(record, value.total_seconds())
+
     raise WriteError(
-        f"{cell.reference} was set to {type(value).__name__}, and only a Decimal "
-        "or a str can be written so far."
+        f"{cell.reference} was set to {type(value).__name__}, and only a Decimal, "
+        "a str, a date or a duration can be written so far."
     )
 
 
@@ -235,6 +265,29 @@ def patchRecord(record: CellRecord, value: Decimal) -> bytes:
         )
     return (
         record.raw[:valueOffset] + Decimal128(value).asBytes() + record.raw[valueEnd:]
+    )
+
+
+def patchDateRecord(record: CellRecord, value: datetime.datetime) -> bytes:
+    """Return one date record with its moment replaced and everything else kept."""
+    if value.tzinfo is None:
+        raise WriteError(
+            f"The date {value} has no time zone, so its seconds since 2001-01-01 UTC "
+            "cannot be worked out."
+        )
+    return patchSecondsRecord(record, (value - appleEpoch).total_seconds())
+
+
+def patchSecondsRecord(record: CellRecord, seconds: float) -> bytes:
+    """Return one date or duration record with its seconds replaced, all else kept."""
+    if len(record.raw) < valueOffset + dateWidth:
+        raise WriteError(
+            f"The record for column {record.column + originOffset} is "
+            f"{len(record.raw)} bytes, too short to hold a date or duration."
+        )
+    return (
+        record.raw[:valueOffset] + struct.pack("<d", seconds)
+        + record.raw[valueOffset + dateWidth:]
     )
 
 

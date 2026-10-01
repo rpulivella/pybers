@@ -7,6 +7,8 @@ they claim, the refusals that leave a table as it was, and the few lines a scrip
 or a command line writes to fill a block.
 
 UPDATES
+2026-09-30  Series continued by `CONTINUE_SERIES`, checked against the drag Numbers
+            made in `65b-series-dragged`, for PYB-137.
 2026-09-29  Written for PYB-118, taking over the fill tests of `formulaFill`, and
             checked against the fills Numbers made in `63*-fill-*`.
 """
@@ -20,6 +22,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/29"
 
+import datetime
 from collections import Counter
 from collections.abc import Callable, Iterable
 from decimal import Decimal
@@ -52,6 +55,7 @@ from pybers.table._refcounts import (
 relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
 named = FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 repeat = CellValueFill.REPEAT_SOURCE_VALUE
+series = CellValueFill.CONTINUE_SERIES
 
 type Ledger = dict[str, tuple[dict[int, int], Counter[int]]]
 
@@ -234,8 +238,7 @@ def testAFillSkipsWhatAMergeCoversAndCountsWhatItFilled() -> None:
         (lambda table: table.cellsFill(
             "D3", "D4", references=relative, values="upward"), "not a value rule"),
         (lambda table: table.cellsFill(
-            "D3", "D4", references=relative, values=CellValueFill.CONTINUE_SERIES),
-         "not supported yet"),
+            "A2:A3", "A4:B4", references=relative, values=series), "asks for both"),
     ],
 )
 def testARefusedFillLeavesTheTableAsItWas(
@@ -528,3 +531,297 @@ def testACommandLineFillsWithTheRulesAsTyped() -> None:
     )
     assert filled == 2
     assert table.cell("D4").formulaText == "=B2+C2"
+
+
+seedRows: dict[str, int] = {"D": 4}
+seededColumns: str = "ABCDEFGHIJKLMN"
+
+
+def readColumnValues(table: pybers.Table, column: str, last: int) -> list[object]:
+    """Return a column's values from row 2 down to `last`."""
+    return [table.cell(f"{column}{row}").value for row in range(2, last + 1)]
+
+
+def testADragOfEveryColumnIsWhatCellsFillProducesUnderSeries(tmp_path: Path) -> None:
+    """PYB-137 AC 2: each column of `65b` equals its seeds filled, saved and read."""
+    document, table = openTable("65-series-base")
+    for column in seededColumns:
+        seeds = seedRows.get(column, 3)
+        table.cellsFill(
+            f"{column}2:{column}{seeds}", f"{column}{seeds + 1}:{column}17",
+            references=relative, values=series,
+        )
+    target = tmp_path / "series.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    dragged = pybers.open(findDocumentPath("65b-series-dragged")).sheets[0].tables[0]
+    for column in seededColumns:
+        assert readColumnValues(saved, column, 17) == readColumnValues(
+            dragged, column, 17
+        ), column
+
+
+def testASeriesFillContinuesAColumnBesideOneThatRepeats() -> None:
+    """A block continues the columns that begin a series and repeats the rest."""
+    _, table = openTable("65-series-base")
+    table.cellsFill("A2:B3", "A4:B5", references=relative, values=series)
+    table.cellsFill("I2:J3", "I4:J5", references=relative, values=series)
+    assert [table.cell(name).value for name in ("A5", "B5", "I5", "J5")] == [
+        Decimal("4"), Decimal("40"), "April", "Item 4"
+    ]
+
+
+def testASeriesFillFromAColumnBeginningNoSeriesRepeatsTheBlock() -> None:
+    """`1, 2, 4` and `alpha, beta` begin no series, which the drag repeated whole."""
+    _, table = openTable("65-series-base")
+    table.cellsFill("D2:D4", "D5:D7", references=relative, values=series)
+    table.cellsFill("N2:N3", "N4:N7", references=relative, values=series)
+    assert readColumnValues(table, "D", 7) == [Decimal(n) for n in (1, 2, 4, 1, 2, 4)]
+    assert readColumnValues(table, "N", 7) == ["alpha", "beta"] * 3
+
+
+def testAFormulaInASeriesSourceFillsAsItDoesWhenRepeated() -> None:
+    """PYB-137 AC 3: a column holding a formula repeats, under either reference rule."""
+    for rule in FormulaReferenceRelocation:
+        _, repeated = openTable("60-move-base")
+        _, continued = openTable("60-move-base")
+        repeated.cellsFill("B2:D3", "B4:D4", references=rule, values=repeat)
+        continued.cellsFill("B2:D3", "B4:D4", references=rule, values=series)
+        for name in ("B4", "C4", "D4"):
+            assert continued.cell(name).formulaText == repeated.cell(name).formulaText
+            assert continued.cell(name).value == repeated.cell(name).value
+
+
+def testAScriptContinuesRowNumbersDownAColumn() -> None:
+    """A script numbering rows names the rule as a string, as a command line would."""
+    document = pybers.open(findDocumentPath("65-series-base"))
+    table = document.sheets[0].tables[0]
+    filled = table.cellsFill(
+        "A2:A3", "A4:A12",
+        references="relative-position",  # type: ignore[arg-type]
+        values="series",  # type: ignore[arg-type]
+    )
+    assert filled == 9
+    assert table.cell("A12").value == Decimal("11")
+
+
+directionDocuments: dict[str, str] = {
+    "down": "66b-series-down", "up": "66c-series-up",
+    "right": "66d-series-right", "left": "66e-series-left",
+}
+
+
+def findSeedCount(index: int) -> int:
+    """Return how many seeds case `index` of the `66` bases holds."""
+    return 3 if index == 2 else 1 if index >= 15 else 2
+
+
+def fillCase(table: pybers.Table, direction: str, index: int) -> None:
+    """Fill one case of a `66` base the way its drag was made."""
+    count = findSeedCount(index)
+    if direction in ("down", "up"):
+        letter = chr(65 + index)
+        source = f"{letter}10:{letter}{9 + count}"
+        through = (
+            f"{letter}{10 + count}:{letter}21" if direction == "down"
+            else f"{letter}2:{letter}9"
+        )
+    else:
+        row = index + 1
+        source = f"J{row}:{chr(73 + count)}{row}"
+        through = (
+            f"{chr(74 + count)}{row}:U{row}" if direction == "right"
+            else f"B{row}:I{row}"
+        )
+    table.cellsFill(source, through, references=relative, values=series)
+
+
+@pytest.mark.parametrize("direction", ["down", "up", "right", "left"])
+def testAFillInEachDirectionIsWhatNumbersDragged(
+    direction: str, tmp_path: Path
+) -> None:
+    """PYB-137 AC 2: all twenty cases of `66b` to `66e` equal their seeds filled."""
+    base = (
+        "66-series-vertical-base" if direction in ("down", "up")
+        else "66-series-horizontal-base"
+    )
+    document, table = openTable(base)
+    for index in range(20):
+        fillCase(table, direction, index)
+    target = tmp_path / "series.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    dragged = pybers.open(findDocumentPath(directionDocuments[direction]))
+    dragged = dragged.sheets[0].tables[0]
+    for index in range(20):
+        if direction in ("down", "up"):
+            names = [f"{chr(65 + index)}{row}" for row in range(2, 22)]
+        else:
+            names = [f"{chr(65 + column)}{index + 1}" for column in range(1, 21)]
+        assert [saved.cell(name).value for name in names] == [
+            dragged.cell(name).value for name in names
+        ], (direction, index)
+
+
+def testAFillOfThreeSeedsAndOfRichTextIsWhatNumbersDragged(tmp_path: Path) -> None:
+    """PYB-137 AC 2: `67b` repeats rich text and continues three seeds, types too."""
+    document, table = openTable("67-series-rich-base")
+    seedCounts = {
+        "A": 2, "B": 1, "C": 2, "D": 3, "E": 3, "F": 3, "G": 3, "H": 3,
+    }
+    for letter, count in seedCounts.items():
+        table.cellsFill(
+            f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+            references=relative, values=series,
+        )
+    target = tmp_path / "rich.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    dragged_path = findDocumentPath("67b-series-rich-dragged")
+    dragged = pybers.open(dragged_path).sheets[0].tables[0]
+    savedRecords = readRecords(target, saved.name)
+    draggedRecords = readRecords(dragged_path, dragged.name)
+    for row in range(2, 14):
+        for column, letter in enumerate("ABCDEFGH"):
+            assert saved.cell(f"{letter}{row}").value == dragged.cell(
+                f"{letter}{row}"
+            ).value, (letter, row)
+            assert (
+                savedRecords[(row - 1, column)].typeByte
+                == draggedRecords[(row - 1, column)].typeByte
+            ), (letter, row)
+
+
+seedCountsByColumn: dict[str, int] = {
+    "A": 2, "B": 1, "C": 2, "D": 3, "E": 3, "F": 3, "G": 3, "H": 3,
+}
+
+
+def fillSeriesGolden(name: str, target: Path) -> None:
+    """Fill a series golden's base the way the golden was made, and save it."""
+    if name.startswith("68"):
+        document, table = openTable("68-series-kinds-base")
+        for index in range(21):
+            letter = chr(65 + index)
+            count = 1 if letter in "QRST" else 2
+            table.cellsFill(
+                f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+                references=relative, values=series,
+            )
+    elif name.startswith("67"):
+        document, table = openTable("67-series-rich-base")
+        for letter, count in seedCountsByColumn.items():
+            table.cellsFill(
+                f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+                references=relative, values=series,
+            )
+    else:
+        direction = name.split("-")[3]
+        document, table = openTable(
+            "66-series-vertical-base" if direction in ("down", "up")
+            else "66-series-horizontal-base"
+        )
+        for index in range(20):
+            fillCase(table, direction, index)
+    document.save(target)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "66-series-filled-down-by-pybers",
+        "66-series-filled-up-by-pybers",
+        "66-series-filled-right-by-pybers",
+        "66-series-filled-left-by-pybers",
+        "67-series-filled-by-pybers",
+        "68-series-filled-by-pybers",
+    ],
+)
+def testTheSeriesGoldensMatchWhatThisLibraryProduces(
+    name: str, tmp_path: Path
+) -> None:
+    """PYB-137 AC 4: each series fill again, against the file to be confirmed."""
+    target = tmp_path / f"{name}.numbers"
+    fillSeriesGolden(name, target)
+    differences = listPackageDifferences(
+        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
+    )
+    assert [
+        difference for difference in differences if difference.identifier is not None
+    ] == []
+
+
+def testTheSeriesGoldensHoldWhatTheyClaimTo() -> None:
+    """Guard the guard: an unfilled copy of a base would pass the match above."""
+    down, up, right, left = (
+        pybers.open(
+            goldenDirectory / f"66-series-filled-{direction}-by-pybers.numbers"
+        ).sheets[0].tables[0]
+        for direction in ("down", "up", "right", "left")
+    )
+    assert [down.cell("A21").value, up.cell("A2").value] == [
+        Decimal("12"), Decimal("-7")
+    ]
+    assert [right.cell("U1").value, left.cell("B1").value] == [
+        Decimal("12"), Decimal("-7")
+    ]
+    assert down.cell("I21").value == "Friday"
+    kinds = pybers.open(
+        goldenDirectory / "68-series-filled-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert [kinds.cell(name).value for name in ("G13", "L13", "U13")] == [
+        "Fri", "Q4", datetime.timedelta(hours=12)
+    ]
+    rich = pybers.open(
+        goldenDirectory / "67-series-filled-by-pybers.numbers"
+    ).sheets[0].tables[0]
+    assert [rich.cell(name).value for name in ("A13", "D13", "G13")] == [
+        "Item 2", Decimal("23"), "Item 23"
+    ]
+
+
+def testAFilledCopyOfRichTextStillRepeatsWhenFilledAsASeries() -> None:
+    """PYB-137: a copy of rich text is rich text, so its series fill still repeats."""
+    _, table = openTable("67-series-rich-base")
+    table.cellsFill("A2:A3", "A4:A5", references=relative, values=repeat)
+    table.cellsFill("A4:A5", "A6:A7", references=relative, values=series)
+    assert readColumnValues(table, "A", 7)[2:] == ["Item 1", "Item 2"] * 2
+
+
+def testRichTextOverwrittenWithPlainTextContinuesAsASeries() -> None:
+    """PYB-137: a cell holds rich text only while its value is still that text."""
+    _, table = openTable("67-series-rich-base")
+    table.cell("A2").value = "Thing 1"
+    table.cell("A3").value = "Thing 2"
+    table.cellsFill("A2:A3", "A4:A5", references=relative, values=series)
+    assert readColumnValues(table, "A", 5) == [
+        "Thing 1", "Thing 2", "Thing 3", "Thing 4"
+    ]
+
+
+def testAFillOfEveryKindOfSeedIsWhatNumbersDragged(tmp_path: Path) -> None:
+    """PYB-137 AC 2: `68b` continues or repeats each kind as the fill does."""
+    document, table = openTable("68-series-kinds-base")
+    letters = [chr(65 + index) for index in range(21)]
+    counts = {letter: 1 if letter in "QRST" else 2 for letter in letters}
+    for letter, count in counts.items():
+        table.cellsFill(
+            f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
+            references=relative, values=series,
+        )
+    target = tmp_path / "kinds.numbers"
+    document.save(target)
+    saved = pybers.open(target).sheets[0].tables[0]
+    draggedPath = findDocumentPath("68b-series-kinds-dragged")
+    dragged = pybers.open(draggedPath).sheets[0].tables[0]
+    savedRecords = readRecords(target, saved.name)
+    draggedRecords = readRecords(draggedPath, dragged.name)
+    for column, letter in enumerate(letters):
+        for row in range(2, 14):
+            assert saved.cell(f"{letter}{row}").value == dragged.cell(
+                f"{letter}{row}"
+            ).value, (letter, row)
+            assert (
+                savedRecords[(row - 1, column)].typeByte
+                == draggedRecords[(row - 1, column)].typeByte
+            ), (letter, row)

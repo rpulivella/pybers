@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-09-30  A cell notes the text of a rich-text record it read, for PYB-137.
 2026-09-23  A cell records where its record sits, and reads the conditions of
             its highlighting rules, for PYB-18.
 2026-09-18  Each row and column reads its identity from the UID map, for PYB-17.
@@ -247,6 +248,12 @@ def readTable(
                     continue
                 cell = table.cell(reference)
                 cell.value = resolveValue(record, strings, richText)
+                cell._richText = (
+                    cell.value
+                    if record.typeByte == richTextKeyType
+                    and isinstance(cell.value, str)
+                    else None
+                )
                 # Each cell is given its own Formula even where the archive is
                 # shared, so an edit to one cannot reach another. Frozen, so
                 # sharing would be safe anyway; built per cell so that neither

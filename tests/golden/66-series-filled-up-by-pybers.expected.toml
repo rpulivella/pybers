@@ -1,0 +1,124 @@
+# What Numbers shows for 66-series-filled-up-by-pybers.numbers, `66-series-vertical-base` with every case filled
+# up to row 2 by `cellsFill` under `CONTINUE_SERIES`. Each expected value is the far end
+# of what Numbers' own drag wrote in `66c-series-up`. Checked by
+# `python3 scripts/golden-confirm.py run 66-series-filled-up-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "A2"
+value = -7
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "B2"
+value = 21
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "C2"
+value = 2
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "D2"
+value = -0.7
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "E2"
+value = 2026-01-22T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "F2"
+value = 2025-05-01T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "G2"
+value = 2024-09-30T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "H2"
+value = 2018-01-01T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "I2"
+value = "Sunday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "J2"
+value = "Saturday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "K2"
+value = "May"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "L2"
+value = "Item -7"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "M2"
+value = "Item -15"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "N2"
+value = "Item -7"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "O2"
+value = "alpha"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "P2"
+value = 7
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "Q2"
+value = 2026-03-07T00:00:00
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "R2"
+value = "Sunday"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "S2"
+value = "May"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "66-series-vertical-base"
+cell = "T2"
+value = "Item -7"

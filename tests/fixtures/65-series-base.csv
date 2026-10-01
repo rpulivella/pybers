@@ -1,0 +1,4 @@
+numbers 1 2,numbers 10 20,numbers 5 3,numbers 1 2 4,dates daily to month end,dates monthly,weekdays Mon Tue,weekday Mon alone,months Jan Feb,text Item 1 2,text Item 1 alone,number 7 alone,date alone,text no number
+1,10,5,1,2026-01-30,2026-01-01,Monday,Monday,January,Item 1,Item 1,7,2026-03-15,alpha
+2,20,3,2,2026-01-31,2026-02-01,Tuesday,,February,Item 2,,,,beta
+,,,4,,,,,,,,,,

@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-09-30  A cell keeps the rich text its record held, so a fill can tell it, for
+            PYB-137.
 2026-09-29  `MergeRange` moved to `merges`, keeping this module within its limit.
 2026-09-29  A block of cells is copied to a new anchor, and a copied cell says
             whether its borders go with it (PYB-136).
@@ -194,6 +196,11 @@ class Cell:
     style: Style = field(default_factory=Style)
     # Set only by the reader and `textLiteralSet`, so a write chooses only text.
     _formatChosen: bool = field(default=False, kw_only=True)
+    # The text a rich-text record held when read or copied, so a cell is rich only
+    # while its value is still that text.
+    _richText: str | None = field(
+        default=None, repr=False, compare=False, kw_only=True
+    )
     # Where the file stores this cell's record, so a save can tell that it moved.
     _origin: CellReference | None = field(
         default=None, repr=False, compare=False, kw_only=True
@@ -490,7 +497,8 @@ class Table:
         """Repeat a block of any content across a range, copying each cell whole.
 
         Neither rule has a default. Positions a merge covers are skipped, and a
-        block holding a merge is refused. Returns how many cells were filled.
+        block holding a merge is refused. `CONTINUE_SERIES` continues each column
+        that begins a series, in any one direction. Returns how many cells were filled.
         """
         return fillCells(self, source, through, references, values)
 
