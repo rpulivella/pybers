@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/logo/pybers-logo-dark.svg">
-  <img src="docs/logo/pybers-logo-light.svg" alt="pybers logo: a selected spreadsheet cell holding the Python prompt and a cursor" width="128">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo/pybers-lockup-dark.svg">
+  <img src="docs/logo/pybers-lockup-light.svg" alt="pybers: a selected spreadsheet cell holding the Python prompt and a cursor, beside the name" width="272">
 </picture>
 
 # pybers
