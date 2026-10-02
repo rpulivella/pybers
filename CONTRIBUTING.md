@@ -1,6 +1,6 @@
 # Contributing to pybers
 
-pybers is built through an agentic harness. This guide is the single source of truth for how change flows into the repository, commits, branches, and release tags. The invisible laws of the codebase live in `CLAUDE.md`; this file is only about the git workflow.
+pybers is built through an agentic harness. This guide is the single source of truth for how change flows into the repository, commits, branches, and release tags, and for where things live. The invisible laws of the codebase live in `CLAUDE.md`.
 
 ## How a ticket is referenced
 
@@ -92,3 +92,22 @@ pip install -e ".[dev]"
 pytest alone is a partial answer. The preflight runs pytest, the prose gate, ruff and mypy in one pass and reports all four. What it cannot answer is the pull request half: the template, the CHANGELOG, the branch's currency and the dependency advisories, which the readiness report adds on GitHub.
 
 Every commit leaves the test suite green. No exceptions.
+
+## Repository layout
+
+| Path | What lives here |
+| --- | --- |
+| `src/pybers/` | The library, a directory per feature with `_persistence/` and `_engine/` beneath them. `protos/` holds the extracted iWork schemas and `_generated/` the modules compiled from them. A leading underscore means a caller has no business there. |
+| `tests/` | The pytest suite, with `fixtures/` (origins), `measurements/` (one change from an origin) and `golden/` (files pybers wrote, confirmed in Numbers). Each directory's README catalogs its files. |
+| `docs/` | `decisions.md`, the settled decisions, and `findings/`, what the real files established about the format. |
+| `scripts/` | Repository tooling, including the ticket and pull request tools and the prose gate. |
+| `tools/` | The schema and function extractors, run against a local `Numbers.app`. |
+| `.claude/` | The slash commands the agentic workflow runs. |
+| `.github/` | The pull request template and the three workflows that check a pull request. |
+| `workarea/` | Ephemeral scratch, git-ignored apart from its README. |
+
+## Code and prose style
+
+**Functions, variables and parameters are camelCase**, the opposite of what most Python tooling assumes, and ruff and mypy are configured for it. Modules stay lowercase and classes PascalCase. `CLAUDE.md` carries the rest of the house style.
+
+**The prose gate lints prose.** Documentation, docstrings and comments are checked against the project's writing rules the way ruff checks code, because a wrong comment is a defect here. `scripts/standards-check.py` runs it alone.
