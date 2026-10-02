@@ -4,7 +4,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 [![License](https://img.shields.io/github/license/rpulivella/pybers)](LICENSE)
 
-> **Status, 2026-10-01:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files today, the command line is not built, and nothing is on PyPI yet.
+> **Status, 2026-10-02:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files today, the command line is not built, and nothing is on PyPI yet.
 
 ## Command line
 
