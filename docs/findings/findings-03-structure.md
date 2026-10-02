@@ -268,8 +268,11 @@ target, `=A3` staying `=A3` and `=$B2` becoming `=$F8`. A formula elsewhere nami
 wholly inside the block follows it, from another table too: `=SUM(B2:D5)` became
 `=SUM(F8:H11)` and `Table 2::C2` became `Table 2::G8`.
 
-**Cut and paste preserves each reference's position relative to its formula.** No
-formula anywhere is rewritten. `=A3` became `=E9`, the locked axis of `=$B2` stayed so it
+**Cut and paste preserves each reference's position relative to its formula.** It
+rewrites only a moved range that would reach past its table's edge, clamping it there:
+`SUM(A1:A12)` pasted six rows lower in a twelve row table was stored as `SUM(E7:E12)`,
+not `SUM(E7:E18)`, measured 2026-09-24. The engine registers every range the same way,
+bounded by the table it reads, whether or not anything moved. `=A3` became `=E9`, the locked axis of `=$B2` stayed so it
 became `=$B8`, and a formula elsewhere kept naming the address the block left, reading
 empty cells. An offset landing outside a table is stored as it is, `=I7` in an eight
 column table and `Table 2::E7` in a one column table, and shows an error.
@@ -287,12 +290,6 @@ kept pointing at the same style archives while Numbers renumbered the list keys.
 border on `C3` moved to `G9` with no layer left behind. The highlighting rule was
 rebuilt as a new archive with identical contents, its operand still one column left,
 because the cell it reads moved with it. No record remains at a vacated position.
-
-**Superseded 2026-09-24: cut and paste does rewrite one kind of formula.** The paragraph
-above says no formula is rewritten. A moved range that would reach past its table's edge
-is clamped to it: `SUM(A1:A12)` pasted six rows lower in a twelve row table was stored as
-`SUM(E7:E12)`, not `SUM(E7:E18)`. The engine registers every range the same way, bounded
-by the table it reads, whether or not anything moved.
 
 **A drag rewrites highlighting as it rewrites formulas**, measured 2026-09-24 in
 `62b-move-rules-dragged`. The rule on `C2` reading `A1` kept reading `A1` from `G8`, and

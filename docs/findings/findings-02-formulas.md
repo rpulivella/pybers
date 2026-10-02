@@ -148,23 +148,21 @@ An absolute column beside a relative row, then the reverse, on the same formula.
 
 ### What this decides
 
-**Moving a cell requires no reference rewriting.** A relative reference is already relative
-to wherever the cell sits, so a moved or copied formula is correct by construction, which
-is why Numbers never needs `$` as a workaround, and why a user can drag freely without
-anything breaking. Locking is then free to mean what it should: *this one stays put*.
+**A relative reference is relative to wherever its cell sits**, so a copied formula is
+correct by construction, which is why Numbers never needs `$` as a workaround. Locking is
+then free to mean what it should: *this one stays put*.
 
-For pybers this removes an entire class of work. There is no formula text to parse, no
-reference rewriting on move, and no regex, the defect in CLAUDE.md's bug list came from
-treating as text something the format never stored as text. What remains is a walk over
-nodes, and unrecognized node types should be carried through untouched rather than
-interpreted, since a formula is shared state that other cells depend on.
+For pybers this means the file holds no formula text to parse and nothing for a regex to
+shift. The range-shifting defect recorded in `docs/decisions.md` came from treating as
+text something the format never stored as text. What remains is a walk over nodes, and an
+unrecognized node type is carried through untouched rather than interpreted, since a
+formula is shared state that other cells depend on.
 
-**Superseded 2026-09-23 for PYB-18: a move rewrites references under one of two rules.**
-The two paragraphs above hold only for a move under `PRESERVE_RELATIVE_POSITION`, which
-rewrites nothing but a range reaching past its table, clamped to the edge, because a
-locked axis stores an index. A move under `PRESERVE_NAMED_CELL` rewrites every relative
-offset that leaves the block, and every locked index that points into it. The caller
-names one of the two, and neither is a default.
+**A move rewrites references under one of two rules**, which the caller names, and neither
+is a default. `PRESERVE_RELATIVE_POSITION` rewrites nothing but a range reaching past its
+table, clamped to the edge, because a locked axis stores an index.
+`PRESERVE_NAMED_CELL` rewrites every relative offset that leaves the block, and every
+locked index that points into it. See [structure](findings-03-structure.md).
 
 ### Cross-table references are relative offsets plus a table UUID
 
@@ -307,7 +305,8 @@ error text for anything else would mean evaluating the formula.
  1  addition            17  number literal      36  cell coordinate
  3  multiplication      19  string literal      46  broken reference (sentinels)
  4  division            31  unknown function    67  range tract
- 6  concatenation       32  unidentified, follows a call in several files
+ 6  concatenation       32  whitespace appended, see findings-08
+                        33  whitespace prepended
  7  comparison
 16  function call
 34/35  a bracketing pair around each argument of a nested call
@@ -322,9 +321,8 @@ one is derivable from these fixtures rather than from Numbers.app.
 
 Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS, 126 = ROUND**. `ROUND(2.5)`
 and `ROUND(2.5,0)` share index 126 with different `numArgs`, so arity is carried on
-the call rather than encoded in the index. These are numeric, so a name map is
-eventually needed and must be derived rather than borrowed, per the schema-ownership
-decision.
+the call rather than encoded in the index. The full name map is derived
+from Numbers itself by `tools/functions-extract.py`, rather than borrowed.
 
 **Excel's table is not that map, checked 2026-09-03.** The comparison is worth making
 because the two applications interoperate and because Excel's older binary format stores

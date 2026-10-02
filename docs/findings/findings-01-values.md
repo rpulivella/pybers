@@ -46,18 +46,20 @@ exceeded 255 columns keeps the wide form after they are deleted. `TSTables` carr
 `-[TSTTableTileStorage widenTilesForUpgrade]` and `-[TSTTableTile widenAllRowsForUpgrade]`
 and nothing that narrows one back.
 
-Both `TileRowInfo.has_wide_offsets` and `Tile.should_use_wide_rows` are set together in
-every document measured. `pybers._persistence.cells.chooseOffsetUnit` honors either alone,
-since which one is authoritative has not been established.
+The row's own `TileRowInfo.has_wide_offsets` decides what its offsets count, not the tile's
+`should_use_wide_rows`. `58-buckets-at-limit` sets the tile's flag over rows that kept byte
+offsets. See [structure](findings-03-structure.md).
 
 Record layout, as far as it is needed to read a value:
 
 ```
 byte  0      storage version (5 in every file seen)
 byte  1      value TYPE (below)
-bytes 4-7    flags bitmask, NOT decoded
-bytes 8-11   purpose unknown, NOT decoded
-bytes 12+    the value
+bytes 6-7    flags: which format layers exist, and at byte 6 0x80 a chosen format
+bytes 8-10   byte 8's low nibble names the value's width; byte 8's 0xE0 and every
+             bit of bytes 9 and 10 each add one trailing reference (below)
+bytes 12+    the value, then the trailing references
+bytes 2-5 and 11 carry nothing this reader uses
 ```
 
 ### Byte 1 is NOT simply `TST.CellType`
@@ -72,40 +74,25 @@ common types. Treat the enum as a useful guide and **not** as an exhaustive list
 further values that neither enum names. Anything reading this byte must handle an unknown
 value by preserving it rather than rejecting the cell.
 
-The table below is what has been *measured*, with the enum names attached where they match:
+Measured 2026-10-01 for PYB-141 across 73,445 records in 142 documents, with the enum names
+attached where they exist. Type 9 holds rich text, whatever `automaticCellType` suggests:
 
-| value | name | status |
-|---|---|---|
-| 0 | `genericCellType` | not seen |
-| 1 | `spanCellType` | not seen. This is how the cells *covered by a merge* are marked |
-| 2 | `numberCellType` | **decoded**, IEEE-754 decimal128, little-endian, 16 bytes |
-| 3 | `textCellType` | **decoded**, uint32 key into the `STRING` `TableDataList` |
-| 4 | `formulaCellType` | not seen |
-| 5 | `dateCellType` | **decoded**, float64 seconds since 2001-01-01 UTC |
-| 6 | `boolCellType` | **decoded**, float64, zero is false |
-| 7 | `durationCellType` | **decoded**, float64 seconds |
-| 8 | `formulaErrorCellType` | not seen |
-| 9 | `automaticCellType` | not seen |
-| 10 | *(named by neither enum)* | **decoded, currency.** Value is decimal128 at bytes 12-27, identical to a plain number |
+| value | `TST.CellType` | records | what it stores | `CellKind` |
+|---|---|---|---|---|
+| 0 | `genericCellType` | 2,230 | no value: a cell holding only a style, a format or a border | `EMPTY` |
+| 1 | `spanCellType` | 0 | not seen; a cell a merge covers has no record at all | |
+| 2 | `numberCellType` | 49,701 | IEEE-754 decimal128, little-endian, 16 bytes | `NUMBER` |
+| 3 | `textCellType` | 20,960 | uint32 key into the `STRING` `TableDataList` | `TEXT` |
+| 4 | `formulaCellType` | 0 | not seen | |
+| 5 | `dateCellType` | 370 | float64 seconds since 2001-01-01 UTC | `DATE_TIME` |
+| 6 | `boolCellType` | 12 | float64, zero is false | `BOOLEAN` |
+| 7 | `durationCellType` | 27 | float64 seconds | `DURATION` |
+| 8 | `formulaErrorCellType` | 42 | no value: a formula that failed, or one not yet calculated | `ERROR` |
+| 9 | `automaticCellType` | 80 | uint32 key into the rich-text payload list | `RICH_TEXT` |
+| 10 | *(named by neither enum)* | 23 | decimal128 at bytes 12-27, identical to a plain number | `CURRENCY` |
 
-**Superseded 2026-10-01 for PYB-141: types 0, 8 and 9 are all seen**, and type 9 holds
-rich text rather than what `automaticCellType` suggests. Across 73,445 records in 142
-documents, nine type bytes occur:
-
-| value | records | what it stores | `CellKind` |
-|---|---|---|---|
-| 0 | 2,230 | no value: a cell holding only a style, a format or a border | `EMPTY` |
-| 2 | 49,701 | a number | `NUMBER` |
-| 3 | 20,960 | a pooled string key | `TEXT` |
-| 5 | 370 | a date | `DATE_TIME` |
-| 6 | 12 | a boolean | `BOOLEAN` |
-| 7 | 27 | a duration | `DURATION` |
-| 8 | 42 | no value: a formula that failed, or one not yet calculated | `ERROR` |
-| 9 | 80 | a rich-text payload key, not "automatic" | `RICH_TEXT` |
-| 10 | 23 | a currency amount | `CURRENCY` |
-
-No document carries type 1 or 4. pybers reports any byte outside these nine as
-`UNKNOWN` and carries the record through a save unchanged.
+pybers reports any byte outside these as `UNKNOWN` and carries the record through a save
+unchanged.
 
 ## How many trailing references a record carries, and what byte 8 says about its value
 
@@ -177,22 +164,19 @@ The format types themselves: `256` number, `257` currency, `258` percent, `260` 
 `261` date, `263` checkbox, `267` star rating, `268` duration. A text format entry
 carries nothing but its `format_type`, so one can be created where a table has none.
 
-**Byte 9 bit `0x10` is the format the cell currently displays with**, as against the
+**Byte 9 bit `0x10` names the kind of format the cell displays with**, as against the
 per-kind slots above, which remember one format per kind so that switching a cell back
-restores what it had. Named on 2026-09-14 by a golden rather than by the corpus, which
-could not separate it: two text cells with identical slots read differently in Numbers,
-`Text` where this named the text format and `Automatic` where it still named the number
-format the cell had been. A plain number puts the same key in this slot and in byte 9
-`0x20`, which is why counting alone never told them apart.
+restores what it had. Its value is the position of a per-kind slot, counted from 1 in slot
+order: 1 number, 2 currency, 3 date, 4 duration, 5 text, 6 checkbox. Across 73,445 records
+in 142 documents, measured 2026-10-01, it always names a kind slot the record holds. A golden of
+2026-09-14 showed it is what the Data Format inspector reads: two text cells with
+identical slots showed `Text` with 5 here and `Automatic` with 1.
 
-**Superseded 2026-09-15: byte 9 `0x10` holds a kind, not a key.** The paragraph above
-reads it as a format key, and it is not one. Its value is the position of a per-kind
-slot, counted from 1 in slot order: 1 number, 2 currency, 3 date, 4 duration, 5 text,
-6 checkbox. In all 11,581 records the fixtures carry, it names a kind slot the record
-holds. `54-format-star-rating` settles it, because its text cell stores 5 there and no
-data list in that table holds a key 5. The reading above survived because
+**It is a kind, never a key, and the fixture that names it hides that.**
 `11-value-types-noformats` keys its number format 1 and its text format 5, the same
-numbers as the kinds. `Text` and `Automatic` in the inspector were 5 and 1.
+numbers as the kinds, so reading this slot as a format key passes there.
+`54-format-star-rating` refutes it: its text cell stores 5 and no list in that table holds
+a key 5.
 
 ### The family of the format a cell displays with
 
@@ -231,21 +215,19 @@ other record carries one, and every displayed kind names a slot the record holds
 key the format list holds. pybers reports a family it cannot follow, by kind, key or
 type, as `UNKNOWN` rather than guessing one.
 
-**Byte 6 bit `0x80` marks a format a person chose** rather than one Numbers decided.
-4515 text records leave it clear against 108 that set it, and the Data Format inspector
-reads `Automatic` without it and `Text` with it. Typing text into Numbers leaves it
-clear, which is why writing a string leaves it clear here.
+**Byte 6 bit `0x80` marks a format a person chose** rather than one Numbers decided, and
+the Data Format inspector reads `Automatic` without it and `Text` with it. Across 73,445
+records in 142 documents, measured 2026-10-01, it is set on 119 text records against
+20,841 that leave it clear, and on 13 empty records, one rich-text record and one
+currency amount. Typing text into Numbers leaves it clear, which is why writing a string
+leaves it clear here.
 
 Setting it is a deliberate act with one purpose: forcing a number to render as text, or
-stopping a formula from evaluating so its own text shows. That is a capability of its
-own rather than a side effect of writing a string, and nothing in this library offers it
-yet.
-
-**Superseded 2026-09-16 for PYB-83: `Cell.textLiteralSet` offers it**, and every read
-cell reports the bit as `Cell.formatChosen`, whatever its type. The fixtures carry it on
-271 text records, 24 empty styled ones and 3 numbers. One record pairs it with a formula,
-`A2` of the golden `18-formula-attached-and-detached`, which Numbers accepted, so the
-writer carries the bit on a formula record rather than refusing one.
+stopping a formula from evaluating so its own text shows. `Cell.textLiteralSet` does it,
+and every read cell reports the bit as `cell.description.formatChosen`, whatever its
+type. One record pairs it with a formula, `A2` of the golden
+`18-formula-attached-and-detached`, which Numbers accepted, so the writer carries the bit
+on a formula record rather than refusing one.
 
 **Pressing return does not interpret stored text, even under Automatic.** Measured
 2026-09-17 on the golden `11-text-literal-written` and on a new document made in Numbers:
@@ -319,22 +301,18 @@ string `****` and set byte 6's chosen-format bit. pybers drops the slot a retype
 which is what releases the count, and Numbers accepted that in
 `11-text-written-and-retyped`.
 
-pybers keeps an entry whose count reaches 0, as its string and formula pools do.
-`11-text-written-and-retyped` carries one: the star-rating format, after `F1` became
-text.
-
-**Superseded 2026-09-15 for PYB-89: pybers now removes it**, as Numbers does, and leaves
+**pybers removes an entry whose count reaches 0**, as Numbers does, and leaves
 `nextListID` alone. An entry whose count Numbers wrote too low can reach 0 while cells
 still name it, so the table's records are read before an entry goes, and one still named
-stays. The string and formula pools still keep theirs, which PYB-92 takes up for strings.
+stays. The string pool follows the same rule with the same guard once the save ends, so
+text written later in that save can still share an entry. A merge releases the strings,
+styles, formulas and rich text of the records it removes, and reports each removed
+formula to the calculation engine.
 
-**Superseded 2026-09-15 for PYB-92: the string pool removes a spent entry too**, by the
-same rule and with the same guard, once the save ends, so text written later in that save
-can still share it. A merge now also releases the strings, styles, formulas and rich text
-of the records it removes, and reports each removed formula to the calculation engine. A string's refcount is how many text records name it, and a style's is how often
-its key sits in byte 8 `0x20` and `0x40`, and a rich-text entry's is how many rich-text
-records name it; all three reproduce every list in the fixtures. The
-formula pool still empties rather than removes, since no fixture has measured one at 0.
+A string's refcount is how many text records name it, a style's is how often its key sits
+in byte 8 `0x20` and `0x40`, and a rich-text entry's is how many rich-text records name
+it. All three reproduce every list in the fixtures. The formula pool empties a spent
+entry rather than removing it, since no fixture has measured one at 0.
 
 ## Currency is a distinct cell type, but not a distinct value encoding
 
