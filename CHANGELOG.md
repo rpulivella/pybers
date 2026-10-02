@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-116] Give pybers a logo and an icon
 - [PYB-115] Bring the README status current for open-sourcing
 - [PYB-141] Describe each cell's stored kind in one frozen record
 - [PYB-137] Continue a series when filling a block of cells
