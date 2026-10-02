@@ -8,7 +8,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Command line
 
-Planned. A command will print a document as JSON for inspecting, diffing and scripting without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface will follow it.
+Not built yet, and first in the [planned work](#planned). A command will print any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and YAML, CSV and other conversions will follow it. A terminal interface for browsing and editing a document comes after that.
 
 ## Python library
 
@@ -39,26 +39,35 @@ Numeric values are `Decimal`, never `float`, because Numbers stores them as deci
 
 ## Capabilities
 
-Built:
+- Opening a document and saving it back, with everything pybers does not change left exactly as it was
+- Reading every cell's value, its kind (number, currency, text, date, duration and more) and its display format
+- Writing numbers and text, and formulas as the text Numbers shows
+- Adding and deleting rows and columns, with every formula and merge following
+- Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does
+- Merging and unmerging cells, and creating sheets and tables
 
-- Opening a document and saving it back, with everything pybers does not change left exactly as it was.
-- Reading every cell's value, its kind (number, currency, text, date, duration and more) and its display format.
-- Writing numbers and text, and formulas as the text Numbers shows.
-- Adding and deleting rows and columns, with every formula and merge following.
-- Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does.
-- Merging and unmerging cells, and creating sheets and tables.
+### Planned
 
-Planned:
+- A command-line app that prints a document as JSON ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), followed by YAML, CSV and other conversions, with a round trip back into Numbers wherever the other format holds enough
+- A terminal interface for browsing and editing a document
+- Any value type in any cell ([PYB-144](https://github.com/rpulivella/pybers/issues/144)), shown in any format the Data Format menu offers ([PYB-145](https://github.com/rpulivella/pybers/issues/145))
+- Cell styling: fills, padding and alignment, borders, and named cell styles ([PYB-126](https://github.com/rpulivella/pybers/issues/126), [PYB-122](https://github.com/rpulivella/pybers/issues/122), [PYB-128](https://github.com/rpulivella/pybers/issues/128))
+- Rich text: styled runs inside a cell, named paragraph styles, OpenType features, tracking and leading ([PYB-125](https://github.com/rpulivella/pybers/issues/125), [PYB-119](https://github.com/rpulivella/pybers/issues/119), [PYB-129](https://github.com/rpulivella/pybers/issues/129), [PYB-131](https://github.com/rpulivella/pybers/issues/131))
+- Table appearance: banding, gridlines and outlines ([PYB-123](https://github.com/rpulivella/pybers/issues/123))
+- Text boxes, shapes and images on a sheet ([PYB-87](https://github.com/rpulivella/pybers/issues/87))
+- The functions added to Numbers after version 15.3.1 ([PYB-139](https://github.com/rpulivella/pybers/issues/139))
+- A release on PyPI ([PYB-148](https://github.com/rpulivella/pybers/issues/148))
 
-- Writing a date, a duration or a boolean into any cell ([PYB-144](https://github.com/rpulivella/pybers/issues/144)).
-- Choosing the format a cell displays with ([PYB-145](https://github.com/rpulivella/pybers/issues/145)).
-- Cell and text styles ([PYB-8](https://github.com/rpulivella/pybers/issues/8), [PYB-125](https://github.com/rpulivella/pybers/issues/125)).
+### Not planned
 
-[`CHANGELOG.md`](CHANGELOG.md) lists the rest.
+- Charts
+- Pivot tables
+- Password-protected documents
+- Calculating formulas, which Numbers does for whatever an edit affects when it next opens the file
 
 ## Verification
 
-Every claim pybers makes about the format is measured against real `.numbers` files that label their own contents, because a misread offset in this format produces a wrong number rather than an error. Every one of those files reads and writes back unchanged, and every golden file in [`tests/golden/`](tests/golden/), each one a change pybers made, was opened and confirmed in Numbers before it became a permanent check. The measurements are written up in [`docs/findings/`](docs/findings/FINDINGS.md).
+Every claim about the format is measured against real `.numbers` files that label their own contents, because a misread offset yields a wrong number rather than an error. Each of those files reads and writes back unchanged, and every golden file in [`tests/golden/`](tests/golden/) was confirmed in Numbers before becoming a permanent check. The measurements are in [`docs/findings/`](docs/findings/FINDINGS.md).
 
 ## Contributing
 
