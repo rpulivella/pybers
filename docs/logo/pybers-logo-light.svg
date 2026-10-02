@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <title>pybers</title>
+  <defs>
+    <linearGradient id="fade-horizontal" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="0">
+      <stop offset="0" stop-color="#070604" stop-opacity="0"/>
+      <stop offset="0.243" stop-color="#070604" stop-opacity="0.75"/>
+      <stop offset="0.757" stop-color="#070604" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#070604" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade-vertical" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="64">
+      <stop offset="0" stop-color="#070604" stop-opacity="0"/>
+      <stop offset="0.349" stop-color="#070604" stop-opacity="0.75"/>
+      <stop offset="0.651" stop-color="#070604" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#070604" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g id="grid" fill="none">
+    <g id="grid-rows" stroke="url(#fade-horizontal)" stroke-width="1.6">
+      <path id="grid-row-top" d="M0 22.328 H64"/>
+      <path id="grid-row-bottom" d="M0 41.672 H64"/>
+    </g>
+    <g id="grid-columns" stroke="url(#fade-vertical)" stroke-width="1.6">
+      <path id="grid-column-left" d="M15.55 0 V64"/>
+      <path id="grid-column-right" d="M48.45 0 V64"/>
+    </g>
+  </g>
+  <g id="selection">
+    <path id="selection-ring" fill="#070604" fill-rule="evenodd" d="M14.372 20.539 H49.628 A0.611 0.611 0 0 1 50.239 21.15 V42.85 A0.611 0.611 0 0 1 49.628 43.461 H14.372 A0.611 0.611 0 0 1 13.761 42.85 V21.15 A0.611 0.611 0 0 1 14.372 20.539 Z M16.35 23.128 V40.872 H47.65 V23.128 Z"/>
+  </g>
+  <g id="prompt">
+    <path id="chevron-1" fill="#070604" d="M19.196 26.932 A0.611 0.611 0 0 0 19.081 27.788 L22.299 32 L19.081 36.212 A0.611 0.611 0 0 0 19.196 37.068 L20.282 37.898 A0.611 0.611 0 0 0 21.139 37.783 L25.273 32.371 A0.611 0.611 0 0 0 25.273 31.629 L21.139 26.217 A0.611 0.611 0 0 0 20.282 26.102 Z"/>
+    <path id="chevron-2" fill="#070604" d="M25.974 26.932 A0.611 0.611 0 0 0 25.859 27.788 L29.077 32 L25.859 36.212 A0.611 0.611 0 0 0 25.974 37.068 L27.06 37.898 A0.611 0.611 0 0 0 27.916 37.783 L32.051 32.371 A0.611 0.611 0 0 0 32.051 31.629 L27.916 26.217 A0.611 0.611 0 0 0 27.06 26.102 Z"/>
+    <path id="chevron-3" fill="#070604" d="M32.751 26.932 A0.611 0.611 0 0 0 32.637 27.788 L35.854 32 L32.637 36.212 A0.611 0.611 0 0 0 32.751 37.068 L33.837 37.898 A0.611 0.611 0 0 0 34.694 37.783 L38.829 32.371 A0.611 0.611 0 0 0 38.829 31.629 L34.694 26.217 A0.611 0.611 0 0 0 33.837 26.102 Z"/>
+  </g>
+  <g id="caret">
+    <rect id="caret-bar" x="41.672" y="26.517" width="2.589" height="10.967" rx="0.611" fill="#E19100"/>
+  </g>
+</svg>
