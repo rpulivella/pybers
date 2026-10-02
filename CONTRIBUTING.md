@@ -65,6 +65,10 @@ A ticket may take several pull requests, and the last one is not always obvious 
 - **Every body carries its closing keyword.** That keyword is what links a pull request to its ticket on GitHub, and no API can make that link any other way. A pull request that is not the last for its ticket says so on its own line beneath the keyword.
 - **Whether a merge completes the ticket is decided at merge time**, and it completes it by default. `/pr-merge` asks. When the answer is no, `pr.py merge --ticket-stays-open` merges, GitHub closes the ticket on the keyword as it always does, and the tool reopens it and restores the Status it held.
 
+## Changelog
+
+Every pull request adds one line to the top of `CHANGELOG.md`'s `## Unreleased` list, `- [PYB-<N>] <ticket title, verbatim>`, and `/changelog-add` writes it. The `readiness` check fails a pull request that has none. A final release reconciles the list against every ticket marked Done, and each version is headed `## X.Y.Z (build) - date`, as the file's own header states.
+
 ## Release tagging
 
 Releases are annotated tags on `develop`. There are no release branches.
