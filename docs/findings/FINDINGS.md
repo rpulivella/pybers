@@ -29,14 +29,12 @@ If nothing else here is read, these six change what the library has to be.
 through a Python `float` would introduce binary rounding error into a document that never had
 any, so `Cell.value` uses `Decimal`., [values](findings-01-values.md)
 
-**Formulas are a postfix AST with relative references, never text.** There is no formula
-language to parse or emit, moving a cell needs no reference rewriting, and `$` is a per-axis
-boolean rather than punctuation. The regex-based range shifting recorded as a defect in
-`CLAUDE.md` was treating structure as text., [formulas](findings-02-formulas.md)
-
-**Superseded 2026-09-23 for PYB-18: a move rewrites references under one of two rules.**
-Numbers' cut and paste rewrites nothing, and dragging a block keeps every reference on the
-cell it named, which rewrites offsets., [structure](findings-03-structure.md)
+**Formulas are a postfix AST with relative references, never text.** The file holds no
+formula text, and `$` is a per-axis boolean rather than punctuation. The regex-based range
+shifting recorded as a defect in `docs/decisions.md` was treating structure as text. A move
+rewrites references under one of two rules: Numbers' cut and paste rewrites nothing, and
+dragging a block keeps every reference on the cell it named, which rewrites offsets.
+[formulas](findings-02-formulas.md), [structure](findings-03-structure.md)
 
 **Merges are stored as formulas**, in a formula store beside the cells, and **Numbers rewrites
 them on structural edits**. Reading is safe; writing is not, a row insert that ignores the
@@ -61,26 +59,15 @@ font feature. pybers must be able to tell them apart and must never write the fa
 
 ## What is still unknown
 
-- The **flags bitmask** on a cell record gates which trailing references are present, but the
-  bit-to-field mapping is not worked out. Only the last reference is identified, as the format
-  key.
-- **Node type 32** appears after a function call in several files with no established meaning,
-  and the AST node message has 45 fields of which a handful are identified.
-- **Function indices are numeric** (168 is SUM, 62 is IF, 231 is SUMIFS) and a full name map
-  has to be derived rather than borrowed, per the schema-ownership decision in `CLAUDE.md`.
-- **Header rows, header columns and footers** are switched off in every fixture here, so the
-  default Numbers table shape is untested. `39-table-bands` covers it and is worth promoting.
-- **Whether `character_index` counts UTF-16 code units or Unicode scalars.** Apple's text stack
-  is NSString, which is UTF-16, so it is very likely code units, but the corpus contains no
-  astral-plane character, so the two are indistinguishable in every fixture read so far. Style
-  run boundaries after an emoji would drift silently. `45-unicode-text` exists to settle it.
-- **Where a supplied image is stored.** `28` exercises image fills, but only with the default
-  image Numbers provides, whose data is not in the document at all. A fixture with a real
-  image dragged in would settle it.
+- **Where a whitespace node attaches.** Node types 32 and 33 carry the spaces a person typed,
+  and postfix order and text order disagree for an operator, so the position each one
+  belongs to is not established. See [formula text](findings-08-formula-text.md).
+- **Cell types 1 and 4**, which `TST.CellType` names and no document carries.
 
 ---
 
-Type identifiers throughout are ours, read from `ArchiveInfo.message_infos`. Human-readable
-class names come from numbers-parser's `mapping.py` and are used **for
-interpretation only**, pybers has not extracted its own mapping yet, and doing so is the half
-of the bootstrap that requires executing an unsigned copy of Numbers.
+Type identifiers throughout are ours, read from `ArchiveInfo.message_infos`. The
+human-readable class names in these findings were first read from numbers-parser's
+`mapping.py`, for interpretation only. `pybers._persistence.types` carries the curated subset
+the read and write paths reach, each mapped to a class generated from the schemas pybers
+extracted itself.

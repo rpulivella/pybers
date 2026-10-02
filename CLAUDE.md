@@ -154,6 +154,9 @@ functions over explanation.
   the current patch, leave removal breadcrumbs, or comment out code.
 - Module docstrings carry a dated `UPDATES` block. No contractions anywhere.
 - Remove dead code, unused state and temporary diagnostics before finishing.
+- **An untrue statement is rewritten to the current fact**, in a doc, a finding or a
+  comment, never left under a "Superseded" note. Only an addressed item, an AC or a
+  checklist line, is struck through or marked NA, because references point at it.
 - **Prose leaving this repository passes `/standards`, both passes, and the report says
   what the judgment read found**: tickets, pull request bodies, commit messages, docs,
   docstrings, and any sentence a tool prints or posts. A script result alone is one pass.

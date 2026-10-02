@@ -1,6 +1,6 @@
 # Contributing to pybers
 
-pybers is built through an agentic harness. This guide is the single source of truth for how change flows into the repository, commits, branches, and release tags. The invisible laws of the codebase live in `CLAUDE.md`; this file is only about the git workflow.
+pybers is built through an agentic harness. This guide is the single source of truth for how change flows into the repository, commits, branches, and release tags, and for where things live. The invisible laws of the codebase live in `CLAUDE.md`.
 
 ## How a ticket is referenced
 
@@ -65,6 +65,10 @@ A ticket may take several pull requests, and the last one is not always obvious 
 - **Every body carries its closing keyword.** That keyword is what links a pull request to its ticket on GitHub, and no API can make that link any other way. A pull request that is not the last for its ticket says so on its own line beneath the keyword.
 - **Whether a merge completes the ticket is decided at merge time**, and it completes it by default. `/pr-merge` asks. When the answer is no, `pr.py merge --ticket-stays-open` merges, GitHub closes the ticket on the keyword as it always does, and the tool reopens it and restores the Status it held.
 
+## Changelog
+
+Every pull request adds one line to the top of `CHANGELOG.md`'s `## Unreleased` list, `- [PYB-<N>] <ticket title, verbatim>`, and `/changelog-add` writes it. The `readiness` check fails a pull request that has none. A final release reconciles the list against every ticket marked Done, and each version is headed `## X.Y.Z (build) - date`, as the file's own header states.
+
 ## Release tagging
 
 Releases are annotated tags on `develop`. There are no release branches.
@@ -92,3 +96,22 @@ pip install -e ".[dev]"
 pytest alone is a partial answer. The preflight runs pytest, the prose gate, ruff and mypy in one pass and reports all four. What it cannot answer is the pull request half: the template, the CHANGELOG, the branch's currency and the dependency advisories, which the readiness report adds on GitHub.
 
 Every commit leaves the test suite green. No exceptions.
+
+## Repository layout
+
+| Path | What lives here |
+| --- | --- |
+| `src/pybers/` | The library, a directory per feature with `_persistence/` and `_engine/` beneath them. `protos/` holds the extracted iWork schemas and `_generated/` the modules compiled from them. A leading underscore means a caller has no business there. |
+| `tests/` | The pytest suite, with `fixtures/` (origins), `measurements/` (one change from an origin) and `golden/` (files pybers wrote, confirmed in Numbers). Each directory's README catalogs its files. |
+| `docs/` | `decisions.md`, the settled decisions, and `findings/`, what the real files established about the format. |
+| `scripts/` | Repository tooling, including the ticket and pull request tools and the prose gate. |
+| `tools/` | The schema and function extractors, run against a local `Numbers.app`. |
+| `.claude/` | The slash commands the agentic workflow runs. |
+| `.github/` | The pull request template and the three workflows that check a pull request. |
+| `workarea/` | Ephemeral scratch, git-ignored apart from its README. |
+
+## Code and prose style
+
+**Functions, variables and parameters are camelCase**, the opposite of what most Python tooling assumes, and ruff and mypy are configured for it. Modules stay lowercase and classes PascalCase. `CLAUDE.md` carries the rest of the house style.
+
+**The prose gate lints prose.** Documentation, docstrings and comments are checked against the project's writing rules the way ruff checks code, because a wrong comment is a defect here. `scripts/standards-check.py` runs it alone.
