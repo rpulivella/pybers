@@ -2,15 +2,17 @@
 """\
 The checks behind the merge-readiness report, and the facts a branch supplies them.
 
-Split in two on purpose, because the two halves run with different trust. The
-collecting half runs on the pull request's own branch with no write access and
-writes facts to a file. The checking half runs this repository's code, reads that
-file as data, and never executes anything the branch carries.
+The facts and the checks both run in the pull request's own job, which holds no
+write access, so a branch can make its own verdict read however it likes. What it
+cannot do is reach the posting half: that half runs the default branch's code and
+reads the stored results as data only, through `readStoredResults`.
 
 Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-10-03  Stored results are read back as data and refused when malformed, for
+            PYB-151.
 2026-09-17  Written for PYB-76.
 """
 from __future__ import annotations
@@ -52,6 +54,9 @@ passed: str = "passed"
 failed: str = "failed"
 attention: str = "attention"
 skipped: str = "skipped"
+checkStatuses: frozenset[str] = frozenset({passed, failed, attention, skipped})
+# A detail past this is cut, because the posting half renders text a branch wrote.
+detailLimit: int = 2000
 
 
 @dataclass(frozen=True)
@@ -102,6 +107,35 @@ class BranchFacts:
         """
         known = {field.name for field in fields(cls)}
         return cls(**{name: value for name, value in stored.items() if name in known})
+
+
+def encodeResults(results: list[CheckResult]) -> list[dict[str, str]]:
+    """Return results as the plain dictionaries the stored file carries."""
+    return [asdict(result) for result in results]
+
+
+def readStoredResults(stored: dict[str, Any]) -> list[CheckResult]:
+    """Return the results a stored file carries, refusing any that is not one.
+
+    The file comes from the pull request's own job, so every field is checked as
+    text and every status against the four this code knows.
+    """
+    entries = stored.get("results")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("The stored report carries no check results.")
+    results = []
+    for entry in entries:
+        values = [entry.get(key) if isinstance(entry, dict) else None
+                  for key in ("name", "status", "detail")]
+        name, status, detail = (value if isinstance(value, str) else None
+                                for value in values)
+        if name is None or detail is None or status not in checkStatuses:
+            raise ValueError(
+                f"The stored report carries an entry that is not a check result: "
+                f"{entry!r:.80}"
+            )
+        results.append(CheckResult(name, str(status), detail[:detailLimit]))
+    return results
 
 
 def runGit(arguments: list[str]) -> str:

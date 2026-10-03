@@ -2,8 +2,10 @@
 # own check: a job inside preflight.yml would read as "preflight / readiness",
 # which says the preflight failed when it did not.
 #
-# It reads this branch and holds no write access. The comment it renders is
-# posted by merge-readiness.yml, which runs the default branch's code.
+# It runs this branch's code and holds no write access. It hands its results on as
+# data, and merge-readiness.yml renders and posts the comment with the default
+# branch's code. A value the branch controls reaches a `run:` step through `env:`
+# only, so a branch name is never read as shell.
 name: readiness
 
 on:
@@ -34,11 +36,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           # The facts read this branch's log and its diff against the base, and a
-          # shallow checkout carries neither.
+          # full checkout fetches every branch, the base included.
           fetch-depth: 0
-
-      - name: Fetch the base branch the facts compare against
-        run: git fetch --no-tags origin ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
 
       - uses: actions/setup-python@v6
         with:
@@ -50,12 +50,17 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Collect this branch's facts
+        env:
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           python scripts/merge-readiness.py collect \
-            --pull-request ${{ github.event.pull_request.number }} \
-            --base origin/${{ github.event.pull_request.base.ref }} \
-            --branch ${{ github.event.pull_request.head.ref }} \
-            --head-sha ${{ github.event.pull_request.head.sha }} \
+            --pull-request "$PULL_REQUEST" \
+            --base "origin/$BASE_REF" \
+            --branch "$HEAD_REF" \
+            --head-sha "$HEAD_SHA" \
             --output merge-readiness.json
 
       - name: Check merge readiness
@@ -66,13 +71,12 @@ jobs:
           python scripts/merge-readiness.py check \
             --results merge-readiness.json --comment merge-readiness.md
 
-      - name: Hand the report to the posting half
-        # Always, because a red report is the one most worth posting.
+      - name: Hand the results to the posting half
+        # Always, because a red report is the one most worth posting. Data only: the
+        # posting half renders the comment itself.
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: merge-readiness
-          path: |
-            merge-readiness.json
-            merge-readiness.md
+          path: merge-readiness.json
           retention-days: 1
