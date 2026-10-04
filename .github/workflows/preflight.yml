@@ -32,6 +32,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Nothing after checkout needs the token, so no step of a pull request's
+          # code can read it from the repository's git configuration.
+          persist-credentials: false
 
       - uses: actions/setup-python@v6
         with:

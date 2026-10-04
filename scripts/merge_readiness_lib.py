@@ -2,15 +2,18 @@
 """\
 The checks behind the merge-readiness report, and the facts a branch supplies them.
 
-Split in two on purpose, because the two halves run with different trust. The
-collecting half runs on the pull request's own branch with no write access and
-writes facts to a file. The checking half runs this repository's code, reads that
-file as data, and never executes anything the branch carries.
+The facts and the checks both run in the pull request's own job, which holds no
+write access, so a branch can make its own verdict read however it likes. What it
+cannot do is reach the posting half: that half runs the default branch's code and
+reads the stored results as data only, through `readStoredResults`.
 
 Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-10-03  Stored results are read back as data and refused when malformed, and a
+            ticket disagrees only with a CHANGELOG line the branch added, for
+            PYB-151.
 2026-09-17  Written for PYB-76.
 """
 from __future__ import annotations
@@ -52,6 +55,9 @@ passed: str = "passed"
 failed: str = "failed"
 attention: str = "attention"
 skipped: str = "skipped"
+checkStatuses: frozenset[str] = frozenset({passed, failed, attention, skipped})
+# A detail past this is cut, because the posting half renders text a branch wrote.
+detailLimit: int = 2000
 
 
 @dataclass(frozen=True)
@@ -80,6 +86,7 @@ class BranchFacts:
     headSha: str = ""
     pullRequest: int = 0
     changelogTickets: list[str] = field(default_factory=list)
+    changelogTicketsAdded: list[str] = field(default_factory=list)
     commitSubjects: list[str] = field(default_factory=list)
     goldensTouched: list[str] = field(default_factory=list)
     goldensConfirmed: list[str] = field(default_factory=list)
@@ -102,6 +109,35 @@ class BranchFacts:
         """
         known = {field.name for field in fields(cls)}
         return cls(**{name: value for name, value in stored.items() if name in known})
+
+
+def encodeResults(results: list[CheckResult]) -> list[dict[str, str]]:
+    """Return results as the plain dictionaries the stored file carries."""
+    return [asdict(result) for result in results]
+
+
+def readStoredResults(stored: dict[str, Any]) -> list[CheckResult]:
+    """Return the results a stored file carries, refusing any that is not one.
+
+    The file comes from the pull request's own job, so every field is checked as
+    text and every status against the four this code knows.
+    """
+    entries = stored.get("results")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("The stored report carries no check results.")
+    results = []
+    for entry in entries:
+        values = [entry.get(key) if isinstance(entry, dict) else None
+                  for key in ("name", "status", "detail")]
+        name, status, detail = (value if isinstance(value, str) else None
+                                for value in values)
+        if name is None or detail is None or status not in checkStatuses:
+            raise ValueError(
+                f"The stored report carries an entry that is not a check result: "
+                f"{entry!r:.80}"
+            )
+        results.append(CheckResult(name, str(status), detail[:detailLimit]))
+    return results
 
 
 def runGit(arguments: list[str]) -> str:
@@ -145,6 +181,12 @@ def readChangelogTickets() -> list[str]:
     return re.findall(r"^- \[[A-Z]{3}-(\d+)\]", section, re.MULTILINE)
 
 
+def readChangelogTicketsAdded(base: str) -> list[str]:
+    """Return every ticket key in a CHANGELOG line this branch added."""
+    diff = runGit(["diff", f"{base}...HEAD", "--", str(changelogPath)])
+    return re.findall(r"^\+- \[[A-Z]{3}-(\d+)\]", diff, re.MULTILINE)
+
+
 def readGoldenConfirmations() -> set[str]:
     """Return every golden the goldens README records a confirmation date for."""
     text = goldenReadmePath.read_text()
@@ -172,6 +214,7 @@ def collectBranchFacts(
         headSha=headSha or runGit(["rev-parse", "HEAD"]),
         pullRequest=pullRequest,
         changelogTickets=readChangelogTickets(),
+        changelogTicketsAdded=readChangelogTicketsAdded(base),
         commitSubjects=runGit(["log", f"{base}..HEAD", "--format=%s"]).splitlines(),
     )
     confirmed = readGoldenConfirmations()
@@ -255,10 +298,12 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     if strangers:
         named = formatList([f"PYB-{number}" for number in strangers])
         disagreeing.append(f"the commits name {named}")
-    # An absent entry belongs to the Changelog check, so only a different one disagrees.
-    others = sorted(set(facts.changelogTickets) - {facts.ticket})
-    if others and facts.ticket not in facts.changelogTickets:
-        disagreeing.append(f"the Unreleased list names PYB-{others[0]}")
+    # Only a line this branch added can disagree: the list accumulates every other
+    # ticket, and an absent entry belongs to the Changelog check.
+    others = sorted(set(facts.changelogTicketsAdded) - {facts.ticket})
+    if others:
+        named = formatList([f"PYB-{number}" for number in others])
+        disagreeing.append(f"this branch adds a CHANGELOG line for {named}")
     titleMatch = re.match(r"^\[[A-Z]{3}-(\d+)\]", title)
     if titleMatch is None:
         disagreeing.append("the title names no ticket")

@@ -1,6 +1,9 @@
 # The posting half of PYB-76, and the only automation in this repository that
-# writes. A workflow reached by `workflow_run` checks out the default branch, so
-# this runs no branch code, and what the branch produced arrives as an artifact.
+# writes. A workflow reached by `workflow_run` checks out the default branch, and
+# what the branch produced arrives as an artifact, which a fork can fill with
+# anything. So it is unpacked outside the checkout and read as data only: the
+# comment is rendered here, and posted only to the pull request whose head is the
+# commit the run checked.
 #
 # readiness.yml decides the verdict, and Actions reports that workflow as its own
 # check. Nothing here decides anything.
@@ -23,6 +26,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v6
         with:
@@ -38,6 +43,9 @@ jobs:
         continue-on-error: true
         with:
           name: merge-readiness
+          # Outside the checkout, so nothing in it can stand in for this
+          # repository's own code.
+          path: ${{ runner.temp }}/readiness
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -47,6 +55,8 @@ jobs:
         if: steps.rendered.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           python scripts/merge-readiness.py report \
-            --results merge-readiness.json --comment merge-readiness.md
+            --results "$RUNNER_TEMP/readiness/merge-readiness.json" \
+            --head-sha "$HEAD_SHA"
