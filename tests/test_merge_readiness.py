@@ -121,6 +121,31 @@ def testOneTicketNumberThroughoutAgrees() -> None:
     assert result.status == checks.passed
 
 
+def testABranchAddingNoChangelogLineAgreesWhateverTheListAlreadyHolds() -> None:
+    facts = buildFacts(
+        commitSubjects=["[76] fix: a thing"],
+        changelogTickets=["116", "109", "94"],
+        changelogTicketsAdded=[],
+    )
+
+    result = checks.checkTicketAgreement(facts, "[PYB-76] A thing")
+
+    assert result.status == checks.passed
+
+
+def testABranchAddingAnotherTicketsChangelogLineDisagrees() -> None:
+    facts = buildFacts(
+        commitSubjects=["[76] fix: a thing"],
+        changelogTickets=["94", "76"],
+        changelogTicketsAdded=["94", "76"],
+    )
+
+    result = checks.checkTicketAgreement(facts, "[PYB-76] A thing")
+
+    assert result.status == checks.failed
+    assert "adds a CHANGELOG line for PYB-94" in result.detail
+
+
 def testACommitNamingAnotherTicketDisagrees() -> None:
     facts = buildFacts(commitSubjects=["[76] feat: a thing", "[94] fix: elsewhere"])
 

@@ -11,7 +11,8 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
-2026-10-03  Stored results are read back as data and refused when malformed, for
+2026-10-03  Stored results are read back as data and refused when malformed, and a
+            ticket disagrees only with a CHANGELOG line the branch added, for
             PYB-151.
 2026-09-17  Written for PYB-76.
 """
@@ -85,6 +86,7 @@ class BranchFacts:
     headSha: str = ""
     pullRequest: int = 0
     changelogTickets: list[str] = field(default_factory=list)
+    changelogTicketsAdded: list[str] = field(default_factory=list)
     commitSubjects: list[str] = field(default_factory=list)
     goldensTouched: list[str] = field(default_factory=list)
     goldensConfirmed: list[str] = field(default_factory=list)
@@ -179,6 +181,12 @@ def readChangelogTickets() -> list[str]:
     return re.findall(r"^- \[[A-Z]{3}-(\d+)\]", section, re.MULTILINE)
 
 
+def readChangelogTicketsAdded(base: str) -> list[str]:
+    """Return every ticket key in a CHANGELOG line this branch added."""
+    diff = runGit(["diff", f"{base}...HEAD", "--", str(changelogPath)])
+    return re.findall(r"^\+- \[[A-Z]{3}-(\d+)\]", diff, re.MULTILINE)
+
+
 def readGoldenConfirmations() -> set[str]:
     """Return every golden the goldens README records a confirmation date for."""
     text = goldenReadmePath.read_text()
@@ -206,6 +214,7 @@ def collectBranchFacts(
         headSha=headSha or runGit(["rev-parse", "HEAD"]),
         pullRequest=pullRequest,
         changelogTickets=readChangelogTickets(),
+        changelogTicketsAdded=readChangelogTicketsAdded(base),
         commitSubjects=runGit(["log", f"{base}..HEAD", "--format=%s"]).splitlines(),
     )
     confirmed = readGoldenConfirmations()
@@ -289,10 +298,12 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     if strangers:
         named = formatList([f"PYB-{number}" for number in strangers])
         disagreeing.append(f"the commits name {named}")
-    # An absent entry belongs to the Changelog check, so only a different one disagrees.
-    others = sorted(set(facts.changelogTickets) - {facts.ticket})
-    if others and facts.ticket not in facts.changelogTickets:
-        disagreeing.append(f"the Unreleased list names PYB-{others[0]}")
+    # Only a line this branch added can disagree: the list accumulates every other
+    # ticket, and an absent entry belongs to the Changelog check.
+    others = sorted(set(facts.changelogTicketsAdded) - {facts.ticket})
+    if others:
+        named = formatList([f"PYB-{number}" for number in others])
+        disagreeing.append(f"this branch adds a CHANGELOG line for {named}")
     titleMatch = re.match(r"^\[[A-Z]{3}-(\d+)\]", title)
     if titleMatch is None:
         disagreeing.append("the title names no ticket")
