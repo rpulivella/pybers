@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-151] Keep fork pull requests from running code with our token
 - [PYB-116] Give pybers a logo and an icon
 - [PYB-115] Bring the README status current for open-sourcing
 - [PYB-141] Describe each cell's stored kind in one frozen record
