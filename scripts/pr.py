@@ -31,6 +31,7 @@ Usage:
     python3 scripts/pr.py export-as-source 8 --body
     python3 scripts/pr.py export-as-source 8 --title
     python3 scripts/pr.py ready 8
+    python3 scripts/pr.py rerun 8
     python3 scripts/pr.py merge 8 --subject "[14] feat: add a thing"
     python3 scripts/pr.py merge 8 --subject "..." --delete-branch
 
@@ -38,6 +39,8 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-10-05  Added `rerun`, which restarts a pull request's canceled or failed workflow
+            runs, after a runner outage canceled both checks on PR #167, for PYB-153.
 2026-10-04  A merge deletes its head branch only with `--delete-branch`, which
             replaces `--keep-branch`, and only when that branch lives in this
             repository, so a fork's branch name never costs this repository a
@@ -97,6 +100,7 @@ import re
 import sys
 import time
 import urllib.parse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -198,6 +202,11 @@ checksNotPassedMarker: str = "checks-not-passed"
 # failure would leave every promoted pull request permanently red.
 passingConclusions: frozenset[str] = frozenset({"success", "skipped"})
 
+# A workflow run's conclusion that a re-run can change. GitHub spells it `cancelled`.
+rerunConclusions: frozenset[str] = frozenset(
+    {"cancelled", "failure", "timed_out", "startup_failure"}
+)
+
 
 class PullRequestSummary(TypedDict):
     """An open or merged pull request, as the skills need to see it."""
@@ -220,6 +229,15 @@ class CheckRun(TypedDict):
 
     name: str
     status: str
+    conclusion: str
+
+
+@dataclass(frozen=True)
+class WorkflowRun:
+    """One workflow run on a commit, reduced to what a re-run decision needs."""
+
+    runId: int
+    name: str
     conclusion: str
 
 
@@ -433,6 +451,35 @@ def chooseLatestRuns(runs: list[dict[str, Any]]) -> list[CheckRun]:
             conclusion=run.get("conclusion") or "",
         )
     return list(latest.values())
+
+
+def readWorkflowRuns(token: str, sha: str) -> list[WorkflowRun]:
+    """Return the newest workflow run per workflow on one commit.
+
+    Newest only, because a promoted pull request keeps its skipped draft run, and a
+    re-run supersedes the run it restarted.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+        f"{ticket.repositoryName}/actions/runs?head_sha={sha}&per_page=100"
+    )
+    payload = ticket.requestJson(url, token, apiVersion="2022-11-28")
+    latest: dict[str, WorkflowRun] = {}
+    runs = payload.get("workflow_runs", [])
+    for run in sorted(runs, key=lambda run: str(run.get("created_at") or "")):
+        latest[run["name"]] = WorkflowRun(
+            runId=run["id"], name=run["name"], conclusion=run.get("conclusion") or ""
+        )
+    return list(latest.values())
+
+
+def restartWorkflowRun(token: str, runId: int) -> None:
+    """Re-run every job of one workflow run."""
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+        f"{ticket.repositoryName}/actions/runs/{runId}/rerun"
+    )
+    ticket.requestJson(url, token, method="POST", apiVersion="2022-11-28")
 
 
 def confirmChecksPassed(runs: list[CheckRun]) -> bool:
@@ -1036,6 +1083,40 @@ def runReady(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def runRerun(arguments: argparse.Namespace) -> int:
+    """Restart every canceled or failed workflow run on a pull request's head commit."""
+    token = ticket.resolveToken()
+    summary = readPullRequest(token, arguments.number)
+    commit = summary["headSha"][:12]
+    stale = [
+        run for run in readWorkflowRuns(token, summary["headSha"])
+        if run.conclusion in rerunConclusions
+    ]
+
+    if not stale:
+        console.print(
+            f"[yellow]Nothing to re-run[/] on {commit}: no workflow run there was "
+            "canceled or failed."
+        )
+        return 0
+
+    if arguments.dryRun:
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
+        for run in stale:
+            console.print(
+                f"would restart [bold]{escape(run.name)}[/]  {run.conclusion}"
+            )
+        return 0
+
+    for run in stale:
+        try:
+            restartWorkflowRun(token, run.runId)
+        except ticket.GitHubHttpError as exc:
+            raise RuntimeError(f"Could not restart {run.name}: {exc}") from exc
+        console.print(f"[green]Restarted[/] [bold]{escape(run.name)}[/] on {commit}")
+    return 0
+
+
 def readTicketFromSubject(subject: str) -> int | None:
     """Return the ticket number a merge subject carries, in the house `[34]` form."""
     matched = re.match(r"^\[(\d+)\]", subject)
@@ -1351,6 +1432,13 @@ def buildParser() -> argparse.ArgumentParser:
     )
     checksParser.add_argument("number", type=parsePullRequestNumber)
     checksParser.set_defaults(handler=runChecks)
+
+    rerunParser = subparsers.add_parser(
+        "rerun", help="restart a pull request's canceled or failed workflow runs"
+    )
+    rerunParser.add_argument("number", type=parsePullRequestNumber)
+    rerunParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    rerunParser.set_defaults(handler=runRerun)
 
     readyParser = subparsers.add_parser("ready", help="take a draft out of draft")
     readyParser.add_argument("number", type=parsePullRequestNumber)
