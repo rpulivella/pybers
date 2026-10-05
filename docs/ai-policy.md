@@ -4,7 +4,7 @@ Using an AI tool to write code, tests or prose for pybers is permitted. This rep
 
 ## Ownership
 
-You are answerable for every line in your pull request, whatever produced it. A maintainer reviews the contribution, never the tool behind it, and a defect is yours to explain and fix whether you typed it or an agent did. This includes anything in that pull request be it code, tooling, imagery, prose, comments, workflows, anything. You also answer for every ticket and comment you post, however it was produced.
+You are answerable for every line in your pull request, whatever produced it. A maintainer reviews the contribution, never the tool behind it, and a defect is yours to explain and fix whether you typed it or an agent did. This includes anything in that pull request, be it code, tooling, imagery, prose, comments, workflows, anything. You also answer for every ticket and comment you post, however it was produced.
 
 ## Disclosure
 
