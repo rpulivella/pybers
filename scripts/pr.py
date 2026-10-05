@@ -4,8 +4,9 @@ pybers pull request tool
 
 The single sanctioned path to GitHub pull requests. `/pr-draft` and
 `/pr-review-code` call this rather than `gh`, so that the workflow's invariants,
-a PR is always opened as a draft, the merge commit carries the house subject, the
-branch is deleted on merge, hold in exactly one place.
+a PR is always opened as a draft and the merge commit carries the house subject,
+hold in exactly one place. A merge deletes no branch unless asked to, and never one
+a fork's pull request merely shares a name with.
 
 **This tool exists to replace `gh`.** `gh` resolves its own identity from an OAuth
 token in the system keyring, which can hold several accounts at once, so the
@@ -31,12 +32,16 @@ Usage:
     python3 scripts/pr.py export-as-source 8 --title
     python3 scripts/pr.py ready 8
     python3 scripts/pr.py merge 8 --subject "[14] feat: add a thing"
-    python3 scripts/pr.py merge 8 --subject "..." --keep-branch
+    python3 scripts/pr.py merge 8 --subject "..." --delete-branch
 
 Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-10-04  A merge deletes its head branch only with `--delete-branch`, which
+            replaces `--keep-branch`, and only when that branch lives in this
+            repository, so a fork's branch name never costs this repository a
+            branch, for PYB-152.
 2026-09-25  Bodies post and export through `ticket.py`'s shared handling, for
             PYB-134.
 2026-09-01  Added `export-as-source`, matching ticket.py's command of the same name
@@ -203,6 +208,8 @@ class PullRequestSummary(TypedDict):
     state: str
     isDraft: bool
     head: str
+    # The repository the head branch lives in, empty once a fork is deleted.
+    headRepository: str
     headSha: str
     base: str
     nodeId: str
@@ -251,10 +258,27 @@ def summarizePullRequest(payload: dict[str, Any]) -> PullRequestSummary:
         state=payload["state"],
         isDraft=bool(payload.get("draft", False)),
         head=payload["head"]["ref"],
+        headRepository=(payload["head"].get("repo") or {}).get("full_name", ""),
         headSha=payload["head"]["sha"],
         base=payload["base"]["ref"],
         nodeId=payload["node_id"],
     )
+
+
+def checkHeadIsOurs(summary: PullRequestSummary) -> bool:
+    """Return whether a pull request's head branch lives in this repository.
+
+    A fork's branch can carry any name, one of ours included, so its name alone
+    never decides what a merge deletes here.
+    """
+    ours = f"{ticket.repositoryOwner}/{ticket.repositoryName}"
+    return summary["headRepository"].lower() == ours.lower()
+
+
+def formatForkBranch(summary: PullRequestSummary) -> str:
+    """Say whose a fork's head branch is, which a merge here never deletes."""
+    owner = summary["headRepository"] or "a fork since deleted"
+    return f"{summary['head']} belongs to {owner}, so it is the fork's to remove"
 
 
 def assertBranchIsPushed(token: str, branch: str) -> None:
@@ -1071,7 +1095,7 @@ def reopenTicketAfterMerge(token: str, subject: str, status: str) -> bool:
 
 
 def runMerge(arguments: argparse.Namespace) -> int:
-    """Merge a pull request and delete its branch."""
+    """Merge a pull request, deleting its branch only when asked and only if ours."""
     if arguments.method not in validMergeMethods:
         console.print(f"[red]Unknown merge method {arguments.method!r}.[/]")
         console.print(f"Choose one of: {', '.join(validMergeMethods)}")
@@ -1102,9 +1126,11 @@ def runMerge(arguments: argparse.Namespace) -> int:
         console.print(
             "branch:  "
             + (
-                "[dim]kept[/]"
-                if arguments.keepBranch
+                "[dim]kept[/] (`--delete-branch` deletes it)"
+                if not arguments.removeBranch
                 else f"would delete {summary['head']}"
+                if checkHeadIsOurs(summary)
+                else f"deletes nothing: {escape(formatForkBranch(summary))}"
             )
         )
         number = readTicketFromSubject(arguments.subject)
@@ -1155,7 +1181,14 @@ def runMerge(arguments: argparse.Namespace) -> int:
     ):
         return partialSuccessExitCode
 
-    if arguments.keepBranch:
+    if not arguments.removeBranch:
+        console.print(f"[dim]Kept branch[/] {escape(summary['head'])}")
+        return 0
+
+    if not checkHeadIsOurs(summary):
+        console.print(
+            f"[green]Deleted nothing:[/] {escape(formatForkBranch(summary))}"
+        )
         return 0
 
     # The merge is irreversible and the delete is a second call, so a failure here
@@ -1338,10 +1371,10 @@ def buildParser() -> argparse.ArgumentParser:
         help="merge keeps every commit (the default); squash collapses them to one",
     )
     mergeParser.add_argument(
-        "--keep-branch",
-        dest="keepBranch",
+        "--delete-branch",
+        dest="removeBranch",
         action="store_true",
-        help="leave the source branch in place instead of deleting it",
+        help="delete the source branch once merged, when it lives in this repository",
     )
     mergeParser.add_argument(
         "--ticket-stays-open",
