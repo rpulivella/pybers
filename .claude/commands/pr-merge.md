@@ -28,8 +28,8 @@ trigger sitting on it.
    required exactly so that GitHub's generated default never lands.
 4. **Merge, completing the ticket unless the work was planned across pull requests.**
    ```
-   .venv/bin/python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>"
-   .venv/bin/python3 scripts/pr.py merge <N> --subject "..." --ticket-stays-open
+   .venv/bin/python3 scripts/pr.py merge <N> --subject "[<N>] <prefix>: <summary>" --delete-branch
+   .venv/bin/python3 scripts/pr.py merge <N> --subject "..." --delete-branch --ticket-stays-open
    ```
    **A merge completes its ticket**, and the first form is the ordinary one. The second
    is for exactly two cases, both decided before the merge: the work was split across
@@ -39,7 +39,9 @@ trigger sitting on it.
    body's closing keyword still closes the ticket, because that keyword is what links a
    pull request to its ticket, and the tool then reopens it and restores the Status it
    held.
-   The source branch is deleted unless `--keep-branch` is passed. `pr.py` refuses a draft,
+   `--delete-branch` deletes the source branch once merged, and only when it lives in
+   this repository: a fork's branch is the fork's to remove, whatever its name. The
+   tool deletes nothing without the flag, so this skill always passes it. `pr.py` refuses a draft,
    so a pull request that never went through `/pr-review-code` cannot arrive here, and it
    refuses any CI state other than passed, including a state it could not read. Neither
    refusal is restated as a step here, because a check a skill performs is a check a
