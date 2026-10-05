@@ -119,7 +119,8 @@ into `workarea/session-tasks.md`.
 
 ## Moving the card afterward
 
-The tool is the only sanctioned path. Never hand-run the GitHub API.
+The tool is the only sanctioned path. Never hand-run the GitHub API without the user's
+permission.
 
 ```
 .venv/bin/python3 scripts/ticket.py close <N> --reason not-planned   # abandoned; Status -> Done, closed unplanned

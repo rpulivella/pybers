@@ -112,6 +112,6 @@ means fetching the current body, changing part of it, and writing the whole thin
   applies; see the Status gate above.
 - Never use `[ ]` checkbox syntax in the ACs, numbered lists only.
 - One label per issue.
-- Never hand-run the GitHub API outside `scripts/ticket.py`.
+- Never hand-run the GitHub API outside `scripts/ticket.py` without the user's permission.
 
 $ARGUMENTS
