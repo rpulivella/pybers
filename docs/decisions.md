@@ -139,6 +139,30 @@ The name leads with `pybers` so later styles sort beside it, and carries no lead
 
 ---
 
+## Dependabot advises and opens no pull request, decided 2026-10-05
+
+Dependabot alerts report an advisory against a dependency `pyproject.toml` declares, or
+against an action a workflow uses, and each alert reaches a maintainer by email.
+Dependabot opens no pull request of either kind, a version update or a security update.
+
+A version update has almost nothing to raise. `pyproject.toml` declares floors and the
+repository holds no lockfile, so a new release already satisfies every requirement
+without an edit. Security updates are off because each would arrive as a pull request
+with no ticket, no template body and no CHANGELOG entry, which every other change
+carries and the `readiness` check expects.
+
+The per-pull-request scan PYB-76 landed already reports an advisory against the resolved
+environment in the `readiness` comment, so alerts cover the time between pull requests.
+An action that falls behind with no advisory against it goes unreported, which costs
+nothing while it carries no vulnerability.
+
+No rule auto-dismisses an alert, because the dev dependencies run in CI with the
+repository's token and an alert nobody reads defeats advising. Automatic dependency
+submission stays off: it spends Actions minutes to find the indirect dependencies, which
+the per-pull-request scan already resolves.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

@@ -77,6 +77,8 @@ Nothing runs on a draft. Once a pull request leaves draft, GitHub shows two chec
 
 A red `readiness` leaves `preflight` green, and `pr.py merge` refuses while either is red. A third workflow posts the report as one comment, replaced on every run. **Green means a person can now test the change, never that it is ready to merge.**
 
+Dependabot advises only. It emails a maintainer when an advisory affects a declared dependency or a workflow action, it opens no pull request, and a maintainer acts on the alert by filing a ticket.
+
 ## One ticket, more than one pull request
 
 A ticket may take several pull requests, and the last one is not always obvious when the first opens. Two rules keep that honest:
