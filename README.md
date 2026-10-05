@@ -78,6 +78,8 @@ Every claim about the format is measured against real `.numbers` files that labe
 
 [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the setup, the four gates every pull request passes, the workflow and the repository layout.
 
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Credits
 
 pybers stands on [`numbers-parser`](https://github.com/masaccio/numbers-parser) by [masaccio](https://github.com/masaccio), which reverse-engineered Apple's undocumented archive format from nothing. No code from it is used here, and [`NOTICE`](NOTICE) records the debt.
