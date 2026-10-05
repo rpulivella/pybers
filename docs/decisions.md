@@ -147,10 +147,9 @@ Dependabot opens no pull request of either kind, a version update or a security 
 
 A version update has almost nothing to raise. `pyproject.toml` declares floors and the
 repository holds no lockfile, so a new release already satisfies every requirement
-without an edit. A security update arrives as a pull request with no ticket, no template
-body and no CHANGELOG entry, which every other change carries and the `readiness` check
-expects. Teaching the checks an exception for one bot costs more than a maintainer filing
-a ticket from the alert, and keeps every change under a ticket.
+without an edit. Security updates are off because each would arrive as a pull request
+with no ticket, no template body and no CHANGELOG entry, which every other change
+carries and the `readiness` check expects.
 
 The per-pull-request scan PYB-76 landed already reports an advisory against the resolved
 environment in the `readiness` comment, so alerts cover the time between pull requests.
