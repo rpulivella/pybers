@@ -6,6 +6,10 @@ Everyone taking part, in any space of this repository, follows the [code of cond
 
 A contribution written with an AI tool is held to the [AI policy](docs/ai-policy.md).
 
+## Who contributes
+
+Write access is held by collaborators. The project draws no line between a collaborator and a maintainer, and uses the one term, maintainer. At present, only a maintainer may open a pull request, and anyone else contributes by filing an issue.
+
 ## How a ticket is referenced
 
 Tickets are written `PYB-34` in prose and pull requests `PR #38`, never a bare number and never a bare `#`. Commit subjects are the exception and keep the bare `[34]`, as does `Closes #34`, which GitHub parses in no other form. The key is declared once in `pyproject.toml` under `[tool.pybers]`.
@@ -35,9 +39,20 @@ per ticket:  <type>/<id>-verbose-slug  ->  PR into develop  ->  delete branch
 release:     annotated tag on develop  ->  CI build
 ```
 
-- **`develop`** stays green. Every ticket merges here through a pull request, and the only thing that lands directly is the occasional `[hotfix]`, to a doc for example.
+- **`develop`** stays green. Every ticket merges here through a pull request, and the only thing that lands directly is the occasional `[hotfix]`, to a doc for example, which an administrator pushes past the rules below.
 - **`type`** is mapped from the ticket's label rather than copied from it, because two of the six read badly as a branch prefix: `feat` becomes `feature` and `fix` becomes `bugfix`, while `perf`, `refactor`, `docs` and `chore` are already their own prefix. Those six are the closed set.
 - **The branch prefix and the commit prefix are two different axes.** A branch carries one `type` for the life of the ticket; the commits inside it each carry whichever Conventional prefix describes that commit. A `feature/12-...` branch normally holds several `feat:` commits and then `docs:`, `fix:` and `refactor:` as the work turns.
+
+## What `develop` enforces
+
+GitHub holds `develop` to these rules, which a reader without access to the repository settings cannot otherwise see:
+
+- No direct push
+- A pull request for every change
+- The `preflight` and `readiness` checks passing before a merge
+- No approving review required
+- No requirement to be up to date with `develop`, which the `readiness` report flags instead
+- An administrator able to bypass every rule above
 
 ## What review-ready means
 
