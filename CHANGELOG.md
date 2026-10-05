@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-106] Say what this project expects of a contributor using AI
 - [PYB-107] Publish a code of conduct and say how it is enforced
 - [PYB-152] Merge a fork's pull request without deleting our branch
 - [PYB-151] Keep fork pull requests from running code with our token

@@ -80,6 +80,8 @@ Every claim about the format is measured against real `.numbers` files that labe
 
 Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
+Contributing with an AI tool is welcome under the [AI policy](docs/ai-policy.md).
+
 ## Credits
 
 pybers stands on [`numbers-parser`](https://github.com/masaccio/numbers-parser) by [masaccio](https://github.com/masaccio), which reverse-engineered Apple's undocumented archive format from nothing. No code from it is used here, and [`NOTICE`](NOTICE) records the debt.
