@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-33] Configure Dependabot to advise on vulnerabilities
 - [PYB-108] Decide the contribution model and record the develop rules
 - [PYB-106] Say what this project expects of a contributor using AI
 - [PYB-107] Publish a code of conduct and say how it is enforced
