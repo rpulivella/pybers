@@ -4,6 +4,8 @@ pybers is built through an agentic harness. This guide is the single source of t
 
 Everyone taking part, in any space of this repository, follows the [code of conduct](CODE_OF_CONDUCT.md).
 
+A contribution written with an AI tool is held to the [AI policy](docs/ai-policy.md).
+
 ## How a ticket is referenced
 
 Tickets are written `PYB-34` in prose and pull requests `PR #38`, never a bare number and never a bare `#`. Commit subjects are the exception and keep the bare `[34]`, as does `Closes #34`, which GitHub parses in no other form. The key is declared once in `pyproject.toml` under `[tool.pybers]`.
