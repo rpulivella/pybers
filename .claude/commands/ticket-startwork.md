@@ -58,8 +58,8 @@ into `workarea/session-tasks.md`.
 6. **Update `workarea/session-tasks.md` for the new ticket.** This file is the **literal
    replacement** for the removed Claude Code Task/Todo tool. Same purpose, same shape, only
    externalized to a text file so it survives `/clear` and window swaps. It holds what is active
-   now and the queue of tickets that follows it. Tickets hold the full scope of work; this file is the
-   current-moment slice.
+   now and the queue of tickets that follows it. Tickets hold the full scope of work; this file
+   is the current-moment slice.
 
    Read the current `workarea/session-tasks.md` (if it does not exist, treat it as empty). Then
    decide what carries forward into the new ticket's work:
