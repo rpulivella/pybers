@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-155] Correct stale references and state Apple non-affiliation
 - [PYB-154] Give issues templates for a bug, a request and a question
 - [PYB-153] Say how to report a vulnerability privately
 - [PYB-33] Configure Dependabot to advise on vulnerabilities
