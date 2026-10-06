@@ -70,9 +70,8 @@ going open source and a rewrite is cheap now and impossible later.
 
 **What it was actually used for was one lookup table.** Every decode in this project needs
 `typeId` -> archive class name, and that came from numbers-parser's generated `mapping.py`.
-That table is now extracted to **`workarea/archive-type-map.json`** (581 entries), which is
-git-ignored, read only by the `workarea/` audit tools, and never imported by anything under
-`src/`. Nothing else in the checkout was in use.
+That table was extracted into a local file (581 entries) that is git-ignored, read only by
+local audit tools, and never imported by anything under `src/`. Nothing else in the checkout was in use.
 
 If that table is ever lost, regenerate it from
 [`numbers-parser`](https://github.com/masaccio/numbers-parser), which is where it

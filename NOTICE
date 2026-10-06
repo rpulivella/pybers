@@ -13,6 +13,6 @@ compiles the protobuf descriptors into Numbers.app, and it provided the dumper t
 recovers them.
 
 pybers includes no numbers-parser source code. Its protobuf schemas are extracted
-independently from a local copy of Numbers.app by scripts/protos-extract.py, and its
+independently from a local copy of Numbers.app by tools/protos-extract.py, and its
 object model and archive layer are separate implementations. This acknowledgment
 credits the technique.
