@@ -14,4 +14,7 @@ body:
     attributes:
       label: Code
       description: Optional. What you have tried so far.
+      placeholder: |
+        document = pybers.open("budget.numbers")
+        print(document.sheet("Summary").table("Costs").cell("B4").value)
       render: python

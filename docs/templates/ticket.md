@@ -7,7 +7,7 @@ punctuation. It becomes the branch name, the pull request title and the CHANGELO
 Label: exactly one of feat, fix, perf, refactor, docs or chore.
 -->
 
-As a <role> I want <outcome> so that <reason>.
+As a [role] I want [outcome] so that [reason].
 
 ## Acceptance criteria
 
@@ -16,9 +16,9 @@ Each criterion states an outcome someone can check, never how the code is built.
 line `1.`, since Markdown counts them. One level of nesting at most, cited as `4.ii`.
 -->
 
-1. <an outcome someone can check>
-1. <another>
-   1. <a nested outcome, cited as 2.i>
+1. [an outcome someone can check]
+1. [another]
+   1. [a nested outcome, cited as 2.i]
 
 ## Constraints
 
@@ -28,4 +28,4 @@ each a fact already established that a competent build would otherwise get wrong
 failing. Never a plan.
 -->
 
-- <a measured fact that rules out the obvious approach>
+- [a measured fact that rules out the obvious approach]
