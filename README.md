@@ -89,3 +89,5 @@ pybers stands on [`numbers-parser`](https://github.com/masaccio/numbers-parser) 
 ## License
 
 [Apache-2.0](LICENSE).
+
+pybers is not affiliated with, endorsed by or sponsored by Apple Inc. Numbers is a trademark of Apple Inc.
