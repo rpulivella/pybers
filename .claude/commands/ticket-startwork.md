@@ -57,18 +57,17 @@ into `workarea/session-tasks.md`.
    ```
 6. **Update `workarea/session-tasks.md` for the new ticket.** This file is the **literal
    replacement** for the removed Claude Code Task/Todo tool. Same purpose, same shape, only
-   externalized to a text file so it survives `/clear` and window swaps. It holds ONLY what is
-   active NOW; it never accumulates. Tickets hold the full scope of work; this file is the
-   current-moment slice.
+   externalized to a text file so it survives `/clear` and window swaps. It holds what is active
+   now and the queue of tickets that follows it. Tickets hold the full scope of work; this file
+   is the current-moment slice.
 
    Read the current `workarea/session-tasks.md` (if it does not exist, treat it as empty). Then
    decide what carries forward into the new ticket's work:
    - **Compound, chained or epic case.** The new ticket references or blocks on current tasks
      (or belongs to the same epic). Carry those specific tasks forward by leaving their entries
      in the file.
-   - **Independent-work case (the default).** The new ticket is unrelated to current tasks. All
-     current tasks are cleared from the file. They stay in their tickets, which are the
-     persistent record of scope.
+   - **The queue stays.** Tickets the maintainer has lined up stay below the new ticket's
+     tasks, in the maintainer's order, never cleared or reordered.
 
    Then REWRITE `workarea/session-tasks.md` (replace the file wholesale, never append). **The
    format is a flat dashboard: one line per task, no indentation, no headers, no dates, no

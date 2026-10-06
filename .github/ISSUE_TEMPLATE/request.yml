@@ -10,7 +10,9 @@ body:
     attributes:
       label: Before you file
       options:
-        - label: I searched the existing issues and found no request for this.
+        - label: I searched the existing issues and found no request for this
+          required: true
+        - label: This request is not a bug report
           required: true
   - type: dropdown
     id: use

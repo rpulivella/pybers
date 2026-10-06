@@ -10,9 +10,11 @@ body:
     attributes:
       label: Before you file
       options:
-        - label: I searched the existing issues and found no report of this.
+        - label: I searched the existing issues and found no report of this
           required: true
-        - label: It happens on the latest release, or on `develop` before the first release.
+        - label: It happens on the latest version of pybers
+          required: true
+        - label: This report is not a feature request
           required: true
   - type: dropdown
     id: use
