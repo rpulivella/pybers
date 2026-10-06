@@ -1,0 +1,51 @@
+name: Request a feature
+description: Something pybers should do that it does not do yet.
+labels: [feat]
+body:
+  - type: markdown
+    attributes:
+      value: A maintainer turns each request into tickets, so describe what you are trying to get done rather than how pybers should do it.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched the existing issues and found no request for this.
+          required: true
+  - type: dropdown
+    id: use
+    attributes:
+      label: How do you use pybers?
+      options:
+        - In my own Python scripts (import pybers)
+        - From the command line
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: What do you want to do?
+      placeholder: Read every formula in a document as the text Numbers shows.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What do you do today instead?
+      placeholder: I open each document in Numbers and copy the formulas out by hand.
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Why does it matter to you?
+      placeholder: I audit forty workbooks a month, and copying by hand misses changes.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: An example
+      description: Optional. Code, a command, or a zipped `.numbers` document that shows what you mean.
+      placeholder: Paste code or a command, or drag a zipped document here.

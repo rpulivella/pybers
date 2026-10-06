@@ -1,0 +1,17 @@
+name: Ask a question
+description: How to do something with pybers, or why it behaves as it does.
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you are trying to do, and what you have tried.
+      placeholder: How do I read a cell's value as the text Numbers displays, rather than as a number?
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code
+      description: Optional. What you have tried so far.
+      render: python
