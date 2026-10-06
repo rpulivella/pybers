@@ -25,7 +25,7 @@ the tag alone records exactly what shipped.
    .venv/bin/python3 scripts/ticket.py list --status Done
    ```
    Run `/changelog-add` for any ticket missing a line, or confirm none are missing.
-5. Create the tag: `git tag <tag>`.
+5. Create the annotated tag: `git tag -a <tag> -m "<tag>"`.
 6. **Do not push automatically.** Show the push command and ask the user to confirm:
    `git push origin <tag>`.
 
