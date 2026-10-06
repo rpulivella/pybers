@@ -8,6 +8,7 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-10-05  `restart` added to the verbs, for PYB-153.
 2026-09-29  `claim`, `fill` and `recount` added to the verbs, for PYB-118.
 2026-09-25  `convert` added to the verbs, for PYB-134.
 2026-09-23  `clamp` and `relocate` added to the verbs, for PYB-18.
@@ -49,7 +50,8 @@ leadingVerbs: frozenset[str] = frozenset({
     "refuse",
     "register", "release", "relocate", "remap", "remove", "render", "reopen",
     "report", "request",
-    "resolve", "retype", "rewrite", "run", "save", "select", "set", "shape", "show",
+    "resolve", "restart",
+    "retype", "rewrite", "run", "save", "select", "set", "shape", "show",
     "split", "summarize", "survey", "to", "tokenize", "unquote", "unwrap", "update",
     "verify", "wait", "walk", "write",
 })

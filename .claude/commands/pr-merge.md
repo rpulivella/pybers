@@ -45,7 +45,8 @@ trigger sitting on it.
    so a pull request that never went through `/pr-review-code` cannot arrive here, and it
    refuses any CI state other than passed, including a state it could not read. Neither
    refusal is restated as a step here, because a check a skill performs is a check a
-   skimmed skill skips.
+   skimmed skill skips. A check canceled by a GitHub outage is restarted with
+   `.venv/bin/python3 scripts/pr.py rerun <N>`.
 5. **Get `develop` current, and read what the pull printed.**
    ```
    git checkout develop
@@ -87,6 +88,6 @@ which is what makes a stale instruction here easy to re-add.
 
 - **Never merge a draft.** `/pr-review-code` promotes out of draft, and this skill merges.
 - **Never merge with a dirty tree or unpushed commits.**
-- **Never hand-run the GitHub API.** `pr.py merge` is the only sanctioned path.
+- **Never hand-run the GitHub API without the user's permission.** `pr.py merge` is the only sanctioned path.
 - **Never move the board by hand after a merge.**
 - Nothing here needs a script of its own. Every action is `pr.py merge` or plain git.
