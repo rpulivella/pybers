@@ -177,6 +177,9 @@ These hold for every script here.
 8. **A `--dry-run` / non-destructive mode** on anything that mutates state.
 9. **The dunder header block** (`__author__` … `__usage__`) on every script.
 10. **No contractions**, in code, comments, or docstrings.
+11. **A message states the miss and stops.** Any sentence a script prints or posts says
+    what was found, never a remedy, a command or a script name. Detail lines take sentence
+    case and no trailing period, and a count of zero is not printed.
 
 ## Logging for long-running tasks
 
