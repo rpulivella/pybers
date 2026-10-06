@@ -12,9 +12,7 @@ neither ships in the wheel, but they answer to different readers and change for 
 reasons.
 
 Every script is self-contained, runnable from the repo root, and reports
-through [`rich`](https://github.com/Textualize/rich). This house style mirrors
-the same author's other repositories exactly,
-same conventions, deliberately kept in sync. The house rules below govern `tools/` too.
+through [`rich`](https://github.com/Textualize/rich). The house rules below govern `tools/` too.
 `src/pybers/` (the library itself) follows the same core conventions but uses dataclasses
 rather than TypedDict for data, and is documented in `CLAUDE.md`.
 

@@ -25,7 +25,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/04"
-__usage__ = "imported, never run: scripts/lib holds no commands"
+__usage__ = "imported, never run: tools/lib holds no commands"
 
 import plistlib
 from dataclasses import dataclass

@@ -18,8 +18,8 @@ machine with no Numbers installed and no protoc available.
 Apple compiles the protobuf descriptors for its own format into the Numbers binary, so
 they are the source of truth and dumping them is a mechanical step. A project that vendors
 another project's dump inherits an artifact it cannot regenerate, explain, or update when
-Apple ships a new Numbers. See "Open architectural decisions" in `CLAUDE.md` for the full
-reasoning.
+Apple ships a new Numbers. See "numbers-parser is NOT vendored here" in `docs/decisions.md`
+for the full reasoning.
 
 That is not theoretical here. Comparing this extraction against the schemas vendored in
 numbers-parser's own `src/protos/` (taken from an earlier Numbers) found **20 of 33

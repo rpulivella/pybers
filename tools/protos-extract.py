@@ -299,7 +299,8 @@ def generatePythonModules(schemaSource: Path, outputDirectory: Path) -> int:
             modulePath.write_text(rewritten, encoding="utf-8")
 
     (outputDirectory / "__init__.py").write_text(
-        '"""Generated protobuf modules. Do not edit, see workarea/bootstrap/."""\n',
+        '"""Generated protobuf modules, compiled from src/pybers/protos/, whose README '
+        'records their origin. Do not edit."""\n',
         encoding="utf-8",
     )
     return len(generated)

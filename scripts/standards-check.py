@@ -22,12 +22,7 @@ What that leaves in scope, and why it includes Python:
     weak-"let" check needs no carve-out for a `let` identifier: code is never in
     scope to be misread as English.
 
-Adapted from the same author's standards-check.py in another repository, which
-remains upstream for the prose rules. Its
-CSS, HTML and Astro checks are dropped whole, since there is no markup here.
-When a prose check improves upstream, diff the two files and re-import rather
-than letting them drift. Deliberate divergences are recorded below, and they are
-few on purpose so that diff stays cheap.
+It checks prose only, with no CSS, HTML or Astro checks, since there is no markup here.
 
 The design constraints inherited from upstream, each earned by a bug:
 

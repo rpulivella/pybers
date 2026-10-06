@@ -26,13 +26,12 @@ One scannable line per commit. The shape:
 
 - `[<N>] <prefix>: <summary>`, the ticket number first, in brackets, read from the branch name.
 - `[hotfix] <prefix>: <summary>`, a ticketless urgent or infrastructural change (tooling, a skill, CI, docs) where a ticket adds no value. Use sparingly.
-- `[init] <prefix>: <summary>`, pre-ticket bootstrap: initial scaffolding and architecture de-risking, before the ticket workflow begins and before anything ships. **The default for this phase**, and it retires the day the first ticket-numbered commit lands.
 
 Rules: single line, no body, no footer; at most 60 characters including the bracket; imperative mood; a Conventional-Commits-inspired prefix always (`feat` `fix` `perf` `refactor` `style` `docs` `chore`). Never a `Co-Authored-By` trailer, it breaks the one-line log.
 
 ```
-[init] chore: scaffold the project, package graph, and pytest gate
-[init] feat: add the dataclass object model
+[14] feat: decode merged cell ranges from the merge store
+[31] fix: keep run indices aligned across astral characters
 [hotfix] docs: correct the install instructions
 ```
 
