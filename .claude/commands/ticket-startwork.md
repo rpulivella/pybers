@@ -29,8 +29,7 @@ into `workarea/session-tasks.md`.
    git checkout develop
    git pull origin develop
    ```
-   The remote and branch are named rather than left to tracking configuration, which is
-   how the same author's other start skill does it and why that one does not break. A
+   The remote and branch are named rather than left to tracking configuration. A
    bare `git pull` on a branch with no upstream prints an error, changes nothing, and
    leaves a stale base behind. **Read what the pull printed** rather than assuming it
    worked; branching from a stale `develop` earns a branch conflicts it never caused.

@@ -8,9 +8,6 @@ call this rather than driving the API by hand, so that the board's invariants,
 one classification label, a Status that always moves forward, an issue that is
 always on the board, hold in exactly one place.
 
-Adapted from the same author's tooling in another repository and carried further
-here; this copy holds credential and markup fixes that predecessor does not.
-
 Talks to GitHub over urllib: REST for issues, GraphQL for the Project board.
 Never shells out to `gh` or `jq`, per the house rules in scripts/README.md.
 

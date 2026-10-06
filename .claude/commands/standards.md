@@ -9,10 +9,6 @@ only thing it does is check words. Execution lives in
 `scripts/standards-check.py`, one deterministic Python pass; this skill invokes
 it, then performs the second pass itself, and relays both.
 
-**Imported from `another repository` on 2026-08-27**, which stays upstream for the
-script. When a check improves there, diff and re-import. Divergences are recorded in
-the script's `UPDATES` block.
-
 ## ⚠ /standards IS TWO PASSES. ALWAYS BOTH. NO EXCEPTIONS.
 
 **1. `scripts/standards-check.py`**
