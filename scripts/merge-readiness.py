@@ -22,6 +22,8 @@ Requires rich, and a GitHub token for `check` and `report`, resolved by
 scripts/ticket.py.
 
 UPDATES
+2026-10-06  Removed `dispatch`, which sent an event no workflow listens for, for
+            PYB-155.
 2026-10-03  The posting half renders the comment from stored results, aims it at
             the pull request its run checked, and replaces only its own earlier
             comment, for PYB-151.
@@ -46,7 +48,6 @@ import subprocess
 import sys
 import time
 import tomllib
-import urllib.parse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -68,9 +69,7 @@ console: Console = Console()
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 projectPath: Path = repositoryRoot / "pyproject.toml"
-reportWorkflowFile: str = "merge-readiness.yml"
 checkRunName: str = "merge readiness"
-preflightWorkflowFile: str = "preflight.yml"
 preflightCheckName: str = "preflight"
 preflightAttempts: int = 40
 preflightPauseSeconds: float = 15.0
@@ -309,40 +308,6 @@ def runReport(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def findLatestPreflightRun(token: str, ref: str) -> int:
-    """Return the newest finished preflight run on a branch, which carries its facts."""
-    url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
-        f"/actions/workflows/{preflightWorkflowFile}/runs"
-        f"?branch={urllib.parse.quote(ref)}&status=completed&per_page=1"
-    )
-    runs = ticket.requestJson(url, token).get("workflow_runs", [])
-    if not runs:
-        raise RuntimeError(f"no finished preflight run on {ref}")
-    return int(runs[0]["id"])
-
-
-def runDispatch(arguments: argparse.Namespace) -> int:
-    """Ask GitHub to run the reporting workflow from a branch, on one preflight run.
-
-    The only way to exercise that workflow before it reaches the default branch,
-    since `workflow_run` fires from the default branch's copy alone.
-    """
-    url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
-        f"/actions/workflows/{reportWorkflowFile}/dispatches"
-    )
-    token = ticket.resolveToken()
-    runId = arguments.run_id or findLatestPreflightRun(token, arguments.ref)
-    ticket.requestJson(
-        url, token, method="POST",
-        payload={"ref": arguments.ref, "inputs": {"run-id": str(runId)}},
-    )
-    console.print(f"[green]dispatched[/] {reportWorkflowFile} on {arguments.ref} "
-                  f"for preflight run {runId}")
-    return 0
-
-
 def buildParser() -> argparse.ArgumentParser:
     """Describe the command line, one subcommand per half of the report."""
     parser = argparse.ArgumentParser(
@@ -384,13 +349,6 @@ def buildParser() -> argparse.ArgumentParser:
     check.add_argument("--comment", default="merge-readiness.md", help="where to write")
     check.set_defaults(handler=runCheck)
 
-    dispatch = commands.add_parser(
-        "dispatch", help="run the reporting workflow by hand, from a branch",
-        formatter_class=RichHelpFormatter,
-    )
-    dispatch.add_argument("--run-id", type=int, help="a preflight run, or the newest")
-    dispatch.add_argument("--ref", required=True, help="the branch to run it from")
-    dispatch.set_defaults(handler=runDispatch)
     return parser
 
 
