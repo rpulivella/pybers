@@ -1,0 +1,68 @@
+name: Report a bug
+description: pybers read or wrote a document wrongly, or failed.
+labels: [fix]
+body:
+  - type: markdown
+    attributes:
+      value: A security problem goes through the [security policy](https://github.com/rpulivella/pybers/blob/develop/SECURITY.md) instead, never a public issue.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched the existing issues and found no report of this.
+          required: true
+        - label: It happens on the latest release, or on `develop` before the first release.
+          required: true
+  - type: dropdown
+    id: use
+    attributes:
+      label: How do you use pybers?
+      options:
+        - In my own Python scripts (import pybers)
+        - From the command line
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: Output of pybers check
+      description: Run `pybers check` on the document and paste what it prints. It holds nothing from the document, so it is safe to post.
+      placeholder: pybers check budget.numbers
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps taken
+      description: The shortest code or command that still shows the problem.
+      placeholder: |
+        document = pybers.open("budget.numbers")
+        document.sheet("Summary").table("Costs").rowAdd(6)
+        document.save()
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      placeholder: Numbers opens the saved document with the new row below row 5.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The message or traceback as printed, or what Numbers shows when it opens the document.
+      placeholder: Numbers reports the document could not be opened.
+    validations:
+      required: true
+  - type: textarea
+    id: document
+    attributes:
+      label: The document
+      description: GitHub does not accept a `.numbers` file as it is, so compress it to a `.zip` first, with File ▸ Compress in Finder. A document that shows the problem is the fastest route to a fix.
+      placeholder: Drag the zipped document here, or say why it cannot be shared.
