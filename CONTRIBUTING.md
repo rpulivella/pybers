@@ -1,6 +1,6 @@
 # Contributing to pybers
 
-pybers is built through an agentic harness. This guide is the single source of truth for how change flows into the repository, commits, branches, and release tags, and for where things live. The invisible laws of the codebase live in `CLAUDE.md`.
+pybers is an open source community project built by independent contributors. This guide is the single source of truth for how change flows into the repository, commits, branches, and release tags, and for where things live.
 
 Everyone taking part, in any space of this repository, follows the [code of conduct](CODE_OF_CONDUCT.md).
 
