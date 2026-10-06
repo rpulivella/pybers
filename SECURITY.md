@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-pybers has not been released yet, so security fixes land on `develop`. Once releases begin, only the latest release receives them.
+Only the latest release receives security fixes.
 
 ## Reporting a vulnerability
 
