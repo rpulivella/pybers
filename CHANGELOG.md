@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-162] Reduce the body snapshot to a chosen set of cases
 - [PYB-175] Keep a skipped run from hiding a check's real result
 - [PYB-155] Correct stale references and state Apple non-affiliation
 - [PYB-154] Give issues templates for a bug, a request and a question
