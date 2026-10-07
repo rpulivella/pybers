@@ -62,7 +62,7 @@ bytes 12+    the value, then the trailing references
 bytes 2-5 and 11 carry nothing this reader uses
 ```
 
-### Byte 1 is NOT simply `TST.CellType`
+### Byte 1 is its own numbering, not `TST.CellType`
 
 It coincides with `TST.CellType` for every type in `11-value-types-noformats`, which made
 that look settled. `12-number-currency` disproved it: **every currency cell carries type

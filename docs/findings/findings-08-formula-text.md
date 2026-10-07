@@ -193,7 +193,7 @@ formula stores:
 22 EMPTY  22 EMPTY  22 EMPTY  36 REFERENCE(K1)  23 TOKEN(true)  23 TOKEN(true)
 ```
 
-and `M1`, labelled `DURATION(,,K1,,,)`, stores `22 22 36 23 23 22`. Six argument nodes
+and `M1`, labeled `DURATION(,,K1,,,)`, stores `22 22 36 23 23 22`. Six argument nodes
 each, matching `numArgs=6`, with type 22 in some omitted positions and type 23 in others.
 `LAMBDA()` in `46-formula-rare-functions` writes `23 TOKEN(false)` for its empty body.
 
