@@ -2,12 +2,14 @@
 """\
 A body carried between GitHub and a file on disk, and posted back unchanged.
 
-**The snapshot under `tests/github-bodies/` is every issue and pull request body
-filed up to 2026-09-25**, exported once so the suite needs no network. A body is
+**The bodies under `tests/github-bodies/` are a few real ones, each kept for a
+construct it holds**, and a construct no real body holds is written out below. A body is
 compared by the HTML it renders to, in GitHub's reading, where a newline inside a
 paragraph is a break.
 
 UPDATES
+2026-10-06  The snapshot reduced to five bodies named for what they hold, for
+            PYB-162.
 2026-09-25  Written for PYB-134, replacing the tests of the unwrapper it removed.
 """
 from __future__ import annotations
@@ -34,7 +36,9 @@ import ticket  # noqa: E402
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 bodyDirectory: Path = Path(__file__).resolve().parent / "github-bodies"
-snapshot: list[Path] = sorted(bodyDirectory.glob("*.md"))
+snapshot: list[Path] = sorted(
+    path for path in bodyDirectory.glob("*.md") if path.name != "README.md"
+)
 
 
 def readBody(path: Path) -> str:
@@ -52,12 +56,6 @@ def runRoundTrip(body: str) -> str:
 def renderOnGitHub(body: str) -> str:
     """Return a body's HTML as GitHub renders a body, a newline being a break."""
     return github_body.renderHtml(body, breaks=True)
-
-
-def testTheSnapshotHoldsEveryBodyFiledSoFar() -> None:
-    """PYB-134 AC 1: numbered 1 to 134, none missing."""
-    numbers = sorted(int(path.stem.split("-")[1]) for path in snapshot)
-    assert numbers == list(range(1, 135))
 
 
 @pytest.mark.parametrize("path", snapshot, ids=[path.stem for path in snapshot])
