@@ -39,6 +39,8 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-10-06  A skipped run no longer hides another run of the same check, after a tie
+            on the start time reported PR #174's readiness as skipped, for PYB-175.
 2026-10-05  Added `rerun`, which restarts a pull request's canceled or failed workflow
             runs, after a runner outage canceled both checks on PR #167, for PYB-153.
 2026-10-04  A merge deletes its head branch only with `--delete-branch`, which
@@ -439,11 +441,17 @@ def chooseLatestRuns(runs: list[dict[str, Any]]) -> list[CheckRun]:
     """Return the newest run per name, since GitHub keeps every run a commit had.
 
     A pull request promoted out of draft carries the skipped draft run beside the
-    real one, under the same name. Reporting both says a check ran twice when it
-    ran once, and leaves a reader to work out which verdict is current.
+    real one, under the same name, and both can start in the same second. A skipped
+    run therefore stands for its check only when the check has no other run, or a
+    tie on the timestamp could report the skip and hide a failure behind it.
     """
+    realNames = {run["name"] for run in runs if run.get("conclusion") != "skipped"}
+    counted = [
+        run for run in runs
+        if run["name"] not in realNames or run.get("conclusion") != "skipped"
+    ]
     latest: dict[str, CheckRun] = {}
-    for run in sorted(runs, key=lambda run: str(run.get("started_at") or "")):
+    for run in sorted(counted, key=lambda run: str(run.get("started_at") or "")):
         latest[run["name"]] = CheckRun(
             name=run["name"],
             status=run["status"],
