@@ -556,8 +556,8 @@ text_style     optional, unused in the corpus
 message on the data store, while `columnHeaders` is a `TSP.Reference` to one. A walker that
 assumes both are references finds only the columns, silently.
 
-`size = 0.00` reading as "default" rather than "zero" is the trap here: a reader that
-propagates it literally collapses every row to nothing. Nothing in the corpus yet has a
+`size = 0.00` means "default", not "zero", and a reader that propagates it literally
+collapses every row to nothing. Nothing in the fixtures yet has a
 resized or hidden row, so non-default values of `size` and `hidingState` remain unmeasured.
 
 ## A table over 256 rows splits into tiles, and both facts about tiles are traps

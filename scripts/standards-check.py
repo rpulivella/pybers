@@ -50,6 +50,7 @@ line of this script, eg:
 /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-10-06  A line opening with a code span is checked, for PYB-178.
 2026-09-28  The body snapshot is skipped, for PYB-134.
 2026-09-14  `.github` and `tools` are in the default scope.
 2026-09-01  Fixed a hole in the banned-phrase check that had been open since the
@@ -462,9 +463,11 @@ def extractMarkdownProse(text: str) -> str:
     every reported line number true to the file on disk.
     """
     out = re.sub(r"```.*?```", blankSpan, text, flags=re.DOTALL)
+    # Found on the original text: a blanked span at a line's start reads as indentation.
+    for match in re.finditer(r"^\s{4,}\S[^\n]*$", text, flags=re.MULTILINE):
+        out = out[:match.start()] + blankSpan(match) + out[match.end():]
     out = re.sub(r"`[^`\n]*`", blankSpan, out)
-    out = re.sub(r"\]\([^)]*\)", blankSpan, out)
-    return re.sub(r"^\s{4,}\S[^\n]*$", blankSpan, out, flags=re.MULTILINE)
+    return re.sub(r"\]\([^)]*\)", blankSpan, out)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
