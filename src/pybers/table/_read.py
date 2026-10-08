@@ -19,7 +19,8 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
-2026-10-07  A row that fails to decode names its table by identifier, for PYB-169.
+2026-10-07  A row that fails to decode names its table by identifier, and a record
+            of a type pybers does not recognize keeps that type, for PYB-169.
 2026-10-01  A cell is described by the kind its record stores and the format it
             shows with, and a save describes it afresh, for PYB-141.
 2026-09-30  A cell notes the text of a rich-text record it read, for PYB-137.
@@ -169,10 +170,12 @@ def readRecordDescription(
     record: CellRecord, formatTypes: dict[int, int]
 ) -> CellDescription:
     """Return what a record stores beyond its value."""
+    kind = storedKinds.get(record.typeByte, CellKind.UNKNOWN)
     return CellDescription(
-        kind=storedKinds.get(record.typeByte, CellKind.UNKNOWN),
+        kind=kind,
         format=findDisplayedFormat(record, formatTypes),
         formatChosen=carriesChosenFormat(record),
+        unrecognizedTypeCode=record.typeByte if kind is CellKind.UNKNOWN else None,
     )
 
 

@@ -7,6 +7,7 @@ fixtures name, a kind following an edit, an unknown type carried through, and th
 few lines a script or a command line writes to ask a cell what it holds.
 
 UPDATES
+2026-10-07  The description's fields include `unrecognizedTypeCode`, for PYB-169.
 2026-10-01  Written for PYB-141.
 """
 from __future__ import annotations
@@ -362,7 +363,7 @@ def testTheDescriptionIsOneFrozenObject() -> None:
     with pytest.raises(dataclasses.FrozenInstanceError):
         description.kind = CellKind.TEXT  # type: ignore[misc]
     assert {field.name for field in dataclasses.fields(description)} == {
-        "kind", "format", "formatChosen"
+        "kind", "format", "formatChosen", "unrecognizedTypeCode"
     }
 
 
