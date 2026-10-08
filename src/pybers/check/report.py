@@ -20,7 +20,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/07"
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,12 +46,14 @@ class CheckFailure:
     """Why pybers could not open a document, and where in pybers it stopped.
 
     `message` is None for an error pybers does not raise itself, because its text
-    was never audited and may quote the document.
+    was never audited and may quote the document. `error` is the exception itself,
+    left out of `repr` and equality, so a caller can raise it with its traceback.
     """
 
     errorType: str
     message: str | None
     frames: tuple[str, ...]
+    error: BaseException | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,19 +75,19 @@ class CheckSheet:
 
 @dataclass(frozen=True, slots=True)
 class CheckCell:
-    """Where a cell of an unrecognized type sits. `sheetName` is None off any sheet."""
+    """Where a cell of an unrecognized type sits."""
 
-    sheetName: str | None
+    sheetName: str
     tableName: str
     address: str
-    typeId: int
+    typeCode: int
 
 
 @dataclass(frozen=True, slots=True)
 class CheckNames:
     """The document's own names, for the person holding it. Never for posting.
 
-    Either part is None when that part of the document could not be walked.
+    Both parts are None when the document could not be opened.
     """
 
     sheets: tuple[CheckSheet, ...] | None
@@ -97,7 +99,8 @@ class Check:
     """Whether pybers can read a document, and what a bug report about it needs.
 
     Both type tables count archives or cells by type identifier. Cell types are
-    None when the cells could not be walked, and `names` is None unless asked for.
+    None when the document could not be opened, and `names` is None unless asked
+    for.
     """
 
     environment: CheckEnvironment

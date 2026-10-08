@@ -8,6 +8,10 @@ document holds 26 types outside it, so the registry cannot tell a maintainer wha
 is new. `testedArchiveTypes` is the union over every test document instead, and a
 test keeps it equal to that union.
 
+**Cells and names come from the document the reader built**, which keeps the type
+of any record it does not recognize, so nothing is decoded twice. A document that
+cannot be opened therefore leaves both unknown.
+
 **A failure is reported without the document's words.** A `PybersError` keeps its
 message, because pybers's own read path names archives by identifier. Any other
 error keeps only its type and where pybers raised it.
@@ -30,17 +34,13 @@ import re
 import traceback
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import replace
 from pathlib import Path
 
-from .._generated import TNArchives_pb2 as tn
-from .._generated import TSTArchives_pb2 as tst
 from .._persistence import NumbersPackage, readPackage
-from .._persistence.index import ArchiveIndex, findRoot
-from .._persistence.types import findArchiveTypeId, readArchiveTypeId
+from .._persistence.types import readArchiveTypeId
 from ..document._read import readDocument
+from ..document.sheets import Document
 from ..errors import PybersError
-from ..table._read import iterateCellRecords, storedKinds
 from .environment import readCheckEnvironment
 from .report import (
     Check,
@@ -52,7 +52,7 @@ from .report import (
     NumbersVersion,
 )
 
-# Every archive type the test documents hold, measured 2026-10-07 across 184.
+# Every archive type the test documents hold, kept equal to their union by a test.
 testedArchiveTypes: frozenset[int] = frozenset({
     1, 2, 205, 210, 212, 213, 219, 222, 401, 601, 633, 634,
     2001, 2011, 2021, 2022, 2023, 2024, 2025, 2043,
@@ -113,68 +113,26 @@ def countUntestedArchiveTypes(package: NumbersPackage) -> dict[int, int]:
     }
 
 
-def listUnrecognizedCells(
-    package: NumbersPackage, source: Path
-) -> list[tuple[int, CheckCell]]:
-    """Return each cell of a type pybers does not recognize, with its table model.
-
-    Every table model is walked, attached to a sheet or not, since a record pybers
-    does not recognize is worth naming wherever it sits. The sheet is left for
-    `readCheckSheets` to supply.
-    """
-    index = ArchiveIndex(package)
-    modelType = findArchiveTypeId(tst.TableModelArchive)
-    found: list[tuple[int, CheckCell]] = []
-    for identifier, archive in index.byIdentifier.items():
-        if not archive.messages or readArchiveTypeId(archive) != modelType:
-            continue
-        model = index.identifierResolve(identifier, tst.TableModelArchive)
-        for reference, record in iterateCellRecords(index, model, source):
-            if record.typeByte not in storedKinds:
-                cell = CheckCell(
-                    None, model.table_name, str(reference), record.typeByte
-                )
-                found.append((identifier, cell))
-    return found
+def listUnrecognizedCells(document: Document) -> list[CheckCell]:
+    """Return each cell the reader kept a type for because it did not recognize it."""
+    return [
+        CheckCell(sheet.name, table.name, str(reference), unrecognized)
+        for sheet in document.sheets
+        for table in sheet.tables
+        for reference, cell in table.cells.items()
+        if (unrecognized := cell.description.unrecognizedTypeCode) is not None
+    ]
 
 
-def readCheckSheets(
-    package: NumbersPackage,
-) -> tuple[tuple[CheckSheet, ...], dict[int, str]]:
-    """Return every sheet with its tables, and the sheet each table model sits on."""
-    index = ArchiveIndex(package)
-    tableType = findArchiveTypeId(tst.TableInfoArchive)
-    sheets: list[CheckSheet] = []
-    sheetNames: dict[int, str] = {}
-    for sheetReference in findRoot(index).sheets:
-        sheet = index.resolve(sheetReference, tn.SheetArchive)
-        tables: list[CheckTable] = []
-        for drawable in sheet.drawable_infos:
-            if index.typeOf(drawable) != tableType:
-                continue
-            info = index.resolve(drawable, tst.TableInfoArchive)
-            model = index.resolve(info.tableModel, tst.TableModelArchive)
-            tables.append(CheckTable(
-                model.table_name, model.number_of_rows, model.number_of_columns
-            ))
-            sheetNames[info.tableModel.identifier] = sheet.name
-        sheets.append(CheckSheet(sheet.name, tuple(tables)))
-    return tuple(sheets), sheetNames
-
-
-def readCheckNames(
-    package: NumbersPackage, cells: list[tuple[int, CheckCell]] | None
-) -> CheckNames:
-    """Return the document's sheets and tables by name, and where each cell sits."""
-    sheets: tuple[CheckSheet, ...] | None
-    try:
-        sheets, sheetNames = readCheckSheets(package)
-    except PybersError:
-        sheets, sheetNames = None, {}
-    located = None if cells is None else tuple(
-        replace(cell, sheetName=sheetNames.get(model)) for model, cell in cells
+def readCheckSheets(document: Document) -> tuple[CheckSheet, ...]:
+    """Return every sheet by name, with its tables and their sizes."""
+    return tuple(
+        CheckSheet(sheet.name, tuple(
+            CheckTable(table.name, table.rowCount, table.colCount)
+            for table in sheet.tables
+        ))
+        for sheet in document.sheets
     )
-    return CheckNames(sheets, located)
 
 
 def listPybersFrames(error: BaseException) -> tuple[str, ...]:
@@ -188,16 +146,21 @@ def listPybersFrames(error: BaseException) -> tuple[str, ...]:
     return tuple(frames)
 
 
-def openForCheck(package: NumbersPackage, source: Path) -> CheckFailure | None:
-    """Open a package as `pybers.open` would, and return why it failed, if it did."""
+def openForCheck(
+    package: NumbersPackage, source: Path
+) -> Document | CheckFailure:
+    """Open a package as `pybers.open` would, or return why it could not be."""
     try:
-        readDocument(package, source)
+        return readDocument(package, source)
     except PybersError as exc:
-        return CheckFailure(type(exc).__name__, str(exc), listPybersFrames(exc))
+        return CheckFailure(
+            type(exc).__name__, str(exc), listPybersFrames(exc), error=exc
+        )
     except Exception as exc:
         # Reported rather than raised, since a check exists to describe this failure.
-        return CheckFailure(type(exc).__name__, None, listPybersFrames(exc))
-    return None
+        return CheckFailure(
+            type(exc).__name__, None, listPybersFrames(exc), error=exc
+        )
 
 
 def checkDocument(
@@ -217,26 +180,21 @@ def checkDocument(
     report("reading the document…")
     package = readPackage(source)
     report("opening it…")
-    failure = openForCheck(package, source)
-    report("walking its cells…")
-    try:
-        cells: list[tuple[int, CheckCell]] | None = listUnrecognizedCells(
-            package, source
-        )
-    except PybersError:
-        cells = None
-    cellTypes = None if cells is None else dict(
-        sorted(Counter(cell.typeId for _, cell in cells).items())
-    )
-    if names:
-        report("reading its names…")
+    opened = openForCheck(package, source)
+    document = opened if isinstance(opened, Document) else None
+    cells = None if document is None else listUnrecognizedCells(document)
     return Check(
         environment=readCheckEnvironment(),
         savedBy=readSavedVersion(package),
-        failure=failure,
+        failure=opened if isinstance(opened, CheckFailure) else None,
         untestedArchiveTypes=countUntestedArchiveTypes(package),
-        unrecognizedCellTypes=cellTypes,
-        names=readCheckNames(package, cells) if names else None,
+        unrecognizedCellTypes=None if cells is None else dict(
+            sorted(Counter(cell.typeCode for cell in cells).items())
+        ),
+        names=None if not names else CheckNames(
+            None if document is None else readCheckSheets(document),
+            None if cells is None else tuple(cells),
+        ),
     )
 
 

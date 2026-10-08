@@ -100,8 +100,8 @@ def formatUnrecognizedCells(
         return [formatLine("Unrecognized cells", "none")]
     grouped: dict[str, dict[str, list[pybers.CheckCell]]] = {}
     for cell in cells:
-        sheetName = cell.sheetName if cell.sheetName is not None else "(no sheet)"
-        grouped.setdefault(sheetName, {}).setdefault(cell.tableName, []).append(cell)
+        byTable = grouped.setdefault(cell.sheetName, {})
+        byTable.setdefault(cell.tableName, []).append(cell)
     shown: list[RenderableType] = [Text("Unrecognized cells:", "label")]
     for sheetName, tables in grouped.items():
         tree = TreeCompact(Text(sheetName, "value"), guide_style="label")
@@ -111,7 +111,7 @@ def formatUnrecognizedCells(
                 branch.add(Text.assemble(
                     (cell.address, "identifier"),
                     (": ", "label"),
-                    (f"cell type {cell.typeId}", "warning"),
+                    (f"cell type {cell.typeCode}", "warning"),
                 ))
         shown.append(tree)
     return shown
@@ -168,9 +168,8 @@ def runCheck(
         )
     console.print(formatCheck(check))
     if check.failure is not None:
-        if findCommandSettings(context).debug:
-            # Opened again, so the failure reported raises with its traceback.
-            pybers.open(documentPath)
+        if findCommandSettings(context).debug and check.failure.error is not None:
+            raise check.failure.error
         raise typer.Exit(1)
 
 

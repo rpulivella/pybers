@@ -45,6 +45,8 @@ from pybers.check import _read as checkRead
 baselinePath: Path = findDocumentPath("00-baseline")
 # A document whose table stores records, three of them empty.
 recordsPath: Path = findDocumentPath("22e-merge-imported")
+# Its empty records are ordinary cells, where 22e's sit under a merge the reader skips.
+emptyCellsPath: Path = findDocumentPath("19-formula-dragged")
 untestedType: int = 99999
 
 
@@ -162,20 +164,43 @@ def testAnArchiveTypeNoTestDocumentHoldsIsCounted(tmp_path: Path) -> None:
 
 
 def testACellTypePybersDoesNotRecognizeIsCounted(tmp_path: Path) -> None:
-    package = readPackage(recordsPath)
+    package = readPackage(emptyCellsPath)
     rewriteFirstRow(package, lambda rowInfo: retypeEmptyRecord(rowInfo, 4))
     check = pybers.checkDocument(writePackageCopy(package, tmp_path))
     assert check.unrecognizedCellTypes == {4: 1}
 
 
+def testTheReaderKeepsTheTypeOfARecordItDoesNotRecognize(tmp_path: Path) -> None:
+    package = readPackage(emptyCellsPath)
+    rewriteFirstRow(package, lambda rowInfo: retypeEmptyRecord(rowInfo, 4))
+    document = pybers.open(writePackageCopy(package, tmp_path))
+    found = [
+        cell.description
+        for sheet in document.sheets
+        for table in sheet.tables
+        for cell in table.cells.values()
+        if cell.description.kind is pybers.CellKind.UNKNOWN
+    ]
+    assert [description.unrecognizedTypeCode for description in found] == [4]
+
+
+def testAFailureKeepsItsErrorToRaise(tmp_path: Path) -> None:
+    package = readPackage(baselinePath)
+    retypeArchive(package, 1, untestedType)
+    failure = pybers.checkDocument(writePackageCopy(package, tmp_path)).failure
+    assert failure is not None
+    assert isinstance(failure.error, pybers.ReadError)
+    assert "error=" not in repr(failure)
+
+
 def testNamesLocateEachUnrecognizedCell(tmp_path: Path) -> None:
-    package = readPackage(recordsPath)
+    package = readPackage(emptyCellsPath)
     rewriteFirstRow(package, lambda rowInfo: retypeEmptyRecord(rowInfo, 4))
     names = pybers.checkDocument(writePackageCopy(package, tmp_path), names=True).names
     assert names is not None
     assert names.unrecognizedCells is not None
     [cell] = names.unrecognizedCells
-    assert (cell.sheetName, cell.tableName, cell.typeId) == ("Sheet1", "Table 1", 4)
+    assert (cell.sheetName, cell.tableName, cell.typeCode) == ("Sheet 1", "Table 1", 4)
 
 
 def testNamesListEachSheetAndTableWithItsSize() -> None:
@@ -191,13 +216,13 @@ def testNamesListEachSheetAndTableWithItsSize() -> None:
     )
 
 
-def testNamesSurviveADocumentPybersCannotOpen(tmp_path: Path) -> None:
+def testNamesAreUnknownWhenTheDocumentCannotBeOpened(tmp_path: Path) -> None:
     package = readPackage(recordsPath)
     retypeArchive(package, 6005, untestedType)
     check = pybers.checkDocument(writePackageCopy(package, tmp_path), names=True)
     assert check.failure is not None
-    assert check.names is not None
-    assert check.names.sheets is not None
+    assert check.names == pybers.CheckNames(None, None)
+    assert check.unrecognizedCellTypes is None
 
 
 def testADocumentPybersCannotOpenReportsWhy(tmp_path: Path) -> None:
@@ -277,9 +302,4 @@ def testAFileThatIsNotADocumentRaisesAPybersError(tmp_path: Path) -> None:
 def testProgressHearsEachStepInOrder() -> None:
     heard: list[str] = []
     pybers.checkDocument(baselinePath, names=True, onProgress=heard.append)
-    assert heard == [
-        "reading the document…",
-        "opening it…",
-        "walking its cells…",
-        "reading its names…",
-    ]
+    assert heard == ["reading the document…", "opening it…"]
