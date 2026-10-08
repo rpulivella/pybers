@@ -19,21 +19,28 @@ the tag alone records exactly what shipped.
    - `git log --oneline -3`, confirm the commit being tagged looks right
    - Confirm the `version` field in `pyproject.toml` matches `<version>`
    - Warn if there are uncommitted changes
-4. **Update `CHANGELOG.md`** before a `final` tag. List what shipped and reconcile it
-   against the `## Unreleased` entries:
+4. **Reconcile `CHANGELOG.md`** before any tag. Every ticket marked Done since the last
+   final release has its line under `## Unreleased`:
    ```
    .venv/bin/python3 scripts/ticket.py list --status Done
    ```
    Run `/changelog-add` for any ticket missing a line, or confirm none are missing.
-5. Create the annotated tag: `git tag -a <tag> -m "<tag>"`.
-6. **Do not push automatically.** Show the push command and ask the user to confirm:
+5. **Write the notes from `CHANGELOG.md`**, the source, never editing it to do so. The
+   grouping, the Miscellaneous judgment and the beta's "In previous betas:" split are
+   in `CONTRIBUTING.md` under Releases. Show the notes and confirm them with the user.
+6. Create the annotated tag. A beta's message is its notes, and a final's is the tag name:
+   `git tag -a <tag> -F <notes file>` or `git tag -a <tag> -m "<tag>"`.
+7. **A final release only:** add `## X.Y.Z (build) - YYYY-MM-DD` directly beneath
+   `## Unreleased`, the one edit a release makes to `CHANGELOG.md`, and publish a
+   GitHub release titled `pybers X.Y.Z` holding the notes. PYB-147 automates both.
+8. **Do not push automatically.** Show the push command and ask the user to confirm:
    `git push origin <tag>`.
 
 ## Tag format reference
 
 ```
-release/v0.1.0-b01     # pre-release build iteration
-release/v0.1.0-Final   # shipped PyPI release
+release/v0.1.0-b01     # a beta, tag only
+release/v0.1.0-Final   # a final release, tag and GitHub release
 ```
 
 ## Hard rules
@@ -42,6 +49,6 @@ release/v0.1.0-Final   # shipped PyPI release
 - Always lowercase prefix; always a `v` prefix on the version.
 - Leading zeros on iteration suffixes: `-b01`, never `-b1`.
 - Never reuse a tag, increment the iteration if a rebuild is needed.
-- Update `CHANGELOG.md` before a `final` release tag.
+- Never sort, group or prune `CHANGELOG.md` itself. Its one release edit is a final's heading.
 
 $ARGUMENTS
