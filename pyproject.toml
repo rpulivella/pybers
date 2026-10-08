@@ -31,7 +31,12 @@ dependencies = [
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 
+[project.scripts]
+pybers = "pybers.cli:main"
+
 [project.optional-dependencies]
+# The command line's own extra, so a script importing pybers never installs Typer.
+cli = ["typer>=0.27.3"]
 # rich and rich_argparse are for scripts/, not for the library. pybers itself must
 # never import them, which the library-purity check enforces. Declared here so that
 # one `pip install -e ".[dev]"` equips the venv for both the test suite and the repo
@@ -40,6 +45,7 @@ license-files = ["LICENSE", "NOTICE"]
 # and the scripts run fine there; this makes the venv self-sufficient as well, so a
 # fresh clone needs one command and neither environment has to be reasoned about.
 dev = [
+    "pybers[cli]",
     "pytest>=9.1.1",
     "rich>=15.0.0",
     "rich_argparse>=1.8.0",
