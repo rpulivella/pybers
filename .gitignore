@@ -44,9 +44,10 @@ htmlcov/
 
 # ── Claude Code / harness ──────────────────────────────────────
 # NOTE: CLAUDE.md is COMMITTED on purpose — it is the shared agent
-# constitution. Only local, machine-specific settings are ignored.
+# constitution. Only local settings and rules are ignored.
 .claude/settings.local.json
 .mcp.json
+CLAUDE.local.md
 
 # ── workarea: ephemeral scratch, never committed ───────────────
 # The whole folder is ignored EXCEPT its README, which documents the

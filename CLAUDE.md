@@ -195,7 +195,7 @@ functions over explanation.
   claiming anything.
 - **Only Numbers can confirm a golden.** Every other test checks pybers against pybers,
   which can agree with itself while both halves are wrong. **Do not claim a golden
-  passed until the user confirms it in Numbers**, and record the date and version in
+  passed until a maintainer confirms it in Numbers**, and record the date and version in
   `tests/golden/README.md`.
 - **Confirm with Quick Look AND Numbers.** Quick Look renders the STORED value and does
   not recalculate, so the pair separates what pybers wrote from what Numbers made of it.
