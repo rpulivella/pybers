@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-07  checkDocument and what it reports re-exported, for PYB-169.
 2026-10-01  CellKind, CellFormat and CellDescription re-exported, for PYB-141.
 2026-09-29  CellValueFill re-exported, for PYB-118.
 2026-09-23  FormulaReferenceRelocation re-exported, for PYB-18.
@@ -40,6 +41,17 @@ from pybers.addressing import (
     toCellReference,
     toColumnLetter,
     toColumnNumber,
+)
+from pybers.check import (
+    Check,
+    CheckCell,
+    CheckEnvironment,
+    CheckFailure,
+    CheckNames,
+    CheckSheet,
+    CheckTable,
+    NumbersVersion,
+    checkDocument,
 )
 from pybers.document import (
     Document,
@@ -122,6 +134,15 @@ __all__ = [
     "parseFormula",
     "renderFormula",
     "Coordinate",
+    "Check",
+    "CheckCell",
+    "CheckEnvironment",
+    "CheckFailure",
+    "CheckNames",
+    "CheckSheet",
+    "CheckTable",
+    "NumbersVersion",
+    "checkDocument",
     "Cell",
     "CellAddress",
     "CellDescription",
