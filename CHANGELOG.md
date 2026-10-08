@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-182] Move the maintainer's own rules into CLAUDE.local.md
 - [PYB-170] Make CONTRIBUTING.md a complete path to a contribution
 - [PYB-169] Check whether pybers can read a document
 - [PYB-178] Check a Markdown line that opens with a code span
