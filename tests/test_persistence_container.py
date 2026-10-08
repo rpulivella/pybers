@@ -19,6 +19,8 @@ to this repository, so an absent one is a defect, and a skip would let the round
 contract quietly stop being tested.
 
 UPDATES
+2026-10-07  A directory, an unreadable file and a zip holding no IWA member are
+            each refused as a ContainerError, for PYB-169.
 2026-08-27  Repointed from the vendored numbers-parser `empty-*.numbers` files onto
             this project's own documents, and turned the skip into a failure. The
             vendored checkout was purged from the repository, which left all eleven
@@ -38,6 +40,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/16"
 
+import os
 import struct
 import zipfile
 from pathlib import Path
@@ -46,6 +49,7 @@ import pytest
 
 from conftest import findDocumentPath
 from pybers._persistence import (
+    ContainerError,
     IWAError,
     decompressRaw,
     isDocumentMember,
@@ -228,3 +232,31 @@ def testRejectsATruncatedFrame() -> None:
     """A frame declaring more bytes than remain is malformed, not merely short."""
     with pytest.raises(IWAError, match="declares"):
         splitFrames(b"\x00\xff\x00\x00" + b"\x00" * 4)
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any file")
+def testRefusesAnUnreadableFileAsAContainerError(tmp_path: Path) -> None:
+    """A file without read permission once escaped as a bare `PermissionError`."""
+    locked = tmp_path / "locked.numbers"
+    locked.write_bytes(findDocumentPath("00-baseline").read_bytes())
+    locked.chmod(0)
+    try:
+        with pytest.raises(ContainerError, match="Permission denied"):
+            readPackage(locked)
+    finally:
+        locked.chmod(0o600)
+
+
+def testRefusesADirectoryAsAContainerError(tmp_path: Path) -> None:
+    """A directory is named as one, rather than reported missing."""
+    with pytest.raises(ContainerError, match="is a directory"):
+        readPackage(tmp_path)
+
+
+def testRefusesAZipHoldingNoIWAMember(tmp_path: Path) -> None:
+    """A zip without the document's members is not a Numbers document."""
+    path = tmp_path / "exported.numbers"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("xl/workbook.xml", "<workbook/>")
+    with pytest.raises(ContainerError, match="not a Numbers document"):
+        readPackage(path)
