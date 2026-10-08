@@ -13,7 +13,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Command line
 
-Not built yet, and first in the [planned work](#planned). A command will print any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and YAML, CSV and other conversions will follow it. A terminal interface for browsing and editing a document comes after that.
+`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. It installs with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will print any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and YAML, CSV and other conversions will follow it. A terminal interface for browsing and editing a document comes after that.
 
 ## Python library
 

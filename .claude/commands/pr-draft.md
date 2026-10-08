@@ -69,7 +69,7 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
 - **A draft may be opened at any point, including mid-work.** Green is required to
   *leave* draft, not to enter it, `/pr-review-code` enforces that. Being feature complete
   with tests still being written is exactly what draft is for. See
-  [What review-ready means](../../CONTRIBUTING.md) for the three conditions.
+  [Open a Pull Request](../../CONTRIBUTING.md#3-open-a-pull-request) in `CONTRIBUTING.md` for the three conditions.
 
 ## `edit`: revising a filed body
 

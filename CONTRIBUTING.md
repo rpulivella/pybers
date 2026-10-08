@@ -1,143 +1,153 @@
 # Contributing to pybers
 
-pybers is an open source community project built by independent contributors. This guide is the single source of truth for how change flows into the repository, commits, branches, and release tags, and for where things live.
+pybers is an open source community project built by independent contributors. This guide takes a contribution from a ready ticket to its merge, and says at each step what must be true before the next one starts.
 
-Everyone taking part, in any space of this repository, follows the [code of conduct](CODE_OF_CONDUCT.md).
+Everyone taking part, in any space of this repository, follows the [code of conduct](CODE_OF_CONDUCT.md). A contribution written with an AI tool is held to the [AI policy](docs/ai-policy.md).
 
-A contribution written with an AI tool is held to the [AI policy](docs/ai-policy.md).
+## Contributors
 
-## Who contributes
-
-Write access is held by collaborators. The project draws no line between a collaborator and a maintainer, and uses the one term, maintainer. At present, only a maintainer may open a pull request, and anyone else contributes by filing an issue.
-
-Anyone can [report a bug](https://github.com/rpulivella/pybers/issues/new?template=bug.yml), [request a feature](https://github.com/rpulivella/pybers/issues/new?template=request.yml) or [ask a question](https://github.com/rpulivella/pybers/issues/new?template=question.yml). A security problem goes through the [security policy](SECURITY.md) instead.
-
-A maintainer writes a ticket from [the ticket template](docs/templates/ticket.md) or with `/ticket-create`. It opens with one sentence saying who wants what and why, then lists acceptance criteria that each state an outcome someone can check, never how to build it.
+Write access is held by collaborators, and the project calls every collaborator a maintainer. At present only a maintainer opens a pull request. Anyone can [report a bug](https://github.com/rpulivella/pybers/issues/new?template=bug.yml), [request a feature](https://github.com/rpulivella/pybers/issues/new?template=request.yml) or [ask a question](https://github.com/rpulivella/pybers/issues/new?template=question.yml), and a security problem goes through the [security policy](SECURITY.md) instead.
 
 A first-time contributor keeps at most one pull request open, and work that shows unguided AI use is closed under the [AI policy](docs/ai-policy.md).
 
-## How a ticket is referenced
+## Prerequisites
 
-Tickets are written `PYB-34` in prose and pull requests `PR #38`, never a bare number and never a bare `#`. Commit subjects are the exception and keep the bare `[34]`, as does `Closes #34`, which GitHub parses in no other form. The key is declared once in `pyproject.toml` under `[tool.pybers]`.
+- **A virtual environment at `.venv`**, holding pybers installed editable with its `dev` extra. Python 3.14 or later.
+- **A classic personal access token** with the `repo` and `project` scopes, in a git-ignored `.dev.vars` as `GITHUB_TOKEN=`. The ticket and pull request tools refuse to run without it, as [their README](scripts/README.md#ticketpy-authentication) explains.
+- **Claude Code, optionally.** Each step below names the skill in `.claude/commands/` that carries it out. A skill is a written procedure, so it can be followed by hand as well.
 
-## Commit message format
+One command runs every local gate, and it is the only one this guide shows:
 
-One scannable line per commit. The shape:
+```bash
+.venv/bin/python3 scripts/pr-preflight-check.py
+```
 
-- `[<N>] <prefix>: <summary>`, the ticket number first, in brackets, read from the branch name.
-- `[hotfix] <prefix>: <summary>`, a ticketless urgent or infrastructural change (tooling, a skill, CI, docs) where a ticket adds no value. Use sparingly.
+## Getting Started
 
-Rules: single line, no body, no footer; at most 60 characters including the bracket; imperative mood; a Conventional-Commits-inspired prefix always (`feat` `fix` `perf` `refactor` `style` `docs` `chore`). Never a `Co-Authored-By` trailer, it breaks the one-line log.
+### 1. Start a Ticket
+
+All work in this repository is contributed against a ticket. To get started, pick a ticket marked `Todo` on [the board](https://github.com/users/rpulivella/projects/3). A ready ticket is preferred to writing your own, and [Filing a Ticket](#filing-a-ticket) covers the case where none fits. pybers has a well-maintained harness, the skills, rules and documents an agent works from, that will expedite every step while keeping each one within the repository's rules and conventions.
+
+`/ticket-startwork` cuts a branch named `<type>/<N>-<title-slug>` from a current `develop` and moves the ticket to `In Progress`.
+
+**Before writing**, the branch must exist, cut from the `develop` on GitHub and not an older copy.
+
+### 2. Write the Change
+
+A competent Python developer would assume none of these:
+
+- **Read [the findings](docs/findings/FINDINGS.md) before designing anything.** Several of them make the obvious approach wrong, and a wrong offset in this format yields a plausible wrong number, never an exception.
+- **A number is `Decimal`, never `float`**, because Numbers stores decimal128.
+- **A formula is a tree of nodes.** The file holds no formula text, so nothing here parses or edits one as a string.
+- **Writing changes the archives that were read**, never new ones built from the model, and anything pybers does not understand is carried through untouched.
+- **Every change to what pybers writes earns a golden**: a real document, one mutation, opened in Numbers and confirmed by a maintainer, then kept as a regression test. [The golden README](tests/golden/README.md) says how, and `/golden-confirm` drives Numbers through it.
+- **Each feature is tested from both of its users**, a script calling `import pybers` and a command run in a terminal. The library prints nothing, and what a command prints follows [the command-line design](docs/cli-design.md).
+- **Functions, variables and parameters are camelCase**, methods are named subject first and verb last (`rowAdd`), and type names lead with their base noun (`Table`, `TableRow`). ruff and mypy are configured for it.
+- **The prose gate checks every comment, docstring and document** the way ruff checks code, because a wrong comment is a defect here.
+- **A commit is one line**, in the format under [Commits](#commits), and leaves the suite green. `/commit` writes it.
+
+**Before opening a pull request**, the preflight must pass.
+
+### 3. Open a Pull Request
+
+A pull request opens as a draft, filled from [the template](.github/pull_request_template.md), and carries its line in `CHANGELOG.md`. `/changelog-add` writes that line and `/pr-draft` opens the draft. Opening one early is encouraged, because a diff is easier to follow as it grows.
+
+**Before review**, three things must be complete: every acceptance criterion is met, tests belonging to the ticket were written and pass, and the full preflight passes.
+
+### 4. Review
+
+`/pr-review-code` moves the ticket to `Code Review`, runs the preflight, then reads the change against [the review rubric](docs/code-review-rubric.md), six questions asked of the change and never of the code around it. A clean review takes the pull request out of draft, and GitHub then runs two checks:
+
+- **`preflight`**, the same four gates the local command runs: pytest, the prose gate, ruff and mypy.
+- **`readiness`**, what exists only on a pull request: the template and its checklist, the CHANGELOG line, the ticket identifier, currency with `develop`, dependency advisories, and a confirmation date for every golden touched. Its report is posted as one comment, replaced on every run.
+
+**Before approval**, both checks must pass. Green means a person can now test the change, never that it is ready to merge.
+
+### 5. Approval
+
+A maintainer with authority over the project reviews the pull request and approves it on GitHub. Nothing merges without that approval, however green its checks.
+
+**Before merging**, a maintainer must have approved the pull request.
+
+### 6. Merge
+
+That maintainer runs `/pr-merge`, which merges the pull request into `develop` as a real merge, keeping its commits, and deletes its branch. The closing keyword closes the ticket, and the board marks it `Done` by itself. A ticket split across several pull requests stays open until the last one.
+
+## Filing a Ticket
+
+When no ready ticket fits, write one from [the ticket template](docs/templates/ticket.md): one sentence saying who wants what and why, then acceptance criteria that each state an outcome someone can check, never how to build it. Its title becomes the branch name, the pull request title and the CHANGELOG line. `/ticket-create` files it, and `/ticket-edit` revises it.
+
+A ticket filed as `Todo` is ready to start. A `Concept` ticket still needs a person to decide something, and goes back there whenever its specification turns out to be inadequate.
+
+## Skills
+
+| Skill | Where it serves |
+| --- | --- |
+| `/ticket-startwork` | 1. Start a Ticket |
+| `/commit` | 2. Write the Change |
+| `/golden-confirm` | 2. Write the Change, confirming a golden in Numbers |
+| `/standards` | 2. Write the Change, proofreading prose |
+| `/script-write` | 2. Write the Change, for a tool in `scripts/` |
+| `/changelog-add` | 3. Open a Pull Request |
+| `/pr-draft` | 3. Open a Pull Request, or revise its body |
+| `/pr-review-code` | 4. Review |
+| `/pr-merge` | 6. Merge |
+| `/ticket-create` | Filing a Ticket |
+| `/ticket-edit` | Filing a Ticket, revising one |
+| `/release-tag` | Releases |
+
+## Reference
+
+### Names
+
+A ticket is `PYB-34` in prose and a pull request `PR #38`, never a bare number and never a bare `#`. A commit subject keeps the bare `[34]`, and `Closes #34` keeps its `#` because GitHub parses no other form. The key is declared in `pyproject.toml` under `[tool.pybers]`.
+
+### Commits
+
+`[<N>] <prefix>: <summary>`: the ticket number from the branch name, a prefix from `feat` `fix` `perf` `refactor` `style` `docs` `chore`, and an imperative summary. One line of at most 60 characters, with no body and no `Co-Authored-By` trailer. A ticketless urgent change is `[hotfix] <prefix>: <summary>`, and it is rare.
 
 ```
 [14] feat: decode merged cell ranges from the merge store
 [31] fix: keep run indices aligned across astral characters
-[hotfix] docs: correct the install instructions
 ```
 
-## Branch strategy
+Each commit takes the prefix that describes it. A `feature/12-...` branch normally holds several `feat:` commits and then `docs:` or `fix:` as the work turns.
 
-**`develop` is the one long-lived trunk branch**, the default, and the release line. There is no `main` and there are no standing release branches: a solo project does not need a parallel production line, and a tag already records exactly what shipped.
+### Branches
 
-```
-per ticket:  <type>/<id>-verbose-slug  ->  PR into develop  ->  delete branch
-release:     annotated tag on develop  ->  CI build
-```
+`develop` is the one long-lived branch, and a tag records each release. A branch's `<type>` comes from its ticket's label: `feat` becomes `feature`, `fix` becomes `bugfix`, and `perf`, `refactor`, `docs` and `chore` stay as they are.
 
-- **`develop`** stays green. Every ticket merges here through a pull request, and the only thing that lands directly is the occasional `[hotfix]`, to a doc for example, which an administrator pushes past the rules below.
-- **`type`** is mapped from the ticket's label rather than copied from it, because two of the six read badly as a branch prefix: `feat` becomes `feature` and `fix` becomes `bugfix`, while `perf`, `refactor`, `docs` and `chore` are already their own prefix. Those six are the closed set.
-- **The branch prefix and the commit prefix are two different axes.** A branch carries one `type` for the life of the ticket; the commits inside it each carry whichever Conventional prefix describes that commit. A `feature/12-...` branch normally holds several `feat:` commits and then `docs:`, `fix:` and `refactor:` as the work turns.
+GitHub holds `develop` to these rules:
 
-## What `develop` enforces
-
-GitHub holds `develop` to these rules, which a reader without access to the repository settings cannot otherwise see:
-
-- No direct push
-- A pull request for every change
+- No direct push, and a pull request for every change
 - The `preflight` and `readiness` checks passing before a merge
-- No approving review required
-- No requirement to be up to date with `develop`, which the `readiness` report flags instead
-- An administrator able to bypass every rule above
+- One approving review from a maintainer, which an administrator bypasses on a pull request of their own, since GitHub permits no author to approve their own
+- No requirement to be current with `develop`, which `readiness` reports instead
+- An administrator is able to bypass each rule above
 
-## What review-ready means
+### Releases
 
-A pull request leaves draft when three things are true, and not before:
+`/release-tag` is used to issue every release, both betas and final releases, from `develop`. Since `CHANGELOG.md` is maintained during development, it provides the source of each release's notes.
 
-1. Every acceptance criterion the ticket carries is met.
-2. Test coverage appropriate to the ticket exists and passes. What is appropriate is a judgment the ticket's own criteria settle: a decoder earns assertions against a fixture whose contents are known independently, and a configuration change earns proof it takes effect.
-3. The gates pass. All four of them, which `scripts/pr-preflight-check.py` runs in one pass and reports together, so a failing run lists everything to fix rather than the first thing: pytest, the prose gate, ruff and mypy. GitHub runs that same command once the pull request leaves draft, so there is one gate list rather than two. This list is meant to grow rather than to stay accurate by omission.
+- **A beta** is issued as an annotated tag whose message contains its notes. `CHANGELOG.md` is left as it is and keeps receiving entries as development continues.
+- **A final release** is a tag and a GitHub release titled `pybers X.Y.Z`. One heading is added to `CHANGELOG.md`, `## X.Y.Z (build) - YYYY-MM-DD`, above the lines it published, capping that release and starting the next. New entries go above this heading, under `## Unreleased`, with one blank line between the heading and the entry just above it.
 
-**A draft PR is the right place to be feature complete with tests still being written.** Opening one early is encouraged, because the diff is easier to follow as it grows than as one arrival. Marking it ready for review is the assertion that all three hold.
-
-The board mirrors this: `Code Review` means an open, non-draft pull request. A branch whose tests are still being written stays `In Progress` even though the feature works.
-
-The standard a review is held to is [docs/code-review-rubric.md](docs/code-review-rubric.md), six questions asked of the change rather than of the repository around it.
-
-## What GitHub checks
-
-Nothing runs on a draft. Once a pull request leaves draft, GitHub shows two checks:
-
-- **`preflight`**, the four gates run locally, one step per gate.
-- **`readiness`**, what exists only at pull request level: the template, the checklist, the CHANGELOG entry, the ticket identifier, currency with `develop`, dependency advisories, and a confirmation date for every golden touched.
-
-A red `readiness` leaves `preflight` green, and `pr.py merge` refuses while either is red. A third workflow posts the report as one comment, replaced on every run. **Green means a person can now test the change, never that it is ready to merge.**
-
-Dependabot advises only. It emails a maintainer when an advisory affects a declared dependency or a workflow action, it opens no pull request, and a maintainer acts on the alert by filing a ticket.
-
-## One ticket, more than one pull request
-
-A ticket may take several pull requests, and the last one is not always obvious when the first opens. Two rules keep that honest:
-
-- **Every body carries its closing keyword.** That keyword is what links a pull request to its ticket on GitHub, and no API can make that link any other way. A pull request that is not the last for its ticket says so on its own line beneath the keyword.
-- **Whether a merge completes the ticket is decided at merge time**, and it completes it by default. `/pr-merge` asks. When the answer is no, `pr.py merge --ticket-stays-open` merges, GitHub closes the ticket on the keyword as it always does, and the tool reopens it and restores the Status it held.
-
-## Changelog
-
-Every pull request adds one line to the top of `CHANGELOG.md`'s `## Unreleased` list, `- [PYB-<N>] <ticket title, verbatim>`, and `/changelog-add` writes it. The `readiness` check fails a pull request that has none. A final release reconciles the list against every ticket marked Done, and each version is headed `## X.Y.Z (build) - date`, as the file's own header states.
-
-## Release tagging
-
-Releases are annotated tags on `develop`. There are no release branches.
+A release's notes group their lines by ticket label under short headings, in the order Features, Fixes, Performance, Refactoring, Documentation and Maintenance, each group in the order its lines were written. Miscellaneous comes last, holding every line with no such label, and the maintainer decides at publication which of them to include. A beta lists what is new since the previous beta first, and the rest under "In previous betas:".
 
 ```
-release/v<version>-b<NN>    # pre-release build iteration (b01, b02, ...)
-release/v<version>-Final    # shipped PyPI release
+release/v<version>-b<NN>    # a beta, tag only
+release/v<version>-Final    # a final release, tag and GitHub release
 ```
 
-- Lowercase prefix; a `v` prefix on the version; leading zeros on iterations (`-b01`, never `-b1`).
-- `<version>` is SemVer and matches the `version` field in `pyproject.toml`.
-- Never reuse a tag, increment the iteration for a rebuild.
-- Update `CHANGELOG.md`'s Unreleased section before a release tag (`/changelog-add`).
-
-## Build and verify
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-.venv/bin/python3 -m pytest                       # the suite, that exact spelling
-.venv/bin/python3 scripts/pr-preflight-check.py   # all four gates, what CI runs
-```
-
-pytest alone is a partial answer. The preflight runs pytest, the prose gate, ruff and mypy in one pass and reports all four. What it cannot answer is the pull request half: the template, the CHANGELOG, the branch's currency and the dependency advisories, which the readiness report adds on GitHub.
-
-Every commit leaves the test suite green. No exceptions.
-
-## Repository layout
+### Layout
 
 | Path | What lives here |
 | --- | --- |
-| `src/pybers/` | The library, a directory per feature with `_persistence/` and `_engine/` beneath them. `protos/` holds the extracted iWork schemas and `_generated/` the modules compiled from them. A leading underscore means a caller has no business there. |
-| `tests/` | The pytest suite, with `fixtures/` (origins), `measurements/` (one change from an origin) and `golden/` (files pybers wrote, confirmed in Numbers). Each directory's README catalogs its files. |
-| `docs/` | `decisions.md`, the settled decisions, and `findings/`, what the real files established about the format. |
-| `scripts/` | Repository tooling, including the ticket and pull request tools and the prose gate. |
+| `src/pybers/` | The library, a directory per feature, with the command line in `cli/`. A leading underscore means a caller has no business there. |
+| `tests/` | The suite, with `fixtures/` and `measurements/` (documents Numbers wrote) and `golden/` (documents pybers wrote and Numbers confirmed). Each README catalogs its files. |
+| `docs/` | The settled decisions, the format findings, the review rubric and the command-line design. |
+| `scripts/` | The ticket and pull request tools, the preflight and the prose gate. |
 | `tools/` | The schema and function extractors, run against a local `Numbers.app`. |
-| `.claude/` | The slash commands the agentic workflow runs. |
-| `.github/` | The pull request template and the three workflows that check a pull request. |
-| `workarea/` | Ephemeral scratch, git-ignored apart from its README. |
-
-## Code and prose style
-
-**Functions, variables and parameters are camelCase**, the opposite of what most Python tooling assumes, and ruff and mypy are configured for it. Modules stay lowercase and classes PascalCase. `CLAUDE.md` carries the rest of the house style.
-
-**The prose gate lints prose.** Documentation, docstrings and comments are checked against the project's writing rules the way ruff checks code, because a wrong comment is a defect here. `scripts/standards-check.py` runs it alone.
+| `.claude/commands/` | The skills. |
+| `.github/` | The templates and the three workflows that check a pull request. |
+| `workarea/` | Scratch space, ignored by git apart from its README. |
