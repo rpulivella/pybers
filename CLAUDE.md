@@ -5,9 +5,10 @@ documents. Built in deep respect for Apple Numbers itself, the goal is for editi
 `.numbers` file programmatically to be as reliable as using Numbers by hand.
 
 Two consumers, both from day one: a library (`import pybers`) and a CLI/TUI on top of
-it. Nothing under `src/pybers/` may import anything front-end or print anything, and
-both consumers reach the library through `import pybers` and nothing deeper.
-`pybers.cli` and `pybers.tui` do not exist yet.
+it. The command line lives at `pybers.cli`, built on Typer from the `cli` extra, and
+the terminal interface will live at `pybers.tui`. No other module under `src/pybers/`
+prints or imports either of them, and both reach the library through `import pybers`
+alone. `tests/test_library_boundary.py` enforces this.
 
 Apache-2.0. Hatchling, not setuptools. Dependencies are declared as floors, never pins.
 This is its own repository, on `develop`.
@@ -21,7 +22,10 @@ business reaching carries a leading underscore.
 ```
 pybers/
   __init__.py     the public surface, and the only import a caller or a CLI needs
+  __main__.py     python -m pybers, the same command as pybers
   addressing/     a cell's address and a rectangle of them, used by every feature
+  check/          whether pybers can read a document, for a bug report
+  cli/            the pybers command, one module per command, a front end
   document/       Document and Sheet, the walk that reads one and the one that saves it
   formula/        the node model, the function table, the text, and both archive halves
   table/          Cell, Table and merges, and both archive halves
@@ -138,6 +142,12 @@ about the format is measured against a fixture that labels its own contents.
   always. Commit subjects keep the bare `[34]`; `Closes #34` keeps its `#`.
 - Module header on every file: `#!/usr/bin/env python3`, docstring, then `__author__`
   through `__date__`. **No `# -*- coding: utf-8 -*-`**, dropped 2026-09-02, `UP009`.
+
+## Command-line output
+
+**Everything a command prints follows `docs/cli-design.md`**, the design system for
+pybers in a terminal. Read it before writing a command, and add a convention there
+before a second command needs it.
 
 ## Comments and docstrings
 

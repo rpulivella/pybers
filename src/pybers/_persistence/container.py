@@ -20,6 +20,8 @@ support, and a reader that carries it survives a file this developer has not
 seen yet. Record what varies; refuse what cannot be verified.
 
 UPDATES
+2026-10-07  A directory, an unreadable file and a zip holding no IWA member are
+            refused by name, for PYB-169.
 2026-09-14  A package can gain an IWA member, and be restored after a failed
             save, for PYB-63.
 2026-08-16  Written. Round-trips empty-1/2/3.numbers byte for byte.
@@ -176,6 +178,11 @@ def readPackage(path: Path) -> NumbersPackage:
     Members are read in the order the zip lists them, and that order is kept,
     because reproducing it is part of writing the file back unchanged.
     """
+    if path.is_dir():
+        raise ContainerError(
+            f"{path} is a directory, and pybers reads a .numbers document saved as "
+            "a single file."
+        )
     if not path.is_file():
         raise ContainerError(f"No such file: {path}")
 
@@ -205,7 +212,16 @@ def readPackage(path: Path) -> NumbersPackage:
                         StoredMember(name=info.filename, data=data)
                     )
     except zipfile.BadZipFile as exc:
-        raise ContainerError(f"{path} is not a readable zip archive.") from exc
+        raise ContainerError(
+            f"{path} is not a Numbers document, because it is not a zip archive."
+        ) from exc
+    except OSError as exc:
+        raise ContainerError(f"{path} could not be read: {exc.strerror}.") from exc
+    if not package.iwaFiles:
+        raise ContainerError(
+            f"{path} is not a Numbers document, because it holds no "
+            f"{indexPrefix}*{iwaSuffix} member."
+        )
     return package
 
 

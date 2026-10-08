@@ -7,6 +7,7 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-10-07  An unknown kind keeps the record's own type, for PYB-169.
 2026-10-01  Written for PYB-141, replacing `Cell.errored`, its chosen-format flag
             and its rich-text marker.
 """
@@ -68,12 +69,14 @@ class CellDescription:
     """A cell's stored kind, its format, and whether a person chose that format.
 
     `format` is None when the record names none, or once an edit changed the kind,
-    since the save then decides it. A failed formula is the `ERROR` kind.
+    since the save then decides it. A failed formula is the `ERROR` kind, and an
+    `UNKNOWN` kind keeps the record's own type in `unrecognizedTypeCode`.
     """
 
     kind: CellKind
     format: CellFormat | None
     formatChosen: bool
+    unrecognizedTypeCode: int | None = None
 
 
 emptyDescription: CellDescription = CellDescription(CellKind.EMPTY, None, False)

@@ -37,6 +37,8 @@ UPDATES
 2026-09-14  A sheet carries the identifier of the archive it was read from,
             for PYB-63.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
+2026-10-07  A package already read becomes a document through `readDocument`,
+            for PYB-169.
 """
 from __future__ import annotations
 
@@ -54,9 +56,7 @@ from .._engine import readTableIdentities
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import (
-    readPackage,
-)
+from .._persistence import NumbersPackage, readPackage
 from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import ReadError
@@ -100,7 +100,11 @@ def open(path: Path | str) -> Document:  # noqa: A001
     site. The builtin is still reachable here as `builtins.open`.
     """
     source = Path(path)
-    package = readPackage(source)
+    return readDocument(readPackage(source), source)
+
+
+def readDocument(package: NumbersPackage, source: Path) -> Document:
+    """Build a `Document` from a package already read from `source`."""
     index = ArchiveIndex(package)
     root = findRoot(index)
 
@@ -120,4 +124,4 @@ def open(path: Path | str) -> Document:  # noqa: A001
     return document
 
 
-__all__ = ["ArchiveIndex", "ReadError", "open"]
+__all__ = ["ArchiveIndex", "ReadError", "open", "readDocument"]
