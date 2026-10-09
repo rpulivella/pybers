@@ -11,6 +11,7 @@ and raises nothing on the way.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-09  A refused write names what the cell holds in words, for PYB-168.
 2026-10-01  The format slots moved to `_persistence.cells`, and a cell's chosen
             format is read from its description, for PYB-141.
 2026-09-30  A date is written over a date and a duration over a duration, for
@@ -53,8 +54,22 @@ from .._persistence.decimal128 import Decimal128, encodedLength
 from .._persistence.index import ArchiveIndex
 from ..addressing.reference import originOffset
 from ..errors import WriteError
+from ._read import storedKinds
 from ._refcounts import StringPool, stringTypeByte
 from .cells import Cell
+from .kinds import CellKind
+
+# How a refusal names what a cell holds, in the words a person would use.
+kindPhrases: dict[CellKind, str] = {
+    CellKind.NUMBER: "a number",
+    CellKind.CURRENCY: "a currency amount",
+    CellKind.TEXT: "text",
+    CellKind.RICH_TEXT: "rich text",
+    CellKind.DATE_TIME: "a date",
+    CellKind.DURATION: "a duration",
+    CellKind.BOOLEAN: "a checkbox value",
+    CellKind.ERROR: "a formula that failed",
+}
 
 # The type bytes a numeric record may carry. 2 is a plain number and 10 is
 # currency, which is the same encoding under a different type.
@@ -144,6 +159,16 @@ def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
         )
 
 
+def formatStoredValue(record: CellRecord) -> str:
+    """Return what a record holds as a person would say it: `is empty`, `holds text`."""
+    kind = storedKinds.get(record.typeByte)
+    if kind is None:
+        return f"holds a value of a type pybers does not recognize, {record.typeByte}"
+    if kind is CellKind.EMPTY:
+        return "is empty"
+    return f"holds {kindPhrases.get(kind, kind.value)}"
+
+
 def buildWrittenRecord(
     cell: Cell,
     record: CellRecord,
@@ -203,33 +228,31 @@ def buildWrittenRecord(
             )
         if record.typeByte not in numericTypeBytes:
             raise WriteError(
-                f"{cell.reference} holds a value of type {record.typeByte} and a "
-                "Decimal was written into it. Only a number, a currency amount and "
-                "text can be written over so far."
+                f"{cell.reference} {formatStoredValue(record)}, and pybers can write "
+                "a number only into a cell holding a number, a currency amount or text."
             )
         return patchRecord(record, value)
 
     if isinstance(value, datetime.datetime):
         if record.typeByte != dateTypeByte:
             raise WriteError(
-                f"{cell.reference} holds a value of type {record.typeByte} and a "
-                "date was written into it. A date can only be written over a date "
-                "so far."
+                f"{cell.reference} {formatStoredValue(record)}, and pybers can write "
+                "a date only into a cell holding a date."
             )
         return patchDateRecord(record, value)
 
     if isinstance(value, datetime.timedelta):
         if record.typeByte != durationTypeByte:
             raise WriteError(
-                f"{cell.reference} holds a value of type {record.typeByte} and a "
-                "duration was written into it. A duration can only be written over "
-                "a duration so far."
+                f"{cell.reference} {formatStoredValue(record)}, and pybers can write "
+                "a duration only into a cell holding a duration."
             )
         return patchSecondsRecord(record, value.total_seconds())
 
     raise WriteError(
-        f"{cell.reference} was set to {type(value).__name__}, and only a Decimal, "
-        "a str, a date or a duration can be written so far."
+        f"{cell.reference} was given a {type(value).__name__}, and pybers can write "
+        "only a number as Decimal, text as str, a date as datetime or a duration as "
+        "timedelta."
     )
 
 
