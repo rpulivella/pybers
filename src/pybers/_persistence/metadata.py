@@ -15,6 +15,7 @@ stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Built on the save's one index, which every change passes through, and
             an archive's component found from it rather than kept beside it, for
@@ -250,8 +251,7 @@ class PackageRegistry:
             info = tspArchive.ArchiveInfo()
             info.ParseFromString(archive.infoBytes)
             for target in (
-                target for message in info.message_infos
-                for target in message.object_references
+                *message.object_references for message in info.message_infos
             ):
                 derived.add(self.externalFor(target))
         return {pair for pair in derived if pair[0] != componentId}

@@ -7,6 +7,7 @@ compares what the file declares with what its cells actually reference rather th
 asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
             spent formats and merges for its AC 9 and 10. Strings and styles
             a merge removes, and spent strings, for PYB-92, with formulas and
@@ -665,7 +666,7 @@ def findDisagreeingPools(path: Path) -> list[str]:
             for record in records if carriesFormula(record)
         )
         richText = Counter(
-            key for record in records for key in listRichTextClaims(record)
+            *listRichTextClaims(record) for record in records
         )
         for name, present, reference, counted in (
             ("formula", store.formula_table.identifier, store.formula_table, formulas),
