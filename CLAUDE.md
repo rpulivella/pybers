@@ -38,9 +38,11 @@ pybers/
 A feature with no archive half yet is a module rather than a directory, and becomes a
 directory the day it gains a `_read.py`. That is how `formula` and `table` grew.
 
-Reasoning for settled decisions lives in `docs/decisions.md`. Format measurements live
-in `docs/findings/findings-*.md`. **Read the findings index before designing anything**,
-because several of them invalidate the obvious approach.
+The shape every public call and command follows is in `docs/library-design.md` and
+`docs/cli-design.md`, and the reasoning for settled decisions in `docs/decisions.md`.
+Format measurements live in `docs/findings/findings-*.md`.
+**Read the findings index before designing anything**, because several of them
+invalidate the obvious approach.
 
 ## Build and gates
 
