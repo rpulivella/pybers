@@ -396,8 +396,8 @@ def measureValueWidth(record: CellRecord) -> int:
     if record.typeByte in numericTypeBytes:
         return encodedLength
     raise WriteError(
-        f"A record of type {record.typeByte} holds a value this library cannot "
-        "measure, so the references behind it cannot be placed."
+        f"The cell in column {record.column + originOffset} "
+        f"{formatStoredValue(record)}, and changing its type is not supported."
     )
 
 

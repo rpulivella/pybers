@@ -131,7 +131,7 @@ def registerFormulaCells(
         raise WriteError(
             f"No dependency tile covers {uncovered}, so a formula written there would "
             "be registered in one of the engine's two registers and not the other. "
-            "Creating a tile beyond column 0 has never been measured."
+            "Creating a tile beyond column 0 is not supported."
         )
 
     componentId = registry.componentRequire(owner.identifier)

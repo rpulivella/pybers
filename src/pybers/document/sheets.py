@@ -116,8 +116,7 @@ def selectByName[NamedT: Named](
         positions = ", ".join(str(position) for position, _ in matched)
         raise SelectionError(
             f"{len(matched)} {kind}s in {within} are named {name!r}, at positions "
-            f"{positions}. A name more than one carries selects neither, so reach "
-            f"for one of them by position instead."
+            f"{positions}. Reach one by position instead."
         )
     return matched[0][1]
 

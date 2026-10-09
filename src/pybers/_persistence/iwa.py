@@ -238,9 +238,8 @@ def splitFrames(data: bytes) -> list[bytes]:
         flag = data[offset]
         if flag != compressedFrameFlag:
             raise IWAError(
-                f"Frame at byte {offset} has flag 0x{flag:02x}, not "
-                f"0x{compressedFrameFlag:02x}. No file examined has ever carried "
-                "another value, so this one is worth studying rather than guessing at."
+                f"Frame at byte {offset} has flag 0x{flag:02x}, which no Numbers file "
+                "has been seen to use."
             )
         compressedLength = int.from_bytes(data[offset + 1:offset + 4], "little")
         start = offset + frameHeaderLength

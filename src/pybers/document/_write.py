@@ -133,7 +133,9 @@ def writeAtomically(package: NumbersPackage, target: Path) -> None:
     """
     directory = target.parent
     if not directory.is_dir():
-        raise WriteError(f"Cannot save to {target}: {directory} is not a directory.")
+        raise WriteError(
+            f"{target} cannot be saved, because {directory} is not a directory."
+        )
 
     # Opened only to reserve a unique name in the target's own directory, so that
     # the replace below is atomic on the same filesystem. `delete=False` keeps the
@@ -170,8 +172,8 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
     if package is None:
         raise WriteError(
             "This document carries no archives, so there is nothing to write. Only "
-            "a document from `pybers.open` can be saved; building one from scratch "
-            "is not supported yet."
+            "a document from `pybers.open` can be saved, and building one from "
+            "scratch is not supported."
         )
     # Created sheets and tables change both the package and the model's identifiers,
     # so a save that fails part way undoes both rather than leaving a retry to

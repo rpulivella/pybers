@@ -104,8 +104,8 @@ class Decimal128:
         if len(digits) > maximumSignificantDigits:
             raise Decimal128Error(
                 f"{self.value} carries {len(digits)} significant digits, and "
-                f"decimal128 holds {maximumSignificantDigits}. Round it yourself if "
-                "that is what you intend, so the rounding is yours."
+                f"decimal128 holds {maximumSignificantDigits}. Round it first if that "
+                "is what you intend."
             )
         if not 0 <= exponent + exponentBias <= maximumBiasedExponent:
             raise Decimal128Error(

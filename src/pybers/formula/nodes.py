@@ -294,9 +294,7 @@ class FormulaReference:
         """
         if self.broken:
             raise FormulaError(
-                "This reference is broken and names no cell. Numbers stores it "
-                "with sentinel coordinates precisely because there is nothing "
-                "left to point at."
+                "This reference is broken and names no cell."
             )
         if self.column is None or self.row is None:
             raise FormulaError(
