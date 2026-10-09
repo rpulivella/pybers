@@ -17,7 +17,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Python library
 
-pybers needs Python 3.14 or newer, and its one runtime dependency is `protobuf`. Until the first release, install it from a clone:
+pybers needs Python 3.15 or newer, and its one runtime dependency is `protobuf`. Until the first release, install it from a clone:
 
 ```bash
 pip install -e .

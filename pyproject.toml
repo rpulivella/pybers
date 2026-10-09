@@ -7,7 +7,7 @@ name = "pybers"
 version = "0.1.0"
 description = "A clean, round-trip-tested Python library for reading and writing Apple Numbers documents."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 authors = [
     { name = "Richard P Ulivella", email = "pybers@richardulivella.com" },
 ]
