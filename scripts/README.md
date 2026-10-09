@@ -16,7 +16,7 @@ through [`rich`](https://github.com/Textualize/rich). The house rules below gove
 `src/pybers/` (the library itself) follows the same core conventions but uses dataclasses
 rather than TypedDict for data, and is documented in `CLAUDE.md`.
 
-> Requires Python 3.15+. `rich` is required; `rich_argparse` is optional (the `--help`
+> Requires the Python that `requires-python` in `pyproject.toml` names. `rich` is required; `rich_argparse` is optional (the `--help`
 > output falls back to plain argparse without it). Per-script extras are noted in each
 > file's docstring.
 

@@ -17,7 +17,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Python library
 
-pybers needs Python 3.15 or newer, and its one runtime dependency is `protobuf`. Until the first release, install it from a clone:
+pybers needs the Python that `requires-python` in `pyproject.toml` names, and its one runtime dependency is `protobuf`. Until the first release, install it from a clone:
 
 ```bash
 pip install -e .
@@ -60,7 +60,7 @@ Numeric values are `Decimal`, never `float`, because Numbers stores them as deci
 - Rich text: styled runs inside a cell, named paragraph styles, OpenType features, tracking and leading ([PYB-125](https://github.com/rpulivella/pybers/issues/125), [PYB-119](https://github.com/rpulivella/pybers/issues/119), [PYB-129](https://github.com/rpulivella/pybers/issues/129), [PYB-131](https://github.com/rpulivella/pybers/issues/131))
 - Table appearance: banding, gridlines and outlines ([PYB-123](https://github.com/rpulivella/pybers/issues/123))
 - Text boxes, shapes and images on a sheet ([PYB-87](https://github.com/rpulivella/pybers/issues/87))
-- The functions added to Numbers after version 15.3.1 ([PYB-139](https://github.com/rpulivella/pybers/issues/139))
+- The functions added to Numbers after the release its schemas were extracted from, recorded in [`src/pybers/protos/README.md`](src/pybers/protos/README.md) ([PYB-139](https://github.com/rpulivella/pybers/issues/139))
 - A release on PyPI ([PYB-148](https://github.com/rpulivella/pybers/issues/148))
 
 ### Not planned
