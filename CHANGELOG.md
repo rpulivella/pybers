@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-181] Move pybers to Python 3.15 for lazy imports
 - [PYB-168] Design how the command line and the library divide pybers
 - [PYB-182] Move the maintainer's own rules into CLAUDE.local.md
 - [PYB-170] Make CONTRIBUTING.md a complete path to a contribution
