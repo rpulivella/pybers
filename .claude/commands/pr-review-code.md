@@ -95,6 +95,8 @@ repeating its checks or assuming nobody made them.
    the checklist, the CHANGELOG entry, the ticket identifier, the branch's currency,
    dependency advisories and golden confirmations, so a review that ignores it repeats
    work or misses a miss.
+   A failed check is read with `.venv/bin/python3 scripts/pr.py logs <N>`, which prints
+   each error its jobs logged, since a job that dies before its last step posts no comment.
 7. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
 8. **Only on green gates with no unresolved finding**, check `I performed a self-review`
