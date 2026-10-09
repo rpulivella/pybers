@@ -47,9 +47,9 @@ def listLoadedProtobufModules(*arguments: str) -> list[str]:
 
 
 @pytest.mark.parametrize("arguments", [("--help",), ("check", "--help")])
-def test_help_loads_no_protobuf(arguments: tuple[str, ...]) -> None:
+def testHelpLoadsNoProtobuf(arguments: tuple[str, ...]) -> None:
     assert listLoadedProtobufModules(*arguments) == []
 
 
-def test_probe_sees_protobuf_once_a_document_is_read() -> None:
+def testProbeSeesProtobufOnceADocumentIsRead() -> None:
     assert "google.protobuf" in listLoadedProtobufModules("check", "missing.numbers")
