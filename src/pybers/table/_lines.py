@@ -129,7 +129,7 @@ def buildLineMap(
     if kept != sorted(kept):
         raise WriteError(
             f"The {axis} of {name!r} are in a different order from the file's, and "
-            "only adding and removing them is written."
+            "reordering them is not supported."
         )
     return LineMap(lines, len(wanted))
 

@@ -52,7 +52,7 @@ def refuseUnmovableEngineState(
     if dependencies.whole_owner_dependencies.dependent_cells.ByteSize():
         raise WriteError(
             f"{name!r} holds a formula the engine records as reading the whole "
-            "table, and moving that record is not measured."
+            "table, and moving that record is not supported."
         )
 
 
@@ -108,9 +108,8 @@ def remapSpills(
             spill.spill_size.num_rows or 1, spill.spill_size.num_columns or 1,
         ):
             raise WriteError(
-                f"{name!r} has an edit landing inside a formula's spill, and Numbers "
-                "re-flows a spill rather than moving it, which means evaluating the "
-                "formula."
+                f"{name!r} has an edit landing inside a formula's spill. Numbers "
+                "re-flows a spill by evaluating its formula, which is not supported."
             )
     # A moved spill is listed first, as Numbers listed it in both measurements
     # where one moved and one stayed.

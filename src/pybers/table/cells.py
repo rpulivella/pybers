@@ -531,8 +531,7 @@ class Table:
         # rule.
         if extent.start == extent.end:
             raise ReferenceError(
-                f"{extent} is one cell, and a merge joins two or more. Numbers has no "
-                "way to make a single-cell merge, so neither does this."
+                f"{extent} is one cell, and a merge joins two or more."
             )
         merge = MergeRange(extent)
         # Checked against the whole block before anything is discarded, so a refused

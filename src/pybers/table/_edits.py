@@ -384,8 +384,8 @@ def applyTableEdits(
                     raise WriteError(
                         f"Row {missing + originOffset} of {table.name!r} is the first "
                         f"row of an empty tile in a table of {table.colCount} columns. "
-                        "Numbers' first row for more than 255 columns has not been "
-                        "measured, so it is not written."
+                        "Writing that row for more than 255 columns is not "
+                        "supported."
                     )
                 createRowStorage(tile, missing - firstRow)
                 createdRows.add(missing)

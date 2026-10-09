@@ -152,7 +152,7 @@ class Parser:
     def parse(self) -> Formula:
         """Parse the whole text, refusing anything left over at the end."""
         if self.peek().kind == "end":
-            raise self.fail("A formula says something, and this says nothing.")
+            raise self.fail("The formula is empty.")
         self.parseExpression()
         if self.peek().kind != "end":
             raise self.fail("This is left over after a complete formula.")

@@ -130,7 +130,7 @@ def writeZipWithoutDocument(tmp_path: Path) -> Path:
 @pytest.mark.parametrize(
     ("prepare", "reason"),
     [
-        (findAbsentPath, "No such file"),
+        (findAbsentPath, "does not exist"),
         (findDirectoryPath, "is a directory"),
         (writeTextFile, "not a zip archive"),
         (writeZipWithoutDocument, "holds no Index/*.iwa member"),

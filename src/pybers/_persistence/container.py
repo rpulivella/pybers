@@ -184,7 +184,7 @@ def readPackage(path: Path) -> NumbersPackage:
             "a single file."
         )
     if not path.is_file():
-        raise ContainerError(f"No such file: {path}")
+        raise ContainerError(f"{path} does not exist.")
 
     package = NumbersPackage()
     try:
@@ -268,4 +268,4 @@ def writePackage(package: NumbersPackage, path: Path) -> None:
                     )
                 archive.writestr(toZipInfo(info), data)
     except OSError as exc:
-        raise ContainerError(f"Could not write {path}: {exc}") from exc
+        raise ContainerError(f"{path} could not be written: {exc.strerror}.") from exc

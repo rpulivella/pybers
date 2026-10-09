@@ -464,7 +464,7 @@ def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     at = findFormulaKeyOffset(record)
     if len(raw) < at:
         raise WriteError(
-            f"column {record.column} is {len(raw)} bytes and its formula key would "
+            f"Column {record.column} is {len(raw)} bytes and its formula key would "
             f"sit at {at}, past the end."
         )
     patched = bytearray(raw)
@@ -486,7 +486,7 @@ def detachFormulaKey(raw: bytes, record: CellRecord) -> bytes:
     at = findFormulaKeyOffset(record)
     if len(raw) < at + referenceWidth:
         raise WriteError(
-            f"column {record.column} is marked as carrying a formula, but its record "
+            f"Column {record.column} is marked as carrying a formula, but its record "
             f"is {len(raw)} bytes and the key would sit at {at}."
         )
     patched = bytearray(raw)
@@ -504,8 +504,8 @@ def patchFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     at = findFormulaKeyOffset(record)
     if len(raw) < at + referenceWidth:
         raise WriteError(
-            f"{record.column} is marked as carrying a formula, but its record is "
-            f"{len(raw)} bytes and the key would sit at {at}."
+            f"Column {record.column} is marked as carrying a formula, but its record "
+            f"is {len(raw)} bytes and the key would sit at {at}."
         )
     return raw[:at] + key.to_bytes(referenceWidth, "little") + raw[at + referenceWidth:]
 
