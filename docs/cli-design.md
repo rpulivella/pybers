@@ -66,7 +66,8 @@ A command shows a formula as the library returns it, stored and never recalculat
 
 ## Errors
 
-- **A refusal is one line on stderr**, naming the command, the file and the reason the library's error gives: `pybers check: No such file: /tmp/a.numbers`.
+- **A refusal is one line on stderr**, naming the command, the file and the reason the library's error gives: `pybers check: /tmp/a.numbers does not exist.`
+- **A message the command writes itself** follows the library's rule for wording an error.
 - **`--debug`, or `PYBERS_DEBUG=1`, replaces that line with the full traceback.** Tracebacks never show local variables, because one can hold a cell's value.
 
 ## Exit status

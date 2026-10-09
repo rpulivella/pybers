@@ -73,4 +73,4 @@ pybers reports what a document stores and never calculates. A formula is returne
 
 ## Errors
 
-Every error is a `PybersError`, carrying a message that names the file and the reason. A document pybers cannot read raises `ReadError`, a write it cannot complete `WriteError`, and a feature's own errors live with that feature. A call never prints an error. It returns a failure only when examining one is its purpose, as `checkDocument` does, and raises every other.
+Every error is a `PybersError`, carrying a message that names the file and the reason. A message opens with what it is about, says what is wrong, then what to do. It says `pybers`, never "this library", calls a limit of pybers "not supported", and cuts any clause the reader does not need. A document pybers cannot read raises `ReadError`, a write it cannot complete `WriteError`, and a feature's own errors live with that feature. A call never prints an error. It returns a failure only when examining one is its purpose, as `checkDocument` does, and raises every other.
