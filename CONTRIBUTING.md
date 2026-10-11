@@ -12,7 +12,7 @@ A first-time contributor keeps at most one pull request open, and work that show
 
 ## Prerequisites
 
-- **A virtual environment at `.venv`**, holding pybers installed editable with its `dev` extra. Python 3.14 or later.
+- **A virtual environment at `.venv`**, holding pybers installed editable with its `dev` extra, on the Python that `requires-python` in `pyproject.toml` names.
 - **A classic personal access token** with the `repo` and `project` scopes, in a git-ignored `.dev.vars` as `GITHUB_TOKEN=`. The ticket and pull request tools refuse to run without it, as [their README](scripts/README.md#ticketpy-authentication) explains.
 - **Claude Code, optionally.** Each step below names the skill in `.claude/commands/` that carries it out. A skill is a written procedure, so it can be followed by hand as well.
 

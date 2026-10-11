@@ -7,6 +7,7 @@ is given, reads correctly and saves correctly, so no behavioral test notices. Th
 read the source instead.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-22  Written for PYB-113.
 """
 from __future__ import annotations
@@ -148,10 +149,9 @@ def listLiteralTypeIds(path: Path) -> list[str]:
 def testNoModuleSpellsATypeIdentifierOutsideTheRegistry() -> None:
     """PYB-113 AC 4."""
     found = [
-        finding
+        *listLiteralTypeIds(path)
         for path in sorted(packageRoot.rglob("*.py"))
         if "_generated" not in path.parts and path.name != "types.py"
-        for finding in listLiteralTypeIds(path)
     ]
 
     assert found == []

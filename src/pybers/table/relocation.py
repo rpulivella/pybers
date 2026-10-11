@@ -10,6 +10,7 @@ on without asking, measured 2026-09-23 in `60e-move-overwrite`, and pybers refus
 instead, since that discards a value nobody asked to lose.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-29  The refusals name the action, so a copy shares them, for PYB-136.
 2026-09-24  A move returns every formula left reading a cell it emptied.
 2026-09-23  Written for PYB-18.
@@ -150,7 +151,7 @@ def findNamedCellRewrites(
     )
     tables = (
         [table] if table.document is None
-        else [other for sheet in table.document.sheets for other in sheet.tables]
+        else [*sheet.tables for sheet in table.document.sheets]
     )
     rewritten: dict[int, tuple[Cell, tuple[Formula | None, tuple[Formula, ...]]]] = {}
     for host in tables:
@@ -211,7 +212,7 @@ def findStrandedCells(table: Table, move: CellsMove) -> list[Cell]:
     ]
     tables = (
         [table] if table.document is None
-        else [other for sheet in table.document.sheets for other in sheet.tables]
+        else [*sheet.tables for sheet in table.document.sheets]
     )
     return [
         cell

@@ -46,7 +46,8 @@ trigger sitting on it.
    refuses any CI state other than passed, including a state it could not read. Neither
    refusal is restated as a step here, because a check a skill performs is a check a
    skimmed skill skips. A check canceled by a GitHub outage is restarted with
-   `.venv/bin/python3 scripts/pr.py rerun <N>`.
+   `.venv/bin/python3 scripts/pr.py rerun <N>`. A check that failed for any other reason
+   is read with `.venv/bin/python3 scripts/pr.py logs <N>` before anything is restarted.
 5. **Get `develop` current, and read what the pull printed.**
    ```
    git checkout develop

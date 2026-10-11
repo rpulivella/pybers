@@ -8,6 +8,7 @@ merges span rows as well as columns. `20-formula-shapes` carries the measurement
 the ticket quotes, 26 stored cells in a declared grid of 96.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-14  Written for PYB-62.
 """
 from __future__ import annotations
@@ -116,7 +117,7 @@ def testIndexingPastTheEndRaisesIndexError() -> None:
 def testWalkingRowByRowYieldsWhatTheWholeWalkYields() -> None:
     table = openMergedTable()
 
-    assert [cell for row in table.rows for cell in row] == list(table.gridIterate())
+    assert [*row for row in table.rows] == list(table.gridIterate())
 
 
 def testARowTakenBeforeAMergeHoldsWhatTheMergeLeft() -> None:

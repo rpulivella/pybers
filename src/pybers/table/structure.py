@@ -20,6 +20,7 @@ single selected cell does, which is what `56f` and `56g` were made from.
 is unmerged rather than kept, both measured in `57-anchors-*` and `57-collapse-*`.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-24  A cell's highlighting conditions follow the edit too, for PYB-18.
 2026-09-18  Written for PYB-17.
 """
@@ -202,7 +203,7 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
 
     tables = (
         [table] if table.document is None
-        else [other for sheet in table.document.sheets for other in sheet.tables]
+        else [*sheet.tables for sheet in table.document.sheets]
     )
     formulas: dict[int, Formula] = {}
     conditions: dict[int, tuple[Formula, ...]] = {}

@@ -7,6 +7,7 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-16  `allDocuments` and `findDocumentPath` gathered here for PYB-90, so a
             test finds a document without knowing whether it is an origin.
 2026-09-08  `dataListBytes` gathered here for #13, so that two golden
@@ -41,7 +42,7 @@ documentDirectories: tuple[Path, ...] = (
 )
 
 allDocuments: list[Path] = sorted(
-    (path for directory in documentDirectories for path in directory.glob("*.numbers")),
+    (*directory.glob("*.numbers") for directory in documentDirectories),
     key=lambda path: path.name,
 )
 

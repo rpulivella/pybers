@@ -32,6 +32,7 @@ Usage:
     python3 scripts/pr.py export-as-source 8 --title
     python3 scripts/pr.py ready 8
     python3 scripts/pr.py rerun 8
+    python3 scripts/pr.py logs 8 --context 30
     python3 scripts/pr.py merge 8 --subject "[14] feat: add a thing"
     python3 scripts/pr.py merge 8 --subject "..." --delete-branch
 
@@ -39,6 +40,8 @@ Requires rich:
     /usr/bin/env python3 -m pip install --upgrade rich
 
 UPDATES
+2026-10-09  Added `logs`, which prints each error a failed job logged, after both
+            checks on PR #191 failed with no readiness comment, for PYB-181.
 2026-10-06  A skipped run no longer hides another run of the same check, after a tie
             on the start time reported PR #174's readiness as skipped, for PYB-175.
 2026-10-05  Added `rerun`, which restarts a pull request's canceled or failed workflow
@@ -101,10 +104,13 @@ import argparse
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from dataclasses import dataclass
+from email.message import Message
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import IO, Any, TypedDict
 
 # scripts/ is not a package, but Python puts a script's OWN directory at the
 # front of sys.path, so this resolves to scripts/ticket.py and takes precedence
@@ -148,6 +154,11 @@ ticketClosePauseSeconds: float = 3.0
 # and only one of them is a fact this tool holds.
 notFoundExitCode: int = 1
 errorExitCode: int = 2
+
+# Lines printed before each error a job logs. The runner's cleanup fills the end
+# of every log, so the error lines locate the cause and the tail does not.
+defaultLogContext: int = 12
+errorLogMarker: str = "##[error]"
 
 # The pull request template, and the authority on what a body may look like.
 # Read here because nothing else in this repository reads it: `/pr-draft` tells
@@ -479,6 +490,119 @@ def readWorkflowRuns(token: str, sha: str) -> list[WorkflowRun]:
             runId=run["id"], name=run["name"], conclusion=run.get("conclusion") or ""
         )
     return list(latest.values())
+
+
+@dataclass(frozen=True)
+class JobFailure:
+    """One job that did not succeed, with the steps that failed and its log."""
+
+    workflow: str
+    name: str
+    conclusion: str
+    failedSteps: tuple[str, ...]
+    log: str
+
+
+class RedirectRefusal(urllib.request.HTTPRedirectHandler):
+    """Surface a redirect instead of following it with the token attached."""
+
+    def redirect_request(
+        self, req: urllib.request.Request, fp: IO[bytes], code: int, msg: str,
+        headers: Message, newurl: str,
+    ) -> None:
+        """Decline every redirect, so urllib raises it as an HTTPError instead."""
+        return None
+
+
+def readJobLog(token: str, jobId: int) -> str:
+    """Return one job's log as text.
+
+    GitHub answers with a redirect to signed storage. Following it with urllib
+    would forward the Authorization header to a host that has no business seeing
+    the token, so the redirect is read and fetched again without it.
+    """
+    url = (
+        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+        f"{ticket.repositoryName}/actions/jobs/{jobId}/logs"
+    )
+    request = urllib.request.Request(url)
+    request.add_header("Authorization", f"Bearer {token}")
+    request.add_header("Accept", "application/vnd.github+json")
+    request.add_header("User-Agent", "pybers-ticket-tool")
+    request.add_header("X-GitHub-Api-Version", "2022-11-28")
+    opener = urllib.request.build_opener(RedirectRefusal)
+    try:
+        with opener.open(request, timeout=30) as response:
+            return response.read().decode(errors="replace")
+    except urllib.error.HTTPError as exc:
+        location = exc.headers.get("Location") if exc.code in (301, 302, 307) else None
+        if location is None:
+            detail = exc.read().decode(errors="replace")
+            raise ticket.GitHubHttpError(
+                exc.code, f"GitHub returned HTTP {exc.code}: {detail}"
+            ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Could not reach GitHub: {exc.reason}") from exc
+    try:
+        with urllib.request.urlopen(location, timeout=60) as response:
+            return response.read().decode(errors="replace")
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Could not download the job log: {exc}") from exc
+
+
+def readJobFailures(token: str, sha: str) -> list[JobFailure]:
+    """Return every job that did not succeed in the newest runs on one commit."""
+    failures: list[JobFailure] = []
+    for run in readWorkflowRuns(token, sha):
+        if run.conclusion not in rerunConclusions:
+            continue
+        url = (
+            f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
+            f"{ticket.repositoryName}/actions/runs/{run.runId}/jobs?per_page=100"
+        )
+        payload = ticket.requestJson(url, token, apiVersion="2022-11-28")
+        for job in payload.get("jobs", []):
+            conclusion = job.get("conclusion") or ""
+            if conclusion not in rerunConclusions:
+                continue
+            failures.append(JobFailure(
+                workflow=run.name,
+                name=job["name"],
+                conclusion=conclusion,
+                failedSteps=tuple(
+                    step["name"] for step in job.get("steps", [])
+                    if step.get("conclusion") in rerunConclusions
+                ),
+                log=readJobLog(token, job["id"]),
+            ))
+    return failures
+
+
+def dropLogTimestamp(line: str) -> str:
+    """Drop the runner's leading timestamp, which every line carries."""
+    stamp, _, rest = line.partition(" ")
+    return rest if stamp[:4].isdigit() and stamp.endswith("Z") else line
+
+
+def findErrorExcerpts(lines: list[str], context: int) -> list[list[str]]:
+    """Return each error line with the lines before it, overlapping excerpts merged.
+
+    A log with no error line returns its last `context` lines, so a job that died
+    without one still shows something.
+    """
+    errors = [index for index, line in enumerate(lines) if errorLogMarker in line]
+    if not errors:
+        return [lines[-context:]] if lines else []
+    excerpts: list[list[str]] = []
+    start, end = max(errors[0] - context, 0), errors[0]
+    for index in errors[1:]:
+        if index - context <= end + 1:
+            end = index
+            continue
+        excerpts.append(lines[start:end + 1])
+        start, end = max(index - context, 0), index
+    excerpts.append(lines[start:end + 1])
+    return excerpts
 
 
 def restartWorkflowRun(token: str, runId: int) -> None:
@@ -1091,6 +1215,32 @@ def runReady(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def runLogs(arguments: argparse.Namespace) -> int:
+    """Print the failed steps and the end of the log of each failed job."""
+    token = ticket.resolveToken()
+    summary = readPullRequest(token, arguments.number)
+    commit = summary["headSha"][:12]
+    failed = readJobFailures(token, summary["headSha"])
+
+    if not failed:
+        console.print(f"[yellow]No failed job[/] on {commit}.")
+        return notFoundExitCode
+
+    for job in failed:
+        steps = ", ".join(job.failedSteps) or "none reported"
+        console.print(
+            f"[red]FAIL[/] [bold]{escape(job.workflow)} / {escape(job.name)}[/]  "
+            f"{escape(job.conclusion)}, failed steps: {escape(steps)}"
+        )
+        lines = [dropLogTimestamp(line) for line in job.log.splitlines()]
+        for excerpt in findErrorExcerpts(lines, arguments.context):
+            console.print("[dim]…[/]")
+            for line in excerpt:
+                console.print(escape(line), highlight=False, soft_wrap=True)
+        console.print()
+    return 0
+
+
 def runRerun(arguments: argparse.Namespace) -> int:
     """Restart every canceled or failed workflow run on a pull request's head commit."""
     token = ticket.resolveToken()
@@ -1447,6 +1597,16 @@ def buildParser() -> argparse.ArgumentParser:
     rerunParser.add_argument("number", type=parsePullRequestNumber)
     rerunParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     rerunParser.set_defaults(handler=runRerun)
+
+    logsParser = subparsers.add_parser(
+        "logs", help="print each error the failed jobs on a pull request logged"
+    )
+    logsParser.add_argument("number", type=parsePullRequestNumber)
+    logsParser.add_argument(
+        "--context", type=int, default=defaultLogContext,
+        help=f"lines to print before each error (default {defaultLogContext})",
+    )
+    logsParser.set_defaults(handler=runLogs)
 
     readyParser = subparsers.add_parser("ready", help="take a draft out of draft")
     readyParser.add_argument("number", type=parsePullRequestNumber)

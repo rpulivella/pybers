@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-09  Re-exports made lazy, so the command line skips protobuf, for PYB-181.
 2026-10-07  checkDocument and what it reports re-exported, for PYB-169.
 2026-10-01  CellKind, CellFormat and CellDescription re-exported, for PYB-141.
 2026-09-29  CellValueFill re-exported, for PYB-118.
@@ -30,7 +31,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
-from pybers.addressing import (
+lazy from pybers.addressing import (
     CellAddress,
     CellRange,
     CellRangeList,
@@ -42,7 +43,7 @@ from pybers.addressing import (
     toColumnLetter,
     toColumnNumber,
 )
-from pybers.check import (
+lazy from pybers.check import (
     Check,
     CheckCell,
     CheckEnvironment,
@@ -53,16 +54,16 @@ from pybers.check import (
     NumbersVersion,
     checkDocument,
 )
-from pybers.document import (
+lazy from pybers.document import (
     Document,
     ReferenceLocation,
     SelectionError,
     Sheet,
     open,
 )
-from pybers.drawable import GraphicalObject, Image, Shape, TextBox
-from pybers.errors import PybersError, ReadError, WriteError
-from pybers.formula import (
+lazy from pybers.drawable import GraphicalObject, Image, Shape, TextBox
+lazy from pybers.errors import PybersError, ReadError, WriteError
+lazy from pybers.formula import (
     ArgumentCountError,
     Coordinate,
     Formula,
@@ -89,9 +90,9 @@ from pybers.formula import (
     parseFormula,
     renderFormula,
 )
-from pybers.geometry import Position, Size
-from pybers.style import Style
-from pybers.table import (
+lazy from pybers.geometry import Position, Size
+lazy from pybers.style import Style
+lazy from pybers.table import (
     Cell,
     CellDescription,
     CellFormat,
@@ -103,7 +104,7 @@ from pybers.table import (
     TableRow,
     TableRows,
 )
-from pybers.text import Paragraph, RichText, TextRun
+lazy from pybers.text import Paragraph, RichText, TextRun
 
 __all__ = [
     "ArgumentCountError",

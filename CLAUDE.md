@@ -169,6 +169,9 @@ functions over explanation.
 - **An untrue statement is rewritten to the current fact**, in a doc, a finding or a
   comment, never left under a "Superseded" note. Only an addressed item, an AC or a
   checklist line, is struck through or marked NA, because references point at it.
+- **A doc never states a version requirement**, a Python floor, a Numbers release or a
+  tool version. It points at the file that owns it, such as `requires-python` in
+  `pyproject.toml`, because a restated number goes stale.
 - **Prose leaving this repository passes `/standards`, both passes, and the report says
   what the judgment read found**: tickets, pull request bodies, commit messages, docs,
   docstrings, and any sentence a tool prints or posts. A script result alone is one pass.

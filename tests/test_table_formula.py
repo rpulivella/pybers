@@ -8,6 +8,7 @@ table Numbers inserted, whose owner held no dependency tile either, so replaying
 edit on `48` compares the tile pybers creates with the one Numbers created.
 
 UPDATES
+2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-15  Written for PYB-86.
 """
 
@@ -531,7 +532,7 @@ def testTheGoldenIsWhatWritingTheFormulasWritesToday(tmp_path: Path) -> None:
         owner, tiles = readOwnerTiles(path, "Sheet 1", "Calc")
         return (
             readRegisteredPairs(owner.cell_dependencies.cell_record),
-            {cell for tile in tiles for cell in readRegisteredPairs(tile.cell_records)},
+            {*readRegisteredPairs(tile.cell_records) for tile in tiles},
         )
 
     assert readRegisterShape(saveWithFormulas(tmp_path)) == readRegisterShape(
