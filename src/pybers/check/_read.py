@@ -17,6 +17,7 @@ message, because pybers's own read path names archives by identifier. Any other
 error keeps only its type and where pybers raised it.
 
 UPDATES
+2026-10-12  Each missing part of a check names why it is missing, for PYB-190.
 2026-10-11  Type counts are built as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
@@ -39,6 +40,7 @@ from pathlib import Path
 
 from .._persistence import NumbersPackage, readPackage
 from .._persistence.types import readArchiveTypeId
+from ..absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
 from ..document._read import readDocument
 from ..document.sheets import Document
 from ..errors import PybersError
@@ -74,11 +76,13 @@ savedBuildPattern: re.Pattern[str] = re.compile(r"M(\d+(?:\.\d+)*)-(.+)")
 pybersDirectory: Path = Path(__file__).resolve().parent.parent
 
 
-def readSavedVersion(package: NumbersPackage) -> NumbersVersion | None:
+def readSavedVersion(
+    package: NumbersPackage,
+) -> NumbersVersion | UNDETERMINED | None:
     """Return the Numbers that last saved a package, or None when it records none.
 
-    An unparseable history is treated as none recorded, because the rest of a
-    check is still worth reporting.
+    An unreadable history is UNDETERMINED rather than an error, because the rest of
+    a check is still worth reporting.
     """
     member = next(
         (held for held in package.otherMembers if held.name == buildHistoryMember),
@@ -89,9 +93,9 @@ def readSavedVersion(package: NumbersPackage) -> NumbersVersion | None:
     try:
         history = plistlib.loads(member.data)
     except (plistlib.InvalidFileException, ValueError):
-        return None
+        return UNDETERMINED
     if not isinstance(history, list):
-        return None
+        return UNDETERMINED
     for entry in reversed(history):
         found = savedBuildPattern.fullmatch(entry) if isinstance(entry, str) else None
         if found:
@@ -160,7 +164,7 @@ def openForCheck(
     except Exception as exc:
         # Reported rather than raised, since a check exists to describe this failure.
         return CheckFailure(
-            type(exc).__name__, None, listPybersFrames(exc), error=exc
+            type(exc).__name__, WITHHELD, listPybersFrames(exc), error=exc
         )
 
 
@@ -189,12 +193,12 @@ def checkDocument(
         savedBy=readSavedVersion(package),
         failure=opened if isinstance(opened, CheckFailure) else None,
         untestedArchiveTypes=countUntestedArchiveTypes(package),
-        unrecognizedCellTypes=None if cells is None else frozendict(
+        unrecognizedCellTypes=UNDETERMINED if cells is None else frozendict(
             sorted(Counter(cell.typeCode for cell in cells).items())
         ),
-        names=None if not names else CheckNames(
-            None if document is None else readCheckSheets(document),
-            None if cells is None else tuple(cells),
+        names=NOT_REQUESTED if not names else CheckNames(
+            UNDETERMINED if document is None else readCheckSheets(document),
+            UNDETERMINED if cells is None else tuple(cells),
         ),
     )
 

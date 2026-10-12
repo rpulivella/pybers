@@ -9,6 +9,7 @@ pybers opened the document, and 1 means it could not, or that the file could not
 be checked.
 
 UPDATES
+2026-10-12  A part a check could not determine reads unknown, for PYB-190.
 2026-10-11  Type counts arrive as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
@@ -40,16 +41,27 @@ def formatLine(label: str, *value: str | tuple[str, str]) -> Text:
     return Text.assemble((f"{label}: ", "label"), *parts)
 
 
-def formatNumbersVersion(found: pybers.NumbersVersion | None) -> str:
+def formatPybersVersion(found: str | pybers.UNDETERMINED) -> str:
+    """Return the pybers version, which an uninstalled pybers cannot determine."""
+    return "not installed" if found is pybers.UNDETERMINED else found
+
+
+def formatNumbersVersion(
+    found: pybers.NumbersVersion | pybers.UNDETERMINED | None,
+) -> str:
     """Return a Numbers version as `Numbers 15.3.1 (build 7050.1.1-2)`."""
     if found is None:
+        return "none"
+    if found is pybers.UNDETERMINED:
         return "unknown"
     return f"Numbers {found.version} (build {found.build})"
 
 
-def formatTypeCounts(counts: frozendict[int, int] | None) -> str | tuple[str, str]:
+def formatTypeCounts(
+    counts: frozendict[int, int] | pybers.UNDETERMINED,
+) -> str | tuple[str, str]:
     """Return type identifiers with their counts, as a warning when there are any."""
-    if counts is None:
+    if counts is pybers.UNDETERMINED:
         return "unknown"
     if not counts:
         return "none"
@@ -62,7 +74,7 @@ def formatReadable(failure: pybers.CheckFailure | None) -> list[Text]:
     if failure is None:
         return [formatLine("Readable", ("yes", "success"))]
     reason = failure.errorType
-    if failure.message is not None:
+    if failure.message is not pybers.WITHHELD:
         reason = f"{reason}: {failure.message}"
     return [formatLine("Readable", (f"no, {reason}", "failure"))] + [
         Text(f"  at {frame}", "detail") for frame in failure.frames
@@ -78,9 +90,11 @@ def formatTable(table: pybers.CheckTable) -> Text:
     )
 
 
-def formatSheets(sheets: tuple[pybers.CheckSheet, ...] | None) -> list[RenderableType]:
+def formatSheets(
+    sheets: tuple[pybers.CheckSheet, ...] | pybers.UNDETERMINED,
+) -> list[RenderableType]:
     """Return the sheets heading, then one tree per sheet holding its tables."""
-    if sheets is None:
+    if sheets is pybers.UNDETERMINED:
         return [formatLine("Sheets", "unknown")]
     shown: list[RenderableType] = [Text("Sheets:", "label")]
     for sheet in sheets:
@@ -92,10 +106,10 @@ def formatSheets(sheets: tuple[pybers.CheckSheet, ...] | None) -> list[Renderabl
 
 
 def formatUnrecognizedCells(
-    cells: tuple[pybers.CheckCell, ...] | None,
+    cells: tuple[pybers.CheckCell, ...] | pybers.UNDETERMINED,
 ) -> list[RenderableType]:
     """Return the unrecognized cells heading, then a tree per sheet down to each."""
-    if cells is None:
+    if cells is pybers.UNDETERMINED:
         return [formatLine("Unrecognized cells", "unknown")]
     if not cells:
         return [formatLine("Unrecognized cells", "none")]
@@ -122,7 +136,7 @@ def formatCheck(check: pybers.Check) -> Group:
     """Return a check as the lines a bug report pastes."""
     environment = check.environment
     shown: list[RenderableType] = [
-        formatLine("pybers", environment.pybersVersion or "not installed"),
+        formatLine("pybers", formatPybersVersion(environment.pybersVersion)),
         formatLine("Python", environment.pythonVersion),
         formatLine("protobuf", environment.protobufVersion),
         formatLine("OS", environment.operatingSystem),
@@ -135,7 +149,7 @@ def formatCheck(check: pybers.Check) -> Group:
             "Unrecognized cell types", formatTypeCounts(check.unrecognizedCellTypes)
         ),
     ]
-    if check.names is not None:
+    if check.names is not pybers.NOT_REQUESTED:
         shown += formatSheets(check.names.sheets)
         shown += formatUnrecognizedCells(check.names.unrecognizedCells)
     return Group(*shown)
