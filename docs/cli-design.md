@@ -35,7 +35,7 @@ A command parses its arguments, calls the library once, formats what comes back,
 
 - **Selectors and addresses** are positional, quoted in the shell, and parsed by the library. Tab completion offers the sheet and table names of the file being typed.
 - **Each command has one default format** that does not change when its output is piped. A terminal only turns color on. `--format` chooses another, and `-o FILE` infers it from the extension.
-- **JSON is always available**, so an agent or a pipeline never parses a report.
+- **Every command offers `--format text`, its default, and `--format json`**, so an agent or a pipeline never parses a report. Both come from `pybers.cli._formats`, and a command never builds JSON itself. JSON keys are the library's own field names, `None` is `null`, and a value missing for a reason is the name of its sentinel, such as `"UNDETERMINED"`.
 - **`-` is stdin or stdout** for text formats. A `.numbers` document is never written to stdout.
 - **Nothing prompts.** A command that would need an answer refuses instead.
 

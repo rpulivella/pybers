@@ -9,6 +9,8 @@ pybers opened the document, and 1 means it could not, or that the file could not
 be checked.
 
 UPDATES
+2026-10-12  `--format json` prints the same facts, and an uninstalled pybers reads
+            unknown, for PYB-187.
 2026-10-12  A part a check could not determine reads unknown, for PYB-190.
 2026-10-11  Type counts arrive as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
@@ -32,7 +34,8 @@ from rich.text import Text
 
 import pybers
 from pybers.cli._common import findCommandSettings, reportPybersErrors
-from pybers.cli._console import TreeCompact, console, statusConsole
+from pybers.cli._console import TreeCompact, statusConsole
+from pybers.cli._formats import FormatOption, OutputFormat, printResult
 
 
 def formatLine(label: str, *value: str | tuple[str, str]) -> Text:
@@ -43,7 +46,7 @@ def formatLine(label: str, *value: str | tuple[str, str]) -> Text:
 
 def formatPybersVersion(found: str | pybers.UNDETERMINED) -> str:
     """Return the pybers version, which an uninstalled pybers cannot determine."""
-    return "not installed" if found is pybers.UNDETERMINED else found
+    return "unknown" if found is pybers.UNDETERMINED else found
 
 
 def formatNumbersVersion(
@@ -175,13 +178,14 @@ def runCheck(
             "Not for posting publicly.",
         ),
     ] = False,
+    outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
     """Report whether pybers can read a document, and what it is running on."""
     with reportPybersErrors(context), statusConsole.status("") as status:
         check = pybers.checkDocument(
             documentPath, names=names, onProgress=status.update
         )
-    console.print(formatCheck(check))
+    printResult(check, outputFormat, formatCheck)
     if check.failure is not None:
         if findCommandSettings(context).debug and check.failure.error is not None:
             raise check.failure.error
