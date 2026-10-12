@@ -9,6 +9,7 @@ pybers opened the document, and 1 means it could not, or that the file could not
 be checked.
 
 UPDATES
+2026-10-11  Type counts arrive as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -46,7 +47,7 @@ def formatNumbersVersion(found: pybers.NumbersVersion | None) -> str:
     return f"Numbers {found.version} (build {found.build})"
 
 
-def formatTypeCounts(counts: dict[int, int] | None) -> str | tuple[str, str]:
+def formatTypeCounts(counts: frozendict[int, int] | None) -> str | tuple[str, str]:
     """Return type identifiers with their counts, as a warning when there are any."""
     if counts is None:
         return "unknown"
