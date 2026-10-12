@@ -11,6 +11,7 @@ and raises nothing on the way.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-10-09  A refused write names what the cell holds in words, for PYB-168.
 2026-10-01  The format slots moved to `_persistence.cells`, and a cell's chosen
             format is read from its description, for PYB-141.
@@ -60,7 +61,7 @@ from .cells import Cell
 from .kinds import CellKind
 
 # How a refusal names what a cell holds, in the words a person would use.
-kindPhrases: dict[CellKind, str] = {
+kindPhrases: frozendict[CellKind, str] = frozendict({
     CellKind.NUMBER: "a number",
     CellKind.CURRENCY: "a currency amount",
     CellKind.TEXT: "text",
@@ -69,7 +70,7 @@ kindPhrases: dict[CellKind, str] = {
     CellKind.DURATION: "a duration",
     CellKind.BOOLEAN: "a checkbox value",
     CellKind.ERROR: "a formula that failed",
-}
+})
 
 # The type bytes a numeric record may carry. 2 is a plain number and 10 is
 # currency, which is the same encoding under a different type.

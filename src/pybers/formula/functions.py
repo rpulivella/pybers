@@ -36,6 +36,7 @@ answers "isn't a valid function name" for each reserved one and where a
 `MAKEARRAY` spill fills three cells with `SPILL`.
 
 UPDATES
+2026-10-11  The function tables are frozendict, not read-only views, for PYB-189.
 2026-09-04  Argument counts added for #44, and the source moved to the
             Objective-C metadata, which names 22 functions the authoring
             methods never reached.
@@ -52,7 +53,6 @@ __date__ = "2026/09/04"
 
 from dataclasses import dataclass
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Final
 
 from pybers._generated.functions import functions as generatedFunctions
@@ -123,7 +123,7 @@ class NumbersFunction:
 # Read-only, because one shared mapping handed out mutable is the same defect
 # the frozen `Style` contract exists to prevent: an edit at one call site would
 # silently rename a function everywhere.
-functionsByName: Final[MappingProxyType[str, NumbersFunction]] = MappingProxyType({
+functionsByName: Final[frozendict[str, NumbersFunction]] = frozendict({
     name: NumbersFunction(
         name, index, minimum, maximum, repeating, FunctionAvailability(availability)
     )
@@ -133,7 +133,7 @@ functionsByName: Final[MappingProxyType[str, NumbersFunction]] = MappingProxyTyp
 
 # Keyed by what the archive holds, so a function stored as node types is absent
 # here and present by name, which is the only honest way to index it.
-functionsByIndex: Final[MappingProxyType[int, NumbersFunction]] = MappingProxyType({
+functionsByIndex: Final[frozendict[int, NumbersFunction]] = frozendict({
     function.index: function
     for function in functionsByName.values()
     if function.index is not None

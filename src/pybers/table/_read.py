@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-10-07  A row that fails to decode names its table by identifier, and a record
             of a type pybers does not recognize keeps that type, for PYB-169.
 2026-10-01  A cell is described by the kind its record stores and the format it
@@ -78,7 +79,7 @@ richTextKeyType: int = 9
 
 # The kind each measured type byte stores. Type 8 is a failed formula, which holds no
 # value, so its formula key sits where a result would. See findings-01-values.md.
-storedKinds: dict[int, CellKind] = {
+storedKinds: frozendict[int, CellKind] = frozendict({
     0: CellKind.EMPTY,
     2: CellKind.NUMBER,
     3: CellKind.TEXT,
@@ -88,10 +89,10 @@ storedKinds: dict[int, CellKind] = {
     8: CellKind.ERROR,
     9: CellKind.RICH_TEXT,
     10: CellKind.CURRENCY,
-}
+})
 
 # The family each measured `format_type` belongs to, every one the documents carry.
-formatFamilies: dict[int, CellFormat] = {
+formatFamilies: frozendict[int, CellFormat] = frozendict({
     256: CellFormat.NUMBER,
     257: CellFormat.CURRENCY,
     258: CellFormat.PERCENT,
@@ -104,7 +105,7 @@ formatFamilies: dict[int, CellFormat] = {
     268: CellFormat.DURATION,
     269: CellFormat.NUMERAL_SYSTEM,
     270: CellFormat.CUSTOM_NUMBER,
-}
+})
 
 
 def readStringTable(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, str]:

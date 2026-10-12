@@ -20,6 +20,7 @@ conversion here takes that cell. Passing the wrong one is not an error, it is a
 wrong answer.
 
 UPDATES
+2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-09-13  A guessed table name no longer eats the operator in front of
             it, for #67. It cost 1469 formulas in one document.
 2026-09-08  Written for #45.
@@ -87,7 +88,7 @@ lambdaName: str = "LAMBDA"
 
 # Every operator Numbers declares, by the text that writes it. Derived from the
 # node types rather than from a grammar, so the two cannot disagree.
-binaryOperators: dict[str, int] = {
+binaryOperators: frozendict[str, int] = frozendict({
     "<>": notEqualToNodeType,
     "<=": lessThanOrEqualNodeType,
     ">=": greaterThanOrEqualNodeType,
@@ -100,19 +101,19 @@ binaryOperators: dict[str, int] = {
     "*": multiplicationNodeType,
     "/": divisionNodeType,
     "^": powerNodeType,
-}
+})
 
 # Two of the three symbols above are also prefixes, and one is a suffix. Each is
 # its own node type, so the parser never has to remember which reading it chose.
-unaryOperators: dict[str, int] = {
+unaryOperators: frozendict[str, int] = frozendict({
     "-": negationNodeType,
     "+": plusSignNodeType,
-}
+})
 percentSymbol: str = "%"
 
-operatorSymbols: dict[int, str] = {
+operatorSymbols: frozendict[int, str] = frozendict({
     nodeType: symbol for symbol, nodeType in binaryOperators.items()
-}
+})
 
 # Every character that begins an operator, so a guessed table name can be told
 # from a scan that ran through one. `%` is here too, being as much an operator as
@@ -142,7 +143,7 @@ atomPrecedence: int = 99
 # interpreter and raise `RecursionError` where a formula error belongs.
 nestingLimit: int = 64
 
-operatorPrecedence: dict[int, int] = {
+operatorPrecedence: frozendict[int, int] = frozendict({
     equalToNodeType: comparisonPrecedence,
     notEqualToNodeType: comparisonPrecedence,
     lessThanNodeType: comparisonPrecedence,
@@ -158,7 +159,7 @@ operatorPrecedence: dict[int, int] = {
     plusSignNodeType: unaryPrecedence,
     powerNodeType: powerPrecedence,
     percentNodeType: percentPrecedence,
-}
+})
 
 comparisonOperators: tuple[int, ...] = tuple(
     nodeType for nodeType, level in operatorPrecedence.items()
