@@ -37,8 +37,7 @@ def testAFileAloneRunsCheckWithNames() -> None:
 
 def testNoArgumentsPrintsTheHelp() -> None:
     result = runner.invoke(app, [])
-    assert "Usage: pybers" in result.stdout
-    assert "check" in result.stdout
+    assert result.output.rstrip() == runner.invoke(app, ["--help"]).output.rstrip()
 
 
 def testCheckByNameReachesCheckWithoutNames() -> None:

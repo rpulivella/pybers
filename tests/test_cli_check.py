@@ -278,7 +278,7 @@ def testDebugRaisesTheFailureAReportDescribes(tmp_path: Path) -> None:
     assert isinstance(result.exception, pybers.ReadError)
 
 
-@pytest.mark.parametrize("arguments", [["--help"], ["check", "--help"], ["chek"]])
+@pytest.mark.parametrize("arguments", [["--help"], ["check", "--help"], ["check"]])
 def testHelpAndUsageErrorsDrawNoBorders(arguments: list[str]) -> None:
     output = runner.invoke(app, arguments).output
     assert output.strip()
