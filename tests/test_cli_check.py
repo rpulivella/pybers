@@ -3,6 +3,7 @@
 `pybers check`, run the way a person reporting a bug runs it.
 
 UPDATES
+2026-10-12  The JSON form and an uninstalled pybers's version, for PYB-187.
 2026-10-12  Each reason a part is missing prints as the design says, for PYB-190.
 2026-10-07  Written for PYB-169.
 """
@@ -17,6 +18,7 @@ __status__ = "Development"
 __date__ = "2026/10/07"
 
 import io
+import json
 import os
 import runpy
 import sys
@@ -80,9 +82,10 @@ def testCheckReportsEveryFactForADocumentPybersOpens() -> None:
 @pytest.mark.parametrize(
     "stem", ["57-structure-refusals-base", "42-table-titles-captions"]
 )
-def testCheckOutputHoldsNothingFromTheDocument(stem: str) -> None:
+@pytest.mark.parametrize("outputFormat", ["text", "json"])
+def testCheckOutputHoldsNothingFromTheDocument(stem: str, outputFormat: str) -> None:
     path = findDocumentPath(stem)
-    result = runner.invoke(app, ["check", str(path)])
+    result = runner.invoke(app, ["check", "--format", outputFormat, str(path)])
     assert result.exit_code == 0
     # Two- and three-letter cell text such as "lo" occurs inside ordinary words.
     words = {word for word in listDocumentWords(path) if len(word.strip()) > 3}
@@ -101,6 +104,55 @@ def testCheckExitsNonzeroWhenPybersCannotOpenTheDocument(
     assert result.exit_code == 1
     assert "Readable: no, ReadError: Expected one archive." in result.stdout
     assert "  at x.py:1" in result.stdout
+
+
+def testJsonHoldsTheSameFactsAsTheLibraryReturns() -> None:
+    found = pybers.checkDocument(recordsPath, names=True)
+    result = runner.invoke(
+        app, ["check", "--names", "--format", "json", str(recordsPath)]
+    )
+    printed = json.loads(result.stdout)
+    assert result.exit_code == 0
+    assert printed["environment"]["pythonVersion"] == found.environment.pythonVersion
+    assert printed["savedBy"] == {"version": "15.3.1", "build": "7050.1.1-2"}
+    assert printed["failure"] is None
+    assert printed["names"]["sheets"][0]["tables"][0] == {
+        "name": "Table 1", "rowCount": 10, "colCount": 7
+    }
+
+
+def testJsonNamesWhyAPartIsMissing() -> None:
+    result = runner.invoke(app, ["check", "--format", "json", str(baselinePath)])
+    assert json.loads(result.stdout)["names"] == "NOT_REQUESTED"
+
+
+@pytest.mark.parametrize("outputFormat", ["text", "json"])
+def testEitherFormExitsOneWhenPybersCannotOpenTheDocument(
+    monkeypatch: pytest.MonkeyPatch, outputFormat: str
+) -> None:
+    failure = pybers.CheckFailure("ReadError", "Expected one archive.", ("x.py:1",))
+    found = replace(pybers.checkDocument(baselinePath), failure=failure)
+    monkeypatch.setattr(pybers, "checkDocument", lambda *_, **__: found)
+    result = runner.invoke(
+        app, ["check", "--format", outputFormat, str(baselinePath)]
+    )
+    assert result.exit_code == 1
+
+
+def testJsonForARefusedFilePrintsNothingOnStdout(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["check", "--format", "json", str(findAbsentPath(tmp_path))]
+    )
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "does not exist" in result.stderr
+
+
+def testAnUninstalledPybersVersionReadsUnknown() -> None:
+    found = pybers.checkDocument(baselinePath)
+    environment = replace(found.environment, pybersVersion=pybers.UNDETERMINED)
+    printed = renderPlain(formatCheck(replace(found, environment=environment)))
+    assert printed.startswith("pybers: unknown\n")
 
 
 def findAbsentPath(tmp_path: Path) -> Path:
