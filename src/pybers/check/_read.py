@@ -17,6 +17,7 @@ message, because pybers's own read path names archives by identifier. Any other
 error keeps only its type and where pybers raised it.
 
 UPDATES
+2026-10-11  Type counts are built as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -98,7 +99,7 @@ def readSavedVersion(package: NumbersPackage) -> NumbersVersion | None:
     return None
 
 
-def countUntestedArchiveTypes(package: NumbersPackage) -> dict[int, int]:
+def countUntestedArchiveTypes(package: NumbersPackage) -> frozendict[int, int]:
     """Return how many archives of each type no test document holds."""
     counts = Counter(
         readArchiveTypeId(archive)
@@ -106,11 +107,11 @@ def countUntestedArchiveTypes(package: NumbersPackage) -> dict[int, int]:
         for archive in iwaFile.archives
         if archive.messages
     )
-    return {
+    return frozendict({
         typeId: count
         for typeId, count in sorted(counts.items())
         if typeId not in testedArchiveTypes
-    }
+    })
 
 
 def listUnrecognizedCells(document: Document) -> list[CheckCell]:
@@ -188,7 +189,7 @@ def checkDocument(
         savedBy=readSavedVersion(package),
         failure=opened if isinstance(opened, CheckFailure) else None,
         untestedArchiveTypes=countUntestedArchiveTypes(package),
-        unrecognizedCellTypes=None if cells is None else dict(
+        unrecognizedCellTypes=None if cells is None else frozendict(
             sorted(Counter(cell.typeCode for cell in cells).items())
         ),
         names=None if not names else CheckNames(

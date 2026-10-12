@@ -8,6 +8,7 @@ Lines are soft-wrapped, so a pasted report keeps each fact on one line, and a tr
 draws two-column guides rather than Rich's four. See `docs/cli-design.md`.
 
 UPDATES
+2026-10-11  The theme's styles are a frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -24,7 +25,7 @@ from rich.console import Console
 from rich.theme import Theme
 from rich.tree import Tree
 
-theme: Theme = Theme({
+themeStyles: frozendict[str, str] = frozendict({
     "label": "dim",
     "value": "bold",
     "success": "green",
@@ -33,6 +34,7 @@ theme: Theme = Theme({
     "detail": "dim",
     "identifier": "bold cyan",
 })
+theme: Theme = Theme(themeStyles)
 
 console: Console = Console(theme=theme, highlight=False, soft_wrap=True)
 statusConsole: Console = Console(
@@ -52,4 +54,4 @@ class TreeCompact(Tree):
     ]
 
 
-__all__ = ["TreeCompact", "console", "statusConsole", "theme"]
+__all__ = ["TreeCompact", "console", "statusConsole", "theme", "themeStyles"]

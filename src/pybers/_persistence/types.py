@@ -21,6 +21,7 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-09-22  An identifier is asked for by its class, and nowhere else spells one,
             for PYB-113.
 2026-09-22  The type identifiers found by scanning live here, for PYB-109.
@@ -61,7 +62,7 @@ from .iwa import Archive
 # which is why this table cannot be derived from them: all 33 were checked for a
 # type-id option and none carries one. Each entry below was confirmed against the
 # documents rather than assumed.
-archiveTypes: dict[int, type[Message]] = {
+archiveTypes: frozendict[int, type[Message]] = frozendict({
     1: tn.DocumentArchive,          # the root: holds the ordered sheet list
     2: tn.SheetArchive,             # a tab: its name and its ordered drawables
     205: tsk.TreeNode,              # one entry in the sidebar's sheet and table tree
@@ -101,7 +102,7 @@ archiveTypes: dict[int, type[Message]] = {
     6383: tst.GroupByArchive.GroupNodeArchive,
     12009: tn.ThemeArchive,         # the theme and its style presets
     11006: tspArchive.PackageMetadata,  # every component and its external references
-}
+})
 
 
 class ArchiveTypeError(PybersError, RuntimeError):
@@ -109,9 +110,9 @@ class ArchiveTypeError(PybersError, RuntimeError):
 
 
 # The registry read the other way, so a module names a type by its class alone.
-archiveTypeIds: dict[type[Message], int] = {
+archiveTypeIds: frozendict[type[Message], int] = frozendict({
     messageClass: typeId for typeId, messageClass in archiveTypes.items()
-}
+})
 
 
 def findArchiveTypeId(messageClass: type[Message]) -> int:

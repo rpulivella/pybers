@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-11  Table names are returned as a frozendict, for PYB-189.
 2026-10-01  A cell describes the kind its record stores and the format it shows
             with, replacing `errored` and `formatChosen` (PYB-141).
 2026-09-30  A cell keeps the rich text its record held, so a fill can tell it, for
@@ -55,7 +56,7 @@ __date__ = "2026/09/02"
 
 import datetime
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING
@@ -289,7 +290,7 @@ class Cell:
         self._stored = replace(self._stored, formatChosen=True)
 
     @property
-    def tableNames(self) -> Mapping[str, str]:
+    def tableNames(self) -> frozendict[str, str]:
         """Return the names this cell's document knows its tables by, or nothing.
 
         Computed from the document each time rather than cached, because a table
@@ -297,7 +298,7 @@ class Cell:
         whichever table now answers to the old name.
         """
         document = None if self.table is None else self.table.document
-        return {} if document is None else document.tableIdentities
+        return frozendict() if document is None else document.tableIdentities
 
     @property
     def mergeAnchored(self) -> MergeRange | None:

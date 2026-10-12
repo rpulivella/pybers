@@ -8,6 +8,7 @@ pybers's own source. `CheckNames` is the one exception, present only when a
 caller asks for names, and never meant for posting.
 
 UPDATES
+2026-10-11  Both type tables are frozendict, so a Check cannot change, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -106,8 +107,8 @@ class Check:
     environment: CheckEnvironment
     savedBy: NumbersVersion | None
     failure: CheckFailure | None
-    untestedArchiveTypes: dict[int, int]
-    unrecognizedCellTypes: dict[int, int] | None
+    untestedArchiveTypes: frozendict[int, int]
+    unrecognizedCellTypes: frozendict[int, int] | None
     names: CheckNames | None
 
 
