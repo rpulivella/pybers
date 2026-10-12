@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-12  NOT_REQUESTED, UNDETERMINED and WITHHELD re-exported, for PYB-190.
 2026-10-09  Re-exports made lazy, so the command line skips protobuf, for PYB-181.
 2026-10-07  checkDocument and what it reports re-exported, for PYB-169.
 2026-10-01  CellKind, CellFormat and CellDescription re-exported, for PYB-141.
@@ -31,6 +32,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
+lazy from pybers.absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
     CellAddress,
     CellRange,
@@ -107,6 +109,9 @@ lazy from pybers.table import (
 lazy from pybers.text import Paragraph, RichText, TextRun
 
 __all__ = [
+    "NOT_REQUESTED",
+    "UNDETERMINED",
+    "WITHHELD",
     "ArgumentCountError",
     "NumbersFunction",
     "UnknownFunctionError",
