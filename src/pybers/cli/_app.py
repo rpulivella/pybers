@@ -11,6 +11,7 @@ draws the title over the table. `tests/test_cli_check.py` fails if a Typer relea
 brings the borders back. See `docs/cli-design.md`.
 
 UPDATES
+2026-10-12  A first argument naming no command runs check --names on it, for PYB-187.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -26,10 +27,14 @@ __date__ = "2026/10/07"
 from typing import Annotated
 
 import typer
+import typer.core
 import typer.rich_utils
 from rich.console import Console, ConsoleOptions, Group, RenderableType, RenderResult
 from rich.padding import Padding
 from rich.text import Text
+
+# Typer bundles Click and names its types nowhere public, so an override reaches in.
+from typer._click import Command, Context
 
 from pybers.cli._common import CommandSettings
 from pybers.cli.check import runCheck
@@ -66,11 +71,31 @@ class HelpSection:
         yield Padding(Group(*shown), (0, 0, 1, 1))
 
 
+# What `pybers FILE` runs, so a document always shows something.
+defaultCommandArguments: tuple[str, ...] = ("check", "--names")
+
+
+class PybersGroup(typer.core.TyperGroup):
+    """The root command, which routes a first argument naming no command to `check`.
+
+    A file named like a command is reached as `./check`, which names no command.
+    """
+
+    def resolve_command(
+        self, ctx: Context, args: list[str]
+    ) -> tuple[str | None, Command | None, list[str]]:
+        """Resolve a command, or `check --names` when the first argument names none."""
+        if args and self.get_command(ctx, args[0]) is None:
+            args = [*defaultCommandArguments, *args]
+        return super().resolve_command(ctx, args)
+
+
 # Typer imports `Panel` without re-exporting it, which is the name it draws with.
 typer.rich_utils.Panel = HelpSection  # type: ignore[attr-defined,assignment]
 
 app = typer.Typer(
     name="pybers",
+    cls=PybersGroup,
     no_args_is_help=True,
     pretty_exceptions_show_locals=False,
 )
