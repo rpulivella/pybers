@@ -54,4 +54,4 @@ class TreeCompact(Tree):
     ]
 
 
-__all__ = ["TreeCompact", "console", "statusConsole", "theme"]
+__all__ = ["TreeCompact", "console", "statusConsole", "theme", "themeStyles"]
