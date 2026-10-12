@@ -23,6 +23,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-11  Table identities are returned as a frozendict, for PYB-189.
 2026-09-14  A sheet or a table is added, and each knows the archive it was read
             from, for PYB-63.
 2026-09-08  Every reference in the document walked in one call, and a table
@@ -252,7 +253,7 @@ class Document:
         )
 
     @property
-    def tableIdentities(self) -> dict[str, str]:
+    def tableIdentities(self) -> frozendict[str, str]:
         """Return the identity of every table, under each name that names it alone.
 
         A formula naming another table writes `Table 2::A1`, and qualifies it as
@@ -273,7 +274,7 @@ class Document:
                 )
                 if seen[table.name] == 1:
                     qualified[table.name] = table.identifier
-        return qualified
+        return frozendict(qualified)
 
     def sheetAdd(self, name: str, position: int | None = None) -> Sheet:
         """Add an empty sheet, last or at a position counted from one, and return it.
