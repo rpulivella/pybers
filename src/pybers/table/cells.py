@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-12  A changed kind describes its format as UNDETERMINED, for PYB-190.
 2026-10-11  Table names are returned as a frozendict, for PYB-189.
 2026-10-01  A cell describes the kind its record stores and the format it shows
             with, replacing `errored` and `formatChosen` (PYB-141).
@@ -61,6 +62,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING
 
+from pybers.absence import UNDETERMINED
 from pybers.addressing.ranges import CellRange, RangeAddress, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
@@ -268,7 +270,7 @@ class Cell:
         kind = findCellKind(self.value, self._stored.kind, self._storedValue, pending)
         if kind is self._stored.kind:
             return self._stored
-        return CellDescription(kind, None, self._stored.formatChosen)
+        return CellDescription(kind, UNDETERMINED, self._stored.formatChosen)
 
     def textLiteralSet(self, text: str) -> None:
         """Hold text Numbers will not interpret, as a cell formatted Text before typing.
