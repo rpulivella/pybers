@@ -119,6 +119,8 @@ about the format is measured against a fixture that labels its own contents.
 - Carry through what is not understood. An unrecognized cell type, node type or archive
   survives a round trip rather than being dropped or interpreted.
 - Never damage a document to make an operation succeed. Refuse and say exactly why.
+- **`None` means nothing exists**, so a value that exists but is missing for a reason
+  is one of the sentinels in `absence.py`.
 - `RuntimeError` subclasses for internal failures, always `raise ... from exc`. No bare
   `except Exception: pass`, and no `try:`/`pass` at a boundary where failure changes the
   outcome.
