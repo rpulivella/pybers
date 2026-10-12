@@ -7,6 +7,7 @@ fixtures name, a kind following an edit, an unknown type carried through, and th
 few lines a script or a command line writes to ask a cell what it holds.
 
 UPDATES
+2026-10-12  A changed kind's format is UNDETERMINED, for PYB-190.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-10-07  The description's fields include `unrecognizedTypeCode`, for PYB-169.
 2026-10-01  Written for PYB-141.
@@ -276,11 +277,11 @@ def testACurrencyAmountChangedStaysCurrency() -> None:
     assert cell.description.kind is CellKind.CURRENCY
 
 
-def testAChangedKindHasNoFormatUntilTheSaveChoosesOne() -> None:
-    """The format the record names belongs to the old kind, so none is reported."""
+def testAChangedKindsFormatIsUndeterminedUntilTheSaveChoosesOne() -> None:
+    """The format the record names belongs to the old kind, so it is not reported."""
     cell = openFirstTable("11-value-types-noformats").cell("A1")
     cell.value = "words"
-    assert cell.description.format is None
+    assert cell.description.format is pybers.UNDETERMINED
 
 
 def testASavedCellIsDescribedByTheRecordTheSaveLeft(tmp_path: Path) -> None:
@@ -408,7 +409,9 @@ def testACommandLineListsEachCellsKindAsText() -> None:
     shown = {
         str(cell.reference): {
             "kind": cell.description.kind.value,
-            "format": cell.description.format and cell.description.format.value,
+            "format": (
+                None if (shown := cell.description.format) is None else str(shown)
+            ),
         }
         for cell in list(table.rows)[0]
     }

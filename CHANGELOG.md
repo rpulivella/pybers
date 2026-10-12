@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-190] Name each None that means something other than no value with a sentinel
 - [PYB-189] Freeze the mappings pybers returns or keeps as fixed tables
 - [PYB-181] Move pybers to Python 3.15 for lazy imports
 - [PYB-168] Design how the command line and the library divide pybers

@@ -7,6 +7,7 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-10-12  A format the save will choose is UNDETERMINED, not None, for PYB-190.
 2026-10-07  An unknown kind keeps the record's own type, for PYB-169.
 2026-10-01  Written for PYB-141, replacing `Cell.errored`, its chosen-format flag
             and its rich-text marker.
@@ -26,6 +27,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING
+
+from pybers.absence import UNDETERMINED
 
 if TYPE_CHECKING:
     from pybers.table.cells import CellValue
@@ -68,13 +71,14 @@ class CellFormat(StrEnum):
 class CellDescription:
     """A cell's stored kind, its format, and whether a person chose that format.
 
-    `format` is None when the record names none, or once an edit changed the kind,
-    since the save then decides it. A failed formula is the `ERROR` kind, and an
-    `UNKNOWN` kind keeps the record's own type in `unrecognizedTypeCode`.
+    `format` is None when the record names none, and UNDETERMINED once an edit
+    changed the kind, since the save then chooses it. A failed formula is the
+    `ERROR` kind, and an `UNKNOWN` kind keeps the record's own type in
+    `unrecognizedTypeCode`.
     """
 
     kind: CellKind
-    format: CellFormat | None
+    format: CellFormat | UNDETERMINED | None
     formatChosen: bool
     unrecognizedTypeCode: int | None = None
 

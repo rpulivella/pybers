@@ -8,6 +8,7 @@ pybers's own source. `CheckNames` is the one exception, present only when a
 caller asks for names, and never meant for posting.
 
 UPDATES
+2026-10-12  A missing part names why it is missing, for PYB-190.
 2026-10-11  Both type tables are frozendict, so a Check cannot change, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
@@ -23,6 +24,8 @@ __date__ = "2026/10/07"
 
 from dataclasses import dataclass, field
 
+from ..absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
+
 
 @dataclass(frozen=True, slots=True)
 class NumbersVersion:
@@ -34,9 +37,9 @@ class NumbersVersion:
 
 @dataclass(frozen=True, slots=True)
 class CheckEnvironment:
-    """What pybers is running on. `pybersVersion` is None when not installed."""
+    """What pybers is running on. `pybersVersion` is UNDETERMINED when not installed."""
 
-    pybersVersion: str | None
+    pybersVersion: str | UNDETERMINED
     pythonVersion: str
     protobufVersion: str
     operatingSystem: str
@@ -46,13 +49,13 @@ class CheckEnvironment:
 class CheckFailure:
     """Why pybers could not open a document, and where in pybers it stopped.
 
-    `message` is None for an error pybers does not raise itself, because its text
-    was never audited and may quote the document. `error` is the exception itself,
+    `message` is WITHHELD for an error pybers does not raise itself, because its
+    text was never audited and may quote the document. `error` is the exception itself,
     left out of `repr` and equality, so a caller can raise it with its traceback.
     """
 
     errorType: str
-    message: str | None
+    message: str | WITHHELD
     frames: tuple[str, ...]
     error: BaseException | None = field(default=None, repr=False, compare=False)
 
@@ -88,11 +91,11 @@ class CheckCell:
 class CheckNames:
     """The document's own names, for the person holding it. Never for posting.
 
-    Both parts are None when the document could not be opened.
+    Both parts are UNDETERMINED when the document could not be opened.
     """
 
-    sheets: tuple[CheckSheet, ...] | None
-    unrecognizedCells: tuple[CheckCell, ...] | None
+    sheets: tuple[CheckSheet, ...] | UNDETERMINED
+    unrecognizedCells: tuple[CheckCell, ...] | UNDETERMINED
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,16 +103,17 @@ class Check:
     """Whether pybers can read a document, and what a bug report about it needs.
 
     Both type tables count archives or cells by type identifier. Cell types are
-    None when the document could not be opened, and `names` is None unless asked
-    for.
+    UNDETERMINED when the document could not be opened, and `names` is
+    NOT_REQUESTED unless asked for. `savedBy` is None when the document records no
+    Numbers, and UNDETERMINED when its record cannot be read.
     """
 
     environment: CheckEnvironment
-    savedBy: NumbersVersion | None
+    savedBy: NumbersVersion | UNDETERMINED | None
     failure: CheckFailure | None
     untestedArchiveTypes: frozendict[int, int]
-    unrecognizedCellTypes: frozendict[int, int] | None
-    names: CheckNames | None
+    unrecognizedCellTypes: frozendict[int, int] | UNDETERMINED
+    names: CheckNames | NOT_REQUESTED
 
 
 __all__ = [

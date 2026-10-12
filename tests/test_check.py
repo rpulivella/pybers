@@ -6,6 +6,7 @@ Each unfamiliar document is made by retyping one archive or one cell record of a
 real fixture, so a test names exactly what pybers has not met.
 
 UPDATES
+2026-10-12  Missing parts are asserted by the sentinel naming why, for PYB-190.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -133,7 +134,7 @@ def testAScriptChecksADocumentThroughImportPybers() -> None:
     assert check.savedBy == pybers.NumbersVersion("15.3.1", "7050.1.1-2")
     assert check.untestedArchiveTypes == {}
     assert check.unrecognizedCellTypes == {}
-    assert check.names is None
+    assert check.names is pybers.NOT_REQUESTED
 
 
 def testTheEnvironmentReportsWhatPybersRunsOn() -> None:
@@ -197,8 +198,8 @@ def testNamesLocateEachUnrecognizedCell(tmp_path: Path) -> None:
     package = readPackage(emptyCellsPath)
     rewriteFirstRow(package, lambda rowInfo: retypeEmptyRecord(rowInfo, 4))
     names = pybers.checkDocument(writePackageCopy(package, tmp_path), names=True).names
-    assert names is not None
-    assert names.unrecognizedCells is not None
+    assert names is not pybers.NOT_REQUESTED
+    assert names.unrecognizedCells is not pybers.UNDETERMINED
     [cell] = names.unrecognizedCells
     assert (cell.sheetName, cell.tableName, cell.typeCode) == ("Sheet 1", "Table 1", 4)
 
@@ -206,7 +207,7 @@ def testNamesLocateEachUnrecognizedCell(tmp_path: Path) -> None:
 def testNamesListEachSheetAndTableWithItsSize() -> None:
     document = pybers.open(recordsPath)
     names = pybers.checkDocument(recordsPath, names=True).names
-    assert names is not None
+    assert names is not pybers.NOT_REQUESTED
     assert names.sheets == tuple(
         pybers.CheckSheet(sheet.name, tuple(
             pybers.CheckTable(table.name, table.rowCount, table.colCount)
@@ -221,8 +222,8 @@ def testNamesAreUnknownWhenTheDocumentCannotBeOpened(tmp_path: Path) -> None:
     retypeArchive(package, 6005, untestedType)
     check = pybers.checkDocument(writePackageCopy(package, tmp_path), names=True)
     assert check.failure is not None
-    assert check.names == pybers.CheckNames(None, None)
-    assert check.unrecognizedCellTypes is None
+    assert check.names == pybers.CheckNames(pybers.UNDETERMINED, pybers.UNDETERMINED)
+    assert check.unrecognizedCellTypes is pybers.UNDETERMINED
 
 
 def testADocumentPybersCannotOpenReportsWhy(tmp_path: Path) -> None:
@@ -244,13 +245,13 @@ def testARowThatFailsToDecodeNamesItsTableByIdentifier(
     rewriteFirstRow(package, moveOffsetPastBuffer)
     check = pybers.checkDocument(writePackageCopy(package, tmp_path))
     assert check.failure is not None
-    assert check.failure.message is not None
+    assert check.failure.message is not pybers.WITHHELD
     assert tableNames
     assert not any(name in check.failure.message for name in tableNames)
-    assert check.unrecognizedCellTypes is None
+    assert check.unrecognizedCellTypes is pybers.UNDETERMINED
 
 
-def testAnErrorPybersDoesNotRaiseKeepsNoMessage(
+def testAnErrorPybersDoesNotRaiseWithholdsItsMessage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def raiseQuotingTheDocument(*_: object) -> None:
@@ -259,7 +260,7 @@ def testAnErrorPybersDoesNotRaiseKeepsNoMessage(
     monkeypatch.setattr(checkRead, "readDocument", raiseQuotingTheDocument)
     check = pybers.checkDocument(baselinePath)
     assert check.failure == pybers.CheckFailure(
-        "KeyError", None, check.failure.frames if check.failure else ()
+        "KeyError", pybers.WITHHELD, check.failure.frames if check.failure else ()
     )
     assert "Quarterly forecast" not in repr(check)
     assert any(frame.startswith("check/_read.py:") for frame in check.failure.frames)
@@ -284,12 +285,16 @@ def testTheSavedVersionIsTheLastNumbersBuildInTheHistory(
     assert checkRead.readSavedVersion(package) == expected
 
 
-def testTheSavedVersionIsNoneWithoutALegibleHistory() -> None:
+def testTheSavedVersionIsNoneWithoutAHistory() -> None:
     assert checkRead.readSavedVersion(NumbersPackage()) is None
+
+
+@pytest.mark.parametrize("stored", [b"not a plist", plistlib.dumps({"M15": "x"})])
+def testTheSavedVersionIsUndeterminedWhenTheHistoryCannotBeRead(stored: bytes) -> None:
     garbled = NumbersPackage(
-        otherMembers=[StoredMember(checkRead.buildHistoryMember, b"not a plist")]
+        otherMembers=[StoredMember(checkRead.buildHistoryMember, stored)]
     )
-    assert checkRead.readSavedVersion(garbled) is None
+    assert checkRead.readSavedVersion(garbled) is pybers.UNDETERMINED
 
 
 def testAFileThatIsNotADocumentRaisesAPybersError(tmp_path: Path) -> None:

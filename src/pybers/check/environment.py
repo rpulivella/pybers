@@ -5,6 +5,7 @@ The versions a bug report needs: pybers, Python, protobuf and the system.
 Each is read from the running Python, never by searching the computer.
 
 UPDATES
+2026-10-12  An uninstalled pybers reports its version as UNDETERMINED, for PYB-190.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -20,15 +21,16 @@ __date__ = "2026/10/07"
 import platform
 from importlib import metadata
 
+from ..absence import UNDETERMINED
 from .report import CheckEnvironment
 
 
-def findPybersVersion() -> str | None:
-    """Return the installed pybers version, or None when it runs uninstalled."""
+def findPybersVersion() -> str | UNDETERMINED:
+    """Return the installed pybers version, UNDETERMINED when it runs uninstalled."""
     try:
         return metadata.version("pybers")
     except metadata.PackageNotFoundError:
-        return None
+        return UNDETERMINED
 
 
 def readCheckEnvironment() -> CheckEnvironment:

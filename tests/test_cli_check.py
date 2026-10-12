@@ -3,6 +3,7 @@
 `pybers check`, run the way a person reporting a bug runs it.
 
 UPDATES
+2026-10-12  Each reason a part is missing prints as the design says, for PYB-190.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -246,6 +247,33 @@ def testANameInBracketsPrintsAsWritten() -> None:
     printed = renderPlain(formatCheck(replace(found, names=names)))
     assert "\n[bold]Q3\n" in printed
     assert "└ [draft]: 1 rows, 1 columns" in printed
+
+
+@pytest.mark.parametrize(
+    ("savedBy", "shown"), [(None, "none"), (pybers.UNDETERMINED, "unknown")]
+)
+def testASavedVersionPrintsNoneWhenAbsentAndUnknownWhenUnreadable(
+    savedBy: pybers.UNDETERMINED | None, shown: str
+) -> None:
+    found = replace(pybers.checkDocument(baselinePath), savedBy=savedBy)
+    assert f"Saved with: {shown}\n" in renderPlain(formatCheck(found))
+
+
+def testAPartPybersCouldNotDetermineReadsUnknown() -> None:
+    found = replace(
+        pybers.checkDocument(baselinePath),
+        unrecognizedCellTypes=pybers.UNDETERMINED,
+        names=pybers.CheckNames(pybers.UNDETERMINED, pybers.UNDETERMINED),
+    )
+    printed = renderPlain(formatCheck(found))
+    assert "Unrecognized cell types: unknown\n" in printed
+    assert "Sheets: unknown\nUnrecognized cells: unknown\n" in printed
+
+
+def testAWithheldMessageLeavesOnlyTheErrorType() -> None:
+    failure = pybers.CheckFailure("KeyError", pybers.WITHHELD, ())
+    found = replace(pybers.checkDocument(baselinePath), failure=failure)
+    assert "Readable: no, KeyError\n" in renderPlain(formatCheck(found))
 
 
 def testUnrecognizedCellsHangUnderTheirSheetAndTable() -> None:
