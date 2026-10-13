@@ -16,6 +16,8 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-10-13  A node's content is written by matching it, checked exhaustive by
+            mypy, for PYB-139.
 2026-10-13  A boolean literal, and a range axis reaching every line, for PYB-139.
 2026-09-29  A copied record claims the formula it names, for PYB-118.
 2026-09-21  A broken reference's sentinels and sticky bits carry each axis's
@@ -38,7 +40,7 @@ __date__ = "2026/09/08"
 import struct
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import cast
+from typing import assert_never, cast
 
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSTArchives_pb2 as tst
@@ -123,6 +125,7 @@ def encodeFormulaNode(
     so a node built from scratch would silently drop everything else it was
     carrying. Starting from the bytes as read and overwriting only what the model
     owns is what carries an unrecognized node through a rewritten formula intact.
+    `assert_never` makes mypy name any content type the model gains and this skips.
     """
     archive = tsce.ASTNodeArrayArchive.ASTNodeArchive()
     if node.raw:
@@ -135,43 +138,48 @@ def encodeFormulaNode(
     )
 
     content = node.content
-    if isinstance(content, Decimal):
-        # decimal128 and the float64 copy beside it, because Numbers writes both
-        # and a reader of either has to find the same number.
-        low, high = struct.unpack(
-            decimalHalfFormat, Decimal128(content).asBytes()
-        )
-        archive.AST_number_node_decimal_low = low
-        archive.AST_number_node_decimal_high = high
-        archive.AST_number_node_number = float(content)
-    elif isinstance(content, bool):
-        archive.AST_boolean_node_boolean = content
-    elif isinstance(content, str):
-        archive.AST_string_node_string = content
-    elif isinstance(content, FormulaFunctionCall):
-        archive.AST_function_node_index = content.index
-        archive.AST_function_node_numArgs = content.argumentCount
-    elif isinstance(content, FormulaGroup):
-        archive.AST_list_node_numArgs = content.argumentCount
-    elif isinstance(content, FormulaUnknownCall):
-        archive.AST_unknown_function_node_string = content.name
-        archive.AST_unknown_function_node_numArgs = content.argumentCount
-    elif isinstance(content, FormulaReference):
-        encodeFormulaReference(archive, content)
-    elif isinstance(content, FormulaRange):
-        encodeFormulaRange(archive, content)
-    elif isinstance(content, FormulaBinding):
-        archive.AST_let_identifier = content.name
-        archive.AST_symbol = content.symbol
-        archive.AST_let_is_continuation = content.continuation
-    elif isinstance(content, FormulaVariable):
-        archive.AST_symbol = content.symbol
-    elif isinstance(content, FormulaLambda):
-        # Cleared first, because a lambda read with two parameters and rewritten
-        # with one would otherwise keep the name it no longer binds.
-        archive.AST_lambda_idents.ClearField("AST_identifier_string")
-        archive.AST_lambda_idents.AST_identifier_string.extend(content.names)
-        archive.AST_lambda_idents.AST_first_symbol = content.firstSymbol
+    match content:
+        case bool():
+            archive.AST_boolean_node_boolean = content
+        case Decimal():
+            # decimal128 and the float64 copy beside it, because Numbers writes both
+            # and a reader of either has to find the same number.
+            low, high = struct.unpack(
+                decimalHalfFormat, Decimal128(content).asBytes()
+            )
+            archive.AST_number_node_decimal_low = low
+            archive.AST_number_node_decimal_high = high
+            archive.AST_number_node_number = float(content)
+        case str():
+            archive.AST_string_node_string = content
+        case FormulaFunctionCall():
+            archive.AST_function_node_index = content.index
+            archive.AST_function_node_numArgs = content.argumentCount
+        case FormulaGroup():
+            archive.AST_list_node_numArgs = content.argumentCount
+        case FormulaUnknownCall():
+            archive.AST_unknown_function_node_string = content.name
+            archive.AST_unknown_function_node_numArgs = content.argumentCount
+        case FormulaReference():
+            encodeFormulaReference(archive, content)
+        case FormulaRange():
+            encodeFormulaRange(archive, content)
+        case FormulaBinding():
+            archive.AST_let_identifier = content.name
+            archive.AST_symbol = content.symbol
+            archive.AST_let_is_continuation = content.continuation
+        case FormulaVariable():
+            archive.AST_symbol = content.symbol
+        case FormulaLambda():
+            # Cleared first, because a lambda read with two parameters and
+            # rewritten with one would otherwise keep the name it no longer binds.
+            archive.AST_lambda_idents.ClearField("AST_identifier_string")
+            archive.AST_lambda_idents.AST_identifier_string.extend(content.names)
+            archive.AST_lambda_idents.AST_first_symbol = content.firstSymbol
+        case None:
+            pass
+        case _:
+            assert_never(content)
     return archive
 
 
