@@ -36,9 +36,14 @@ this reads as Apple removing the enum rather than an incomplete extraction.
 
 Numbers 15.4 changed two schemas from 15.3.1. `TSS.StylesheetArchive` gained
 `styles_for_15_4`, field 27, and a command archive's `sheet_index` in
-`TNCommandArchives.proto` became `int32` where it was `uint32`. A document 15.3.1 saved
-never holds field 27, and the two integer types read the same bytes until an index is
-negative.
+`TNCommandArchives.proto` became `int32` where it was `uint32`. The two integer types
+read the same bytes until an index is negative.
+
+Apple adds one `styles_for_*` slot every release, and no document Numbers made here fills
+any after `styles_for_10_1`: not one 15.4 re-saved, created blank or created from its
+templates, and not one given a 15.3 sheet tab color, whose style lands in
+`styles_for_10_0`. The new templates offered only with a Creator Studio subscription are
+untried.
 
 ## Regenerating
 
