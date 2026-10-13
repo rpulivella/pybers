@@ -60,5 +60,6 @@ can hang or crash it.
 - **Never claim a golden confirmed** on a passing run alone. The QA checks and the
   record in `tests/golden/README.md` still follow the confirmation rules in `CLAUDE.md`.
 - **Nothing in the preflight, CI or the test suite runs this**, and nothing under `src/`
-  or `tests/` imports it. It needs a logged-in Mac with Numbers.
+  imports it. A test may import its pure functions but must never drive Numbers, which
+  needs a logged-in Mac.
 - **The report folder is never committed.** `/pr-merge` purges the ticket's folder.
