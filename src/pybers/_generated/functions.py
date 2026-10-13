@@ -2,8 +2,8 @@
 """\
 Numbers formula functions, by index. Machine output, do not edit.
 
-Written by tools/functions-extract.py from Numbers 15.3.1
-(build 7050.1.1). A correction made here is destroyed by the next
+Written by tools/functions-extract.py from Numbers 15.4
+(build 7051.0.79). A correction made here is destroyed by the next
 extraction; correct the extractor instead.
 
 Each row is the index, the minimum argument count, the maximum, the size of the
@@ -15,7 +15,7 @@ rather than as an indexed call. Availability is one of three: offered in the
 function browser, reserved with an index and no argument spec so Numbers
 refuses the name, or internal, which Numbers uses itself and never offers.
 
-371 of the 373 functions Numbers names are covered.
+389 of the 391 functions Numbers names are covered.
 """
 
 functions: dict[str, tuple[int | None, int, int, int, str]] = {
@@ -24,6 +24,8 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "ACCRINTM": (3, 3, 5, 0, "offered"),
     "ACOS": (4, 1, 1, 0, "offered"),
     "ACOSH": (5, 1, 1, 0, "offered"),
+    "ACOT": (374, 1, 1, 0, "offered"),
+    "ACOTH": (375, 1, 1, 0, "offered"),
     "ADDRESS": (6, 2, 5, 0, "offered"),
     "ALTITUDE": (284, 0, 0, 0, "reserved"),
     "AND": (7, 1, 1, 1, "offered"),
@@ -73,6 +75,7 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "COLUMN": (22, 0, 1, 0, "offered"),
     "COLUMNS": (23, 1, 2, 0, "offered"),
     "COMBIN": (24, 2, 2, 0, "offered"),
+    "COMBINA": (383, 2, 2, 0, "offered"),
     "CONCAT": (329, 1, 14, 1, "offered"),
     "CONCATENATE": (25, 1, 1, 1, "offered"),
     "CONFIDENCE": (26, 3, 3, 0, "offered"),
@@ -81,6 +84,8 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "CORREL": (27, 2, 2, 0, "offered"),
     "COS": (28, 1, 1, 0, "offered"),
     "COSH": (29, 1, 1, 0, "offered"),
+    "COT": (376, 1, 1, 0, "offered"),
+    "COTH": (377, 1, 1, 0, "offered"),
     "COUNT": (30, 1, 8, 1, "offered"),
     "COUNTA": (31, 1, 9, 1, "offered"),
     "COUNTBLANK": (32, 1, 1, 0, "offered"),
@@ -94,6 +99,8 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "COVAR": (38, 2, 2, 0, "offered"),
     "COVARIANCE.S": (290, 2, 2, 0, "offered"),
     "CRITBINOM": (251, 3, 3, 0, "offered"),
+    "CSC": (378, 1, 1, 0, "offered"),
+    "CSCH": (379, 1, 1, 0, "offered"),
     "CUMIPMT": (201, 6, 6, 0, "offered"),
     "CUMPRINC": (202, 6, 6, 0, "offered"),
     "CURRENCY": (300, 2, 3, 0, "offered"),
@@ -105,6 +112,7 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "DATEVALUE": (228, 1, 1, 0, "offered"),
     "DAY": (41, 1, 1, 0, "offered"),
     "DAYNAME": (236, 1, 1, 0, "offered"),
+    "DAYS": (389, 2, 2, 0, "offered"),
     "DAYS360": (261, 2, 3, 0, "offered"),
     "DB": (42, 4, 5, 0, "offered"),
     "DDB": (43, 4, 5, 0, "offered"),
@@ -142,12 +150,15 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "FIND": (53, 2, 3, 0, "offered"),
     "FIND.CASEINSENSITIVE": (296, 2, 3, 0, "internal"),
     "FINV": (257, 3, 3, 0, "offered"),
+    "FISHER": (386, 1, 1, 0, "offered"),
+    "FISHERINV": (387, 1, 1, 0, "offered"),
     "FIXED": (54, 1, 3, 0, "offered"),
     "FLOOR": (55, 2, 2, 0, "offered"),
     "FORECAST": (56, 3, 3, 0, "offered"),
     "FORMULATEXT": (323, 1, 1, 0, "offered"),
     "FREQUENCY": (222, 2, 2, 0, "offered"),
     "FV": (57, 3, 5, 0, "offered"),
+    "GAMMA": (384, 1, 1, 0, "offered"),
     "GAMMADIST": (229, 4, 4, 0, "offered"),
     "GAMMAINV": (230, 3, 3, 0, "offered"),
     "GAMMALN": (227, 1, 1, 0, "offered"),
@@ -245,11 +256,14 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "ODD": (100, 1, 1, 0, "offered"),
     "OFFSET": (101, 3, 5, 0, "offered"),
     "OR": (102, 1, 1, 1, "offered"),
+    "PEARSON": (390, 2, 2, 0, "offered"),
     "PERCENTILE": (103, 2, 2, 0, "offered"),
     "PERCENTILE.EXC": (292, 2, 2, 0, "offered"),
     "PERCENTRANK": (226, 2, 3, 0, "offered"),
     "PERCENTRANK.EXC": (293, 2, 3, 0, "offered"),
     "PERMUT": (245, 2, 2, 0, "offered"),
+    "PERMUTATIONA": (388, 2, 2, 0, "offered"),
+    "PHI": (385, 1, 1, 0, "offered"),
     "PI": (104, 0, 0, 0, "offered"),
     "PLAINTEXT": (297, 1, 1, 0, "offered"),
     "PMT": (105, 3, 5, 0, "offered"),
@@ -288,8 +302,11 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "ROUNDUP": (128, 2, 2, 0, "offered"),
     "ROW": (129, 0, 1, 0, "offered"),
     "ROWS": (130, 1, 2, 0, "offered"),
+    "RSQ": (391, 2, 2, 0, "offered"),
     "SCAN": (368, 3, 3, 0, "offered"),
     "SEARCH": (131, 2, 3, 0, "offered"),
+    "SEC": (380, 1, 1, 0, "offered"),
+    "SECH": (381, 1, 1, 0, "offered"),
     "SECOND": (132, 1, 1, 0, "offered"),
     "SEQUENCE": (338, 0, 4, 0, "offered"),
     "SERIESSUM": (286, 4, 4, 0, "offered"),
@@ -366,6 +383,7 @@ functions: dict[str, tuple[int | None, int, int, int, str]] = {
     "XLOOKUP": (314, 3, 6, 0, "offered"),
     "XMATCH": (315, 2, 4, 0, "offered"),
     "XNPV": (312, 3, 3, 0, "offered"),
+    "XOR": (382, 1, 1, 1, "offered"),
     "YEAR": (167, 1, 1, 0, "offered"),
     "YEARFRAC": (214, 2, 3, 0, "offered"),
     "YIELD": (191, 6, 7, 0, "offered"),

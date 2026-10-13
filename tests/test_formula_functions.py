@@ -7,6 +7,7 @@ own cells, so `SUM` is 168 because a document written in Numbers says so, not
 because the extractor and this suite agree with each other.
 
 UPDATES
+2026-10-12  The 18 functions Numbers 15.4 added, for PYB-139.
 2026-09-04  Written for #44.
 """
 from __future__ import annotations
@@ -49,6 +50,20 @@ repositoryRoot: Path = Path(__file__).resolve().parent.parent
 # 2026-09-04 on Numbers 15.3.1. Everything above it was appended later and is
 # in release order rather than name order.
 originalAlphabeticalCeiling: int = 167
+
+# The highest index in the table extracted from Numbers 15.3.1.
+lastIndexBefore15Point4: int = 373
+
+# What Numbers 15.4 added, as its extraction reported it against the 15.3.1 table.
+addedIn15Point4: dict[str, tuple[int, int, int, int]] = {
+    "ACOT": (374, 1, 1, 0), "ACOTH": (375, 1, 1, 0), "COT": (376, 1, 1, 0),
+    "COTH": (377, 1, 1, 0), "CSC": (378, 1, 1, 0), "CSCH": (379, 1, 1, 0),
+    "SEC": (380, 1, 1, 0), "SECH": (381, 1, 1, 0), "XOR": (382, 1, 1, 1),
+    "COMBINA": (383, 2, 2, 0), "GAMMA": (384, 1, 1, 0), "PHI": (385, 1, 1, 0),
+    "FISHER": (386, 1, 1, 0), "FISHERINV": (387, 1, 1, 0),
+    "PERMUTATIONA": (388, 2, 2, 0), "DAYS": (389, 2, 2, 0),
+    "PEARSON": (390, 2, 2, 0), "RSQ": (391, 2, 2, 0),
+}
 
 
 def openFirstTable(name: str) -> pybers.Table:
@@ -140,6 +155,26 @@ def testTheOriginalIndicesAreInAlphabeticalOrder() -> None:
     )
     assert within[0] == (1, "ABS")
     assert within[-1] == (originalAlphabeticalCeiling, "YEAR")
+
+
+def testTheFunctionsNumbers15Point4AddedAreOfferedWithTheirCounts() -> None:
+    found = {
+        name: (
+            function.index, function.minimumArguments,
+            function.maximumArguments, function.repeatingGroupSize,
+        )
+        for name, function in functionsByName.items()
+        if name in addedIn15Point4 and function.offered
+    }
+    assert found == addedIn15Point4
+
+
+def testOnlyTheFunctionsNumbers15Point4AddedSitAfterTheEarlierTable() -> None:
+    later = {
+        function.name for index, function in functionsByIndex.items()
+        if index > lastIndexBefore15Point4
+    }
+    assert later == set(addedIn15Point4)
 
 
 # ── AC 2: an unknown function survives ───────────────────────────────────────
