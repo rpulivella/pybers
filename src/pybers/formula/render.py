@@ -21,6 +21,9 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-10-13  A node renders by matching what it holds, checked exhaustive by
+            mypy, for PYB-139.
+2026-10-13  A boolean literal renders as TRUE or FALSE, for PYB-139.
 2026-09-11  A bracket the author typed is written back, for #67. The claim that
             the file records no parentheses was false; node type 25 is one.
 2026-09-08  `renderAddress` and `findShortestNames` exported for #13, so that one
@@ -40,6 +43,7 @@ __date__ = "2026/09/08"
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
+from typing import assert_never
 
 from pybers.addressing.ranges import RangeEndpoint, renderEndpoint
 from pybers.addressing.reference import (
@@ -61,23 +65,19 @@ from pybers.formula.nodes import (
     FormulaUnknownCall,
     FormulaVariable,
     additionNodeType,
-    brokenReferenceNodeType,
     emptyArgumentNodeType,
     endScopeNodeType,
     negationNodeType,
-    numberNodeType,
     percentNodeType,
     plusSignNodeType,
     powerNodeType,
-    rangeNodeType,
-    referenceNodeType,
-    stringNodeType,
     subtractionNodeType,
     tokenNodeType,
 )
 from pybers.formula.syntax import (
     argumentSeparator,
     atomPrecedence,
+    booleanTexts,
     brokenReferenceText,
     cosmeticNodeTypes,
     formulaMarker,
@@ -229,60 +229,63 @@ class Renderer:
         return f"{formulaMarker}{self.stack[0].text}"
 
     def step(self, node: FormulaNode) -> None:
-        """Take one node, and put what it makes of the stack back onto it."""
+        """Take one node, and put what it makes of the stack back onto it.
+
+        Matched on what the node holds, and `assert_never` makes mypy name any
+        content type the model gains and this does not render.
+        """
         kind = node.nodeType
         content = node.content
         if kind in cosmeticNodeTypes or kind in thunkNodeTypes:
             return
-        if kind == numberNodeType and isinstance(content, Decimal):
-            self.stack.append(Rendered(renderNumber(content)))
-            return
-        if kind == stringNodeType and isinstance(content, str):
-            self.stack.append(Rendered(quoteString(content)))
-            return
+        match content:
+            case bool():
+                self.stack.append(Rendered(booleanTexts[content]))
+            case Decimal():
+                self.stack.append(Rendered(renderNumber(content)))
+            case str():
+                self.stack.append(Rendered(quoteString(content)))
+            case FormulaReference() | FormulaRange():
+                self.stack.append(
+                    Rendered(renderAddress(node, self.host, self.names))
+                )
+            case FormulaGroup():
+                self.stepGroup(content)
+            case FormulaFunctionCall():
+                self.stepCall(content)
+            case FormulaUnknownCall():
+                self.stack.append(
+                    renderCall(content.name, self.pop(content.argumentCount))
+                )
+            case FormulaVariable():
+                self.stepVariable(content)
+            case FormulaBinding():
+                value = self.pop(1)[0]
+                self.bindings.append((content.name, value.text, content.continuation))
+            case FormulaLambda():
+                self.stepLambda(content)
+            case None:
+                self.stepBare(kind)
+            case _:
+                assert_never(content)
+
+    def stepBare(self, kind: int) -> None:
+        """Take a node that holds nothing, whose type alone says what it does."""
         # Type 23 is the second spelling of an argument that is not there, and it
         # writes the same nothing. Reading it back gives type 22, the only one of
         # the two whose placement is established, so those formulas round trip
         # through the text and not through the node type.
         if kind in (emptyArgumentNodeType, tokenNodeType):
             self.stack.append(Rendered(""))
-            return
-        if kind in (referenceNodeType, brokenReferenceNodeType, rangeNodeType):
-            self.stack.append(
-                Rendered(renderAddress(node, self.host, self.names))
-            )
-            return
-        if isinstance(content, FormulaGroup):
-            self.stepGroup(content)
-            return
-        if isinstance(content, FormulaFunctionCall):
-            self.stepCall(content)
-            return
-        if isinstance(content, FormulaUnknownCall):
-            self.stack.append(
-                renderCall(content.name, self.pop(content.argumentCount))
-            )
-            return
-        if isinstance(content, FormulaVariable):
-            self.stepVariable(content)
-            return
-        if isinstance(content, FormulaBinding):
-            value = self.pop(1)[0]
-            self.bindings.append((content.name, value.text, content.continuation))
-            return
-        if kind == endScopeNodeType:
+        elif kind == endScopeNodeType:
             self.stepEndScope()
-            return
-        if isinstance(content, FormulaLambda):
-            self.stepLambda(content)
-            return
-        if kind in operatorPrecedence:
+        elif kind in operatorPrecedence:
             self.stepOperator(kind)
-            return
-        raise FormulaError(
-            f"Node type {kind} has no written form. A formula holding one can be "
-            "read and written back, and cannot be rendered as text."
-        )
+        else:
+            raise FormulaError(
+                f"Node type {kind} has no written form. A formula holding one can "
+                "be read and written back, and cannot be rendered as text."
+            )
 
     def stepGroup(self, group: FormulaGroup) -> None:
         """Bracket the piece on top of the stack, as the author bracketed it.

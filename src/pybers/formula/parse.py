@@ -21,6 +21,7 @@ the first of the four functions that evaluate lazily, and a person types none of
 that. See `thunkingFunctionIndices`.
 
 UPDATES
+2026-10-13  TRUE and FALSE without brackets are boolean literals, for PYB-139.
 2026-09-11  A bracket becomes the node Numbers stores for one, for #67.
 2026-09-08  Written for #45.
 """
@@ -60,6 +61,7 @@ from pybers.formula.nodes import (
     additionNodeType,
     beginLambdaThunkNodeType,
     beginThunkNodeType,
+    booleanNodeType,
     brokenReferenceNodeType,
     concatenationNodeType,
     divisionNodeType,
@@ -87,6 +89,7 @@ from pybers.formula.syntax import (
     FormulaSyntaxError,
     Token,
     binaryOperators,
+    booleanLiterals,
     buildRange,
     buildReference,
     comparisonOperators,
@@ -280,6 +283,10 @@ class Parser:
             return
         if token.kind == "name" and token.text in self.bound:
             self.emit(variableNodeType, FormulaVariable(self.bound[token.text]))
+            return
+        literal = booleanLiterals.get(token.text.upper())
+        if literal is not None and not token.qualifier:
+            self.emit(booleanNodeType, literal)
             return
         self.emitAddress(token)
 

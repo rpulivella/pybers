@@ -198,10 +198,24 @@ node with its own anchoring, adjusting one cannot disturb the other, the structu
 the correct behavior the default, which is precisely what a regex over formula text could
 not do.
 
-### A whole-column reference is a coordinate with no row
+### A whole column or row: absent in a reference, a sentinel in a range
 
-`SUM(A)` gives `column: -5, absolute: false` and **no row component at all**. Unboundedness
-is expressed by absence rather than by a sentinel or a flag.
+`SUM(A)` gives `column: -5, absolute: false` and **no row component at all**: a single-cell
+reference expresses an unbounded axis by absence.
+
+A range does not. Typed into Numbers 15.4 for `71-whole-axis-ranges-and-booleans`,
+`SUM(C:D)` and `SUM(Table 1::B:C)` hold an **absolute row of 2147483647 with no end**, and
+`SUM(5:6)` and `SUM(Table 1::2:3)` an **absolute column of 32767 with no end**. These are
+the values a broken reference uses (node type 46), so the node type decides which they
+mean. The sticky bits leave the unbounded axis unlocked though the tract holds it
+absolute, and `$B:$C` locks only the bounded axis. Read as a line, the sentinel names one
+far past any table and the range cannot be rendered, which is how the Retirement
+template's `VLOOKUP(Life Plans::B1,Data::B:E,4,FALSE)` surfaced it.
+
+### TRUE and FALSE typed bare are boolean nodes
+
+`=TRUE` and the `FALSE` in `=IF(FALSE,1,2)` are node type 18 holding
+`AST_boolean_node_boolean`, not calls. `TRUE()` with brackets stays a call to function 156.
 
 ### The engine keeps its own register of which cells hold formulas, stored TWICE
 

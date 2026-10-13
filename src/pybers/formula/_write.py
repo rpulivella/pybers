@@ -16,6 +16,9 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-10-13  A node's content is written by matching it, checked exhaustive by
+            mypy, for PYB-139.
+2026-10-13  A boolean literal, and a range axis reaching every line, for PYB-139.
 2026-09-29  A copied record claims the formula it names, for PYB-118.
 2026-09-21  A broken reference's sentinels and sticky bits carry each axis's
             lock, the end bits never set, for PYB-17.
@@ -37,7 +40,7 @@ __date__ = "2026/09/08"
 import struct
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import cast
+from typing import assert_never, cast
 
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSTArchives_pb2 as tst
@@ -72,6 +75,8 @@ from .nodes import (
     Span,
     brokenColumnSentinel,
     brokenRowSentinel,
+    unboundedRangeColumn,
+    unboundedRangeRow,
 )
 
 # Byte 0 of every cell record in the documents. A created record carries it too.
@@ -120,6 +125,7 @@ def encodeFormulaNode(
     so a node built from scratch would silently drop everything else it was
     carrying. Starting from the bytes as read and overwriting only what the model
     owns is what carries an unrecognized node through a rewritten formula intact.
+    `assert_never` makes mypy name any content type the model gains and this skips.
     """
     archive = tsce.ASTNodeArrayArchive.ASTNodeArchive()
     if node.raw:
@@ -132,41 +138,48 @@ def encodeFormulaNode(
     )
 
     content = node.content
-    if isinstance(content, Decimal):
-        # decimal128 and the float64 copy beside it, because Numbers writes both
-        # and a reader of either has to find the same number.
-        low, high = struct.unpack(
-            decimalHalfFormat, Decimal128(content).asBytes()
-        )
-        archive.AST_number_node_decimal_low = low
-        archive.AST_number_node_decimal_high = high
-        archive.AST_number_node_number = float(content)
-    elif isinstance(content, str):
-        archive.AST_string_node_string = content
-    elif isinstance(content, FormulaFunctionCall):
-        archive.AST_function_node_index = content.index
-        archive.AST_function_node_numArgs = content.argumentCount
-    elif isinstance(content, FormulaGroup):
-        archive.AST_list_node_numArgs = content.argumentCount
-    elif isinstance(content, FormulaUnknownCall):
-        archive.AST_unknown_function_node_string = content.name
-        archive.AST_unknown_function_node_numArgs = content.argumentCount
-    elif isinstance(content, FormulaReference):
-        encodeFormulaReference(archive, content)
-    elif isinstance(content, FormulaRange):
-        encodeFormulaRange(archive, content)
-    elif isinstance(content, FormulaBinding):
-        archive.AST_let_identifier = content.name
-        archive.AST_symbol = content.symbol
-        archive.AST_let_is_continuation = content.continuation
-    elif isinstance(content, FormulaVariable):
-        archive.AST_symbol = content.symbol
-    elif isinstance(content, FormulaLambda):
-        # Cleared first, because a lambda read with two parameters and rewritten
-        # with one would otherwise keep the name it no longer binds.
-        archive.AST_lambda_idents.ClearField("AST_identifier_string")
-        archive.AST_lambda_idents.AST_identifier_string.extend(content.names)
-        archive.AST_lambda_idents.AST_first_symbol = content.firstSymbol
+    match content:
+        case bool():
+            archive.AST_boolean_node_boolean = content
+        case Decimal():
+            # decimal128 and the float64 copy beside it, because Numbers writes both
+            # and a reader of either has to find the same number.
+            low, high = struct.unpack(
+                decimalHalfFormat, Decimal128(content).asBytes()
+            )
+            archive.AST_number_node_decimal_low = low
+            archive.AST_number_node_decimal_high = high
+            archive.AST_number_node_number = float(content)
+        case str():
+            archive.AST_string_node_string = content
+        case FormulaFunctionCall():
+            archive.AST_function_node_index = content.index
+            archive.AST_function_node_numArgs = content.argumentCount
+        case FormulaGroup():
+            archive.AST_list_node_numArgs = content.argumentCount
+        case FormulaUnknownCall():
+            archive.AST_unknown_function_node_string = content.name
+            archive.AST_unknown_function_node_numArgs = content.argumentCount
+        case FormulaReference():
+            encodeFormulaReference(archive, content)
+        case FormulaRange():
+            encodeFormulaRange(archive, content)
+        case FormulaBinding():
+            archive.AST_let_identifier = content.name
+            archive.AST_symbol = content.symbol
+            archive.AST_let_is_continuation = content.continuation
+        case FormulaVariable():
+            archive.AST_symbol = content.symbol
+        case FormulaLambda():
+            # Cleared first, because a lambda read with two parameters and
+            # rewritten with one would otherwise keep the name it no longer binds.
+            archive.AST_lambda_idents.ClearField("AST_identifier_string")
+            archive.AST_lambda_idents.AST_identifier_string.extend(content.names)
+            archive.AST_lambda_idents.AST_first_symbol = content.firstSymbol
+        case None:
+            pass
+        case _:
+            assert_never(content)
     return archive
 
 
@@ -269,6 +282,9 @@ def encodeFormulaRange(
 ) -> None:
     """Write one range tract into the field variant its anchoring belongs in.
 
+    An axis reaching every line is written as Numbers writes it: absolute, holding
+    the unbounded value, with no end.
+
     The variant an axis sits in IS its anchoring, so every variant is cleared
     first. Writing a relative axis without clearing the absolute one would leave a
     tract claiming both, which the reader resolves by preferring the relative and
@@ -279,13 +295,17 @@ def encodeFormulaRange(
     for name in ("relative_column", "relative_row",
                  "absolute_column", "absolute_row"):
         tract.ClearField(name)
-    if extent.columns is not None:
+    if extent.columns is None:
+        tract.absolute_column.add().range_begin = unboundedRangeColumn
+    else:
         field = (
             tract.absolute_column if extent.columns.absolute
             else tract.relative_column
         )
         encodeSpan(field.add(), extent.columns)
-    if extent.rows is not None:
+    if extent.rows is None:
+        tract.absolute_row.add().range_begin = unboundedRangeRow
+    else:
         field = (
             tract.absolute_row if extent.rows.absolute else tract.relative_row
         )
@@ -304,8 +324,9 @@ def encodeStickyBits(
     an absolute tract and displayed by Numbers as `SUM(A1:A5)`. Both ends of an
     axis share one flag because `Span` cannot express a range locked at one end.
 
-    An axis the range leaves unbounded is written as not absolute, which is an
-    assumption rather than a measurement: no range in the documents omits an axis.
+    An axis the range leaves unbounded is written as not absolute, though its tract
+    holds it absolute, as Numbers wrote every such axis in
+    `71-whole-axis-ranges-and-booleans`.
     """
     columns = extent.columns.absolute if extent.columns is not None else False
     rows = extent.rows.absolute if extent.rows is not None else False

@@ -20,17 +20,17 @@ or modifies any part of Numbers. The technique of finding the values in compiled
 code rather than in a published table comes from the numbers-parser project and
 is not claimed as this project's invention.
 
-Three readings, two of them independent, all measured on Numbers 15.3.1:
+Three readings, two of them independent, all measured on Numbers 15.4:
 
     names       every `TSCEFunction_<NAME>` class declares `+functionIndex` as a
-                two-instruction method returning its index. 369 classes.
+                two-instruction method returning its index. 387 classes.
     corroborant `TSCEFormulaCreationMagic` carries one authoring method per
                 function, loading the index before a call. It reaches fewer
                 functions and exists here to disagree if either reading is
                 wrong.
     arity       one 133 KB function builds every `TSCEFunctionSpec`, sending
                 `specWithFunctionName:minArgs:maxArgs:...` with the counts as
-                literal immediates. 367 calls across eight selector variants.
+                literal immediates. 385 calls across eight selector variants.
 
 **A repeating group makes the maximum a floor rather than a ceiling.** `SUM`
 declares a maximum of two with a repeating group of one, which is how a document
@@ -57,6 +57,8 @@ decoding are both Python, so there is no objdump, no c++filt and no
 architecture-specific toolchain to install.
 
 UPDATES
+2026-10-12  The registry is found by its calls to the spec factories, since
+            Numbers 15.4 no longer loads the spec class's address, for PYB-139.
 2026-09-04  Names moved to the Objective-C metadata and arity added, for #44.
             The authoring methods reach 324 functions and the classes 346, so
             the first reading became the cross-check rather than the source.
@@ -114,7 +116,6 @@ knownPairs: dict[str, int] = {"SUM": 168, "IF": 62, "SUMIFS": 231, "ROUND": 126}
 functionClassPrefix: str = "TSCEFunction_"
 indexSelector: str = "functionIndex"
 specSelectorPrefix: str = "specWithFunctionName:"
-specClassSymbol: str = "_OBJC_CLASS_$_TSCEFunctionSpec"
 
 # `_ZN24TSCEFormulaCreationMagic<length><NAME>E<arguments>`, matched rather than
 # demangled because a general demangler for one shape earns nothing.
@@ -381,37 +382,20 @@ def specFactories(image: Image) -> dict[int, bool]:
     return factories
 
 
-def specRegistry(image: Image) -> tuple[int, int]:
+def specRegistry(image: Image, factories: dict[int, bool]) -> tuple[int, int]:
     """Return the extent of the function that builds every spec.
 
-    Located by counting references to the spec class rather than by address,
-    because it carries no symbol and its address moves with every release.
+    Located by counting calls to the spec factories rather than by address,
+    because it carries no symbol and its address moves with every release. In
+    Numbers 15.4 it no longer loads the spec class's address directly, so a
+    count of class references found nothing there.
     """
-    classAddress = next(
-        (a for a, n in image.symbols.items() if n == specClassSymbol), None
-    )
-    if classAddress is None:
-        raise ExtractionError(f"{specClassSymbol} is absent from the symbol table.")
-
     text = image.sections["__TEXT,__text"]
-    pages: dict[int, int] = {}
     counts: Counter[int] = Counter()
     for step in range(0, text.size & ~3, 4):
         word = struct.unpack_from("<I", image.data, text.offset + step)[0]
         address = text.address + step
-        if word & addressPageMask == addressPageValue:
-            pages[word & 0x1F] = pageAddress(word, address)
-            continue
-        base = pages.get((word >> 5) & 0x1F)
-        if base is None:
-            continue
-        if word & addImmediateMask == addImmediateValue:
-            reference = base + ((word >> 10) & 0xFFF)
-        elif word & loadRegisterMask == loadRegisterValue:
-            reference = base + (((word >> 10) & 0xFFF) * 8)
-        else:
-            continue
-        if reference != classAddress:
+        if branchTarget(word, address) not in factories:
             continue
         bounds = image.functionBounds(address)
         if bounds is not None:
@@ -433,7 +417,7 @@ def arityFromRegistry(image: Image) -> dict[str, tuple[int, int, int]]:
     most recent write before a send is the value being passed.
     """
     factories = specFactories(image)
-    start, end = specRegistry(image)
+    start, end = specRegistry(image, factories)
     text = image.sections["__TEXT,__text"]
 
     registers: dict[int, int] = {}

@@ -20,6 +20,8 @@ conversion here takes that cell. Passing the wrong one is not an error, it is a
 wrong answer.
 
 UPDATES
+2026-10-13  A span of whole rows reads as an address, and TRUE and FALSE as
+            literals, for PYB-139.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-09-13  A guessed table name no longer eats the operator in front of
             it, for #67. It cost 1469 formulas in one document.
@@ -111,6 +113,11 @@ unaryOperators: frozendict[str, int] = frozendict({
 })
 percentSymbol: str = "%"
 
+# The two words Numbers stores as a boolean node rather than as a call, which is
+# what it writes for `TRUE` typed bare; `TRUE()` stays a call.
+booleanLiterals: frozendict[str, bool] = frozendict({"TRUE": True, "FALSE": False})
+booleanTexts: frozendict[bool, str] = frozendict({True: "TRUE", False: "FALSE"})
+
 operatorSymbols: frozendict[int, str] = frozendict({
     nodeType: symbol for symbol, nodeType in binaryOperators.items()
 })
@@ -187,6 +194,11 @@ endpointExpression: str = r"\$?[A-Za-z]+\$?[0-9]+|\$?[A-Za-z]+|\$?[0-9]+"
 
 addressPattern: re.Pattern[str] = re.compile(
     rf"(?:{endpointExpression})(?::(?!:)(?:{endpointExpression}))?"
+)
+
+# A span of whole rows, `5:6`, which begins with digits a number would otherwise take.
+rowSpanPattern: re.Pattern[str] = re.compile(
+    r"\$?[0-9]+:(?!:)\$?[0-9]+(?![0-9A-Za-z.])"
 )
 
 # A table name in front of an address, `Table 2::A1`, qualified further as
@@ -379,6 +391,9 @@ def readValueToken(
     broken = brokenPattern.match(text, position)
     if broken is not None:
         return Token("broken", broken.group(), position, len(broken.group()))
+    rows = rowSpanPattern.match(text, position)
+    if rows is not None:
+        return Token("address", rows.group(), position, len(rows.group()))
     number = numberPattern.match(text, position)
     if number is not None:
         return Token("number", number.group(), position, len(number.group()))

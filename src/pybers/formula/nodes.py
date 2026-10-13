@@ -30,9 +30,11 @@ single-cell reference therefore finds nothing and reports everything unlocked.
 
 **Unboundedness is absence.** `SUM(A)` stores a column and no row at all, so a
 row of `None` means the whole column rather than row zero. The same rule
-`pybers.addressing.ranges` already follows.
+`pybers.addressing.ranges` already follows. A range's tract stores the unbounded axis
+as a sentinel line, read here as `None`.
 
 UPDATES
+2026-10-13  A boolean literal and a range reaching every row or column, for PYB-139.
 2026-09-18  A broken reference names the rows and columns it lost, for PYB-17.
 2026-09-11  Apple's list node is a bracket the author typed, for #67. It
             enclosed one value in all 4364 instances measured.
@@ -79,6 +81,7 @@ from pybers.formula.functions import (
 # documents.
 functionNodeType: int = 16
 numberNodeType: int = 17
+booleanNodeType: int = 18
 stringNodeType: int = 19
 unknownFunctionNodeType: int = 31
 referenceNodeType: int = 36
@@ -167,6 +170,12 @@ thunkingFunctionIndices: frozenset[int] = frozenset({19, 62, 313, 336})
 # raise nothing, which is why they are recognized here rather than at a caller.
 brokenColumnSentinel: int = 32767
 brokenRowSentinel: int = 2147483647
+
+# A range reaching every row stores this absolute row with no end, and one reaching
+# every column this column: the broken values again, given meaning by the node type.
+# Measured in tests/measurements/71-whole-axis-ranges-and-booleans.
+unboundedRangeColumn: int = brokenColumnSentinel
+unboundedRangeRow: int = brokenRowSentinel
 
 
 class FormulaError(PybersError, ValueError):
@@ -491,6 +500,7 @@ class FormulaGroup:
 # implied.
 NodeContent = (
     Decimal
+    | bool
     | str
     | FormulaFunctionCall
     | FormulaGroup

@@ -7,7 +7,8 @@
 //
 // It performs only the operations named in `HelperOperation` and never runs a script
 // or command it is given (PYB-94 AC 15). Every AppleScript it sends is written here,
-// and the only values a request places into one are paths and cell names it escapes.
+// and the only values a request places into one are paths, cell names and cell values
+// it escapes.
 //
 // UPDATES
 // 2026-09-30  Reads a date at the zone's offset now, which Numbers applies to every date, for PYB-137.
@@ -74,6 +75,7 @@ enum EditAction: String, Codable {
     case select
     case menuPress
     case formatSet
+    case valueSet
 }
 
 // `document` counts the request's `documentPaths` from zero; the first is the one saved.
@@ -85,6 +87,7 @@ struct EditStep: Codable {
     var range: String?
     var menuItem: EditMenuItem?
     var format: EditCellFormat?
+    var value: String?
 }
 
 struct CellAddress: Codable {
@@ -1088,6 +1091,16 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
                 remedy: "run the helper only through scripts/golden-confirm.py"))
         }
         _ = try runAppleScript("set t to \(table)\nset format of \(range) of t to \(format.rawValue)")
+    case .valueSet:
+        // Numbers parses a value starting with "=" as a formula, storing it as typed.
+        let (table, _) = try formatRangeReference(step, documentId: documentId)
+        guard let value = step.value, let cell = step.range else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a valueSet step needs a value and a single cell",
+                remedy: "run the helper only through scripts/golden-confirm.py"))
+        }
+        _ = try runAppleScript(
+            "set t to \(table)\nset value of cell \(quoteAppleScript(cell)) of t to \(quoteAppleScript(value))")
     }
 }
 
