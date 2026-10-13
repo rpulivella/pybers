@@ -6,7 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
-- [PYB-139] Support the functions added to Numbers after 15.3.1
+- [PYB-139] Support the functions added in Numbers 15.4
 - [PYB-187] Bring the check command into line with the command-line design
 - [PYB-190] Name each None that means something other than no value with a sentinel
 - [PYB-189] Freeze the mappings pybers returns or keeps as fixed tables
