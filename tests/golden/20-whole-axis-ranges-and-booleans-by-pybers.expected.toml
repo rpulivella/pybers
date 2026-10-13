@@ -2,7 +2,7 @@
 # pybers wrote into `Sheet 1 / Table 2` of `20-formula-shapes`, the whole-column and
 # whole-row ranges and boolean literals typed into Numbers for
 # `71-whole-axis-ranges-and-booleans`, whose calculated values these are. Checked by
-# `python3 scripts/golden-confirm.py run 20-whole-axis-ranges-and-booleans-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 20-whole-axis-ranges-and-booleans-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

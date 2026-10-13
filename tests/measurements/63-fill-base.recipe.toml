@@ -1,7 +1,7 @@
 # How Numbers made 63-fill-base: `61-move-styles-base`, which holds a fill at B2, a
 # highlighting rule at C2, a bold face at D2 and a border around C3, with the rich
 # text of `02-text-rich` pasted into B3 and a checkbox format given to D3. Made by
-# `python3 scripts/golden-confirm.py measure 63-fill-base`.
+# `.venv/bin/python3 scripts/golden-confirm.py measure 63-fill-base`.
 
 base = "61-move-styles-base"
 documents = ["02-text-rich"]

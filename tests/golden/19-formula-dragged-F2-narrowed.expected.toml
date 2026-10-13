@@ -1,5 +1,5 @@
 # What Numbers shows for 19-formula-dragged-F2-narrowed.numbers, checked by
-# `python3 scripts/golden-confirm.py run 19-formula-dragged-F2-narrowed.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 19-formula-dragged-F2-narrowed.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

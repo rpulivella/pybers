@@ -14,13 +14,13 @@ Shells out to `security`, `swiftc`, `codesign` and `open`, the external toolchai
 house rules allow: no Python library signs an app or starts one under its own grants.
 
 Usage:
-    python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers
-    python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers --dry-run
-    python3 scripts/golden-confirm.py damage-check
-    python3 scripts/golden-confirm.py helper-build
-    python3 scripts/golden-confirm.py helper-build --identity <SHA-1> --dry-run
-    python3 scripts/golden-confirm.py permissions
-    python3 scripts/golden-confirm.py measure 63b-fill-dragged-down
+    .venv/bin/python3 scripts/golden-confirm.py run 20-sheets-added.numbers
+    .venv/bin/python3 scripts/golden-confirm.py run 20-sheets-added.numbers --dry-run
+    .venv/bin/python3 scripts/golden-confirm.py damage-check
+    .venv/bin/python3 scripts/golden-confirm.py helper-build
+    .venv/bin/python3 scripts/golden-confirm.py helper-build --identity <hash> --dry-run
+    .venv/bin/python3 scripts/golden-confirm.py permissions
+    .venv/bin/python3 scripts/golden-confirm.py measure 63b-fill-dragged-down
 
 A run holds `caffeinate` while it drives Numbers, because the screen lock that follows
 display sleep stops it.
@@ -28,9 +28,11 @@ display sleep stops it.
 Each run's helper log is `helper.log` beside its report rather than in workarea/logs/,
 so the log is purged with the ticket's folder that holds the run it explains.
 
-Requires rich, and the Xcode command line tools for `helper-build`.
+Runs on the repository's venv, which holds rich and pybers, and needs the Xcode
+command line tools for `helper-build`.
 
 UPDATES
+2026-10-13  Every command it shows runs on the repository's venv, for PYB-201.
 2026-10-13  A recipe step can type a value or formula into a cell, and a
             measurement may start from a golden, so Numbers can save what pybers
             wrote, for PYB-139.
@@ -49,7 +51,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/17"
-__usage__ = "python3 scripts/golden-confirm.py <command> [options]"
+__usage__ = ".venv/bin/python3 scripts/golden-confirm.py <command> [options]"
 
 import argparse
 import hashlib
@@ -305,12 +307,12 @@ def checkHelperCurrent() -> None:
     if installed is None:
         raise GoldenConfirmError(
             f"{helperBundle} is not installed; run "
-            "`python3 scripts/golden-confirm.py helper-build`"
+            "`.venv/bin/python3 scripts/golden-confirm.py helper-build`"
         )
     if installed != readHelperSourceHash():
         raise GoldenConfirmError(
             "the installed helper was built from different source than this checkout; "
-            "run `python3 scripts/golden-confirm.py helper-build`"
+            "run `.venv/bin/python3 scripts/golden-confirm.py helper-build`"
         )
 
 

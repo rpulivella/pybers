@@ -1,5 +1,5 @@
 # What Numbers shows for 45-merged-by-pybers.numbers, checked by
-# `python3 scripts/golden-confirm.py run 45-merged-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 45-merged-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

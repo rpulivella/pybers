@@ -1,5 +1,5 @@
 # What Numbers shows for 20-formula-rows-created.numbers, checked by
-# `python3 scripts/golden-confirm.py run 20-formula-rows-created.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 20-formula-rows-created.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

@@ -1,6 +1,6 @@
 # What Numbers shows for 56-row-added-by-pybers.numbers, `56-structure-base` with
 # row 3 inserted with `rowAdd(3)`, checked by
-# `python3 scripts/golden-confirm.py run 56-row-added-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 56-row-added-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

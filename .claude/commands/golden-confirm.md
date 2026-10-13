@@ -22,16 +22,16 @@ what the expected-values file says. The checks it leaves for QA remain yours.
    Numbers shows, since copying Numbers' output into the expectation proves nothing.
 2. **Check the helper and its permissions:**
    ```
-   python3 scripts/golden-confirm.py permissions
+   .venv/bin/python3 scripts/golden-confirm.py permissions
    ```
    A missing or stale helper, a locked screen, or a missing permission stops here and
    names where to fix it. Build or rebuild the helper with
-   `python3 scripts/golden-confirm.py helper-build`, and relay any grant it asks for to
-   the user rather than working around it.
+   `.venv/bin/python3 scripts/golden-confirm.py helper-build`, and relay any grant it
+   asks for to the user rather than working around it.
 3. **Preview, then run:**
    ```
-   python3 scripts/golden-confirm.py run <golden> --dry-run
-   python3 scripts/golden-confirm.py run <golden>
+   .venv/bin/python3 scripts/golden-confirm.py run <golden> --dry-run
+   .venv/bin/python3 scripts/golden-confirm.py run <golden>
    ```
    Numbers opens a copy hidden, and shows on screen for about a second. The run survives
    switching desktops and full-screen apps, so the developer can keep working.
@@ -46,7 +46,7 @@ what the expected-values file says. The checks it leaves for QA remain yours.
 ## Proving a damaged file fails
 
 ```
-python3 scripts/golden-confirm.py damage-check
+.venv/bin/python3 scripts/golden-confirm.py damage-check
 ```
 
 Opens a truncated copy and a copy with a damaged tile archive, and passes only when each

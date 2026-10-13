@@ -2,7 +2,7 @@
 # with every column filled down to row 13 by `cellsFill` under `CONTINUE_SERIES`: rich
 # text repeated, three seeds continued. Each expected value is what Numbers' own drag
 # wrote in `67b`. Checked by
-# `python3 scripts/golden-confirm.py run 67-series-filled-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 67-series-filled-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet1"

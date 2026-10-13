@@ -2,7 +2,7 @@
 # `61-move-styles-base` with a row added at 2 and a column added at B, beside lines
 # holding no border, so its block of 21 to 53 sits at `C3:E6` and the one border,
 # around `C3` before, surrounds `D4`. Checked by
-# `python3 scripts/golden-confirm.py run 61-lines-added-beside-no-border-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 61-lines-added-beside-no-border-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

@@ -1,6 +1,6 @@
 # How Numbers made 64b-copy-styles-pasted: `61-move-styles-base`, which holds a fill at B2, a highlighting rule at C2, a bold face at D2 and a border around C3, with
 # `B2:D5` copied and pasted at `F8`. Made by
-# `python3 scripts/golden-confirm.py measure 64b-copy-styles-pasted`.
+# `.venv/bin/python3 scripts/golden-confirm.py measure 64b-copy-styles-pasted`.
 
 base = "61-move-styles-base"
 

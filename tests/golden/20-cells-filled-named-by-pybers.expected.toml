@@ -1,7 +1,7 @@
 # What Numbers shows for 20-cells-filled-named-by-pybers.numbers, `20-formula-shapes`
 # with `A11` filled across `A11:D11` by `cellsFill` under `PRESERVE_NAMED_CELL`, so
 # every filled cell sums column A. Checked by
-# `python3 scripts/golden-confirm.py run 20-cells-filled-named-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 20-cells-filled-named-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

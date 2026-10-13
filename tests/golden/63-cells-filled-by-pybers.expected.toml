@@ -2,7 +2,7 @@
 # filled across `B2:D7` by `cellsFill` under `PRESERVE_RELATIVE_POSITION`, so rows 4 to
 # 7 repeat the block: a filled 21, highlighted 22 and bold 23 over the rich-text Hello,
 # 32 and a checked checkbox. Checked by
-# `python3 scripts/golden-confirm.py run 63-cells-filled-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 63-cells-filled-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

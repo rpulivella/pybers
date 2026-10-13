@@ -1,5 +1,5 @@
 # What Numbers shows for 18-formula-attached-and-detached.numbers, checked by
-# `python3 scripts/golden-confirm.py run 18-formula-attached-and-detached.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 18-formula-attached-and-detached.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"
