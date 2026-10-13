@@ -2,7 +2,8 @@
 """\
 The golden confirmation tool's report text, and the interpreter it refuses.
 
-Only pure functions are exercised; nothing here drives Numbers.
+Only `golden_confirm_lib` is imported, and the tool itself is read as source, so
+nothing here drives Numbers.
 
 UPDATES
 2026-10-13  Written for PYB-201.
@@ -18,27 +19,17 @@ __status__ = "Development"
 __date__ = "2026/10/13"
 
 import ast
-import importlib.util
 import sys
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
-scriptPath: Path = (
-    Path(__file__).resolve().parent.parent / "scripts" / "golden-confirm.py"
-)
+scriptDirectory: Path = Path(__file__).resolve().parent.parent / "scripts"
+sys.path.insert(0, str(scriptDirectory))
 
+import golden_confirm_lib as report  # noqa: E402
 
-def loadGoldenConfirm() -> ModuleType:
-    """Return the tool, loaded by path since its file name holds a hyphen."""
-    spec = importlib.util.spec_from_file_location("golden_confirm", scriptPath)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    # Registered first, because its dataclasses resolve their own module by name.
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+scriptPath: Path = scriptDirectory / "golden-confirm.py"
 
 
 def testNoFunctionImportsPybersLate() -> None:
@@ -69,7 +60,7 @@ def testNoFunctionImportsPybersLate() -> None:
     ("", "empty text"),
 ])
 def testAValueIsQuotedAsACodeSpan(value: object, span: str) -> None:
-    assert loadGoldenConfirm().formatCodeSpan(value) == span
+    assert report.formatCodeSpan(value) == span
 
 
 @pytest.mark.parametrize(("formula", "spaced"), [
@@ -83,8 +74,8 @@ def testAValueIsQuotedAsACodeSpan(value: object, span: str) -> None:
     ("=A1<>B1", "=A1 <> B1"),
 ])
 def testAFormulaIsSpacedAroundEachOperator(formula: str, spaced: str) -> None:
-    assert loadGoldenConfirm().formatSpacedFormula(formula) == spaced
+    assert report.formatSpacedFormula(formula) == spaced
 
 
 def testUnreadableFormulaTextIsShownAsWritten() -> None:
-    assert loadGoldenConfirm().formatSpacedFormula('="open') == '="open'
+    assert report.formatSpacedFormula('="open') == '="open'

@@ -33,7 +33,7 @@ command line tools for `helper-build`.
 
 UPDATES
 2026-10-13  Quotes each reported value as a code span, and spaces the operators of
-            a reported formula, for PYB-201.
+            a reported formula, both from `golden_confirm_lib`, for PYB-201.
 2026-10-13  Imports pybers before any command runs, for PYB-201.
 2026-10-13  Every command it shows runs on the repository's venv, for PYB-201.
 2026-10-13  A recipe step can type a value or formula into a cell, and a
@@ -82,12 +82,10 @@ from pybers import CellRange, CellReference, MergeRange, PybersError
 # Internal on purpose: pybers exposes no archives, and round-trip tests share this.
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
-from pybers.formula.syntax import (
-    FormulaSyntaxError,
-    formulaMarker,
-    percentSymbol,
-    tokenize,
-)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from golden_confirm_lib import formatCodeSpan, formatSpacedFormula
 
 try:
     from rich_argparse import RichHelpFormatter
@@ -608,38 +606,6 @@ def readFormulaText(shown: str) -> str:
     """Spell a formula as pybers does, from the typographic operators Numbers shows."""
     # Numbers ends some formulas it saved itself with a newline outside the formula.
     return shown.translate(numbersOperators).rstrip()
-
-
-def formatCodeSpan(value: object) -> str:
-    """Quote one reported value as a Markdown code span, fenced past its backticks."""
-    if value is None:
-        return "nothing"
-    text = str(value).lower() if isinstance(value, bool) else str(value)
-    if text == "":
-        return "empty text"
-    fence = "`" * (max((len(run) for run in re.findall("`+", text)), default=0) + 1)
-    padding = " " if text.startswith("`") or text.endswith("`") else ""
-    return f"{fence}{padding}{text}{padding}{fence}"
-
-
-def formatSpacedFormula(text: str) -> str:
-    """Return a formula with one space each side of every binary operator, for reading.
-
-    Only the report reads this; every check compares the exact text Numbers read.
-    """
-    body = text.removeprefix(formulaMarker)
-    try:
-        tokens = tokenize(body)
-    except FormulaSyntaxError:
-        return text
-    pieces: list[str] = []
-    expectsOperand = True
-    for token in tokens[:-1]:
-        piece = body[token.position:token.position + token.width]
-        isOperator = token.kind == "operator" and token.text != percentSymbol
-        pieces.append(f" {piece} " if isOperator and not expectsOperand else piece)
-        expectsOperand = token.kind in ("open", "comma") or isOperator
-    return text[:len(text) - len(body)] + "".join(pieces)
 
 
 def checkValue(expected: object, reading: dict[str, str]) -> bool:
