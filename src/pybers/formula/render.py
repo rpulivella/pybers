@@ -21,6 +21,7 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-10-13  A boolean literal renders as TRUE or FALSE, for PYB-139.
 2026-09-11  A bracket the author typed is written back, for #67. The claim that
             the file records no parentheses was false; node type 25 is one.
 2026-09-08  `renderAddress` and `findShortestNames` exported for #13, so that one
@@ -61,6 +62,7 @@ from pybers.formula.nodes import (
     FormulaUnknownCall,
     FormulaVariable,
     additionNodeType,
+    booleanNodeType,
     brokenReferenceNodeType,
     emptyArgumentNodeType,
     endScopeNodeType,
@@ -78,6 +80,7 @@ from pybers.formula.nodes import (
 from pybers.formula.syntax import (
     argumentSeparator,
     atomPrecedence,
+    booleanTexts,
     brokenReferenceText,
     cosmeticNodeTypes,
     formulaMarker,
@@ -236,6 +239,9 @@ class Renderer:
             return
         if kind == numberNodeType and isinstance(content, Decimal):
             self.stack.append(Rendered(renderNumber(content)))
+            return
+        if kind == booleanNodeType and isinstance(content, bool):
+            self.stack.append(Rendered(booleanTexts[content]))
             return
         if kind == stringNodeType and isinstance(content, str):
             self.stack.append(Rendered(quoteString(content)))

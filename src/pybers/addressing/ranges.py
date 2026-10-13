@@ -3,7 +3,9 @@
 
 Split from `pybers.addressing.reference` because only a range has to represent the
 absence of a coordinate. A whole-column reference is a column with no row at all,
-which is how the file stores it too, and no single-cell address may hold that.
+which is how the file stores one, and no single-cell address may hold that. A range
+in the file holds a sentinel there instead, which the formula reader turns into
+absence.
 
 **Unboundedness is absence, never a sentinel.** A range standing in for `A` with
 rows 1 through 1048576 would compare equal to a bounded range that happens to span
@@ -11,6 +13,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-10-13  A range in the file marks an unbounded axis with a sentinel, for PYB-139.
 2026-09-13  A range endpoint past the last row is refused, for #67.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
 2026-09-01  Written for #9.

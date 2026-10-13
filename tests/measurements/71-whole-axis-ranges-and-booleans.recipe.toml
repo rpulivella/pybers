@@ -1,0 +1,71 @@
+# How Numbers made 71-whole-axis-ranges-and-booleans: `20-formula-shapes`, with eight
+# formulas typed into `Sheet 1 / Table 2`: whole-column and whole-row ranges in the same
+# table and in `Table 1`, two of them anchored, a TRUE literal and a FALSE one as an
+# argument. Made by `python3 scripts/golden-confirm.py measure
+# 71-whole-axis-ranges-and-booleans`.
+
+base = "20-formula-shapes"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B1"
+value = '=SUM(C:D)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B2"
+value = '=SUM(5:6)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B3"
+value = '=SUM(Table 1::B:C)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B4"
+value = '=SUM(Table 1::2:3)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B5"
+value = '=TRUE'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B6"
+value = '=IF(FALSE,1,2)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B7"
+value = '=SUM(Table 1::$B:$C)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 2"
+range = "B8"
+value = '=SUM(Table 1::$2:$3)'

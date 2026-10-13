@@ -16,6 +16,7 @@ error, which is why each is handled here and not left to a caller:
   ordinary numbers they name a cell far outside the table and raise nothing.
 
 UPDATES
+2026-10-13  A boolean literal, and a range axis reaching every line, for PYB-139.
 2026-09-18  A broken reference reads the lines it lost, for PYB-17.
 2026-09-11  The list node's one field is read, for #67.
 2026-09-10  A key the pool does not hold is refused rather than read as no
@@ -33,6 +34,7 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 import struct
+from collections.abc import Sequence
 from typing import cast
 
 from .._generated import TSCEArchives_pb2 as tsce
@@ -64,6 +66,7 @@ from .nodes import (
     FormulaVariable,
     NodeContent,
     Span,
+    booleanNodeType,
     brokenColumnSentinel,
     brokenReferenceNodeType,
     brokenRowSentinel,
@@ -75,6 +78,8 @@ from .nodes import (
     rangeNodeType,
     referenceNodeType,
     stringNodeType,
+    unboundedRangeColumn,
+    unboundedRangeRow,
     unknownFunctionNodeType,
     variableNodeType,
 )
@@ -198,6 +203,27 @@ def readReferenceLoss(
     )
 
 
+def readRangeAxis(
+    relative: Sequence[ColonTractAxis],
+    absolute: Sequence[ColonTractAxis],
+    unboundedValue: int,
+) -> Span | None:
+    """Return one axis of a range tract, or None when the range reaches every line.
+
+    Every line is an absolute axis holding `unboundedValue` and no end, which is
+    how Numbers writes `B:C` and `2:3`. Read as a line it names one far past any
+    table, and rendering that range fails.
+    """
+    if relative:
+        return readSpan(relative[0], absolute=False)
+    if not absolute:
+        return None
+    entry = absolute[0]
+    if entry.range_begin == unboundedValue and not entry.HasField("range_end"):
+        return None
+    return readSpan(entry, absolute=True)
+
+
 def readFormulaRange(
     node: tsce.ASTNodeArrayArchive.ASTNodeArchive,
 ) -> FormulaRange:
@@ -209,20 +235,10 @@ def readFormulaRange(
     both is what keeps the two node kinds from drifting apart.
     """
     tract = node.AST_colon_tract
-    columns = (
-        readSpan(tract.relative_column[0], absolute=False)
-        if tract.relative_column
-        else readSpan(tract.absolute_column[0], absolute=True)
-        if tract.absolute_column
-        else None
+    columns = readRangeAxis(
+        tract.relative_column, tract.absolute_column, unboundedRangeColumn
     )
-    rows = (
-        readSpan(tract.relative_row[0], absolute=False)
-        if tract.relative_row
-        else readSpan(tract.absolute_row[0], absolute=True)
-        if tract.absolute_row
-        else None
-    )
+    rows = readRangeAxis(tract.relative_row, tract.absolute_row, unboundedRangeRow)
     tableId = (
         readUuid(node.AST_cross_table_reference_extra_info.table_id)
         if node.HasField("AST_cross_table_reference_extra_info")
@@ -253,6 +269,8 @@ def readFormulaNode(
             node.AST_number_node_decimal_high,
         )
         content = Decimal128.fromBytes(packed).value
+    elif kind == booleanNodeType:
+        content = node.AST_boolean_node_boolean
     elif kind == stringNodeType:
         content = node.AST_string_node_string
     elif kind == functionNodeType:

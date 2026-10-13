@@ -17,6 +17,8 @@ message, because pybers's own read path names archives by identifier. Any other
 error keeps only its type and where pybers raised it.
 
 UPDATES
+2026-10-13  Six archive types a Numbers 15.4 template holds count as tested, for
+            PYB-139.
 2026-10-12  Each missing part of a check names why it is missing, for PYB-190.
 2026-10-11  Type counts are built as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
@@ -61,11 +63,11 @@ testedArchiveTypes: frozenset[int] = frozenset({
     2001, 2011, 2021, 2022, 2023, 2024, 2025, 2043,
     3005, 3006, 3009, 3016, 3045, 3047, 3056, 3061, 3091, 3097,
     4000, 4003, 4004, 4008, 4009, 4010, 4011,
-    5020, 5022, 5024, 5026, 5028, 5030,
+    5020, 5021, 5022, 5023, 5024, 5025, 5026, 5027, 5028, 5029, 5030,
     6000, 6001, 6002, 6003, 6004, 6005, 6006, 6008, 6010, 6030, 6204, 6206, 6218,
     6220, 6247, 6267, 6283, 6305, 6306, 6316, 6317, 6318, 6365, 6366, 6372, 6373,
     6383,
-    10024, 11006, 11008, 11011, 11014, 11015, 12009, 12026, 12028, 12050,
+    10024, 11006, 11008, 11011, 11014, 11015, 12006, 12009, 12026, 12028, 12050,
 })
 
 # Numbers appends one entry per build that saves; a template or an import names
