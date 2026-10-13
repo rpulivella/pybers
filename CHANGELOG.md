@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-201] Run golden-confirm through the repository's venv
 - [PYB-200] Write the rectangle flag on every range as Numbers does
 - [PYB-139] Support the functions added in Numbers 15.4
 - [PYB-187] Bring the check command into line with the command-line design
