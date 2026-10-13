@@ -32,6 +32,8 @@ Runs on the repository's venv, which holds rich and pybers, and needs the Xcode
 command line tools for `helper-build`.
 
 UPDATES
+2026-10-13  Quotes each reported value as a code span, and spaces the operators of
+            a reported formula, for PYB-201.
 2026-10-13  Imports pybers before any command runs, for PYB-201.
 2026-10-13  Every command it shows runs on the repository's venv, for PYB-201.
 2026-10-13  A recipe step can type a value or formula into a cell, and a
@@ -80,6 +82,12 @@ from pybers import CellRange, CellReference, MergeRange, PybersError
 # Internal on purpose: pybers exposes no archives, and round-trip tests share this.
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
+from pybers.formula.syntax import (
+    FormulaSyntaxError,
+    formulaMarker,
+    percentSymbol,
+    tokenize,
+)
 
 try:
     from rich_argparse import RichHelpFormatter
@@ -602,6 +610,38 @@ def readFormulaText(shown: str) -> str:
     return shown.translate(numbersOperators).rstrip()
 
 
+def formatCodeSpan(value: object) -> str:
+    """Quote one reported value as a Markdown code span, fenced past its backticks."""
+    if value is None:
+        return "nothing"
+    text = str(value).lower() if isinstance(value, bool) else str(value)
+    if text == "":
+        return "empty text"
+    fence = "`" * (max((len(run) for run in re.findall("`+", text)), default=0) + 1)
+    padding = " " if text.startswith("`") or text.endswith("`") else ""
+    return f"{fence}{padding}{text}{padding}{fence}"
+
+
+def formatSpacedFormula(text: str) -> str:
+    """Return a formula with one space each side of every binary operator, for reading.
+
+    Only the report reads this; every check compares the exact text Numbers read.
+    """
+    body = text.removeprefix(formulaMarker)
+    try:
+        tokens = tokenize(body)
+    except FormulaSyntaxError:
+        return text
+    pieces: list[str] = []
+    expectsOperand = True
+    for token in tokens[:-1]:
+        piece = body[token.position:token.position + token.width]
+        isOperator = token.kind == "operator" and token.text != percentSymbol
+        pieces.append(f" {piece} " if isOperator and not expectsOperand else piece)
+        expectsOperand = token.kind in ("open", "comma") or isOperator
+    return text[:len(text) - len(body)] + "".join(pieces)
+
+
 def checkValue(expected: object, reading: dict[str, str]) -> bool:
     """Compare an expected TOML value with what Numbers reads, region-free (AC 4)."""
     kind, text = reading["kind"], reading["text"]
@@ -626,29 +666,33 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
         """Add one comparison, showing both sides when it fails."""
         detail = f"{name} {found}"
         if not passed:
-            detail += f", expected {wanted!r}"
+            detail += f", expected {wanted}"
         status = "passed" if passed else "failed"
         checks.append(Check(status, subject, detail, evidence))
 
     value = reading.get("value") or {"kind": "missing", "text": ""}
     # The formatted value follows region settings, so it is shown, never compared.
-    shown = f"{value['kind']} {value['text']!r}, shown as "
+    shown = (f"{value['kind']} {formatCodeSpan(value['text'])}, shown as "
+             f"{formatCodeSpan(reading.get('formattedValue'))}")
     if expected.value is not None:
-        record("value", checkValue(expected.value, value), expected.value,
-               shown + repr(reading.get("formattedValue")))
+        record("value", checkValue(expected.value, value),
+               formatCodeSpan(expected.value), shown)
     if expected.empty:
-        record("value", value["kind"] == "empty", "empty",
-               shown + repr(reading.get("formattedValue")))
+        record("value", value["kind"] == "empty", "empty", shown)
     if expected.formula is not None:
         found = readFormulaText(reading.get("formula") or "")
-        record("formula", found == expected.formula, expected.formula, repr(found))
+        record("formula", found == expected.formula,
+               formatCodeSpan(formatSpacedFormula(expected.formula)),
+               formatCodeSpan(formatSpacedFormula(found)))
     if expected.formatKind is not None:
         found = reading.get("formatKind") or ""
-        record("format", found == expected.formatKind, expected.formatKind, repr(found))
+        record("format", found == expected.formatKind,
+               formatCodeSpan(expected.formatKind), formatCodeSpan(found))
     settings = readDataFormatSettings(reading.get("dataFormat", []))
     for label, wanted in expected.dataFormat.items():
         name = label if label == "Data Format" else f"Data Format {label}"
-        record(name, settings.get(label) == wanted, wanted, repr(settings.get(label)))
+        record(name, settings.get(label) == wanted, formatCodeSpan(wanted),
+               formatCodeSpan(settings.get(label)))
     for question in expected.qa:
         checks.append(Check("qa", subject, question, evidence))
     return checks
