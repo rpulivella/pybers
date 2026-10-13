@@ -7,6 +7,7 @@ end, and a bare TRUE as a boolean node rather than a call. Both were measured by
 typing each formula into Numbers, in `71-whole-axis-ranges-and-booleans`.
 
 UPDATES
+2026-10-13  Each node compares with no field set aside, for PYB-200.
 2026-10-13  Written for PYB-139.
 """
 from __future__ import annotations
@@ -72,15 +73,9 @@ def openMeasuredTable() -> tuple[pybers.Document, pybers.Table]:
 
 
 def readStoredNode(node: FormulaNode) -> tsce.ASTNodeArrayArchive.ASTNodeArchive:
-    """Return a node as Numbers stored it, its tract's default flag left out.
-
-    `preserve_rectangular` defaults to true and Numbers writes it anyway, which
-    pybers has never done for any range; that difference is not this one.
-    """
+    """Return a node exactly as Numbers stored it."""
     stored = tsce.ASTNodeArrayArchive.ASTNodeArchive()
     stored.ParseFromString(node.raw)
-    if stored.HasField("AST_colon_tract"):
-        stored.AST_colon_tract.ClearField("preserve_rectangular")
     return stored
 
 

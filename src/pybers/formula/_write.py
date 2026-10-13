@@ -16,6 +16,7 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-10-13  Every range tract holds `preserve_rectangular`, for PYB-200.
 2026-10-13  A node's content is written by matching it, checked exhaustive by
             mypy, for PYB-139.
 2026-10-13  A boolean literal, and a range axis reaching every line, for PYB-139.
@@ -310,6 +311,8 @@ def encodeFormulaRange(
             tract.absolute_row if extent.rows.absolute else tract.relative_row
         )
         encodeSpan(field.add(), extent.rows)
+    # A default, yet Numbers writes it on every range, so a node compares equal.
+    tract.preserve_rectangular = True
     encodeStickyBits(archive, extent)
 
 
