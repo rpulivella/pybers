@@ -32,6 +32,7 @@ Runs on the repository's venv, which holds rich and pybers, and needs the Xcode
 command line tools for `helper-build`.
 
 UPDATES
+2026-10-13  Imports pybers before any command runs, for PYB-201.
 2026-10-13  Every command it shows runs on the repository's venv, for PYB-201.
 2026-10-13  A recipe step can type a value or formula into a cell, and a
             measurement may start from a golden, so Numbers can save what pybers
@@ -73,6 +74,12 @@ from typing import Any
 
 from rich.console import Console
 from rich.markup import escape
+
+from pybers import CellRange, CellReference, MergeRange, PybersError
+
+# Internal on purpose: pybers exposes no archives, and round-trip tests share this.
+from pybers._persistence import readPackage
+from pybers._persistence.difference import listPackageDifferences
 
 try:
     from rich_argparse import RichHelpFormatter
@@ -524,8 +531,6 @@ def readExpectedTable(
     path: Path, position: int, entry: dict[str, Any]
 ) -> ExpectedTable:
     """Read one [[table]] entry, its merges spelled as pybers spells a merge."""
-    from pybers import CellRange, MergeRange, PybersError
-
     label = f"table {position}"
     checkEntryKeys(path, label, entry, expectedTableKeys, {"sheet", "table"})
     if not {"rows", "columns", "merges"} & set(entry):
@@ -651,8 +656,6 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
 
 def readMerges(subject: str, cellNames: list[list[str]]) -> list[str]:
     """Find each merge in Numbers' cell names, where a covered cell names its anchor."""
-    from pybers import CellRange, CellReference, PybersError
-
     corners: dict[str, tuple[int, int]] = {}
     for row, names in enumerate(cellNames, start=1):
         for column, name in enumerate(names, start=1):
@@ -672,8 +675,6 @@ def readMerges(subject: str, cellNames: list[list[str]]) -> list[str]:
 
 def readMergeOrder(merge: str) -> tuple[int | None, ...]:
     """Order a merge by its rows, then its columns, rather than as text."""
-    from pybers import CellRange
-
     extent = CellRange.parse(merge)
     return (extent.startRow, extent.startCol, extent.endRow, extent.endCol)
 
@@ -744,10 +745,6 @@ def formatQuickLookName(position: int, sheet: str) -> str:
 
 def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
     """Name every member and archive the Numbers-saved copy holds differently (AC 7)."""
-    # Internal on purpose: pybers exposes no archives, and round-trip tests share this.
-    from pybers._persistence import readPackage
-    from pybers._persistence.difference import listPackageDifferences
-
     before, after = readPackage(golden), readPackage(saved)
     return [str(difference) for difference in listPackageDifferences(before, after)]
 
