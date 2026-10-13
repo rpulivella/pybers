@@ -31,6 +31,9 @@ so the log is purged with the ticket's folder that holds the run it explains.
 Requires rich, and the Xcode command line tools for `helper-build`.
 
 UPDATES
+2026-10-13  A recipe step can type a value or formula into a cell, and a
+            measurement may start from a golden, so Numbers can save what pybers
+            wrote, for PYB-139.
 2026-09-29  `measure` makes a measurement in Numbers from the recipe beside it, for
             PYB-118.
 2026-09-22  Checks a table's size and merges and an empty cell, for PYB-111.
@@ -86,11 +89,12 @@ helperSourceHashKey: str = "PybersSourceHash"
 goldenDirectory: Path = repositoryRoot / "tests" / "golden"
 documentDirectories: tuple[Path, ...] = (
     repositoryRoot / "tests" / "fixtures", repositoryRoot / "tests" / "measurements",
+    goldenDirectory,
 )
 measurementDirectory: Path = repositoryRoot / "tests" / "measurements"
 recipeSuffix: str = ".recipe.toml"
 recipeStepKeys: frozenset[str] = frozenset({
-    "action", "document", "sheet", "table", "range", "menuItem", "format",
+    "action", "document", "sheet", "table", "range", "menuItem", "format", "value",
 })
 reportRoot: Path = repositoryRoot / "workarea" / "golden-confirm"
 expectedSuffix: str = ".expected.toml"
@@ -410,15 +414,15 @@ def findGolden(argument: str) -> Path:
 
 
 def findDocument(stem: str) -> Path:
-    """Return the one fixture or measurement named `stem`, refusing none or two."""
+    """Return the one document named `stem`, refusing none or two."""
     found = [
         directory / f"{stem}.numbers" for directory in documentDirectories
         if (directory / f"{stem}.numbers").is_file()
     ]
     if len(found) != 1:
         raise GoldenConfirmError(
-            f"{stem}.numbers is in {len(found)} of tests/fixtures and "
-            "tests/measurements"
+            f"{stem}.numbers is in {len(found)} of tests/fixtures, "
+            "tests/measurements and tests/golden"
         )
     return found[0]
 
