@@ -28,9 +28,12 @@ try:
 except ImportError:  # the readiness posting job installs rich alone
     RichHelpFormatter = argparse.HelpFormatter  # type: ignore[assignment,misc]
 
-__all__ = ["RichHelpFormatter", "readTicketNumber", "repositoryRoot"]
+__all__ = ["RichHelpFormatter", "errorExitCode", "readTicketNumber", "repositoryRoot"]
 
 repositoryRoot: Path = Path(__file__).resolve().parents[3]
+
+# A command exits 2 when it could not ask its question, which a "no" answer never means.
+errorExitCode: int = 2
 
 ticketBranchPattern: re.Pattern[str] = re.compile(r"^[a-z]+/(\d+)-")
 

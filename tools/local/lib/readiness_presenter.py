@@ -11,6 +11,7 @@ The verdict says a change is ready for a person to test. It never says a change 
 ready to merge, because no automated check can know that.
 
 UPDATES
+2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-13  Moved here from `scripts/merge_readiness_presenter.py`, for PYB-204.
 2026-09-17  Written for PYB-76.
 """
@@ -29,7 +30,7 @@ from datetime import UTC, datetime
 from rich.console import Console
 from rich.markup import escape
 
-from tools.workflow.lib.readiness import (
+from tools.local.lib.readiness import (
     BranchFacts,
     CheckResult,
     attention,

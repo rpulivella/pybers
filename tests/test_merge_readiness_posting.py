@@ -30,9 +30,9 @@ from typing import Any
 import pytest
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-from tools.workflow.lib import readiness as checks  # noqa: E402
-from tools.workflow.lib import readiness_posting as posting  # noqa: E402
-from tools.workflow.lib import readiness_presenter as presenter  # noqa: E402
+from tools.local.lib import readiness as checks  # noqa: E402
+from tools.local.lib import readiness_posting as posting  # noqa: E402
+from tools.local.lib import readiness_presenter as presenter  # noqa: E402
 
 workflowDirectory: Path = repositoryRoot / ".github" / "workflows"
 checkedHead: str = "0123456789abcdef0123456789abcdef01234567"
@@ -216,11 +216,11 @@ def testThePostingWorkflowUnpacksTheArtifactOutsideItsCheckout() -> None:
 def testThePostingWorkflowRunsItsOwnScriptAgainstTheUnpackedData() -> None:
     (script,) = [
         block for block in listRunBlocks(readWorkflow("merge-readiness.yml"))
-        if "tools.workflow.merge_readiness" in block
+        if "tools.local.merge_readiness" in block
     ]
 
     assert script.split()[:4] == [
-        "python", "-m", "tools.workflow.merge_readiness", "report",
+        "python", "-m", "tools.local.merge_readiness", "report",
     ]
     assert '--results "$RUNNER_TEMP/readiness/merge-readiness.json"' in script
     assert '--head-sha "$HEAD_SHA"' in script

@@ -25,6 +25,8 @@ from typing import Any
 
 import pytest
 
+from tools.workflow.lib import pull_request as pullRequest
+
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 
 def loadPrScript() -> ModuleType:
@@ -55,7 +57,7 @@ def runRerunOf(
     monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
         pr, "readPullRequest",
-        lambda token, number: pr.PullRequestSummary(
+        lambda token, number: pullRequest.PullRequestSummary(
             number=167, title="", url="", state="open", isDraft=False, head="",
             headRepository="", headSha="a" * 40, base="develop", nodeId="",
         ),

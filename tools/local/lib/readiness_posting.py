@@ -7,6 +7,7 @@ automation makes, and reads the stored results the pull request's job wrote as d
 only. Kept apart from `lib/readiness.py`, which never reaches this half.
 
 UPDATES
+2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-13  Moved here from `merge-readiness.py`, for PYB-204.
 """
 from __future__ import annotations
@@ -22,11 +23,10 @@ __date__ = "2026/10/03"
 from datetime import datetime
 from typing import Any
 
+from tools.local.lib import readiness as checks
+from tools.local.lib import readiness_presenter as presenter
 from tools.workflow.lib import github
-from tools.workflow.lib import readiness as checks
-from tools.workflow.lib import readiness_presenter as presenter
 from tools.workflow.lib.pull_request import (
-    defaultBaseBranch,
     formatPullRequestRef,
 )
 
@@ -34,19 +34,6 @@ from tools.workflow.lib.pull_request import (
 # for this report.
 reportAuthor: str = "github-actions[bot]"
 commentsPerPage: int = 100
-
-
-def readPullRequestFacts(token: str, number: int) -> dict[str, Any]:
-    """Return the title, body, base and head a pull request carries."""
-    url = f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
-    payload = github.requestJson(f"{url}/pulls/{number}", token)
-    return {
-        "title": payload.get("title", ""),
-        "body": payload.get("body") or "",
-        "base": payload.get("base", {}).get("ref", defaultBaseBranch),
-        "head": payload.get("head", {}).get("sha", ""),
-        "draft": bool(payload.get("draft")),
-    }
 
 
 def findReportComment(token: str, number: int) -> int | None:
@@ -75,7 +62,7 @@ def confirmCheckedPullRequest(token: str, number: int, headSha: str) -> None:
     The number arrives in a file the pull request's own job wrote, so it is held
     against the run's head commit, which GitHub supplies and no branch can set.
     """
-    head = readPullRequestFacts(token, number)["head"]
+    head = checks.readPullRequestFacts(token, number)["head"]
     if head != headSha:
         raise RuntimeError(
             f"{formatPullRequestRef(number)} has head {head[:12] or 'none'}, "

@@ -580,7 +580,6 @@ def runBlock(arguments: argparse.Namespace) -> int:
 def buildParser() -> argparse.ArgumentParser:
     """Assemble the command line, one subcommand per cmd-prefixed handler."""
     parser = argparse.ArgumentParser(
-        prog="ticket.py",
         description="File and move pybers tickets on GitHub Issues and the "
         "Project board.",
     )

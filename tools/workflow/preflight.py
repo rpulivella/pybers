@@ -209,7 +209,6 @@ def report(results: list[GateResult]) -> int:
 def main() -> int:
     """Parse arguments, run the gates, and report."""
     parser = argparse.ArgumentParser(
-        prog="pr-preflight-check.py",
         description="Run every pybers gate in one pass and report all of them.",
         formatter_class=RichHelpFormatter,
     )

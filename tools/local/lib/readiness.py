@@ -11,6 +11,9 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
+2026-10-14  Reading a pull request, its preflight, its base and the declared
+            packages moved here from `merge-readiness.py`, for PYB-204.
 2026-10-13  Moved here from `scripts/merge_readiness_lib.py`, for PYB-204.
 2026-10-13  The repository root and a branch's ticket number come from
             `lib/shared.py`, for PYB-204.
@@ -32,6 +35,9 @@ __date__ = "2026/09/17"
 import json
 import re
 import subprocess
+import sys
+import time
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -39,7 +45,13 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
-from tools.workflow.lib.pull_request import templatePath
+from tools.workflow.lib import github
+from tools.workflow.lib.pull_request import (
+    defaultBaseBranch,
+    findBodyFindings,
+    readTemplate,
+    templatePath,
+)
 from tools.workflow.lib.shared import readTicketNumber, repositoryRoot
 
 goldenDirectory: Path = repositoryRoot / "tests" / "golden"
@@ -455,3 +467,108 @@ def checkDependencies(facts: BranchFacts) -> CheckResult:
         "Dependencies", passed,
         f"{len(watched)} resolved {packages}, no advisories, none withdrawn",
     )
+
+
+projectPath: Path = repositoryRoot / "pyproject.toml"
+
+
+preflightCheckName: str = "preflight"
+
+
+preflightAttempts: int = 40
+
+
+preflightPauseSeconds: float = 15.0
+
+
+def readDeclaredPackages() -> list[str]:
+    """Return every package this project declares, runtime and development alike."""
+    with projectPath.open("rb") as handle:
+        project = tomllib.load(handle)["project"]
+    declared = list(project.get("dependencies", []))
+    for extra in project.get("optional-dependencies", {}).values():
+        declared += extra
+    return [
+        re.split(r"[<>=!~\[; ]", entry, maxsplit=1)[0] for entry in declared if entry
+    ]
+
+
+def readResolvedPackages() -> list[list[str]]:
+    """Return what a fresh install resolved, since this project pins nothing."""
+    listed = subprocess.run(
+        [sys.executable, "-m", "pip", "list", "--format=json"],
+        capture_output=True, text=True, check=False,
+    )
+    if listed.returncode != 0:
+        return []
+    return [[entry["name"], entry["version"]] for entry in json.loads(listed.stdout)]
+
+
+def waitForPreflight(token: str, sha: str) -> str:
+    """Return the preflight check's conclusion for a commit, waiting for it to finish.
+
+    Read from GitHub rather than handed over, because the preflight is its own
+    workflow and its own check. Waiting is what AC 3 asks for, and a preflight
+    that never finishes leaves this reporting a wait rather than a verdict.
+    """
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
+        f"/commits/{sha}/check-runs"
+    )
+    for attempt in range(preflightAttempts):
+        runs = github.requestJson(url, token, apiVersion="2022-11-28")["check_runs"]
+        # A commit carries its skipped draft run beside the real one, and taking
+        # that as the answer reports a preflight that never ran while it is running.
+        decided = [
+            run for run in runs
+            if run["name"] == preflightCheckName
+            and run["status"] == "completed"
+            and run["conclusion"] not in (None, "skipped")
+        ]
+        if decided:
+            newest = max(decided, key=lambda run: str(run["started_at"]))
+            return str(newest["conclusion"])
+        if attempt < preflightAttempts - 1:
+            time.sleep(preflightPauseSeconds)
+    return ""
+
+
+def readCommitsBehind(token: str, base: str, head: str) -> int:
+    """Return how many commits the base holds that this head does not."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
+        f"/compare/{base}...{head}"
+    )
+    return int(github.requestJson(url, token).get("behind_by", 0))
+
+
+def checkPullRequest(facts: BranchFacts, token: str) -> list[CheckResult]:
+    """Run every check, in the order the comment lists them."""
+    pullRequest = readPullRequestFacts(token, facts.pullRequest)
+    behind = readCommitsBehind(token, pullRequest["base"], facts.headSha)
+    # The branch's template when it carried one, since the body was written against it.
+    template = facts.template or readTemplate()
+    findings = findBodyFindings(pullRequest["body"], template)
+    return [
+        checkPreflight(waitForPreflight(token, facts.headSha)),
+        checkTemplate(findings),
+        checkChecklist(pullRequest["body"]),
+        checkChangelog(facts, pullRequest["body"]),
+        checkTicketAgreement(facts, pullRequest["title"]),
+        checkBranchCurrent(behind, pullRequest["base"]),
+        checkDependencies(facts),
+        checkGoldenConfirmations(facts),
+    ]
+
+
+def readPullRequestFacts(token: str, number: int) -> dict[str, Any]:
+    """Return the title, body, base and head a pull request carries."""
+    url = f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
+    payload = github.requestJson(f"{url}/pulls/{number}", token)
+    return {
+        "title": payload.get("title", ""),
+        "body": payload.get("body") or "",
+        "base": payload.get("base", {}).get("ref", defaultBaseBranch),
+        "head": payload.get("head", {}).get("sha", ""),
+        "draft": bool(payload.get("draft")),
+    }

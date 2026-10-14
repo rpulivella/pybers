@@ -27,6 +27,8 @@ from typing import Any
 
 import pytest
 
+from tools.workflow.lib import pull_request as pullRequest
+
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 sameSecond: str = "2026-10-06T17:18:19Z"
 
@@ -62,7 +64,7 @@ def readVerdicts(runs: list[dict[str, Any]]) -> dict[str, str]:
     """Return each check's reported conclusion, or its status while it runs."""
     return {
         run.name: run.conclusion or run.status
-        for run in loadPrScript().chooseLatestRuns(runs)
+        for run in pullRequest.chooseLatestRuns(runs)
     }
 
 
@@ -94,7 +96,7 @@ def testARealRunStillInProgressIsReportedOverItsSkippedTwin() -> None:
 
 def testALoneSkippedRunReportsSkippedAndIsNoPass() -> None:
     pr = loadPrScript()
-    runs = pr.chooseLatestRuns([buildRun("readiness", "skipped")])
+    runs = pullRequest.chooseLatestRuns([buildRun("readiness", "skipped")])
     assert [run.conclusion for run in runs] == ["skipped"]
     assert pr.confirmChecksPassed(runs) is False
 
@@ -114,7 +116,8 @@ def testAMergeRefusesAFailureTiedWithASkippedRun(
     }
     monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
-        pr, "readPullRequest", lambda token, number: pr.summarizePullRequest(payload)
+        pr, "readPullRequest",
+        lambda token, number: pullRequest.summarizePullRequest(payload),
     )
     monkeypatch.setattr(
         pr.github, "requestJson",

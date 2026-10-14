@@ -97,3 +97,17 @@ def testEveryShownCommandRunsOnTheVenv() -> None:
         if shownCommand.search(line)
     ]
     assert shown == []
+
+
+@pytest.mark.parametrize(
+    "path",
+    [path for path in toolingFiles if "workflow" in path.parts],
+    ids=lambda path: path.name,
+)
+def testTheSharedWorkflowImportsNothingLocal(path: Path) -> None:
+    imported = [
+        node.module or ""
+        for node in ast.walk(readTree(path))
+        if isinstance(node, ast.ImportFrom)
+    ]
+    assert not [module for module in imported if module.startswith("tools.local")]

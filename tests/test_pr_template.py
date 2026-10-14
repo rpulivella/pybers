@@ -201,7 +201,7 @@ def testOnlyTheNewestRunOfEachCheckIsReported() -> None:
          "started_at": "2026-09-18T02:05:00Z"},
     ]
 
-    reported = loadPrTool().chooseLatestRuns(runs)
+    reported = pullRequest.chooseLatestRuns(runs)
 
     assert [(run.name, run.conclusion) for run in reported] == [
         ("preflight", "success"),

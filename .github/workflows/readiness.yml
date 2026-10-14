@@ -56,7 +56,7 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          python -m tools.workflow.merge_readiness collect \
+          python -m tools.local.merge_readiness collect \
             --pull-request "$PULL_REQUEST" \
             --base "origin/$BASE_REF" \
             --branch "$HEAD_REF" \
@@ -68,7 +68,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python -m tools.workflow.merge_readiness check \
+          python -m tools.local.merge_readiness check \
             --results merge-readiness.json --comment merge-readiness.md
 
       - name: Hand the results to the posting half

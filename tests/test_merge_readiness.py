@@ -23,8 +23,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-from tools.workflow.lib import readiness as checks  # noqa: E402
-from tools.workflow.lib import readiness_presenter as presenter  # noqa: E402
+from tools.local.lib import readiness as checks  # noqa: E402
+from tools.local.lib import readiness_presenter as presenter  # noqa: E402
 
 
 def buildFacts(**overrides: object) -> checks.BranchFacts:

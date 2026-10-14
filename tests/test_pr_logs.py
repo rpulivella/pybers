@@ -26,6 +26,8 @@ from typing import Any
 
 import pytest
 
+from tools.workflow.lib import pull_request as pullRequest
+
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 setupLog: str = (
     "2026-10-09T18:00:01.0000000Z Extracted >=3.15 from pyproject.toml\n"
@@ -66,13 +68,13 @@ def runLogsOf(
     monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
         pr, "readPullRequest",
-        lambda token, number: pr.PullRequestSummary(
+        lambda token, number: pullRequest.PullRequestSummary(
             number=191, title="", url="", state="open", isDraft=False, head="",
             headRepository="", headSha="a" * 40, base="develop", nodeId="",
         ),
     )
     monkeypatch.setattr(pr.github, "requestJson", buildApiStandIn(runs, jobs))
-    monkeypatch.setattr(pr, "readJobLog", readLogStandIn)
+    monkeypatch.setattr(pullRequest, "readJobLog", readLogStandIn)
     arguments = pr.buildParser().parse_args(["logs", "191"])
     return pr.runLogs(arguments), fetched
 

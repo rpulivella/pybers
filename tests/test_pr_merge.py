@@ -27,6 +27,8 @@ from typing import Any
 
 import pytest
 
+from tools.workflow.lib import pull_request as pullRequest
+
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 sharedName: str = "feature/136-copy-a-block-of-cells"
 
@@ -58,12 +60,15 @@ def runMergeOf(
     deleted: list[str] = []
     monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
-        pr, "readPullRequest", lambda token, number: pr.summarizePullRequest(payload)
+        pr, "readPullRequest",
+        lambda token, number: pullRequest.summarizePullRequest(payload),
     )
     monkeypatch.setattr(
         pr, "readCheckRuns",
         lambda token, sha: [
-            pr.CheckRun(name="preflight", status="completed", conclusion="success")
+            pullRequest.CheckRun(
+                name="preflight", status="completed", conclusion="success"
+            )
         ],
     )
     monkeypatch.setattr(pr, "mergePullRequest", lambda *args: "b" * 40)
