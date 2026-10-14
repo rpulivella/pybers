@@ -177,7 +177,7 @@ def testAnUnchangedDashboardIsNotRewritten() -> None:
     assert dashboardModule.dashboardPath.stat().st_mtime_ns == modified
 
 
-def fakeGitHub(
+def patchGitHubReads(
     monkeypatch: pytest.MonkeyPatch, draft: bool | None, status: str,
     blockers: dict[int, list[int]],
 ) -> None:
@@ -202,7 +202,7 @@ def fakeGitHub(
 def testADraftPullRequestReadsDprAndLeavesTheQueue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fakeGitHub(monkeypatch, draft=True, status="In Progress", blockers={})
+    patchGitHubReads(monkeypatch, draft=True, status="In Progress", blockers={})
     board = parseBoard(dashboard)
     updateDashboard("token", board, "PYB-156")
     assert board.status == "dPR · PYB-156: Ticket 156"
@@ -212,7 +212,7 @@ def testADraftPullRequestReadsDprAndLeavesTheQueue(
 def testAnUnstartedTicketReadsDashesAndBlockersRebuild(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fakeGitHub(monkeypatch, draft=None, status="Todo", blockers={156: [157]})
+    patchGitHubReads(monkeypatch, draft=None, status="Todo", blockers={156: [157]})
     monkeypatch.setattr(
         "tools.workflow.lib.dashboard.readCurrentBranch", lambda: "develop"
     )
@@ -226,7 +226,7 @@ def testAnUnstartedTicketReadsDashesAndBlockersRebuild(
 
 
 def testClearingTheFocusReadsNone(monkeypatch: pytest.MonkeyPatch) -> None:
-    fakeGitHub(monkeypatch, draft=None, status="", blockers={})
+    patchGitHubReads(monkeypatch, draft=None, status="", blockers={})
     board = parseBoard(dashboard)
     updateDashboard("token", board, "")
     assert board.status == "None"
