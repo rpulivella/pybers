@@ -1,7 +1,7 @@
 // pybersdev-golden-confirm
 //
 // The background app that holds Accessibility and Screen Recording for
-// scripts/golden-confirm.py, so that Terminal holds neither (PYB-94 AC 11). macOS
+// tools/local/golden_confirm.py, so that Terminal holds neither (PYB-94 AC 11). macOS
 // judges a program Terminal starts directly by Terminal's grants, so this is an app
 // started with `open`, reading one request file and writing one result file.
 //
@@ -297,7 +297,7 @@ func checkTemporaryPath(_ path: String?, field: String) throws -> String {
         throw HelperFailure(problem: HelperProblem(
             kind: "request",
             detail: "\(field) must be a .numbers path inside \(temporary)",
-            remedy: "run the helper only through scripts/golden-confirm.py"))
+            remedy: "run the helper only through the golden confirmation"))
     }
     return path
 }
@@ -313,7 +313,7 @@ func checkCaptureDirectory(_ path: String?) throws -> String {
         throw HelperFailure(problem: HelperProblem(
             kind: "request",
             detail: "captureDirectory must be an existing folder under workarea/golden-confirm/",
-            remedy: "run the helper only through scripts/golden-confirm.py"))
+            remedy: "run the helper only through the golden confirmation"))
     }
     return path
 }
@@ -1053,7 +1053,7 @@ func formatRangeReference(_ step: EditStep, documentId: String) throws -> (table
     guard let sheet = step.sheet, let table = step.table, let range = step.range else {
         throw HelperFailure(problem: HelperProblem(
             kind: "request", detail: "a \(step.action.rawValue) step needs a sheet, a table and a range",
-            remedy: "run the helper only through scripts/golden-confirm.py"))
+            remedy: "run the helper only through the golden confirmation"))
     }
     let document = "document id \(quoteAppleScript(documentId))"
     return (
@@ -1080,7 +1080,7 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
         guard let item = step.menuItem else {
             throw HelperFailure(problem: HelperProblem(
                 kind: "request", detail: "a menuPress step needs a menuItem",
-                remedy: "run the helper only through scripts/golden-confirm.py"))
+                remedy: "run the helper only through the golden confirmation"))
         }
         try pressMenuItem(item, pid: numbers.processIdentifier)
     case .formatSet:
@@ -1088,7 +1088,7 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
         guard let format = step.format else {
             throw HelperFailure(problem: HelperProblem(
                 kind: "request", detail: "a formatSet step needs a format",
-                remedy: "run the helper only through scripts/golden-confirm.py"))
+                remedy: "run the helper only through the golden confirmation"))
         }
         _ = try runAppleScript("set t to \(table)\nset format of \(range) of t to \(format.rawValue)")
     case .valueSet:
@@ -1097,7 +1097,7 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
         guard let value = step.value, let cell = step.range else {
             throw HelperFailure(problem: HelperProblem(
                 kind: "request", detail: "a valueSet step needs a value and a single cell",
-                remedy: "run the helper only through scripts/golden-confirm.py"))
+                remedy: "run the helper only through the golden confirmation"))
         }
         _ = try runAppleScript(
             "set t to \(table)\nset value of cell \(quoteAppleScript(cell)) of t to \(quoteAppleScript(value))")
@@ -1116,7 +1116,7 @@ func runDocumentEdit(_ request: HelperRequest) -> HelperResult {
         guard !paths.isEmpty, steps.allSatisfy({ paths.indices.contains($0.document) }) else {
             throw HelperFailure(problem: HelperProblem(
                 kind: "request", detail: "every step must name one of the documentPaths",
-                remedy: "run the helper only through scripts/golden-confirm.py"))
+                remedy: "run the helper only through the golden confirmation"))
         }
         let (numbers, launched) = try launchNumbers()
         if launched { numbersLaunchedByRun = numbers }
