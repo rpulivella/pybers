@@ -41,6 +41,8 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-10-14  A refused merge states the miss and stops, as house rule 11 asks,
+            for PYB-204.
 2026-10-14  Moved here from `scripts/pr.py`, and run as a module, for PYB-204.
 2026-10-13  The comment commands are `github.py`'s own, for PYB-204.
 2026-10-13  The repository root comes from `lib/shared.py`, for PYB-204.
@@ -614,16 +616,13 @@ def runMerge(arguments: argparse.Namespace) -> int:
 
     if summary.isDraft:
         console.print(
-            f"[red]{formatPullRequestRef(summary.number)} is still a draft.[/] "
-            "Run /pr-review-code, which owns the promotion out of draft."
+            f"[red]{formatPullRequestRef(summary.number)} is still a draft.[/]"
         )
         return errorExitCode
 
     if not confirmChecksPassed(readCheckRuns(token, summary.headSha)):
         console.print(
-            f"[red]CI has not passed on {formatPullRequestRef(summary.number)}.[/] "
-            f"Run `.venv/bin/python3 -m tools.workflow.pr checks {summary.number}` "
-            "for which."
+            f"[red]CI has not passed on {formatPullRequestRef(summary.number)}.[/]"
         )
         return errorExitCode
 

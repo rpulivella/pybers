@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-14  A missing or stale helper states the miss and stops, as house rule 11
+            asks, for PYB-204.
 2026-10-14  The confirmation's logic moved here from `golden_confirm.py`, for
             PYB-204.
 2026-10-13  Moved here from `scripts/golden_confirm_lib.py`, for PYB-204.
@@ -344,14 +346,10 @@ def checkHelperCurrent() -> None:
     """Refuse a run whose helper is missing or was built from other source (AC 14)."""
     installed = readInstalledHelperHash()
     if installed is None:
-        raise GoldenConfirmError(
-            f"{helperBundle} is not installed; run "
-            "`.venv/bin/python3 -m tools.local.golden_confirm helper-build`"
-        )
+        raise GoldenConfirmError(f"{helperBundle} is not installed")
     if installed != readHelperSourceHash():
         raise GoldenConfirmError(
-            "the installed helper was built from different source than this checkout; "
-            "run `.venv/bin/python3 -m tools.local.golden_confirm helper-build`"
+            "the installed helper was built from different source than this checkout"
         )
 
 

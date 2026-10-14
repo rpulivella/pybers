@@ -25,7 +25,7 @@ what the expected-values file says. The checks it leaves for QA remain yours.
    .venv/bin/python3 -m tools.local.golden_confirm permissions
    ```
    A missing or stale helper, a locked screen, or a missing permission stops here and
-   names where to fix it. Build or rebuild the helper with
+   says which. Build or rebuild the helper with
    `.venv/bin/python3 -m tools.local.golden_confirm helper-build`, and relay any grant it
    asks for to the user rather than working around it.
 3. **Preview, then run:**
