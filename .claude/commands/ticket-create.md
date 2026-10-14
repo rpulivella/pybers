@@ -1,5 +1,5 @@
 ---
-description: Write and file a new GitHub Issue for pybers in this repo's exact format (opener, ACs, constraints), then add it to the Project board as Todo or Concept.
+description: Write and file a new GitHub Issue for pybers in this repo's exact format (opener, ACs, design, constraints), then add it to the Project board as Todo or Concept.
 argument-hint: <description of the ticket>
 ---
 
