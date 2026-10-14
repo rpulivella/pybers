@@ -299,8 +299,7 @@ class Table:
     name: str
     rowCount: int = 0
     colCount: int = 0
-    # The `table` feature's own store. A caller reads it through `cells`, which
-    # refuses a write, so a cell changes only through the table.
+    # The feature's own store; a caller reads `cells`, which refuses a write.
     _cells: dict[CellReference, Cell] = field(default_factory=dict)
     mergeRanges: list[MergeRange] = field(default_factory=list)
     identifier: str = ""
