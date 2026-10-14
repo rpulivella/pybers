@@ -15,6 +15,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/14"
 
+from types import SimpleNamespace
+
 import pytest
 
 from tools.workflow.lib import dashboard as dashboardModule
@@ -31,6 +33,7 @@ from tools.workflow.lib.dashboard import (
     renderBoard,
     saveMerge,
     setBlockers,
+    updateDashboard,
     writeDashboard,
 )
 
@@ -172,4 +175,59 @@ def testAnUnchangedDashboardIsNotRewritten() -> None:
     modified = dashboardModule.dashboardPath.stat().st_mtime_ns
     assert not writeDashboard(board)
     assert dashboardModule.dashboardPath.stat().st_mtime_ns == modified
+
+
+def fakeGitHub(
+    monkeypatch: pytest.MonkeyPatch, draft: bool | None, status: str,
+    blockers: dict[int, list[int]],
+) -> None:
+    """Answer every GitHub read `updateDashboard` makes, with no network."""
+    monkeypatch.setattr(
+        "tools.workflow.lib.dashboard.findTicketPullRequest",
+        lambda token, number: None if draft is None else SimpleNamespace(isDraft=draft),
+    )
+    monkeypatch.setattr(
+        "tools.workflow.lib.github.readBoardStatus", lambda token, number: status
+    )
+    monkeypatch.setattr(
+        "tools.workflow.lib.github.readTicket",
+        lambda token, number: SimpleNamespace(title=f"Ticket {number}"),
+    )
+    monkeypatch.setattr(
+        "tools.workflow.lib.github.readOpenBlockers",
+        lambda token, number: blockers.get(number, []),
+    )
+
+
+def testADraftPullRequestReadsDprAndLeavesTheQueue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fakeGitHub(monkeypatch, draft=True, status="In Progress", blockers={})
+    board = parseBoard(dashboard)
+    updateDashboard("token", board, "PYB-156")
+    assert board.status == "dPR · PYB-156: Ticket 156"
+    assert [readStatusKey(line) for line in board.queue] == ["PYB-164"]
+
+
+def testAnUnstartedTicketReadsDashesAndBlockersRebuild(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fakeGitHub(monkeypatch, draft=None, status="Todo", blockers={156: [157]})
+    monkeypatch.setattr(
+        "tools.workflow.lib.dashboard.readCurrentBranch", lambda: "develop"
+    )
+    board = parseBoard(dashboard)
+    updateDashboard("token", board)
+    assert board.status == "--- · PYB-211: Ticket 211"
+    assert board.queue == [
+        "PYB-156 make the repository public › blocked by PYB-157",
+        "PYB-164 accept pull requests from anyone",
+    ]
+
+
+def testClearingTheFocusReadsNone(monkeypatch: pytest.MonkeyPatch) -> None:
+    fakeGitHub(monkeypatch, draft=None, status="", blockers={})
+    board = parseBoard(dashboard)
+    updateDashboard("token", board, "")
+    assert board.status == "None"
 
