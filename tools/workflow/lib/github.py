@@ -12,6 +12,8 @@ a missing token is a loud failure, never a guess:
     2. a GITHUB_TOKEN= line in the git-ignored .dev.vars at the repository root
 
 UPDATES
+2026-10-14  `readBoardStatus`, a ticket's Status for the dashboard, for PYB-211.
+2026-10-14  `readOpenBlockers`, for the dashboard's blocked-by notes, for PYB-211.
 2026-10-13  Split from `ticket.py`, which keeps its commands, for PYB-204. The history
             of this code before the split is in that file's UPDATES.
 """
@@ -454,6 +456,45 @@ def readDependencies(token: str, number: int, direction: str) -> list[tuple[int,
     )
     issues = requestJson(url, token, apiVersion=dependencyApiVersion) or []
     return [(issue["number"], issue["title"]) for issue in issues]
+
+
+def readBoardStatus(token: str, number: int) -> str:
+    """Return a ticket's Status on this repository's board, or '' when absent."""
+    query = """
+    query($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        issue(number: $number) {
+          projectItems(first: 20) {
+            nodes {
+              project { number }
+              fieldValueByName(name: "Status") {
+                ... on ProjectV2ItemFieldSingleSelectValue { name }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    data = requestGraphql(
+        token, query,
+        {"owner": repositoryOwner, "name": repositoryName, "number": number},
+    )
+    issue = data["repository"]["issue"] or {}
+    for item in (issue.get("projectItems") or {}).get("nodes") or []:
+        if item["project"]["number"] == projectNumber:
+            return str((item.get("fieldValueByName") or {}).get("name") or "")
+    return ""
+
+
+def readOpenBlockers(token: str, number: int) -> list[int]:
+    """Return the issues still open that block this one, by number."""
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}"
+        f"/issues/{number}/dependencies/blocked_by"
+    )
+    issues = requestJson(url, token, apiVersion=dependencyApiVersion) or []
+    return [int(issue["number"]) for issue in issues if issue.get("state") == "open"]
 
 
 def addBlockedBy(token: str, number: int, blockerNumber: int) -> None:
