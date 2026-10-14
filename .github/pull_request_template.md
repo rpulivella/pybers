@@ -34,6 +34,7 @@ None
 - [ ] I performed a self-review
 - [ ] The CHANGELOG.md Unreleased entry is in this PR (`/changelog-add`)
 - [ ] I added or updated pytest tests covering the change
+- [ ] I updated the user and developer docs, or named the ticket that does
 - [ ] Round-trip / golden-file tests pass for any archive-layer change
 - [ ] I created the goldens this change earns and confirmed each in Numbers (`/golden-confirm`)
 
