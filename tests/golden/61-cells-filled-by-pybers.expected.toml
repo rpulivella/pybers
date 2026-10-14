@@ -2,7 +2,7 @@
 # `B2:D3` filled across `B2:H7` by `cellsFill` under `PRESERVE_RELATIVE_POSITION`, so
 # the block repeats from `B2` and each filled cell reads its block cell's value. The
 # block itself is unchanged and not listed. Checked by
-# `python3 scripts/golden-confirm.py run 61-cells-filled-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 61-cells-filled-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

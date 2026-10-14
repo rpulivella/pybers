@@ -1,5 +1,5 @@
 # What Numbers shows for 11-text-written-and-retyped.numbers, checked by
-# `python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

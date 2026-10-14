@@ -14,13 +14,13 @@ Shells out to `security`, `swiftc`, `codesign` and `open`, the external toolchai
 house rules allow: no Python library signs an app or starts one under its own grants.
 
 Usage:
-    python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers
-    python3 scripts/golden-confirm.py run 11-text-written-and-retyped.numbers --dry-run
-    python3 scripts/golden-confirm.py damage-check
-    python3 scripts/golden-confirm.py helper-build
-    python3 scripts/golden-confirm.py helper-build --identity <SHA-1> --dry-run
-    python3 scripts/golden-confirm.py permissions
-    python3 scripts/golden-confirm.py measure 63b-fill-dragged-down
+    .venv/bin/python3 scripts/golden-confirm.py run 20-sheets-added.numbers
+    .venv/bin/python3 scripts/golden-confirm.py run 20-sheets-added.numbers --dry-run
+    .venv/bin/python3 scripts/golden-confirm.py damage-check
+    .venv/bin/python3 scripts/golden-confirm.py helper-build
+    .venv/bin/python3 scripts/golden-confirm.py helper-build --identity <hash> --dry-run
+    .venv/bin/python3 scripts/golden-confirm.py permissions
+    .venv/bin/python3 scripts/golden-confirm.py measure 63b-fill-dragged-down
 
 A run holds `caffeinate` while it drives Numbers, because the screen lock that follows
 display sleep stops it.
@@ -28,9 +28,14 @@ display sleep stops it.
 Each run's helper log is `helper.log` beside its report rather than in workarea/logs/,
 so the log is purged with the ticket's folder that holds the run it explains.
 
-Requires rich, and the Xcode command line tools for `helper-build`.
+Runs on the repository's venv, which holds rich and pybers, and needs the Xcode
+command line tools for `helper-build`.
 
 UPDATES
+2026-10-13  Quotes each reported value as a code span, and spaces the operators of
+            a reported formula, both from `golden_confirm_lib`, for PYB-201.
+2026-10-13  Imports pybers before any command runs, for PYB-201.
+2026-10-13  Every command it shows runs on the repository's venv, for PYB-201.
 2026-10-13  A recipe step can type a value or formula into a cell, and a
             measurement may start from a golden, so Numbers can save what pybers
             wrote, for PYB-139.
@@ -49,7 +54,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/17"
-__usage__ = "python3 scripts/golden-confirm.py <command> [options]"
+__usage__ = ".venv/bin/python3 scripts/golden-confirm.py <command> [options]"
 
 import argparse
 import hashlib
@@ -71,6 +76,16 @@ from typing import Any
 
 from rich.console import Console
 from rich.markup import escape
+
+from pybers import CellRange, CellReference, MergeRange, PybersError
+
+# Internal on purpose: pybers exposes no archives, and round-trip tests share this.
+from pybers._persistence import readPackage
+from pybers._persistence.difference import listPackageDifferences
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from golden_confirm_lib import formatCodeSpan, formatSpacedFormula
 
 try:
     from rich_argparse import RichHelpFormatter
@@ -305,12 +320,12 @@ def checkHelperCurrent() -> None:
     if installed is None:
         raise GoldenConfirmError(
             f"{helperBundle} is not installed; run "
-            "`python3 scripts/golden-confirm.py helper-build`"
+            "`.venv/bin/python3 scripts/golden-confirm.py helper-build`"
         )
     if installed != readHelperSourceHash():
         raise GoldenConfirmError(
             "the installed helper was built from different source than this checkout; "
-            "run `python3 scripts/golden-confirm.py helper-build`"
+            "run `.venv/bin/python3 scripts/golden-confirm.py helper-build`"
         )
 
 
@@ -522,8 +537,6 @@ def readExpectedTable(
     path: Path, position: int, entry: dict[str, Any]
 ) -> ExpectedTable:
     """Read one [[table]] entry, its merges spelled as pybers spells a merge."""
-    from pybers import CellRange, MergeRange, PybersError
-
     label = f"table {position}"
     checkEntryKeys(path, label, entry, expectedTableKeys, {"sheet", "table"})
     if not {"rows", "columns", "merges"} & set(entry):
@@ -619,29 +632,33 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
         """Add one comparison, showing both sides when it fails."""
         detail = f"{name} {found}"
         if not passed:
-            detail += f", expected {wanted!r}"
+            detail += f", expected {wanted}"
         status = "passed" if passed else "failed"
         checks.append(Check(status, subject, detail, evidence))
 
     value = reading.get("value") or {"kind": "missing", "text": ""}
     # The formatted value follows region settings, so it is shown, never compared.
-    shown = f"{value['kind']} {value['text']!r}, shown as "
+    shown = (f"{value['kind']} {formatCodeSpan(value['text'])}, shown as "
+             f"{formatCodeSpan(reading.get('formattedValue'))}")
     if expected.value is not None:
-        record("value", checkValue(expected.value, value), expected.value,
-               shown + repr(reading.get("formattedValue")))
+        record("value", checkValue(expected.value, value),
+               formatCodeSpan(expected.value), shown)
     if expected.empty:
-        record("value", value["kind"] == "empty", "empty",
-               shown + repr(reading.get("formattedValue")))
+        record("value", value["kind"] == "empty", "empty", shown)
     if expected.formula is not None:
         found = readFormulaText(reading.get("formula") or "")
-        record("formula", found == expected.formula, expected.formula, repr(found))
+        record("formula", found == expected.formula,
+               formatCodeSpan(formatSpacedFormula(expected.formula)),
+               formatCodeSpan(formatSpacedFormula(found)))
     if expected.formatKind is not None:
         found = reading.get("formatKind") or ""
-        record("format", found == expected.formatKind, expected.formatKind, repr(found))
+        record("format", found == expected.formatKind,
+               formatCodeSpan(expected.formatKind), formatCodeSpan(found))
     settings = readDataFormatSettings(reading.get("dataFormat", []))
     for label, wanted in expected.dataFormat.items():
         name = label if label == "Data Format" else f"Data Format {label}"
-        record(name, settings.get(label) == wanted, wanted, repr(settings.get(label)))
+        record(name, settings.get(label) == wanted, formatCodeSpan(wanted),
+               formatCodeSpan(settings.get(label)))
     for question in expected.qa:
         checks.append(Check("qa", subject, question, evidence))
     return checks
@@ -649,8 +666,6 @@ def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
 
 def readMerges(subject: str, cellNames: list[list[str]]) -> list[str]:
     """Find each merge in Numbers' cell names, where a covered cell names its anchor."""
-    from pybers import CellRange, CellReference, PybersError
-
     corners: dict[str, tuple[int, int]] = {}
     for row, names in enumerate(cellNames, start=1):
         for column, name in enumerate(names, start=1):
@@ -670,8 +685,6 @@ def readMerges(subject: str, cellNames: list[list[str]]) -> list[str]:
 
 def readMergeOrder(merge: str) -> tuple[int | None, ...]:
     """Order a merge by its rows, then its columns, rather than as text."""
-    from pybers import CellRange
-
     extent = CellRange.parse(merge)
     return (extent.startRow, extent.startCol, extent.endRow, extent.endCol)
 
@@ -742,10 +755,6 @@ def formatQuickLookName(position: int, sheet: str) -> str:
 
 def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
     """Name every member and archive the Numbers-saved copy holds differently (AC 7)."""
-    # Internal on purpose: pybers exposes no archives, and round-trip tests share this.
-    from pybers._persistence import readPackage
-    from pybers._persistence.difference import listPackageDifferences
-
     before, after = readPackage(golden), readPackage(saved)
     return [str(difference) for difference in listPackageDifferences(before, after)]
 

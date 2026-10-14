@@ -1,7 +1,7 @@
 # What Numbers shows for 20-functions-added-in-15-4-by-pybers.numbers, one call to each
 # function Numbers 15.4 added, written by name into `20-formula-shapes`. Each value is the
 # one Numbers 15.4 calculated when it saved `69-functions-added-in-15-4`. Checked by
-# `python3 scripts/golden-confirm.py run 20-functions-added-in-15-4-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 20-functions-added-in-15-4-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

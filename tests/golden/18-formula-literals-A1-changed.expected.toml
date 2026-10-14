@@ -1,5 +1,5 @@
 # What Numbers shows for 18-formula-literals-A1-changed.numbers, checked by
-# `python3 scripts/golden-confirm.py run 18-formula-literals-A1-changed.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 18-formula-literals-A1-changed.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

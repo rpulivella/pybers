@@ -1,7 +1,7 @@
 # What Numbers shows for 64-cells-copied-relative-by-pybers.numbers, `60-move-base` with `B2:D5` copied to
 # `F8` under `PRESERVE_RELATIVE_POSITION`, which is copy and paste in Numbers. Values are what
 # Numbers itself computed for `64-copy-pasted`.
-# Checked by `python3 scripts/golden-confirm.py run 64-cells-copied-relative-by-pybers.numbers`.
+# Checked by `.venv/bin/python3 scripts/golden-confirm.py run 64-cells-copied-relative-by-pybers.numbers`.
 # The source block and every formula outside the copy read as they did before.
 
 [[cell]]

@@ -1,7 +1,7 @@
 # How Numbers made 64g-copy-imported-merge: `22e-merge-imported`, whose three merges
 # along row 1 came from Excel and keep a record under covered cells, with `A1:G2`
 # copied and pasted at `A5`. Made by
-# `python3 scripts/golden-confirm.py measure 64g-copy-imported-merge`.
+# `.venv/bin/python3 scripts/golden-confirm.py measure 64g-copy-imported-merge`.
 
 base = "22e-merge-imported"
 

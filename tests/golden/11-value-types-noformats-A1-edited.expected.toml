@@ -1,5 +1,5 @@
 # What Numbers shows for 11-value-types-noformats-A1-edited.numbers, checked by
-# `python3 scripts/golden-confirm.py run 11-value-types-noformats-A1-edited.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 11-value-types-noformats-A1-edited.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

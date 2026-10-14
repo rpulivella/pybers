@@ -1,6 +1,6 @@
 # How Numbers made 69-functions-added-in-15-4: the golden
 # `20-functions-added-in-15-4-by-pybers`, one call to each function Numbers 15.4 added,
 # opened in Numbers, which calculates the formulas pybers marked dirty, and saved with
-# no other step. Made by `python3 scripts/golden-confirm.py measure 69-functions-added-in-15-4`.
+# no other step. Made by `.venv/bin/python3 scripts/golden-confirm.py measure 69-functions-added-in-15-4`.
 
 base = "20-functions-added-in-15-4-by-pybers"

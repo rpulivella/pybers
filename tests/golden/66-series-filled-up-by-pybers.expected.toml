@@ -1,7 +1,7 @@
 # What Numbers shows for 66-series-filled-up-by-pybers.numbers, `66-series-vertical-base` with every case filled
 # up to row 2 by `cellsFill` under `CONTINUE_SERIES`. Each expected value is the far end
 # of what Numbers' own drag wrote in `66c-series-up`. Checked by
-# `python3 scripts/golden-confirm.py run 66-series-filled-up-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 66-series-filled-up-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

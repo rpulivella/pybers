@@ -1,7 +1,7 @@
 # What Numbers shows for 66-series-filled-left-by-pybers.numbers, `66-series-horizontal-base` with every case filled
 # left to column B by `cellsFill` under `CONTINUE_SERIES`. Each expected value is the far end
 # of what Numbers' own drag wrote in `66e-series-left`. Checked by
-# `python3 scripts/golden-confirm.py run 66-series-filled-left-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 66-series-filled-left-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet 1"

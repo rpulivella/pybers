@@ -1,7 +1,7 @@
 # What Numbers shows for 60-move-cut-pasted-by-pybers.numbers, `60-move-base` with `B2:D5` moved to
 # `F8` under `PRESERVE_RELATIVE_POSITION`, which is cut and paste in Numbers. Values are what
 # Numbers itself computed for `60b-move-cut-pasted`. Checked by
-# `python3 scripts/golden-confirm.py run 60-move-cut-pasted-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 60-move-cut-pasted-by-pybers.numbers`.
 # Column A holds the numbers 1 to 12, which the move never reaches.
 
 [[cell]]

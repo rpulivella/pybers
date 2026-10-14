@@ -2,7 +2,7 @@
 # filled down to row 13 by `cellsFill` under `CONTINUE_SERIES`: formatted numbers, times,
 # abbreviated and re-cased names, quarters, durations and text that repeats. Each expected
 # value is the last row of what Numbers' own drag wrote in `68b`. Checked by
-# `python3 scripts/golden-confirm.py run 68-series-filled-by-pybers.numbers`.
+# `.venv/bin/python3 scripts/golden-confirm.py run 68-series-filled-by-pybers.numbers`.
 
 [[cell]]
 sheet = "Sheet1"
