@@ -1,5 +1,5 @@
 ---
-description: Begin work on a ticket, fetch it, surface ACs + constraints, branch, set Status In Progress, and write the acceptance criteria into workarea/session-tasks.md. No code written.
+description: Begin work on a ticket, fetch it, surface ACs + constraints, branch, set Status In Progress, and write the acceptance criteria into workarea/dashboard.md. No code written.
 argument-hint: <issue number, #number, or issue URL>
 ---
 
@@ -7,7 +7,7 @@ argument-hint: <issue number, #number, or issue URL>
 
 Preparation only, **write no code in this skill.** It fetches the ticket, surfaces the
 contract, opens the working branch, moves the Project card, and writes the acceptance criteria
-into `workarea/session-tasks.md`.
+into `workarea/dashboard.md`.
 
 ## Steps
 
@@ -56,66 +56,16 @@ into `workarea/session-tasks.md`.
    ```
    Then read `.venv/bin/python3 --version`. The work must use what that version adds in
    any code the ticket touches.
-6. **Update `workarea/session-tasks.md` for the new ticket.** This file is the **literal
-   replacement** for the removed Claude Code Task/Todo tool. Same purpose, same shape, only
-   externalized to a text file so it survives `/clear` and window swaps. It holds what is active
-   now and the queue of tickets that follows it. Tickets hold the full scope of work; this file
-   is the current-moment slice.
-
-   Read the current `workarea/session-tasks.md` (if it does not exist, treat it as empty). Then
-   decide what carries forward into the new ticket's work:
-   - **Compound, chained or epic case.** The new ticket references or blocks on current tasks
-     (or belongs to the same epic). Carry those specific tasks forward by leaving their entries
-     in the file.
-   - **The queue stays.** Tickets the maintainer has lined up stay below the new ticket's
-     tasks, in the maintainer's order, never cleared or reordered.
-
-   Then REWRITE `workarea/session-tasks.md` (replace the file wholesale, never append). **The
-   format is a flat dashboard: one line per task, no indentation, no headers, no dates, no
-   notes, no prose.** It matches the visual language of the removed Task/Todo tool sidebar:
-
-   ```
-   ◼ <in-progress task subject>
-   ◻ <pending task subject> › blocked by <blocker>
-   ◻ <pending task subject> › blocked by <blocker>
-   ◻ <pending task subject> › deferred
-   ✔ <completed task subject>
-   ✔ <completed task subject>
-   ```
-
-   Symbols (Unicode, single character each):
-   - `◼` in progress (exactly one at a time)
-   - `◻` pending
-   - `✔` completed
-   - `› blocked by X` inline notation, tail of the line
-   - `› deferred` inline notation for a pending task not in the immediate chain
-
-   **Flat only. No hierarchy, no indentation, ever.** Every task sits at column zero. There is
-   no "parent" task that owns others. Order is natural priority: the `◼` at the top, pendings
-   next, completed at the bottom. If a task feels like it needs subtasks, it is really a ticket
-   in disguise, so file it as one and reference it by `PYB-` key.
-
-   **Never multi-line an entry.** No status notes, no descriptions, no "as of" dates, no
-   completed-earlier-this-session sections. Task subjects are terse, like commit messages. If a
-   task needs context beyond one line, it belongs in its ticket, not in this file.
-
-   `.vscode/settings.json` colors each status through the Highlight extension
-   (`fabiospampinato.vscode-highlight`), so keep the symbols and the `›` notations exact.
-
-7. Build the initial task list for the new ticket by writing entries to
-   `workarea/session-tasks.md`. Each entry maps to a concrete AC or implementation step, cited
-   in the ticket's own numbering (`PYB-52 AC 9.ii`, not `9.2`). Mark the first entry `◼` (in
-   progress) if work begins immediately.
-8. Display the resulting `workarea/session-tasks.md` contents to the user.
+6. **Update the dashboard through `/dashboard-update`.** Replace the Tasks section with the new
+   ticket's tasks, one per AC or step, the first `◼` if work begins now, and keep the
+   queue. `ticket start` in step 5 has already put the ticket in focus. Show the user
+   the file.
 
 ## Hard rules
 
 - Write no code. Always fetch before acting; never guess ACs or constraints.
 - Branch from a current `develop`. Never guess the branch name, and never use the raw
   label as `<type>`; run it through the mapping in step 4.
-- One task `◼` at a time.
-- **`workarea/session-tasks.md` is the only task dashboard.** Rewrite it the moment a task
-  starts, finishes or becomes blocked, so it never trails the work.
 
 ## Moving the card afterward
 
