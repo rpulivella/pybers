@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-193] Stop callers editing a table's cells directly
 - [PYB-205] Require user and developer docs in every ticket
 - [PYB-204] Run the tooling on the venv through shared libraries
 - [PYB-201] Run golden-confirm through the repository's venv
