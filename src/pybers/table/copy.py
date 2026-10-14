@@ -11,7 +11,8 @@ No formula outside the copy changes, under either rule. See findings-03-structur
 afterward exactly as it did before.
 
 UPDATES
-2026-10-14  Checks a range against the grid through `bounds`, for PYB-193.
+2026-10-14  Writes the table's own store, `cells` being read-only, and checks a
+            range against the grid through `bounds`, for PYB-193.
 2026-09-29  Written for PYB-136.
 """
 from __future__ import annotations
@@ -76,7 +77,7 @@ def copyCells(
         if table.addressable(reference)
     ]
     for reference in destination:
-        table.cells.pop(reference, None)
+        table._cells.pop(reference, None)
     for cell in copied:
         target = Cell(reference=copy.cellMap(cell.reference), table=table)
         copyCellContent(target, cell, named, borders=True)
@@ -84,7 +85,7 @@ def copyCells(
             target.formula = clampFormulaRanges(
                 target.formula, target.reference, table.rowCount, table.colCount
             )
-        table.cells[target.reference] = target
+        table._cells[target.reference] = target
     table.mergeRanges.extend(
         MergeRange(CellRange.fromReferences(
             copy.cellMap(merge.anchor), copy.cellMap(merge.extent.end or merge.anchor)

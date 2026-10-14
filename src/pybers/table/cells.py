@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-14  `cells` is a read-only view of the table's own store, for PYB-193.
 2026-10-14  A range is checked against the grid in `bounds`, for PYB-193.
 2026-10-12  A changed kind describes its format as UNDETERMINED, for PYB-190.
 2026-10-11  Table names are returned as a frozendict, for PYB-189.
@@ -58,9 +59,10 @@ __date__ = "2026/09/02"
 
 import datetime
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from decimal import Context, Decimal
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
@@ -297,7 +299,9 @@ class Table:
     name: str
     rowCount: int = 0
     colCount: int = 0
-    cells: dict[CellReference, Cell] = field(default_factory=dict)
+    # The `table` feature's own store. A caller reads it through `cells`, which
+    # refuses a write, so a cell changes only through the table.
+    _cells: dict[CellReference, Cell] = field(default_factory=dict)
     mergeRanges: list[MergeRange] = field(default_factory=list)
     identifier: str = ""
     # The archive this table was read from or saved as, and None until it has one.
@@ -392,6 +396,11 @@ class Table:
         """
         return copyCells(self, source, anchor, references)
 
+    @property
+    def cells(self) -> Mapping[CellReference, Cell]:
+        """Return the cells by reference, read-only, since only the table edits them."""
+        return MappingProxyType(self._cells)
+
     def cell(
         self,
         address: CellAddress | None = None,
@@ -424,9 +433,9 @@ class Table:
                 f"{key} is covered by the merge {merge.extent}, whose anchor is "
                 f"{merge.anchor}."
             )
-        if key not in self.cells:
-            self.cells[key] = Cell(reference=key, table=self)
-        return self.cells[key]
+        if key not in self._cells:
+            self._cells[key] = Cell(reference=key, table=self)
+        return self._cells[key]
 
     @property
     def rows(self) -> TableRows:
@@ -520,7 +529,7 @@ class Table:
         self.mergeRanges.append(merge)
         for reference in merge.extent:
             if reference != merge.anchor:
-                self.cells.pop(reference, None)
+                self._cells.pop(reference, None)
         return merge
 
     def mergeRemove(self, address: CellAddress) -> MergeRange:
