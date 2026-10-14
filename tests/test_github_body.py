@@ -8,6 +8,10 @@ compared by the HTML it renders to, in GitHub's reading, where a newline inside 
 paragraph is a break.
 
 UPDATES
+2026-10-13  The missing-formatter case runs in a fresh interpreter, since
+            `lib/github_body.py` is now a lazy import that a test cannot unload.
+2026-10-13  `pr.py` reads a body in two places, its comment commands now being
+            `github.py`'s, for PYB-204.
 2026-10-06  The snapshot reduced to five bodies named for what they hold, for
             PYB-162.
 2026-09-25  Written for PYB-134, replacing the tests of the unwrapper it removed.
@@ -28,11 +32,7 @@ from pathlib import Path
 
 import pytest
 
-# `scripts/` is not a package and is not installed, so it is reached by path.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-
-import github_body  # noqa: E402
-import ticket  # noqa: E402
+from tools.workflow.lib import github, github_body
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 bodyDirectory: Path = Path(__file__).resolve().parent / "github-bodies"
@@ -113,8 +113,12 @@ def testABreakTypedOnGitHubSurvivesAnEditElsewhere() -> None:
 
 def testARenderingChangeIsRefusedNamingTheLines() -> None:
     """PYB-134 AC 4, through the check both directions share."""
-    with pytest.raises(github_body.BodyRenderingError, match=r"\+<p>after</p>"):
-        github_body.refuseRenderingChange("<p>before</p>", "<p>after</p>", "Posting")
+    with pytest.raises(
+        github_body.BodyRenderingError, match=r"\+<p>after</p>"
+    ):
+        github_body.refuseRenderingChange(
+            "<p>before</p>", "<p>after</p>", "Posting"
+        )
 
 
 def testBlankLineRunsCollapseAndNoBlankLineEndsABody() -> None:
@@ -147,9 +151,9 @@ def testEachCaseFoundOn20260924RoundTrips(body: str) -> None:
 
 
 def testTicketsPullRequestsAndCommentsPostThroughOneReader() -> None:
-    """PYB-134 AC 7: `pr.py` formats nothing itself; it calls `ticket.readBodyFile`."""
-    source = (repositoryRoot / "scripts" / "pr.py").read_text(encoding="utf-8")
-    assert source.count("ticket.readBodyFile(bodyPath)") == 4
+    """PYB-134 AC 7: `pr.py` formats nothing itself; it calls `github.readBodyFile`."""
+    source = (repositoryRoot / "tools" / "workflow" / "pr.py").read_text("utf-8")
+    assert source.count("github.readBodyFile(bodyPath)") == 2
     assert "mdformat" not in source and "github_body" not in source
 
 
@@ -157,21 +161,26 @@ def testReadingABodyFileFormatsIt(tmp_path: Path) -> None:
     """The reader every posting command uses returns the formatted body."""
     path = tmp_path / "body.md"
     path.write_text("wrapped\nline\n", encoding="utf-8")
-    posted = ticket.readBodyFile(path)
+    posted = github.readBodyFile(path)
     assert posted is not None and posted.text == "wrapped line\n"
     assert posted.tidied == 2
 
 
-def testAnInterpreterLackingTheFormatterSaysSoAndPostsNothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The system interpreter lacks the dev extras, and a post there must not crash."""
-    monkeypatch.delitem(sys.modules, "github_body")
-    monkeypatch.setitem(sys.modules, "mdformat", None)
+def testAnInterpreterLackingTheFormatterSaysSoAndPostsNothing(tmp_path: Path) -> None:
+    """An interpreter without the dev extras refuses a post rather than crashing."""
     path = tmp_path / "body.md"
     path.write_text("a body\n", encoding="utf-8")
-    assert ticket.readBodyFile(path) is None
-    assert "lacks mdformat" in " ".join(capsys.readouterr().out.split())
+    script = (
+        "import sys; sys.modules['mdformat'] = None; "
+        "import pathlib; from tools.workflow.lib import github; "
+        f"print(github.readBodyFile(pathlib.Path({str(path)!r})))"
+    )
+    printed = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True,
+        cwd=repositoryRoot,
+    ).stdout
+    assert "lacks mdformat" in " ".join(printed.split())
+    assert printed.rstrip().endswith("None")
 
 
 def testImportingPybersLoadsNoneOfTheFormatter() -> None:
@@ -187,7 +196,7 @@ def testImportingPybersLoadsNoneOfTheFormatter() -> None:
 def testTheToolsImportWithoutTheFormatter() -> None:
     """The job posting the readiness comment installs rich alone, and imports these."""
     script = (
-        "import sys; sys.path.insert(0, 'scripts'); import ticket, pr; "
+        "import sys, tools.workflow.ticket, tools.workflow.pr; "
         "print(sorted(sys.modules))"
     )
     loaded = subprocess.run(

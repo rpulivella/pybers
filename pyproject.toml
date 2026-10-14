@@ -18,7 +18,7 @@ dependencies = [
     # modules (6.32.1, from protoc 32.1). That is the version below which this
     # provably cannot work, and it is NOT the floor declared here. The floor is the
     # oldest version the suite has actually been run against, which is higher, and
-    # re-running tools/protos-extract.py with a newer protoc can only raise the
+    # re-running tools/local/protos_extract.py with a newer protoc can only raise the
     # mechanical minimum toward it. The development environment and a clean install
     # both run 7.36.1, so one number covers both rather than the manifest allowing
     # a version nobody exercises.
@@ -37,7 +37,7 @@ pybers = "pybers.cli:main"
 [project.optional-dependencies]
 # The command line's own extra, so a script importing pybers never installs Typer.
 cli = ["typer>=0.27.3"]
-# rich and rich_argparse are for scripts/, not for the library. pybers itself must
+# rich and rich_argparse are for tools/, not for the library. pybers itself must
 # never import them, which the library-purity check enforces. Declared here so that
 # one `pip install -e ".[dev]"` equips the venv for both the test suite and the repo
 # tooling, rather than the tooling depending on whatever the system interpreter
@@ -49,7 +49,7 @@ dev = [
     "pytest>=9.1.1",
     "rich>=15.0.0",
     "rich_argparse>=1.8.0",
-    # Bodies posted to GitHub by scripts/ are formatted and checked by these, never pybers.
+    # Bodies posted to GitHub by tools/ are formatted and checked by these, never pybers.
     "mdformat>=1.0.0",
     "mdformat-gfm>=1.0.0",
     "markdown-it-py>=4.2.0",
@@ -66,13 +66,15 @@ dev = [
 
 [tool.pybers]
 # The ticket key. Declared here because this is the file that already names the
-# project, and read by scripts/ticket.py so that one edit moves the key everywhere
+# project, and read by tools/workflow/ticket.py so that one edit moves the key everywhere
 # the tools print it. README.md and CLAUDE.md restate it for a human reading the
 # repository; neither owns it.
 ticketPrefix = "PYB"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The root, so a test imports the tooling as `tools.workflow`, the name a command runs by.
+pythonpath = ["."]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pybers"]
@@ -129,7 +131,7 @@ strict = true
 exclude = ["^src/pybers/_generated/", "^src/pybers/protos/"]
 # Both trees are checked by a bare `mypy`, so nobody has to remember two commands
 # and CI runs one line.
-files = ["src/pybers", "scripts", "tools"]
+files = ["src/pybers", "tools"]
 
 [[tool.mypy.overrides]]
 # The generated protobuf modules build their classes at import time through the
@@ -156,20 +158,16 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Repository tooling, checked but not held to the library's standard. AC 7 of #4 is
-# why it is checked at all: two calls in `scripts/pr.py` whose arguments did not
+# why it is checked at all: two calls in `tools/workflow/pr.py` whose arguments did not
 # match the signature sat undiscovered until a real pull request ran one of them,
 # and that is a call-signature check rather than a strictness one.
-#
-# `scripts/` has no `__init__.py`, so mypy names each file by its stem rather than
-# as a package. Matching on `scripts.*` silently matched nothing.
 module = [
-    "pr",
-    "ticket",
-    "standards-check",
-    "protos-extract",
-    "functions-extract",
-    "lib.numbersapp",
-    "lib.machoreader",
+    "tools.workflow.pr",
+    "tools.workflow.ticket",
+    "tools.local.protos_extract",
+    "tools.local.functions_extract",
+    "tools.local.lib.numbersapp",
+    "tools.local.lib.machoreader",
 ]
 disallow_untyped_defs = false
 disallow_any_generics = false

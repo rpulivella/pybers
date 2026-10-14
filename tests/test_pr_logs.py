@@ -5,6 +5,7 @@ Printing what the failed jobs on a pull request logged, and nothing else.
 GitHub is stood in for at the API boundary.
 
 UPDATES
+2026-10-13  Pull request summaries and check runs are dataclasses, for PYB-204.
 2026-10-09  Written for PYB-181, after both checks on PR #191 failed with no comment.
 """
 from __future__ import annotations
@@ -18,7 +19,6 @@ __status__ = "Development"
 __date__ = "2026/10/09"
 
 import importlib
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -26,9 +26,9 @@ from typing import Any
 
 import pytest
 
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(repositoryRoot / "scripts"))
+from tools.workflow.lib import pull_request as pullRequest
 
+repositoryRoot: Path = Path(__file__).resolve().parent.parent
 setupLog: str = (
     "2026-10-09T18:00:01.0000000Z Extracted >=3.15 from pyproject.toml\n"
     "2026-10-09T18:00:02.0000000Z ##[error]The version '>=3.15.0' was not found.\n"
@@ -38,7 +38,7 @@ setupLog: str = (
 
 def loadPrScript() -> ModuleType:
     """Return the pull request tool, imported the way its own tests import it."""
-    return importlib.import_module("pr")
+    return importlib.import_module("tools.workflow.pr")
 
 
 def buildApiStandIn(
@@ -65,13 +65,16 @@ def runLogsOf(
         fetched.append(jobId)
         return setupLog
 
-    monkeypatch.setattr(pr.ticket, "resolveToken", lambda: "token")
+    monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
         pr, "readPullRequest",
-        lambda token, number: {"number": 191, "headSha": "a" * 40},
+        lambda token, number: pullRequest.PullRequestSummary(
+            number=191, title="", url="", state="open", isDraft=False, head="",
+            headRepository="", headSha="a" * 40, base="develop", nodeId="",
+        ),
     )
-    monkeypatch.setattr(pr.ticket, "requestJson", buildApiStandIn(runs, jobs))
-    monkeypatch.setattr(pr, "readJobLog", readLogStandIn)
+    monkeypatch.setattr(pr.github, "requestJson", buildApiStandIn(runs, jobs))
+    monkeypatch.setattr(pullRequest, "readJobLog", readLogStandIn)
     arguments = pr.buildParser().parse_args(["logs", "191"])
     return pr.runLogs(arguments), fetched
 

@@ -7,6 +7,7 @@ merge that deleted by name alone could cost this repository a branch it never
 merged. GitHub is stood in for at the API boundary, and the deletes recorded.
 
 UPDATES
+2026-10-13  Pull request summaries and check runs are dataclasses, for PYB-204.
 2026-10-04  Written for PYB-152.
 """
 from __future__ import annotations
@@ -20,22 +21,21 @@ __status__ = "Development"
 __date__ = "2026/10/04"
 
 import importlib
-import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
 
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(repositoryRoot / "scripts"))
+from tools.workflow.lib import pull_request as pullRequest
 
+repositoryRoot: Path = Path(__file__).resolve().parent.parent
 sharedName: str = "feature/136-copy-a-block-of-cells"
 
 
 def loadPrScript() -> ModuleType:
     """Return the pull request tool, imported the way its own tests import it."""
-    return importlib.import_module("pr")
+    return importlib.import_module("tools.workflow.pr")
 
 
 def buildPayload(repository: str | None, branch: str = sharedName) -> dict[str, Any]:
@@ -58,14 +58,18 @@ def runMergeOf(
     """Merge one pull request with GitHub stood in for, and return what was deleted."""
     pr = loadPrScript()
     deleted: list[str] = []
-    monkeypatch.setattr(pr.ticket, "resolveToken", lambda: "token")
+    monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
-        pr, "readPullRequest", lambda token, number: pr.summarizePullRequest(payload)
+        pr, "readPullRequest",
+        lambda token, number: pullRequest.summarizePullRequest(payload),
     )
     monkeypatch.setattr(
         pr, "readCheckRuns",
-        lambda token, sha: [{"name": "preflight", "status": "completed",
-                             "conclusion": "success"}],
+        lambda token, sha: [
+            pullRequest.CheckRun(
+                name="preflight", status="completed", conclusion="success"
+            )
+        ],
     )
     monkeypatch.setattr(pr, "mergePullRequest", lambda *args: "b" * 40)
     monkeypatch.setattr(
@@ -87,7 +91,7 @@ def testAMergeDeletesNoBranchUnlessAsked(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     pr = loadPrScript()
-    ours = f"{pr.ticket.repositoryOwner}/{pr.ticket.repositoryName}"
+    ours = f"{pr.github.repositoryOwner}/{pr.github.repositoryName}"
 
     code, deleted = runMergeOf(monkeypatch, buildPayload(ours), asked=False)
 
@@ -97,7 +101,7 @@ def testAMergeDeletesNoBranchUnlessAsked(
 
 def testOurOwnBranchIsDeletedAfterItsMerge(monkeypatch: pytest.MonkeyPatch) -> None:
     pr = loadPrScript()
-    ours = f"{pr.ticket.repositoryOwner}/{pr.ticket.repositoryName}"
+    ours = f"{pr.github.repositoryOwner}/{pr.github.repositoryName}"
 
     code, deleted = runMergeOf(monkeypatch, buildPayload(ours))
 
@@ -126,7 +130,7 @@ def testTheRepositoryNameIsComparedWhateverItsCase(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pr = loadPrScript()
-    ours = f"{pr.ticket.repositoryOwner}/{pr.ticket.repositoryName}".upper()
+    ours = f"{pr.github.repositoryOwner}/{pr.github.repositoryName}".upper()
 
     _, deleted = runMergeOf(monkeypatch, buildPayload(ours))
 

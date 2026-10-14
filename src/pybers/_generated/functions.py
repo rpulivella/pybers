@@ -2,7 +2,7 @@
 """\
 Numbers formula functions, by index. Machine output, do not edit.
 
-Written by tools/functions-extract.py from Numbers 15.4
+Written by tools/local/functions_extract.py from Numbers 15.4
 (build 7051.0.79). A correction made here is destroyed by the next
 extraction; correct the extractor instead.
 

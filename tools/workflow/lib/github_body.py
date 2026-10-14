@@ -14,6 +14,7 @@ checked by rendering before and after, and a change GitHub would show is refused
 Measured 2026-09-25: all 134 bodies filed up to then survived the round trip.
 
 UPDATES
+2026-10-13  Moved here from `scripts/github_body.py`, for PYB-204.
 2026-09-25  Written for PYB-134.
 """
 from __future__ import annotations

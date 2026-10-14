@@ -1,52 +1,35 @@
-# pybers: Scripts
+# pybers: Workflow tools
 
-**The repository harness.** Everything here serves the workflow rather than the library:
-filing and moving tickets, opening and merging pull requests, and running the gates. Each
-one backs a skill, and a skill is the only thing that should be calling one.
+**The development workflow, shared rather than specific to pybers.** Filing and moving
+tickets, opening and merging pull requests, and running the gates. Each command backs a
+skill, and a skill is the only thing that should be calling one. This folder is the part
+meant to be extracted and shared across repositories, so nothing here may depend on
+`tools/local/`.
 
-**What does NOT belong here is anything that builds pybers itself.** The extractors that
-read Numbers and write `src/pybers/protos/`, `src/pybers/_generated/` and the function
-table live in `tools/`, which has [its own README](../tools/README.md). The split is
-whether a program serves the repository or the library; both are development tooling and
-neither ships in the wheel, but they answer to different readers and change for different
-reasons.
+**What only pybers needs lives in [`tools/local/`](../local/README.md):** the extractors
+that read Numbers and write `src/pybers/protos/`, `src/pybers/_generated/` and the function
+table, and the golden confirmation that drives Numbers. Neither folder ships in the wheel.
 
-Every script is self-contained, runnable from the repo root, and reports
-through [`rich`](https://github.com/Textualize/rich). The house rules below govern `tools/` too.
-`src/pybers/` (the library itself) follows the same core conventions but uses dataclasses
-rather than TypedDict for data, and is documented in `CLAUDE.md`.
+Run a command from the repository root as `.venv/bin/python3 -m tools.workflow.<command>`.
+Each reports through [`rich`](https://github.com/Textualize/rich). The house rules below
+govern `tools/local/` too, and `src/pybers/` follows the same conventions in `CLAUDE.md`.
 
-> Requires the Python that `requires-python` in `pyproject.toml` names. `rich` is required; `rich_argparse` is optional (the `--help`
-> output falls back to plain argparse without it). Per-script extras are noted in each
-> file's docstring.
+## Layout
 
-## Current scripts
+This folder lists only the commands a person runs, each holding its command line and
+output. Its logic sits in `lib/`, and a test reaches logic there, testing a command only
+for its own handling.
 
 ```
-ticket.py    file and move tickets on GitHub Issues and the pybers Project board,
-             the single sanctioned path, never hand-run the GitHub API around it
-             (see the command map below). Live now.
-pr.py        open, inspect, promote and merge pull requests. Exists so that no
-             skill needs `gh`, whose identity is an ambient keyring holding
-             several accounts at once. Live now.
-pr-preflight-check.py
-             run every gate in one pass and report all of them: pytest, the
-             prose gate, ruff and mypy. The deterministic half of
-             `/pr-review-code`, and what `.github/workflows/preflight.yml`
-             calls, so the gate list lives here rather than in two places, and
-             that workflow names no gate of its own. Live now.
-merge-readiness.py
-             gather a branch's facts on GitHub, then check a pull request and
-             report one verdict as a single comment on it. Two halves for two
-             levels of trust: `collect` runs on the branch with no write access,
-             and `report` runs this repository's code over the facts it wrote.
-             `merge_readiness_lib.py` holds the checks and
-             `merge_readiness_presenter.py` renders the comment. Live now.
-golden-confirm.py
-             confirm a golden in running Numbers and write a report of what
-             Numbers shows, through a helper app that holds the permissions so
-             Terminal holds none. Backs `/golden-confirm`, and nothing in the
-             preflight, CI or the suite runs it. Live now.
+ticket.py            file and move tickets on GitHub Issues and the pybers Project
+                     board, the single sanctioned path (see the command map below)
+pr.py                open, inspect, promote and merge pull requests, so that no skill
+                     needs `gh`, whose identity is an ambient keyring holding several
+                     accounts at once
+preflight.py         run every gate in one pass and report all of them: pytest, the
+                     prose gate, ruff and mypy. What `.github/workflows/preflight.yml`
+                     calls, so the gate list lives here rather than in two places
+standards_check.py   the prose gate on its own, for a file, the tree or a string
 ```
 
 ## Naming
@@ -54,16 +37,9 @@ golden-confirm.py
 Names are **topic-first**, matching the skill convention that sorts `ticket-create`
 beside `ticket-edit`, so everything about one subject sorts together.
 
-The **`test-` prefix is the deliberate exception** for a hand-rolled test script, not
-used here since this project's tests are real `pytest` under `tests/`, not hand-rolled
-`scripts/test-*.py`. If a repo-tooling script ever needs its own test outside pytest's
-reach, follow the `test-<topic>.py` / synthetic-data / glob-discovered convention from
-the author's other repositories.
-
-- A **`-check`** asserts something about the repository as it stands right now, and can
-  fail because a *file* changed. Run it against the working tree.
-- A **`test-`** is a unit test: it drives a function with synthetic inputs and can only
-  fail because the *code* changed.
+A module name takes underscores, because Python cannot import a hyphen. A `_check` command
+asserts something about the repository as it stands, so it fails when a *file* changes.
+Tests live under `tests/` as `pytest` and import from `lib/`.
 
 ## ticket.py commands, and the skill that calls each
 
@@ -87,7 +63,7 @@ why every command above that reaches one takes the id alone. Passing a ticket nu
 beside it would imply a check that is not happening.
 
 Pull requests are **not** here: `ticket.py` owns Issues and the Project board only.
-They live in `pr.py`, which shares this tool's auth rather than duplicating it.
+They live in `pr.py`, and both reach GitHub through `lib/github.py`.
 
 ## pr.py commands, and the skill that calls each
 
@@ -115,9 +91,10 @@ keyring, which can hold several accounts at once, so the account it acts as is a
 state no repository can pin. `pr.py` uses the explicit PAT below, which keeps every GitHub
 interaction here on exactly two channels: a PAT for the API, and SSH for git itself.
 
-## ticket.py authentication
+## GitHub authentication
 
-`pr.py` reuses this, so there is exactly one auth story here. Resolved in order:
+`lib/github.py` resolves the token for every command, so there is exactly one auth
+story here. Resolved in order:
 `GITHUB_TOKEN` or `GH_TOKEN` in the environment, then a `GITHUB_TOKEN=` line in the
 git-ignored `.dev.vars` at the repository root. **There is deliberately no third
 fallback**, a missing token raises rather than guessing.
@@ -147,7 +124,7 @@ These hold for every script here.
 3. **Full type annotations on everything**, parameters, returns, and module data, even
    when the type is obvious. Dataclasses for structured config, not TypedDict.
 4. **Docstrings on every function and class.** No exceptions.
-5. **`argparse` for every CLI**, with `cmd`-prefixed handler functions mapping 1:1 onto
+5. **`argparse` for every CLI**, with `run`-prefixed handler functions mapping 1:1 onto
    subcommands.
 6a. **Never interpolate arbitrary text into a markup-enabled `console.print`.** rich reads
    square brackets as style tags and silently consumes any that look like one. Measured
@@ -188,15 +165,10 @@ relying on captured stdout, `workarea/logs/<script>-<timestamp>.log`.
 ## Setup
 
 ```
-/usr/bin/env python3 -m pip install --upgrade rich rich_argparse
+.venv/bin/python3 -m pip install -e ".[dev]"
 ```
 
-**Either interpreter runs these, corrected 2026-09-02.** `rich` and `rich_argparse` moved
-into the `dev` extra, so `pip install -e ".[dev]"` equips the venv for the tooling as well
-as the suite, and this section's earlier claim that the venv carried only test
-dependencies stopped being true then.
-
-**`pr-preflight-check.py` is the exception and must use the venv**, because pytest, ruff
-and mypy exist nowhere else.
-
-See each script's docstring for its specific prerequisites.
+The `dev` extra equips the venv for every command and the suite. The one exception is the
+job that posts the readiness comment, which installs rich alone, so `rich_argparse` stays
+optional and `lib/github_body.py` is a lazy import. A command's docstring names any other
+prerequisite.

@@ -19,6 +19,7 @@ fields holding them, flagged by the high bit of the list's entry size. Reading a
 relative list as absolute yields offsets in the gigabytes and an exception.
 
 UPDATES
+2026-10-13  Moved here from `tools/lib/machoreader.py`, for PYB-204.
 2026-09-04  Written for #44.
 """
 from __future__ import annotations
@@ -30,7 +31,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/04"
-__usage__ = "imported, never run: tools/lib holds no commands"
+__usage__ = "imported, never run: a module in lib/ holds no command"
 
 import bisect
 import struct
@@ -81,7 +82,7 @@ class ObjectiveCClass:
     classMethods: dict[str, int] = field(default_factory=dict)
 
 
-def arm64Slice(binary: Path) -> bytes:
+def readArm64Slice(binary: Path) -> bytes:
     """Return the arm64 slice of a Mach-O file, which may be universal or thin.
 
     A universal header is big-endian, which is the one place in this module
@@ -114,7 +115,7 @@ class Image:
 
     def __init__(self, binary: Path) -> None:
         """Parse the load commands, the symbol table and the function starts."""
-        self.data = arm64Slice(binary)
+        self.data = readArm64Slice(binary)
         if struct.unpack_from("<I", self.data, 0)[0] != machO64Magic:
             raise MachOError(f"{binary} is not a 64-bit Mach-O image.")
 

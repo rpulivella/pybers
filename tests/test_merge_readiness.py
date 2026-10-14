@@ -19,15 +19,12 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/17"
 
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(repositoryRoot / "scripts"))
-
-import merge_readiness_lib as checks  # noqa: E402
-import merge_readiness_presenter as presenter  # noqa: E402
+from tools.local.lib import readiness as checks  # noqa: E402
+from tools.local.lib import readiness_presenter as presenter  # noqa: E402
 
 
 def buildFacts(**overrides: object) -> checks.BranchFacts:

@@ -35,7 +35,7 @@ htmlcov/
 .env
 .env.local
 .env.*.local
-# CLAUDE.md/scripts/ticket.py name .dev.vars as the sanctioned home for the GitHub
+# CLAUDE.md and tools/workflow/lib/github.py name .dev.vars as the sanctioned home for the GitHub
 # token. Never let this line be removed — see the author's other tooling own .gitignore for why
 # this comment exists: it was named as git-ignored there once and was not.
 .dev.vars

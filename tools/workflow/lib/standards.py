@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-Standards Check
+The standards checks, which `standards_check` and the preflight both run.
 
 Lint this repository's WRITING, the prose that humans and agents both read.
 One deterministic pass over every file in scope; reports FAILURES (hard blocks)
@@ -34,7 +34,7 @@ The design constraints inherited from upstream, each earned by a bug:
 
 Scopes (argparse):
   (no args)         git-changed files, tracked and untracked. The preflight.
-  --all             the full tree: src/, tests/, scripts/, docs/, .claude/.
+  --all             the full tree: src/, tests/, tools/, docs/, .claude/.
   PATH [PATH ...]   exactly those files or directories.  standards-ok: synopsis
                     Naming a path BYPASSES the auto-exclusions, so a workarea/
                     note can be linted on demand. Directories are walked.
@@ -45,11 +45,14 @@ Generated code is never in scope. src/pybers/_generated/ is protoc output and
 src/pybers/protos/ is the schema dump it came from. Neither is authored here and
 neither may be hand-edited, so a finding in either is noise by construction.
 
-If missing dependencies, follow the path of the python interpreter on the first
-line of this script, eg:
-/usr/bin/env python3 -m pip install --upgrade rich
+Runs on the repository's venv, which holds rich.
 
 UPDATES
+2026-10-13  Moved here from `scripts/standards-check.py`, for PYB-204.
+2026-10-13  Typed strictly, since mypy reaches this file now that its name
+            imports, for PYB-204.
+2026-10-13  The checks moved here from `standards-check.py`, which keeps only its
+            command line, so a test and the preflight import them, for PYB-204.
 2026-10-06  A line opening with a code span is checked, for PYB-178.
 2026-09-28  The body snapshot is skipped, for PYB-134.
 2026-09-14  `.github` and `tools` are in the default scope.
@@ -118,22 +121,20 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/27"
-__usage__ = "python3 scripts/standards-check.py [--all | PATH ... | --text STRING]"
 
 import argparse
 import ast
 import contextlib
 import re
 import subprocess
-import sys
 from pathlib import Path
 
-try:
-    from rich.console import Console
-except ImportError:
-    sys.exit("ERROR: rich not installed. Run: python3 -m pip install rich")
+from rich.console import Console
 
 console = Console()
+
+# A finding is its level, FAIL or WARN, the file, the line (0 for the file) and why.
+type Finding = tuple[str, Path, int, str]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SCOPE
@@ -166,7 +167,7 @@ generatedOnly: tuple[str, ...] = (
 # review rubric, which a contributor reads before anything else, had never been
 # checked by the gate that states the rules they follow.
 allRoots: tuple[str, ...] = (
-    "src", "tests", "scripts", "docs", ".claude", ".github", "tools",
+    "src", "tests", "docs", ".claude", ".github", "tools",
 )
 checkExtensions: tuple[str, ...] = (".py", ".md")
 
@@ -209,7 +210,7 @@ contractionRe = re.compile(
 # trip promise, exercise, our and four.  A match preceded by an identifier
 # separator (/ @ . - _) is skipped: that is a third-party identifier, which the
 # global rule explicitly carves out.
-britishSpellings: tuple[tuple[re.Pattern, str], ...] = (
+britishSpellings: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bcolour\w*", re.I), "color"),
     (re.compile(r"\bbehaviour\w*", re.I), "behavior"),
     (re.compile(r"\bfavour\w*", re.I), "favor"),
@@ -252,7 +253,7 @@ britishSpellings: tuple[tuple[re.Pattern, str], ...] = (
 # space matches the unwrapped half and misses the wrapped half in silence. Measured
 # 2026-09-01: "worth stating plainly" failed on one line and PASSED across two, which
 # is how it reached a pull request body through a gate that reported clean.
-bannedPhrases: tuple[tuple[re.Pattern, str], ...] = (
+bannedPhrases: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bload[-\s]bearing\b", re.I), "banned phrase"),
     (re.compile(r"\bworth\s+stating\s+plainly\b", re.I), "banned phrase"),
     (re.compile(r"\bfull\s+stop\b", re.I), "banned phrase"),
@@ -313,7 +314,7 @@ def findLineNumber(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
-def blankSpan(match: re.Match) -> str:
+def blankSpan(match: re.Match[str]) -> str:
     """Replace a span with spaces, preserving newlines so offsets hold."""
     return re.sub(r"[^\n]", " ", match.group(0))
 
@@ -403,7 +404,7 @@ def extractConsoleProse(text: str) -> str:
     category of prose: `console.print("Dry run - nothing was filed.")` is read
     by a person and is subject to the same rules as any other sentence.
 
-    Measured, not theorized. `scripts/ticket.py` carried thirty em dashes and
+    Measured, not theorized. `tools/workflow/ticket.py` carried thirty em dashes and
     the gate saw eighteen; the other twelve were console output.
 
     Only literals passed to a printing call are taken. A path, a URL, an API
@@ -474,7 +475,7 @@ def extractMarkdownProse(text: str) -> str:
 # PROSE CHECKS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def checkContractions(path: Path, prose: str, findings: list) -> None:
+def checkContractions(path: Path, prose: str, findings: list[Finding]) -> None:
     """No contractions in docstrings, comments or docs."""
     if isRuleDoc(path, "contractions"):
         return
@@ -483,7 +484,7 @@ def checkContractions(path: Path, prose: str, findings: list) -> None:
                          f"contraction '{match.group(0)}'"))
 
 
-def checkCoAuthored(path: Path, text: str, findings: list) -> None:
+def checkCoAuthored(path: Path, text: str, findings: list[Finding]) -> None:
     """No AI attribution trailers, anywhere."""
     if ".claude/commands" in path.as_posix():
         return
@@ -495,7 +496,7 @@ def checkCoAuthored(path: Path, text: str, findings: list) -> None:
                          f"{token} attribution"))
 
 
-def checkBritish(path: Path, prose: str, findings: list) -> None:
+def checkBritish(path: Path, prose: str, findings: list[Finding]) -> None:
     """US English is absolute, with one carve-out for upstream identifiers.
 
     Rule docs are exempt for the same reason they are exempt from every other
@@ -514,7 +515,7 @@ def checkBritish(path: Path, prose: str, findings: list) -> None:
                              f"British spelling '{match.group(0)}', use {hint}"))
 
 
-def checkEmDash(path: Path, prose: str, findings: list) -> None:
+def checkEmDash(path: Path, prose: str, findings: list[Finding]) -> None:
     """Em dashes are banned outright, not rationed.
 
     This is the sharpest divergence from the upstream script, which allows two
@@ -533,7 +534,7 @@ def checkEmDash(path: Path, prose: str, findings: list) -> None:
                          "em dash, use a comma, parentheses, or a new sentence"))
 
 
-def checkBannedPhrases(path: Path, prose: str, findings: list) -> None:
+def checkBannedPhrases(path: Path, prose: str, findings: list[Finding]) -> None:
     """The global banned list, plus the not-just-X-but-Y rhetorical move."""
     if isRuleDoc(path, "banned"):
         return
@@ -546,7 +547,7 @@ def checkBannedPhrases(path: Path, prose: str, findings: list) -> None:
                          f"'{match.group(0)}', state the claim directly"))
 
 
-def checkWeakLet(path: Path, prose: str, findings: list) -> None:
+def checkWeakLet(path: Path, prose: str, findings: list[Finding]) -> None:
     """A product enables or gives the ability; it does not 'let'."""
     if isRuleDoc(path, "weakLet"):
         return
@@ -558,7 +559,7 @@ def checkWeakLet(path: Path, prose: str, findings: list) -> None:
                          "ability"))
 
 
-def checkSplitVerb(path: Path, prose: str, findings: list) -> None:
+def checkSplitVerb(path: Path, prose: str, findings: list[Finding]) -> None:
     """The adverb belongs before the auxiliary, not inside the verb."""
     if isRuleDoc(path, "splitVerb"):
         return
@@ -567,7 +568,7 @@ def checkSplitVerb(path: Path, prose: str, findings: list) -> None:
                          f"split verb '{match.group(0).strip()}'"))
 
 
-def checkStrandedPreposition(path: Path, prose: str, findings: list) -> None:
+def checkStrandedPreposition(path: Path, prose: str, findings: list[Finding]) -> None:
     """A sentence does not end on a preposition."""
     if isRuleDoc(path, "strandedPrep"):
         return
@@ -576,21 +577,21 @@ def checkStrandedPreposition(path: Path, prose: str, findings: list) -> None:
                          f"stranded preposition '{match.group(0).strip()}'"))
 
 
-def checkYearHyphen(path: Path, prose: str, findings: list) -> None:
+def checkYearHyphen(path: Path, prose: str, findings: list[Finding]) -> None:
     """A year range takes an en dash."""
     for match in re.finditer(r"\b\d{4}-\d{4}\b", prose):
         findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          f"year range '{match.group(0)}' must use an en dash"))
 
 
-def checkEllipsis(path: Path, prose: str, findings: list) -> None:
+def checkEllipsis(path: Path, prose: str, findings: list[Finding]) -> None:
     """Three periods are not an ellipsis."""
     for match in re.finditer(r"(?<![.\w])\.\.\.(?!\w)", prose):
         findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          "'...' must be a real ellipsis (…)"))
 
 
-def checkHardBreak(path: Path, text: str, findings: list) -> None:
+def checkHardBreak(path: Path, text: str, findings: list[Finding]) -> None:
     """A markdown line ending in two or more spaces renders as a forced line break.
 
     Never deliberate here, and invisible in the source, so it changes how a paragraph
@@ -616,7 +617,7 @@ def checkHardBreak(path: Path, text: str, findings: list) -> None:
                              "forced <br>"))
 
 
-def checkSemicolons(path: Path, prose: str, findings: list) -> None:
+def checkSemicolons(path: Path, prose: str, findings: list[Finding]) -> None:
     """Semicolons in prose should be near zero."""
     if isRuleDoc(path, "semicolons") or path.suffix == ".py":
         return
@@ -626,7 +627,7 @@ def checkSemicolons(path: Path, prose: str, findings: list) -> None:
                          f"{count} semicolons in prose (rule: near-zero)"))
 
 
-def checkDocstringShape(path: Path, tree: ast.Module, findings: list) -> None:
+def checkDocstringShape(path: Path, tree: ast.Module, findings: list[Finding]) -> None:
     """No Args/Returns/Raises sections, a docstring is prose, not a form.
 
     This is the one docstring rule that is about WRITING rather than structure.
@@ -650,7 +651,7 @@ def checkDocstringShape(path: Path, tree: ast.Module, findings: list) -> None:
 # DISPATCH
 # ─────────────────────────────────────────────────────────────────────────────
 
-def checkFile(path: Path, findings: list, text: str | None = None) -> None:
+def checkFile(path: Path, findings: list[Finding], text: str | None = None) -> None:
     """Run every check that applies to one file."""
     body = read(path) if text is None else text
     suffix = path.suffix
@@ -669,7 +670,7 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
     else:
         prose = extractMarkdownProse(body)
 
-    local: list = []
+    local: list[Finding] = []
     # Both of these take the RAW body rather than the prose view.
     checkCoAuthored(path, body, local)
     checkHardBreak(path, body, local)
@@ -684,7 +685,7 @@ def checkFile(path: Path, findings: list, text: str | None = None) -> None:
     findings.extend(f for f in local if not (f[2] and f[2] in skip))
 
 
-def collectFiles(arguments: argparse.Namespace, warnings: list) -> list[Path]:
+def collectFiles(arguments: argparse.Namespace, warnings: list[str]) -> list[Path]:
     """Resolve the scope to a concrete list of files."""
     if arguments.paths:
         found: list[Path] = []
@@ -743,7 +744,7 @@ def collectFiles(arguments: argparse.Namespace, warnings: list) -> list[Path]:
             if not any(marker in p.as_posix() for marker in skipSubstrings)]
 
 
-def report(findings: list, files: list[Path], warnings: list) -> int:
+def report(findings: list[Finding], files: list[Path], warnings: list[str]) -> int:
     """Print the report and return the exit code."""
     for warning in warnings:
         console.print(f"[yellow]scope:[/] {warning}")
@@ -768,36 +769,3 @@ def report(findings: list, files: list[Path], warnings: list) -> int:
                   f"[red]{len(failures)} failure(s)[/], "
                   f"[yellow]{len(reviews)} warning(s)[/].")
     return 1 if failures else 0
-
-
-def main() -> int:
-    """Parse the scope, run the checks, print the report."""
-    parser = argparse.ArgumentParser(
-        description="Lint prose and Python house style.",
-        epilog="With no arguments, checks git-changed files.")
-    parser.add_argument("paths", nargs="*", help="files or directories to check")
-    parser.add_argument("--all", action="store_true", help="check the whole tree")
-    parser.add_argument("--text", help="lint a raw string instead of files")
-    parser.add_argument("--ext", choices=checkExtensions, default=".md",
-                        help="which check set --text gets (default: .md)")
-    arguments = parser.parse_args()
-
-    findings: list = []
-    warnings: list = []
-
-    if arguments.text is not None:
-        pseudo = Path(f"<text>{arguments.ext}")
-        checkFile(pseudo, findings, text=arguments.text)
-        return report(findings, [pseudo], warnings)
-
-    files = collectFiles(arguments, warnings)
-    if not files:
-        console.print("[green]PASS[/], nothing in scope to check.")
-        return 0
-    for path in files:
-        checkFile(path, findings)
-    return report(findings, files, warnings)
-
-
-if __name__ == "__main__":
-    sys.exit(main())

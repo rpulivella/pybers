@@ -6,10 +6,9 @@ Run every gate this repository has, in one pass, and report all of them. A pull
 request should fail on mechanical problems before a human or an agent reads it,
 and one run should list everything to fix rather than the first thing.
 
-**Run this with the project venv, not the system interpreter.** That is the
-opposite of the other scripts here and it is deliberate: pytest, ruff and mypy
-live only in `.venv`, and `pip install -e ".[dev]"` puts rich there too, so one
-environment carries all four gates and this script's own output.
+**Run this with the project venv, as every script here is run.** pytest, ruff and
+mypy live only in `.venv`, and all three are imported before any gate starts, so
+the wrong interpreter stops the run at once rather than inside a gate.
 
 Three of the four gates are driven through real interfaces rather than a shell.
 `pytest.main()`, `mypy.api.run()` and the standards checker's own functions all
@@ -28,6 +27,10 @@ no base to diff against. Needing neither is why this runs unchanged in CI on a
 default shallow checkout.
 
 UPDATES
+2026-10-14  Moved here from `scripts/pr-preflight-check.py`, and run as a module,
+            for PYB-204.
+2026-10-13  Imports every gate's tool and the standards checks at the top, and
+            takes the repository root from `lib/shared.py`, for PYB-204.
 2026-09-02  Written for #3. Repository-wide from the start; an early
             branch-scoped draft needed a git base that a shallow CI
             checkout does not carry.
@@ -41,26 +44,24 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/02"
-__usage__ = "python3 scripts/pr-preflight-check.py [--gate NAME ...]"
+__usage__ = ".venv/bin/python3 -m tools.workflow.preflight [--gate NAME ...]"
 
 import argparse
 import contextlib
-import importlib
 import io
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType
 
+import mypy.api
+import pytest
 from rich.console import Console
 from rich.markup import escape
+from ruff.__main__ import find_ruff_bin
 
-try:
-    from rich_argparse import RichHelpFormatter
-except ImportError:  # rich_argparse is optional, per scripts/README.md
-    RichHelpFormatter = argparse.HelpFormatter  # type: ignore[assignment,misc]
+from tools.workflow.lib import standards
+from tools.workflow.lib.shared import RichHelpFormatter, repositoryRoot
 
 console: Console = Console()
 
@@ -84,27 +85,8 @@ class PreflightError(RuntimeError):
     """A gate that could not be run at all, as distinct from one that failed."""
 
 
-def findRepositoryRoot() -> Path:
-    """Return the repository root, so the script runs from any directory."""
-    return Path(__file__).resolve().parent.parent
-
-
-def loadStandardsModule() -> ModuleType:
-    """Return the standards checker as a module.
-
-    `scripts/` carries no `__init__.py` and is an implicit namespace package, and
-    the file name has a hyphen, so `import_module` with a string is the only
-    spelling that works. It needs no importlib machinery beyond that.
-    """
-    if str(findRepositoryRoot()) not in sys.path:
-        sys.path.insert(0, str(findRepositoryRoot()))
-    return importlib.import_module("scripts.standards-check")
-
-
 def runTests() -> GateResult:
     """Run the whole pytest suite in this process and report what it found."""
-    import pytest
-
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
         code = pytest.main(["-q", "tests"])
@@ -119,7 +101,6 @@ def runStandards() -> GateResult:
     A warning here is a heuristic worth reading and not a defect, so it is
     reported and never gates.
     """
-    standards = loadStandardsModule()
     warnings: list[str] = []
     # The checker records a finding as (level, path, line, message).
     findings: list[tuple[str, Path, int, str]] = []
@@ -149,8 +130,6 @@ def runStandards() -> GateResult:
 
 def runRuff() -> GateResult:
     """Run ruff over the whole repository, the one gate that needs a binary."""
-    from ruff.__main__ import find_ruff_bin
-
     binary = find_ruff_bin()
     try:
         completed = subprocess.run(
@@ -168,8 +147,6 @@ def runRuff() -> GateResult:
 
 def runTypes() -> GateResult:
     """Run mypy through its own API over the paths pyproject.toml declares."""
-    import mypy.api
-
     output, errors, status = mypy.api.run([])
     combined = (output + errors).strip()
     lastLine = combined.splitlines()[-1] if combined else "mypy printed nothing"
@@ -232,7 +209,6 @@ def report(results: list[GateResult]) -> int:
 def main() -> int:
     """Parse arguments, run the gates, and report."""
     parser = argparse.ArgumentParser(
-        prog="pr-preflight-check.py",
         description="Run every pybers gate in one pass and report all of them.",
         formatter_class=RichHelpFormatter,
     )
@@ -249,7 +225,7 @@ def main() -> int:
     # pyproject.toml there, and the standards checker resolves its own roots.
     # Done once here so that running this from anywhere is one guarantee rather
     # than four separate habits, one of which was already missing.
-    with contextlib.chdir(findRepositoryRoot()):
+    with contextlib.chdir(repositoryRoot):
         return report(runGates(chosen))
 
 

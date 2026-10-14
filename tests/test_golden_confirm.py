@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """\
-The golden confirmation tool's report text, and the interpreter it refuses.
+The golden confirmation report's text, as the report shows it.
 
-Only `golden_confirm_lib` is imported, and the tool itself is read as source, so
-nothing here drives Numbers.
+Only `lib/golden_confirm.py` is imported, so nothing here drives Numbers.
 
 UPDATES
+2026-10-13  The late-import check moved to `test_tooling_layout.py`, which covers
+            every script, for PYB-204.
 2026-10-13  Written for PYB-201.
 """
 from __future__ import annotations
@@ -18,36 +19,10 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/13"
 
-import ast
-import sys
-from pathlib import Path
 
 import pytest
 
-scriptDirectory: Path = Path(__file__).resolve().parent.parent / "scripts"
-sys.path.insert(0, str(scriptDirectory))
-
-import golden_confirm_lib as report  # noqa: E402
-
-scriptPath: Path = scriptDirectory / "golden-confirm.py"
-
-
-def testNoFunctionImportsPybersLate() -> None:
-    late = [
-        node.lineno
-        for function in ast.walk(ast.parse(scriptPath.read_text()))
-        if isinstance(function, ast.FunctionDef)
-        for node in ast.walk(function)
-        if isinstance(node, ast.ImportFrom | ast.Import)
-        and any(
-            name.split(".")[0] == "pybers"
-            for name in (
-                [node.module or ""] if isinstance(node, ast.ImportFrom)
-                else [alias.name for alias in node.names]
-            )
-        )
-    ]
-    assert late == []
+from tools.local.lib import golden_confirm as report  # noqa: E402
 
 
 @pytest.mark.parametrize(("value", "span"), [

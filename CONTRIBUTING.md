@@ -13,13 +13,13 @@ A first-time contributor keeps at most one pull request open, and work that show
 ## Prerequisites
 
 - **A virtual environment at `.venv`**, holding pybers installed editable with its `dev` extra, on the Python that `requires-python` in `pyproject.toml` names.
-- **A classic personal access token** with the `repo` and `project` scopes, in a git-ignored `.dev.vars` as `GITHUB_TOKEN=`. The ticket and pull request tools refuse to run without it, as [their README](scripts/README.md#ticketpy-authentication) explains.
+- **A classic personal access token** with the `repo` and `project` scopes, in a git-ignored `.dev.vars` as `GITHUB_TOKEN=`. The ticket and pull request tools refuse to run without it, as [their README](tools/workflow/README.md#github-authentication) explains.
 - **Claude Code, optionally.** Each step below names the skill in `.claude/commands/` that carries it out. A skill is a written procedure, so it can be followed by hand as well.
 
 One command runs every local gate, and it is the only one this guide shows:
 
 ```bash
-.venv/bin/python3 scripts/pr-preflight-check.py
+.venv/bin/python3 -m tools.workflow.preflight
 ```
 
 ## Getting Started
@@ -87,7 +87,7 @@ A ticket filed as `Todo` is ready to start. A `Concept` ticket still needs a per
 | `/commit` | 2. Write the Change |
 | `/golden-confirm` | 2. Write the Change, confirming a golden in Numbers |
 | `/standards` | 2. Write the Change, proofreading prose |
-| `/script-write` | 2. Write the Change, for a tool in `scripts/` |
+| `/script-write` | 2. Write the Change, for a tool in `tools/` |
 | `/changelog-add` | 3. Open a Pull Request |
 | `/pr-draft` | 3. Open a Pull Request, or revise its body |
 | `/pr-review-code` | 4. Review |
@@ -146,8 +146,8 @@ release/v<version>-Final    # a final release, tag and GitHub release
 | `src/pybers/` | The library, a directory per feature, with the command line in `cli/`. A leading underscore means a caller has no business there. |
 | `tests/` | The suite, with `fixtures/` and `measurements/` (documents Numbers wrote) and `golden/` (documents pybers wrote and Numbers confirmed). Each README catalogs its files. |
 | `docs/` | The settled decisions, the format findings, the review rubric and the command-line design. |
-| `scripts/` | The ticket and pull request tools, the preflight and the prose gate. |
-| `tools/` | The schema and function extractors, run against a local `Numbers.app`. |
+| `tools/workflow/` | The ticket and pull request tools, the preflight and the prose gate, shared rather than pybers-specific. |
+| `tools/local/` | What only pybers needs: the schema and function extractors, the golden confirmation and the merge readiness report. |
 | `.claude/commands/` | The skills. |
 | `.github/` | The templates and the three workflows that check a pull request. |
 | `workarea/` | Scratch space, ignored by git apart from its README. |

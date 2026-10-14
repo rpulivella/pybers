@@ -48,7 +48,7 @@ invalidate the obvious approach.
 
 ```bash
 .venv/bin/python3 -m pytest              # the suite, that exact spelling
-.venv/bin/python3 scripts/pr-preflight-check.py   # all four gates, what CI runs
+.venv/bin/python3 -m tools.workflow.preflight   # all four gates, what CI runs
 ```
 
 pytest alone is a partial answer. The preflight runs pytest, the prose gate, ruff and

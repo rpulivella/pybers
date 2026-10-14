@@ -7,6 +7,7 @@ run, and both can start in the same second. GitHub is stood in for at the API
 boundary, with the runs PR #174 carried on 7057e55.
 
 UPDATES
+2026-10-13  Pull request summaries and check runs are dataclasses, for PYB-204.
 2026-10-06  Written for PYB-175.
 """
 from __future__ import annotations
@@ -20,22 +21,21 @@ __status__ = "Development"
 __date__ = "2026/10/06"
 
 import importlib
-import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
 
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(repositoryRoot / "scripts"))
+from tools.workflow.lib import pull_request as pullRequest
 
+repositoryRoot: Path = Path(__file__).resolve().parent.parent
 sameSecond: str = "2026-10-06T17:18:19Z"
 
 
 def loadPrScript() -> ModuleType:
     """Return the pull request tool, imported the way its own tests import it."""
-    return importlib.import_module("pr")
+    return importlib.import_module("tools.workflow.pr")
 
 
 def buildRun(
@@ -63,8 +63,8 @@ def buildPr174Runs(readiness: str) -> list[dict[str, Any]]:
 def readVerdicts(runs: list[dict[str, Any]]) -> dict[str, str]:
     """Return each check's reported conclusion, or its status while it runs."""
     return {
-        run["name"]: run["conclusion"] or run["status"]
-        for run in loadPrScript().chooseLatestRuns(runs)
+        run.name: run.conclusion or run.status
+        for run in pullRequest.chooseLatestRuns(runs)
     }
 
 
@@ -96,8 +96,8 @@ def testARealRunStillInProgressIsReportedOverItsSkippedTwin() -> None:
 
 def testALoneSkippedRunReportsSkippedAndIsNoPass() -> None:
     pr = loadPrScript()
-    runs = pr.chooseLatestRuns([buildRun("readiness", "skipped")])
-    assert [run["conclusion"] for run in runs] == ["skipped"]
+    runs = pullRequest.chooseLatestRuns([buildRun("readiness", "skipped")])
+    assert [run.conclusion for run in runs] == ["skipped"]
     assert pr.confirmChecksPassed(runs) is False
 
 
@@ -114,12 +114,13 @@ def testAMergeRefusesAFailureTiedWithASkippedRun(
                  "repo": {"full_name": "rpulivella/pybers"}},
         "base": {"ref": "develop"},
     }
-    monkeypatch.setattr(pr.ticket, "resolveToken", lambda: "token")
+    monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
-        pr, "readPullRequest", lambda token, number: pr.summarizePullRequest(payload)
+        pr, "readPullRequest",
+        lambda token, number: pullRequest.summarizePullRequest(payload),
     )
     monkeypatch.setattr(
-        pr.ticket, "requestJson",
+        pr.github, "requestJson",
         lambda url, token, **options: {
             "check_runs": ordering(buildPr174Runs("failure")),
         },

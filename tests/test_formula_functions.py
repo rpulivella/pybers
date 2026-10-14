@@ -7,6 +7,8 @@ own cells, so `SUM` is 168 because a document written in Numbers says so, not
 because the extractor and this suite agree with each other.
 
 UPDATES
+2026-10-13  Imports `tools/functiontable.py` rather than the extractor, for
+            PYB-204.
 2026-10-12  The 18 functions Numbers 15.4 added, for PYB-139.
 2026-09-04  Written for #44.
 """
@@ -21,11 +23,8 @@ __status__ = "Development"
 __date__ = "2026/09/04"
 
 import dataclasses
-import importlib
 import shutil
-import sys
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
@@ -45,6 +44,7 @@ from pybers.formula.functions import (
 from pybers.formula.nodes import functionNodeType
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
+from tools.local.lib import functiontable  # noqa: E402
 
 # The highest index Apple assigned in the original alphabetical pass, measured
 # 2026-09-04 on Numbers 15.3.1. Everything above it was appended later and is
@@ -80,20 +80,6 @@ def collectCalls(table: pybers.Table) -> list[FormulaFunctionCall]:
         for node in cell.formula
         if isinstance(node.content, FormulaFunctionCall)
     ]
-
-
-def loadExtractor() -> ModuleType:
-    """Return the extraction script as a module, for its comparison logic.
-
-    `scripts/` carries no `__init__.py` and the file name has a hyphen, so
-    `import_module` with a string is the only spelling that works, the same way
-    `scripts/pr-preflight-check.py` reaches the standards checker.
-    """
-    if str(repositoryRoot) not in sys.path:
-        sys.path.insert(0, str(repositoryRoot))
-    if str(repositoryRoot / "tools") not in sys.path:
-        sys.path.insert(0, str(repositoryRoot / "tools"))
-    return importlib.import_module("tools.functions-extract")
 
 
 # ── AC 1: a call reports its name ────────────────────────────────────────────
@@ -478,10 +464,10 @@ def testAFunctionWithNoIndexRefusesToProduceOne() -> None:
 
 def testComparisonReportsAnAddedFunction() -> None:
     """A function Numbers gained appears as added rather than silently arriving."""
-    module = loadExtractor()
-    before = {"ABS": module.NumbersFunction("ABS", 1, 1, 1, 0)}
-    after = dict(before) | {"NEWONE": module.NumbersFunction("NEWONE", 2, 1, 1, 0)}
-    comparison = module.compareTables(after, before)
+    before = {"ABS": functiontable.NumbersFunction("ABS", 1, 1, 1, 0)}
+    added = functiontable.NumbersFunction("NEWONE", 2, 1, 1, 0)
+    after = dict(before) | {"NEWONE": added}
+    comparison = functiontable.compareTables(after, before)
     assert [f.name for f in comparison.added] == ["NEWONE"]
     assert comparison.removed == () and comparison.changed == ()
     assert comparison.unchangedCount == 1
@@ -489,17 +475,16 @@ def testComparisonReportsAnAddedFunction() -> None:
 
 def testComparisonReportsARemovedAndAChangedFunction() -> None:
     """A withdrawn index and one whose counts moved are different findings."""
-    module = loadExtractor()
     before = {
-        "ABS": module.NumbersFunction("ABS", 1, 1, 1, 0),
-        "GONE": module.NumbersFunction("GONE", 2, 1, 1, 0),
-        "NOW": module.NumbersFunction("NOW", 3, 1, 1, 0),
+        "ABS": functiontable.NumbersFunction("ABS", 1, 1, 1, 0),
+        "GONE": functiontable.NumbersFunction("GONE", 2, 1, 1, 0),
+        "NOW": functiontable.NumbersFunction("NOW", 3, 1, 1, 0),
     }
     after = {
-        "ABS": module.NumbersFunction("ABS", 1, 1, 1, 0),
-        "NOW": module.NumbersFunction("NOW", 3, 1, 4, 0),
+        "ABS": functiontable.NumbersFunction("ABS", 1, 1, 1, 0),
+        "NOW": functiontable.NumbersFunction("NOW", 3, 1, 4, 0),
     }
-    comparison = module.compareTables(after, before)
+    comparison = functiontable.compareTables(after, before)
     assert [f.name for f in comparison.removed] == ["GONE"]
     assert [(w.maximumArguments, n.maximumArguments)
             for w, n in comparison.changed] == [(1, 4)]
@@ -509,12 +494,11 @@ def testComparisonReportsARemovedAndAChangedFunction() -> None:
 def testComparisonAgainstItselfIsEmpty() -> None:
     """Regenerating on the same Numbers reports nothing, which is what makes a
     real change visible."""
-    module = loadExtractor()
-    committed = module.readCommitted(
+    committed = functiontable.readCommitted(
         repositoryRoot / "src" / "pybers" / "_generated" / "functions.py"
     )
     assert committed is not None
-    comparison = module.compareTables(committed, committed)
+    comparison = functiontable.compareTables(committed, committed)
     assert (comparison.added, comparison.removed, comparison.changed) == ((), (), ())
     assert comparison.unchangedCount == len(committed)
 
@@ -522,8 +506,7 @@ def testComparisonAgainstItselfIsEmpty() -> None:
 def testTheCommittedTableMatchesWhatTheLibraryLoads() -> None:
     """The generated file and the model read the same table, so a stale
     regeneration cannot pass unnoticed."""
-    module = loadExtractor()
-    committed = module.readCommitted(
+    committed = functiontable.readCommitted(
         repositoryRoot / "src" / "pybers" / "_generated" / "functions.py"
     )
     assert committed is not None

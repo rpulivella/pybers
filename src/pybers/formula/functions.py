@@ -5,7 +5,7 @@ The functions a formula can call, each with its index, name and argument counts.
 A `.numbers` package records a call as a bare number and an argument count, so
 `SUM` is 168 and nothing in the file says so. The table comes from the Numbers
 application binary, is committed under `pybers._generated`, and is regenerated
-by `tools/functions-extract.py`, which reports what changed rather than
+by `tools/local/functions_extract.py`, which reports what changed rather than
 replacing it silently.
 
 **The index is what the file holds, and everything here is a convenience over
@@ -165,7 +165,7 @@ def findFunctionNamed(name: str) -> NumbersFunction:
         raise UnknownFunctionError(
             f"{name!r} is not a function this table names. Either Numbers does "
             "not have it, or it is one of the few it declares nothing about; "
-            "run tools/functions-extract.py --gaps to see which. Construct "
+            "run tools/local/functions_extract.py --gaps to see which. Construct "
             "FormulaFunctionCall with the index directly if you know it."
         )
     return function

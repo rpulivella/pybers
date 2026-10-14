@@ -22,7 +22,7 @@ the tag alone records exactly what shipped.
 4. **Reconcile `CHANGELOG.md`** before any tag. Every ticket marked Done since the last
    final release has its line under `## Unreleased`:
    ```
-   .venv/bin/python3 scripts/ticket.py list --status Done
+   .venv/bin/python3 -m tools.workflow.ticket list --status Done
    ```
    Run `/changelog-add` for any ticket missing a line, or confirm none are missing.
 5. **Write the notes from `CHANGELOG.md`**, the source, never editing it to do so. The

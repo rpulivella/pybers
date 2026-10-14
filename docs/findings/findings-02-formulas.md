@@ -336,7 +336,7 @@ one is derivable from these fixtures rather than from Numbers.app.
 Function indices: **168 = SUM, 62 = IF, 231 = SUMIFS, 126 = ROUND**. `ROUND(2.5)`
 and `ROUND(2.5,0)` share index 126 with different `numArgs`, so arity is carried on
 the call rather than encoded in the index. The full name map is derived
-from Numbers itself by `tools/functions-extract.py`, rather than borrowed.
+from Numbers itself by `tools/local/functions_extract.py`, rather than borrowed.
 
 **Excel's table is not that map, checked 2026-09-03.** The comparison is worth making
 because the two applications interoperate and because Excel's older binary format stores

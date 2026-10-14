@@ -6,7 +6,7 @@ argument-hint: <description of the ticket>
 # /ticket-create
 
 Write and file a new GitHub Issue. The skill drafts the body in the required format,
-then files it through the Python tool (`scripts/ticket.py`. See `scripts/README.md`),
+then files it through the Python tool (`tools/workflow/ticket.py`. See `tools/workflow/README.md`),
 which adds it to the pybers Project board and sets its Status. It does NOT assign the
 issue, assignment happens at `/ticket-startwork`, when work begins. Never hand-run the
 GitHub API outside the tool without the user's permission.
@@ -43,8 +43,8 @@ Pass `--status Concept` when filing; `Todo` is the default.
 6. Decide the starting Status. See [Concept or Todo](#concept-or-todo--the-spec-in-decision).
 7. On approval, file it:
    ```
-   .venv/bin/python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft>
-   .venv/bin/python3 scripts/ticket.py create --label <label> --title "<title>" --body-file <draft> --status Concept
+   .venv/bin/python3 -m tools.workflow.ticket create --label <label> --title "<title>" --body-file <draft>
+   .venv/bin/python3 -m tools.workflow.ticket create --label <label> --title "<title>" --body-file <draft> --status Concept
    ```
 8. Report the issue URL the tool prints.
 

@@ -11,7 +11,7 @@ Add an entry to the `CHANGELOG.md` Unreleased list for the current ticket.
 
 1. Get the ticket number from `$ARGUMENTS` or the branch name (`<label>/<N>-...`).
 2. **If there is a ticket number**, fetch the **issue title only**:
-   `.venv/bin/python3 scripts/ticket.py export-as-source <N> --title`. It is copied verbatim into
+   `.venv/bin/python3 -m tools.workflow.ticket export-as-source <N> --title`. It is copied verbatim into
    `CHANGELOG.md`, so it must come from `export-as-source`; `show` prefixes `PYB-<N> ` and
    wraps. **If there is none**, see
    [Entries with no ticket](#entries-with-no-ticket) below and write the summary

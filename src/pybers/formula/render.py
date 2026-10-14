@@ -309,7 +309,7 @@ class Renderer:
             raise FormulaError(
                 f"Function {call.index} is not in the table this build carries, so "
                 "there is no name to write. Regenerate it with "
-                "tools/functions-extract.py."
+                "tools/local/functions_extract.py."
             )
         self.stack.append(renderCall(call.name, self.pop(call.argumentCount)))
 
