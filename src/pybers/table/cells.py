@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-14  `cells` is a read-only view of the table's own store, for PYB-193.
+2026-10-14  A range is checked against the grid in `bounds`, for PYB-193.
 2026-10-12  A changed kind describes its format as UNDETERMINED, for PYB-190.
 2026-10-11  Table names are returned as a frozendict, for PYB-189.
 2026-10-01  A cell describes the kind its record stores and the format it shows
@@ -57,9 +59,10 @@ __date__ = "2026/09/02"
 
 import datetime
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from decimal import Context, Decimal
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
@@ -80,6 +83,7 @@ from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.formula.render import renderFormula
 from pybers.geometry import Position
 from pybers.style import Style
+from pybers.table.bounds import listRangePositions, refuseRangeOutside
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
 from pybers.table.kinds import CellDescription, emptyDescription, findCellKind
@@ -143,36 +147,6 @@ def generateOwnerIdentity() -> str:
     """
     value = int.from_bytes(uuid.uuid4().bytes, "little") & ownerBaseMask
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
-
-
-def listRangePositions(table: Table, address: RangeAddress) -> list[CellReference]:
-    """Return the positions ranges cover, checking every range before returning any."""
-    extent = table.extent
-    items = []
-    for item in toCellRanges(address):
-        if item.rowsUnbounded or item.colsUnbounded:
-            if extent is None:
-                continue
-            item = item.boundedBy(extent)
-        refuseRangeOutside(table, item)
-        items.append(item)
-    return [
-        reference.asUnlocked() for item in items for reference in item
-        if table.addressable(reference)
-    ]
-
-
-def refuseRangeOutside(table: Table, item: CellRange) -> None:
-    """Refuse a bounded range with a corner outside a table's declared grid."""
-    extent = table.extent
-    if extent is None or not all(
-        corner is not None and extent.covers(corner)
-        for corner in (item.start, item.end)
-    ):
-        raise ReferenceError(
-            f"{item} reaches outside {table.name!r}, which is {table.rowCount} "
-            f"rows by {table.colCount} columns."
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,7 +299,8 @@ class Table:
     name: str
     rowCount: int = 0
     colCount: int = 0
-    cells: dict[CellReference, Cell] = field(default_factory=dict)
+    # The feature's own store; a caller reads `cells`, which refuses a write.
+    _cells: dict[CellReference, Cell] = field(default_factory=dict)
     mergeRanges: list[MergeRange] = field(default_factory=list)
     identifier: str = ""
     # The archive this table was read from or saved as, and None until it has one.
@@ -420,6 +395,11 @@ class Table:
         """
         return copyCells(self, source, anchor, references)
 
+    @property
+    def cells(self) -> Mapping[CellReference, Cell]:
+        """Return the cells by reference, read-only, since only the table edits them."""
+        return MappingProxyType(self._cells)
+
     def cell(
         self,
         address: CellAddress | None = None,
@@ -452,9 +432,9 @@ class Table:
                 f"{key} is covered by the merge {merge.extent}, whose anchor is "
                 f"{merge.anchor}."
             )
-        if key not in self.cells:
-            self.cells[key] = Cell(reference=key, table=self)
-        return self.cells[key]
+        if key not in self._cells:
+            self._cells[key] = Cell(reference=key, table=self)
+        return self._cells[key]
 
     @property
     def rows(self) -> TableRows:
@@ -548,7 +528,7 @@ class Table:
         self.mergeRanges.append(merge)
         for reference in merge.extent:
             if reference != merge.anchor:
-                self.cells.pop(reference, None)
+                self._cells.pop(reference, None)
         return merge
 
     def mergeRemove(self, address: CellAddress) -> MergeRange:

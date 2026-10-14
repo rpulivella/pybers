@@ -10,6 +10,8 @@ on without asking, measured 2026-09-23 in `60e-move-overwrite`, and pybers refus
 instead, since that discards a value nobody asked to lose.
 
 UPDATES
+2026-10-14  Writes the table's own store, `cells` being read-only, and checks a
+            range against the grid through `bounds`, for PYB-193.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-29  The refusals name the action, so a copy shares them, for PYB-136.
 2026-09-24  A move returns every formula left reading a cell it emptied.
@@ -42,6 +44,7 @@ from pybers.formula.relocation import (
     clampFormulaRanges,
     relocateFormula,
 )
+from pybers.table.bounds import refuseRangeOutside
 
 if TYPE_CHECKING:
     from pybers.table.cells import Cell, Table
@@ -234,7 +237,6 @@ def moveCells(
     references: FormulaReferenceRelocation,
 ) -> list[Cell]:
     """Move a block so its top-left lands on `anchor`, and return what it strands."""
-    from pybers.table.cells import refuseRangeOutside
     from pybers.table.merges import MergeRange
 
     rule = toRelocationRule(references)
@@ -254,12 +256,12 @@ def moveCells(
         cell for reference, cell in table.cells.items() if extent.covers(reference)
     ]
     for cell in moving:
-        del table.cells[cell.reference]
+        del table._cells[cell.reference]
     for reference in move.destination:
-        table.cells.pop(reference, None)
+        table._cells.pop(reference, None)
     for cell in moving:
         cell.reference = move.cellMap(cell.reference)
-        table.cells[cell.reference] = cell
+        table._cells[cell.reference] = cell
         if cell.formula is not None and not named:
             cell.formula = clampFormulaRanges(
                 cell.formula, cell.reference, table.rowCount, table.colCount

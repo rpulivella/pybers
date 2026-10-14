@@ -17,7 +17,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | ---- | ---------- | ---- |
 | `Document` | The handle: its sheets, and the one place a save starts | Owner |
 | `Sheet` | A tab, holding its tables in the order Numbers shows them | Owner |
-| `Table` | A grid of cells, with its size and its merges | Owner |
+| `Table` | A grid of cells, with its size and its merges. `cells` is a read-only view, and a cell changes through the table | Owner |
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
 | `Cell` | One cell: its value, formula, style and stored description | Owner |
 | `CellValue` | `Decimal`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |

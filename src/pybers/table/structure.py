@@ -20,6 +20,7 @@ single selected cell does, which is what `56f` and `56g` were made from.
 is unmerged rather than kept, both measured in `57-anchors-*` and `57-collapse-*`.
 
 UPDATES
+2026-10-14  Writes the table's own store, `cells` being read-only, for PYB-193.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-24  A cell's highlighting conditions follow the edit too, for PYB-18.
 2026-09-18  Written for PYB-17.
@@ -251,7 +252,7 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
                 cell._conditions = conditions[id(cell)]
     for reference, cell in cells.items():
         cell.reference = reference
-    table.cells = cells
+    table._cells = cells
     table.mergeRanges = merges
     start = edit.at - 1
     if edit.removing:
