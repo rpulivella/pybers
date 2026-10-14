@@ -49,7 +49,7 @@ untried.
 
 Regeneration needs a local Numbers install and `protodump.py`, so it cannot run on a fresh
 clone or in CI, which is why the output is committed. See
-`tools/protos-extract.py` for the process, its prerequisites, and the credited
+`tools/local/protos_extract.py` for the process, its prerequisites, and the credited
 provenance of the extraction technique.
 
 **Do not hand-edit anything in this directory or in `_generated/`.** Both are machine

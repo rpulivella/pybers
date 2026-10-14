@@ -65,7 +65,7 @@ argument after the first is bracketed**, measured for `IF` against the fixture a
 consistent with what laziness means for the other three, whose first argument is the
 selector rather than a branch. `TSCEFunctionArgSpec` carries a per-argument `unwrapThunk`
 flag, so a later ticket wanting certainty for `CHOOSE`, `IFS` and `SWITCH` can read it out
-of the spec registry the same way `tools/functions-extract.py` reads the argument counts.
+of the spec registry the same way `tools/local/functions_extract.py` reads the argument counts.
 
 `LAMBDA` uses a second pair, 56 and 57, around its body.
 

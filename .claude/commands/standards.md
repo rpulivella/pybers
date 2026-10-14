@@ -6,12 +6,12 @@ description: Proofread prose against the repo's writing standards, in two passes
 
 Proofread written prose. This is the rubocop equivalent for **writing**, and the
 only thing it does is check words. Execution lives in
-`scripts/standards-check.py`, one deterministic Python pass; this skill invokes
+`tools/workflow/standards_check.py`, one deterministic Python pass; this skill invokes
 it, then performs the second pass itself, and relays both.
 
 ## ⚠ /standards IS TWO PASSES. ALWAYS BOTH. NO EXCEPTIONS.
 
-**1. `scripts/standards-check.py`**
+**1. `tools/workflow/standards_check.py`**
 **2. The judgment read**, the inlined rubric at the end of this file.
 
 **Every invocation. No conditions.** Not "the change was small", not "it was only
@@ -36,10 +36,10 @@ and catching it after filing is too late.
 ## Running it
 
 ```
-python3 scripts/standards-check.py                      # git-changed files (preflight)
-python3 scripts/standards-check.py --all                # the whole tree
-python3 scripts/standards-check.py path/to/file.md      # exactly this
-python3 scripts/standards-check.py --text 'draft copy'  # a raw string, no file
+.venv/bin/python3 -m tools.workflow.standards_check                      # git-changed files (preflight)
+.venv/bin/python3 -m tools.workflow.standards_check --all                # the whole tree
+.venv/bin/python3 -m tools.workflow.standards_check path/to/file.md      # exactly this
+.venv/bin/python3 -m tools.workflow.standards_check --text 'draft copy'  # a raw string, no file
 ```
 
 Untracked files are in the default scope, since a new file is the likeliest to carry a

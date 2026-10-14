@@ -19,7 +19,7 @@ until PYB-12 decides what replaces it, because this repository is going public a
 agentic review means the diff leaves this machine and every run bills. Step 5 below stands
 as the shape to return to, not as an instruction to follow now.
 
-`scripts/pr-preflight-check.py` runs pytest, the prose gate, ruff and mypy in one pass and
+`tools/workflow/preflight.py` runs pytest, the prose gate, ruff and mypy in one pass and
 reports all four, so a failing run lists everything to fix rather than the first thing.
 
 **The preflight does not read the pull request itself.** The `readiness` check does,
@@ -29,7 +29,7 @@ repeating its checks or assuming nobody made them.
 ## Steps
 
 1. Get the pull request from `$ARGUMENTS` (`PR #42`, `#42`, `42`, URL) or the branch
-   (`.venv/bin/python3 scripts/pr.py find --number-only`). **Read what it printed.** One of three
+   (`.venv/bin/python3 -m tools.workflow.pr find --number-only`). **Read what it printed.** One of three
    things:
    - a bare number. That is the PR;
    - `no-open-pull-request`, there genuinely is none for this branch and base; stop and
@@ -42,7 +42,7 @@ repeating its checks or assuming nobody made them.
    the printed output is the contract here. Do not depend on `$?`.
 2. **Run the preflight and stop if it fails:**
    ```
-   .venv/bin/python3 scripts/pr-preflight-check.py
+   .venv/bin/python3 -m tools.workflow.preflight
    ```
    With the project venv, not the system interpreter, because pytest, ruff and mypy live
    there. Non-zero means **do not review**: report every failing gate and its reason
@@ -50,7 +50,7 @@ repeating its checks or assuming nobody made them.
    friendlier. The one exception is a waiver. See below.
 3. **Move the card, before reviewing anything:**
    ```
-   .venv/bin/python3 scripts/ticket.py status <ticket> --set "Code Review"
+   .venv/bin/python3 -m tools.workflow.ticket status <ticket> --set "Code Review"
    ```
    Set when a review starts, not when it passes, so a review that stops on a finding
    still leaves the board saying what is happening. Re-setting it is harmless.
@@ -59,7 +59,7 @@ repeating its checks or assuming nobody made them.
    ```
    git diff develop...HEAD --stat
    git diff develop...HEAD
-   .venv/bin/python3 scripts/ticket.py show <ticket>
+   .venv/bin/python3 -m tools.workflow.ticket show <ticket>
    ```
 5. **Review against the rubric.** Read `docs/code-review-rubric.md` and answer its six
    questions for this change, yourself. **The delegation below is suspended pending PYB-12**,
@@ -85,7 +85,7 @@ repeating its checks or assuming nobody made them.
      dataclass or other new type.
 
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
-6. **Read CI and report it, without gating on it:** `.venv/bin/python3 scripts/pr.py checks <N>`.
+6. **Read CI and report it, without gating on it:** `.venv/bin/python3 -m tools.workflow.pr checks <N>`.
    A review runs before promotion, so `checks-not-passed` is the ordinary answer here
    and is never a finding. `/pr-merge` is where it becomes a refusal.
 
@@ -95,14 +95,14 @@ repeating its checks or assuming nobody made them.
    the checklist, the CHANGELOG entry, the ticket identifier, the branch's currency,
    dependency advisories and golden confirmations, so a review that ignores it repeats
    work or misses a miss.
-   A failed check is read with `.venv/bin/python3 scripts/pr.py logs <N>`, which prints
+   A failed check is read with `.venv/bin/python3 -m tools.workflow.pr logs <N>`, which prints
    each error its jobs logged, since a job that dies before its last step posts no comment.
 7. **Report**, separating what you verified by execution from what you only read. Name
    the commands you ran. State what could not be checked, rather than omitting it.
 8. **Only on green gates with no unresolved finding**, check `I performed a self-review`
    in the body, because this review stands in for that human check, through the
    mechanism `/pr-draft edit <N>` owns. Then promote it:
-   `.venv/bin/python3 scripts/pr.py ready <N>`. Until PYB-3 lands, "green gates" means the two
+   `.venv/bin/python3 -m tools.workflow.pr ready <N>`. Until PYB-3 lands, "green gates" means the two
    commands above run clean, and the report says that is what was run.
 
    Promotion is the review's outcome; step 3 is its beginning. What draft should mean
