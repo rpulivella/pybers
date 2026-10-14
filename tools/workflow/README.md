@@ -16,8 +16,9 @@ govern `tools/local/` too, and `src/pybers/` follows the same conventions in `CL
 
 ## Layout
 
-This folder lists only the commands a person runs. What they import sits in `lib/`, and a
-test imports from `lib/`, never a command.
+This folder lists only the commands a person runs, each holding its command line and
+output. Its logic sits in `lib/`, and a test reaches logic there, testing a command only
+for its own handling.
 
 ```
 ticket.py            file and move tickets on GitHub Issues and the pybers Project
@@ -29,9 +30,6 @@ preflight.py         run every gate in one pass and report all of them: pytest, 
                      prose gate, ruff and mypy. What `.github/workflows/preflight.yml`
                      calls, so the gate list lives here rather than in two places
 standards_check.py   the prose gate on its own, for a file, the tree or a string
-merge_readiness.py   gather a branch's facts, check a pull request, and post one
-                     verdict as a comment. `collect` runs on the branch with no write
-                     access, and `report` runs this repository's code over those facts
 ```
 
 ## Naming

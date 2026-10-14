@@ -147,7 +147,7 @@ release/v<version>-Final    # a final release, tag and GitHub release
 | `tests/` | The suite, with `fixtures/` and `measurements/` (documents Numbers wrote) and `golden/` (documents pybers wrote and Numbers confirmed). Each README catalogs its files. |
 | `docs/` | The settled decisions, the format findings, the review rubric and the command-line design. |
 | `tools/workflow/` | The ticket and pull request tools, the preflight and the prose gate, shared rather than pybers-specific. |
-| `tools/local/` | The schema and function extractors and the golden confirmation, which need a local `Numbers.app`. |
+| `tools/local/` | What only pybers needs: the schema and function extractors, the golden confirmation and the merge readiness report. |
 | `.claude/commands/` | The skills. |
 | `.github/` | The templates and the three workflows that check a pull request. |
 | `workarea/` | Scratch space, ignored by git apart from its README. |

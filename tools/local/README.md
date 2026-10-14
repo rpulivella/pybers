@@ -1,10 +1,10 @@
 # pybers: Local tools
 
 **Development tooling only pybers needs.** The extractors read the Numbers application on
-this machine and write a committed artifact into `src/pybers/`, and the golden
-confirmation drives Numbers itself. None of them ships in the wheel, none runs in CI, and
-none can run on a fresh clone, which is why the extractors' output is committed rather
-than built.
+this machine and write a committed artifact into `src/pybers/`, the golden confirmation
+drives Numbers itself, and the merge readiness report runs in CI. None of them ships in
+the wheel, and the extractors cannot run on a fresh clone, which is why their output is
+committed rather than built.
 
 Contrast [`tools/workflow/`](../workflow/README.md), the shared development workflow:
 filing tickets, opening pull requests, running the gates. That folder may not depend on
@@ -23,6 +23,10 @@ golden_confirm.py    confirm a golden in running Numbers and write a report of w
                      Numbers shows, through a helper app that holds the permissions
                      so Terminal holds none. Backs `/golden-confirm`, and nothing in
                      the preflight, CI or the suite runs it
+merge_readiness.py   gather a branch's facts, check a pull request, and post one
+                     verdict as a comment. `collect` runs on the branch with no
+                     write access, and `report` runs this repository's code over
+                     those facts
 ```
 
 ## Reading a binary is not running one
