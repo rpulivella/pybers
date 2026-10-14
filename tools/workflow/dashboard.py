@@ -54,8 +54,10 @@ def saveDashboard(board: Dashboard, dryRun: bool) -> None:
     if dryRun:
         console.print(renderBoard(board), markup=False, highlight=False)
         return
-    writeDashboard(board)
-    console.print(f"[green]wrote[/] {escape(board.status)}")
+    if writeDashboard(board):
+        console.print(f"[green]wrote[/] {escape(board.status)}")
+    else:
+        console.print(f"[dim]unchanged[/] {escape(board.status)}")
 
 
 def parseTicketKey(value: str) -> str:

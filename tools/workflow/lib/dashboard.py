@@ -133,8 +133,9 @@ def recordMerge(board: Dashboard, key: str, pullRequest: int) -> None:
         clear(line) for line in board.tasks if key not in line.split(noteSeparator)[0]
     ]
     board.queue = [clear(line) for line in board.queue if readStatusKey(line) != key]
-    board.completed = [f"{key} merged as PR #{pullRequest}", *board.completed]
-    board.completed = board.completed[:recentLimit]
+    entry = f"{key} merged as PR #{pullRequest}"
+    if entry not in board.completed:
+        board.completed = [entry, *board.completed][:recentLimit]
 
 
 def renderBoard(board: Dashboard) -> str:
@@ -155,10 +156,14 @@ def readDashboard() -> Dashboard:
     return parseBoard(dashboardPath.read_text(encoding="utf-8"))
 
 
-def writeDashboard(board: Dashboard) -> None:
-    """Write the dashboard in its one shape."""
+def writeDashboard(board: Dashboard) -> bool:
+    """Write the dashboard in its one shape, returning False when nothing changed."""
+    text = renderBoard(board)
+    if dashboardPath.is_file() and dashboardPath.read_text(encoding="utf-8") == text:
+        return False
     dashboardPath.parent.mkdir(parents=True, exist_ok=True)
-    dashboardPath.write_text(renderBoard(board), encoding="utf-8")
+    dashboardPath.write_text(text, encoding="utf-8")
+    return True
 
 
 def findFocusKey(board: Dashboard, focus: str | None) -> str:

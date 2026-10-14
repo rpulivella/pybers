@@ -31,6 +31,7 @@ from tools.workflow.lib.dashboard import (
     renderBoard,
     saveMerge,
     setBlockers,
+    writeDashboard,
 )
 
 dashboard: str = """WiP · PYB-211: Give session tasks a status line
@@ -156,4 +157,19 @@ def testAMalformedDashboardWarnsRatherThanFailingTheMerge() -> None:
     dashboardModule.dashboardPath.write_text("## Tasks\n", encoding="utf-8")
     warning = saveMerge("PYB-211", 212)
     assert warning.startswith("The dashboard was not updated:")
+
+
+def testRecordingAMergeTwiceKeepsOneLine() -> None:
+    board = parseBoard(dashboard)
+    recordMerge(board, "PYB-211", 212)
+    recordMerge(board, "PYB-211", 212)
+    assert board.completed.count("PYB-211 merged as PR #212") == 1
+
+
+def testAnUnchangedDashboardIsNotRewritten() -> None:
+    board = parseBoard(dashboard)
+    assert writeDashboard(board)
+    modified = dashboardModule.dashboardPath.stat().st_mtime_ns
+    assert not writeDashboard(board)
+    assert dashboardModule.dashboardPath.stat().st_mtime_ns == modified
 
