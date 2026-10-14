@@ -81,9 +81,7 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
    Each AC is concrete, testable and individually referenceable ("AC 3 fails because…").
    ACs nest **one level**, an indented ordered list with markers all `1.` since markdown
    counts them. GitHub shows `i.`, `ii.`, so cite `4.ii`. A third level means two tickets.
-   **Docs are ACs too.** Cover user docs with examples, for `import pybers` and the CLI
-   or TUI, and the developer docs the change adds to, corrects or removes, or name the
-   ticket that does.
+   **Docs are ACs too**, under the rule in `.github/ticket_template.md`.
 3. **Design** (optional), under a `## Design` heading: CLI, TUI or GUI specifications,
    Figma links, screenshots or wireframes. Reference for the outcome, never
    implementation, and never in place of an AC.
