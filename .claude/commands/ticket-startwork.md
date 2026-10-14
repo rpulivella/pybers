@@ -54,6 +54,8 @@ into `workarea/session-tasks.md`.
    ```
    .venv/bin/python3 -m tools.workflow.ticket start <N>
    ```
+   Then read `.venv/bin/python3 --version`. The work must use what that version adds in
+   any code the ticket touches.
 6. **Update `workarea/session-tasks.md` for the new ticket.** This file is the **literal
    replacement** for the removed Claude Code Task/Todo tool. Same purpose, same shape, only
    externalized to a text file so it survives `/clear` and window swaps. It holds what is active
