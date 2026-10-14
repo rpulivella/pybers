@@ -87,7 +87,6 @@ A ticket filed as `Todo` is ready to start. A `Concept` ticket still needs a per
 | `/commit` | 2. Write the Change |
 | `/golden-confirm` | 2. Write the Change, confirming a golden in Numbers |
 | `/standards` | 2. Write the Change, proofreading prose |
-| `/script-write` | 2. Write the Change, for a tool in `tools/` |
 | `/changelog-add` | 3. Open a Pull Request |
 | `/pr-draft` | 3. Open a Pull Request, or revise its body |
 | `/pr-review-code` | 4. Review |

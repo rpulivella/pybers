@@ -8,7 +8,7 @@ committed rather than built.
 
 Contrast [`tools/workflow/`](../workflow/README.md), the shared development workflow:
 filing tickets, opening pull requests, running the gates. That folder may not depend on
-this one, and its house rules govern both. Run a command from the repository root as
+this one, and its workflow rules govern both. Run a command from the repository root as
 `.venv/bin/python3 -m tools.local.<command>`. What a command imports sits in `lib/`.
 
 ```
