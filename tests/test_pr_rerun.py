@@ -5,6 +5,7 @@ Restarting a pull request's canceled or failed workflow runs, and nothing else.
 GitHub is stood in for at the API boundary, and the restarts recorded.
 
 UPDATES
+2026-10-13  Pull request summaries and check runs are dataclasses, for PYB-204.
 2026-10-05  Written for PYB-153, after a runner outage canceled both checks on PR #167.
 """
 from __future__ import annotations
@@ -18,7 +19,6 @@ __status__ = "Development"
 __date__ = "2026/10/05"
 
 import importlib
-import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -26,12 +26,10 @@ from typing import Any
 import pytest
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(repositoryRoot / "scripts"))
-
 
 def loadPrScript() -> ModuleType:
     """Return the pull request tool, imported the way its own tests import it."""
-    return importlib.import_module("pr")
+    return importlib.import_module("tools.workflow.pr")
 
 
 def buildRun(
@@ -54,13 +52,16 @@ def runRerunOf(
             raise failure
         restarted.append(runId)
 
-    monkeypatch.setattr(pr.ticket, "resolveToken", lambda: "token")
+    monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
     monkeypatch.setattr(
         pr, "readPullRequest",
-        lambda token, number: {"number": 167, "headSha": "a" * 40},
+        lambda token, number: pr.PullRequestSummary(
+            number=167, title="", url="", state="open", isDraft=False, head="",
+            headRepository="", headSha="a" * 40, base="develop", nodeId="",
+        ),
     )
     monkeypatch.setattr(
-        pr.ticket, "requestJson",
+        pr.github, "requestJson",
         lambda url, token, **options: {"workflow_runs": runs},
     )
     monkeypatch.setattr(pr, "restartWorkflowRun", restartStandIn)
@@ -123,7 +124,7 @@ def testARefusedRestartFailsNamingTheRunAndTheReason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pr = loadPrScript()
-    refusal = pr.ticket.GitHubHttpError(403, "GitHub returned HTTP 403: not accessible")
+    refusal = pr.github.GitHubHttpError(403, "GitHub returned HTTP 403: not accessible")
     runs = [buildRun(1, "preflight", "cancelled", "2026-10-05T01:00:00Z")]
     with pytest.raises(RuntimeError, match="Could not restart preflight.*403"):
         runRerunOf(monkeypatch, runs, failure=refusal)

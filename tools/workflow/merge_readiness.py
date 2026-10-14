@@ -14,14 +14,20 @@ honest as the branch. What a branch cannot do is run code in the posting half or
 aim a comment at another pull request. See .github/workflows/.
 
 Usage:
-    python3 scripts/merge-readiness.py collect --pull-request 42 --output results.json
-    python3 scripts/merge-readiness.py check --results results.json
-    python3 scripts/merge-readiness.py report --results results.json --head-sha abc123
+    .venv/bin/python3 -m tools.workflow.merge_readiness collect --pull-request 42 \
+        --output results.json
+    .venv/bin/python3 -m tools.workflow.merge_readiness check --results results.json
+    .venv/bin/python3 -m tools.workflow.merge_readiness report --results results.json \
+        --head-sha abc123
 
-Requires rich, and a GitHub token for `check` and `report`, resolved by
-scripts/ticket.py.
+Runs on the repository's venv, though the posting workflow installs rich alone, and
+needs a GitHub token for `check` and `report`, resolved by tools/workflow/lib/github.py.
 
 UPDATES
+2026-10-14  Moved here from `scripts/merge-readiness.py`, and run as a module,
+            for PYB-204.
+2026-10-13  The posting half moved to `lib/readiness_posting.py`, so its tests
+            import a library rather than this command, for PYB-204.
 2026-10-06  Removed `dispatch`, which sent an event no workflow listens for, for
             PYB-155.
 2026-10-03  The posting half renders the comment from stored results, aims it at
@@ -38,7 +44,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/17"
-__usage__ = "python3 scripts/merge-readiness.py <command> [options]"
+__usage__ = ".venv/bin/python3 -m tools.workflow.merge_readiness <command> [options]"
 
 import argparse
 import json
@@ -50,24 +56,23 @@ import time
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import merge_readiness_lib as checks
-import merge_readiness_presenter as presenter
-import pr
-import ticket
 from rich.console import Console
 
-try:
-    from rich_argparse import RichHelpFormatter
-except ImportError:  # rich_argparse is optional, per scripts/README.md
-    RichHelpFormatter = argparse.HelpFormatter  # type: ignore[assignment,misc]
+from tools.workflow.lib import github
+from tools.workflow.lib import readiness as checks
+from tools.workflow.lib import readiness_posting as posting
+from tools.workflow.lib import readiness_presenter as presenter
+from tools.workflow.lib.pull_request import (
+    defaultBaseBranch,
+    findBodyFindings,
+    formatPullRequestRef,
+    readTemplate,
+)
+from tools.workflow.lib.shared import RichHelpFormatter, repositoryRoot
 
 console: Console = Console()
 
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
 projectPath: Path = repositoryRoot / "pyproject.toml"
 checkRunName: str = "merge readiness"
 preflightCheckName: str = "preflight"
@@ -75,12 +80,6 @@ preflightAttempts: int = 40
 preflightPauseSeconds: float = 15.0
 failedExitCode: int = 1
 errorExitCode: int = 2
-# The account a workflow's own token posts as, so a copied marker is never mistaken
-# for this report.
-reportAuthor: str = "github-actions[bot]"
-commentsPerPage: int = 100
-
-
 def readDeclaredPackages() -> list[str]:
     """Return every package this project declares, runtime and development alike."""
     with projectPath.open("rb") as handle:
@@ -112,11 +111,11 @@ def waitForPreflight(token: str, sha: str) -> str:
     that never finishes leaves this reporting a wait rather than a verdict.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
         f"/commits/{sha}/check-runs"
     )
     for attempt in range(preflightAttempts):
-        runs = ticket.requestJson(url, token, apiVersion="2022-11-28")["check_runs"]
+        runs = github.requestJson(url, token, apiVersion="2022-11-28")["check_runs"]
         # A commit carries its skipped draft run beside the real one, and taking
         # that as the answer reports a preflight that never ran while it is running.
         decided = [
@@ -133,86 +132,22 @@ def waitForPreflight(token: str, sha: str) -> str:
     return ""
 
 
-def readPullRequestFacts(token: str, number: int) -> dict[str, Any]:
-    """Return the title, body, base and head a pull request carries."""
-    url = f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
-    payload = ticket.requestJson(f"{url}/pulls/{number}", token)
-    return {
-        "title": payload.get("title", ""),
-        "body": payload.get("body") or "",
-        "base": payload.get("base", {}).get("ref", pr.defaultBaseBranch),
-        "head": payload.get("head", {}).get("sha", ""),
-        "draft": bool(payload.get("draft")),
-    }
-
-
 def readCommitsBehind(token: str, base: str, head: str) -> int:
     """Return how many commits the base holds that this head does not."""
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
         f"/compare/{base}...{head}"
     )
-    return int(ticket.requestJson(url, token).get("behind_by", 0))
-
-
-def findReportComment(token: str, number: int) -> int | None:
-    """Return this report's earlier comment: its marker, posted by its own account."""
-    url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
-        f"/issues/{number}/comments?per_page={commentsPerPage}"
-    )
-    page = 1
-    while True:
-        batch = ticket.requestJson(f"{url}&page={page}", token)
-        for comment in batch:
-            author = (comment.get("user") or {}).get("login")
-            if author == reportAuthor and presenter.commentMarker in (
-                comment.get("body") or ""
-            ):
-                return int(comment["id"])
-        if len(batch) < commentsPerPage:
-            return None
-        page += 1
-
-
-def confirmCheckedPullRequest(token: str, number: int, headSha: str) -> None:
-    """Refuse to post unless the pull request's head is the commit this run checked.
-
-    The number arrives in a file the pull request's own job wrote, so it is held
-    against the run's head commit, which GitHub supplies and no branch can set.
-    """
-    head = readPullRequestFacts(token, number)["head"]
-    if head != headSha:
-        raise RuntimeError(
-            f"{pr.formatPullRequestRef(number)} has head {head[:12] or 'none'}, "
-            f"not {headSha[:12]}, the commit this run checked, so nothing was posted."
-        )
-
-
-def postReportComment(token: str, number: int, body: str) -> str:
-    """Post the report, or replace the one an earlier run left, and say which."""
-    root = f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}"
-    existing = findReportComment(token, number)
-    if existing is None:
-        ticket.requestJson(
-            f"{root}/issues/{number}/comments", token, method="POST",
-            payload={"body": body},
-        )
-        return "posted"
-    ticket.requestJson(
-        f"{root}/issues/comments/{existing}", token, method="PATCH",
-        payload={"body": body},
-    )
-    return "replaced"
+    return int(github.requestJson(url, token).get("behind_by", 0))
 
 
 def checkPullRequest(facts: checks.BranchFacts, token: str) -> list[checks.CheckResult]:
     """Run every check, in the order the comment lists them."""
-    pullRequest = readPullRequestFacts(token, facts.pullRequest)
+    pullRequest = posting.readPullRequestFacts(token, facts.pullRequest)
     behind = readCommitsBehind(token, pullRequest["base"], facts.headSha)
     # The branch's template when it carried one, since the body was written against it.
-    template = facts.template or pr.readTemplate()
-    findings = pr.findBodyFindings(pullRequest["body"], template)
+    template = facts.template or readTemplate()
+    findings = findBodyFindings(pullRequest["body"], template)
     return [
         checks.checkPreflight(waitForPreflight(token, facts.headSha)),
         checks.checkTemplate(findings),
@@ -247,7 +182,7 @@ def runCheck(arguments: argparse.Namespace) -> int:
     """
     stored = json.loads(Path(arguments.results).read_text())
     facts = checks.BranchFacts.fromDictionary(stored)
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     results = checkPullRequest(facts, token)
     verdict = checks.readVerdict(results)
     moment = datetime.now(UTC)
@@ -273,21 +208,6 @@ def writeWorkflowOutput(results: list[checks.CheckResult], body: str) -> None:
         Path(summaryPath).write_text(body)
 
 
-def renderStoredReport(stored: dict[str, Any], headSha: str) -> tuple[int, str]:
-    """Return the pull request a stored report names and the comment this code renders.
-
-    Nothing of the stored file is posted as written: its results are read as data
-    and the comment is built here, against the head commit the run supplies.
-    """
-    facts = checks.BranchFacts.fromDictionary(stored)
-    if not isinstance(facts.pullRequest, int) or facts.pullRequest <= 0:
-        raise ValueError("The stored report names no pull request.")
-    results = checks.readStoredResults(stored)
-    moment = datetime.fromisoformat(str(stored.get("checkedAt", "")))
-    facts.headSha = headSha
-    return facts.pullRequest, presenter.renderComment(results, facts, moment)
-
-
 def runReport(arguments: argparse.Namespace) -> int:
     """Post the comment for a checked pull request, or replace the one already there.
 
@@ -297,14 +217,14 @@ def runReport(arguments: argparse.Namespace) -> int:
     more than that.
     """
     stored = json.loads(Path(arguments.results).read_text())
-    number, body = renderStoredReport(stored, arguments.head_sha)
+    number, body = posting.renderStoredReport(stored, arguments.head_sha)
     if arguments.dry_run:
         console.print(body, markup=False, highlight=False)
         return 0
-    token = ticket.resolveToken()
-    confirmCheckedPullRequest(token, number, arguments.head_sha)
-    console.print(f"{postReportComment(token, number, body)} the report on "
-                  f"{pr.formatPullRequestRef(number)}")
+    token = github.resolveToken()
+    posting.confirmCheckedPullRequest(token, number, arguments.head_sha)
+    console.print(f"{posting.postReportComment(token, number, body)} the report on "
+                  f"{formatPullRequestRef(number)}")
     return 0
 
 
@@ -322,7 +242,7 @@ def buildParser() -> argparse.ArgumentParser:
         formatter_class=RichHelpFormatter,
     )
     collect.add_argument("--pull-request", type=int, required=True, help="its number")
-    collect.add_argument("--base", default=pr.defaultBaseBranch, help="the base branch")
+    collect.add_argument("--base", default=defaultBaseBranch, help="the base branch")
     collect.add_argument("--branch", help="its head branch, which a merge commit hides")
     collect.add_argument("--head-sha", help="its head commit, not the merge commit")
     collect.add_argument(

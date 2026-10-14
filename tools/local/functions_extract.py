@@ -46,17 +46,24 @@ Output is committed for the same reason the schemas are: `pip install pybers` ha
 no Numbers to read. Nothing is written unless --write is passed.
 
 Usage:
-    python3 tools/functions-extract.py
-    python3 tools/functions-extract.py --gaps
-    python3 tools/functions-extract.py --numbers "/Applications/Numbers.app"
-    python3 tools/functions-extract.py --write
-    python3 tools/functions-extract.py --write --dry-run
+    .venv/bin/python3 -m tools.local.functions_extract
+    .venv/bin/python3 -m tools.local.functions_extract --gaps
+    .venv/bin/python3 -m tools.local.functions_extract \
+        --numbers "/Applications/Numbers.app"
+    .venv/bin/python3 -m tools.local.functions_extract --write
+    .venv/bin/python3 -m tools.local.functions_extract --write --dry-run
 
-Requires rich. Needs no other tooling: the Mach-O parsing and the AArch64
-decoding are both Python, so there is no objdump, no c++filt and no
+Runs on the repository's venv. Needs no other tooling: the Mach-O parsing and the
+AArch64 decoding are both Python, so there is no objdump, no c++filt and no
 architecture-specific toolchain to install.
 
 UPDATES
+2026-10-14  Moved here from `tools/functions-extract.py`, and run as a module,
+            for PYB-204.
+2026-10-13  The repository root and the help formatter come from
+            `scripts/lib/shared.py`, for PYB-204.
+2026-10-13  The table, its reading and its comparison moved to
+            `functiontable.py`, so a test imports them, for PYB-204.
 2026-10-12  The registry is found by its calls to the spec factories, since
             Numbers 15.4 no longer loads the spec class's address, for PYB-139.
 2026-09-04  Names moved to the Objective-C metadata and arity added, for #44.
@@ -73,29 +80,30 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/04"
-__usage__ = "python3 tools/functions-extract.py [options]"
+__usage__ = ".venv/bin/python3 -m tools.local.functions_extract [options]"
 
 import argparse
-import ast
 import re
 import struct
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path
 
-from lib.machoreader import Image, MachOError
-from lib.numbersapp import NumbersApplication, locateNumbers
 from rich.console import Console
 from rich.markup import escape
 
-try:
-    from rich_argparse import RichHelpFormatter
-except ImportError:  # rich_argparse is optional, per tools/README.md
-    RichHelpFormatter = argparse.HelpFormatter  # type: ignore[assignment,misc]
+from tools.local.lib.functiontable import (
+    FunctionTable,
+    NumbersFunction,
+    TableComparison,
+    compareTables,
+    readCommitted,
+    renderModule,
+)
+from tools.local.lib.machoreader import Image, MachOError
+from tools.local.lib.numbersapp import NumbersApplication, locateNumbers
+from tools.workflow.lib.shared import RichHelpFormatter, repositoryRoot
 
 console: Console = Console()
-
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
 
 # Committed, so that naming a function never needs a local Numbers.
 generatedPath: Path = repositoryRoot / "src" / "pybers" / "_generated" / "functions.py"
@@ -166,57 +174,7 @@ class ExtractionError(RuntimeError):
     """The binary could not be read, or carries nothing this script recognizes."""
 
 
-@dataclass(frozen=True)
-class NumbersFunction:
-    """One function as Numbers declares it: name, index and argument counts.
-
-    `index` is absent for a function the format stores as its own node types
-    rather than as an indexed call. `availability` is one of three: offered in
-    the function browser, reserved with an index and no argument spec, or
-    internal, which Numbers uses itself and does not offer.
-    """
-
-    name: str
-    index: int | None
-    minimumArguments: int
-    maximumArguments: int
-    repeatingGroupSize: int
-    availability: str = "offered"
-
-    @property
-    def reserved(self) -> bool:
-        """Report whether Numbers declares this and refuses the name."""
-        return self.availability == "reserved"
-
-    @property
-    def unbounded(self) -> bool:
-        """Report whether a repeating group removes the maximum entirely."""
-        return self.repeatingGroupSize > 0
-
-
-@dataclass(frozen=True)
-class FunctionTable:
-    """An extracted table, and everything a reader needs to judge it."""
-
-    functions: dict[str, NumbersFunction]
-    uncovered: tuple[str, ...]
-    corroborated: int
-    disagreements: tuple[tuple[str, int, int], ...]
-    version: str
-    build: str
-
-
-@dataclass(frozen=True)
-class TableComparison:
-    """How a freshly extracted table differs from the committed one."""
-
-    added: tuple[NumbersFunction, ...]
-    removed: tuple[NumbersFunction, ...]
-    changed: tuple[tuple[NumbersFunction, NumbersFunction], ...]
-    unchangedCount: int
-
-
-def movedImmediate(word: int) -> tuple[int, int] | None:
+def readMovedImmediate(word: int) -> tuple[int, int] | None:
     """Return the register and value one immediate move writes, or None."""
     if word & moveMask == moveValue:
         return word & 0x1F, ((word >> 5) & 0xFFFF) << (((word >> 21) & 3) * 16)
@@ -225,7 +183,7 @@ def movedImmediate(word: int) -> tuple[int, int] | None:
     return None
 
 
-def branchTarget(word: int, address: int) -> int | None:
+def findBranchTarget(word: int, address: int) -> int | None:
     """Return where a `bl` goes, or None when the word is not one."""
     if word & branchLinkMask != branchLinkValue:
         return None
@@ -235,7 +193,7 @@ def branchTarget(word: int, address: int) -> int | None:
     return address + (offset << 2)
 
 
-def pageAddress(word: int, address: int) -> int:
+def findPageAddress(word: int, address: int) -> int:
     """Return the page an `adrp` names, sign-extended as the encoding requires."""
     immediate = (((word >> 5) & 0x7FFFF) << 2) | ((word >> 29) & 3)
     if immediate & (1 << 20):
@@ -260,7 +218,7 @@ def indexFromClasses(image: Image) -> dict[str, int]:
         if offset is None or offset + 8 > len(image.data):
             continue
         word, following = struct.unpack_from("<2I", image.data, offset)
-        moved = movedImmediate(word)
+        moved = readMovedImmediate(word)
         if moved is None or moved[0] != 0 or following != returnInstruction:
             continue
         found[name[len(functionClassPrefix):]] = moved[1]
@@ -285,7 +243,7 @@ def indexInBody(
     fromClosure: int | None = None
     for position in range(0, len(body) & ~3, 4):
         word = struct.unpack_from("<I", body, position)[0]
-        moved = movedImmediate(word)
+        moved = readMovedImmediate(word)
         if moved is not None:
             registers[moved[0]] = moved[1]
             continue
@@ -294,7 +252,7 @@ def indexInBody(
             # instead of passing it, so the halfword store is the only carrier.
             fromClosure = registers.get(word & 0x1F, fromClosure)
             continue
-        target = branchTarget(word, address + position)
+        target = findBranchTarget(word, address + position)
         if target is None:
             continue
         if target in helpers and 0 in registers:
@@ -347,7 +305,7 @@ def indexFromAuthoringMethods(image: Image) -> dict[str, int]:
     }
 
 
-def specFactories(image: Image) -> dict[int, bool]:
+def findSpecFactories(image: Image) -> dict[int, bool]:
     """Return each spec factory stub, and whether it carries a repeating group.
 
     Read from the stub's own selector load rather than assumed, so a renamed or
@@ -362,7 +320,7 @@ def specFactories(image: Image) -> dict[int, bool]:
         word = struct.unpack_from("<I", image.data, stubs.offset + step)[0]
         address = stubs.address + step
         if word & addressPageMask == addressPageValue:
-            pages[word & 0x1F] = pageAddress(word, address)
+            pages[word & 0x1F] = findPageAddress(word, address)
         elif word & loadRegisterMask == loadRegisterValue:
             base = pages.get((word >> 5) & 0x1F)
             if base is None:
@@ -382,7 +340,7 @@ def specFactories(image: Image) -> dict[int, bool]:
     return factories
 
 
-def specRegistry(image: Image, factories: dict[int, bool]) -> tuple[int, int]:
+def findSpecRegistry(image: Image, factories: dict[int, bool]) -> tuple[int, int]:
     """Return the extent of the function that builds every spec.
 
     Located by counting calls to the spec factories rather than by address,
@@ -395,7 +353,7 @@ def specRegistry(image: Image, factories: dict[int, bool]) -> tuple[int, int]:
     for step in range(0, text.size & ~3, 4):
         word = struct.unpack_from("<I", image.data, text.offset + step)[0]
         address = text.address + step
-        if branchTarget(word, address) not in factories:
+        if findBranchTarget(word, address) not in factories:
             continue
         bounds = image.functionBounds(address)
         if bounds is not None:
@@ -408,7 +366,7 @@ def specRegistry(image: Image, factories: dict[int, bool]) -> tuple[int, int]:
     return bounds
 
 
-def arityFromRegistry(image: Image) -> dict[str, tuple[int, int, int]]:
+def readArityFromRegistry(image: Image) -> dict[str, tuple[int, int, int]]:
     """Return each function's minimum, maximum and repeating group size.
 
     One pass over the registry builder, tracking immediates and materialized
@@ -416,8 +374,8 @@ def arityFromRegistry(image: Image) -> dict[str, tuple[int, int, int]]:
     sets a call's arguments after the last thing that could clobber them, so the
     most recent write before a send is the value being passed.
     """
-    factories = specFactories(image)
-    start, end = specRegistry(image, factories)
+    factories = findSpecFactories(image)
+    start, end = findSpecRegistry(image, factories)
     text = image.sections["__TEXT,__text"]
 
     registers: dict[int, int] = {}
@@ -427,13 +385,13 @@ def arityFromRegistry(image: Image) -> dict[str, tuple[int, int, int]]:
         word = struct.unpack_from(
             "<I", image.data, text.offset + address - text.address
         )[0]
-        moved = movedImmediate(word)
+        moved = readMovedImmediate(word)
         if moved is not None:
             registers[moved[0]] = moved[1]
             pages.pop(moved[0], None)
             continue
         if word & addressPageMask == addressPageValue:
-            pages[word & 0x1F] = pageAddress(word, address)
+            pages[word & 0x1F] = findPageAddress(word, address)
             registers.pop(word & 0x1F, None)
             continue
         if word & addImmediateMask == addImmediateValue:
@@ -442,7 +400,7 @@ def arityFromRegistry(image: Image) -> dict[str, tuple[int, int, int]]:
                 pages[word & 0x1F] = base + ((word >> 10) & 0xFFF)
                 registers.pop(word & 0x1F, None)
             continue
-        target = branchTarget(word, address)
+        target = findBranchTarget(word, address)
         if target is None or target not in factories:
             continue
         name = image.constantStringAt(pages.get(nameRegister, 0))
@@ -458,7 +416,7 @@ def arityFromRegistry(image: Image) -> dict[str, tuple[int, int, int]]:
     return specs
 
 
-def displayName(symbolName: str) -> str:
+def formatDisplayName(symbolName: str) -> str:
     """Return the spelling Numbers uses for a name written in C or C++.
 
     A leading underscore avoids a collision with a macro, `_MAX` being `MAX`, and
@@ -472,19 +430,19 @@ def buildTable(application: NumbersApplication) -> FunctionTable:
     image = Image(application.frameworkBinary(frameworkName))
     declared = indexFromClasses(image)
     corroborant = indexFromAuthoringMethods(image)
-    arities = arityFromRegistry(image)
+    arities = readArityFromRegistry(image)
     known = set(application.localizedStrings(stringsTableName))
 
     # The two sources spell an internal function differently, the class calling
     # it SPILL and the registry __SPILL, so specs are also indexed by the name
     # a reader would recognize.
-    arityByDisplay = {displayName(key): value for key, value in arities.items()}
+    arityByDisplay = {formatDisplayName(key): value for key, value in arities.items()}
 
     functions: dict[str, NumbersFunction] = {}
     claimed: dict[int, str] = {}
 
     for symbolName, index in sorted(declared.items()):
-        name = displayName(symbolName)
+        name = formatDisplayName(symbolName)
         if index in claimed:
             raise ExtractionError(
                 f"Function index {index} is claimed by both {claimed[index]} and "
@@ -527,7 +485,7 @@ def buildTable(application: NumbersApplication) -> FunctionTable:
             functions[name] = NumbersFunction(name, None, *arity)
 
     disagreements = tuple(
-        (displayName(symbolName), index, declared[symbolName])
+        (formatDisplayName(symbolName), index, declared[symbolName])
         for symbolName, index in sorted(corroborant.items())
         if symbolName in declared and declared[symbolName] != index
     )
@@ -559,103 +517,6 @@ def buildTable(application: NumbersApplication) -> FunctionTable:
         version=application.version,
         build=application.build,
     )
-
-
-def readCommitted(path: Path) -> dict[str, NumbersFunction] | None:
-    """Return the committed table, or None when there is nothing to compare with.
-
-    Read as a literal rather than imported, so comparing depends neither on
-    pybers being installed nor on running the file about to be overwritten.
-    None covers both an absent file and one written in an older shape, because
-    refusing to run until the output is already correct would leave no way to
-    correct it.
-    """
-    if not path.is_file():
-        return None
-    for statement in ast.parse(path.read_text(), str(path)).body:
-        if not isinstance(statement, ast.AnnAssign | ast.Assign):
-            continue
-        targets = (
-            [statement.target] if isinstance(statement, ast.AnnAssign)
-            else statement.targets
-        )
-        named = any(
-            isinstance(target, ast.Name) and target.id == "functions"
-            for target in targets
-        )
-        if not named or statement.value is None:
-            continue
-        try:
-            return {
-                str(name): NumbersFunction(
-                    str(name),
-                    None if row[0] is None else int(row[0]),
-                    int(row[1]), int(row[2]), int(row[3]), str(row[4]),
-                )
-                for name, row in ast.literal_eval(statement.value).items()
-            }
-        except (IndexError, TypeError, ValueError):
-            # A table written in an older shape, which the next --write replaces.
-            return None
-    return None
-
-
-def compareTables(
-    extracted: dict[str, NumbersFunction], committed: dict[str, NumbersFunction]
-) -> TableComparison:
-    """Report what a regeneration would change, which is what makes it reviewable."""
-    added = tuple(
-        function for name, function in sorted(extracted.items())
-        if name not in committed
-    )
-    removed = tuple(
-        function for name, function in sorted(committed.items())
-        if name not in extracted
-    )
-    changed = tuple(
-        (committed[name], function)
-        for name, function in sorted(extracted.items())
-        if name in committed and committed[name] != function
-    )
-    unchanged = sum(
-        1 for name, function in extracted.items() if committed.get(name) == function
-    )
-    return TableComparison(added, removed, changed, unchanged)
-
-
-def renderModule(table: FunctionTable) -> str:
-    """Return the source of the generated module, one line per function."""
-    entries = "\n".join(
-        f'    "{function.name}": ({function.index}, '
-        f"{function.minimumArguments}, {function.maximumArguments}, "
-        f'{function.repeatingGroupSize}, "{function.availability}"),'
-        for _name, function in sorted(table.functions.items())
-    )
-    total = len(table.functions) + len(table.uncovered)
-    return f'''#!/usr/bin/env python3
-"""\\
-Numbers formula functions, by index. Machine output, do not edit.
-
-Written by tools/functions-extract.py from Numbers {table.version}
-(build {table.build}). A correction made here is destroyed by the next
-extraction; correct the extractor instead.
-
-Each row is the index, the minimum argument count, the maximum, the size of the
-repeating group that makes the maximum a floor rather than a ceiling, and how
-the function may be used. A group of zero means the maximum is exact.
-
-An index of None means the format stores the function as its own node types
-rather than as an indexed call. Availability is one of three: offered in the
-function browser, reserved with an index and no argument spec so Numbers
-refuses the name, or internal, which Numbers uses itself and never offers.
-
-{len(table.functions)} of the {total} functions Numbers names are covered.
-"""
-
-functions: dict[str, tuple[int | None, int, int, int, str]] = {{
-{entries}
-}}
-'''
 
 
 def showApplication(application: NumbersApplication) -> None:

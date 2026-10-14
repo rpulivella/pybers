@@ -25,7 +25,7 @@ is deliberately never vendored here.
 
 protodump lives in workarea/bootstrap/, which is git-ignored, so it is never committed
 or distributed with pybers. It additionally needs:
-    /usr/bin/env python3 -m pip install --upgrade protobuf tqdm
+    .venv/bin/python3 -m pip install --upgrade protobuf tqdm
 
 Nothing is written into the repository unless --write is passed. The default run is a
 read-only report, which is also the differential check: a dump that matches the
@@ -33,18 +33,22 @@ vendored schemas corroborates both, and any difference is a finding to understan
 rather than a silent divergence.
 
 Usage:
-    python3 tools/protos-extract.py
-    python3 tools/protos-extract.py \
+    .venv/bin/python3 -m tools.local.protos_extract
+    .venv/bin/python3 -m tools.local.protos_extract \
         --numbers "/Applications/Numbers Creator Studio.app"
-    python3 tools/protos-extract.py --protodump ~/.local/share/protodump/protodump.py
-    python3 tools/protos-extract.py --write
-    python3 tools/protos-extract.py --write --dry-run
+    .venv/bin/python3 -m tools.local.protos_extract \
+        --protodump ~/.local/share/protodump/protodump.py
+    .venv/bin/python3 -m tools.local.protos_extract --write
+    .venv/bin/python3 -m tools.local.protos_extract --write --dry-run
 
-Requires rich. protodump additionally requires protobuf and tqdm, and generating
-Python from the dumped schemas requires protoc on PATH, and the type stubs
-beside it require mypy-protobuf's `protoc-gen-mypy` plugin there too.
+Runs on the repository's venv. protodump additionally requires protobuf and tqdm,
+generating Python from the dumped schemas requires protoc on PATH, and the type
+stubs beside it require mypy-protobuf's `protoc-gen-mypy` plugin there too.
 
 UPDATES
+2026-10-14  Moved here from `tools/protos-extract.py`, and run as a module, for PYB-204.
+2026-10-13  The repository root comes from `scripts/lib/shared.py`, for
+            PYB-204.
 2026-09-04  Locating Numbers moved to tools/lib/numbersapp.py for #44, so the
             function-index extractor searches the same way rather than a second
             way that drifts.
@@ -62,7 +66,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/13"
-__usage__ = "python3 tools/protos-extract.py [options]"
+__usage__ = ".venv/bin/python3 -m tools.local.protos_extract [options]"
 
 import argparse
 import os
@@ -72,9 +76,11 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from lib.numbersapp import NumbersApplication, locateNumbers
 from rich.console import Console
 from rich.markup import escape
+
+from tools.local.lib.numbersapp import NumbersApplication, locateNumbers
+from tools.workflow.lib.shared import repositoryRoot
 
 console = Console()
 
@@ -83,8 +89,7 @@ console = Console()
 # is the same opacity this project refused when it declined to vendor someone else's
 # dump. It cannot run on a fresh clone: it needs a local Numbers and a separately
 # obtained protodump: which is exactly why the output is committed rather than built.
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
-
+#
 # Where the dumped schemas and the generated Python land once --write is passed. Both
 # are committed, so that installing pybers never requires a local Numbers.
 schemaDirectory: Path = repositoryRoot / "src" / "pybers" / "protos"
@@ -336,7 +341,7 @@ def showComparison(comparison: SchemaComparison) -> None:
             console.print(f"  [{tint}]{label}[/]  {name}")
 
 
-def cmdExtract(arguments: argparse.Namespace) -> int:
+def runExtract(arguments: argparse.Namespace) -> int:
     """Dump the schemas, compare them with the reference set, and optionally
     commit them."""
     application = locateNumbers(Path(arguments.numbers) if arguments.numbers else None)
@@ -426,7 +431,7 @@ def buildParser() -> argparse.ArgumentParser:
         "(default is a read-only report)",
     )
     parser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    parser.set_defaults(handler=cmdExtract)
+    parser.set_defaults(handler=runExtract)
     return parser
 
 

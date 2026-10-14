@@ -11,7 +11,7 @@ a fork's pull request merely shares a name with.
 **This tool exists to replace `gh`.** `gh` resolves its own identity from an OAuth
 token in the system keyring, which can hold several accounts at once, so the
 account a `gh pr create` acts as is ambient state no repository can control. This
-tool authenticates with the explicit PAT that `ticket.py` already resolves, which
+tool authenticates with the explicit PAT that `github.py` already resolves, which
 means every GitHub interaction in this repository runs on exactly two channels: a
 PAT for the API, and SSH for git itself.
 
@@ -20,26 +20,30 @@ one operation REST does not expose (marking a draft ready for review). Never
 shells out, not to `gh`, not to `git`, not to `curl`. The current branch is read
 by parsing `.git/HEAD` directly.
 
-Authentication and the HTTP helpers are reused from `ticket.py` rather than
+Authentication and the HTTP helpers are reused from `github.py` rather than
 reimplemented, so this repository keeps exactly one auth story.
 
 Usage:
-    python3 scripts/pr.py create --title "[#14] Add a thing" --body-file draft.md
-    python3 scripts/pr.py create --title "..." --body-file draft.md --base main
-    python3 scripts/pr.py find
-    python3 scripts/pr.py find --number-only
-    python3 scripts/pr.py export-as-source 8 --body
-    python3 scripts/pr.py export-as-source 8 --title
-    python3 scripts/pr.py ready 8
-    python3 scripts/pr.py rerun 8
-    python3 scripts/pr.py logs 8 --context 30
-    python3 scripts/pr.py merge 8 --subject "[14] feat: add a thing"
-    python3 scripts/pr.py merge 8 --subject "..." --delete-branch
+    .venv/bin/python3 -m tools.workflow.pr create --title "[PYB-14] Add a thing" \
+        --body-file draft.md
+    .venv/bin/python3 -m tools.workflow.pr create --title "..." --body-file draft.md \
+        --base main
+    .venv/bin/python3 -m tools.workflow.pr find
+    .venv/bin/python3 -m tools.workflow.pr find --number-only
+    .venv/bin/python3 -m tools.workflow.pr export-as-source 8 --body
+    .venv/bin/python3 -m tools.workflow.pr export-as-source 8 --title
+    .venv/bin/python3 -m tools.workflow.pr ready 8
+    .venv/bin/python3 -m tools.workflow.pr rerun 8
+    .venv/bin/python3 -m tools.workflow.pr logs 8 --context 30
+    .venv/bin/python3 -m tools.workflow.pr merge 8 --subject "[14] feat: add a thing"
+    .venv/bin/python3 -m tools.workflow.pr merge 8 --subject "..." --delete-branch
 
-Requires rich:
-    /usr/bin/env python3 -m pip install --upgrade rich
+Runs on the repository's venv.
 
 UPDATES
+2026-10-14  Moved here from `scripts/pr.py`, and run as a module, for PYB-204.
+2026-10-13  The comment commands are `github.py`'s own, for PYB-204.
+2026-10-13  The repository root comes from `lib/shared.py`, for PYB-204.
 2026-10-09  Added `logs`, which prints each error a failed job logged, after both
             checks on PR #191 failed with no readiness comment, for PYB-181.
 2026-10-06  A skipped run no longer hides another run of the same check, after a tie
@@ -50,16 +54,16 @@ UPDATES
             replaces `--keep-branch`, and only when that branch lives in this
             repository, so a fork's branch name never costs this repository a
             branch, for PYB-152.
-2026-09-25  Bodies post and export through `ticket.py`'s shared handling, for
+2026-09-25  Bodies post and export through `github.py`'s shared handling, for
             PYB-134.
-2026-09-01  Added `export-as-source`, matching ticket.py's command of the same name
+2026-09-01  Added `export-as-source`, matching github.py's command of the same name
             down to the flags and the handler name. `edit` replaces the WHOLE body
             and GitHub has no conflict detection, so a revision drafted from memory
-            silently discards whatever changed in between. ticket.py has carried the
+            silently discards whatever changed in between. github.py has carried the
             remedy since 2026-08-13 and this tool carried only the hazard, which was
             hit twice in one day revising pull request 15. One divergence, forced by
             the data rather than chosen: PullRequestSummary omits the body, so the
-            body emitter takes a string where ticket.py's takes a summary.
+            body emitter takes a string where github.py's takes a summary.
 2026-08-31  Added `edit`, and fixed two calls that passed a `ticket` argument their
             signatures stopped taking when this module moved from injecting that
             dependency to importing it. Both were unreachable until now: the first
@@ -98,7 +102,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/13"
-__usage__ = "python3 scripts/pr.py <command> [options]"
+__usage__ = ".venv/bin/python3 -m tools.workflow.pr <command> [options]"
 
 import argparse
 import re
@@ -110,24 +114,25 @@ import urllib.request
 from dataclasses import dataclass
 from email.message import Message
 from pathlib import Path
-from typing import IO, Any, TypedDict
+from typing import IO, Any
 
-# scripts/ is not a package, but Python puts a script's OWN directory at the
-# front of sys.path, so this resolves to scripts/ticket.py and takes precedence
-# over any installed package of the same name. Reused rather than
-# reimplemented so this repository keeps exactly one auth story.
-import ticket
 from rich.console import Console
 from rich.markup import escape
 
+# The one GitHub client, reused rather than reimplemented, so there is one auth story.
+from tools.workflow.lib import github
+from tools.workflow.lib import github_commands as commands
+from tools.workflow.lib.pull_request import (
+    defaultBaseBranch,
+    findBodyFindings,
+    formatPullRequestRef,
+    readHeadings,
+    readTemplate,
+)
+from tools.workflow.lib.shared import repositoryRoot
+
 console = Console()
 
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
-
-# The base a pull request targets by default. Library and app repositories cut from
-# develop; a web-facing repository whose deploy tracks a different branch overrides
-# this per invocation with --base.
-defaultBaseBranch: str = "develop"
 
 # GitHub also offers "rebase". It is deliberately absent: rebasing rewrites the
 # branch's commits, and nothing in this workflow has ever asked for that.
@@ -160,15 +165,6 @@ errorExitCode: int = 2
 defaultLogContext: int = 12
 errorLogMarker: str = "##[error]"
 
-# The pull request template, and the authority on what a body may look like.
-# Read here because nothing else in this repository reads it: `/pr-draft` tells
-# an author to fill it, and GitHub applies it only to a body typed in the web
-# interface, so a body posted through the API carries what it was given and
-# nothing more.
-templatePath: Path = repositoryRoot / ".github" / "pull_request_template.md"
-
-# A body may run to twice the template's own length, comments excluded from both.
-maximumBodyLengthMultiple: int = 2
 
 # The merge landed and only the cleanup did not. Distinct from both of the above
 # because the recovery is neither "retry" nor "investigate": it is "finish the
@@ -198,11 +194,6 @@ def parsePullRequestNumber(value: str) -> int:
     return int(text)
 
 
-def formatPullRequestRef(number: int) -> str:
-    """Return a pull request reference in the house form, both parts always."""
-    return f"PR #{number}"
-
-
 # What `checks` prints as its verdict. Words rather than color alone, for the
 # reason the marker above exists: the consumer is an agent reading stdout, and it
 # must be able to tell an answer from a command that died before printing one.
@@ -221,7 +212,8 @@ rerunConclusions: frozenset[str] = frozenset(
 )
 
 
-class PullRequestSummary(TypedDict):
+@dataclass(frozen=True)
+class PullRequestSummary:
     """An open or merged pull request, as the skills need to see it."""
 
     number: int
@@ -237,7 +229,8 @@ class PullRequestSummary(TypedDict):
     nodeId: str
 
 
-class CheckRun(TypedDict):
+@dataclass(frozen=True)
+class CheckRun:
     """One check run on a commit, reduced to what a merge decision needs."""
 
     name: str
@@ -302,14 +295,14 @@ def checkHeadIsOurs(summary: PullRequestSummary) -> bool:
     A fork's branch can carry any name, one of ours included, so its name alone
     never decides what a merge deletes here.
     """
-    ours = f"{ticket.repositoryOwner}/{ticket.repositoryName}"
-    return summary["headRepository"].lower() == ours.lower()
+    ours = f"{github.repositoryOwner}/{github.repositoryName}"
+    return summary.headRepository.lower() == ours.lower()
 
 
 def formatForkBranch(summary: PullRequestSummary) -> str:
     """Say whose a fork's head branch is, which a merge here never deletes."""
-    owner = summary["headRepository"] or "a fork since deleted"
-    return f"{summary['head']} belongs to {owner}, so it is the fork's to remove"
+    owner = summary.headRepository or "a fork since deleted"
+    return f"{summary.head} belongs to {owner}, so it is the fork's to remove"
 
 
 def assertBranchIsPushed(token: str, branch: str) -> None:
@@ -327,12 +320,12 @@ def assertBranchIsPushed(token: str, branch: str) -> None:
     could not possibly help.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/branches/{urllib.parse.quote(branch)}"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/branches/{urllib.parse.quote(branch)}"
     )
     try:
-        ticket.requestJson(url, token)
-    except ticket.GitHubHttpError as exc:
+        github.requestJson(url, token)
+    except github.GitHubHttpError as exc:
         if exc.statusCode == 404:
             raise RuntimeError(
                 f"Branch {branch!r} was not found on the remote. Usually that means it "
@@ -356,8 +349,8 @@ def createDraftPullRequest(
     signal in this workflow, and only /pr-review-code may clear it.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/pulls"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls"
     )
     payload = {
         "title": title,
@@ -367,7 +360,7 @@ def createDraftPullRequest(
         "draft": True,
     }
     return summarizePullRequest(
-        ticket.requestJson(url, token, method="POST", payload=payload)
+        github.requestJson(url, token, method="POST", payload=payload)
     )
 
 
@@ -388,13 +381,13 @@ def findOpenPullRequest(
     merged.
     """
     query = urllib.parse.urlencode(
-        {"head": f"{ticket.repositoryOwner}:{head}", "base": base, "state": "open"}
+        {"head": f"{github.repositoryOwner}:{head}", "base": base, "state": "open"}
     )
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/pulls?{query}"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls?{query}"
     )
-    matches = ticket.requestJson(url, token)
+    matches = github.requestJson(url, token)
     if not matches:
         return None
     if len(matches) > 1:
@@ -413,10 +406,10 @@ def findOpenPullRequest(
 def readPullRequest(token: str, number: int) -> PullRequestSummary:
     """Fetch one pull request by number."""
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/pulls/{number}"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls/{number}"
     )
-    return summarizePullRequest(ticket.requestJson(url, token))
+    return summarizePullRequest(github.requestJson(url, token))
 
 
 def readPullRequestBody(token: str, number: int) -> str:
@@ -426,10 +419,10 @@ def readPullRequestBody(token: str, number: int) -> str:
     is not that. It is needed only to verify an edit landed.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/pulls/{number}"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls/{number}"
     )
-    return ticket.requestJson(url, token).get("body") or ""
+    return github.requestJson(url, token).get("body") or ""
 
 
 def readCheckRuns(token: str, sha: str) -> list[CheckRun]:
@@ -441,10 +434,10 @@ def readCheckRuns(token: str, sha: str) -> list[CheckRun]:
     silent pass this command exists to prevent.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/commits/{sha}/check-runs"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/commits/{sha}/check-runs"
     )
-    payload = ticket.requestJson(url, token, apiVersion="2022-11-28")
+    payload = github.requestJson(url, token, apiVersion="2022-11-28")
     return chooseLatestRuns(payload.get("check_runs", []))
 
 
@@ -479,10 +472,10 @@ def readWorkflowRuns(token: str, sha: str) -> list[WorkflowRun]:
     re-run supersedes the run it restarted.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/actions/runs?head_sha={sha}&per_page=100"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/actions/runs?head_sha={sha}&per_page=100"
     )
-    payload = ticket.requestJson(url, token, apiVersion="2022-11-28")
+    payload = github.requestJson(url, token, apiVersion="2022-11-28")
     latest: dict[str, WorkflowRun] = {}
     runs = payload.get("workflow_runs", [])
     for run in sorted(runs, key=lambda run: str(run.get("created_at") or "")):
@@ -522,8 +515,8 @@ def readJobLog(token: str, jobId: int) -> str:
     the token, so the redirect is read and fetched again without it.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/actions/jobs/{jobId}/logs"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/actions/jobs/{jobId}/logs"
     )
     request = urllib.request.Request(url)
     request.add_header("Authorization", f"Bearer {token}")
@@ -538,7 +531,7 @@ def readJobLog(token: str, jobId: int) -> str:
         location = exc.headers.get("Location") if exc.code in (301, 302, 307) else None
         if location is None:
             detail = exc.read().decode(errors="replace")
-            raise ticket.GitHubHttpError(
+            raise github.GitHubHttpError(
                 exc.code, f"GitHub returned HTTP {exc.code}: {detail}"
             ) from exc
     except urllib.error.URLError as exc:
@@ -557,10 +550,10 @@ def readJobFailures(token: str, sha: str) -> list[JobFailure]:
         if run.conclusion not in rerunConclusions:
             continue
         url = (
-            f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-            f"{ticket.repositoryName}/actions/runs/{run.runId}/jobs?per_page=100"
+            f"{github.restRoot}/repos/{github.repositoryOwner}/"
+            f"{github.repositoryName}/actions/runs/{run.runId}/jobs?per_page=100"
         )
-        payload = ticket.requestJson(url, token, apiVersion="2022-11-28")
+        payload = github.requestJson(url, token, apiVersion="2022-11-28")
         for job in payload.get("jobs", []):
             conclusion = job.get("conclusion") or ""
             if conclusion not in rerunConclusions:
@@ -608,10 +601,10 @@ def findErrorExcerpts(lines: list[str], context: int) -> list[list[str]]:
 def restartWorkflowRun(token: str, runId: int) -> None:
     """Re-run every job of one workflow run."""
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/actions/runs/{runId}/rerun"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/actions/runs/{runId}/rerun"
     )
-    ticket.requestJson(url, token, method="POST", apiVersion="2022-11-28")
+    github.requestJson(url, token, method="POST", apiVersion="2022-11-28")
 
 
 def confirmChecksPassed(runs: list[CheckRun]) -> bool:
@@ -628,21 +621,11 @@ def confirmChecksPassed(runs: list[CheckRun]) -> bool:
     if not runs:
         return False
     if not all(
-        run["status"] == "completed" and run["conclusion"] in passingConclusions
+        run.status == "completed" and run.conclusion in passingConclusions
         for run in runs
     ):
         return False
-    return any(run["conclusion"] == "success" for run in runs)
-
-
-def printTitleAsRawString(summary: PullRequestSummary) -> None:
-    """Write a pull request title to stdout with nothing added but its own newline.
-
-    Deliberately bare. `find` prints `PR #<N> <title>` for a reader, which is the right
-    shape to look at and the wrong one to copy: a title reused verbatim would arrive
-    carrying a number it never had.
-    """
-    print(summary["title"])
+    return any(run.conclusion == "success" for run in runs)
 
 
 def editPullRequest(
@@ -654,8 +637,8 @@ def editPullRequest(
     the description rather than leave it alone.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/pulls/{number}"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls/{number}"
     )
     payload: dict[str, str] = {}
     if title is not None:
@@ -663,7 +646,7 @@ def editPullRequest(
     if body is not None:
         payload["body"] = body
     return summarizePullRequest(
-        ticket.requestJson(url, token, method="PATCH", payload=payload)
+        github.requestJson(url, token, method="PATCH", payload=payload)
     )
 
 
@@ -682,7 +665,7 @@ def markReadyForReview(token: str, nodeId: str) -> bool:
       }
     }
     """
-    data = ticket.requestGraphql(token, mutation, {"pullRequestId": nodeId})
+    data = github.requestGraphql(token, mutation, {"pullRequestId": nodeId})
     return not data["markPullRequestReadyForReview"]["pullRequest"]["isDraft"]
 
 
@@ -698,11 +681,11 @@ def mergePullRequest(
     rather than GitHub's generated default.
     """
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/"
-        f"{ticket.repositoryName}/pulls/{number}/merge"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls/{number}/merge"
     )
     payload = {"merge_method": method, "commit_title": subject}
-    result = ticket.requestJson(url, token, method="PUT", payload=payload)
+    result = github.requestJson(url, token, method="PUT", payload=payload)
     if not result or not result.get("merged"):
         raise RuntimeError(
             f"GitHub did not merge {formatPullRequestRef(number)}: {result}"
@@ -713,145 +696,25 @@ def mergePullRequest(
 def deleteBranch(token: str, branch: str) -> None:
     """Delete a merged branch from the remote."""
     url = (
-        f"{ticket.restRoot}/repos/{ticket.repositoryOwner}/{ticket.repositoryName}/"
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}/"
         f"git/refs/heads/{urllib.parse.quote(branch)}"
     )
-    ticket.requestJson(url, token, method="DELETE")
+    github.requestJson(url, token, method="DELETE")
 
 
 def showPullRequest(summary: PullRequestSummary) -> None:
     """Print one pull request, color-coded and unbordered."""
-    state = "draft" if summary["isDraft"] else summary["state"]
-    tint = "yellow" if summary["isDraft"] else "green"
+    state = "draft" if summary.isDraft else summary.state
+    tint = "yellow" if summary.isDraft else "green"
     console.print(
-        f"[bold cyan]{formatPullRequestRef(summary['number'])}[/] "
-        f"[bold]{escape(summary['title'])}[/]"
+        f"[bold cyan]{formatPullRequestRef(summary.number)}[/] "
+        f"[bold]{escape(summary.title)}[/]"
     )
-    console.print(f"[dim]{escape(summary['url'])}[/]")
+    console.print(f"[dim]{escape(summary.url)}[/]")
     console.print(
         f"state: [{tint}]{state}[/]   "
-        f"[magenta]{escape(summary['head'])}[/] -> [cyan]{escape(summary['base'])}[/]"
+        f"[magenta]{escape(summary.head)}[/] -> [cyan]{escape(summary.base)}[/]"
     )
-
-
-def readTemplate() -> str:
-    """Return the pull request template, refusing when it is absent.
-
-    Missing means the checks below have nothing to compare a body against, and
-    passing one because the authority went missing is the fallback cascade this
-    repository refuses everywhere else.
-    """
-    if not templatePath.is_file():
-        raise RuntimeError(
-            f"No pull request template at {templatePath}. Every body is checked "
-            "against it, so there is nothing left to check against."
-        )
-    return templatePath.read_text(encoding="utf-8")
-
-
-def readHeadings(text: str) -> list[str]:
-    """Return every `##` heading, in order."""
-    return [line.strip() for line in text.splitlines() if line.startswith("## ")]
-
-
-def readBoldRuns(text: str) -> list[str]:
-    """Return every line that is nothing but bold text, which reads as a heading.
-
-    Markdown makes `**Like this**` alone on a line look exactly like a section
-    heading while staying invisible to a `## ` scan, which is how a body grows a
-    section the template never had. The template uses bold inline under Breaking
-    Changes, so only a line that is ENTIRELY bold counts.
-    """
-    return [
-        line.strip()
-        for line in text.splitlines()
-        if re.fullmatch(r"\*\*[^*]+\*\*", line.strip())
-    ]
-
-
-def readCheckboxLabels(text: str) -> list[str]:
-    """Return every checkbox's label, with its ticked state discarded.
-
-    The state is what an author is meant to change and the label is what the
-    template owns, so comparing labels catches a reworded line without
-    complaining about a box legitimately ticked. `NA ` counts as a state,
-    because the template says to mark an inapplicable item that way rather than
-    delete it, which keeps its label under comparison.
-    """
-    labels: list[str] = []
-    for line in text.splitlines():
-        matched = re.match(r"\s*- (?:\[[ xX]\]\s*|NA\s+)(.+?)\s*$", line)
-        if matched:
-            labels.append(matched.group(1))
-    return labels
-
-
-def countProseWords(text: str) -> int:
-    """Return the word count with HTML comments removed.
-
-    The template is largely instructions inside comments, so counting those
-    would raise the ceiling by the size of guidance no body ever publishes.
-    """
-    return len(re.findall(r"\S+", re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)))
-
-
-def findBodyFindings(body: str, template: str) -> list[str]:
-    """Return every way a body departs from its template.
-
-    Pure by design: two strings in and complaints out, so the checks are
-    testable without a token, a network or a repository. Headings are compared
-    in BOTH directions, because the template asks for `None` under a heading a
-    body does not need rather than for the heading to go. Checkboxes are
-    compared in ONE, because it asks for the inapplicable ones to be deleted.
-    """
-    findings: list[str] = []
-    templateHeadings = readHeadings(template)
-    headings = readHeadings(body)
-
-    invented = [heading for heading in headings if heading not in templateHeadings]
-    if invented:
-        findings.append(
-            f"{len(invented)} heading(s) the template does not carry: "
-            + ", ".join(invented)
-        )
-    missing = [heading for heading in templateHeadings if heading not in headings]
-    if missing:
-        findings.append(
-            f"{len(missing)} template heading(s) missing: " + ", ".join(missing)
-        )
-    if not invented and not missing and headings != templateHeadings:
-        findings.append(
-            "headings are out of the template's order, expected "
-            f"{templateHeadings} and got {headings}"
-        )
-
-    templateBold = set(readBoldRuns(template))
-    inventedBold = [run for run in readBoldRuns(body) if run not in templateBold]
-    if inventedBold:
-        findings.append(
-            f"{len(inventedBold)} bold line(s) reading as a heading: "
-            + ", ".join(inventedBold)
-        )
-
-    templateLabels = set(readCheckboxLabels(template))
-    reworded = [
-        label for label in readCheckboxLabels(body) if label not in templateLabels
-    ]
-    if reworded:
-        findings.append(
-            f"this body carries {len(reworded)} checkbox the template does not: "
-            + ", ".join(reworded)
-        )
-
-    templateWords = countProseWords(template)
-    words = countProseWords(body)
-    ceiling = templateWords * maximumBodyLengthMultiple
-    if words > ceiling:
-        findings.append(
-            f"body is {words} words against a ceiling of {ceiling}, which is "
-            f"{maximumBodyLengthMultiple} times the template's {templateWords}"
-        )
-    return findings
 
 
 def refuseBody(body: str) -> bool:
@@ -881,11 +744,11 @@ def runCreate(arguments: argparse.Namespace) -> int:
     if not bodyPath.is_file():
         console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
         return errorExitCode
-    posted = ticket.readBodyFile(bodyPath)
+    posted = github.readBodyFile(bodyPath)
     if posted is None:
         return 1
     body = posted.text
-    ticket.reportTidying(posted)
+    github.reportTidying(posted)
     if refuseBody(body):
         return errorExitCode
 
@@ -907,7 +770,7 @@ def runCreate(arguments: argparse.Namespace) -> int:
         console.print(body, markup=False, highlight=False)
         return 0
 
-    token = ticket.resolveToken()
+    token = github.resolveToken()
 
     existing = findOpenPullRequest(token, head, arguments.base)
     if existing is not None:
@@ -937,7 +800,7 @@ def runFind(arguments: argparse.Namespace) -> int:
     """
     head = arguments.head or readCurrentBranch()
     summary = findOpenPullRequest(
-        ticket.resolveToken(), head, arguments.base
+        github.resolveToken(), head, arguments.base
     )
 
     if summary is None:
@@ -956,7 +819,7 @@ def runFind(arguments: argparse.Namespace) -> int:
         return notFoundExitCode
 
     if arguments.numberOnly:
-        console.print(summary["number"])
+        console.print(summary.number)
         return 0
 
     showPullRequest(summary)
@@ -971,24 +834,24 @@ def runChecks(arguments: argparse.Namespace) -> int:
     the first means a merge is safe, and a pull request with no checks at all is
     the second rather than the first.
     """
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     summary = readPullRequest(token, arguments.number)
-    runs = readCheckRuns(token, summary["headSha"])
-    commit = summary["headSha"][:12]
+    runs = readCheckRuns(token, summary.headSha)
+    commit = summary.headSha[:12]
 
     for run in runs:
-        if run["status"] != "completed":
+        if run.status != "completed":
             mark = "[yellow]WAIT[/]"
-        elif run["conclusion"] == "success":
+        elif run.conclusion == "success":
             mark = "[green]PASS[/]"
-        elif run["conclusion"] in passingConclusions:
+        elif run.conclusion in passingConclusions:
             # Tolerated, but never a pass on its own. PASS here would contradict
             # the verdict printed underneath it.
             mark = "[yellow]SKIP[/]"
         else:
             mark = "[red]FAIL[/]"
-        state = run["conclusion"] or run["status"]
-        console.print(f"{mark} [bold]{escape(run['name'])}[/]  {escape(state)}")
+        state = run.conclusion or run.status
+        console.print(f"{mark} [bold]{escape(run.name)}[/]  {escape(state)}")
 
     if confirmChecksPassed(runs):
         console.print(f"[green]{checksPassedMarker}[/] on {commit}")
@@ -1016,101 +879,33 @@ def runExportAsSource(arguments: argparse.Namespace) -> int:
     memory silently discards whatever changed in between. This is what makes
     drafting one against the current text possible.
     """
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     if arguments.body:
         body = readPullRequestBody(token, arguments.number)
-        return 0 if ticket.writeBodyForEditing(body) else 1
+        return 0 if github.writeBodyForEditing(body) else 1
     else:
-        printTitleAsRawString(readPullRequest(token, arguments.number))
+        commands.printTitleAsRawString(readPullRequest(token, arguments.number).title)
     return 0
 
 
 def runComment(arguments: argparse.Namespace) -> int:
     """Add one comment to a pull request."""
-    bodyPath = Path(arguments.bodyFile)
-    if not bodyPath.is_file():
-        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
-        return errorExitCode
-    posted = ticket.readBodyFile(bodyPath)
-    if posted is None:
-        return 1
-    body = posted.text
-    if arguments.dryRun:
-        console.print(
-            f"[yellow]Dry run[/] comment on {formatPullRequestRef(arguments.number)}:"
-        )
-        console.print(body, markup=False, highlight=False)
-        return 0
-    token = ticket.resolveToken()
-    comment = ticket.postComment(token, arguments.number, body)
-    ticket.reportTidying(posted)
-    console.print(
-        "[green]Commented on[/] "
-        f"[bold cyan]{formatPullRequestRef(arguments.number)}[/] "
-        f"as comment [bold cyan]{comment['id']}[/]"
+    return commands.postCommentFromFile(
+        arguments, formatPullRequestRef(arguments.number)
     )
-    return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
 
 
 def runCommentList(arguments: argparse.Namespace) -> int:
     """Print every comment on a pull request, rendered, with each one's id.
 
-    A command of its own here where `ticket.py` puts the same thing behind
+    A command of its own here where `github.py` puts the same thing behind
     `show --comments`, because `pr.py` has no `show`: it reads by branch through
     `find` and by number through `export-as-source`, and neither is a renderer a
     flag could hang on. Adding one for symmetry would cost more than the asymmetry.
     """
-    ticket.showComments(
-        ticket.readComments(ticket.resolveToken(), arguments.number)
+    commands.showComments(
+        github.readComments(github.resolveToken(), arguments.number)
     )
-    return 0
-
-
-def runCommentExport(arguments: argparse.Namespace) -> int:
-    """Emit one comment's body for editing, for a caller that will send it back."""
-    comment = ticket.readComment(ticket.resolveToken(), arguments.commentId)
-    return 0 if ticket.writeBodyForEditing(comment["body"]) else 1
-
-
-def runCommentEdit(arguments: argparse.Namespace) -> int:
-    """Replace one comment's body, keeping its id and its place in the thread.
-
-    What a re-running review needs: replacing its own summary costs neither the
-    record that the first run happened nor the comment's position in the thread.
-    """
-    bodyPath = Path(arguments.bodyFile)
-    if not bodyPath.is_file():
-        console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
-        return errorExitCode
-    posted = ticket.readBodyFile(bodyPath)
-    if posted is None:
-        return 1
-    body = posted.text
-    if arguments.dryRun:
-        console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
-        console.print(body, markup=False, highlight=False)
-        return 0
-    token = ticket.resolveToken()
-    comment = ticket.updateComment(token, arguments.commentId, body)
-    ticket.reportTidying(posted)
-    console.print(f"[green]Edited comment[/] [bold cyan]{comment['id']}[/]")
-    return 0 if ticket.verifyCommentBody(token, comment, body) else errorExitCode
-
-
-def runCommentDelete(arguments: argparse.Namespace) -> int:
-    """Remove one comment, after printing what is about to be lost."""
-    token = ticket.resolveToken()
-    comment = ticket.readComment(token, arguments.commentId)
-    console.print(
-        f"[yellow]GitHub keeps no copy of a deleted comment.[/] About to remove "
-        f"comment [bold cyan]{comment['id']}[/] by {escape(comment['author'])}:"
-    )
-    console.print(comment["body"], markup=False, highlight=False)
-    if arguments.dryRun:
-        console.print("[yellow]Dry run: nothing was removed.[/]")
-        return 0
-    ticket.deleteComment(token, arguments.commentId)
-    console.print("[green]Deleted.[/]")
     return 0
 
 
@@ -1132,11 +927,11 @@ def runEdit(arguments: argparse.Namespace) -> int:
         if not bodyPath.is_file():
             console.print(f"[red]Body file not found:[/] {escape(str(bodyPath))}")
             return errorExitCode
-        posted = ticket.readBodyFile(bodyPath)
+        posted = github.readBodyFile(bodyPath)
         if posted is None:
             return 1
         body = posted.text
-        ticket.reportTidying(posted)
+        github.reportTidying(posted)
         if refuseBody(body):
             return errorExitCode
 
@@ -1149,7 +944,7 @@ def runEdit(arguments: argparse.Namespace) -> int:
             console.print(body, markup=False, highlight=False)
         return 0
 
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     summary = editPullRequest(token, arguments.number, arguments.title, body)
 
     # Read it back rather than trusting the write's echo. A body edit replaces the
@@ -1161,7 +956,7 @@ def runEdit(arguments: argparse.Namespace) -> int:
     mismatches: list[str] = []
     if body is not None and readPullRequestBody(token, arguments.number) != body:
         mismatches.append("body")
-    if arguments.title is not None and summary["title"] != arguments.title:
+    if arguments.title is not None and summary.title != arguments.title:
         mismatches.append("title")
 
     if mismatches:
@@ -1169,25 +964,25 @@ def runEdit(arguments: argparse.Namespace) -> int:
             f"[red]Edit did not land cleanly:[/] {', '.join(mismatches)} differs "
             "from what was sent."
         )
-        console.print(summary["url"])
+        console.print(summary.url)
         return errorExitCode
 
     console.print(
-        f"[green]Edited[/] [bold cyan]{formatPullRequestRef(summary['number'])}[/]"
+        f"[green]Edited[/] [bold cyan]{formatPullRequestRef(summary.number)}[/]"
     )
     console.print("[dim]verified against the pull request[/]")
-    console.print(summary["url"])
+    console.print(summary.url)
     return 0
 
 
 def runReady(arguments: argparse.Namespace) -> int:
     """Take a draft pull request out of draft."""
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     summary = readPullRequest(token, arguments.number)
 
-    if not summary["isDraft"]:
+    if not summary.isDraft:
         console.print(
-            f"[yellow]{formatPullRequestRef(summary['number'])} is already out of "
+            f"[yellow]{formatPullRequestRef(summary.number)} is already out of "
             "draft.[/]"
         )
         return 0
@@ -1195,32 +990,32 @@ def runReady(arguments: argparse.Namespace) -> int:
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was changed.[/]")
         console.print(
-            f"would mark [bold cyan]{formatPullRequestRef(summary['number'])}[/] "
+            f"would mark [bold cyan]{formatPullRequestRef(summary.number)}[/] "
             "ready for review"
         )
         return 0
 
-    if not markReadyForReview(token, summary["nodeId"]):
+    if not markReadyForReview(token, summary.nodeId):
         console.print(
-            f"[red]{formatPullRequestRef(summary['number'])} is still a draft "
+            f"[red]{formatPullRequestRef(summary.number)} is still a draft "
             "after the mutation reported success.[/]"
         )
         return errorExitCode
 
     console.print(
         f"[green]Ready for review[/] "
-        f"[bold cyan]{formatPullRequestRef(summary['number'])}[/]"
+        f"[bold cyan]{formatPullRequestRef(summary.number)}[/]"
     )
-    console.print(summary["url"])
+    console.print(summary.url)
     return 0
 
 
 def runLogs(arguments: argparse.Namespace) -> int:
     """Print the failed steps and the end of the log of each failed job."""
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     summary = readPullRequest(token, arguments.number)
-    commit = summary["headSha"][:12]
-    failed = readJobFailures(token, summary["headSha"])
+    commit = summary.headSha[:12]
+    failed = readJobFailures(token, summary.headSha)
 
     if not failed:
         console.print(f"[yellow]No failed job[/] on {commit}.")
@@ -1243,11 +1038,11 @@ def runLogs(arguments: argparse.Namespace) -> int:
 
 def runRerun(arguments: argparse.Namespace) -> int:
     """Restart every canceled or failed workflow run on a pull request's head commit."""
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     summary = readPullRequest(token, arguments.number)
-    commit = summary["headSha"][:12]
+    commit = summary.headSha[:12]
     stale = [
-        run for run in readWorkflowRuns(token, summary["headSha"])
+        run for run in readWorkflowRuns(token, summary.headSha)
         if run.conclusion in rerunConclusions
     ]
 
@@ -1269,7 +1064,7 @@ def runRerun(arguments: argparse.Namespace) -> int:
     for run in stale:
         try:
             restartWorkflowRun(token, run.runId)
-        except ticket.GitHubHttpError as exc:
+        except github.GitHubHttpError as exc:
             raise RuntimeError(f"Could not restart {run.name}: {exc}") from exc
         console.print(f"[green]Restarted[/] [bold]{escape(run.name)}[/] on {commit}")
     return 0
@@ -1289,7 +1084,7 @@ def waitForTicketClosed(token: str, number: int) -> bool:
     for the close is what makes the correction reliable.
     """
     for attempt in range(ticketCloseAttempts):
-        if ticket.readTicket(token, number)["state"] == "closed":
+        if github.readTicket(token, number).state == "closed":
             return True
         if attempt < ticketCloseAttempts - 1:
             time.sleep(ticketClosePauseSeconds)
@@ -1312,22 +1107,22 @@ def reopenTicketAfterMerge(token: str, subject: str, status: str) -> bool:
         return False
     if not waitForTicketClosed(token, number):
         console.print(
-            f"[yellow]{ticket.formatTicketRef(number)} is still open[/], so the merge "
+            f"[yellow]{github.formatTicketRef(number)} is still open[/], so the merge "
             "closed nothing and there was nothing to reopen"
         )
         return True
     try:
-        ticket.reopenTicket(token, number)
-        ticket.moveTicketStatus(token, number, status)
+        github.reopenTicket(token, number)
+        github.moveTicketStatus(token, number, status)
     except Exception as exc:
         console.print(
-            f"[red]The merge landed, but {ticket.formatTicketRef(number)} could not be "
+            f"[red]The merge landed, but {github.formatTicketRef(number)} could not be "
             "reopened, so it reads as delivered.[/]"
         )
         console.print(f"  [dim]{escape(str(exc))}[/]")
         return False
     console.print(
-        f"[green]{ticket.formatTicketRef(number)}[/] stays open at [cyan]{status}[/], "
+        f"[green]{github.formatTicketRef(number)}[/] stays open at [cyan]{status}[/], "
         "because this merge does not complete it"
     )
     return True
@@ -1340,20 +1135,21 @@ def runMerge(arguments: argparse.Namespace) -> int:
         console.print(f"Choose one of: {', '.join(validMergeMethods)}")
         return errorExitCode
 
-    token = ticket.resolveToken()
+    token = github.resolveToken()
     summary = readPullRequest(token, arguments.number)
 
-    if summary["isDraft"]:
+    if summary.isDraft:
         console.print(
-            f"[red]{formatPullRequestRef(summary['number'])} is still a draft.[/] "
+            f"[red]{formatPullRequestRef(summary.number)} is still a draft.[/] "
             "Run /pr-review-code, which owns the promotion out of draft."
         )
         return errorExitCode
 
-    if not confirmChecksPassed(readCheckRuns(token, summary["headSha"])):
+    if not confirmChecksPassed(readCheckRuns(token, summary.headSha)):
         console.print(
-            f"[red]CI has not passed on {formatPullRequestRef(summary['number'])}.[/] "
-            f"Run `python3 scripts/pr.py checks {summary['number']}` for which."
+            f"[red]CI has not passed on {formatPullRequestRef(summary.number)}.[/] "
+            f"Run `.venv/bin/python3 -m tools.workflow.pr checks {summary.number}` "
+            "for which."
         )
         return errorExitCode
 
@@ -1367,13 +1163,13 @@ def runMerge(arguments: argparse.Namespace) -> int:
             + (
                 "[dim]kept[/] (`--delete-branch` deletes it)"
                 if not arguments.removeBranch
-                else f"would delete {summary['head']}"
+                else f"would delete {summary.head}"
                 if checkHeadIsOurs(summary)
                 else f"deletes nothing: {escape(formatForkBranch(summary))}"
             )
         )
         number = readTicketFromSubject(arguments.subject)
-        reference = ticket.formatTicketRef(number) if number else "the ticket"
+        reference = github.formatTicketRef(number) if number else "the ticket"
         console.print(
             "ticket:  "
             + (
@@ -1398,7 +1194,7 @@ def runMerge(arguments: argparse.Namespace) -> int:
         )
     except Exception as exc:
         console.print(
-            f"[red]The merge request for {formatPullRequestRef(summary['number'])} "
+            f"[red]The merge request for {formatPullRequestRef(summary.number)} "
             "did not complete "
             "cleanly, and whether it landed is unknown.[/]"
         )
@@ -1411,7 +1207,7 @@ def runMerge(arguments: argparse.Namespace) -> int:
         return partialSuccessExitCode
 
     console.print(
-        f"[green]Merged[/] [bold cyan]{formatPullRequestRef(summary['number'])}[/] "
+        f"[green]Merged[/] [bold cyan]{formatPullRequestRef(summary.number)}[/] "
         f"by [cyan]{arguments.method}[/] as [dim]{sha[:12]}[/]"
     )
 
@@ -1421,7 +1217,7 @@ def runMerge(arguments: argparse.Namespace) -> int:
         return partialSuccessExitCode
 
     if not arguments.removeBranch:
-        console.print(f"[dim]Kept branch[/] {escape(summary['head'])}")
+        console.print(f"[dim]Kept branch[/] {escape(summary.head)}")
         return 0
 
     if not checkHeadIsOurs(summary):
@@ -1440,7 +1236,7 @@ def runMerge(arguments: argparse.Namespace) -> int:
     # separately and re-raising would escape this function entirely rather than fall
     # through to the sibling clause, which would regress the whole point of this block.
     try:
-        deleteBranch(token, summary["head"])
+        deleteBranch(token, summary.head)
     except RuntimeError as exc:
         # 404 or 422 means the ref is already gone, which is the NORMAL outcome when the
         # repository has "automatically delete head branches" enabled. Reporting that as
@@ -1450,7 +1246,7 @@ def runMerge(arguments: argparse.Namespace) -> int:
         alreadyGone = getattr(exc, "statusCode", None) in (404, 422)
         if alreadyGone:
             console.print(
-                f"[green]Branch[/] {escape(summary['head'])} "
+                f"[green]Branch[/] {escape(summary.head)} "
                 "[green]was already deleted.[/]"
             )
             return 0
@@ -1458,11 +1254,11 @@ def runMerge(arguments: argparse.Namespace) -> int:
         console.print(f"  [dim]{escape(str(exc))}[/]")
         console.print(
             f"[bold]Do not re-run merge[/], "
-            f"{formatPullRequestRef(summary['number'])} is already merged. "
-            f"Finish by hand:\n  git push origin --delete {summary['head']}"
+            f"{formatPullRequestRef(summary.number)} is already merged. "
+            f"Finish by hand:\n  git push origin --delete {summary.head}"
         )
         return partialSuccessExitCode
-    console.print(f"[green]Deleted branch[/] {escape(summary['head'])}")
+    console.print(f"[green]Deleted branch[/] {escape(summary.head)}")
     return 0
 
 
@@ -1520,7 +1316,7 @@ def buildParser() -> argparse.ArgumentParser:
     )
     exportParser.add_argument("number", type=parsePullRequestNumber)
     # Mutually exclusive and required, because these never compose: each is a whole
-    # output, not a modifier on a shared one. Same shape as ticket.py's.
+    # output, not a modifier on a shared one. Same shape as github.py's.
     fieldGroup = exportParser.add_mutually_exclusive_group(required=True)
     fieldGroup.add_argument(
         "--body", action="store_true",
@@ -1566,7 +1362,7 @@ def buildParser() -> argparse.ArgumentParser:
         "form to revise and send back to `comment-edit`.",
     )
     commentExportParser.add_argument("commentId", type=int)
-    commentExportParser.set_defaults(handler=runCommentExport)
+    commentExportParser.set_defaults(handler=commands.runCommentExport)
 
     commentEditParser = subparsers.add_parser(
         "comment-edit", help="replace a comment's body in place"
@@ -1576,14 +1372,14 @@ def buildParser() -> argparse.ArgumentParser:
         "--body-file", dest="bodyFile", required=True, help="revised comment body"
     )
     commentEditParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentEditParser.set_defaults(handler=runCommentEdit)
+    commentEditParser.set_defaults(handler=commands.runCommentEdit)
 
     commentDeleteParser = subparsers.add_parser(
         "comment-delete", help="delete a comment (permanent, no GitHub undo)"
     )
     commentDeleteParser.add_argument("commentId", type=int)
     commentDeleteParser.add_argument("--dry-run", dest="dryRun", action="store_true")
-    commentDeleteParser.set_defaults(handler=runCommentDelete)
+    commentDeleteParser.set_defaults(handler=commands.runCommentDelete)
 
     checksParser = subparsers.add_parser(
         "checks", help="report whether every check on a pull request has passed"

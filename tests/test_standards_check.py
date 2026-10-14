@@ -6,6 +6,8 @@ A code span at the start of a line, blanked to spaces, once made the line read a
 indented code block, so the whole sentence escaped every check.
 
 UPDATES
+2026-10-13  Imports `lib/standards.py` rather than loading the command, for
+            PYB-204.
 2026-10-06  Written for PYB-178.
 """
 from __future__ import annotations
@@ -18,30 +20,18 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/06"
 
-import importlib.util
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-
-
-def loadStandardsCheck() -> ModuleType:
-    """Return the prose gate, loaded by path since its file name holds a hyphen."""
-    spec = importlib.util.spec_from_file_location(
-        "standards_check", repositoryRoot / "scripts" / "standards-check.py"
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from tools.workflow.lib import standards  # noqa: E402
 
 
 def findMessages(text: str) -> list[str]:
     """Return every finding the gate reports for one Markdown text."""
     findings: list = []
-    loadStandardsCheck().checkFile(Path("sample.md"), findings, text)
+    standards.checkFile(Path("sample.md"), findings, text)
     return [finding[3] for finding in findings if finding[0] == "FAIL"]
 
 

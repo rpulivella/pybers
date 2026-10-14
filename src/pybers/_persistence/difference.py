@@ -3,7 +3,7 @@
 What two packages hold differently, member by member and archive by archive.
 
 The one owner of package comparison. The round-trip tests assert that nothing
-differs, and scripts/golden-confirm.py lists what a copy Numbers saved changed, so
+differs, and tools/local/golden_confirm.py lists what a copy Numbers saved changed, so
 both read the same answer rather than two implementations of it.
 
 An archive differs when any part of it does, every message and its `ArchiveInfo`

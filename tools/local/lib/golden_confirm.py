@@ -6,6 +6,7 @@ Every function here returns a string and touches nothing else, so the report's t
 testable without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-13  Moved here from `scripts/golden_confirm_lib.py`, for PYB-204.
 2026-10-13  Written for PYB-201.
 """
 from __future__ import annotations

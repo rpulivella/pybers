@@ -57,6 +57,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          python scripts/merge-readiness.py report \
+          python -m tools.workflow.merge_readiness report \
             --results "$RUNNER_TEMP/readiness/merge-readiness.json" \
             --head-sha "$HEAD_SHA"

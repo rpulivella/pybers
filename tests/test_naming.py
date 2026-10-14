@@ -8,6 +8,8 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-10-14  Checks `tools/` too, which the move from `scripts/` brought into reach,
+            for PYB-204.
 2026-10-05  `restart` added to the verbs, for PYB-153.
 2026-09-29  `claim`, `fill` and `recount` added to the verbs, for PYB-118.
 2026-09-25  `convert` added to the verbs, for PYB-134.
@@ -32,20 +34,21 @@ import re
 from pathlib import Path
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-checkedDirectories: tuple[str, ...] = ("src", "tests", "scripts")
+checkedDirectories: tuple[str, ...] = ("src", "tests", "tools")
 
 leadingVerbs: frozenset[str] = frozenset({
     "add", "apply", "assert", "assign", "attach", "author", "bind", "blank",
     "borrow", "build", "carries", "check", "choose", "claim", "clamp", "classify",
     "close",
     "collect",
-    "compress", "confirm", "convert", "copy", "count", "create", "decode",
+    "compare", "compress", "confirm", "convert", "copy", "count", "create", "decode",
     "decompress",
     "delete", "detach", "drop", "edit", "emit", "encode", "expand", "extract",
     "fill", "find", "forge", "format", "generate", "hold", "index", "is", "iterate",
     "list",
-    "load",
-    "map", "mark", "measure", "merge", "move", "open", "order", "parse", "patch",
+    "load", "locate",
+    "map", "mark", "measure", "merge", "move", "normalize", "open", "order", "parse",
+    "patch",
     "place", "post", "print", "qualify", "quote", "read", "recount", "reduce",
     "refuse",
     "register", "release", "relocate", "remap", "remove", "render", "reopen",

@@ -8,6 +8,8 @@ code, that it lands only on the pull request the run checked, and that no
 workflow hands a branch's values to a shell or keeps its token in a checkout.
 
 UPDATES
+2026-10-13  Imports `lib/readiness_posting.py` rather than the command, for
+            PYB-204.
 2026-10-03  Written for PYB-151.
 """
 from __future__ import annotations
@@ -20,30 +22,21 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/03"
 
-import importlib
 import json
 import re
-import sys
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 import pytest
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(repositoryRoot / "scripts"))
-
-import merge_readiness_lib as checks  # noqa: E402
-import merge_readiness_presenter as presenter  # noqa: E402
+from tools.workflow.lib import readiness as checks  # noqa: E402
+from tools.workflow.lib import readiness_posting as posting  # noqa: E402
+from tools.workflow.lib import readiness_presenter as presenter  # noqa: E402
 
 workflowDirectory: Path = repositoryRoot / ".github" / "workflows"
 checkedHead: str = "0123456789abcdef0123456789abcdef01234567"
 workflowNames: list[str] = sorted(path.name for path in workflowDirectory.glob("*.yml"))
-
-
-def loadPostingScript() -> ModuleType:
-    """Return the posting script, whose hyphenated name only `import_module` accepts."""
-    return importlib.import_module("merge-readiness")
 
 
 def buildStoredReport(**overrides: Any) -> dict[str, Any]:
@@ -90,7 +83,7 @@ def testTheRenderedCommentComesFromStoredResultsNotFromAnyBodyTheBranchWrote(
     stored = buildStoredReport()
     (tmp_path / "merge-readiness.md").write_text("Anything a fork wanted to say")
 
-    number, body = loadPostingScript().renderStoredReport(stored, checkedHead)
+    number, body = posting.renderStoredReport(stored, checkedHead)
 
     assert number == 160
     assert body.startswith(presenter.commentMarker)
@@ -101,7 +94,7 @@ def testTheRenderedCommentComesFromStoredResultsNotFromAnyBodyTheBranchWrote(
 def testTheCommentNamesTheCommitTheRunCheckedNotTheOneTheFileClaims() -> None:
     stored = buildStoredReport(headSha="ffffffffffff")
 
-    _, body = loadPostingScript().renderStoredReport(stored, checkedHead)
+    _, body = posting.renderStoredReport(stored, checkedHead)
 
     assert checkedHead[:12] in body
     assert "ffffffffffff" not in body
@@ -118,7 +111,7 @@ def testTheCommentNamesTheCommitTheRunCheckedNotTheOneTheFileClaims() -> None:
 )
 def testAStoredReportWithoutValidResultsIsRefused(results: list[Any]) -> None:
     with pytest.raises(ValueError):
-        loadPostingScript().renderStoredReport(
+        posting.renderStoredReport(
             buildStoredReport(results=results), checkedHead
         )
 
@@ -126,7 +119,7 @@ def testAStoredReportWithoutValidResultsIsRefused(results: list[Any]) -> None:
 @pytest.mark.parametrize("pullRequest", [0, -3, "160"])
 def testAStoredReportNamingNoValidPullRequestIsRefused(pullRequest: object) -> None:
     with pytest.raises(ValueError):
-        loadPostingScript().renderStoredReport(
+        posting.renderStoredReport(
             buildStoredReport(pullRequest=pullRequest), checkedHead
         )
 
@@ -142,9 +135,8 @@ def testALongDetailIsCutRatherThanPostedWhole() -> None:
 def testNothingIsPostedToAPullRequestWhoseHeadIsNotTheCheckedCommit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posting = loadPostingScript()
     monkeypatch.setattr(
-        posting.ticket, "requestJson",
+        posting.github, "requestJson",
         lambda url, token, **kwargs: {"head": {"sha": "f" * 40}, "base": {"ref": "x"}},
     )
 
@@ -155,9 +147,8 @@ def testNothingIsPostedToAPullRequestWhoseHeadIsNotTheCheckedCommit(
 def testAPullRequestWhoseHeadIsTheCheckedCommitIsConfirmed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posting = loadPostingScript()
     monkeypatch.setattr(
-        posting.ticket, "requestJson",
+        posting.github, "requestJson",
         lambda url, token, **kwargs: {
             "head": {"sha": checkedHead}, "base": {"ref": "x"}
         },
@@ -174,13 +165,12 @@ def buildComment(identifier: int, login: str, body: str) -> dict[str, Any]:
 def testAnotherAccountsCommentCarryingTheMarkerIsNeverTakenForTheReport(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posting = loadPostingScript()
     page = [
         buildComment(1, "someone", f"{presenter.commentMarker} imitation"),
         buildComment(2, posting.reportAuthor, f"{presenter.commentMarker} real"),
     ]
     monkeypatch.setattr(
-        posting.ticket, "requestJson", lambda url, token, **kwargs: page
+        posting.github, "requestJson", lambda url, token, **kwargs: page
     )
 
     assert posting.findReportComment("token", 160) == 2
@@ -189,10 +179,9 @@ def testAnotherAccountsCommentCarryingTheMarkerIsNeverTakenForTheReport(
 def testOnlyAnImitationMeansThereIsNoEarlierReport(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posting = loadPostingScript()
     page = [buildComment(1, "someone", f"{presenter.commentMarker} imitation")]
     monkeypatch.setattr(
-        posting.ticket, "requestJson", lambda url, token, **kwargs: page
+        posting.github, "requestJson", lambda url, token, **kwargs: page
     )
 
     assert posting.findReportComment("token", 160) is None
@@ -201,7 +190,6 @@ def testOnlyAnImitationMeansThereIsNoEarlierReport(
 def testTheReportIsFoundPastTheFirstHundredComments(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posting = loadPostingScript()
     filler = [buildComment(n, "someone", "chatter") for n in range(100)]
     report = buildComment(500, posting.reportAuthor, presenter.commentMarker)
     pages = {1: filler, 2: [report]}
@@ -212,7 +200,7 @@ def testTheReportIsFoundPastTheFirstHundredComments(
         requested.append(number)
         return pages.get(number, [])
 
-    monkeypatch.setattr(posting.ticket, "requestJson", answerPage)
+    monkeypatch.setattr(posting.github, "requestJson", answerPage)
 
     assert posting.findReportComment("token", 160) == 500
     assert requested == [1, 2]
@@ -228,10 +216,12 @@ def testThePostingWorkflowUnpacksTheArtifactOutsideItsCheckout() -> None:
 def testThePostingWorkflowRunsItsOwnScriptAgainstTheUnpackedData() -> None:
     (script,) = [
         block for block in listRunBlocks(readWorkflow("merge-readiness.yml"))
-        if "merge-readiness.py" in block
+        if "tools.workflow.merge_readiness" in block
     ]
 
-    assert script.split()[:3] == ["python", "scripts/merge-readiness.py", "report"]
+    assert script.split()[:4] == [
+        "python", "-m", "tools.workflow.merge_readiness", "report",
+    ]
     assert '--results "$RUNNER_TEMP/readiness/merge-readiness.json"' in script
     assert '--head-sha "$HEAD_SHA"' in script
     assert "--comment" not in script

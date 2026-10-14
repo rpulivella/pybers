@@ -13,6 +13,7 @@ identifier `com.apple.Numbers` and executable `Numbers`. A locator that trusted
 has it, which is why the search falls back to inspecting bundle contents.
 
 UPDATES
+2026-10-13  Moved here from `tools/lib/numbersapp.py`, for PYB-204.
 2026-09-04  Written for #44, moved out of protos-extract.py, which was the only
             caller until the function-index extractor needed the same search.
 """
@@ -25,7 +26,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/04"
-__usage__ = "imported, never run: tools/lib holds no commands"
+__usage__ = "imported, never run: a module in lib/ holds no command"
 
 import plistlib
 from dataclasses import dataclass

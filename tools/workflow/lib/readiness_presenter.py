@@ -11,6 +11,7 @@ The verdict says a change is ready for a person to test. It never says a change 
 ready to merge, because no automated check can know that.
 
 UPDATES
+2026-10-13  Moved here from `scripts/merge_readiness_presenter.py`, for PYB-204.
 2026-09-17  Written for PYB-76.
 """
 from __future__ import annotations
@@ -25,7 +26,10 @@ __date__ = "2026/09/17"
 
 from datetime import UTC, datetime
 
-from merge_readiness_lib import (
+from rich.console import Console
+from rich.markup import escape
+
+from tools.workflow.lib.readiness import (
     BranchFacts,
     CheckResult,
     attention,
@@ -34,8 +38,6 @@ from merge_readiness_lib import (
     readVerdict,
     skipped,
 )
-from rich.console import Console
-from rich.markup import escape
 
 commentMarker: str = "<!-- pybers-merge-readiness -->"
 commentHeading: str = "Merge Readiness"

@@ -7,20 +7,22 @@ golden's expected-values file names, and writes a report a developer reads in pl
 manual session in Numbers. Backs the /golden-confirm skill (PYB-94).
 
 Everything that needs Accessibility, Screen Recording or control of Numbers happens in
-pybersdev-golden-confirm.app, built from scripts/golden-confirm-helper/ by the
+pybersdev-golden-confirm.app, built from tools/local/lib/golden-confirm-helper/ by the
 `helper-build` command, so that Terminal holds none of those permissions.
 
 Shells out to `security`, `swiftc`, `codesign` and `open`, the external toolchain the
 house rules allow: no Python library signs an app or starts one under its own grants.
 
 Usage:
-    .venv/bin/python3 scripts/golden-confirm.py run 20-sheets-added.numbers
-    .venv/bin/python3 scripts/golden-confirm.py run 20-sheets-added.numbers --dry-run
-    .venv/bin/python3 scripts/golden-confirm.py damage-check
-    .venv/bin/python3 scripts/golden-confirm.py helper-build
-    .venv/bin/python3 scripts/golden-confirm.py helper-build --identity <hash> --dry-run
-    .venv/bin/python3 scripts/golden-confirm.py permissions
-    .venv/bin/python3 scripts/golden-confirm.py measure 63b-fill-dragged-down
+    .venv/bin/python3 -m tools.local.golden_confirm run 20-sheets-added.numbers
+    .venv/bin/python3 -m tools.local.golden_confirm run 20-sheets-added.numbers \
+        --dry-run
+    .venv/bin/python3 -m tools.local.golden_confirm damage-check
+    .venv/bin/python3 -m tools.local.golden_confirm helper-build
+    .venv/bin/python3 -m tools.local.golden_confirm helper-build --identity <hash> \
+        --dry-run
+    .venv/bin/python3 -m tools.local.golden_confirm permissions
+    .venv/bin/python3 -m tools.local.golden_confirm measure 63b-fill-dragged-down
 
 A run holds `caffeinate` while it drives Numbers, because the screen lock that follows
 display sleep stops it.
@@ -32,6 +34,10 @@ Runs on the repository's venv, which holds rich and pybers, and needs the Xcode
 command line tools for `helper-build`.
 
 UPDATES
+2026-10-14  Moved here from `scripts/golden-confirm.py`, and run as a module,
+            for PYB-204.
+2026-10-13  The repository root, a branch's ticket number and the help formatter
+            come from `lib/shared.py`, for PYB-204.
 2026-10-13  Quotes each reported value as a code span, and spaces the operators of
             a reported formula, both from `golden_confirm_lib`, for PYB-201.
 2026-10-13  Imports pybers before any command runs, for PYB-201.
@@ -54,7 +60,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/17"
-__usage__ = ".venv/bin/python3 scripts/golden-confirm.py <command> [options]"
+__usage__ = ".venv/bin/python3 -m tools.local.golden_confirm <command> [options]"
 
 import argparse
 import hashlib
@@ -82,20 +88,16 @@ from pybers import CellRange, CellReference, MergeRange, PybersError
 # Internal on purpose: pybers exposes no archives, and round-trip tests share this.
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from golden_confirm_lib import formatCodeSpan, formatSpacedFormula
-
-try:
-    from rich_argparse import RichHelpFormatter
-except ImportError:  # rich_argparse is optional, per scripts/README.md
-    RichHelpFormatter = argparse.HelpFormatter  # type: ignore[assignment,misc]
+from tools.local.lib.golden_confirm import formatCodeSpan, formatSpacedFormula
+from tools.workflow.lib.shared import (
+    RichHelpFormatter,
+    readTicketNumber,
+    repositoryRoot,
+)
 
 console: Console = Console()
 
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
-helperSourceDirectory: Path = repositoryRoot / "scripts" / "golden-confirm-helper"
+helperSourceDirectory: Path = Path(__file__).parent / "lib" / "golden-confirm-helper"
 helperSourceFiles: tuple[str, ...] = ("Info.plist", "helper.entitlements", "main.swift")
 helperName: str = "pybersdev-golden-confirm"
 helperInstallDirectory: Path = Path.home() / "Library/Application Support/pybers"
@@ -320,12 +322,12 @@ def checkHelperCurrent() -> None:
     if installed is None:
         raise GoldenConfirmError(
             f"{helperBundle} is not installed; run "
-            "`.venv/bin/python3 scripts/golden-confirm.py helper-build`"
+            "`.venv/bin/python3 -m tools.local.golden_confirm helper-build`"
         )
     if installed != readHelperSourceHash():
         raise GoldenConfirmError(
             "the installed helper was built from different source than this checkout; "
-            "run `.venv/bin/python3 scripts/golden-confirm.py helper-build`"
+            "run `.venv/bin/python3 -m tools.local.golden_confirm helper-build`"
         )
 
 
@@ -465,13 +467,13 @@ def readTicketKey() -> str:
     with (repositoryRoot / "pyproject.toml").open("rb") as handle:
         prefix = tomllib.load(handle)["tool"]["pybers"]["ticketPrefix"]
     branch = runTool(["git", "-C", str(repositoryRoot), "branch", "--show-current"])
-    match = re.match(r"^[a-z]+/(\d+)-", branch.stdout.strip())
-    if match is None:
+    number = readTicketNumber(branch.stdout.strip())
+    if not number:
         raise GoldenConfirmError(
             f"branch {branch.stdout.strip() or '(detached)'} names no ticket, so the "
             "report has no folder; switch to a <type>/<N>-<title> branch"
         )
-    return f"{prefix}-{match.group(1)}"
+    return f"{prefix}-{number}"
 
 
 def readExpectedValues(golden: Path) -> ExpectedValues:

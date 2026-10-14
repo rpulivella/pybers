@@ -11,6 +11,9 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-10-13  Moved here from `scripts/merge_readiness_lib.py`, for PYB-204.
+2026-10-13  The repository root and a branch's ticket number come from
+            `lib/shared.py`, for PYB-204.
 2026-10-03  Stored results are read back as data and refused when malformed, and a
             ticket disagrees only with a CHANGELOG line the branch added, for
             PYB-151.
@@ -36,11 +39,12 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
-repositoryRoot: Path = Path(__file__).resolve().parent.parent
+from tools.workflow.lib.pull_request import templatePath
+from tools.workflow.lib.shared import readTicketNumber, repositoryRoot
+
 goldenDirectory: Path = repositoryRoot / "tests" / "golden"
 changelogPath: Path = repositoryRoot / "CHANGELOG.md"
 goldenReadmePath: Path = goldenDirectory / "README.md"
-templatePath: Path = repositoryRoot / ".github" / "pull_request_template.md"
 
 osvBatchUrl: str = "https://api.osv.dev/v1/querybatch"
 pypiRoot: str = "https://pypi.org/pypi"
@@ -155,12 +159,6 @@ def runGit(arguments: list[str]) -> str:
             f"git {' '.join(arguments)} failed: {completed.stderr.strip()}"
         )
     return completed.stdout.strip()
-
-
-def readTicketNumber(branch: str) -> str:
-    """Return the ticket number a branch name carries, or an empty string."""
-    match = re.match(r"^[a-z]+/(\d+)-", branch)
-    return match.group(1) if match else ""
 
 
 def readUnreleasedSection(text: str) -> str:

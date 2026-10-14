@@ -52,22 +52,22 @@ jobs:
       # reports all four.
       - name: pytest
         shell: bash -o pipefail -e {0}
-        run: python scripts/pr-preflight-check.py --gate pytest 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+        run: python -m tools.workflow.preflight --gate pytest 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
 
       - name: standards
         if: always()
         shell: bash -o pipefail -e {0}
-        run: python scripts/pr-preflight-check.py --gate standards 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+        run: python -m tools.workflow.preflight --gate standards 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
 
       - name: ruff
         if: always()
         shell: bash -o pipefail -e {0}
-        run: python scripts/pr-preflight-check.py --gate ruff 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+        run: python -m tools.workflow.preflight --gate ruff 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
 
       - name: mypy
         if: always()
         shell: bash -o pipefail -e {0}
-        run: python scripts/pr-preflight-check.py --gate mypy 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+        run: python -m tools.workflow.preflight --gate mypy 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
 
       - name: Summarize the gates
         # A verdict is matched by its two-space column rather than by any gate
