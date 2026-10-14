@@ -33,12 +33,15 @@ for sheet, table, cell in document.cellsIterate():
     print(sheet.name, table.name, cell.reference, cell.value, cell.description.kind)
 
 costs = document.sheet("Summary").table("Costs")
+print(len(costs.cells), "cells hold something")
 costs.cell("B4").value = Decimal("1250.00")
 costs.cell("B5").formulaText = "=SUM(B1:B4)"
 costs.rowAdd(6)
 
 document.save()
 ```
+
+A table's `cells` maps each reference to its cell and is read-only: a cell changes through the table, as `costs.cell("B4")` does above, so no edit can leave a table holding something that is not one of its cells.
 
 Numeric values are `Decimal`, never `float`, because Numbers stores them as decimal128 and a binary float would add rounding error the document never had.
 

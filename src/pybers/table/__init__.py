@@ -6,6 +6,10 @@ One feature, whole. `cells` is what a caller reaches through, and `_read` and
 `_write` are the archive halves, private because a caller wanting a cell asks the
 table for one rather than walking a tile.
 
+**The cell store belongs to this feature, not to the caller.** `Table._cells` is
+written by the table, `copy`, `relocation` and `structure`, and a caller reads
+`Table.cells`, a read-only view of it.
+
 **A table is sparse and declares more than it holds.** The grid comes from what the
 table declares, never from which cells hold something: 7 of the 74 tables in the
 documents declare more rows or columns than their records reach, so an inferred size
@@ -16,6 +20,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-10-14  The cell store is the feature's own, read through `cells`, for PYB-193.
 2026-10-01  `CellKind`, `CellFormat` and `CellDescription`, for PYB-141.
 2026-09-30  A fill under `CONTINUE_SERIES` continues a series, for PYB-137.
 2026-09-29  `CellValueFill`, the value rule a fill names, for PYB-118.
