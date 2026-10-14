@@ -75,7 +75,7 @@ That maintainer runs `/pr-merge`, which merges the pull request into `develop` a
 
 ## Filing a Ticket
 
-When no ready ticket fits, write one from [the ticket template](docs/templates/ticket.md): one sentence saying who wants what and why, then acceptance criteria that each state an outcome someone can check, never how to build it. Its title becomes the branch name, the pull request title and the CHANGELOG line. `/ticket-create` files it, and `/ticket-edit` revises it.
+When no ready ticket fits, write one from [the ticket template](.github/ticket_template.md): one sentence saying who wants what and why, then acceptance criteria that each state an outcome someone can check, never how to build it. Its title becomes the branch name, the pull request title and the CHANGELOG line. `/ticket-create` files it, and `/ticket-edit` revises it.
 
 A ticket filed as `Todo` is ready to start. A `Concept` ticket still needs a person to decide something, and goes back there whenever its specification turns out to be inadequate.
 
