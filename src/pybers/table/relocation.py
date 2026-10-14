@@ -10,6 +10,7 @@ on without asking, measured 2026-09-23 in `60e-move-overwrite`, and pybers refus
 instead, since that discards a value nobody asked to lose.
 
 UPDATES
+2026-10-14  Checks a range against the grid through `bounds`, for PYB-193.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-29  The refusals name the action, so a copy shares them, for PYB-136.
 2026-09-24  A move returns every formula left reading a cell it emptied.
@@ -42,6 +43,7 @@ from pybers.formula.relocation import (
     clampFormulaRanges,
     relocateFormula,
 )
+from pybers.table.bounds import refuseRangeOutside
 
 if TYPE_CHECKING:
     from pybers.table.cells import Cell, Table
@@ -234,7 +236,6 @@ def moveCells(
     references: FormulaReferenceRelocation,
 ) -> list[Cell]:
     """Move a block so its top-left lands on `anchor`, and return what it strands."""
-    from pybers.table.cells import refuseRangeOutside
     from pybers.table.merges import MergeRange
 
     rule = toRelocationRule(references)

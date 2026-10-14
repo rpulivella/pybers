@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-14  A range is checked against the grid in `bounds`, for PYB-193.
 2026-10-12  A changed kind describes its format as UNDETERMINED, for PYB-190.
 2026-10-11  Table names are returned as a frozendict, for PYB-189.
 2026-10-01  A cell describes the kind its record stores and the format it shows
@@ -80,6 +81,7 @@ from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.formula.render import renderFormula
 from pybers.geometry import Position
 from pybers.style import Style
+from pybers.table.bounds import listRangePositions, refuseRangeOutside
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
 from pybers.table.kinds import CellDescription, emptyDescription, findCellKind
@@ -143,36 +145,6 @@ def generateOwnerIdentity() -> str:
     """
     value = int.from_bytes(uuid.uuid4().bytes, "little") & ownerBaseMask
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
-
-
-def listRangePositions(table: Table, address: RangeAddress) -> list[CellReference]:
-    """Return the positions ranges cover, checking every range before returning any."""
-    extent = table.extent
-    items = []
-    for item in toCellRanges(address):
-        if item.rowsUnbounded or item.colsUnbounded:
-            if extent is None:
-                continue
-            item = item.boundedBy(extent)
-        refuseRangeOutside(table, item)
-        items.append(item)
-    return [
-        reference.asUnlocked() for item in items for reference in item
-        if table.addressable(reference)
-    ]
-
-
-def refuseRangeOutside(table: Table, item: CellRange) -> None:
-    """Refuse a bounded range with a corner outside a table's declared grid."""
-    extent = table.extent
-    if extent is None or not all(
-        corner is not None and extent.covers(corner)
-        for corner in (item.start, item.end)
-    ):
-        raise ReferenceError(
-            f"{item} reaches outside {table.name!r}, which is {table.rowCount} "
-            f"rows by {table.colCount} columns."
-        )
 
 
 @dataclass(frozen=True, slots=True)

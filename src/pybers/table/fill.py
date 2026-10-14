@@ -12,6 +12,7 @@ drag repeats the same way except where a column continues a series, the case
 `CONTINUE_SERIES` covers, in any one direction. See findings-03-structure.md.
 
 UPDATES
+2026-10-14  Checks a range against the grid through `bounds`, for PYB-193.
 2026-10-01  A filled cell copies its source's record description, for PYB-141.
 2026-09-30  `CONTINUE_SERIES` continues each column that begins a series, for
             PYB-137.
@@ -35,6 +36,7 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, RangeAddress
 from pybers.addressing.reference import CellReference, ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation, relocateFormula
+from pybers.table.bounds import listRangePositions
 from pybers.table.kinds import CellKind
 from pybers.table.relocation import findBlockCorners, toRelocationRule
 from pybers.table.series import SeedValue, findSeriesContinuation
@@ -167,8 +169,6 @@ def fillCells(
     values: CellValueFill,
 ) -> int:
     """Repeat a block across a range, and return how many cells were filled."""
-    from pybers.table.cells import listRangePositions
-
     namedCell = (
         toRelocationRule(references) is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
     )

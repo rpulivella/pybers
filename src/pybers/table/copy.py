@@ -11,6 +11,7 @@ No formula outside the copy changes, under either rule. See findings-03-structur
 afterward exactly as it did before.
 
 UPDATES
+2026-10-14  Checks a range against the grid through `bounds`, for PYB-193.
 2026-09-29  Written for PYB-136.
 """
 from __future__ import annotations
@@ -28,6 +29,7 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, RangeAddress
 from pybers.addressing.reference import CellAddress, ReferenceError, toCellReference
 from pybers.formula.relocation import FormulaReferenceRelocation, clampFormulaRanges
+from pybers.table.bounds import refuseRangeOutside
 from pybers.table.fill import copyCellContent
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import (
@@ -49,7 +51,7 @@ def copyCells(
     references: FormulaReferenceRelocation,
 ) -> CellRange:
     """Copy a block so its top-left lands on `anchor`, and return where it landed."""
-    from pybers.table.cells import Cell, refuseRangeOutside
+    from pybers.table.cells import Cell
 
     rule = toRelocationRule(references)
     named = rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
