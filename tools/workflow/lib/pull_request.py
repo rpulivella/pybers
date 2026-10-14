@@ -6,6 +6,8 @@ runs, and a body checked against the template.
 Shared by `pr.py` and the readiness check.
 
 UPDATES
+2026-10-14  `findTicketPullRequest`, a ticket's open pull request by its branch,
+            for PYB-211.
 2026-10-14  The pull request client moved here from `pr.py`, which keeps its
             commands, for PYB-204.
 2026-10-14  Moved here from `pr.py`, so the readiness code imports a library rather
@@ -33,7 +35,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from tools.workflow.lib import github
-from tools.workflow.lib.shared import repositoryRoot
+from tools.workflow.lib.shared import readTicketNumber, repositoryRoot
 
 # The base a pull request targets by default. Library and app repositories cut from
 # develop; a web-facing repository whose deploy tracks a different branch overrides
@@ -405,6 +407,18 @@ def findOpenPullRequest(
             "number explicitly."
         )
     return summarizePullRequest(matches[0])
+
+
+def findTicketPullRequest(token: str, number: int) -> PullRequestSummary | None:
+    """Return the open pull request whose branch carries this ticket's number."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls?state=open&per_page=100"
+    )
+    for payload in github.requestJson(url, token) or []:
+        if readTicketNumber(payload.get("head", {}).get("ref", "")) == str(number):
+            return summarizePullRequest(payload)
+    return None
 
 
 def readPullRequest(token: str, number: int) -> PullRequestSummary:

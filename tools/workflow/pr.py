@@ -41,6 +41,8 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-10-14  `create`, `ready` and `merge` keep the dashboard's status line current,
+            for PYB-211.
 2026-10-14  A refused merge states the miss and stops, as house rule 11 asks,
             for PYB-204.
 2026-10-14  Moved here from `scripts/pr.py`, and run as a module, for PYB-204.
@@ -114,7 +116,7 @@ from rich.console import Console
 from rich.markup import escape
 
 # The one GitHub client, reused rather than reimplemented, so there is one auth story.
-from tools.workflow.lib import github
+from tools.workflow.lib import dashboard, github
 from tools.workflow.lib import github_commands as commands
 from tools.workflow.lib.pull_request import (
     PullRequestSummary,
@@ -148,7 +150,7 @@ from tools.workflow.lib.pull_request import (
     restartWorkflowRun,
     waitForTicketClosed,
 )
-from tools.workflow.lib.shared import errorExitCode
+from tools.workflow.lib.shared import errorExitCode, readTicketNumber
 
 console = Console()
 
@@ -284,6 +286,7 @@ def runCreate(arguments: argparse.Namespace) -> int:
     )
     console.print("[green]Opened as draft[/]")
     showPullRequest(summary)
+    reportDashboard(dashboard.saveStageChange(token))
     return 0
 
 
@@ -504,6 +507,7 @@ def runReady(arguments: argparse.Namespace) -> int:
         f"[bold cyan]{formatPullRequestRef(summary.number)}[/]"
     )
     console.print(summary.url)
+    reportDashboard(dashboard.saveStageChange(token))
     return 0
 
 
@@ -604,6 +608,12 @@ def reopenTicketAfterMerge(token: str, subject: str, status: str) -> bool:
     return True
 
 
+def reportDashboard(problem: str) -> None:
+    """Print the dashboard's warning, when a command could not update it."""
+    if problem:
+        console.print(f"[yellow]{escape(problem)}[/]")
+
+
 def runMerge(arguments: argparse.Namespace) -> int:
     """Merge a pull request, deleting its branch only when asked and only if ours."""
     if arguments.method not in validMergeMethods:
@@ -683,6 +693,11 @@ def runMerge(arguments: argparse.Namespace) -> int:
         f"[green]Merged[/] [bold cyan]{formatPullRequestRef(summary.number)}[/] "
         f"by [cyan]{arguments.method}[/] as [dim]{sha[:12]}[/]"
     )
+    merged = readTicketFromSubject(arguments.subject) or readTicketNumber(summary.head)
+    if merged:
+        reportDashboard(
+            dashboard.saveMerge(github.formatTicketRef(int(merged)), summary.number)
+        )
 
     if arguments.ticketStaysOpen and not reopenTicketAfterMerge(
         token, arguments.subject, arguments.ticketStatus
