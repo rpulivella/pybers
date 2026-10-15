@@ -1,0 +1,67 @@
+# The four gates on a runner, shared by `preflight` before a merge and `health`
+# after one, so the two workflows differ only in when they run.
+name: gates
+description: Install the project and run pytest, the prose gate, ruff and mypy.
+
+inputs:
+  title:
+    description: The heading of the run's summary, the workflow that called this.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        # One interpreter, the one `requires-python` declares. Naming no
+        # version here keeps the claim in a single place, so raising the floor
+        # needs no edit to this file.
+        python-version-file: pyproject.toml
+
+    - name: Install the project
+      shell: bash
+      run: pip install -e ".[dev]"
+
+    # One step per gate, because GitHub shows a step as its own line with its own
+    # verdict. Each runs whatever the one before it did, so a failing run still
+    # reports all four.
+    - name: pytest
+      shell: bash -o pipefail -e {0}
+      run: python -m tools.workflow.preflight --gate pytest 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+
+    - name: standards
+      if: always()
+      shell: bash -o pipefail -e {0}
+      run: python -m tools.workflow.preflight --gate standards 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+
+    - name: ruff
+      if: always()
+      shell: bash -o pipefail -e {0}
+      run: python -m tools.workflow.preflight --gate ruff 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+
+    - name: mypy
+      if: always()
+      shell: bash -o pipefail -e {0}
+      run: python -m tools.workflow.preflight --gate mypy 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+
+    - name: Summarize the gates
+      # A verdict is matched by its two-space column rather than by any gate
+      # name, because a failing checker prints its own `FAIL (1)` header and
+      # AC 3 forbids this file from carrying a copy of the gate list.
+      if: always()
+      shell: bash
+      env:
+        TITLE: ${{ inputs.title }}
+      run: |
+        {
+          echo "### $TITLE · Python $(python -V | cut -d' ' -f2)"
+          echo
+          echo '| Gate | Result |'
+          echo '| --- | --- |'
+          gates=$(grep -E '^(PASS|FAIL) [^ ]+  ' "$RUNNER_TEMP/preflight.log" || true)
+          if [ -z "$gates" ]; then
+            echo '| none | ❌ the preflight printed no gate lines |'
+          else
+            echo "$gates" | sed -E 's/^PASS ([^ ]+)  (.*)$/| \1 | ✅ \2 |/; s/^FAIL ([^ ]+)  (.*)$/| \1 | ❌ \2 |/'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
