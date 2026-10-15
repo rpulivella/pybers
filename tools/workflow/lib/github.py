@@ -12,6 +12,8 @@ a missing token is a loud failure, never a guess:
     2. a GITHUB_TOKEN= line in the git-ignored .dev.vars at the repository root
 
 UPDATES
+2026-10-14  `readAuthenticatedLogin` and `readPermission`, for a merge's approval
+            gate, for PYB-156.
 2026-10-14  `readBoardStatus`, a ticket's Status for the dashboard, for PYB-211.
 2026-10-14  `readOpenBlockers`, for the dashboard's blocked-by notes, for PYB-211.
 2026-10-13  Split from `ticket.py`, which keeps its commands, for PYB-204. The history
@@ -485,6 +487,20 @@ def readBoardStatus(token: str, number: int) -> str:
         if item["project"]["number"] == projectNumber:
             return str((item.get("fieldValueByName") or {}).get("name") or "")
     return ""
+
+
+def readAuthenticatedLogin(token: str) -> str:
+    """Return the login the token acts as."""
+    return str((requestJson(f"{restRoot}/user", token) or {}).get("login", ""))
+
+
+def readPermission(token: str, login: str) -> str:
+    """Return a user's permission on this repository: admin, write, read or none."""
+    url = (
+        f"{restRoot}/repos/{repositoryOwner}/{repositoryName}"
+        f"/collaborators/{login}/permission"
+    )
+    return str((requestJson(url, token) or {}).get("permission", "none"))
 
 
 def readOpenBlockers(token: str, number: int) -> list[int]:

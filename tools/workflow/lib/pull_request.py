@@ -6,6 +6,8 @@ runs, and a body checked against the template.
 Shared by `pr.py` and the readiness check.
 
 UPDATES
+2026-10-14  A summary carries its author, and `readApprovers` and
+            `confirmMergeApproved` gate a merge on approval, for PYB-156.
 2026-10-14  `findTicketPullRequest`, a ticket's open pull request by its branch,
             for PYB-211.
 2026-10-14  The pull request client moved here from `pr.py`, which keeps its
@@ -233,6 +235,7 @@ class PullRequestSummary:
     headSha: str
     base: str
     nodeId: str
+    author: str
 
 
 @dataclass(frozen=True)
@@ -292,6 +295,7 @@ def summarizePullRequest(payload: dict[str, Any]) -> PullRequestSummary:
         headSha=payload["head"]["sha"],
         base=payload["base"]["ref"],
         nodeId=payload["node_id"],
+        author=(payload.get("user") or {}).get("login", ""),
     )
 
 
@@ -419,6 +423,27 @@ def findTicketPullRequest(token: str, number: int) -> PullRequestSummary | None:
         if readTicketNumber(payload.get("head", {}).get("ref", "")) == str(number):
             return summarizePullRequest(payload)
     return None
+
+
+def readApprovers(token: str, number: int) -> list[str]:
+    """Return who approved a pull request in their latest decisive review."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls/{number}/reviews?per_page=100"
+    )
+    latest: dict[str, str] = {}
+    for review in github.requestJson(url, token) or []:
+        # A comment leaves a reviewer's verdict standing; a dismissal withdraws it.
+        if review.get("state") in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
+            latest[(review.get("user") or {}).get("login", "")] = review["state"]
+    return sorted(login for login, state in latest.items() if state == "APPROVED")
+
+
+def confirmMergeApproved(
+    approvers: list[str], author: str, merger: str, mergerIsAdmin: bool
+) -> bool:
+    """Return whether a merge may proceed: approved, or the administrator's own."""
+    return bool(approvers) or (mergerIsAdmin and author != "" and author == merger)
 
 
 def readPullRequest(token: str, number: int) -> PullRequestSummary:

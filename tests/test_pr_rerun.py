@@ -60,6 +60,7 @@ def runRerunOf(
         lambda token, number: pullRequest.PullRequestSummary(
             number=167, title="", url="", state="open", isDraft=False, head="",
             headRepository="", headSha="a" * 40, base="develop", nodeId="",
+            author="",
         ),
     )
     monkeypatch.setattr(

@@ -48,12 +48,14 @@ def buildPayload(repository: str | None, branch: str = sharedName) -> dict[str, 
             "repo": None if repository is None else {"full_name": repository},
         },
         "base": {"ref": "develop"},
+        "user": {"login": "contributor"},
     }
 
 
 def runMergeOf(
     monkeypatch: pytest.MonkeyPatch, payload: dict[str, Any], *extra: str,
-    asked: bool = True,
+    asked: bool = True, approvers: tuple[str, ...] = ("maintainer",),
+    merger: str = "maintainer", permission: str = "admin",
 ) -> tuple[int, list[str]]:
     """Merge one pull request with GitHub stood in for, and return what was deleted."""
     pr = loadPrScript()
@@ -71,6 +73,9 @@ def runMergeOf(
             )
         ],
     )
+    monkeypatch.setattr(pr, "readApprovers", lambda token, number: list(approvers))
+    monkeypatch.setattr(pr.github, "readAuthenticatedLogin", lambda token: merger)
+    monkeypatch.setattr(pr.github, "readPermission", lambda token, login: permission)
     monkeypatch.setattr(pr, "mergePullRequest", lambda *args: "b" * 40)
     monkeypatch.setattr(
         pr, "deleteBranch", lambda token, branch: deleted.append(branch)
@@ -148,3 +153,71 @@ def testADryRunOfAForksMergeSaysItDeletesNothing(
     assert (code, deleted) == (0, [])
     assert "deletes nothing" in output
     assert "would delete" not in output
+
+
+@pytest.mark.parametrize(("approvers", "author", "merger", "isAdmin", "allowed"), [
+    (["maintainer"], "contributor", "maintainer", False, True),
+    ([], "maintainer", "maintainer", True, True),
+    ([], "contributor", "maintainer", True, False),
+    ([], "maintainer", "maintainer", False, False),
+    ([], "", "", True, False),
+])
+def testAMergeNeedsAnApprovalOrTheAdministratorsOwnPullRequest(
+    approvers: list[str], author: str, merger: str, isAdmin: bool, allowed: bool
+) -> None:
+    decision = pullRequest.confirmMergeApproved(approvers, author, merger, isAdmin)
+    assert decision is allowed
+
+
+def testOnlyAReviewersLatestDecisionCounts(monkeypatch: pytest.MonkeyPatch) -> None:
+    reviews = [
+        {"user": {"login": "ann"}, "state": "APPROVED"},
+        {"user": {"login": "ann"}, "state": "COMMENTED"},
+        {"user": {"login": "bob"}, "state": "APPROVED"},
+        {"user": {"login": "bob"}, "state": "CHANGES_REQUESTED"},
+        {"user": {"login": "cy"}, "state": "APPROVED"},
+        {"user": {"login": "cy"}, "state": "DISMISSED"},
+    ]
+    monkeypatch.setattr(pullRequest.github, "requestJson", lambda url, token: reviews)
+    assert pullRequest.readApprovers("token", 160) == ["ann"]
+
+
+def testAnUnapprovedPullRequestFromAContributorIsRefused(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pr = loadPrScript()
+    ours = f"{pr.github.repositoryOwner}/{pr.github.repositoryName}"
+
+    code, deleted = runMergeOf(monkeypatch, buildPayload(ours), approvers=())
+
+    assert (code, deleted) == (pr.errorExitCode, [])
+    assert "has no approving review" in readOutput(capsys)
+
+
+def testTheAdministratorMergesTheirOwnUnapprovedPullRequest(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pr = loadPrScript()
+    ours = f"{pr.github.repositoryOwner}/{pr.github.repositoryName}"
+
+    code, _ = runMergeOf(
+        monkeypatch, buildPayload(ours), "--dry-run", approvers=(), merger="contributor"
+    )
+
+    assert code == 0
+    assert "merged by its author contributor as administrator" in readOutput(capsys)
+
+
+def testAWriterCannotMergeTheirOwnUnapprovedPullRequest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pr = loadPrScript()
+    ours = f"{pr.github.repositoryOwner}/{pr.github.repositoryName}"
+
+    code, _ = runMergeOf(
+        monkeypatch, buildPayload(ours), approvers=(), merger="contributor",
+        permission="write",
+    )
+
+    assert code == pr.errorExitCode
+
