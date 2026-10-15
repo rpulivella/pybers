@@ -47,7 +47,7 @@ runs:
     - name: Summarize the gates
       # A verdict is matched by its two-space column rather than by any gate
       # name, because a failing checker prints its own `FAIL (1)` header and
-      # AC 3 forbids this file from carrying a copy of the gate list.
+      # PYB-5's AC 3 forbids this file from carrying a copy of the gate list.
       if: always()
       shell: bash
       env:

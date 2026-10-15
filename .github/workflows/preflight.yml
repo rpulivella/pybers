@@ -1,6 +1,6 @@
 # Runs the same gates a contributor runs locally, on a machine that is not
 # theirs. Whether a cold install passes at the declared version is the one thing
-# a local run cannot answer, which is what earns this its runtime. See #5.
+# a local run cannot answer, which is what earns this its runtime. See PYB-5.
 name: preflight
 
 on:
