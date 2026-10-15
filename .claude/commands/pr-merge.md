@@ -43,8 +43,9 @@ trigger sitting on it.
    this repository: a fork's branch is the fork's to remove, whatever its name. The
    tool deletes nothing without the flag, so this skill always passes it. `pr.py` refuses a draft,
    so a pull request that never went through `/pr-review-code` cannot arrive here, and it
-   refuses any CI state other than passed, including a state it could not read. Neither
-   refusal is restated as a step here, because a check a skill performs is a check a
+   refuses any CI state other than passed, including a state it could not read. It also
+   refuses a pull request with no approving review, unless its author is the administrator
+   merging it. No refusal is restated as a step here, because a check a skill performs is a check a
    skimmed skill skips. A check canceled by a GitHub outage is restarted with
    `.venv/bin/python3 -m tools.workflow.pr rerun <N>`. A check that failed for any other reason
    is read with `.venv/bin/python3 -m tools.workflow.pr logs <N>` before anything is restarted.
