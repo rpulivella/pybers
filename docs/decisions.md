@@ -163,6 +163,82 @@ the per-pull-request scan already resolves.
 
 ---
 
+## Writing values and formats, decided 2026-10-16
+
+Settled for PYB-217, PYB-144 and PYB-145 across three users at once: a person at the
+command line, a script through `import pybers`, and an agent holding several documents
+open. Whatever serves one of them has to read the same way to the other two.
+
+**A value's kind follows its Python type.** `Decimal` is a number, `str` text, `bool` a
+boolean, `datetime` a date and time, and `timedelta` a duration. An `int` is accepted as the
+exact number it names, and a `date` as midnight, which is how Numbers stores a date typed
+without a time. A `float` is refused with a message naming `Decimal`, because Numbers keeps
+numbers as decimal128 and a binary float carries rounding error into a document that never
+had any.
+
+**A date and time always carries a time zone.** One with none is refused, so a written
+moment is never ambiguous. Whether Numbers stores a date in UTC or in some local time, and
+whether it keeps a date with no time zone at all, is not measured yet; PYB-218 measures
+both, and if Numbers does keep such a date, pybers represents it rather than refusing it.
+
+**A cell that changes kind takes Numbers' Automatic format for its new kind**, as a value
+typed into a fresh cell does. A boolean therefore shows TRUE or FALSE; a checkbox is a
+format, chosen through formats like any other.
+
+**A format is a value of one union, `CellFormat`**, with one frozen dataclass per family:
+`CellFormatNumber`, `CellFormatNumberCustom`, `CellFormatDuration`, `CellFormatCurrency`
+and the rest. `CellFormatAutomatic` and `CellFormatUnknown` are members too, so a format
+nobody chose and a format pybers cannot decode are explicit values rather than `None`, and
+a `match` over a cell's format is exhaustive. The names lead with `CellFormat` so the family
+sorts together and never collides with text or table formatting, and `CellFormatFamily`
+names the families. A small `Protocol` carries what every format shares.
+Typed objects were chosen over the alternatives other libraries take, a format string as in
+openpyxl or keyword options as in numbers-parser, because Numbers has no format syntax to
+borrow and a misspelled keyword fails late or not at all.
+
+**A format belongs to no document.** One read from a cell in one document applies to a
+cell in another, and the writer finds or adds the matching entry in that table's format
+list. Every format has one text form tagged by its family, which the command line, JSON
+export and import, and an agent all use.
+
+**A cell's kind and format always agree.** A write that would leave a format on a value it
+cannot show, such as a duration format on text, is refused, naming both, unless the caller
+passes `CellFormatConflict.AUTOMATIC`, which falls back to the Automatic format and reports
+it. The policy is a parameter of the library and of an agent's calls, and other writes can
+take it later, an import or a fill among them.
+
+**A write reports each cell whose kind or format it changed**, before and after, and a
+preview reports the same without writing. Nothing about a column is special: a write
+touches the cells it names, and whether a column stays consistent is answered by reading
+the table's structure, which reports each column's kind and format and the cells that
+differ. That reading is also what keeps JSON export compact, since a column is described
+once and only its exceptions are listed.
+
+**Formats apply over a range**, `table.cellFormatApply(range, format)`, and a single cell's
+value, format and style are set together in one call, `table.cellSet`, the style a named
+one or one written into the cell alone.
+
+**A custom number format is a structured value** holding its positive, negative and zero
+forms, the shape Numbers stores. A shorthand parser may later build one, and the structured
+value stays what pybers stores.
+
+**Currency has one home** that the format code and the formula code share, since a
+formula's result can be a currency amount as well as a cell's value (PYB-220).
+
+**No format bit is written before it is decoded.** PYB-219 decodes each family's archive
+and flag bits, and the format work splits by family on its findings.
+
+**On the command line, the verb comes first**: `pybers set FILE ADDRESS VALUE`. A file
+first would leave `diff A B`, `import` and `export -o` without a consistent place, and the
+bare `pybers FILE` already covers looking at one document. `set` infers a value's kind and
+`--as` overrides the inference; should inference prove unreliable, `set` falls back to text
+unless `--as` names a kind. The inference is one table of parsers built on the standard
+library, tried in order, rather than a chain of conditions. `set --format` sets a format by
+its text form. `--preview` shows a change and writes nothing, the flag named for what it
+does.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

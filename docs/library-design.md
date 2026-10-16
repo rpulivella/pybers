@@ -21,6 +21,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
 | `Cell` | One cell: its value, formula, style and stored description | Owner |
 | `CellValue` | `Decimal`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
+| `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `Style` | A cell's appearance | Frozen |
 | `RichText` | Text with styled runs | Frozen |
@@ -66,6 +67,18 @@ Each command answers to one public call, and the call does the work.
 - **A call returns data and prints nothing.** What it returns is a frozen dataclass, or the model itself, which the caller formats however it likes. `pybers.checkDocument` is the pattern.
 - **A long call takes `onProgress`**, a callback that hears each step as it starts, so the caller decides how progress looks, if at all.
 - **Nothing waits for input.** A call that cannot proceed raises.
+
+## Writing a cell
+
+A value's kind follows its Python type, as the table above lists. An `int` is written as that exact number and a `date` as midnight, a `float` is refused in favor of `Decimal`, and a `datetime` with no time zone is refused.
+
+- **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does.
+- **A cell's kind and format always agree.** A write that would leave a format on a value it cannot show is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`.
+- **Formats apply over a range**, with `table.cellFormatApply(range, format)`, and `table.cellSet` sets one cell's value, format and style in one call.
+- **A write reports each cell whose kind or format it changed**, and `preview=True` reports the same without writing.
+- **A table's structure is readable**: each column's kind and format, and the cells that differ from them.
+
+The reasoning is in `decisions.md`, under writing values and formats.
 
 ## What is stored
 

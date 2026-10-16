@@ -42,7 +42,9 @@ A command parses its arguments, calls the library once, formats what comes back,
 ## Writing
 
 - **A write names its target**: `--in-place` changes the file given, and `-o NEW` writes a new document beside it. A command that writes requires one of the two.
-- **`--dry-run`** shows the change and writes nothing, and a change that alters nothing writes nothing.
+- **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
+- **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind named is refused.
+- **`set --format SPEC`** sets how the cells show their value, SPEC being a format's text form, tagged by its family.
 - **A cell outside its table** is refused, naming the table's size, unless `--extend` grows the table to hold it.
 
 ## Formulas
