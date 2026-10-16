@@ -71,6 +71,7 @@ def runLogsOf(
         lambda token, number: pullRequest.PullRequestSummary(
             number=191, title="", url="", state="open", isDraft=False, head="",
             headRepository="", headSha="a" * 40, base="develop", nodeId="",
+            author="",
         ),
     )
     monkeypatch.setattr(pr.github, "requestJson", buildApiStandIn(runs, jobs))

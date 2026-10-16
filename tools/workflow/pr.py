@@ -41,6 +41,8 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-10-14  `merge` refuses a pull request with no approving review unless its
+            author is the administrator merging it, for PYB-156.
 2026-10-14  `create`, `ready` and `merge` keep the dashboard's status line current,
             for PYB-211.
 2026-10-14  A refused merge states the miss and stops, as house rule 11 asks,
@@ -123,6 +125,7 @@ from tools.workflow.lib.pull_request import (
     assertBranchIsPushed,
     checkHeadIsOurs,
     confirmChecksPassed,
+    confirmMergeApproved,
     createDraftPullRequest,
     defaultBaseBranch,
     deleteBranch,
@@ -137,6 +140,7 @@ from tools.workflow.lib.pull_request import (
     mergePullRequest,
     parsePullRequestNumber,
     passingConclusions,
+    readApprovers,
     readCheckRuns,
     readCurrentBranch,
     readHeadings,
@@ -614,6 +618,18 @@ def reportDashboard(problem: str) -> None:
         console.print(f"[yellow]{escape(problem)}[/]")
 
 
+def readMergeApproval(token: str, summary: PullRequestSummary) -> str:
+    """Return who approved a merge, or the administrator's own bypass, or ''."""
+    approvers = readApprovers(token, summary.number)
+    if approvers:
+        return f"approved by {', '.join(approvers)}"
+    merger = github.readAuthenticatedLogin(token)
+    isAdmin = github.readPermission(token, merger) == "admin"
+    if confirmMergeApproved(approvers, summary.author, merger, isAdmin):
+        return f"unapproved, merged by its author {merger} as administrator"
+    return ""
+
+
 def runMerge(arguments: argparse.Namespace) -> int:
     """Merge a pull request, deleting its branch only when asked and only if ours."""
     if arguments.method not in validMergeMethods:
@@ -636,10 +652,19 @@ def runMerge(arguments: argparse.Namespace) -> int:
         )
         return errorExitCode
 
+    approval = readMergeApproval(token, summary)
+    if not approval:
+        console.print(
+            f"[red]{formatPullRequestRef(summary.number)} has no approving review.[/] "
+            "Only its author may merge it unapproved, and only as an administrator."
+        )
+        return errorExitCode
+
     if arguments.dryRun:
         console.print("[yellow]Dry run. Nothing was merged.[/]")
         showPullRequest(summary)
         console.print(f"method:  [cyan]{arguments.method}[/]")
+        console.print(f"review:  {escape(approval)}")
         console.print(f"subject: [bold]{escape(arguments.subject)}[/]")
         console.print(
             "branch:  "

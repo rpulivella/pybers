@@ -1,6 +1,6 @@
 # Runs the same gates a contributor runs locally, on a machine that is not
 # theirs. Whether a cold install passes at the declared version is the one thing
-# a local run cannot answer, which is what earns this its runtime. See #5.
+# a local run cannot answer, which is what earns this its runtime. See PYB-5.
 name: preflight
 
 on:
@@ -9,8 +9,7 @@ on:
     # `ready_for_review` fires this the moment a pull request leaves draft, so a
     # branch is covered without any draft run.
     types: [opened, synchronize, reopened, ready_for_review]
-  # No push to develop: a pull request merges only once this is green, so a run
-  # after the merge could only report what is already known.
+  # A push to develop is `health`, which checks what landed after the fact.
 
 # Pushing three commits in a row cancels the two superseded runs.
 # Keyed by draft too, so a late draft run cannot cancel the run promotion fired.
@@ -37,53 +36,6 @@ jobs:
           # code can read it from the repository's git configuration.
           persist-credentials: false
 
-      - uses: actions/setup-python@v6
+      - uses: ./.github/actions/gates
         with:
-          # One interpreter, the one `requires-python` declares. Naming no
-          # version here keeps the claim in a single place, so raising the floor
-          # needs no edit to this file.
-          python-version-file: pyproject.toml
-
-      - name: Install the project
-        run: pip install -e ".[dev]"
-
-      # One step per gate, because GitHub shows a step as its own line with its own
-      # verdict. Each runs whatever the one before it did, so a failing run still
-      # reports all four.
-      - name: pytest
-        shell: bash -o pipefail -e {0}
-        run: python -m tools.workflow.preflight --gate pytest 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
-
-      - name: standards
-        if: always()
-        shell: bash -o pipefail -e {0}
-        run: python -m tools.workflow.preflight --gate standards 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
-
-      - name: ruff
-        if: always()
-        shell: bash -o pipefail -e {0}
-        run: python -m tools.workflow.preflight --gate ruff 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
-
-      - name: mypy
-        if: always()
-        shell: bash -o pipefail -e {0}
-        run: python -m tools.workflow.preflight --gate mypy 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
-
-      - name: Summarize the gates
-        # A verdict is matched by its two-space column rather than by any gate
-        # name, because a failing checker prints its own `FAIL (1)` header and
-        # AC 3 forbids this file from carrying a copy of the gate list.
-        if: always()
-        run: |
-          {
-            echo "### Preflight · Python $(python -V | cut -d' ' -f2)"
-            echo
-            echo '| Gate | Result |'
-            echo '| --- | --- |'
-            gates=$(grep -E '^(PASS|FAIL) [^ ]+  ' "$RUNNER_TEMP/preflight.log" || true)
-            if [ -z "$gates" ]; then
-              echo '| none | ❌ the preflight printed no gate lines |'
-            else
-              echo "$gates" | sed -E 's/^PASS ([^ ]+)  (.*)$/| \1 | ✅ \2 |/; s/^FAIL ([^ ]+)  (.*)$/| \1 | ❌ \2 |/'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          title: Preflight

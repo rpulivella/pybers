@@ -7,13 +7,14 @@
 
 Read and write Apple Numbers documents from Python, with the aim that an edit made by script is as reliable as one made in Numbers by hand.
 
+[![health](https://github.com/rpulivella/pybers/actions/workflows/health.yml/badge.svg?branch=develop)](https://github.com/rpulivella/pybers/actions/workflows/health.yml)
 [![License](https://img.shields.io/github/license/rpulivella/pybers)](LICENSE)
 
-> **Status, 2026-10-02:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files today, the command line is not built, and nothing is on PyPI yet.
+> **Status, 15 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has one command, `pybers check`, and nothing is on PyPI yet.
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. It installs with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will print any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and YAML, CSV and other conversions will follow it. A terminal interface for browsing and editing a document comes after that.
+`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. It installs with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
 
 ## Python library
 
@@ -56,14 +57,14 @@ Numeric values are `Decimal`, never `float`, because Numbers stores them as deci
 
 ### Planned
 
-- A command-line app that prints a document as JSON ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), followed by YAML, CSV and other conversions, with a round trip back into Numbers wherever the other format holds enough
-- A terminal interface for browsing and editing a document
-- Any value type in any cell ([PYB-144](https://github.com/rpulivella/pybers/issues/144)), shown in any format the Data Format menu offers ([PYB-145](https://github.com/rpulivella/pybers/issues/145))
+- A command-line app that exports a document as JSON ([PYB-142](https://github.com/rpulivella/pybers/issues/142))
+- A terminal interface for browsing a document read-only ([PYB-171](https://github.com/rpulivella/pybers/issues/171))
+- Writing any value type into any cell ([PYB-144](https://github.com/rpulivella/pybers/issues/144)), shown in any format the Data Format menu offers ([PYB-145](https://github.com/rpulivella/pybers/issues/145))
 - Cell styling: fills, padding and alignment, borders, and named cell styles ([PYB-126](https://github.com/rpulivella/pybers/issues/126), [PYB-122](https://github.com/rpulivella/pybers/issues/122), [PYB-128](https://github.com/rpulivella/pybers/issues/128))
 - Rich text: styled runs inside a cell, named paragraph styles, OpenType features, tracking and leading ([PYB-125](https://github.com/rpulivella/pybers/issues/125), [PYB-119](https://github.com/rpulivella/pybers/issues/119), [PYB-129](https://github.com/rpulivella/pybers/issues/129), [PYB-131](https://github.com/rpulivella/pybers/issues/131))
 - Table appearance: banding, gridlines and outlines ([PYB-123](https://github.com/rpulivella/pybers/issues/123))
-- Text boxes, shapes and images on a sheet ([PYB-87](https://github.com/rpulivella/pybers/issues/87))
-- The functions added to Numbers after the release its schemas were extracted from, recorded in [`src/pybers/protos/README.md`](src/pybers/protos/README.md) ([PYB-139](https://github.com/rpulivella/pybers/issues/139))
+- Placing anything on a sheet by a named anchor, at the sizes Numbers draws ([PYB-87](https://github.com/rpulivella/pybers/issues/87))
+- Calculating formula values, so a document read without opening Numbers shows what Numbers would ([PYB-196](https://github.com/rpulivella/pybers/issues/196), [PYB-197](https://github.com/rpulivella/pybers/issues/197), [PYB-198](https://github.com/rpulivella/pybers/issues/198))
 - A release on PyPI ([PYB-148](https://github.com/rpulivella/pybers/issues/148))
 
 ### Not planned
@@ -71,7 +72,6 @@ Numeric values are `Decimal`, never `float`, because Numbers stores them as deci
 - Charts
 - Pivot tables
 - Password-protected documents
-- Calculating formulas, which Numbers does for whatever an edit affects when it next opens the file
 
 ## Verification
 
