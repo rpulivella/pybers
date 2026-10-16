@@ -74,7 +74,7 @@ A value's kind follows its Python type, as the table above lists. An `int` is wr
 
 - **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does.
 - **A cell's kind and format always agree.** A write that would leave a format on a value it cannot show is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`.
-- **Formats apply over a range**, with `table.cellFormatApply(range, format)`, and `table.cellSet` sets one cell's value, format and style in one call.
+- **Formats apply over a range**, with `table.cellFormatApply(range, format)`, and `document.cellSet(address, ...)` sets one cell's value, format and style in one call, returning the change. `document.cell(address)` reaches a cell by its full address.
 - **A write reports each cell whose kind or format it changed**, and `preview=True` reports the same without writing.
 - **A table's structure is readable**: each column's kind and format, and the cells that differ from them.
 
