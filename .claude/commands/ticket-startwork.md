@@ -58,8 +58,8 @@ into `workarea/dashboard.md`.
    any code the ticket touches.
 6. **Update the dashboard through `/dashboard-update`.** Replace the Tasks section with the new
    ticket's tasks, one per AC or step, the first `◼` if work begins now, and keep the
-   queue. `ticket start` in step 5 has already put the ticket in focus. Show the user
-   the file.
+   queue. Then put the ticket in focus with `.venv/bin/python3 -m tools.workflow.dashboard focus PYB-<N>`, and show
+   the user the file.
 
 ## Hard rules
 
