@@ -4,8 +4,8 @@ Keep the session dashboard, `workarea/dashboard.md`, in step with the repository
 
 `sync` rewrites the status line for the ticket in focus and rebuilds the queue's
 `› blocked by` notes from GitHub. `focus` names the ticket in focus off its branch, and
-`merged` records a ticket that merged. `ticket start`, `pr create`, `pr ready` and `pr
-merge` do the same as they change a ticket's stage, and `/dashboard-update` describes
+`merged` records a ticket that merged. Nothing else writes the dashboard: the workflow
+skills run this command when a ticket's stage changes, and `/dashboard-update` describes
 everything a person edits by hand.
 
 Usage:
@@ -15,6 +15,7 @@ Usage:
     .venv/bin/python3 -m tools.workflow.dashboard merged PYB-193 210
 
 UPDATES
+2026-10-15  The only writer of the dashboard, run explicitly, for PYB-156.
 2026-10-14  Written for PYB-211.
 """
 from __future__ import annotations

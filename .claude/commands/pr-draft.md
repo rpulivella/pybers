@@ -51,7 +51,8 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    Head is the checked-out branch and base is `develop`, both by default. `--dry-run`
    first prints the body without opening anything. Pass the body as a **file**. Never
    through a shell heredoc, which would mangle the backticks in every code span.
-8. Output the PR URL, which `pr.py` prints.
+8. Run `.venv/bin/python3 -m tools.workflow.dashboard sync`, so the dashboard shows the draft.
+9. Output the PR URL, which `pr.py` prints.
 
 ## Hard rules
 

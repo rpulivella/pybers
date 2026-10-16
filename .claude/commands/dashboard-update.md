@@ -36,11 +36,11 @@ The editor's highlighting keys on these markers, so keep them exact. Never type 
 
 ## What writes it
 
-`ticket start`, `pr create`, `pr ready` and `pr merge` rewrite the first line as they change a ticket's stage, and `pr merge` records the merge and clears the focus. The command `.venv/bin/python3 -m tools.workflow.dashboard` covers the rest:
+Only the command `.venv/bin/python3 -m tools.workflow.dashboard` writes the file, and only when a person or a skill runs it. No other command touches the dashboard. The workflow skills run it at the step where a ticket's stage changes:
 
 - `sync` rewrites the first line for the ticket in focus, and rebuilds every queue line's `› blocked by` note from the blockers still open. Run it after editing the file, or whenever the first line names a ticket other than the checked-out branch's.
 - `focus PYB-<N>` puts a ticket in focus off its branch, and `focus none` clears it.
-- `merged PYB-<N> <pull request>` records a merge made outside `pr merge`.
+- `merged PYB-<N> <pull request>` records a merge that completed its ticket, and clears the ticket's tasks and focus. A merge that leaves its ticket open is a `sync`, never a `merged`.
 
 ## Steps
 

@@ -65,7 +65,11 @@ trigger sitting on it.
    `/golden-confirm` writes every report, screenshot and log for a ticket into that one
    folder, so a folder still present for a merged ticket is stale. Leave every other
    `PYB-` folder alone, because it belongs to work still open.
-7. **Report** the merge commit, whether the ticket closed or stayed open and why,
+7. **Update the dashboard to match what the merge did to the ticket.** When the ticket
+   closed, run `.venv/bin/python3 -m tools.workflow.dashboard merged PYB-<N> <pull request>`. When it stayed
+   open, run `.venv/bin/python3 -m tools.workflow.dashboard sync` on `develop` instead, because `merged` clears
+   the ticket's tasks.
+8. **Report** the merge commit, whether the ticket closed or stayed open and why,
    whether the branch was deleted, the state of `develop`, and whether a golden-confirm
    folder was purged.
 

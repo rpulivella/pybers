@@ -102,7 +102,7 @@ repeating its checks or assuming nobody made them.
 8. **Only on green gates with no unresolved finding**, check `I performed a self-review`
    in the body, because this review stands in for that human check, through the
    mechanism `/pr-draft edit <N>` owns. Then promote it:
-   `.venv/bin/python3 -m tools.workflow.pr ready <N>`. Until PYB-3 lands, "green gates" means the two
+   `.venv/bin/python3 -m tools.workflow.pr ready <N>`, then `.venv/bin/python3 -m tools.workflow.dashboard sync`. Until PYB-3 lands, "green gates" means the two
    commands above run clean, and the report says that is what was run.
 
    Promotion is the review's outcome; step 3 is its beginning. What draft should mean
