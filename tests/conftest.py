@@ -27,8 +27,6 @@ __date__ = "2026/09/07"
 
 from pathlib import Path
 
-import pytest
-
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import NumbersPackage, readPackage
 from pybers._persistence.cells import chooseOffsetUnit, decodeRow
@@ -123,11 +121,3 @@ def readRecordedColumns(path: Path, row: int) -> set[int]:
     if row not in recorded:
         raise AssertionError(f"No table in {path.name} holds row {row}.")
     return recorded[row]
-
-
-@pytest.fixture(autouse=True)
-def isolateDashboard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Point every test's dashboard at its own folder, never the maintainer's."""
-    monkeypatch.setattr(
-        "tools.workflow.lib.dashboard.dashboardPath", tmp_path / "dashboard.md"
-    )

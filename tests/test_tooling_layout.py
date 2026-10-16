@@ -5,6 +5,8 @@ The tooling's layout: commands in each folder, libraries in its `lib/`, and impo
 Read as source, so nothing here runs a command or reaches GitHub or Numbers.
 
 UPDATES
+2026-10-15  `pr`, `ticket` and `dashboard` import none of one another, and only
+            `dashboard` reaches the dashboard library, for PYB-156.
 2026-10-13  Written for PYB-204.
 """
 from __future__ import annotations
@@ -111,3 +113,30 @@ def testTheSharedWorkflowImportsNothingLocal(path: Path) -> None:
         if isinstance(node, ast.ImportFrom)
     ]
     assert not [module for module in imported if module.startswith("tools.local")]
+
+
+def readImportedModules(path: Path) -> set[str]:
+    """Return every module a file imports, `from a import b` counted as `a.b` too."""
+    modules: set[str] = set()
+    for node in ast.walk(readTree(path)):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.add(node.module)
+            modules.update(f"{node.module}.{alias.name}" for alias in node.names)
+    return modules
+
+
+@pytest.mark.parametrize("command", ["pr", "ticket", "dashboard"])
+def testTheWorkflowCommandsImportNoneOfOneAnother(command: str) -> None:
+    others = {f"tools.workflow.{other}" for other in ("pr", "ticket", "dashboard")}
+    path = repositoryRoot / "tools" / "workflow" / f"{command}.py"
+    assert readImportedModules(path) & (others - {f"tools.workflow.{command}"}) == set()
+
+
+@pytest.mark.parametrize("path", toolingFiles, ids=lambda path: path.name)
+def testOnlyTheDashboardCommandReachesTheDashboardLibrary(path: Path) -> None:
+    if path.name == "dashboard.py":
+        return
+    assert "tools.workflow.lib.dashboard" not in readImportedModules(path)
+

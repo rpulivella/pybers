@@ -30,6 +30,7 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-10-15  `start` no longer touches the session dashboard, for PYB-156.
 2026-10-14  `start` puts the ticket in focus on the dashboard, for PYB-211.
 2026-10-14  Moved here from `scripts/ticket.py`, and run as a module, for PYB-204.
 2026-10-13  The GitHub client moved to `lib/github.py` and the comment commands to
@@ -102,7 +103,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.markup import escape
 
-from tools.workflow.lib import dashboard, github
+from tools.workflow.lib import github
 from tools.workflow.lib import github_commands as commands
 
 console = Console()
@@ -259,9 +260,6 @@ def runStart(arguments: argparse.Namespace) -> int:
         f"assigned to [green]{escape(arguments.assignee)}[/], "
         "Status [cyan]In Progress[/]"
     )
-    focus = github.formatTicketRef(summary.number)
-    if problem := dashboard.saveStageChange(token, focus):
-        console.print(f"[yellow]{escape(problem)}[/]")
     return 0
 
 

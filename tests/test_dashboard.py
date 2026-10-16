@@ -15,6 +15,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/14"
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -31,11 +32,17 @@ from tools.workflow.lib.dashboard import (
     recentLimit,
     recordMerge,
     renderBoard,
-    saveMerge,
     setBlockers,
     updateDashboard,
     writeDashboard,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolateDashboard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point each test's dashboard at its own folder, never the maintainer's."""
+    monkeypatch.setattr(dashboardModule, "dashboardPath", tmp_path / "dashboard.md")
+
 
 dashboard: str = """WiP · PYB-211: Give session tasks a status line
 \n## Tasks
@@ -156,12 +163,6 @@ def testOffATicketBranchTheStatusLineDecides(monkeypatch: pytest.MonkeyPatch) ->
     assert findFocusKey(parseBoard(dashboard), None) == "PYB-211"
 
 
-def testAMalformedDashboardWarnsRatherThanFailingTheMerge() -> None:
-    dashboardModule.dashboardPath.write_text("## Tasks\n", encoding="utf-8")
-    warning = saveMerge("PYB-211", 212)
-    assert warning.startswith("The dashboard was not updated:")
-
-
 def testRecordingAMergeTwiceKeepsOneLine() -> None:
     board = parseBoard(dashboard)
     recordMerge(board, "PYB-211", 212)
@@ -230,4 +231,3 @@ def testClearingTheFocusReadsNone(monkeypatch: pytest.MonkeyPatch) -> None:
     board = parseBoard(dashboard)
     updateDashboard("token", board, "")
     assert board.status == "None"
-

@@ -6,6 +6,8 @@ A first line giving the active ticket's stage and title, then its tasks in state
 order, the queue of tickets after it, and the tickets that recently merged.
 
 UPDATES
+2026-10-15  The save helpers other commands called are gone; only the dashboard
+            command writes the file, for PYB-156.
 2026-10-14  Written for PYB-211.
 """
 from __future__ import annotations
@@ -204,25 +206,3 @@ def updateBlockerNote(token: str, line: str) -> str:
         return line
     blockers = github.readOpenBlockers(token, github.parseTicketNumber(key))
     return setBlockers(line, [github.formatTicketRef(number) for number in blockers])
-
-
-def saveStageChange(token: str, focus: str | None = None) -> str:
-    """Save the dashboard after a stage changed, returning a warning or ''."""
-    try:
-        board = readDashboard()
-        updateDashboard(token, board, focus)
-        writeDashboard(board)
-    except (DashboardError, RuntimeError, OSError) as exc:
-        return f"The dashboard was not updated: {exc}"
-    return ""
-
-
-def saveMerge(key: str, pullRequest: int) -> str:
-    """Record a merge on the dashboard, returning a warning or ''."""
-    try:
-        board = readDashboard()
-        recordMerge(board, key, pullRequest)
-        writeDashboard(board)
-    except (DashboardError, OSError) as exc:
-        return f"The dashboard was not updated: {exc}"
-    return ""
