@@ -25,12 +25,15 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `Style` | A cell's appearance | Frozen |
 | `RichText` | Text with styled runs | Frozen |
-| `CellReference` | One cell's address, `B3`, with `$` per axis | Frozen |
-| `CellRange`, `CellRangeList` | A rectangle of cells, and several | Frozen |
+| `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
+| `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |
+| `CellReference` | How something points at a cell: an address, `$` per axis, and the table it names when its context needs one | Frozen |
+| `TableReference`, `SheetReference` | A table by name, its sheet's name when the table's is shared, and a sheet by name | Frozen |
+| `CellRange`, `CellRangeList` | A rectangle of cells, naming its table when its context needs one, and several | Frozen |
 | `MergeRange` | A merged region | Frozen |
-| `CellAddress`, `RangeAddress` | A reference or its text, wherever a call takes one | Alias |
+| `CellReferenceLike`, `CellRangeLike` | A reference or a range, or its text, wherever a call takes one | Alias |
 
-A selector reaching across sheets and tables, as under Addresses, becomes a frozen type of its own when it is built.
+A reference is qualified only as far as its context needs, as a path is. Each owner takes its part and hands the rest down: `document.cell` needs the table named, `sheet.cell` takes a table on that sheet, and `table.cell` takes `B3` alone or a qualifier naming that table. A table keys its cells by `CellAddress`, so iterating a table yields addresses, and anything gathered across tables yields qualified references. A selector reaching several cells across sheets and tables, as under Addresses, becomes a frozen type of its own when it is built.
 
 ## One handle
 

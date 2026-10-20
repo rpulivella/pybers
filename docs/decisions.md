@@ -240,6 +240,46 @@ does.
 
 ---
 
+## A cell's position, how it is pointed at, and how far apart two are, decided 2026-10-19
+
+Three types, each one idea. **`CellAddress`** is where a cell sits in any table: a row and a
+column counted from one, bounded by the largest table Numbers holds, with no table and no
+`$`. **`CellReference`** is how something points at a cell: an address, a lock on each axis,
+and the table it names when its context needs one. **`CellOffset`** is a signed distance in
+rows and columns.
+
+**A lock belongs to the reference, never to the address.** `B3`, `$B3`, `B$3` and `$B$3` all
+point at one address and differ only in how they move when a formula is copied, so every
+formula reference carries both locks, each on or off. Keeping the lock out of the address
+is also what lets a table key its cells by address with no normalizing step: two spellings
+of one position are always one key.
+
+**A reference is qualified only as far as its context needs**, the model of a path or a
+URL. `B3`, `Q3::B3` and `Budget::Q3::B3` are one type, its table and that table's sheet
+given by `TableReference` and `SheetReference`, typed rather than bare strings. Each owner
+takes its part and hands the rest down: `document.cell` refuses a reference naming no table,
+`sheet.cell` refuses one naming another sheet, and `table.cell` takes `B3` alone or a
+qualifier naming that table. A qualified and an unqualified reference compare unequal, as
+two paths do. Merging position and qualification into one type was weighed and kept apart
+from the address, because a qualified key would have to be stripped before every lookup.
+
+**An offset is its own type**, because an address is counted from one and bounded, and an
+offset is signed and may be zero. An address plus an offset is an address, an address
+minus an address is an offset, and two offsets add, which is the `datetime` and
+`timedelta` algebra. A formula stores a relative axis as exactly this signed distance and a
+locked axis as a position, so the three types meet what Numbers keeps.
+
+**Iterating a table yields addresses**, portable to any table, which is what a template, a
+move within one table or a conversion wants. Anything gathered across tables, a search, a
+change report or a document-wide walk, yields qualified references, since a result that
+leaves its loop has to say where it was.
+
+**The input aliases are named for what they accept**, `CellReferenceLike` and
+`CellRangeLike`, in the style of `os.PathLike`, so the word address names one type and the
+text syntax, never an alias.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on
