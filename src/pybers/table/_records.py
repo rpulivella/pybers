@@ -57,7 +57,7 @@ from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._read import storedKinds
 from ._refcounts import StringPool, stringTypeByte
-from .cell import Cell
+from .cell import Cell, refuseValueOverFormula
 from .kinds import CellKind
 
 # How a refusal names what a cell holds, in the words a person would use.
@@ -154,10 +154,7 @@ def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
     recalculated, which is a silent loss wearing the shape of a success.
     """
     if carriesFormula(record):
-        raise WriteError(
-            f"{cell.address} is backed by a formula, so writing a value would "
-            "discard it. Replace the formula instead, or clear it first."
-        )
+        refuseValueOverFormula(cell.address)
 
 
 def formatStoredValue(record: CellRecord) -> str:

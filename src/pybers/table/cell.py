@@ -6,8 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
-2026-10-20  A cell's value is set through `valueSet`, which reports the change
-            and previews it, for PYB-217.
+2026-10-20  Setting `value` makes an `int` exact and refuses a `float` or a value
+            over a formula, and reports the change to `cellSet`, for PYB-217.
 2026-10-20  Moved here from `cells`, which keeps `Table`, for PYB-217. The history of
             this code before the move is in that module's UPDATES.
 """
@@ -24,7 +24,7 @@ __date__ = "2026/10/20"
 import datetime
 from dataclasses import dataclass, field, replace
 from decimal import Context, Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 from pybers.absence import UNDETERMINED
 from pybers.addressing.ranges import CellRange
@@ -123,6 +123,14 @@ def isSameValue(before: CellValue, after: CellValue) -> bool:
     return before == after
 
 
+def refuseValueOverFormula(address: CellAddress) -> NoReturn:
+    """Refuse a value written over a cell a formula backs, which would discard it."""
+    raise WriteError(
+        f"{address} is backed by a formula, so writing a value would discard it. "
+        "Replace the formula instead, or clear it first."
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class CellChange:
     """What a write did to one cell, or would do in a preview, and how far it grew."""
@@ -154,7 +162,7 @@ class Cell:
     """
 
     address: CellAddress
-    value: CellValue = None
+    _value: CellValue = field(default=None, kw_only=True)
     formula: Formula | None = None
     style: Style = field(default_factory=Style)
     # The record as read, copied or saved, its chosen format the one direct edit.
@@ -225,9 +233,19 @@ class Cell:
         """
         if self.table is None:
             return CellReference(self.address.row, self.address.col)
-        return self.table.addressQualify(self.address)
+        return self.table._addressQualify(self.address)
 
-    def valueSet(self, value: object, *, preview: bool = False) -> CellChange:
+    @property
+    def value(self) -> CellValue:
+        """Return the value this cell holds, as Numbers last cached it for a formula."""
+        return self._value
+
+    @value.setter
+    def value(self, value: CellValue | int) -> None:
+        """Set this cell's value: an `int` exact, a `float` refused, a formula kept."""
+        self._valueChange(value)
+
+    def _valueChange(self, value: object, preview: bool = False) -> CellChange:
         """Set this cell's value and return the change, or only report it in preview.
 
         An `int` is written as that exact number and a `float` is refused, because a
@@ -235,15 +253,12 @@ class Cell:
         """
         written = toCellValue(value, self.address)
         if self.formula is not None:
-            raise WriteError(
-                f"{self.address} is backed by a formula, so writing a value would "
-                "discard it. Replace the formula instead, or clear it first."
-            )
+            refuseValueOverFormula(self.address)
         before = self.description.kind
         after = findCellKind(written, self._stored.kind, self._storedValue, False)
-        change = CellChange(self.reference, self.value, written, before, after)
+        change = CellChange(self.reference, self._value, written, before, after)
         if not preview and change.changed:
-            self.value = written
+            self._value = written
         return change
 
     @property
@@ -277,7 +292,7 @@ class Cell:
                 f"{self.address} is backed by a formula, so holding literal text "
                 "would discard it. Clear the formula first."
             )
-        self.value = text
+        self._value = text
         self._stored = replace(self._stored, formatChosen=True)
 
     @property
@@ -303,5 +318,6 @@ class Cell:
 
 
 __all__ = [
-    "Cell", "CellChange", "CellCopy", "CellValue", "decimal128Context", "toCellValue",
+    "Cell", "CellChange", "CellCopy", "CellValue", "decimal128Context",
+    "refuseValueOverFormula", "toCellValue",
 ]

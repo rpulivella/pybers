@@ -126,3 +126,29 @@ def testAValueOverAFormulaIsRefused(working: Path) -> None:
     )
     with pytest.raises(pybers.WriteError, match="backed by a formula"):
         document.cellSet(formulaCell.reference, 1)
+
+
+def testAssigningAnIntToACellWritesThatExactNumber() -> None:
+    cell = pybers.Table(name="Table 1", rowCount=2, colCount=2).cell("A1")
+    cell.value = 42
+    assert cell.value == Decimal(42)
+    assert isinstance(cell.value, Decimal)
+
+
+def testAssigningAFloatToACellIsRefusedAtOnce() -> None:
+    cell = pybers.Table(name="Table 1", rowCount=2, colCount=2).cell("A1")
+    with pytest.raises(pybers.WriteError, match=r"Decimal\('0.1'\)"):
+        cell.value = 0.1  # type: ignore[assignment]
+    assert cell.value is None
+
+
+def testAssigningOverAFormulaIsRefusedAtOnce(working: Path) -> None:
+    document = pybers.open(working)
+    formulaCell = next(
+        cell for _, _, cell in document.cellsIterate() if cell.formula is not None
+    )
+    cached = formulaCell.value
+    with pytest.raises(pybers.WriteError, match="backed by a formula"):
+        formulaCell.value = 1
+    assert formulaCell.value == cached
+

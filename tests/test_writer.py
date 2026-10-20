@@ -451,20 +451,20 @@ def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
     """
     working = copyDocument("18-formula-literals", tmp_path)
 
-    document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = Decimal("999")
+    cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
     with pytest.raises(WriteError, match="backed by a formula"):
-        document.save()
+        cell.value = Decimal("999")
 
 
 def test_aRefusedSaveLeavesTheFileExactlyAsItWas(tmp_path: Path) -> None:
     """The refusal is worth nothing if half the package has already been written."""
-    working = copyDocument("18-formula-literals", tmp_path)
+    working = copyDocument("65-series-base", tmp_path)
     before = working.read_bytes()
 
     document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = Decimal("999")
+    date = document.sheets[0].tables[0].cell("E2").value
+    document.sheets[0].tables[0].cell("A2").value = date
     with pytest.raises(WriteError):
         document.save()
 
@@ -489,14 +489,12 @@ def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
 def test_writingSomethingNeitherTextNorANumberIsStillRefused(
     tmp_path: Path,
 ) -> None:
-    """The refusal that remains, since a boolean has no write path yet."""
+    """A value no cell holds is refused as it is assigned, naming what a cell holds."""
     working = copyDocument("11-value-types-noformats", tmp_path)
+    cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
-    document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = [1, 2]
-
-    with pytest.raises(WriteError, match="can write only a number as Decimal"):
-        document.save()
+    with pytest.raises(WriteError, match="A cell holds a Decimal"):
+        cell.value = [1, 2]  # type: ignore[assignment]
 
 
 def test_aDateWrittenOverANumberIsRefused(tmp_path: Path) -> None:

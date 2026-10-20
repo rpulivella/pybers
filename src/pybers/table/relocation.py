@@ -242,7 +242,7 @@ def moveCells(
 
     rule = toRelocationRule(references)
     extent = table.rangeSingle(source, "move")
-    landing = table.addressResolve(anchor)
+    landing = table._addressResolve(anchor)
     startRow, startCol, _, _ = findBlockCorners(extent)
     move = CellsMove(extent, landing.row - startRow, landing.col - startCol)
     refuseRangeOutside(table, move.destination)

@@ -138,7 +138,7 @@ def copyCellContent(
     """Give a cell everything another holds, its formulas under the rule named."""
     from pybers.table.cell import CellCopy
 
-    target.value = source.value
+    target._value = source._value
     target.style = source.style
     target._stored = source._stored
     target._storedValue = source._storedValue
@@ -193,7 +193,7 @@ def fillCells(
             borders=False,
         )
         if position in continued:
-            cell.value = continued[position]
+            cell._value = continued[position]
     return len(targets)
 
 

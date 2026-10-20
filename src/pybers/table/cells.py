@@ -241,7 +241,7 @@ class Table:
         the grid is never an error. Two addresses raise: one outside the declared
         grid, and one swallowed by a merge, reached through its anchor.
         """
-        key = self.addressResolve(toCellReferenceNamed(address, row, col))
+        key = self._addressResolve(toCellReferenceNamed(address, row, col))
         extent = self.extent
         if extent is None or not extent.covers(key):
             raise ReferenceError(
@@ -288,7 +288,7 @@ class Table:
         """
         return [self.cell(reference) for reference in listRangePositions(self, address)]
 
-    def addressQualify(self, address: CellAddress) -> CellReference:
+    def _addressQualify(self, address: CellAddress) -> CellReference:
         """Return a reference to an address here, naming this table and its sheet."""
         sheet = self.sheet
         return CellReference(
@@ -300,7 +300,7 @@ class Table:
             ),
         )
 
-    def addressResolve(self, reference: CellReferenceLike) -> CellAddress:
+    def _addressResolve(self, reference: CellReferenceLike) -> CellAddress:
         """Return where a reference points in this table, refusing one naming another.
 
         A reference naming no table is taken as this table's, the way a relative path
@@ -325,7 +325,7 @@ class Table:
         False for a position swallowed by a merge, which is why a range over a
         merged block yields the anchor once rather than one cell per position.
         """
-        reference = self.addressResolve(address)
+        reference = self._addressResolve(address)
         merge = self.mergeCovering(reference)
         return merge is None or merge.anchor == reference
 
@@ -411,7 +411,7 @@ class Table:
         if merge is None:
             raise ReferenceError(
                 f"No merge in {self.name!r} covers "
-                f"{self.addressResolve(address)}."
+                f"{self._addressResolve(address)}."
             )
         self.mergeRanges.remove(merge)
         return merge
@@ -442,7 +442,7 @@ class Table:
         position holds no value whatever wrote the merge. Derived on every call rather
         than stored, because a copy would go stale the moment a merge changed.
         """
-        reference = self.addressResolve(address)
+        reference = self._addressResolve(address)
         for merge in self.mergeRanges:
             if merge.covers(reference):
                 return merge

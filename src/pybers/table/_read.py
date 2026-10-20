@@ -300,7 +300,7 @@ def readTable(
         cell = table.cell(reference)
         value = resolveValue(record, strings, richText)
         setCellDescription(cell, record, value, formatTypes)
-        cell.value = value
+        cell._value = value
         # Each cell is given its own Formula even where the archive is shared, so
         # an edit to one cannot reach another. Frozen, so sharing would be safe
         # anyway; built per cell so that neither guarantee depends on the other.

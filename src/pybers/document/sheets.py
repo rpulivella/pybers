@@ -334,7 +334,7 @@ class Document:
 
     def cell(self, reference: CellReferenceLike) -> Cell:
         """Return the cell a reference names, walking from sheet to table to cell."""
-        return self.tableResolve(reference).cell(reference)
+        return self._tableResolve(reference).cell(reference)
 
     def cellSet(
         self,
@@ -349,8 +349,8 @@ class Document:
         A reference past the table's last row or column is refused unless `extend`
         grows the table to hold it. A preview creates nothing, not even an empty cell.
         """
-        table = self.tableResolve(reference)
-        address = table.addressResolve(reference)
+        table = self._tableResolve(reference)
+        address = table._addressResolve(reference)
         rowsAdded = max(0, address.row - table.rowCount)
         colsAdded = max(0, address.col - table.colCount)
         outside = bool(rowsAdded or colsAdded)
@@ -359,17 +359,17 @@ class Document:
         if preview:
             cell = None if outside else table.cells.get(address)
             target = Cell(address=address, table=table) if cell is None else cell
-            change = target.valueSet(value, preview=True)
+            change = target._valueChange(value, preview=True)
             return replace(change, rowsAdded=rowsAdded, colsAdded=colsAdded)
         toCellValue(value, address)
         if rowsAdded:
             table.rowAdd(table.rowCount + 1, rowsAdded)
         if colsAdded:
             table.columnAdd(table.colCount + 1, colsAdded)
-        change = table.cell(address).valueSet(value)
+        change = table.cell(address)._valueChange(value)
         return replace(change, rowsAdded=rowsAdded, colsAdded=colsAdded)
 
-    def tableResolve(self, reference: CellReferenceLike) -> Table:
+    def _tableResolve(self, reference: CellReferenceLike) -> Table:
         """Return the table a reference names, by its sheet or alone in the document.
 
         With no sheet named, the table must be the only one of its name in the
