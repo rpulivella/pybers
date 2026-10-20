@@ -10,11 +10,17 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 [![health](https://github.com/rpulivella/pybers/actions/workflows/health.yml/badge.svg?branch=develop)](https://github.com/rpulivella/pybers/actions/workflows/health.yml)
 [![License](https://img.shields.io/github/license/rpulivella/pybers)](LICENSE)
 
-> **Status, 15 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has one command, `pybers check`, and nothing is on PyPI yet.
+> **Status, 20 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has two commands, `pybers check` and `pybers set`, and nothing is on PyPI yet.
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. It installs with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
+`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. `pybers set FILE CELL VALUE` sets one cell, reading the value as a number or as text unless `--as` names the kind, and `--preview` shows the change without writing it:
+
+```bash
+pybers set budget.numbers "Summary::Costs::B4" 1250.00 --in-place
+```
+
+Both install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
 
 ## Python library
 
@@ -36,13 +42,14 @@ for sheet, table, cell in document.cellsIterate():
 costs = document.sheet("Summary").table("Costs")
 print(len(costs.cells), "cells hold something")
 costs.cell("B4").value = Decimal("1250.00")
+document.cellSet("Summary::Costs::B6", Decimal("300.00"))
 costs.cell("B5").formulaText = "=SUM(B1:B4)"
 costs.rowAdd(6)
 
 document.save()
 ```
 
-A table's `cells` maps each reference to its cell and is read-only: a cell changes through the table, as `costs.cell("B4")` does above, so no edit can leave a table holding something that is not one of its cells.
+A table's `cells` maps each address to its cell and is read-only: a cell changes through the table, as `costs.cell("B4")` does above, so no edit can leave a table holding something that is not one of its cells.
 
 Numeric values are `Decimal`, never `float`, because Numbers stores them as decimal128 and a binary float would add rounding error the document never had.
 
