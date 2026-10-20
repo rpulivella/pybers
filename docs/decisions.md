@@ -181,7 +181,7 @@ measured. pybers reads one as a naive `datetime` and writes a naive one as it is
 `datetime` is converted to the document's time zone and its wall-clock time written, so a
 caller holding real moments never has to strip zones by hand. The document's time zone is a
 `tzinfo`, or a name handed unchanged to `zoneinfo.ZoneInfo`, so Python and not pybers decides
-which names are valid. It defaults to the machine's local zone, is set once with
+which names are valid. It defaults to the zone pybers is running in, is set once with
 `pybers.open(path, timeZone=...)` for a result that does not depend on where the code runs,
 and lives only for the session, since the file has nowhere to keep it. Refusing an aware
 `datetime`, as openpyxl and pandas do for Excel, was weighed and rejected for the friction

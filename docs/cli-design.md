@@ -41,11 +41,11 @@ A command parses its arguments, calls the library once, formats what comes back,
 
 ## Writing
 
-- **A write names its target**: `--in-place` changes the file given, and `-o NEW` writes a new document beside it. A command that writes requires one of the two, and `-o` refuses a file that already exists.
+- **A write specifies its target**: `--in-place` changes the file given, and `-o NEW` writes a new document beside it. A command that writes requires one of the two, and `-o` refuses a file that already exists.
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
-- **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind named is refused.
+- **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
 - **`set --format SPEC`** sets how the cells show their value, SPEC being a format's text form, tagged by its family.
-- **A cell outside its table** is refused, naming the table's size, unless `--extend` grows the table to hold it.
+- **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
 ## Formulas
 
@@ -89,7 +89,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 
 ## Color
 
-Named styles in one Rich `Theme`, so a command names a meaning and never a color.
+Named styles in one Rich `Theme`, so a command specifies a meaning and never a color.
 
 | Style | Rich style | Meaning | Example |
 | ----- | ---------- | ------- | ------- |
