@@ -13,6 +13,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-10-19  `CellRangeLike`, what a call accepts for a range, for PYB-217.
 2026-10-13  A range in the file marks an unbounded axis with a sentinel, for PYB-139.
 2026-09-13  A range endpoint past the last row is refused, for #67.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
@@ -35,6 +36,7 @@ from dataclasses import dataclass, field
 from pybers.addressing.reference import (
     CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
     absoluteMarker,
     cellPattern,
@@ -269,8 +271,11 @@ class CellRange:
         )
 
     @classmethod
-    def fromReferences(cls, start: CellReference, end: CellReference) -> CellRange:
+    def fromReferences(
+        cls, start: CellReference | CellAddress, end: CellReference | CellAddress
+    ) -> CellRange:
         """Return the rectangle two cells bound, given in either order."""
+        start, end = toCellReference(start), toCellReference(end)
         return cls.fromAxes(
             ((start.row, start.rowAbsolute), (end.row, end.rowAbsolute)),
             ((start.col, start.colAbsolute), (end.col, end.colAbsolute)),
@@ -302,7 +307,7 @@ class CellRange:
             ((first.col, first.colAbsolute), (last.col, last.colAbsolute)),
         )
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether a cell falls inside this range, its edges included."""
         reference = toCellReference(address)
         withinRows = self.startRow is None or (
@@ -358,7 +363,7 @@ class CellRange:
             return first
         return f"{first}{rangeSeparator}{last}"
 
-    def __iter__(self) -> Iterator[CellReference]:
+    def __iter__(self) -> Iterator[CellAddress]:
         """Yield every cell this range covers, row by row and left to right.
 
         An unbounded range cannot be walked, and refusing is better than inventing
@@ -370,7 +375,7 @@ class CellRange:
             raise ReferenceError(f"{self} spans every column and cannot be walked.")
         for row in range(self.startRow, self.endRow + 1):
             for col in range(self.startCol, self.endCol + 1):
-                yield CellReference(row, col)
+                yield CellAddress(row, col)
 
     def __str__(self) -> str:
         """Return the written form, so an error message reads as a range."""
@@ -404,7 +409,7 @@ class CellRangeList:
         """Return the list as it would be written, in its own order."""
         return listSeparator.join(item.asReference() for item in self.ranges)
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether any range in the list covers a cell."""
         return any(item.covers(address) for item in self.ranges)
 
@@ -423,10 +428,10 @@ class CellRangeList:
 
 # What a caller may hand to anything that addresses more than one cell. A plain
 # string covers both a single range and a comma-separated list of them.
-RangeAddress = CellRange | CellRangeList | str
+CellRangeLike = CellRange | CellRangeList | str
 
 
-def toCellRanges(address: RangeAddress) -> tuple[CellRange, ...]:
+def toCellRanges(address: CellRangeLike) -> tuple[CellRange, ...]:
     """Return the ranges an address names, as a tuple even when there is one.
 
     One range and a list of them are treated the same way everywhere downstream, so

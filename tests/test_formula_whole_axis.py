@@ -110,7 +110,7 @@ def testEachFormulaEncodesAsNumbersStoredIt(address: str, text: str) -> None:
     cell = table.cell(address)
     stored = cell.formula
     assert stored is not None
-    parsed = parseFormula(text, cell.reference, tables=document.tableIdentities)
+    parsed = parseFormula(text, cell.address, tables=document.tableIdentities)
     assert [encodeFormulaNode(node) for node in parsed] == [
         readStoredNode(node) for node in stored
     ]

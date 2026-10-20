@@ -64,6 +64,9 @@ mypy in one pass and reports all four.
   add each feature on top of something that already works.
 - Make architectural decisions for the long term. Do not accept a stopgap.
 - Write no documentation unless asked.
+- Keep no memory outside the repository. A decision or a preference is written where
+  someone can see it: in this file, a doc or a ticket for everyone, or in the git-ignored
+  `CLAUDE.local.md` for one person's own rules. Otherwise it is not kept.
 
 ## Engineering approach
 
@@ -171,6 +174,9 @@ functions over explanation.
 - **An untrue statement is rewritten to the current fact**, in a doc, a finding or a
   comment, never left under a "Superseded" note. Only an addressed item, an AC or a
   checklist line, is struck through or marked NA, because references point at it.
+- **A statement names only the current design**, never what it replaced: no "formerly",
+  "renamed from" or "was". A breaking change that tells users what to do instead is the
+  one exception.
 - **A doc never states a version requirement**, a Python floor, a Numbers release or a
   tool version. It points at the file that owns it, such as `requires-python` in
   `pyproject.toml`, because a restated number goes stale.

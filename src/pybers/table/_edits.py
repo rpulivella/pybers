@@ -65,8 +65,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
-from ..addressing import CellReference
-from ..addressing.reference import originOffset
+from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ..formula._write import (
     FormulaPool,
@@ -119,7 +118,8 @@ from ._tiles import (
     rewriteRow,
     writeTileRange,
 )
-from .cells import Cell, Table
+from .cell import Cell
+from .cells import Table
 
 
 def findRowsNeedingStorage(
@@ -249,7 +249,7 @@ def applyTableEdits(
         return formatKeys[formatType]
 
     def formatsCount(
-        before: bytes | None, after: bytes | None, where: CellReference
+        before: bytes | None, after: bytes | None, where: CellAddress
     ) -> None:
         """Move the format refcounts one written or removed record changed."""
         if formatList is not None:
@@ -257,7 +257,7 @@ def applyTableEdits(
                 moveFormatReferences(formatList, before, after, str(where))
             )
 
-    def releaseRecord(record: CellRecord, reference: CellReference) -> bool:
+    def releaseRecord(record: CellRecord, reference: CellAddress) -> bool:
         """Release every list entry a removed record names, reporting a formula."""
         nonlocal stylesMoved, richTextMoved, controlsMoved
         formatsCount(record.raw, None, reference)
@@ -283,7 +283,7 @@ def applyTableEdits(
         control = findSlotValue(record, controlSlot)
         return [] if control is None else [control]
 
-    def claimRecord(record: CellRecord, reference: CellReference) -> bytes:
+    def claimRecord(record: CellRecord, reference: CellAddress) -> bytes:
         """Claim every list entry a duplicated record names, and return it to place."""
         nonlocal stylesMoved, richTextMoved, controlsMoved
         raw = record.raw
@@ -333,7 +333,7 @@ def applyTableEdits(
                 formulaAdded.append((row, column))
         for (row, column), record in copied.displaced.items():
             released = releaseRecord(
-                record, CellReference(row + originOffset, column + originOffset)
+                record, CellAddress(row + originOffset, column + originOffset)
             )
             placed = copied.placed.get((row, column))
             if released and (placed is None or not carriesFormula(placed)):
@@ -403,7 +403,7 @@ def applyTableEdits(
             for record in decodeRow(
                 rowInfo.cell_offsets, rowInfo.cell_storage_buffer, offsetUnit
             ):
-                reference = CellReference(
+                reference = CellAddress(
                     row + originOffset, record.column + originOffset
                 )
                 if (row, record.column) in swallowed:
@@ -450,7 +450,7 @@ def applyTableEdits(
                 for column in range(table.colCount):
                     if column in present or (row, column) in swallowed:
                         continue
-                    reference = CellReference(row + originOffset, column + originOffset)
+                    reference = CellAddress(row + originOffset, column + originOffset)
                     cell = table.cells.get(reference)
                     if cell is None:
                         continue

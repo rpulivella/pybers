@@ -20,16 +20,21 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `Table` | A grid of cells, with its size and its merges. `cells` is a read-only view, and a cell changes through the table | Owner |
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
 | `Cell` | One cell: its value, formula, style and stored description | Owner |
+| `CellChange` | What a write did to one cell, or would do in a preview: value and kind before and after, and how far the table grew | Frozen |
 | `CellValue` | `Decimal`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
+| `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `Style` | A cell's appearance | Frozen |
 | `RichText` | Text with styled runs | Frozen |
-| `CellReference` | One cell's address, `B3`, with `$` per axis | Frozen |
-| `CellRange`, `CellRangeList` | A rectangle of cells, and several | Frozen |
+| `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
+| `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |
+| `CellReference` | How something points at a cell: an address, `$` per axis, and the table it names when its context needs one | Frozen |
+| `TableReference`, `SheetReference` | A table by name, its sheet's name when the table's is shared, and a sheet by name | Frozen |
+| `CellRange`, `CellRangeList` | A rectangle of cells, naming its table when its context needs one, and several | Frozen |
 | `MergeRange` | A merged region | Frozen |
-| `CellAddress`, `RangeAddress` | A reference or its text, wherever a call takes one | Alias |
+| `CellReferenceLike`, `CellRangeLike` | A reference or a range, or its text, wherever a call takes one | Alias |
 
-A selector reaching across sheets and tables, as under Addresses, becomes a frozen type of its own when it is built.
+A reference is qualified only as far as its context needs, as a path is. Each owner takes its part and hands the rest down: `document.cell` needs the table named, `sheet.cell` takes a table on that sheet, and `table.cell` takes `B3` alone or a qualifier naming that table. A table keys its cells by `CellAddress`, so iterating a table yields addresses, and anything gathered across tables yields qualified references. A selector reaching several cells across sheets and tables, as under Addresses, becomes a frozen type of its own when it is built.
 
 ## One handle
 
@@ -44,6 +49,8 @@ document.save()
 ```
 
 ## Addresses
+
+**A reference is a path, and a selector is CSS.** A reference names one cell and resolves through its owners, qualified only as far as its context needs, as a path does. A selector matches a set of cells by pattern and returns their references, as a CSS selector does: grouping with commas, wildcards, conditions on a cell's kind or format, positions such as every nth row, and negation. Every way of selecting cells is one or the other.
 
 One syntax, Numbers' own, parsed by the library for every caller:
 
@@ -66,6 +73,18 @@ Each command answers to one public call, and the call does the work.
 - **A call returns data and prints nothing.** What it returns is a frozen dataclass, or the model itself, which the caller formats however it likes. `pybers.checkDocument` is the pattern.
 - **A long call takes `onProgress`**, a callback that hears each step as it starts, so the caller decides how progress looks, if at all.
 - **Nothing waits for input.** A call that cannot proceed raises.
+
+## Writing a cell
+
+A value's kind follows its Python type, as the table above lists. An `int` is written as that exact number and a `date` as midnight, a `float` is refused in favor of `Decimal`, and a `datetime` with no time zone is refused.
+
+- **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does.
+- **A cell's kind and format always agree.** A write that would leave a format on a value it cannot show is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`.
+- **Formats apply over a range**, with `table.cellFormatApply(range, format)`, and `document.cellSet(reference, ...)` sets one cell's value, format and style in one call, returning the change. `document.cell(reference)` reaches a cell by a reference naming its table.
+- **A write reports each cell whose kind or format it changed**, and `preview=True` reports the same without writing.
+- **A table's structure is readable**: each column's kind and format, and the cells that differ from them.
+
+The reasoning is in `decisions.md`, under writing values and formats.
 
 ## What is stored
 

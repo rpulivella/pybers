@@ -64,7 +64,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from pybers.addressing.ranges import CellRange
-from pybers.addressing.reference import CellReference
+from pybers.addressing.reference import CellAddress, CellReference
 from pybers.errors import PybersError
 from pybers.formula.functions import (
     ArgumentCountError,
@@ -294,7 +294,7 @@ class FormulaReference:
         """Report whether this reference points into a different table."""
         return self.tableId is not None
 
-    def resolve(self, host: CellReference) -> CellReference:
+    def resolve(self, host: CellAddress) -> CellReference:
         """Return the cell this reference names, for a formula living at `host`.
 
         Refuses rather than guessing on the two cases that have no single cell to
@@ -352,7 +352,7 @@ class FormulaRange:
         """Report whether this range points into a different table."""
         return self.tableId is not None
 
-    def resolve(self, host: CellReference) -> CellRange:
+    def resolve(self, host: CellAddress) -> CellRange:
         """Return the rectangle this range covers, for a formula living at `host`.
 
         The counterpart of `FormulaReference.resolve`, where a formula's vocabulary

@@ -60,8 +60,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
-from ..addressing import CellReference
-from ..addressing.reference import originOffset
+from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ..formula._read import readFormula
 from ._conditions import readConditionalPlan, writeConditionalCounts
@@ -77,7 +76,8 @@ from ._tiles import (
     rewriteRow,
     writeTileRange,
 )
-from .cells import Cell, Table
+from .cell import Cell
+from .cells import Table
 
 # A stored (row, column), counted from zero, mapped to where its cell now sits.
 type CellMoves = dict[tuple[int, int], tuple[int, int]]
@@ -107,7 +107,7 @@ copyableSlots: frozenset[tuple[int, int]] = frozenset({
 })
 
 # Claims every entry a duplicated record names, returning the record to place.
-type RecordClaim = Callable[[CellRecord, CellReference], bytes]
+type RecordClaim = Callable[[CellRecord, CellAddress], bytes]
 
 
 def findCellMoves(table: Table, maps: GridMaps) -> CellMoves:
@@ -148,7 +148,7 @@ def listCoveredOffsets(cell: Cell) -> list[tuple[int, int]]:
     if merge is None:
         return []
     return [
-        (covered.row - cell.reference.row, covered.col - cell.reference.col)
+        (covered.row - cell.address.row, covered.col - cell.address.col)
         for covered in merge.extent if covered != merge.anchor
     ]
 
@@ -166,12 +166,12 @@ def findCellCopies(table: Table) -> CellCopies:
         if copy is None:
             continue
         source = copy.source
-        if table.cells.get(source.reference) is not source:
+        if table.cells.get(source.address) is not source:
             raise WriteError(
                 f"{reference} was copied from a cell no longer in {table.name!r}, "
                 "so there is no record to copy."
             )
-        stored = source.reference
+        stored = source.address
         row, column = reference.row - originOffset, reference.col - originOffset
         top, left = stored.row - originOffset, stored.col - originOffset
         records[(row, column)] = None if source._origin is None else (top, left)
@@ -192,7 +192,7 @@ def findBorderCopies(table: Table) -> CellMoves:
         copy = cell._copiedFrom
         if copy is None or not copy.borders:
             continue
-        source = copy.source.reference
+        source = copy.source.address
         row, column = reference.row - originOffset, reference.col - originOffset
         top, left = source.row - originOffset, source.col - originOffset
         copies[(row, column)] = (top, left)
@@ -311,7 +311,7 @@ class RecordCopies:
     displaced: dict[tuple[int, int], CellRecord]
 
 
-def refuseUncopyableRecord(record: CellRecord, where: CellReference) -> None:
+def refuseUncopyableRecord(record: CellRecord, where: CellAddress) -> None:
     """Refuse a record whose duplicate would name an entry nobody counted."""
     for at, bit in listReferenceSlots(record.raw):
         if (at, bit) not in copyableSlots:
@@ -358,7 +358,7 @@ def copyCellRecords(
         row, column = min(missing)
         raise WriteError(
             f"A copy names the record at "
-            f"{CellReference(row + originOffset, column + originOffset)}, and the file "
+            f"{CellAddress(row + originOffset, column + originOffset)}, and the file "
             "holds none there."
         )
     placed = {
@@ -367,7 +367,7 @@ def copyCellRecords(
     }
     for (row, column), record in placed.items():
         refuseUncopyableRecord(
-            record, CellReference(row + originOffset, column + originOffset)
+            record, CellAddress(row + originOffset, column + originOffset)
         )
     displaced = {landed: found[landed] for landed in records if landed in found}
     removals: dict[int, set[int]] = {}
@@ -375,7 +375,7 @@ def copyCellRecords(
     for row, column in displaced:
         removals.setdefault(row, set()).add(column)
     for (row, column), record in placed.items():
-        where = CellReference(row + originOffset, column + originOffset)
+        where = CellAddress(row + originOffset, column + originOffset)
         placements.setdefault(row, {})[column] = claim(record, where)
     placeRecords(registry, store, tileRange, removals, placements)
     return RecordCopies(placed, displaced)
@@ -411,7 +411,7 @@ def applyConditionChanges(
             ):
                 key = findSlotValue(record, conditionalSlot)
                 cell = table.cells.get(
-                    CellReference(row + originOffset, record.column + originOffset)
+                    CellAddress(row + originOffset, record.column + originOffset)
                 )
                 if key is None or key not in plan.rules or cell is None:
                     continue

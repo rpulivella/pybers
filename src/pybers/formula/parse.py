@@ -43,6 +43,7 @@ from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
     CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
     toCellReference,
 )
@@ -116,7 +117,7 @@ class Parser:
 
     text: str
     tokens: list[Token]
-    host: CellReference
+    host: CellAddress
     tables: Mapping[str, str]
     pieces: Mapping[str, CellRange | CellReference]
     nodes: list[FormulaNode] = field(default_factory=list)
@@ -505,7 +506,7 @@ class Parser:
 
 def parseFormula(
     text: str,
-    host: CellAddress,
+    host: CellReferenceLike,
     *,
     tables: Mapping[str, str] | None = None,
     pieces: Mapping[str, CellRange | CellReference] | None = None,
@@ -523,7 +524,7 @@ def parseFormula(
     return Parser(
         text=body,
         tokens=tokenize(body, tuple(tables or ())),
-        host=toCellReference(host),
+        host=toCellReference(host).address,
         tables=tables or {},
         pieces=pieces or {},
     ).parse()

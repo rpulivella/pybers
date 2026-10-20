@@ -13,7 +13,7 @@ As a [role] I want [outcome] so that [reason].
 ## Acceptance criteria
 
 <!--
-Each criterion states an outcome someone can check, never how the code is built. Number every line `1.`, since Markdown counts them. One level of nesting at most, cited as `4.ii`. Docs only for what the change leaves unobvious: user docs with an example, for `import pybers` and the CLI or TUI, and developer docs it adds to, corrects or removes, or name the ticket that does. A removal counts, and a change that leaves nothing unobvious needs none.
+Each criterion states an outcome someone can check, never how the code is built. Number every line `1.`, since Markdown counts them. One level of nesting at most, cited as `4.ii`. Docs only for what the change leaves unobvious: user docs with an example, for `import pybers` and the CLI or TUI, and developer docs it adds to, corrects or removes, or name the ticket that does. A removal counts, and a change that leaves nothing unobvious needs none. Docs run from the front door to the docstrings: what a newcomer reads first, the design and its reasoning, the rules contributors and agents follow, and the help a call or a command gives. A docs AC asks for every layer the change makes untrue or incomplete, and which files that means is found while working the ticket, never listed here.
 -->
 
 1. [an outcome someone can check]

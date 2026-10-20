@@ -98,7 +98,7 @@ def collectFormulaDependencies(
                 f"column {column + originOffset} that the model does not hold."
             )
         dependencies[(row, column)] = resolveFormulaDependencies(
-            cell.formula, cell.reference, hostOwner, ownerIds, table.name, extents
+            cell.formula, cell.address, hostOwner, ownerIds, table.name, extents
         )
     return dependencies
 

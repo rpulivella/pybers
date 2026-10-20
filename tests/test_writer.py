@@ -40,7 +40,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import allDocuments, findDocumentPath
+from conftest import allDocuments, copyDocument, findDocumentPath
 from pybers._engine import readTableOwnerIds
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
@@ -59,7 +59,7 @@ from pybers._persistence.types import (
     parseArchive,
     readArchiveTypeId,
 )
-from pybers.addressing import toCellReference
+from pybers.addressing import CellAddress, toCellReference
 from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
@@ -309,13 +309,6 @@ def test_writeDocumentIsTheSameCallAsSave(tmp_path: Path) -> None:
 
 # ── AC 2, 3 and 4: a numeric edit reaches its cell and touches nothing else ──
 
-def copyDocument(name: str, tmp_path: Path) -> Path:
-    """Copy a document somewhere writable, since a save lands in place by default."""
-    working = tmp_path / f"{name}-edited.numbers"
-    shutil.copy(findDocumentPath(name), working)
-    return working
-
-
 def test_aDecimalWrittenToACellIsThereWhenTheFileIsReopened(tmp_path: Path) -> None:
     """AC 2 and AC 3 together, which is the pair a caller actually experiences."""
     working = copyDocument("11-value-types-noformats", tmp_path)
@@ -406,7 +399,7 @@ def test_theNeighborsOfAnEditedCellAreUntouched(tmp_path: Path) -> None:
     expected = {
         reference: cell.value
         for reference, cell in before.cells.items()
-        if reference != toCellReference("A1")
+        if reference != CellAddress.parse("A1")
     }
 
     document = pybers.open(working)
@@ -458,20 +451,20 @@ def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
     """
     working = copyDocument("18-formula-literals", tmp_path)
 
-    document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = Decimal("999")
+    cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
     with pytest.raises(WriteError, match="backed by a formula"):
-        document.save()
+        cell.value = Decimal("999")
 
 
 def test_aRefusedSaveLeavesTheFileExactlyAsItWas(tmp_path: Path) -> None:
     """The refusal is worth nothing if half the package has already been written."""
-    working = copyDocument("18-formula-literals", tmp_path)
+    working = copyDocument("65-series-base", tmp_path)
     before = working.read_bytes()
 
     document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = Decimal("999")
+    date = document.sheets[0].tables[0].cell("E2").value
+    document.sheets[0].tables[0].cell("A2").value = date
     with pytest.raises(WriteError):
         document.save()
 
@@ -496,14 +489,12 @@ def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
 def test_writingSomethingNeitherTextNorANumberIsStillRefused(
     tmp_path: Path,
 ) -> None:
-    """The refusal that remains, since a boolean has no write path yet."""
+    """A value no cell holds is refused as it is assigned, naming what a cell holds."""
     working = copyDocument("11-value-types-noformats", tmp_path)
+    cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
-    document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = [1, 2]
-
-    with pytest.raises(WriteError, match="can write only a number as Decimal"):
-        document.save()
+    with pytest.raises(WriteError, match="A cell holds a Decimal"):
+        cell.value = [1, 2]  # type: ignore[assignment]
 
 
 def test_aDateWrittenOverANumberIsRefused(tmp_path: Path) -> None:
@@ -638,7 +629,7 @@ def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
     for _, _, cell in document.cellsIterate():
         # Rows 11 and 12 are the formula row and its labels. A formula-backed cell is
         # refused rather than overwritten, and a label is not a number.
-        if isinstance(cell.value, Decimal) and cell.reference.row <= 10:
+        if isinstance(cell.value, Decimal) and cell.address.row <= 10:
             cell.value = cell.value + Decimal(1000)
     document.save()
 
@@ -1173,7 +1164,6 @@ def readRecordAt(
 ) -> CellRecord:
     """Return the raw cell record at an address, in the first table or a named one."""
     from pybers._persistence.index import ArchiveIndex
-    from pybers.addressing import toCellReference
     from pybers.document._read import findRoot
 
     wanted = toCellReference(address)

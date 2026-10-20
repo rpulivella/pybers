@@ -25,14 +25,13 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 import dataclasses
-import shutil
 from pathlib import Path
 
 import pytest
 
 import pybers
-from conftest import findDocumentPath, readDataListBytes
-from pybers import CellReference, Table
+from conftest import copyDocument, findDocumentPath, readDataListBytes
+from pybers import Table
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
 from pybers.formula.nodes import FormulaRange, FormulaReference, Span
@@ -98,11 +97,6 @@ def openShapes() -> pybers.Document:
     return pybers.open(findDocumentPath("20-formula-shapes"))
 
 
-def copyDocument(name: str, into: Path) -> Path:
-    """Return a writable copy of a document, so a save never touches the documents."""
-    return Path(shutil.copy(findDocumentPath(name), into / f"{name}.numbers"))
-
-
 def readFormulaTexts(table: Table) -> dict[str, str]:
     """Return every formula a table holds, as text, keyed by its cell."""
     return {
@@ -119,7 +113,7 @@ def findLocationAt(document: pybers.Document, name: str) -> pybers.ReferenceLoca
     return next(
         location
         for location in document.referencesIterate()
-        if str(location.cell.reference) == name
+        if str(location.cell.address) == name
     )
 
 
@@ -178,13 +172,13 @@ def testTheWalkRefusesAReferenceIntoATableTheDocumentDoesNotHold() -> None:
         list(document.referencesIterate())
 
 
-def testACellReferenceNeverNamesATable() -> None:
-    """AC 1.ii. Addressing stays table-local: four fields, none of them a table."""
-    assert [field.name for field in dataclasses.fields(CellReference)] == [
-        "row", "col", "rowAbsolute", "colAbsolute",
+def testACellAddressNeverNamesATable() -> None:
+    """AC 1.ii. A position stays table-local: a row and a column, nothing more."""
+    assert [field.name for field in dataclasses.fields(pybers.CellAddress)] == [
+        "row", "col",
     ]
-    with pytest.raises(pybers.ReferenceError, match="A1-style"):
-        CellReference.parse("Table 2::A1")
+    with pytest.raises(pybers.ReferenceError, match="names a table"):
+        pybers.CellAddress.parse("Table 2::A1")
 
 
 # ── AC 2: every reference, in one call ───────────────────────────────────────
@@ -193,7 +187,7 @@ def testACellReferenceNeverNamesATable() -> None:
 def testEveryReferenceInTheDocumentIsWalkedInOneCall() -> None:
     """AC 2. Nine locations across eight formulas, none of them named in advance."""
     locations = list(openShapes().referencesIterate())
-    assert [str(location.cell.reference) for location in locations] == [
+    assert [str(location.cell.address) for location in locations] == [
         "A11", "B11", "C11", "C11", "D11", "E11", "F11", "G11", "H11",
     ]
 
@@ -202,7 +196,7 @@ def testTheWalkYieldsEachRangeOfAMultiRangeCallSeparately() -> None:
     """AC 2. `SUMIFS(A1:A10,A1:A10,">5")` is two ranges, and both can move."""
     locations = [
         location for location in openShapes().referencesIterate()
-        if str(location.cell.reference) == "C11"
+        if str(location.cell.address) == "C11"
     ]
     assert [location.index for location in locations] == [0, 1]
     assert all(isinstance(location.content, FormulaRange) for location in locations)
@@ -219,7 +213,7 @@ def testTheWalkFindsReferencesOnEverySheet() -> None:
     far.cell("C1").formulaText = "=A1+1"
 
     found = [
-        (location.sheet.name, str(location.cell.reference))
+        (location.sheet.name, str(location.cell.address))
         for location in document.referencesIterate()
         if location.target is far
     ]
@@ -239,7 +233,7 @@ def testASiteReportsWhetherItLeavesTheTableHoldingIt() -> None:
     """AC 2. What a CLI filters on, and the reason `target` alone is not enough."""
     document = openShapes()
     assert [
-        str(location.cell.reference) for location in document.referencesIterate()
+        str(location.cell.address) for location in document.referencesIterate()
         if location.crossTable
     ] == ["G11", "H11"]
 
@@ -363,13 +357,13 @@ def testAShiftOfNothingReportsNothingAndWritesNothing() -> None:
     """AC 4. A no-op must report accurately and must not touch the formula."""
     document = openShapes()
     before = {
-        str(location.cell.reference): location.cell.formula
+        str(location.cell.address): location.cell.formula
         for location in document.referencesIterate()
     }
 
     assert not any(location.shift() for location in document.referencesIterate())
     assert all(
-        location.cell.formula is before[str(location.cell.reference)]
+        location.cell.formula is before[str(location.cell.address)]
         for location in document.referencesIterate()
     )
 
@@ -391,7 +385,7 @@ def testShiftingOneLocationLeavesTheOthersOnThatFormulaUsable() -> None:
     document = openShapes()
     first, second = (
         location for location in document.referencesIterate()
-        if str(location.cell.reference) == "C11"
+        if str(location.cell.address) == "C11"
     )
 
     assert first.shift(cols=7) is True
@@ -532,7 +526,7 @@ def testACliListsEveryReferenceWithWhereItIsAndWhereItPoints() -> None:
     """The `pybers references list` consumer: one printable line per reference."""
     document = openShapes()
     report = [
-        f"{location.sheet.name}/{location.table.name}/{location.cell.reference}"
+        f"{location.sheet.name}/{location.table.name}/{location.cell.address}"
         f"  {location.text}  -> {location.target.name}"
         for location in document.referencesIterate()
     ]
@@ -549,7 +543,7 @@ def testACliReportsBrokenReferencesAndTheirCount() -> None:
     document = pybers.open(findDocumentPath("21-formula-errors"))
     broken = [location for location in document.referencesIterate() if location.broken]
 
-    assert [str(location.cell.reference) for location in broken] == ["C1"]
+    assert [str(location.cell.address) for location in broken] == ["C1"]
 
 
 def testATuiFollowsAReferenceToTheCellItPointsAt() -> None:
@@ -558,7 +552,7 @@ def testATuiFollowsAReferenceToTheCellItPointsAt() -> None:
     location = findLocationAt(document, "G11")
 
     destination = location.target.cell(
-        location.content.resolve(location.cell.reference)
+        location.content.resolve(location.cell.address)
     )
 
     assert destination.value == 42

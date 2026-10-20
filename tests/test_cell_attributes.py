@@ -245,7 +245,7 @@ def testEveryReferenceInEveryDocumentResolvesOnTheGrid() -> None:
         for _, _, cell in pybers.open(path).cellsIterate():
             if cell.formula is None:
                 continue
-            host = cell.reference
+            host = cell.address
             for reference in cell.formula.references:
                 if reference.broken:
                     continue

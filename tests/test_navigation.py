@@ -194,7 +194,7 @@ def test_theIterationTakesSheetsThenTablesThenRowsThenColumns() -> None:
 
     firstTable = document.sheet(1).table("Table 1")
     references = [
-        str(cell.reference) for _, table, cell in found if table is firstTable
+        str(cell.address) for _, table, cell in found if table is firstTable
     ]
     assert references == (
         [f"A{row}" for row in range(1, 11)]
@@ -224,7 +224,7 @@ def test_aCellArrivesWithTheTableAndSheetHoldingIt() -> None:
     atA1 = [
         (sheet.name, table.name, cell.value)
         for sheet, table, cell in document.cellsIterate()
-        if str(cell.reference) == "A1"
+        if str(cell.address) == "A1"
     ]
     assert atA1 == [
         ("Sheet 1", "Table 1", Decimal(1)),
@@ -236,7 +236,7 @@ def test_aCellArrivesWithTheTableAndSheetHoldingIt() -> None:
 def test_theYieldedCellIsTheTablesOwnCellAndNotACopy() -> None:
     document = openDocument("20-formula-shapes")
     sheet, table, cell = next(iter(document.cellsIterate()))
-    assert cell is table.cells[cell.reference]
+    assert cell is table.cells[cell.address]
     assert table is sheet.tables[0]
     assert isinstance(cell, Cell)
 
@@ -247,7 +247,7 @@ def test_theIterationCoversStoredCellsAndNotAnEmptyRectangle() -> None:
     kind has a record in a tile at all."""
     document = openDocument("22-merge-2x2")
     table = document.sheet(1).table(1)
-    yielded = [str(cell.reference) for _, _, cell in document.cellsIterate()]
+    yielded = [str(cell.address) for _, _, cell in document.cellsIterate()]
     assert len(yielded) == len(table.cells) == 18
     assert table.rowCount * table.colCount == 26
     # A1:B1 is merged, so A1 is yielded once and B1 not at all.
@@ -292,16 +292,16 @@ def test_theIterationDrivesAnEditThatSurvivesAReopen(tmp_path: Path) -> None:
     edited: dict[tuple[str, str, str], Decimal] = {}
     for sheet, table, cell in document.cellsIterate():
         countBySheet[sheet.name] = countBySheet.get(sheet.name, 0) + 1
-        if not isinstance(cell.value, Decimal) or cell.reference.row > 10:
+        if not isinstance(cell.value, Decimal) or cell.address.row > 10:
             continue
         replacement = cell.value + Decimal(1000)
         cell.value = replacement
-        edited[(sheet.name, table.name, str(cell.reference))] = replacement
+        edited[(sheet.name, table.name, str(cell.address))] = replacement
 
     assert countBySheet == {"Sheet 1": 27, "Sheet 2": 1}
     assert len(edited) == 12
     order = [
-        (sheet.name, table.name, str(cell.reference))
+        (sheet.name, table.name, str(cell.address))
         for sheet, table, cell in document.cellsIterate()
     ]
 
@@ -309,10 +309,10 @@ def test_theIterationDrivesAnEditThatSurvivesAReopen(tmp_path: Path) -> None:
     reopened = pybers.open(target)
 
     assert [
-        (sheet.name, table.name, str(cell.reference))
+        (sheet.name, table.name, str(cell.address))
         for sheet, table, cell in reopened.cellsIterate()
     ] == order
     for sheet, table, cell in reopened.cellsIterate():
-        key = (sheet.name, table.name, str(cell.reference))
+        key = (sheet.name, table.name, str(cell.address))
         if key in edited:
             assert cell.value == edited[key]

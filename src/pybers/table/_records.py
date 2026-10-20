@@ -57,7 +57,7 @@ from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._read import storedKinds
 from ._refcounts import StringPool, stringTypeByte
-from .cells import Cell
+from .cell import Cell, refuseValueOverFormula
 from .kinds import CellKind
 
 # How a refusal names what a cell holds, in the words a person would use.
@@ -154,10 +154,7 @@ def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
     recalculated, which is a silent loss wearing the shape of a success.
     """
     if carriesFormula(record):
-        raise WriteError(
-            f"{cell.reference} is backed by a formula, so writing a value would "
-            "discard it. Replace the formula instead, or clear it first."
-        )
+        refuseValueOverFormula(cell.address)
 
 
 def formatStoredValue(record: CellRecord) -> str:
@@ -199,7 +196,7 @@ def buildWrittenRecord(
     if isinstance(value, str):
         if pool is None:
             raise WriteError(
-                f"{cell.reference} was set to text and its table carries no string "
+                f"{cell.address} was set to text and its table carries no string "
                 "list to pool it in. A table that has never held text has none."
             )
         previous = (
@@ -229,7 +226,7 @@ def buildWrittenRecord(
             )
         if record.typeByte not in numericTypeBytes:
             raise WriteError(
-                f"{cell.reference} {formatStoredValue(record)}, and pybers can write "
+                f"{cell.address} {formatStoredValue(record)}, and pybers can write "
                 "a number only into a cell holding a number, a currency amount or text."
             )
         return patchRecord(record, value)
@@ -237,7 +234,7 @@ def buildWrittenRecord(
     if isinstance(value, datetime.datetime):
         if record.typeByte != dateTypeByte:
             raise WriteError(
-                f"{cell.reference} {formatStoredValue(record)}, and pybers can write "
+                f"{cell.address} {formatStoredValue(record)}, and pybers can write "
                 "a date only into a cell holding a date."
             )
         return patchDateRecord(record, value)
@@ -245,13 +242,13 @@ def buildWrittenRecord(
     if isinstance(value, datetime.timedelta):
         if record.typeByte != durationTypeByte:
             raise WriteError(
-                f"{cell.reference} {formatStoredValue(record)}, and pybers can write "
+                f"{cell.address} {formatStoredValue(record)}, and pybers can write "
                 "a duration only into a cell holding a duration."
             )
         return patchSecondsRecord(record, value.total_seconds())
 
     raise WriteError(
-        f"{cell.reference} was given a {type(value).__name__}, and pybers can write "
+        f"{cell.address} was given a {type(value).__name__}, and pybers can write "
         "only a number as Decimal, text as str, a date as datetime or a duration as "
         "timedelta."
     )

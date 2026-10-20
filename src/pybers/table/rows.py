@@ -24,10 +24,11 @@ __date__ = "2026/09/14"
 from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, overload
 
-from pybers.addressing.reference import CellReference, firstColumn
+from pybers.addressing.reference import CellAddress, firstColumn
 
 if TYPE_CHECKING:
-    from pybers.table.cells import Cell, Table
+    from pybers.table.cell import Cell
+    from pybers.table.cells import Table
 
 
 class TableRows(Sequence["TableRow"]):
@@ -90,13 +91,13 @@ class TableRow(Sequence["Cell"]):
         self.rowNumber = rowNumber
         self.columnNumbers = columnNumbers
 
-    def cellReferences(self) -> list[CellReference]:
+    def cellAddresses(self) -> list[CellAddress]:
         """Return the address of every cell in this row, a covered position omitted.
 
         Asked of the table on every call rather than kept, because a merge made after
         this view was taken changes which positions hold a cell.
         """
-        candidates = (CellReference(self.rowNumber, col) for col in self.columnNumbers)
+        candidates = (CellAddress(self.rowNumber, col) for col in self.columnNumbers)
         return [
             reference for reference in candidates if self.table.addressable(reference)
         ]
@@ -110,25 +111,25 @@ class TableRow(Sequence["Cell"]):
     def __getitem__(self, index: int | slice) -> Cell | TableRow:
         """Return one cell, or the cells a slice selects as another view."""
         if isinstance(index, slice):
-            selected = [reference.col for reference in self.cellReferences()[index]]
+            selected = [reference.col for reference in self.cellAddresses()[index]]
             return TableRow(self.table, self.rowNumber, tuple(selected))
-        return self.table.cell(self.cellReferences()[index])
+        return self.table.cell(self.cellAddresses()[index])
 
     def __iter__(self) -> Iterator[Cell]:
         """Yield each cell once, left to right, finding the addresses only once."""
-        for reference in self.cellReferences():
+        for reference in self.cellAddresses():
             yield self.table.cell(reference)
 
     def __len__(self) -> int:
         """Return how many cells this row holds, creating none."""
-        return len(self.cellReferences())
+        return len(self.cellAddresses())
 
     def __contains__(self, candidate: object) -> bool:
         """Report whether a cell is one this row holds, creating none to find out."""
         # The inherited test walks the row, which would create every cell in it.
         return any(
             self.table.cells.get(reference) is candidate
-            for reference in self.cellReferences()
+            for reference in self.cellAddresses()
         )
 
     def __eq__(self, other: object) -> bool:

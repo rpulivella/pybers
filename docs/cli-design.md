@@ -24,7 +24,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `diff A B` | The cells that differ between two documents |
 | `visinum FILE [ADDRESS]` | The read-only terminal browser |
 
-`check` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
+`check`, `set` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
 
 - **The default action** comes from a `TyperGroup` subclass that routes a first argument naming no command to `check --names`. A file named like a command is reached as `./check`.
 - **`python -m pybers`** runs the same command.
@@ -41,8 +41,10 @@ A command parses its arguments, calls the library once, formats what comes back,
 
 ## Writing
 
-- **A write names its target**: `--in-place` changes the file given, and `-o NEW` writes a new document beside it. A command that writes requires one of the two.
-- **`--dry-run`** shows the change and writes nothing, and a change that alters nothing writes nothing.
+- **A write names its target**: `--in-place` changes the file given, and `-o NEW` writes a new document beside it. A command that writes requires one of the two, and `-o` refuses a file that already exists.
+- **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
+- **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind named is refused.
+- **`set --format SPEC`** sets how the cells show their value, SPEC being a format's text form, tagged by its family.
 - **A cell outside its table** is refused, naming the table's size, unless `--extend` grows the table to hold it.
 
 ## Formulas

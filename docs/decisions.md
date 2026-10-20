@@ -163,6 +163,149 @@ the per-pull-request scan already resolves.
 
 ---
 
+## Writing values and formats, decided 2026-10-16
+
+Settled for PYB-217, PYB-144 and PYB-145 across three users at once: a person at the
+command line, a script through `import pybers`, and an agent holding several documents
+open. Whatever serves one of them has to read the same way to the other two.
+
+**A value's kind follows its Python type.** `Decimal` is a number, `str` text, `bool` a
+boolean, `datetime` a date and time, and `timedelta` a duration. An `int` is accepted as the
+exact number it names, and a `date` as midnight, which is how Numbers stores a date typed
+without a time. A `float` is refused with a message naming `Decimal`, because Numbers keeps
+numbers as decimal128 and a binary float carries rounding error into a document that never
+had any.
+
+**A date and time always carries a time zone.** One with none is refused, so a written
+moment is never ambiguous. Whether Numbers stores a date in UTC or in some local time, and
+whether it keeps a date with no time zone at all, is not measured yet; PYB-218 measures
+both, and if Numbers does keep such a date, pybers represents it rather than refusing it.
+
+**A cell that changes kind takes Numbers' Automatic format for its new kind**, as a value
+typed into a fresh cell does. A boolean therefore shows TRUE or FALSE; a checkbox is a
+format, chosen through formats like any other.
+
+**A format is a value of one union, `CellFormat`**, with one frozen dataclass per family:
+`CellFormatNumber`, `CellFormatNumberCustom`, `CellFormatDuration`, `CellFormatCurrency`
+and the rest. `CellFormatAutomatic` and `CellFormatUnknown` are members too, so a format
+nobody chose and a format pybers cannot decode are explicit values rather than `None`, and
+a `match` over a cell's format is exhaustive. The names lead with `CellFormat` so the family
+sorts together and never collides with text or table formatting, and `CellFormatFamily`
+names the families. A small `Protocol` carries what every format shares.
+Typed objects were chosen over the alternatives other libraries take, a format string as in
+openpyxl or keyword options as in numbers-parser, because Numbers has no format syntax to
+borrow and a misspelled keyword fails late or not at all.
+
+**A format belongs to no document.** One read from a cell in one document applies to a
+cell in another, and the writer finds or adds the matching entry in that table's format
+list. Every format has one text form tagged by its family, which the command line, JSON
+export and import, and an agent all use.
+
+**A cell's kind and format always agree.** A write that would leave a format on a value it
+cannot show, such as a duration format on text, is refused, naming both, unless the caller
+passes `CellFormatConflict.AUTOMATIC`, which falls back to the Automatic format and reports
+it. The policy is a parameter of the library and of an agent's calls, and other writes can
+take it later, an import or a fill among them.
+
+**A write reports each cell whose kind or format it changed**, before and after, and a
+preview reports the same without writing. Nothing about a column is special: a write
+touches the cells it names, and whether a column stays consistent is answered by reading
+the table's structure, which reports each column's kind and format and the cells that
+differ. That reading is also what keeps JSON export compact, since a column is described
+once and only its exceptions are listed.
+
+**Formats apply over a range**, `table.cellFormatApply(range, format)`, and a single cell's
+value, format and style are set together in one call, `document.cellSet(reference, ...)`,
+the style a named one or one written into the cell alone. The call sits on the document
+because its reference names the table, and it returns the change it made.
+
+**A custom number format is a structured value** holding its positive, negative and zero
+forms, the shape Numbers stores. A shorthand parser may later build one, and the structured
+value stays what pybers stores.
+
+**Currency has one home** that the format code and the formula code share, since a
+formula's result can be a currency amount as well as a cell's value (PYB-220).
+
+**No format bit is written before it is decoded.** PYB-219 decodes each family's archive
+and flag bits, and the format work splits by family on its findings.
+
+**On the command line, the verb comes first**: `pybers set FILE ADDRESS VALUE`. A file
+first would leave `diff A B`, `import` and `export -o` without a consistent place, and the
+bare `pybers FILE` already covers looking at one document. `set` infers a value's kind and
+`--as` overrides the inference; should inference prove unreliable, `set` falls back to text
+unless `--as` names a kind. The inference is one table of parsers built on the standard
+library, tried in order, rather than a chain of conditions. `set --format` sets a format by
+its text form. `--preview` shows a change and writes nothing, the flag named for what it
+does.
+
+---
+
+## A cell's position, how it is pointed at, and how far apart two are, decided 2026-10-19
+
+Three types, each one idea. **`CellAddress`** is where a cell sits in any table: a row and a
+column counted from one, bounded by the largest table Numbers holds, with no table and no
+`$`. **`CellReference`** is how something points at a cell: an address, a lock on each axis,
+and the table it names when its context needs one. **`CellOffset`** is a signed distance in
+rows and columns.
+
+**A lock belongs to the reference, never to the address.** `B3`, `$B3`, `B$3` and `$B$3` all
+point at one address and differ only in how they move when a formula is copied, so every
+formula reference carries both locks, each on or off. Keeping the lock out of the address
+is also what lets a table key its cells by address with no normalizing step: two spellings
+of one position are always one key.
+
+**A reference is qualified only as far as its context needs**, the model of a path or a
+URL. `B3`, `Q3::B3` and `Budget::Q3::B3` are one type, its table and that table's sheet
+given by `TableReference` and `SheetReference`, typed rather than bare strings. Each owner
+takes its part and hands the rest down: `document.cell` refuses a reference naming no table,
+`sheet.cell` refuses one naming another sheet, and `table.cell` takes `B3` alone or a
+qualifier naming that table. A qualified and an unqualified reference compare unequal, as
+two paths do. Merging position and qualification into one type was weighed and kept apart
+from the address, because a qualified key would have to be stripped before every lookup.
+
+**An offset is its own type**, because an address is counted from one and bounded, and an
+offset is signed and may be zero. An address plus an offset is an address, an address
+minus an address is an offset, and two offsets add, which is the `datetime` and
+`timedelta` algebra. A formula stores a relative axis as exactly this signed distance and a
+locked axis as a position, so the three types meet what Numbers keeps.
+
+**Iterating a table yields addresses**, portable to any table, which is what a template, a
+move within one table or a conversion wants. Anything gathered across tables, a search, a
+change report or a document-wide walk, yields qualified references, since a result that
+leaves its loop has to say where it was.
+
+**The input aliases are named for what they accept**, `CellReferenceLike` and
+`CellRangeLike`, in the style of `os.PathLike`, so the word address names one type and the
+text syntax, never an alias.
+
+---
+
+## A reference is a path, and a selector is CSS, decided 2026-10-20
+
+Selecting cells borrows two models a developer already knows, one for naming a single
+cell and one for matching many.
+
+**A reference follows `pathlib.Path`.** It is qualified only as far as its context needs,
+the way a path is relative or absolute, and each owner resolves its part and hands the rest
+down, the way a path walks directories. `cell.address` and `cell.reference` are a path's
+name and its resolved form, and an offset between two addresses is a relative path.
+
+**A selector follows CSS.** It matches a set of cells by pattern and returns their
+references. The `::` chain is the descendant combinator, `Budget::*, Notes::Table 1` is
+grouping, and `Q*::*` is a partial match on names. CSS also offers what an agent asking for
+cells by meaning rather than by position needs: a condition on a cell's kind or format,
+in the manner of an attribute selector (`[kind=duration]`), a state, in the manner of a
+pseudo-class (`:empty`, `:formula`, `:header`), a position by pattern, in the manner of
+`:nth-child` (every second row, every third column), and negation, in the manner of
+`:not()`. One string can then ask for every duration in every quarterly table that is not
+a header, and the table-structure read and JSON export answer to the same selectors.
+
+pybers borrows from CSS elsewhere too: a created table starts from a reset in the sense of
+a CSS reset, and an item on a sheet is placed by the anchor names of `background-position`.
+The selector type is built in PYB-223.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

@@ -28,7 +28,7 @@ __date__ = "2026/09/16"
 
 from dataclasses import dataclass
 
-from pybers.addressing.reference import CellReference, originOffset
+from pybers.addressing.reference import CellAddress, originOffset
 from pybers.formula.nodes import Formula, FormulaRange, FormulaReference
 
 
@@ -75,7 +75,7 @@ class Precedents:
     spans: tuple[SpanPrecedent, ...] = ()
 
 
-def resolveFormulaPrecedents(formula: Formula, host: CellReference) -> Precedents:
+def resolveFormulaPrecedents(formula: Formula, host: CellAddress) -> Precedents:
     """Return what a formula reads, resolved against the cell holding it.
 
     Duplicates are dropped and order is kept, since a call naming one range twice
@@ -135,7 +135,7 @@ def resolveFormulaPrecedents(formula: Formula, host: CellReference) -> Precedent
 
 
 def expandReferenceSpans(
-    reference: FormulaReference, host: CellReference
+    reference: FormulaReference, host: CellAddress
 ) -> list[SpanPrecedent]:
     """Return the whole column or row one unbounded reference names."""
     if reference.column is not None:

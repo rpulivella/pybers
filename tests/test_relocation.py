@@ -64,7 +64,7 @@ def readTableState(table: pybers.Table) -> tuple[object, ...]:
     """Return what a refused move must leave alone: every cell and every merge."""
     return (
         {
-            reference: (cell.formulaText or cell.value, cell.reference)
+            reference: (cell.formulaText or cell.value, cell.address)
             for reference, cell in table.cells.items()
         },
         list(table.mergeRanges),
@@ -152,7 +152,7 @@ def testAConditionFollowsARowAddedAboveIt() -> None:
     table.rowAdd(1)
     (condition,) = table.cell("C3")._conditions
     (reference,) = condition.references
-    assert reference.resolve(table.cell("C3").reference) == pybers.CellReference(2, 1)
+    assert reference.resolve(table.cell("C3").address) == pybers.CellReference(2, 1)
 
 
 def readRuleConditions(path: Path) -> dict[tuple[int, int], object]:
@@ -380,7 +380,7 @@ def testAMoveReturnsEveryFormulaReadingAVacatedCell(
     """PYB-18 AC 8: a partial range under either rule, the old address under one."""
     _, table = openTable("60-move-base")
     stranded = table.cellsMove("B2:D5", anchor, references=rule)
-    assert [str(cell.reference) for cell in stranded] == expected
+    assert [str(cell.address) for cell in stranded] == expected
 
 
 def testAMovedImportedMergeCarriesTheRecordsItCovers(tmp_path: Path) -> None:
@@ -447,7 +447,7 @@ def testACommandLineMovesABlockWithTheRuleAsTyped() -> None:
     stranded = table.cellsMove(arguments[1], arguments[2], references=arguments[3])  # type: ignore[arg-type]
     assert table.cell("H8").formulaText == "=F8+G8"
     assert [
-        f"{cell.table.name}::{cell.reference}" for cell in stranded if cell.table
+        f"{cell.table.name}::{cell.address}" for cell in stranded if cell.table
     ] == [
         "Table 1::E2", "Table 1::E3", "Table 1::E4", "Table 1::E5", "Table 1::E8",
         "Table 1::E9", "Table 2::A2", "Table 2::A3",

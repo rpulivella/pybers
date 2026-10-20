@@ -42,7 +42,8 @@ from pybers.formula.nodes import (
     FormulaReference,
 )
 from pybers.formula.render import findShortestNames, renderAddress
-from pybers.table.cells import Cell, Table
+from pybers.table.cell import Cell
+from pybers.table.cells import Table
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +79,7 @@ class ReferenceLocation:
             node.content, FormulaReference | FormulaRange
         ):
             raise FormulaError(
-                f"Node {self.index} of {self.cell.reference} is no longer the "
+                f"Node {self.index} of {self.cell.address} is no longer the "
                 "reference this location names. A location views a formula rather than "
                 "holding one, so replacing that formula invalidates it."
             )
@@ -99,7 +100,7 @@ class ReferenceLocation:
     def text(self) -> str:
         """This reference as Numbers spells it, `Table 2::A1`, qualified as needed."""
         return renderAddress(
-            self.node, self.cell.reference, findShortestNames(self.cell.tableNames)
+            self.node, self.cell.address, findShortestNames(self.cell.tableNames)
         )
 
     def shift(self, *, rows: int = 0, cols: int = 0) -> bool:

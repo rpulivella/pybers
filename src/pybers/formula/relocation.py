@@ -29,7 +29,7 @@ __date__ = "2026/09/23"
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pybers.addressing.reference import CellReference
+from pybers.addressing.reference import CellAddress
 from pybers.formula.nodes import (
     Coordinate,
     Formula,
@@ -92,8 +92,8 @@ def placeSpan(span: Span, begin: int, end: int, host: int) -> Span:
 
 def relocateReference(
     reference: FormulaReference,
-    host: CellReference,
-    landed: CellReference,
+    host: CellAddress,
+    landed: CellAddress,
     move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> FormulaReference:
@@ -122,8 +122,8 @@ def relocateReference(
 
 def relocateRange(
     extent: FormulaRange,
-    host: CellReference,
-    landed: CellReference,
+    host: CellAddress,
+    landed: CellAddress,
     move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> FormulaRange:
@@ -150,8 +150,8 @@ def relocateRange(
 
 def relocateFormula(
     formula: Formula,
-    host: CellReference,
-    landed: CellReference,
+    host: CellAddress,
+    landed: CellAddress,
     move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> Formula:
@@ -191,7 +191,7 @@ def clampSpan(span: Span | None, host: int, count: int) -> Span | None:
 
 
 def clampFormulaRanges(
-    formula: Formula, host: CellReference, rowCount: int, columnCount: int
+    formula: Formula, host: CellAddress, rowCount: int, columnCount: int
 ) -> Formula:
     """Return a formula whose ranges in its own table stop at that table's edge."""
     nodes = []

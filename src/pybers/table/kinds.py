@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING
 from pybers.absence import UNDETERMINED
 
 if TYPE_CHECKING:
-    from pybers.table.cells import CellValue
+    from pybers.table.cell import CellValue
 
 
 class CellKind(StrEnum):

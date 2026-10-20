@@ -48,7 +48,7 @@ from typing import assert_never
 from pybers.addressing.ranges import RangeEndpoint, renderEndpoint
 from pybers.addressing.reference import (
     CellAddress,
-    CellReference,
+    CellReferenceLike,
     tableNameSeparator,
     toCellReference,
 )
@@ -126,7 +126,7 @@ def collectBoundNames(formula: Formula) -> dict[int, str]:
 
 
 def renderAddress(
-    node: FormulaNode, host: CellReference, names: Mapping[str, str]
+    node: FormulaNode, host: CellAddress, names: Mapping[str, str]
 ) -> str:
     """Return the text of one reference or range node, from the cell holding it."""
     content = node.content
@@ -199,7 +199,7 @@ class Renderer:
     """
 
     formula: Formula
-    host: CellReference
+    host: CellAddress
     names: Mapping[str, str]
     symbols: dict[int, str] = field(default_factory=dict)
     stack: list[Rendered] = field(default_factory=list)
@@ -382,7 +382,7 @@ class Renderer:
 
 def renderFormula(
     formula: Formula,
-    host: CellAddress,
+    host: CellReferenceLike,
     *,
     tables: Mapping[str, str] | None = None,
 ) -> str:
@@ -393,7 +393,9 @@ def renderFormula(
     `tables` names the tables a formula reaches into, from `Document.tableIdentities`.
     """
     return Renderer(
-        formula=formula, host=toCellReference(host), names=findShortestNames(tables)
+        formula=formula,
+        host=toCellReference(host).address,
+        names=findShortestNames(tables),
     ).render()
 
 

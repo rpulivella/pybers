@@ -22,7 +22,7 @@ __date__ = "2026/09/22"
 from collections.abc import Mapping
 
 from .._engine import CellEdge, FormulaDependencies, RangeEdge, SpanEdge
-from ..addressing.reference import CellReference
+from ..addressing.reference import CellAddress
 from ..errors import WriteError
 from .nodes import Formula
 from .precedents import resolveFormulaPrecedents
@@ -30,7 +30,7 @@ from .precedents import resolveFormulaPrecedents
 
 def resolveFormulaDependencies(
     formula: Formula,
-    host: CellReference,
+    host: CellAddress,
     hostOwner: int,
     ownerIds: Mapping[str, int],
     tableName: str,
