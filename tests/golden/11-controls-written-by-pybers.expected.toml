@@ -1,0 +1,44 @@
+# What Numbers shows for 11-controls-written-by-pybers.numbers: values pybers wrote over the
+# controls of `11-value-types-noformats`. FALSE at E1 and 100 at G1 fit their controls and
+# keep them; 7 at F1, 500 at H1 and Banana at I1 do not, so each cell loses its control and
+# keeps its value. Checked by
+# `.venv/bin/python3 -m tools.local.golden_confirm run 11-controls-written-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E1"
+value = false
+format = "checkbox"
+qa = ["E1 shows an unchecked checkbox"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F1"
+value = 7
+format = "automatic"
+qa = ["F1 shows 7 as a plain number, with no star rating left behind"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G1"
+value = 100
+format = "slider"
+dataFormat = { "Data Format" = "Slider", Minimum = "1", Maximum = "100", Increment = "1" }
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H1"
+value = 500
+format = "automatic"
+qa = ["H1 shows 500 as a plain number, with no stepper left behind"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "I1"
+value = "Banana"
+qa = ["I1 shows Banana as plain text, with no pop-up menu left behind"]
