@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-20  A printed cell shows `value`, never the private field behind it,
+            for PYB-225.
 2026-10-20  Setting `value` makes an `int` exact and refuses a `float` or a value
             over a formula, and reports the change to `cellSet`, for PYB-217.
 2026-10-20  Moved here from `cells`, which keeps `Table`, for PYB-217. The history of
@@ -22,7 +24,7 @@ __status__ = "Development"
 __date__ = "2026/10/20"
 
 import datetime
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING, NoReturn
 
@@ -223,6 +225,19 @@ class Cell:
             text, self.address, tables=self.tableNames, pieces=pieces
         )
         return self.formula
+
+    def __repr__(self) -> str:
+        """Return the fields the dataclass shows, a private one under its public name.
+
+        Built from the field list rather than written out, so a field added later
+        shows without anyone remembering to add it here.
+        """
+        shown = (
+            (each.name.removeprefix("_"), getattr(self, each.name.removeprefix("_")))
+            for each in fields(self)
+            if each.repr
+        )
+        return f"Cell({', '.join(f'{name}={value!r}' for name, value in shown)})"
 
     @property
     def reference(self) -> CellReference:
