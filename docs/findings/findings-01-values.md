@@ -398,7 +398,7 @@ region to English (Italy) leaves both values as they were. Text typed with a zon
 convert it. Apple Community reports that a zone typed in a longer form, such as
 `Jan 30, 2023 6:23:04 AM PST`, is converted on entry, which no fixture here measures.
 
-No function among the 389 Numbers offers names or converts a zone. `NOW()` and `TODAY()` read
+None of the 389 functions Numbers offers names or converts a zone. `NOW()` and `TODAY()` read
 the clock of the Mac that recalculates, so their cached value is that Mac's wall-clock time,
 which is inferred rather than measured.
 
