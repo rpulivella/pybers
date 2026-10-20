@@ -9,6 +9,8 @@ reasons a value is missing survive. Objects stay as the library returned them un
 the encoder reaches each one. See `docs/cli-design.md`.
 
 UPDATES
+2026-10-20  A Decimal as its exact digits, and a cell's address or reference as
+            its text, for PYB-217.
 2026-10-12  Written for PYB-187.
 """
 from __future__ import annotations
@@ -24,12 +26,14 @@ __date__ = "2026/10/12"
 import dataclasses
 import json
 from collections.abc import Callable
+from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Any
 
 import typer
 from rich.console import RenderableType
 
+import pybers
 from pybers.cli._console import console
 
 
@@ -50,6 +54,11 @@ def encodeJsonValue(value: object) -> Any:
     """Return what the JSON encoder writes for a value it cannot write itself."""
     if isinstance(value, sentinel):
         return repr(value)
+    # A number as its exact digits, so no float ever stands between the cell and JSON.
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, pybers.CellAddress | pybers.CellReference):
+        return str(value)
     if isinstance(value, frozendict):
         return dict(value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):

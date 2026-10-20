@@ -3,6 +3,8 @@
 How the formats every command offers write a library result.
 
 UPDATES
+2026-10-20  A number as its exact digits and a cell position as its text, for
+            PYB-217.
 2026-10-12  Written for PYB-187.
 """
 from __future__ import annotations
@@ -47,6 +49,15 @@ def testADataclassIsWrittenAsTheFieldsItsReprShows() -> None:
     }
 
 
+def testANumberIsWrittenAsItsExactDigits() -> None:
+    assert writeJson(Decimal("1.50")) == "1.50"
+
+
+def testACellPositionIsWrittenAsItsText() -> None:
+    assert writeJson(pybers.CellAddress(3, 2)) == "B3"
+    assert writeJson(pybers.CellReference.parse("Q3::$B3")) == "Q3::$B3"
+
+
 def testAValueWithNoJsonFormIsRefusedByName() -> None:
-    with pytest.raises(TypeError, match="no JSON form for Decimal"):
-        writeJson(Decimal("1.5"))
+    with pytest.raises(TypeError, match="no JSON form for complex"):
+        writeJson(1j)
