@@ -49,6 +49,8 @@ document.save()
 
 ## Addresses
 
+**A reference is a path, and a selector is CSS.** A reference names one cell and resolves through its owners, qualified only as far as its context needs, as a path does. A selector matches a set of cells by pattern and returns their references, as a CSS selector does: grouping with commas, wildcards, conditions on a cell's kind or format, positions such as every nth row, and negation. Every way of selecting cells is one or the other.
+
 One syntax, Numbers' own, parsed by the library for every caller:
 
 | Form | Selects |

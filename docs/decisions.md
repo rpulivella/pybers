@@ -280,6 +280,32 @@ text syntax, never an alias.
 
 ---
 
+## A reference is a path, and a selector is CSS, decided 2026-10-20
+
+Selecting cells borrows two models a developer already knows, one for naming a single
+cell and one for matching many.
+
+**A reference follows `pathlib.Path`.** It is qualified only as far as its context needs,
+the way a path is relative or absolute, and each owner resolves its part and hands the rest
+down, the way a path walks directories. `cell.address` and `cell.reference` are a path's
+name and its resolved form, and an offset between two addresses is a relative path.
+
+**A selector follows CSS.** It matches a set of cells by pattern and returns their
+references. The `::` chain is the descendant combinator, `Budget::*, Notes::Table 1` is
+grouping, and `Q*::*` is a partial match on names. CSS also offers what an agent asking for
+cells by meaning rather than by position needs: a condition on a cell's kind or format,
+in the manner of an attribute selector (`[kind=duration]`), a state, in the manner of a
+pseudo-class (`:empty`, `:formula`, `:header`), a position by pattern, in the manner of
+`:nth-child` (every second row, every third column), and negation, in the manner of
+`:not()`. One string can then ask for every duration in every quarterly table that is not
+a header, and the table-structure read and JSON export answer to the same selectors.
+
+pybers borrows from CSS elsewhere too: a created table starts from a reset in the sense of
+a CSS reset, and an item on a sheet is placed by the anchor names of `background-position`.
+The selector type is built in PYB-223.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on
