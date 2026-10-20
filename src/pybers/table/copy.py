@@ -56,12 +56,12 @@ def copyCells(
     references: FormulaReferenceRelocation,
 ) -> CellRange:
     """Copy a block so its top-left lands on `anchor`, and return where it landed."""
-    from pybers.table.cells import Cell
+    from pybers.table.cell import Cell
 
     rule = toRelocationRule(references)
     named = rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
     extent = table.rangeSingle(source, "copy")
-    landing = toCellReference(anchor).asUnlocked()
+    landing = toCellReference(anchor).address
     startRow, startCol, _, _ = findBlockCorners(extent)
     copy = CellsMove(extent, landing.row - startRow, landing.col - startCol)
     destination = copy.destination
@@ -83,16 +83,16 @@ def copyCells(
     for reference in destination:
         table._cells.pop(reference, None)
     for cell in copied:
-        target = Cell(reference=copy.cellMap(cell.reference), table=table)
+        target = Cell(address=copy.cellMap(cell.address), table=table)
         copyCellContent(target, cell, named, borders=True)
         if target.formula is not None and not named:
             target.formula = clampFormulaRanges(
-                target.formula, target.reference, table.rowCount, table.colCount
+                target.formula, target.address, table.rowCount, table.colCount
             )
-        table._cells[target.reference] = target
+        table._cells[target.address] = target
     table.mergeRanges.extend(
         MergeRange(CellRange.fromReferences(
-            copy.cellMap(merge.anchor), copy.cellMap(merge.extent.end or merge.anchor)
+            copy.cellMap(merge.anchor), copy.cellMap(merge.corner)
         ))
         for merge in list(table.mergeRanges) if extent.covers(merge.anchor)
     )

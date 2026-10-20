@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One cell's address, and the column letter conversion everything else reaches for.
+"""Where a cell is, how something points at it, and the column letter conversion.
 
 Rectangles live in `pybers.addressing.ranges`, which imports this module and never the
 other way around. The split is by what each has to represent: a single cell always
@@ -16,6 +16,8 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-10-20  `CellAddress`, a position alone, and the table and sheet a reference
+            names, for PYB-217.
 2026-10-19  `CellReferenceLike`, what a call accepts for one cell, for PYB-217.
 2026-09-23  `toCellReferenceNamed` moved here from the table model, for PYB-18.
 2026-09-22  The offset between stored and model coordinates lives here, for PYB-109.
@@ -127,18 +129,16 @@ def chooseMarker(absolute: bool) -> str:
     return absoluteMarker if absolute else ""
 
 
-@dataclass(frozen=True, slots=True)
-class CellReference:
-    """One cell's address, counted from one, carrying its locking on each axis.
+@dataclass(frozen=True, slots=True, order=True)
+class CellAddress:
+    """Where a cell sits in any table, counted from one, with no table and no `$`.
 
-    Frozen because an address is a value rather than a thing: two callers naming B2
-    hold the same address, and neither may change what the other points at.
+    A lock describes how a reference moves when a formula is copied, never where a
+    cell is, so an address has none and two spellings of one cell are one address.
     """
 
     row: int
     col: int
-    rowAbsolute: bool = field(default=False, kw_only=True)
-    colAbsolute: bool = field(default=False, kw_only=True)
 
     def __post_init__(self) -> None:
         """Reject a coordinate outside a real table at construction rather than at use.
@@ -148,6 +148,9 @@ class CellReference:
         not: `=Ledger` parsed to column 144,936,576 and raised nothing, because six
         letters are a valid base-26 label.
         """
+        for axis, value in (("Row", self.row), ("Column", self.col)):
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise ReferenceError(f"{axis} {value!r} is not a whole number.")
         if self.row < firstRow:
             raise ReferenceError(
                 f"Row {self.row} is before row {firstRow}. Rows count from one."
@@ -167,6 +170,87 @@ class CellReference:
                 f"Column {self.col} is past column {lastColumn}, which is the last "
                 "column a Numbers table can hold."
             )
+
+    @classmethod
+    def parse(cls, text: str) -> CellAddress:
+        """Return the address `B3` names, refusing a `$`, which only a reference has."""
+        reference = CellReference.parse(text)
+        if reference.rowAbsolute or reference.colAbsolute:
+            raise ReferenceError(
+                f"{text!r} carries a lock, which belongs to a `CellReference`. An "
+                "address is the position alone, such as "
+                f"{reference.address}."
+            )
+        return reference.address
+
+    def asRowColumn(self) -> tuple[int, int]:
+        """Return this address as a (row, column) pair, both counted from one."""
+        return (self.row, self.col)
+
+    def __str__(self) -> str:
+        """Return the address as it is written, `B3`."""
+        return f"{toColumnLetter(self.col)}{self.row}"
+
+
+@dataclass(frozen=True, slots=True)
+class SheetReference:
+    """A sheet, by its name."""
+
+    name: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name:
+            raise ReferenceError(f"A sheet is named, and {self.name!r} is no name.")
+
+    def __str__(self) -> str:
+        return self.name
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TableReference:
+    """A table, by its name, and by its sheet's when another sheet shares the name."""
+
+    sheet: SheetReference | None = None
+    name: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name:
+            raise ReferenceError(f"A table is named, and {self.name!r} is no name.")
+
+    def __str__(self) -> str:
+        if self.sheet is None:
+            return self.name
+        return f"{self.sheet}{tableNameSeparator}{self.name}"
+
+
+@dataclass(frozen=True, slots=True)
+class CellReference:
+    """How something points at a cell: its address, a lock per axis, and a table.
+
+    The table is named only when the context needs it, as a path is relative or
+    absolute. Frozen because a reference is a value: two callers naming B2 hold the
+    same reference, and neither may change what the other points at.
+    """
+
+    row: int
+    col: int
+    rowAbsolute: bool = field(default=False, kw_only=True)
+    colAbsolute: bool = field(default=False, kw_only=True)
+    table: TableReference | None = field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        """Check the position by building the address it stands on."""
+        CellAddress(self.row, self.col)
+
+    @property
+    def address(self) -> CellAddress:
+        """Return where this reference points, with its locks and table set aside."""
+        return CellAddress(self.row, self.col)
+
+    @property
+    def sheet(self) -> SheetReference | None:
+        """Return the sheet this reference names, or None when it names none."""
+        return None if self.table is None else self.table.sheet
 
     @classmethod
     def parse(cls, reference: str) -> CellReference:
@@ -201,35 +285,28 @@ class CellReference:
         )
 
     def asRowColumn(self) -> tuple[int, int]:
-        """Return this address as a (row, column) pair, both counted from one."""
+        """Return the position as a (row, column) pair, both counted from one."""
         return (self.row, self.col)
 
-    def asUnlocked(self) -> CellReference:
-        """Return the same cell with its locking markers dropped.
-
-        `$A$1` and `A1` are one cell written two ways, so anything keyed by address must
-        agree on which of the four spellings it files them under. That agreement is why
-        a table can be keyed by a reference at all.
-        """
-        if not self.rowAbsolute and not self.colAbsolute:
-            return self
-        return CellReference(self.row, self.col)
-
     def __str__(self) -> str:
-        """Return the written form, so an error message reads as a reference."""
-        return self.asReference()
+        """Return the written form, qualified by its table when it names one."""
+        if self.table is None:
+            return self.asReference()
+        return f"{self.table}{tableNameSeparator}{self.asReference()}"
 
 
 # What a caller may hand to anything that addresses one cell. The string form is
 # included deliberately: `table.cell("A1")` is how this library is meant to read at
 # a call site, and the string is parsed at the boundary rather than carried around.
-CellReferenceLike = CellReference | str
+CellReferenceLike = CellReference | CellAddress | str
 
 
 def toCellReference(address: CellReferenceLike) -> CellReference:
     """Return a `CellReference` for whichever of its forms was given."""
     if isinstance(address, str):
         return CellReference.parse(address)
+    if isinstance(address, CellAddress):
+        return CellReference(address.row, address.col)
     return address
 
 

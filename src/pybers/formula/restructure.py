@@ -30,7 +30,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pybers.addressing.lines import LineMapping
-from pybers.addressing.reference import CellReference
+from pybers.addressing.reference import CellAddress
 from pybers.formula.nodes import (
     Coordinate,
     Formula,
@@ -70,7 +70,7 @@ class FormulaRestructure:
 
 
 def mapFormula(
-    formula: Formula, host: CellReference, change: FormulaRestructure
+    formula: Formula, host: CellAddress, change: FormulaRestructure
 ) -> Formula:
     """Return a formula whose references follow the edit, or the same one unchanged.
 
@@ -83,7 +83,7 @@ def mapFormula(
 
 
 def mapFormulaNode(
-    node: FormulaNode, host: CellReference, change: FormulaRestructure
+    node: FormulaNode, host: CellAddress, change: FormulaRestructure
 ) -> FormulaNode:
     """Return one node following the edit, or the same node when nothing moves."""
     content = node.content
@@ -153,7 +153,7 @@ def mapCoordinate(
 
 
 def mapFormulaReference(
-    reference: FormulaReference, host: CellReference, change: FormulaRestructure
+    reference: FormulaReference, host: CellAddress, change: FormulaRestructure
 ) -> FormulaReference | None:
     """Return a single-cell reference after the change, None when its cell is gone."""
     reaches = change.targets(reference.tableId)
@@ -189,7 +189,7 @@ def mapSpan(
 
 
 def mapFormulaRange(
-    extent: FormulaRange, host: CellReference, change: FormulaRestructure
+    extent: FormulaRange, host: CellAddress, change: FormulaRestructure
 ) -> FormulaRange | None:
     """Return a range after the change, None when it loses every line."""
     reaches = change.targets(extent.tableId)
@@ -204,7 +204,7 @@ def mapFormulaRange(
 
 def findReferenceLoss(
     content: FormulaReference | FormulaRange,
-    host: CellReference,
+    host: CellAddress,
     change: FormulaRestructure,
 ) -> FormulaReference:
     """Return the broken reference a lost one becomes, naming every line it covered.

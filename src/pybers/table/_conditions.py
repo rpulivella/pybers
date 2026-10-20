@@ -57,8 +57,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
-from ..addressing import CellReference
-from ..addressing.reference import originOffset
+from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ..formula._read import readFormula
 from ..formula._write import encodeFormula
@@ -182,7 +181,7 @@ def mapRuleSet(
     """
     changed = tst.ConditionalStyleSetArchive()
     changed.CopyFrom(rules)
-    host = CellReference(row + originOffset, column + originOffset)
+    host = CellAddress(row + originOffset, column + originOffset)
     outcome = "same"
     for formula in listRuleFormulas(changed):
         read = readFormula(formula)

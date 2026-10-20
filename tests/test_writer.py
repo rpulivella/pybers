@@ -59,7 +59,7 @@ from pybers._persistence.types import (
     parseArchive,
     readArchiveTypeId,
 )
-from pybers.addressing import toCellReference
+from pybers.addressing import CellAddress, toCellReference
 from pybers.document import Document
 from pybers.document._write import writeDocument
 from pybers.errors import WriteError
@@ -406,7 +406,7 @@ def test_theNeighborsOfAnEditedCellAreUntouched(tmp_path: Path) -> None:
     expected = {
         reference: cell.value
         for reference, cell in before.cells.items()
-        if reference != toCellReference("A1")
+        if reference != CellAddress.parse("A1")
     }
 
     document = pybers.open(working)
@@ -638,7 +638,7 @@ def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
     for _, _, cell in document.cellsIterate():
         # Rows 11 and 12 are the formula row and its labels. A formula-backed cell is
         # refused rather than overwritten, and a label is not a number.
-        if isinstance(cell.value, Decimal) and cell.reference.row <= 10:
+        if isinstance(cell.value, Decimal) and cell.address.row <= 10:
             cell.value = cell.value + Decimal(1000)
     document.save()
 
@@ -1173,7 +1173,6 @@ def readRecordAt(
 ) -> CellRecord:
     """Return the raw cell record at an address, in the first table or a named one."""
     from pybers._persistence.index import ArchiveIndex
-    from pybers.addressing import toCellReference
     from pybers.document._read import findRoot
 
     wanted = toCellReference(address)

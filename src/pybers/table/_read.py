@@ -63,12 +63,13 @@ from .._persistence.index import (
     richTextListType,
     stringListType,
 )
-from ..addressing import CellRange, CellReference
-from ..addressing.reference import originOffset
+from ..addressing import CellRange
+from ..addressing.reference import CellAddress, originOffset
 from ..errors import ReadError
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
-from .cells import Cell, CellValue, Table
+from .cell import Cell, CellValue
+from .cells import Table
 from .kinds import CellDescription, CellFormat, CellKind, emptyDescription
 from .merges import MergeRange
 
@@ -313,7 +314,7 @@ def readTable(
 
 def iterateCellRecords(
     index: ArchiveIndex, model: tst.TableModelArchive, source: Path
-) -> Iterator[tuple[CellReference, CellRecord]]:
+) -> Iterator[tuple[CellAddress, CellRecord]]:
     """Yield every record a table stores, with the cell it belongs to."""
     dataStore = model.base_data_store
     tileSize = dataStore.tiles.tile_size
@@ -345,7 +346,7 @@ def iterateCellRecords(
                 ) from exc
             for record in records:
                 column = record.column + originOffset
-                yield CellReference(row + originOffset, column), record
+                yield CellAddress(row + originOffset, column), record
 
 
 def setCellDescription(
@@ -368,7 +369,7 @@ def updateCellDescriptions(
     strings = readStringTable(index, dataStore)
     richText = readRichTextTable(index, dataStore)
     formatTypes = readFormatTypes(index, dataStore)
-    described: set[CellReference] = set()
+    described: set[CellAddress] = set()
     for reference, record in iterateCellRecords(index, model, source):
         cell = table.cells.get(reference)
         if cell is None:

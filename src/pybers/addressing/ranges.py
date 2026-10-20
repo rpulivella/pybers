@@ -34,6 +34,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from pybers.addressing.reference import (
+    CellAddress,
     CellReference,
     CellReferenceLike,
     ReferenceError,
@@ -270,8 +271,11 @@ class CellRange:
         )
 
     @classmethod
-    def fromReferences(cls, start: CellReference, end: CellReference) -> CellRange:
+    def fromReferences(
+        cls, start: CellReference | CellAddress, end: CellReference | CellAddress
+    ) -> CellRange:
         """Return the rectangle two cells bound, given in either order."""
+        start, end = toCellReference(start), toCellReference(end)
         return cls.fromAxes(
             ((start.row, start.rowAbsolute), (end.row, end.rowAbsolute)),
             ((start.col, start.colAbsolute), (end.col, end.colAbsolute)),
@@ -359,7 +363,7 @@ class CellRange:
             return first
         return f"{first}{rangeSeparator}{last}"
 
-    def __iter__(self) -> Iterator[CellReference]:
+    def __iter__(self) -> Iterator[CellAddress]:
         """Yield every cell this range covers, row by row and left to right.
 
         An unbounded range cannot be walked, and refusing is better than inventing
@@ -371,7 +375,7 @@ class CellRange:
             raise ReferenceError(f"{self} spans every column and cannot be walked.")
         for row in range(self.startRow, self.endRow + 1):
             for col in range(self.startCol, self.endCol + 1):
-                yield CellReference(row, col)
+                yield CellAddress(row, col)
 
     def __str__(self) -> str:
         """Return the written form, so an error message reads as a range."""

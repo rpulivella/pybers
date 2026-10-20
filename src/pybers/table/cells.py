@@ -6,6 +6,10 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-20  `Cell` moved to `cell`, keeping this module within its limit, for
+            PYB-217.
+2026-10-20  A cell sits at a `CellAddress`, and `cell.reference` names it from
+            anywhere; a table finds its sheet, for PYB-217.
 2026-10-14  `cells` is a read-only view of the table's own store, for PYB-193.
 2026-10-14  A range is checked against the grid in `bounds`, for PYB-193.
 2026-10-12  A changed kind describes its format as UNDETERMINED, for PYB-190.
@@ -57,18 +61,15 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/02"
 
-import datetime
 import uuid
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field, replace
-from decimal import Context, Decimal
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from pybers.absence import UNDETERMINED
 from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
-    CellReference,
+    CellAddress,
     CellReferenceLike,
     ReferenceError,
     firstColumn,
@@ -76,17 +77,12 @@ from pybers.addressing.reference import (
     toCellReference,
     toCellReferenceNamed,
 )
-from pybers.errors import WriteError
-from pybers.formula.nodes import Formula
-from pybers.formula.parse import parseFormula
 from pybers.formula.relocation import FormulaReferenceRelocation
-from pybers.formula.render import renderFormula
 from pybers.geometry import Position
-from pybers.style import Style
 from pybers.table.bounds import listRangePositions, refuseRangeOutside
+from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
-from pybers.table.kinds import CellDescription, emptyDescription, findCellKind
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
@@ -99,40 +95,7 @@ from pybers.table.structure import (
 if TYPE_CHECKING:
     # Guarded because `sheet` imports this module, and the link back is a type
     # reference rather than anything this module calls.
-    from pybers.document.sheets import Document
-
-# IEEE-754 decimal128, which is exactly what Numbers stores a numeric cell as: 34
-# significant digits with this exponent range. Declared here so that any arithmetic a
-# caller performs through this library rounds the way Numbers itself rounds, rather
-# than the way Python's 28-digit default happens to.
-decimal128Context: Context = Context(prec=34, Emax=6144, Emin=-6143)
-
-# What a cell may hold. Deliberately not `float` anywhere.
-#
-# Decimal is not a compromise here, it is the matching type. Verified 2026-08-17:
-# Decimal("0.1") + Decimal("0.2") == Decimal("0.3") is True, and 1.1 * 1.1 is exactly
-# 1.21, where float64 gets both wrong. Division still rounds (1/3 * 3 is 0.999...9)
-# but that is inherent to decimal arithmetic and Numbers, using the same decimal128,
-# behaves identically. Matching its rounding is the point.
-#
-# Scaled integers, the fixed-point trick from finance software, were considered and
-# rejected: that works because money has a fixed scale, whereas a spreadsheet cell
-# ranges from 1e-300 to 1e300. It would also mean converting between two number systems
-# on every read and write, which reintroduces exactly the error being avoided.
-#
-# THE FAILURE THIS PREVENTS, and the reason to build values from strings:
-# Decimal(0.1) carries the float's binary error straight in, yielding
-# 0.1000000000000000055511151231257827...
-# Decimal("0.1") does not. Never construct a cell value from a float.
-CellValue = (
-    Decimal
-    | str
-    | bool
-    | datetime.datetime
-    | datetime.timedelta
-    | None
-)
-
+    from pybers.document.sheets import Document, Sheet
 
 # A new table's owner identity leaves its low byte clear, because Numbers derives each
 # of a table's owners by adding the owner's kind to it, and the kinds reach 35.
@@ -149,144 +112,6 @@ def generateOwnerIdentity() -> str:
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
 
 
-@dataclass(frozen=True, slots=True)
-class CellCopy:
-    """The cell whose stored record a save duplicates, and whether its borders go too.
-
-    A fill copies no border and a paste copies all four, as `63e` and `64b` measured.
-    """
-
-    source: Cell
-    borders: bool
-
-
-@dataclass(slots=True)
-class Cell:
-    """One cell's value, optional formula, and style, at an address.
-
-    `value` is the result Numbers last cached, never derived from `formula`, so the
-    two disagree until it recalculates. `description` says what the record stores.
-    """
-
-    reference: CellReference
-    value: CellValue = None
-    formula: Formula | None = None
-    style: Style = field(default_factory=Style)
-    # The record as read, copied or saved, its chosen format the one direct edit.
-    _stored: CellDescription = field(
-        default=emptyDescription, repr=False, kw_only=True
-    )
-    # The value that record holds, so an edit since is told from it.
-    _storedValue: CellValue = field(
-        default=None, repr=False, compare=False, kw_only=True
-    )
-    # Where the file stores this cell's record, so a save can tell that it moved.
-    _origin: CellReference | None = field(
-        default=None, repr=False, compare=False, kw_only=True
-    )
-    # The conditions of its highlighting rules, one per rule, hosted here.
-    _conditions: tuple[Formula, ...] = field(
-        default=(), repr=False, compare=False, kw_only=True
-    )
-    # The cell whose stored record a save duplicates here, set by a fill or a copy.
-    _copiedFrom: CellCopy | None = field(
-        default=None, repr=False, compare=False, kw_only=True
-    )
-    # The table this belongs to, so that reading or writing a formula as text needs
-    # neither the cell's own address nor the names of the other tables passed in.
-    # Excluded from equality and `repr` for the reason `Document._package` is: it is
-    # where this cell sits rather than what it holds.
-    table: Table | None = field(
-        default=None, repr=False, compare=False, kw_only=True
-    )
-
-    @property
-    def formulaText(self) -> str | None:
-        """This cell's formula as Numbers displays it, or None when it holds none.
-
-        Assignable: `cell.formulaText = "=SUM(B1:B5)"` parses against this cell,
-        which is what an unlocked reference is an offset from, so the wrong host
-        cannot be passed. Use `formulaSet` to name an address rather than write it.
-        """
-        if self.formula is None:
-            return None
-        return renderFormula(self.formula, self.reference, tables=self.tableNames)
-
-    @formulaText.setter
-    def formulaText(self, text: str) -> None:
-        """Give this cell the formula a written expression describes."""
-        self.formulaSet(text)
-
-    def formulaSet(
-        self, text: str, **pieces: CellRange | CellReference
-    ) -> Formula:
-        """Give this cell the formula text describes, and return what was stored.
-
-        A keyword argument fills a `{name}` in the text with an address this library
-        already validated, so `formulaSet("=SUM({sales})", sales=extent)` never
-        splices one into a string and parses it back out.
-        """
-        self.formula = parseFormula(
-            text, self.reference, tables=self.tableNames, pieces=pieces
-        )
-        return self.formula
-
-    @property
-    def description(self) -> CellDescription:
-        """Return the kind this cell stores, its format, and whether that was chosen.
-
-        The kind follows `value`, so text written over rich text reports text.
-        """
-        pending = (
-            self.formula is not None and self._origin is None
-            and self._copiedFrom is None
-        )
-        kind = findCellKind(self.value, self._stored.kind, self._storedValue, pending)
-        if kind is self._stored.kind:
-            return self._stored
-        return CellDescription(kind, UNDETERMINED, self._stored.formatChosen)
-
-    def textLiteralSet(self, text: str) -> None:
-        """Hold text Numbers will not interpret, as a cell formatted Text before typing.
-
-        `=SUM(A1:A5)` then stays that text when somebody edits the cell. Refused on a
-        cell holding a formula, which this would discard.
-        """
-        if not isinstance(text, str):
-            raise WriteError(
-                f"Literal text for {self.reference} must be a str, and was given "
-                f"{type(text).__name__}."
-            )
-        if self.formula is not None:
-            raise WriteError(
-                f"{self.reference} is backed by a formula, so holding literal text "
-                "would discard it. Clear the formula first."
-            )
-        self.value = text
-        self._stored = replace(self._stored, formatChosen=True)
-
-    @property
-    def tableNames(self) -> frozendict[str, str]:
-        """Return the names this cell's document knows its tables by, or nothing.
-
-        Computed from the document each time rather than cached, because a table
-        renamed after a cached copy was taken would write a formula pointing at
-        whichever table now answers to the old name.
-        """
-        document = None if self.table is None else self.table.document
-        return frozendict() if document is None else document.tableIdentities
-
-    @property
-    def mergeAnchored(self) -> MergeRange | None:
-        """Return the merge this cell anchors, or None when it anchors none."""
-        if self.table is None:
-            return None
-        merge = self.table.mergeCovering(self.reference)
-        if merge is None or merge.anchor != self.reference.asUnlocked():
-            return None
-        return merge
-
-
 @dataclass(slots=True)
 class Table:
     """A single table on a sheet, a sparse grid of cells plus its merged regions.
@@ -300,7 +125,7 @@ class Table:
     rowCount: int = 0
     colCount: int = 0
     # The feature's own store; a caller reads `cells`, which refuses a write.
-    _cells: dict[CellReference, Cell] = field(default_factory=dict)
+    _cells: dict[CellAddress, Cell] = field(default_factory=dict)
     mergeRanges: list[MergeRange] = field(default_factory=list)
     identifier: str = ""
     # The archive this table was read from or saved as, and None until it has one.
@@ -396,8 +221,8 @@ class Table:
         return copyCells(self, source, anchor, references)
 
     @property
-    def cells(self) -> Mapping[CellReference, Cell]:
-        """Return the cells by reference, read-only, since only the table edits them."""
+    def cells(self) -> Mapping[CellAddress, Cell]:
+        """Return the cells by address, read-only, since only the table edits them."""
         return MappingProxyType(self._cells)
 
     def cell(
@@ -416,7 +241,7 @@ class Table:
         # Unlocked before it is used as a key, because `$A$1` and `A1` compare
         # unequal and are one cell. Without this the same cell files itself under
         # four spellings and a write through one is invisible to the other three.
-        key = toCellReferenceNamed(address, row, col).asUnlocked()
+        key = toCellReferenceNamed(address, row, col).address
         extent = self.extent
         if extent is None or not extent.covers(key):
             raise ReferenceError(
@@ -433,7 +258,7 @@ class Table:
                 f"{merge.anchor}."
             )
         if key not in self._cells:
-            self._cells[key] = Cell(reference=key, table=self)
+            self._cells[key] = Cell(address=key, table=self)
         return self._cells[key]
 
     @property
@@ -469,9 +294,22 @@ class Table:
         False for a position swallowed by a merge, which is why a range over a
         merged block yields the anchor once rather than one cell per position.
         """
-        reference = toCellReference(address).asUnlocked()
+        reference = toCellReference(address).address
         merge = self.mergeCovering(reference)
         return merge is None or merge.anchor == reference
+
+    @property
+    def sheet(self) -> Sheet | None:
+        """Return the sheet holding this table, found through its document, or None."""
+        if self.document is None:
+            return None
+        return next(
+            (
+                sheet for sheet in self.document.sheets
+                if any(table is self for table in sheet.tables)
+            ),
+            None,
+        )
 
     @property
     def extent(self) -> CellRange | None:
@@ -542,7 +380,7 @@ class Table:
         if merge is None:
             raise ReferenceError(
                 f"No merge in {self.name!r} covers "
-                f"{toCellReference(address).asUnlocked()}."
+                f"{toCellReference(address).address}."
             )
         self.mergeRanges.remove(merge)
         return merge

@@ -57,7 +57,8 @@ from pybers.addressing.reference import lastColumn, lastRow, tableNameSeparator
 from pybers.drawable import GraphicalObject
 from pybers.errors import PybersError
 from pybers.geometry import Position
-from pybers.table.cells import Cell, Table, generateOwnerIdentity
+from pybers.table.cell import Cell
+from pybers.table.cells import Table, generateOwnerIdentity
 
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.

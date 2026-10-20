@@ -180,7 +180,7 @@ def testARelativeFillSharesOneStoredFormula(tmp_path: Path) -> None:
                                 ("C11", "C1:C10"), ("D11", "D1:D10")):
         cell = table.cell(reference)
         assert cell.formula is not None
-        assert str(cell.formula.ranges[0].resolve(cell.reference)) == expected
+        assert str(cell.formula.ranges[0].resolve(cell.address)) == expected
     records = readRecords(target, "Table 1")
     keys = {listFormulaClaims(records[(10, column)])[0] for column in range(4)}
     assert len(keys) == 1

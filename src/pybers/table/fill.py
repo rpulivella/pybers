@@ -34,7 +34,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pybers.addressing.ranges import CellRange, CellRangeLike
-from pybers.addressing.reference import CellReference, ReferenceError
+from pybers.addressing.reference import CellAddress, ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation, relocateFormula
 from pybers.table.bounds import listRangePositions
 from pybers.table.kinds import CellKind
@@ -42,7 +42,8 @@ from pybers.table.relocation import findBlockCorners, toRelocationRule
 from pybers.table.series import SeedValue, findSeriesContinuation
 
 if TYPE_CHECKING:
-    from pybers.table.cells import Cell, Table
+    from pybers.table.cell import Cell
+    from pybers.table.cells import Table
 
 
 # Numbers repeats rather than continues a line holding either of these.
@@ -80,18 +81,18 @@ def refuseMergeInBlock(table: Table, extent: CellRange) -> None:
             )
 
 
-def findSourcePosition(extent: CellRange, target: CellReference) -> CellReference:
+def findSourcePosition(extent: CellRange, target: CellAddress) -> CellAddress:
     """Return the block position a target takes, repeating from the block's corner."""
     top, left, bottom, right = findBlockCorners(extent)
     height, width = bottom - top + 1, right - left + 1
-    return CellReference(
+    return CellAddress(
         top + (target.row - top) % height, left + (target.col - left) % width
     )
 
 
 def findSeriesValues(
-    table: Table, extent: CellRange, targets: list[CellReference]
-) -> dict[CellReference, SeedValue]:
+    table: Table, extent: CellRange, targets: list[CellAddress]
+) -> dict[CellAddress, SeedValue]:
     """Return each filled cell's continued value, refusing a range not in line with it.
 
     A block continues down or up its columns, or right or left along its rows, and
@@ -106,13 +107,13 @@ def findSeriesValues(
             "rows, and the range asks for both."
         )
     lines = (
-        [[CellReference(row, column) for row in range(top, bottom + 1)]
+        [[CellAddress(row, column) for row in range(top, bottom + 1)]
          for column in range(left, right + 1)]
         if down else
-        [[CellReference(row, column) for column in range(left, right + 1)]
+        [[CellAddress(row, column) for column in range(left, right + 1)]
          for row in range(top, bottom + 1)]
     )
-    values: dict[CellReference, SeedValue] = {}
+    values: dict[CellAddress, SeedValue] = {}
     for line in lines:
         cells = [table.cell(reference) for reference in line]
         if any(
@@ -135,7 +136,7 @@ def copyCellContent(
     target: Cell, source: Cell, namedCell: bool, borders: bool
 ) -> None:
     """Give a cell everything another holds, its formulas under the rule named."""
-    from pybers.table.cells import CellCopy
+    from pybers.table.cell import CellCopy
 
     target.value = source.value
     target.style = source.style
@@ -144,10 +145,10 @@ def copyCellContent(
     formula, conditions = source.formula, source._conditions
     if namedCell:
         formula = formula and relocateFormula(
-            formula, source.reference, target.reference, None, True
+            formula, source.address, target.address, None, True
         )
         conditions = tuple(
-            relocateFormula(condition, source.reference, target.reference, None, True)
+            relocateFormula(condition, source.address, target.address, None, True)
             for condition in conditions
         )
     target.formula = formula

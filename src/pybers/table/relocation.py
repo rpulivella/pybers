@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 
 from pybers.addressing.ranges import CellRange, CellRangeLike
 from pybers.addressing.reference import (
+    CellAddress,
     CellReference,
     CellReferenceLike,
     ReferenceError,
@@ -47,7 +48,8 @@ from pybers.formula.relocation import (
 from pybers.table.bounds import refuseRangeOutside
 
 if TYPE_CHECKING:
-    from pybers.table.cells import Cell, Table
+    from pybers.table.cell import Cell
+    from pybers.table.cells import Table
 
 
 def findBlockCorners(extent: CellRange) -> tuple[int, int, int, int]:
@@ -81,11 +83,11 @@ class CellsMove:
         """Return the source block's corners as (startRow, startCol, endRow, endCol)."""
         return findBlockCorners(self.source)
 
-    def cellMap(self, reference: CellReference) -> CellReference:
+    def cellMap(self, reference: CellAddress) -> CellAddress:
         """Return where a cell lands: moved when the block holds it, else in place."""
         if not self.source.covers(reference):
             return reference
-        return CellReference(
+        return CellAddress(
             reference.row + self.rowShift, reference.col + self.columnShift
         )
 
@@ -176,8 +178,8 @@ def findNamedCellRewrites(
 
 
 def isFormulaReadingVacated(
-    formula: Formula, host: CellReference, inside: bool, table: Table,
-    vacated: list[CellReference],
+    formula: Formula, host: CellAddress, inside: bool, table: Table,
+    vacated: list[CellAddress],
 ) -> bool:
     """Report whether a formula reads any position of `table` the move emptied."""
     for node in formula.nodes:
@@ -196,7 +198,7 @@ def isFormulaReadingVacated(
         except ReferenceError:
             continue
         if isinstance(target, CellReference):
-            if target.asUnlocked() in vacated:
+            if target.address in vacated:
                 return True
         elif any(target.covers(position) for position in vacated):
             return True
@@ -241,7 +243,7 @@ def moveCells(
 
     rule = toRelocationRule(references)
     extent = table.rangeSingle(source, "move")
-    landing = toCellReference(anchor).asUnlocked()
+    landing = toCellReference(anchor).address
     startRow, startCol, _, _ = findBlockCorners(extent)
     move = CellsMove(extent, landing.row - startRow, landing.col - startCol)
     refuseRangeOutside(table, move.destination)
@@ -256,22 +258,22 @@ def moveCells(
         cell for reference, cell in table.cells.items() if extent.covers(reference)
     ]
     for cell in moving:
-        del table._cells[cell.reference]
+        del table._cells[cell.address]
     for reference in move.destination:
         table._cells.pop(reference, None)
     for cell in moving:
-        cell.reference = move.cellMap(cell.reference)
-        table._cells[cell.reference] = cell
+        cell.address = move.cellMap(cell.address)
+        table._cells[cell.address] = cell
         if cell.formula is not None and not named:
             cell.formula = clampFormulaRanges(
-                cell.formula, cell.reference, table.rowCount, table.colCount
+                cell.formula, cell.address, table.rowCount, table.colCount
             )
     for cell, (formula, conditions) in rewritten.values():
         cell.formula = formula
         cell._conditions = conditions
     table.mergeRanges = [
         MergeRange(CellRange.fromReferences(
-            move.cellMap(merge.anchor), move.cellMap(merge.extent.end or merge.anchor)
+            move.cellMap(merge.anchor), move.cellMap(merge.corner)
         )) if extent.covers(merge.anchor) else merge
         for merge in table.mergeRanges
     ]

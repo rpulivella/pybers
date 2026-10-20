@@ -135,9 +135,9 @@ def testEveryCellReportsTheKindItsRecordStores(path: Path) -> None:
     for table, types in zip(tables, readStoredTypes(path), strict=True):
         assert set(types.values()) <= set(recordKinds)
         for cell in table.gridIterate():
-            stored = types.get((cell.reference.row, cell.reference.col))
+            stored = types.get((cell.address.row, cell.address.col))
             expected = CellKind.EMPTY if stored is None else recordKinds[stored]
-            assert cell.description.kind is expected, f"{table.name}!{cell.reference}"
+            assert cell.description.kind is expected, f"{table.name}!{cell.address}"
 
 
 @pytest.mark.parametrize(
@@ -310,8 +310,8 @@ def testARowInsertedIsDescribedAsAReopenDescribesIt(tmp_path: Path) -> None:
 
     reopened = pybers.open(working).sheets[0].tables[0]
     assert {
-        str(cell.reference): cell.description for cell in table.gridIterate()
-    } == {str(cell.reference): cell.description for cell in reopened.gridIterate()}
+        str(cell.address): cell.description for cell in table.gridIterate()
+    } == {str(cell.address): cell.description for cell in reopened.gridIterate()}
 
 
 @pytest.mark.parametrize("operation", ["cellsMove", "cellsCopy"])
@@ -327,8 +327,8 @@ def testABlockMovedOrCopiedIsDescribedAsAReopenDescribesIt(
 
     reopened = pybers.open(working).sheets[0].tables[0]
     assert {
-        str(cell.reference): cell.description for cell in table.gridIterate()
-    } == {str(cell.reference): cell.description for cell in reopened.gridIterate()}
+        str(cell.address): cell.description for cell in table.gridIterate()
+    } == {str(cell.address): cell.description for cell in reopened.gridIterate()}
     assert reopened.cell("F2").description.kind is CellKind.NUMBER
 
 
@@ -407,7 +407,7 @@ def testACommandLineListsEachCellsKindAsText() -> None:
     """The few lines a command line writes, printing kinds a person can read."""
     table = openFirstTable("21-formula-errors")
     shown = {
-        str(cell.reference): {
+        str(cell.address): {
             "kind": cell.description.kind.value,
             "format": (
                 None if (shown := cell.description.format) is None else str(shown)

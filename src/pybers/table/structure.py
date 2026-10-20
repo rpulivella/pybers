@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING
 from pybers.addressing.lines import GridEdit
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
-    CellReference,
+    CellAddress,
     ReferenceError,
     lastColumn,
     lastRow,
@@ -51,7 +51,8 @@ from pybers.formula.nodes import Formula
 from pybers.formula.restructure import FormulaRestructure, mapFormula
 
 if TYPE_CHECKING:
-    from pybers.table.cells import Cell, Table
+    from pybers.table.cell import Cell
+    from pybers.table.cells import Table
     from pybers.table.merges import MergeRange
 
 
@@ -113,13 +114,13 @@ def buildGridEdit(
     return GridEdit(rows=rows, at=at, count=count, removing=removing)
 
 
-def mapCell(reference: CellReference, edit: GridEdit) -> CellReference | None:
+def mapCell(reference: CellAddress, edit: GridEdit) -> CellAddress | None:
     """Return where a cell lands, or None when the edit removes its line."""
     if edit.rows:
         row = edit.lineMap(reference.row)
-        return None if row is None else CellReference(row, reference.col)
+        return None if row is None else CellAddress(row, reference.col)
     col = edit.lineMap(reference.col)
-    return None if col is None else CellReference(reference.row, col)
+    return None if col is None else CellAddress(reference.row, col)
 
 
 def mapMerge(merge: MergeRange, edit: GridEdit) -> MergeRange | None:
@@ -147,14 +148,14 @@ def mapMerge(merge: MergeRange, edit: GridEdit) -> MergeRange | None:
 
 def findMergeAnchorMoves(
     table: Table, edit: GridEdit
-) -> dict[CellReference, CellReference]:
+) -> dict[CellAddress, CellAddress]:
     """Return where each merge whose anchor line goes carries its value.
 
     **The merged value survives its anchor's line**, measured 2026-09-21 in
     `57-anchors-anchor-row-deleted`, where deleting the row the anchor sat on left
     the merge one row shorter, still holding its text at the top of what remained.
     """
-    moves: dict[CellReference, CellReference] = {}
+    moves: dict[CellAddress, CellAddress] = {}
     if not edit.removing:
         return moves
     for merge in table.mergeRanges:
@@ -166,8 +167,8 @@ def findMergeAnchorMoves(
         if mapped is None:
             continue
         anchor = (
-            CellReference(mapped[0], startCol) if edit.rows
-            else CellReference(startRow, mapped[0])
+            CellAddress(mapped[0], startCol) if edit.rows
+            else CellAddress(startRow, mapped[0])
         )
         moves[merge.anchor] = anchor
     return moves
@@ -238,7 +239,7 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
                 broken.append(cell)
 
     carried = findMergeAnchorMoves(table, edit)
-    cells: dict[CellReference, Cell] = {}
+    cells: dict[CellAddress, Cell] = {}
     for reference, cell in table.cells.items():
         moved = carried.get(reference) or mapCell(reference, edit)
         if moved is not None:
@@ -251,7 +252,7 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
             if id(cell) in conditions:
                 cell._conditions = conditions[id(cell)]
     for reference, cell in cells.items():
-        cell.reference = reference
+        cell.address = reference
     table._cells = cells
     table.mergeRanges = merges
     start = edit.at - 1

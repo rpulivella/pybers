@@ -28,6 +28,7 @@ import pytest
 import pybers
 from conftest import allDocuments
 from pybers.addressing import (
+    CellAddress,
     CellRange,
     CellRangeList,
     CellReference,
@@ -57,8 +58,8 @@ def buildSampleTable() -> Table:
     fixed row and column count and touching a far cell does not extend it.
     """
     table = Table(name="Table 1", rowCount=3, colCount=3)
-    for reference in CellRange.parse("A1:C3"):
-        table.cell(reference).value = reference.asReference()
+    for address in CellRange.parse("A1:C3"):
+        table.cell(address).value = str(address)
     return table
 
 
@@ -89,16 +90,13 @@ def test_theBase26BoundaryIsWhereItIsClaimedToBe() -> None:
 
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
-def test_everyReferenceInEveryDocumentSurvivesTheRoundTrip(path: Path) -> None:
-    """Every cell in every document re-parses to the reference it came from."""
+def test_everyAddressInEveryDocumentSurvivesTheRoundTrip(path: Path) -> None:
+    """Every cell in every document re-parses to the address it came from."""
     document = pybers.open(path)
     for sheet in document.sheets:
         for table in sheet.tables:
             for cell in table.cells.values():
-                assert (
-                    CellReference.parse(cell.reference.asReference())
-                    == cell.reference
-                )
+                assert CellAddress.parse(str(cell.address)) == cell.address
 
 
 # AC 1.b
@@ -164,7 +162,7 @@ def test_aRangeReportsItsSpansAndWhatItCovers() -> None:
 
 # AC 3.b
 def test_arangeYieldsEveryCellItCoversInRowMajorOrder() -> None:
-    walked = [reference.asReference() for reference in CellRange.parse("A1:B2")]
+    walked = [str(address) for address in CellRange.parse("A1:B2")]
     assert walked == ["A1", "B1", "A2", "B2"]
 
 
@@ -201,7 +199,7 @@ def test_anUnboundedRangeCannotBeWalkedUntilItIsBounded() -> None:
     with pytest.raises(ReferenceError):
         list(CellRange.parse("A"))
     bounded = CellRange.parse("A").boundedBy(CellRange(1, 1, 3, 3))
-    assert [reference.asReference() for reference in bounded] == ["A1", "A2", "A3"]
+    assert [str(address) for address in bounded] == ["A1", "A2", "A3"]
 
 
 def test_aSpanOfWholeColumnsOrWholeRowsParsesAndReEmits() -> None:
@@ -252,13 +250,13 @@ def test_aTableAcceptsBothFormsOfAnAddress() -> None:
 # AC 6.a
 def test_aTableReturnsTheCellsARangeCovers() -> None:
     table = buildSampleTable()
-    covered = [cell.reference.asReference() for cell in table.range("A1:B2")]
+    covered = [str(cell.address) for cell in table.range("A1:B2")]
     assert covered == ["A1", "B1", "A2", "B2"]
 
 
 def test_aTableReturnsTheCellsEveryRangeInAListCovers() -> None:
     table = buildSampleTable()
-    covered = [cell.reference.asReference() for cell in table.range("A1,C3")]
+    covered = [str(cell.address) for cell in table.range("A1,C3")]
     assert covered == ["A1", "C3"]
 
 
@@ -266,9 +264,9 @@ def test_anUnboundedRangeIsBoundedByTheTablesOwnExtent() -> None:
     """A range knows nothing about the table it is used against, so the extent is
     the only thing that can answer what `A` covers."""
     table = buildSampleTable()
-    covered = [cell.reference.asReference() for cell in table.range("A")]
+    covered = [str(cell.address) for cell in table.range("A")]
     assert covered == ["A1", "A2", "A3"]
-    assert [cell.reference.asReference() for cell in table.range("1")] == [
+    assert [str(cell.address) for cell in table.range("1")] == [
         "A1", "B1", "C1"
     ]
 
@@ -309,7 +307,7 @@ def test_anExtentIsTheDeclaredGridAndNotWhatTheCellsReach() -> None:
 def test_aMergeExpressesItsExtentAsARange() -> None:
     merge = MergeRange(CellRange.parse("A1:B1"))
     assert merge.extent == CellRange(1, 1, 1, 2)
-    assert merge.anchor == CellReference(1, 1)
+    assert merge.anchor == CellAddress(1, 1)
     assert merge.covers("B1") is True
     assert merge.covers("C1") is False
 
@@ -344,7 +342,7 @@ def test_aCellSwallowedByAMergeIsNotAddressable() -> None:
 def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
     """A merged region is one cell, so a range over it returns one cell."""
     table = buildMergedTable()
-    assert [cell.reference.asReference() for cell in table.range("A1:C1")] == [
+    assert [str(cell.address) for cell in table.range("A1:C1")] == [
         "A1", "C1"
     ]
     assert table.range("B1") == []

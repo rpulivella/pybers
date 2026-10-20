@@ -34,6 +34,7 @@ import conftest
 import pybers
 from conftest import allDocuments, findDocumentPath
 from pybers.addressing import (
+    CellAddress,
     CellReference,
     ReferenceError,
     toColumnLetter,
@@ -167,7 +168,7 @@ def test_aLockedReferenceAddressesTheSameCellAndIsNotTheSameReference() -> None:
 
 def test_aCellKnowsItsOwnReference() -> None:
     table = openOnlyTable("11-value-types-noformats")
-    assert table.cell("I1").reference == CellReference(1, 9)
+    assert table.cell("I1").address == CellAddress(1, 9)
 
 
 # ── AC 5: every value type the persistence layer reads ───────────────────────
@@ -276,7 +277,7 @@ def test_everyCellOfEveryTableReads(path: Path) -> None:
         for table in sheet.tables:
             for reference, cell in table.cells.items():
                 assert reference.row >= 1 and reference.col >= 1
-                assert cell.reference == reference
+                assert cell.address == reference
 
 
 def test_aMultiTileTableKeepsItsRowsInOrder() -> None:

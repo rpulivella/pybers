@@ -47,7 +47,7 @@ def openMergedTable() -> Table:
 
 def listWalkAddresses(cells: object) -> list[str]:
     """Return the written address of each cell in a walk, in the order walked."""
-    return [str(cell.reference) for cell in cells]  # type: ignore[attr-defined]
+    return [str(cell.address) for cell in cells]  # type: ignore[attr-defined]
 
 
 # ── AC 1: the declared grid, each cell once ──────────────────────────────────
@@ -100,8 +100,8 @@ def testARowHoldsOnlyTheCellsNoMergeSwallowed() -> None:
 def testIndexingARowCountsItsCellsRatherThanItsColumns() -> None:
     row = openMergedTable().rows[1]
 
-    assert str(row[3].reference) == "E2"
-    assert str(row[-1].reference) == "G2"
+    assert str(row[3].address) == "E2"
+    assert str(row[-1].address) == "G2"
     assert listWalkAddresses(row[1:4]) == ["B2", "C2", "E2"]
 
 
@@ -275,7 +275,7 @@ def testACoveredPositionIsRefusedByNumberAsByAddress() -> None:
 def testEveryCellAWalkYieldsIsTheCellTheTableReturns() -> None:
     table = openMergedTable()
 
-    assert all(cell is table.cell(cell.reference) for cell in table.gridIterate())
+    assert all(cell is table.cell(cell.address) for cell in table.gridIterate())
 
 
 def testAWriteThroughAWalkReachesTheFile(tmp_path: Path) -> None:
@@ -288,7 +288,7 @@ def testAWriteThroughAWalkReachesTheFile(tmp_path: Path) -> None:
     document.save()
 
     reopened = pybers.open(working).sheet(1).table("Table 2")
-    assert reopened.cells[last.reference].value == Decimal("7.25")
+    assert reopened.cells[last.address].value == Decimal("7.25")
 
 
 def testAWriteThroughARowReachesTheFile(tmp_path: Path) -> None:

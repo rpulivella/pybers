@@ -48,9 +48,12 @@ from pybers.addressing.ranges import (
     toCellRanges,
 )
 from pybers.addressing.reference import (
+    CellAddress,
     CellReference,
     CellReferenceLike,
     ReferenceError,
+    SheetReference,
+    TableReference,
     absoluteMarker,
     alphabetSize,
     cellPattern,
@@ -65,6 +68,7 @@ from pybers.addressing.reference import (
 
 __all__ = [
     "AxisBound",
+    "CellAddress",
     "CellReferenceLike",
     "CellRange",
     "CellRangeList",
@@ -75,6 +79,8 @@ __all__ = [
     "CellRangeLike",
     "RangeEndpoint",
     "ReferenceError",
+    "SheetReference",
+    "TableReference",
     "absoluteMarker",
     "alphabetSize",
     "cellPattern",

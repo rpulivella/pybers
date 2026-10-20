@@ -212,7 +212,7 @@ def updateCellOrigins(document: Document) -> None:
                     or cell.formula is not None
                     or copied is not None and copied._origin is not None
                 ):
-                    cell._origin = cell.reference
+                    cell._origin = cell.address
 
 
 # `Document.save` reaches `writeDocument` and nothing else, and no other module in

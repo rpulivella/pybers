@@ -42,8 +42,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
-from ..addressing import CellReference
-from ..addressing.reference import originOffset
+from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ._conditions import (
     ConditionalPlan,
@@ -156,7 +155,7 @@ def moveGridRecords(
     tileRange: TileRange,
     maps: GridMaps,
     table: Table,
-    release: Callable[[CellRecord, CellReference], bool],
+    release: Callable[[CellRecord, CellAddress], bool],
     plan: ConditionalPlan | None = None,
 ) -> set[int]:
     """Move every stored row and record to its new line, releasing the removed ones.
@@ -180,7 +179,7 @@ def moveGridRecords(
             for record in records:
                 column = maps.columns.lineMap(record.column)
                 if row is None or column is None:
-                    reference = CellReference(
+                    reference = CellAddress(
                         stored + originOffset, record.column + originOffset
                     )
                     release(record, reference)
