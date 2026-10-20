@@ -238,10 +238,7 @@ class Table:
         the grid is never an error. Two addresses raise: one outside the declared
         grid, and one swallowed by a merge, reached through its anchor.
         """
-        # Unlocked before it is used as a key, because `$A$1` and `A1` compare
-        # unequal and are one cell. Without this the same cell files itself under
-        # four spellings and a write through one is invisible to the other three.
-        key = toCellReferenceNamed(address, row, col).address
+        key = self.addressResolve(toCellReferenceNamed(address, row, col))
         extent = self.extent
         if extent is None or not extent.covers(key):
             raise ReferenceError(
@@ -288,13 +285,32 @@ class Table:
         """
         return [self.cell(reference) for reference in listRangePositions(self, address)]
 
+    def addressResolve(self, reference: CellReferenceLike) -> CellAddress:
+        """Return where a reference points in this table, refusing one naming another.
+
+        A reference naming no table is taken as this table's, the way a relative path
+        is taken from the directory it is used in.
+        """
+        found = toCellReference(reference)
+        named = found.table
+        if named is None:
+            return found.address
+        sheet = self.sheet
+        if named.name.casefold() == self.name.casefold() and (
+            named.sheet is None
+            or (sheet is not None and named.sheet.name == sheet.name)
+        ):
+            return found.address
+        here = self.name if sheet is None else f"{sheet.name}::{self.name}"
+        raise ReferenceError(f"{found} names another table, and this is {here}.")
+
     def addressable(self, address: CellReferenceLike) -> bool:
         """Report whether an address names a cell this table can hand over.
 
         False for a position swallowed by a merge, which is why a range over a
         merged block yields the anchor once rather than one cell per position.
         """
-        reference = toCellReference(address).address
+        reference = self.addressResolve(address)
         merge = self.mergeCovering(reference)
         return merge is None or merge.anchor == reference
 
@@ -380,7 +396,7 @@ class Table:
         if merge is None:
             raise ReferenceError(
                 f"No merge in {self.name!r} covers "
-                f"{toCellReference(address).address}."
+                f"{self.addressResolve(address)}."
             )
         self.mergeRanges.remove(merge)
         return merge
@@ -411,7 +427,7 @@ class Table:
         position holds no value whatever wrote the merge. Derived on every call rather
         than stored, because a copy would go stale the moment a merge changed.
         """
-        reference = toCellReference(address)
+        reference = self.addressResolve(address)
         for merge in self.mergeRanges:
             if merge.covers(reference):
                 return merge

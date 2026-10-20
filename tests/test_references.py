@@ -183,7 +183,7 @@ def testACellAddressNeverNamesATable() -> None:
     assert [field.name for field in dataclasses.fields(pybers.CellAddress)] == [
         "row", "col",
     ]
-    with pytest.raises(pybers.ReferenceError, match="A1-style"):
+    with pytest.raises(pybers.ReferenceError, match="names a table"):
         pybers.CellAddress.parse("Table 2::A1")
 
 

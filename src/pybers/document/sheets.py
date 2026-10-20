@@ -23,6 +23,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-20  A document and a sheet each reach a cell by a reference naming its
+            table, walking down the owners, for PYB-217.
 2026-10-11  Table identities are returned as a frozendict, for PYB-189.
 2026-09-14  A sheet or a table is added, and each knows the archive it was read
             from, for PYB-63.
@@ -53,7 +55,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from pybers.addressing.reference import lastColumn, lastRow, tableNameSeparator
+from pybers.addressing.reference import (
+    CellReferenceLike,
+    lastColumn,
+    lastRow,
+    tableNameSeparator,
+    toCellReference,
+)
 from pybers.drawable import GraphicalObject
 from pybers.errors import PybersError
 from pybers.geometry import Position
@@ -185,6 +193,25 @@ class Sheet:
             self.tables, nameOrPosition, "table", repr(self.name), foldCase=True
         )
 
+    def cell(self, reference: CellReferenceLike) -> Cell:
+        """Return the cell a reference names on this sheet, its table named in it.
+
+        A reference naming another sheet is refused, and so is one naming no table,
+        since a sheet holds tables rather than cells.
+        """
+        found = toCellReference(reference)
+        if found.table is None:
+            raise SelectionError(
+                f"{found} names no table, and a sheet holds only tables. Name one, "
+                f"such as `Table 1::{found}`."
+            )
+        if found.sheet is not None and found.sheet.name != self.name:
+            raise SelectionError(
+                f"{found} names the sheet {found.sheet.name!r}, and this is "
+                f"{self.name!r}."
+            )
+        return self.table(found.table.name).cell(found)
+
     def tableAdd(
         self, name: str, rows: int, cols: int, position: Position | None = None
     ) -> Table:
@@ -302,6 +329,48 @@ class Document:
         sheet = Sheet(name=name, document=self)
         self.sheets.insert(position - firstPosition, sheet)
         return sheet
+
+    def cell(self, reference: CellReferenceLike) -> Cell:
+        """Return the cell a reference names, walking from sheet to table to cell.
+
+        With no sheet named, the table must be the only one of its name in the
+        document, so a name two sheets share is refused with both qualified names.
+        """
+        found = toCellReference(reference)
+        if found.table is None:
+            raise SelectionError(
+                f"{found} names no table. A reference into a document reads "
+                f"`Table 1::{found}` or `Sheet 1::Table 1::{found}`."
+            )
+        if found.sheet is not None:
+            return self.sheet(found.sheet.name).cell(found)
+        wanted = found.table.name.casefold()
+        matches = [
+            (sheet, table)
+            for sheet in self.sheets
+            for table in sheet.tables
+            if table.name.casefold() == wanted
+        ]
+        if len(matches) == 1:
+            return matches[0][1].cell(found)
+        if matches:
+            shared = ", ".join(
+                f"{sheet.name}{tableNameSeparator}{table.name}"
+                for sheet, table in matches
+            )
+            raise SelectionError(
+                f"{found.table.name!r} names a table on more than one sheet. Name "
+                f"one of them: {shared}."
+            )
+        every = ", ".join(
+            f"{sheet.name}{tableNameSeparator}{table.name}"
+            for sheet in self.sheets
+            for table in sheet.tables
+        )
+        raise SelectionError(
+            f"No table in this document is named {found.table.name!r}. The tables "
+            f"are {every}."
+        )
 
     def tableFor(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.

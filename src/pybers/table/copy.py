@@ -31,7 +31,6 @@ from pybers.addressing.ranges import CellRange, CellRangeLike
 from pybers.addressing.reference import (
     CellReferenceLike,
     ReferenceError,
-    toCellReference,
 )
 from pybers.formula.relocation import FormulaReferenceRelocation, clampFormulaRanges
 from pybers.table.bounds import refuseRangeOutside
@@ -61,7 +60,7 @@ def copyCells(
     rule = toRelocationRule(references)
     named = rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
     extent = table.rangeSingle(source, "copy")
-    landing = toCellReference(anchor).address
+    landing = table.addressResolve(anchor)
     startRow, startCol, _, _ = findBlockCorners(extent)
     copy = CellsMove(extent, landing.row - startRow, landing.col - startCol)
     destination = copy.destination

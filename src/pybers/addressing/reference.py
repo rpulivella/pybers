@@ -16,6 +16,7 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-10-20  A reference reads the table and sheet its text names, for PYB-217.
 2026-10-20  `CellOffset`, a signed distance, and the arithmetic between it and an
             address, for PYB-217.
 2026-10-20  `CellAddress`, a position alone, and the table and sheet a reference
@@ -178,6 +179,11 @@ class CellAddress:
     def parse(cls, text: str) -> CellAddress:
         """Return the address `B3` names, refusing a `$`, which only a reference has."""
         reference = CellReference.parse(text)
+        if reference.table is not None:
+            raise ReferenceError(
+                f"{text!r} names a table, which belongs to a `CellReference`. An "
+                f"address is the position alone, such as {reference.address}."
+            )
         if reference.rowAbsolute or reference.colAbsolute:
             raise ReferenceError(
                 f"{text!r} carries a lock, which belongs to a `CellReference`. An "
@@ -307,12 +313,21 @@ class CellReference:
 
     @classmethod
     def parse(cls, reference: str) -> CellReference:
-        """Return the cell an A1-style reference addresses, markers preserved.
+        """Return the reference `B3`, `Q3::B$3` or `Budget::Q3::$B$3` writes.
 
         `$A1` and `A1` name the same cell and compare unequal, because locking is
-        part of what was written and has to survive being read back out.
+        part of what was written and has to survive being read back out. A table is
+        named as far as the text names it, and no further.
         """
-        match = cellPattern.match(reference.strip())
+        text = reference.strip()
+        tableName, separator, cellText = text.rpartition(tableNameSeparator)
+        table = None
+        if separator:
+            sheetName, sheetSeparator, name = tableName.rpartition(tableNameSeparator)
+            table = TableReference(
+                sheet=SheetReference(sheetName) if sheetSeparator else None, name=name
+            )
+        match = cellPattern.match(cellText.strip())
         if match is None:
             raise ReferenceError(f"{reference!r} is not an A1-style cell reference.")
         colMarker, letters, rowMarker, digits = match.groups()
@@ -328,6 +343,7 @@ class CellReference:
             toColumnNumber(letters),
             rowAbsolute=rowMarker == absoluteMarker,
             colAbsolute=colMarker == absoluteMarker,
+            table=table,
         )
 
     def asReference(self) -> str:

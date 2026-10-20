@@ -36,7 +36,6 @@ from pybers.addressing.reference import (
     CellReference,
     CellReferenceLike,
     ReferenceError,
-    toCellReference,
 )
 from pybers.formula.nodes import Formula, FormulaRange, FormulaReference
 from pybers.formula.relocation import (
@@ -243,7 +242,7 @@ def moveCells(
 
     rule = toRelocationRule(references)
     extent = table.rangeSingle(source, "move")
-    landing = toCellReference(anchor).address
+    landing = table.addressResolve(anchor)
     startRow, startCol, _, _ = findBlockCorners(extent)
     move = CellsMove(extent, landing.row - startRow, landing.col - startCol)
     refuseRangeOutside(table, move.destination)

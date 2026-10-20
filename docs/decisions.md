@@ -215,9 +215,9 @@ differ. That reading is also what keeps JSON export compact, since a column is d
 once and only its exceptions are listed.
 
 **Formats apply over a range**, `table.cellFormatApply(range, format)`, and a single cell's
-value, format and style are set together in one call, `document.cellSet(address, ...)`,
+value, format and style are set together in one call, `document.cellSet(reference, ...)`,
 the style a named one or one written into the cell alone. The call sits on the document
-because its address names the sheet and table, and it returns the change it made.
+because its reference names the table, and it returns the change it made.
 
 **A custom number format is a structured value** holding its positive, negative and zero
 forms, the shape Numbers stores. A shorthand parser may later build one, and the structured
