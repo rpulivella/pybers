@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-144] Write any value type into any cell
 - [PYB-218] Measure how Numbers stores a date's time zone
 - [PYB-225] Print a cell with its value, never its private field
 - [PYB-217] Set a cell's value from the command line
