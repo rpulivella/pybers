@@ -70,8 +70,11 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
+    CellReference,
     CellReferenceLike,
     ReferenceError,
+    SheetReference,
+    TableReference,
     firstColumn,
     firstRow,
     toCellReference,
@@ -284,6 +287,18 @@ class Table:
         merge are skipped, so a merged block yields its anchor once.
         """
         return [self.cell(reference) for reference in listRangePositions(self, address)]
+
+    def addressQualify(self, address: CellAddress) -> CellReference:
+        """Return a reference to an address here, naming this table and its sheet."""
+        sheet = self.sheet
+        return CellReference(
+            address.row,
+            address.col,
+            table=TableReference(
+                sheet=None if sheet is None else SheetReference(sheet.name),
+                name=self.name,
+            ),
+        )
 
     def addressResolve(self, reference: CellReferenceLike) -> CellAddress:
         """Return where a reference points in this table, refusing one naming another.

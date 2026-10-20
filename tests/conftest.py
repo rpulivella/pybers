@@ -25,6 +25,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/07"
 
+import shutil
 from pathlib import Path
 
 from pybers._generated import TSTArchives_pb2 as tst
@@ -56,6 +57,11 @@ def findDocumentPath(stem: str) -> Path:
     ]
     assert len(found) == 1, f"{stem}.numbers is in {len(found)} document directories"
     return found[0]
+
+
+def copyDocument(stem: str, into: Path) -> Path:
+    """Return a writable copy of a document, so a save never touches the original."""
+    return Path(shutil.copy(findDocumentPath(stem), into / f"{stem}.numbers"))
 
 
 tableModelType: int = next(

@@ -20,6 +20,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `Table` | A grid of cells, with its size and its merges. `cells` is a read-only view, and a cell changes through the table | Owner |
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
 | `Cell` | One cell: its value, formula, style and stored description | Owner |
+| `CellChange` | What a write did to one cell, or would do in a preview: value and kind before and after, and how far the table grew | Frozen |
 | `CellValue` | `Decimal`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |

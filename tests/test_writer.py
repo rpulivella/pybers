@@ -40,7 +40,7 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import allDocuments, findDocumentPath
+from conftest import allDocuments, copyDocument, findDocumentPath
 from pybers._engine import readTableOwnerIds
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCEArchives_pb2 as tsce
@@ -308,13 +308,6 @@ def test_writeDocumentIsTheSameCallAsSave(tmp_path: Path) -> None:
 
 
 # ── AC 2, 3 and 4: a numeric edit reaches its cell and touches nothing else ──
-
-def copyDocument(name: str, tmp_path: Path) -> Path:
-    """Copy a document somewhere writable, since a save lands in place by default."""
-    working = tmp_path / f"{name}-edited.numbers"
-    shutil.copy(findDocumentPath(name), working)
-    return working
-
 
 def test_aDecimalWrittenToACellIsThereWhenTheFileIsReopened(tmp_path: Path) -> None:
     """AC 2 and AC 3 together, which is the pair a caller actually experiences."""

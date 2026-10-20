@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-20  A cell's value is set through `valueSet`, which reports the change
+            and previews it, for PYB-217.
 2026-10-20  Moved here from `cells`, which keeps `Table`, for PYB-217. The history of
             this code before the move is in that module's UPDATES.
 """
@@ -29,15 +31,18 @@ from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
     CellAddress,
     CellReference,
-    SheetReference,
-    TableReference,
 )
 from pybers.errors import WriteError
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.style import Style
-from pybers.table.kinds import CellDescription, emptyDescription, findCellKind
+from pybers.table.kinds import (
+    CellDescription,
+    CellKind,
+    emptyDescription,
+    findCellKind,
+)
 from pybers.table.merges import MergeRange
 
 if TYPE_CHECKING:
@@ -88,6 +93,56 @@ class CellCopy:
 
     source: Cell
     borders: bool
+
+
+def toCellValue(value: object, address: CellAddress) -> CellValue:
+    """Return a value as a cell holds it, an `int` exact, refusing a `float`."""
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        return Decimal(value)
+    if isinstance(value, float):
+        raise WriteError(
+            f"{address} was given the float {value!r}, which carries binary rounding "
+            f"error. Write Decimal({str(value)!r}) instead."
+        )
+    if isinstance(value, Decimal | str | datetime.datetime | datetime.timedelta):
+        return value
+    raise WriteError(
+        f"{address} was given a {type(value).__name__}. A cell holds a Decimal, an "
+        "int, a str, a bool, a datetime, a timedelta or None."
+    )
+
+
+def isSameValue(before: CellValue, after: CellValue) -> bool:
+    """Report whether two values are one stored value, a Decimal down to its digits."""
+    if type(before) is not type(after):
+        return False
+    if isinstance(before, Decimal) and isinstance(after, Decimal):
+        return before.as_tuple() == after.as_tuple()
+    return before == after
+
+
+@dataclass(frozen=True, slots=True)
+class CellChange:
+    """What a write did to one cell, or would do in a preview, and how far it grew."""
+
+    reference: CellReference
+    valueBefore: CellValue
+    valueAfter: CellValue
+    kindBefore: CellKind
+    kindAfter: CellKind
+    rowsAdded: int = 0
+    colsAdded: int = 0
+
+    @property
+    def changed(self) -> bool:
+        """Report whether anything differs, a grown table included."""
+        return bool(
+            self.rowsAdded or self.colsAdded
+            or self.kindBefore is not self.kindAfter
+            or not isSameValue(self.valueBefore, self.valueAfter)
+        )
 
 
 @dataclass(slots=True)
@@ -168,18 +223,28 @@ class Cell:
         Built from the owners on every call, so renaming the table or the sheet, or an
         edit that moves the cell, never leaves a stale copy behind.
         """
-        table = self.table
-        if table is None:
+        if self.table is None:
             return CellReference(self.address.row, self.address.col)
-        sheet = table.sheet
-        return CellReference(
-            self.address.row,
-            self.address.col,
-            table=TableReference(
-                sheet=None if sheet is None else SheetReference(sheet.name),
-                name=table.name,
-            ),
-        )
+        return self.table.addressQualify(self.address)
+
+    def valueSet(self, value: object, *, preview: bool = False) -> CellChange:
+        """Set this cell's value and return the change, or only report it in preview.
+
+        An `int` is written as that exact number and a `float` is refused, because a
+        binary float carries rounding error into a document that never had any.
+        """
+        written = toCellValue(value, self.address)
+        if self.formula is not None:
+            raise WriteError(
+                f"{self.address} is backed by a formula, so writing a value would "
+                "discard it. Replace the formula instead, or clear it first."
+            )
+        before = self.description.kind
+        after = findCellKind(written, self._stored.kind, self._storedValue, False)
+        change = CellChange(self.reference, self.value, written, before, after)
+        if not preview and change.changed:
+            self.value = written
+        return change
 
     @property
     def description(self) -> CellDescription:
@@ -237,4 +302,6 @@ class Cell:
         return merge
 
 
-__all__ = ["Cell", "CellCopy", "CellValue", "decimal128Context"]
+__all__ = [
+    "Cell", "CellChange", "CellCopy", "CellValue", "decimal128Context", "toCellValue",
+]

@@ -25,13 +25,12 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 import dataclasses
-import shutil
 from pathlib import Path
 
 import pytest
 
 import pybers
-from conftest import findDocumentPath, readDataListBytes
+from conftest import copyDocument, findDocumentPath, readDataListBytes
 from pybers import Table
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
@@ -96,11 +95,6 @@ retargetedText: dict[str, str] = {
 def openShapes() -> pybers.Document:
     """Return `20-formula-shapes`, the three-table two-sheet measurement."""
     return pybers.open(findDocumentPath("20-formula-shapes"))
-
-
-def copyDocument(name: str, into: Path) -> Path:
-    """Return a writable copy of a document, so a save never touches the documents."""
-    return Path(shutil.copy(findDocumentPath(name), into / f"{name}.numbers"))
 
 
 def readFormulaTexts(table: Table) -> dict[str, str]:

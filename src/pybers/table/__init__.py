@@ -20,6 +20,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-10-20  `CellChange`, what a write did to one cell, for PYB-217.
 2026-10-14  The cell store is the feature's own, read through `cells`, for PYB-193.
 2026-10-01  `CellKind`, `CellFormat` and `CellDescription`, for PYB-141.
 2026-09-30  A fill under `CONTINUE_SERIES` continues a series, for PYB-137.
@@ -38,7 +39,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from pybers.table.cell import Cell, CellValue
+from pybers.table.cell import Cell, CellChange, CellValue
 from pybers.table.cells import Table
 from pybers.table.fill import CellValueFill
 from pybers.table.kinds import CellDescription, CellFormat, CellKind
@@ -50,6 +51,7 @@ __all__ = [
     "CellDescription",
     "CellFormat",
     "CellKind",
+    "CellChange",
     "CellValue",
     "CellValueFill",
     "MergeRange",
