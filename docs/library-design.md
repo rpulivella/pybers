@@ -33,6 +33,8 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellRange`, `CellRangeList` | A rectangle of cells, specifying its table when its context needs one, and several | Frozen |
 | `MergeRange` | A merged region | Frozen |
 | `CellReferenceLike`, `CellRangeLike` | A reference or a range, or its text, wherever a call takes one | Alias |
+| `TimeZoneLike` | A `tzinfo`, or a name `zoneinfo.ZoneInfo` knows, wherever a call takes a time zone | Alias |
+| `MachineTimeZone` | The zone pybers is running in, a document's time zone unless `pybers.open` specifies another | Value |
 
 A reference is qualified only as far as its context needs, as a path is. Each owner takes its part and hands the rest down: `document.cell` needs the table named, `sheet.cell` takes a table on that sheet, and `table.cell` takes `B3` alone or a qualifier naming that table. A table keys its cells by `CellAddress`, so iterating a table yields addresses, and anything gathered across tables yields qualified references. A selector reaching several cells across sheets and tables, as under Addresses, becomes a frozen type of its own when it is built.
 
