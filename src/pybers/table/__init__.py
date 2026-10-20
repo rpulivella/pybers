@@ -20,6 +20,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-10-20  `formatCellValue`, the text a value reads back from, for PYB-144.
 2026-10-20  `parseCellValue`, a cell value read from text, for PYB-217.
 2026-10-20  `CellChange`, what a write did to one cell, for PYB-217.
 2026-10-14  The cell store is the feature's own, read through `cells`, for PYB-193.
@@ -43,7 +44,7 @@ __date__ = "2026/09/08"
 from pybers.table.cell import Cell, CellChange, CellValue
 from pybers.table.cells import Table
 from pybers.table.fill import CellValueFill
-from pybers.table.inference import parseCellValue
+from pybers.table.inference import formatCellValue, parseCellValue
 from pybers.table.kinds import CellDescription, CellFormat, CellKind
 from pybers.table.merges import MergeRange
 from pybers.table.rows import TableRow, TableRows
@@ -60,5 +61,6 @@ __all__ = [
     "Table",
     "TableRow",
     "TableRows",
+    "formatCellValue",
     "parseCellValue",
 ]

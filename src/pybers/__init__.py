@@ -11,7 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
-2026-10-20  MachineTimeZone, TimeZoneError and TimeZoneLike re-exported, for PYB-144.
+2026-10-20  MachineTimeZone, TimeZoneError, TimeZoneLike and formatCellValue
+            re-exported, for PYB-144.
 2026-10-20  `parseCellValue` re-exported, for PYB-217.
 2026-10-20  `CellChange` re-exported, for PYB-217.
 2026-10-12  NOT_REQUESTED, UNDETERMINED and WITHHELD re-exported, for PYB-190.
@@ -113,6 +114,7 @@ lazy from pybers.table import (
     Table,
     TableRow,
     TableRows,
+    formatCellValue,
     parseCellValue,
 )
 lazy from pybers.text import Paragraph, RichText, TextRun
@@ -147,6 +149,7 @@ __all__ = [
     "FormulaVariable",
     "FormulaLambda",
     "Formula",
+    "formatCellValue",
     "parseCellValue",
     "parseFormula",
     "renderFormula",

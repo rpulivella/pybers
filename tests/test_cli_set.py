@@ -6,6 +6,8 @@ Each test edits a copy of `20-formula-shapes`, whose `Table 2` is ten rows by fi
 columns and named on one sheet only, while `Table 1` is named on two.
 
 UPDATES
+2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
+            aware date is written in, for PYB-144.
 2026-10-20  Written for PYB-217.
 """
 from __future__ import annotations
@@ -18,6 +20,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/20"
 
+import datetime
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -148,3 +151,72 @@ def testJsonReportsTheChangeAsTheLibraryReturnsIt(working: Path) -> None:
         "rowsAdded": 0,
         "colsAdded": 0,
     }
+
+
+@pytest.mark.parametrize(("text", "value", "shown"), [
+    ("2026-10-20 09:30", datetime.datetime(2026, 10, 20, 9, 30), "2026-10-20 09:30:00"),
+    ("2026-10-20", datetime.datetime(2026, 10, 20), "2026-10-20 00:00:00"),
+    ("1h 30m", datetime.timedelta(minutes=90), "1h 30m"),
+    ("90m", datetime.timedelta(minutes=90), "1h 30m"),
+    ("TRUE", True, "TRUE"),
+    ("false", False, "FALSE"),
+])
+def testADateADurationAndABooleanAreInferred(
+    working: Path, text: str, value: object, shown: str
+) -> None:
+    result = runSetCommand(str(working), "Table 2::B2", text, "--in-place")
+    assert result.exit_code == 0
+    assert result.stdout.splitlines()[-1].startswith(f"After: {shown} (")
+    assert readCell(working, "Table 2::B2").value == value
+
+
+@pytest.mark.parametrize(("text", "kind", "value"), [
+    ("1:30", "duration", datetime.timedelta(minutes=90)),
+    ("20261020", "date", datetime.datetime(2026, 10, 20)),
+    ("TRUE", "text", "TRUE"),
+    ("2026-10-20", "text", "2026-10-20"),
+    ("True", "boolean", True),
+])
+def testAsOverridesTheInference(
+    working: Path, text: str, kind: str, value: object
+) -> None:
+    runSetCommand(str(working), "Table 2::B2", text, "--as", kind, "--in-place")
+    assert readCell(working, "Table 2::B2").value == value
+
+
+def testAClockIsTextUnlessADurationIsNamed(working: Path) -> None:
+    runSetCommand(str(working), "Table 2::B2", "1:30", "--in-place")
+    assert readCell(working, "Table 2::B2").value == "1:30"
+
+
+def testTimeZoneWritesAnOffsetDateAsThatZonesWallClock(working: Path) -> None:
+    result = runSetCommand(
+        str(working), "Table 2::B2", "2026-10-20T16:00Z",
+        "--time-zone", "America/Los_Angeles", "--in-place",
+    )
+    assert result.exit_code == 0
+    assert "After: 2026-10-20 09:00:00 (date-time)" in result.stdout
+    assert readCell(working, "Table 2::B2").value == datetime.datetime(2026, 10, 20, 9)
+
+
+def testAZoneNoOneKnowsIsRefusedAndNothingWritten(working: Path) -> None:
+    before = working.read_bytes()
+    result = runSetCommand(
+        str(working), "Table 2::B2", "2026-10-20T16:00Z",
+        "--time-zone", "Mars/Olympus", "--in-place",
+    )
+    assert result.exit_code == 1
+    assert "'Mars/Olympus' specifies no time zone" in result.stderr
+    assert working.read_bytes() == before
+
+
+def testWhatJsonPrintsIsTextSetWritesBackUnchanged(working: Path) -> None:
+    result = runSetCommand(
+        str(working), "Table 2::B2", "2d 4h 0.5s", "--preview", "--format", "json"
+    )
+    printed = json.loads(result.stdout)["valueAfter"]
+    assert printed == "2d 4h 0.5s"
+    runSetCommand(str(working), "Table 2::B2", printed, "--in-place")
+    assert readCell(working, "Table 2::B2").value == datetime.timedelta(
+        days=2, hours=4, milliseconds=500
+    )
