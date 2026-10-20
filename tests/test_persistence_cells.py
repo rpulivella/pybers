@@ -8,6 +8,7 @@ this format produces plausible wrong numbers rather than an exception, so a deco
 only be checked against content established outside itself.
 
 UPDATES
+2026-10-20  A date reads as naive wall-clock time, for PYB-144.
 2026-08-18  Written with pybers._persistence.cells.
 2026-09-01  Added the encoder and the caller-context regression, for #2.
 """
@@ -102,7 +103,7 @@ def testValueTypesMeasurement() -> None:
 
     assert values[0] == Decimal("1234.5")
     assert values[1] == Decimal("42")
-    assert values[2] == datetime.datetime(2027, 6, 15, tzinfo=datetime.UTC)
+    assert values[2] == datetime.datetime(2027, 6, 15)
     assert values[3] == datetime.timedelta(minutes=20)
     assert values[4] is True
     # A star rating, a slider and a stepper: interactive controls store ordinary
@@ -143,8 +144,8 @@ def testPercentStoresTheFractionNotTheDisplayedNumber() -> None:
 def testDateTimeLivesInsideTheValue() -> None:
     """A date-time is one number: the time is not a separate field."""
     values = decodeValueRow("14-number-date")
-    midnight = datetime.datetime(2027, 6, 15, tzinfo=datetime.UTC)
-    withTime = datetime.datetime(2027, 6, 15, 11, tzinfo=datetime.UTC)
+    midnight = datetime.datetime(2027, 6, 15)
+    withTime = datetime.datetime(2027, 6, 15, 11)
 
     assert values[0] == midnight
     assert values[1] == withTime

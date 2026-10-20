@@ -7,6 +7,7 @@ Los Angeles in B1, and the same time typed with `PST` in C1.
 `72b-date-time-zones-region` is that document with its region set to English (Italy).
 
 UPDATES
+2026-10-20  A date reads as naive wall-clock time, for PYB-144.
 2026-10-20  Written for PYB-218.
 """
 from __future__ import annotations
@@ -32,10 +33,11 @@ appleEpoch: datetime.datetime = datetime.datetime(2001, 1, 1)
 
 
 def readStoredSeconds(stem: str, reference: str) -> float:
-    """Return the seconds a date cell stores, whatever zone the reader names."""
+    """Return the seconds a date cell stores, read as the wall-clock time it is."""
     value = pybers.open(findDocumentPath(stem)).cell(reference).value
     assert isinstance(value, datetime.datetime)
-    return (value.replace(tzinfo=None) - appleEpoch).total_seconds()
+    assert value.tzinfo is None
+    return (value - appleEpoch).total_seconds()
 
 
 @pytest.mark.parametrize("stem", ["72-date-time-zones", "72b-date-time-zones-region"])

@@ -20,6 +20,7 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-10-20  A date decodes as naive wall-clock time, for PYB-144.
 2026-10-01  The per-kind format slots and the displayed kind, gathered here from
             the writers, so the reader can follow them, for PYB-141.
 2026-09-21  The trailing-reference slots and the conditional ones, gathered here
@@ -54,10 +55,8 @@ from dataclasses import dataclass
 from ..errors import PybersError
 from .decimal128 import Decimal128
 
-# Apple counts dates from 2001-01-01 UTC rather than the Unix epoch.
-appleEpoch: datetime.datetime = datetime.datetime(
-    2001, 1, 1, tzinfo=datetime.UTC
-)
+# A date counts wall-clock seconds from 2001-01-01 in no zone, as PYB-218 measured.
+appleEpoch: datetime.datetime = datetime.datetime(2001, 1, 1)
 
 # Every offset is a uint16 in both layouts, and this value marks a column with no
 # cell at all. An empty cell is an ABSENCE of a record, not a record holding

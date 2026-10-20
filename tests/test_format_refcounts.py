@@ -7,6 +7,7 @@ compares what the file declares with what its cells actually reference rather th
 asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
+2026-10-20  A borrowed shape keeps no format, and a copy reaches the guard, for PYB-144.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
             spent formats and merges for its AC 9 and 10. Strings and styles
@@ -45,7 +46,6 @@ from pybers._persistence.cells import (
     displayedKindSlot,
     findFormulaKeySlot,
     listReferenceSlots,
-    textFormatSlot,
 )
 from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.types import findArchiveTypeId
@@ -315,7 +315,7 @@ def test_aFormatNoWrittenCellNamesKeepsTheCountItHad(tmp_path: Path) -> None:
 
 
 def test_aCellNamingAFormatItsTableDoesNotHoldIsRefused(tmp_path: Path) -> None:
-    """A borrowed text shape names the text format, so its absence stops the save."""
+    """A copied text record names the text format, so its absence stops the save."""
     working = copyDocument("11-value-types-noformats", tmp_path)
     textKey = findFormatKeyOfType(working, "Table 1", textFormatType)
 
@@ -327,25 +327,48 @@ def test_aCellNamingAFormatItsTableDoesNotHoldIsRefused(tmp_path: Path) -> None:
     forgeDataList(working, "Table 1", removeTextFormat)
     unchanged = working.read_bytes()
     document = pybers.open(working)
-    document.sheets[0].tables[0].cell("J1").value = "into an empty cell"
+    document.sheets[0].tables[0].cellsCopy(
+        "A2", "J1",
+        references=pybers.FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION,
+    )
 
     with pytest.raises(WriteError, match=f"J1 would name format {textKey}"):
         document.save()
     assert working.read_bytes() == unchanged
 
 
-def test_aBorrowedShapeKeepsOnlyTheFormatSlotOfItsOwnKind() -> None:
+def test_aNewCellNamesNoFormatOfTheSiblingItIsShapedFrom(tmp_path: Path) -> None:
+    """A borrowed shape takes the sibling's style alone, never its formats."""
+    working = copyDocument("11-value-types-noformats", tmp_path)
+    textKey = findFormatKeyOfType(working, "Table 1", textFormatType)
+
+    def removeTextFormat(formats: tst.TableDataList) -> None:
+        kept = [entry for entry in formats.entries if entry.key != textKey]
+        del formats.entries[:]
+        formats.entries.extend(kept)
+
+    forgeDataList(working, "Table 1", removeTextFormat)
+    document = pybers.open(working)
+    document.sheets[0].tables[0].cell("J1").value = "into an empty cell"
+    document.save()
+
+    assert pybers.open(working).sheets[0].tables[0].cell("J1").value == (
+        "into an empty cell"
+    )
+    assert findFormatKeyOfType(working, "Table 1", textFormatType) != textKey
+
+
+def test_aBorrowedShapeKeepsNoFormatOfTheCellItCameFrom() -> None:
     """`N2` is text remembering a number, a date and a duration format as well.
 
-    Those three belong to the cell they were chosen for, and a new cell naming them
-    would claim counts in slots this library does not maintain.
+    Every one belongs to the cell it was chosen for, and a new cell takes the
+    Automatic format of its own kind.
     """
     record = readRecordAt(findDocumentPath("15-number-duration-formats"), "N2")
     shaped = decodeRecord(record.column, borrowShape(record))
 
-    kept = set(listReferenceSlots(shaped.raw))
     assert len(listReferenceSlots(record.raw)) == 5, "the cell remembers formats"
-    assert kept == {textFormatSlot, displayedKindSlot}
+    assert listReferenceSlots(shaped.raw) == []
     assert not shaped.raw[6] & 0x80, "a chosen format is not borrowed either"
     assert shaped.value == record.value
 

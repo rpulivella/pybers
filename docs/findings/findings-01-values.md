@@ -84,7 +84,7 @@ attached where they exist. Type 9 holds rich text, whatever `automaticCellType` 
 | 2 | `numberCellType` | 49,701 | IEEE-754 decimal128, little-endian, 16 bytes | `NUMBER` |
 | 3 | `textCellType` | 20,960 | uint32 key into the `STRING` `TableDataList` | `TEXT` |
 | 4 | `formulaCellType` | 0 | not seen | |
-| 5 | `dateCellType` | 370 | float64 seconds since 2001-01-01 UTC | `DATE_TIME` |
+| 5 | `dateCellType` | 370 | float64 wall-clock seconds since 2001-01-01, in no zone | `DATE_TIME` |
 | 6 | `boolCellType` | 12 | float64, zero is false | `BOOLEAN` |
 | 7 | `durationCellType` | 27 | float64 seconds | `DURATION` |
 | 8 | `formulaErrorCellType` | 42 | no value: a formula that failed, or one not yet calculated | `ERROR` |
@@ -244,12 +244,22 @@ as a star rating.
 
 ### What this settles for writing
 
-A record whose type changes keeps its references and therefore keeps the count, so bytes
-9 and 10 are never rewritten and the slots keep their meanings. What that leaves is a
-text cell naming the format its number had, which Numbers accepts: confirmed in Numbers
-15.3.1 on 2026-09-14, where a cell converted from a number displays as text with a Data
-Format of Automatic, and one converted from a star-rating control displays as plain text
-with no control.
+A value of the kind a record already holds replaces the value bytes alone, so the record
+keeps its format, its style and any control. A value of another kind retypes the record:
+byte 1 and byte 8's value bits change, the old kind's format slot and any control go, the
+new kind's slot names that kind's Automatic format, the displayed kind names that slot,
+and bytes 6 and 7 clear, since a value typed into a fresh cell stores no flags there. Every
+other reference keeps its slot and its value, which carries the style across. Numbers
+accepted the number and text retypes in Numbers 15.3.1 on 2026-09-14, where a cell
+converted from a star-rating control displays as plain text with no control.
+
+The Automatic format of each kind is taken from what Numbers stored: `256` with 253
+decimal places for a number, a bare `260` for text, `268` with automatic units for the
+duration in `11-value-types-noformats` `D1`, and a bare format type `1` for the boolean a
+formula returned in `69-functions-added-in-15-4` and a typed TRUE in
+`73-values-typed-over-controls`. A date has no Automatic, since Numbers names a pattern for every date: pybers
+writes ISO 8601 order, `yyyy-MM-dd` for one at midnight, as `66-series-horizontal-base`
+holds, and `yyyy-MM-dd HH:mm` for one with a time.
 
 ### What a format's refcount counts
 
@@ -273,7 +283,7 @@ Under this rule neither does. That audit read fewer slots than Numbers counts.
 What pybers does with it: a written record moves counts by the difference between the
 format slots it held and those it holds now, so an entry no written record names keeps
 the count Numbers wrote, even one that disagrees with its cells. A shape borrowed from a
-sibling holds no claim before the write, and it keeps only its own kind's format slot.
+sibling holds no claim before the write, and it keeps none of the sibling's format slots.
 
 ### What Numbers does with a format nothing names
 
@@ -641,6 +651,29 @@ model rather than leaving it to taste.
 A checkbox, star rating, slider, stepper and popup menu all store a **normal value**, bool,
 number, or string, and reference a `CONTROL_CELL_SPEC` separately. The control is how the
 value is edited, not what it is. So they need no new value type, only a reference to carry.
+
+**A value the control cannot show is clamped or loses the control.** Measured 2026-10-20 for
+PYB-144 in `73-values-typed-over-controls`, typed into `11-value-types-noformats` by Numbers
+15.4. A number outside a range control is clamped to it, and the control stays: 7 in the star
+rating of 0 to 5 stores 5, and 150 in the slider and 500 in the stepper, each of 1 to 100,
+store 100. Text that is none of a pop-up menu's items stays text, and the cell loses its
+control, whose entry Numbers then removes. A pop-up menu's items are in a
+`TST.PopUpMenuModel`, type 6206, which the control's `chooser_control_popup_model` specifies.
+
+pybers never clamps, since a value must read back as written, so a value a control cannot
+show resets the cell to its kind's Automatic format and drops the control, as Numbers does
+for a pop-up menu. **A star rating is a format as well as a control**, `267` in the number
+slot, so dropping the control alone is not enough: `11-controls-written-by-pybers`, written
+that way, opened with 7 drawn as five stars, and Numbers' scripting failed on the cell.
+Reset to Automatic, the same cell shows 7, confirmed by `/golden-confirm` on 2026-10-20 in
+Numbers 15.4. A pop-up menu whose items include a kind other than text or the blank choice
+is not measured, so pybers keeps its control.
+
+The same document measures what a value typed into a plain cell stores. TRUE stores format
+type `1` in the checkbox slot, as a formula's boolean result does. A date and a duration
+each store a format Numbers chose from the text typed, `yyyy-M-d H:mm` for
+`2026-10-20 09:30` and automatic units for `1h 30m`. All three store no flags in bytes 6
+and 7, and Numbers' inspector reads each as Automatic.
 
 ### Two storage strategies by type
 

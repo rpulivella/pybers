@@ -9,6 +9,9 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-20  A value of any kind is written over any other, releasing the control
+            and rich text its record no longer specifies, and dropping a control
+            that cannot show the value, for PYB-144.
 2026-10-01  A cell's chosen format is read from its description, for PYB-141.
 2026-09-29  Filled cells take a duplicate of the record they copied, which claims
             what it names, and a removed record releases its control, for PYB-118.
@@ -52,8 +55,9 @@ __date__ = "2026/09/08"
 
 from dataclasses import dataclass
 
+from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRow
+from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
 from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
@@ -77,16 +81,18 @@ from ..formula._write import (
     readFormulaPool,
 )
 from ._conditions import ConditionalPlan, writeConditionalCounts
+from ._controls import checkControlShows
 from ._lines import GridMaps
 from ._read import readRichTextTable, readStringTable, resolveValue
 from ._records import (
+    applyAutomaticFormat,
     applyChosenFormat,
     buildFreshRecord,
     buildWrittenRecord,
     controlSlot,
     findFormatKey,
     findTemplateRecord,
-    numericTypeBytes,
+    findWrittenTypeByte,
     patchRichTextKey,
 )
 from ._refcounts import (
@@ -101,7 +107,6 @@ from ._refcounts import (
     releaseEntries,
     removeSpentEntries,
     removeSpentRichText,
-    stringTypeByte,
 )
 from ._relocation import (
     CellCopies,
@@ -118,7 +123,7 @@ from ._tiles import (
     rewriteRow,
     writeTileRange,
 )
-from .cell import Cell
+from .cell import Cell, isSameValue
 from .cells import Table
 
 
@@ -219,7 +224,7 @@ def applyTableEdits(
         index.resolve(store.format_table, tst.TableDataList)
         if store.format_table.identifier else None
     )
-    formatKeys: dict[int, int] = {}
+    formatKeys: dict[bytes, int] = {}
     formatsMoved: set[int] = set()
     tiles: list[tst.Tile] = []
     styleList = (
@@ -240,13 +245,14 @@ def applyTableEdits(
     controlsReleased: set[int] = set()
     richTextReleased: set[int] = set()
 
-    def formatFor(formatType: int) -> int | None:
-        """Return the key naming a format of this kind, caching the lookup."""
+    def formatFor(wanted: tsk.FormatStructArchive) -> int | None:
+        """Return the key naming exactly this format, caching the lookup."""
         if formatList is None:
             return None
-        if formatType not in formatKeys:
-            formatKeys[formatType] = findFormatKey(formatList, formatType)
-        return formatKeys[formatType]
+        cached = wanted.SerializeToString(deterministic=True)
+        if cached not in formatKeys:
+            formatKeys[cached] = findFormatKey(formatList, wanted)
+        return formatKeys[cached]
 
     def formatsCount(
         before: bytes | None, after: bytes | None, where: CellAddress
@@ -277,6 +283,30 @@ def applyTableEdits(
             pool.release(record.references[findFormulaKeySlot(record)])
             return True
         return False
+
+    def releaseReplaced(record: CellRecord, written: bytes) -> None:
+        """Release the control and rich text a rewrite of a record no longer names."""
+        nonlocal richTextMoved, controlsMoved
+        after = decodeRecord(record.column, written)
+        control = findSlotValue(record, controlSlot)
+        if (
+            controlList is not None and control is not None
+            and findSlotValue(after, controlSlot) is None
+        ):
+            controlsMoved |= releaseEntries(controlList, [control])
+            controlsReleased.add(control)
+        if richTextList is not None and after.typeByte != record.typeByte:
+            richTextMoved |= releaseEntries(richTextList, listRichTextClaims(record))
+            richTextReleased.update(listRichTextClaims(record))
+
+    def dropUnshownControl(raw: bytes, cell: Cell) -> bytes:
+        """Return the record without a control that cannot show the cell's value."""
+        control = findSlotValue(decodeRecord(0, raw), controlSlot)
+        if control is None or controlList is None:
+            return raw
+        if checkControlShows(index, controlList, control, cell.value):
+            return raw
+        return applyAutomaticFormat(raw, cell.value, formatFor)
 
     def listControlClaims(record: CellRecord) -> list[int]:
         """Return the control key a record names, if it names one."""
@@ -413,7 +443,9 @@ def applyTableEdits(
                 cell = table.cells.get(reference)
                 if cell is None:
                     continue
-                valueChanged = cell.value != resolveValue(record, strings, richText)
+                valueChanged = not isSameValue(
+                    resolveValue(record, strings, richText), cell.value
+                )
                 edit = classifyFormulaEdit(cell.formula, record, pool)
                 chosenChanged = (
                     cell.description.formatChosen != carriesChosenFormat(record)
@@ -425,10 +457,12 @@ def applyTableEdits(
                 # refuses here rather than being masked by the formula edit below.
                 # Attaching a formula is a different act and is allowed.
                 if valueChanged:
-                    patched = buildWrittenRecord(
-                        cell, record, textPool, formatFor=formatFor
+                    patched = dropUnshownControl(
+                        buildWrittenRecord(cell, record, textPool, formatFor=formatFor),
+                        cell,
                     )
                     formatsCount(record.raw, patched, reference)
+                    releaseReplaced(record, patched)
                 if pool is not None and edit != "none":
                     patched = applyFormulaEdit(edit, patched, record, cell, pool)
                     if edit in ("attach", "replace"):
@@ -465,13 +499,11 @@ def applyTableEdits(
                     # A value needs a record shaped like one this table already
                     # holds, since its trailing references are keys into the
                     # table's own lists rather than anything derivable.
-                    wanted = (
-                        stringTypeByte if isinstance(cell.value, str)
-                        else numericTypeBytes[0]
+                    shape = findTemplateRecord(
+                        index, store, findWrittenTypeByte(cell.value)
                     )
-                    shape = findTemplateRecord(index, store, wanted)
                     if shape is None:
-                        shape = buildFreshRecord(column, wanted, formatFor)
+                        shape = buildFreshRecord(column)
                     replacements[column] = applyChosenFormat(
                         buildWrittenRecord(
                             cell, shape, textPool, borrowed=True, formatFor=formatFor

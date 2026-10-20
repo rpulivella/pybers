@@ -1,0 +1,47 @@
+# What Numbers shows for 11-booleans-written-by-pybers.numbers: booleans pybers wrote into
+# `11-value-types-noformats`, over a number at A1 and B1, over the checkbox at E1, over the
+# star rating at F1, and into J1, which had no record. Checked by
+# `.venv/bin/python3 -m tools.local.golden_confirm run 11-booleans-written-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A1"
+value = true
+format = "automatic"
+dataFormat = { "Data Format" = "Automatic" }
+qa = ["A1 shows TRUE"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B1"
+value = false
+format = "automatic"
+qa = ["B1 shows FALSE"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E1"
+value = false
+format = "checkbox"
+dataFormat = { "Data Format" = "Checkbox" }
+qa = ["E1 shows an unchecked checkbox"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F1"
+value = true
+format = "automatic"
+qa = ["F1 shows TRUE, with no star rating left behind"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "J1"
+value = true
+format = "automatic"
+dataFormat = { "Data Format" = "Automatic" }
+qa = ["J1 shows TRUE"]

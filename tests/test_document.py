@@ -10,6 +10,7 @@ plausible wrong number rather than an exception, so a test that compares the rea
 against itself proves nothing.
 
 UPDATES
+2026-10-20  A date reads as naive wall-clock time, for PYB-144.
 2026-09-16  A document found in neither directory, or in both, fails for
             PYB-90 rather than skipping.
 2026-08-31  Written for #1.
@@ -185,9 +186,7 @@ def test_everyValueTypeDecodesAsTheMeasurementLabelsIt() -> None:
 
     assert table.cell("A1").value == Decimal("1234.5")
     assert table.cell("B1").value == Decimal("42")
-    assert table.cell("C1").value == datetime.datetime(
-        2027, 6, 15, tzinfo=datetime.UTC
-    )
+    assert table.cell("C1").value == datetime.datetime(2027, 6, 15)
     assert table.cell("D1").value == datetime.timedelta(minutes=20)
     assert table.cell("E1").value is True
     assert table.cell("I1").value == "Item 1"

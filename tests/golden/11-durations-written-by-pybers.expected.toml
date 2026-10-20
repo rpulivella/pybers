@@ -1,0 +1,27 @@
+# What Numbers shows for 11-durations-written-by-pybers.numbers: durations pybers wrote into
+# `11-value-types-noformats`, over a number at A1, over a duration at D1, and into J1, which
+# had no record. Checked by
+# `.venv/bin/python3 -m tools.local.golden_confirm run 11-durations-written-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A1"
+format = "automatic"
+dataFormat = { "Data Format" = "Automatic" }
+qa = ["A1 shows 1h 30m, and its Duration format uses Automatic Units"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D1"
+format = "automatic"
+qa = ["D1 shows 2h in the units it showed 20m in"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "J1"
+format = "automatic"
+dataFormat = { "Data Format" = "Automatic" }
+qa = ["J1 shows 1d 2h"]

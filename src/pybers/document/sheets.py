@@ -23,6 +23,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-20  A document carries the time zone an aware `datetime` is written in, for
+            PYB-144.
 2026-10-20  `cellSet` writes one cell by its reference, growing the table when asked
             and reporting the change, for PYB-217.
 2026-10-20  A document and a sheet each reach a cell by a reference naming its
@@ -51,6 +53,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/02"
 
+import datetime
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field, replace
@@ -69,6 +72,7 @@ from pybers.errors import PybersError
 from pybers.geometry import Position
 from pybers.table.cell import Cell, CellChange, toCellValue
 from pybers.table.cells import Table, generateOwnerIdentity
+from pybers.timezone import TimeZoneLike, machineTimeZone, toTimeZone
 
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.
@@ -271,6 +275,20 @@ class Document:
     sheets: list[Sheet] = field(default_factory=list)
     _package: NumbersPackage | None = field(default=None, repr=False, compare=False)
     _sourcePath: Path | None = field(default=None, repr=False, compare=False)
+    # Lives for the session alone, since the file has nowhere to keep a zone.
+    _timeZone: datetime.tzinfo = field(
+        default=machineTimeZone, repr=False, compare=False
+    )
+
+    @property
+    def timeZone(self) -> datetime.tzinfo:
+        """Return the zone an aware `datetime` written here is converted to."""
+        return self._timeZone
+
+    @timeZone.setter
+    def timeZone(self, zone: TimeZoneLike) -> None:
+        """Set that zone, as a `tzinfo` or a name `zoneinfo.ZoneInfo` knows."""
+        self._timeZone = toTimeZone(zone)
 
     def sheet(self, nameOrPosition: str | int) -> Sheet:
         """Return one of this document's sheets by its name or by its position.
@@ -361,7 +379,7 @@ class Document:
             target = Cell(address=address, table=table) if cell is None else cell
             change = target._valueChange(value, preview=True)
             return replace(change, rowsAdded=rowsAdded, colsAdded=colsAdded)
-        toCellValue(value, address)
+        toCellValue(value, address, self.timeZone)
         if rowsAdded:
             table.rowAdd(table.rowCount + 1, rowsAdded)
         if colsAdded:

@@ -7,6 +7,8 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-10-20  The boolean family, Numbers' Automatic format for TRUE and FALSE, for
+            PYB-144.
 2026-10-12  A format the save will choose is UNDETERMINED, not None, for PYB-190.
 2026-10-07  An unknown kind keeps the record's own type, for PYB-169.
 2026-10-01  Written for PYB-141, replacing `Cell.errored`, its chosen-format flag
@@ -53,6 +55,7 @@ class CellFormat(StrEnum):
     """The family of the format a cell displays its value with."""
 
     NUMBER = "number"
+    BOOLEAN = "boolean"
     CURRENCY = "currency"
     PERCENT = "percent"
     SCIENTIFIC = "scientific"

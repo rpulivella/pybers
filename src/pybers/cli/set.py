@@ -6,6 +6,8 @@ The command reads the text into a value, makes one `cellSet` call, and saves onl
 when the cell changed and the call was not a preview.
 
 UPDATES
+2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
+            aware date is written in, for PYB-144.
 2026-10-20  Written for PYB-217.
 """
 from __future__ import annotations
@@ -33,7 +35,7 @@ from pybers.cli._formats import FormatOption, OutputFormat, printResult
 
 def formatValue(value: pybers.CellValue, kind: pybers.CellKind) -> Text:
     """Return a value and its kind as one report value, `none` for an empty cell."""
-    shown = "none" if value is None else str(value)
+    shown = pybers.formatCellValue(value)
     return Text.assemble((shown, "value"), (f" ({kind.value})", "detail"))
 
 
@@ -93,14 +95,32 @@ def runSet(
     ],
     value: Annotated[
         str,
-        typer.Argument(metavar="VALUE", help="The value, as text.", show_default=False),
+        typer.Argument(
+            metavar="VALUE",
+            help="The value as text: 42, TRUE, 2026-10-20 09:00, 1h 30m, or any text.",
+            show_default=False,
+        ),
     ],
     kind: Annotated[
         str | None,
         typer.Option(
             "--as",
             metavar="KIND",
-            help="Read VALUE as this kind rather than inferring it: number or text.",
+            help=(
+                "Read VALUE as this kind rather than inferring it. One of: number, "
+                "boolean, date, duration, text."
+            ),
+        ),
+    ] = None,
+    timeZone: Annotated[
+        str | None,
+        typer.Option(
+            "--time-zone",
+            metavar="ZONE",
+            help=(
+                "Write a date carrying an offset as the wall-clock time in ZONE, "
+                "such as America/New_York, rather than the zone pybers is running in."
+            ),
         ),
     ] = None,
     inPlace: Annotated[
@@ -122,7 +142,10 @@ def runSet(
     """Set one cell's value, its kind inferred from VALUE unless --as names one."""
     target = findSaveTarget(documentPath, inPlace, output, preview)
     with reportPybersErrors(context):
-        document = pybers.open(documentPath)
+        document = (
+            pybers.open(documentPath) if timeZone is None
+            else pybers.open(documentPath, timeZone=timeZone)
+        )
         change = document.cellSet(
             reference,
             pybers.parseCellValue(value, kind),

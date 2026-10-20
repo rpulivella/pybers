@@ -28,11 +28,13 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `RichText` | Text with styled runs | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
 | `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |
-| `CellReference` | How something points at a cell: an address, `$` per axis, and the table it names when its context needs one | Frozen |
+| `CellReference` | How something points at a cell: an address, `$` per axis, and the table it specifies when its context needs one | Frozen |
 | `TableReference`, `SheetReference` | A table by name, its sheet's name when the table's is shared, and a sheet by name | Frozen |
-| `CellRange`, `CellRangeList` | A rectangle of cells, naming its table when its context needs one, and several | Frozen |
+| `CellRange`, `CellRangeList` | A rectangle of cells, specifying its table when its context needs one, and several | Frozen |
 | `MergeRange` | A merged region | Frozen |
 | `CellReferenceLike`, `CellRangeLike` | A reference or a range, or its text, wherever a call takes one | Alias |
+| `TimeZoneLike` | A `tzinfo`, or a name `zoneinfo.ZoneInfo` knows, wherever a call takes a time zone | Alias |
+| `MachineTimeZone` | The zone pybers is running in, a document's time zone unless `pybers.open` specifies another | Value |
 
 A reference is qualified only as far as its context needs, as a path is. Each owner takes its part and hands the rest down: `document.cell` needs the table named, `sheet.cell` takes a table on that sheet, and `table.cell` takes `B3` alone or a qualifier naming that table. A table keys its cells by `CellAddress`, so iterating a table yields addresses, and anything gathered across tables yields qualified references. A selector reaching several cells across sheets and tables, as under Addresses, becomes a frozen type of its own when it is built.
 
@@ -50,7 +52,7 @@ document.save()
 
 ## Addresses
 
-**A reference is a path, and a selector is CSS.** A reference names one cell and resolves through its owners, qualified only as far as its context needs, as a path does. A selector matches a set of cells by pattern and returns their references, as a CSS selector does: grouping with commas, wildcards, conditions on a cell's kind or format, positions such as every nth row, and negation. Every way of selecting cells is one or the other.
+**A reference is a path, and a selector is CSS.** A reference specifies one cell and resolves through its owners, qualified only as far as its context needs, as a path does. A selector matches a set of cells by pattern and returns their references, as a CSS selector does: grouping with commas, wildcards, conditions on a cell's kind or format, positions such as every nth row, and negation. Every way of selecting cells is one or the other.
 
 One syntax, Numbers' own, parsed by the library for every caller:
 
@@ -76,10 +78,11 @@ Each command answers to one public call, and the call does the work.
 
 ## Writing a cell
 
-A value's kind follows its Python type, as the table above lists. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the machine's own.
+A value's kind follows its Python type, as the table above lists. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone pybers is running in.
 
-- **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does.
-- **A cell's kind and format always agree.** A write that would leave a format on a value it cannot show is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`.
+- **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does, and loses any control the old value had.
+- **A value write never fails because of the cell's format.** A value of the cell's kind keeps its format and control.
+- **A cell's kind and format always agree.** A format applied that cannot show the cell's value is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`.
 - **Formats apply over a range**, with `table.cellFormatApply(range, format)`, and `document.cellSet(reference, ...)` sets one cell's value, format and style in one call, returning the change. `document.cell(reference)` reaches a cell by a reference naming its table.
 - **A write reports each cell whose kind or format it changed**, and `preview=True` reports the same without writing.
 - **A table's structure is readable**: each column's kind and format, and the cells that differ from them.
@@ -92,4 +95,4 @@ pybers reports what a document stores and never calculates. A formula is returne
 
 ## Errors
 
-Every error is a `PybersError`, carrying a message that names the file and the reason. A message opens with what it is about, says what is wrong, then what to do. It says `pybers`, never "this library", calls a limit of pybers "not supported", and cuts any clause the reader does not need. A document pybers cannot read raises `ReadError`, a write it cannot complete `WriteError`, and a feature's own errors live with that feature. A call never prints an error. It returns a failure only when examining one is its purpose, as `checkDocument` does, and raises every other.
+Every error is a `PybersError`, carrying a message that specifies the file and the reason. A message opens with what it is about, says what is wrong, then what to do. It says `pybers`, never "this library", calls a limit of pybers "not supported", and cuts any clause the reader does not need. A document pybers cannot read raises `ReadError`, a write it cannot complete `WriteError`, and a feature's own errors live with that feature. A call never prints an error. It returns a failure only when examining one is its purpose, as `checkDocument` does, and raises every other.
