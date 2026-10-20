@@ -20,14 +20,14 @@ __date__ = "2026/10/14"
 
 from typing import TYPE_CHECKING
 
-from pybers.addressing.ranges import CellRange, RangeAddress, toCellRanges
+from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import CellReference, ReferenceError
 
 if TYPE_CHECKING:
     from pybers.table.cells import Table
 
 
-def listRangePositions(table: Table, address: RangeAddress) -> list[CellReference]:
+def listRangePositions(table: Table, address: CellRangeLike) -> list[CellReference]:
     """Return the positions ranges cover, checking every range before returning any."""
     extent = table.extent
     items = []

@@ -41,8 +41,8 @@ from decimal import Decimal, InvalidOperation
 
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
-    CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
     toCellReference,
 )
@@ -505,7 +505,7 @@ class Parser:
 
 def parseFormula(
     text: str,
-    host: CellAddress,
+    host: CellReferenceLike,
     *,
     tables: Mapping[str, str] | None = None,
     pieces: Mapping[str, CellRange | CellReference] | None = None,

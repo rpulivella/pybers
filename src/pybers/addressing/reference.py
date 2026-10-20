@@ -16,6 +16,7 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-10-19  `CellReferenceLike`, what a call accepts for one cell, for PYB-217.
 2026-09-23  `toCellReferenceNamed` moved here from the table model, for PYB-18.
 2026-09-22  The offset between stored and model coordinates lives here, for PYB-109.
 2026-09-13  An address past the far end of either axis is refused, for #67.
@@ -222,10 +223,10 @@ class CellReference:
 # What a caller may hand to anything that addresses one cell. The string form is
 # included deliberately: `table.cell("A1")` is how this library is meant to read at
 # a call site, and the string is parsed at the boundary rather than carried around.
-CellAddress = CellReference | str
+CellReferenceLike = CellReference | str
 
 
-def toCellReference(address: CellAddress) -> CellReference:
+def toCellReference(address: CellReferenceLike) -> CellReference:
     """Return a `CellReference` for whichever of its forms was given."""
     if isinstance(address, str):
         return CellReference.parse(address)
@@ -233,7 +234,7 @@ def toCellReference(address: CellAddress) -> CellReference:
 
 
 def toCellReferenceNamed(
-    address: CellAddress | None, row: int | None, col: int | None
+    address: CellReferenceLike | None, row: int | None, col: int | None
 ) -> CellReference:
     """Return the cell an address names, or the one `row=` and `col=` name together.
 

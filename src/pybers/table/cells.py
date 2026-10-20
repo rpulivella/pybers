@@ -66,10 +66,10 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
-from pybers.addressing.ranges import CellRange, RangeAddress, toCellRanges
+from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
-    CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
     firstColumn,
     firstRow,
@@ -369,8 +369,8 @@ class Table:
 
     def cellsMove(
         self,
-        source: RangeAddress,
-        anchor: CellAddress,
+        source: CellRangeLike,
+        anchor: CellReferenceLike,
         *,
         references: FormulaReferenceRelocation,
     ) -> list[Cell]:
@@ -383,8 +383,8 @@ class Table:
 
     def cellsCopy(
         self,
-        source: RangeAddress,
-        anchor: CellAddress,
+        source: CellRangeLike,
+        anchor: CellReferenceLike,
         *,
         references: FormulaReferenceRelocation,
     ) -> CellRange:
@@ -402,7 +402,7 @@ class Table:
 
     def cell(
         self,
-        address: CellAddress | None = None,
+        address: CellReferenceLike | None = None,
         *,
         row: int | None = None,
         col: int | None = None,
@@ -454,7 +454,7 @@ class Table:
         for row in self.rows:
             yield from row
 
-    def range(self, address: RangeAddress) -> list[Cell]:
+    def range(self, address: CellRangeLike) -> list[Cell]:
         """Return the cells one or more ranges cover, in the order they name them.
 
         An unbounded range is bounded by this table's extent, and an empty table has
@@ -463,7 +463,7 @@ class Table:
         """
         return [self.cell(reference) for reference in listRangePositions(self, address)]
 
-    def addressable(self, address: CellAddress) -> bool:
+    def addressable(self, address: CellReferenceLike) -> bool:
         """Report whether an address names a cell this table can hand over.
 
         False for a position swallowed by a merge, which is why a range over a
@@ -486,7 +486,7 @@ class Table:
         return CellRange(firstRow, firstColumn, self.rowCount, self.colCount)
 
     def cellsFill(
-        self, source: RangeAddress, through: RangeAddress, *,
+        self, source: CellRangeLike, through: CellRangeLike, *,
         references: FormulaReferenceRelocation, values: CellValueFill,
     ) -> int:
         """Repeat a block of any content across a range, copying each cell whole.
@@ -497,7 +497,7 @@ class Table:
         """
         return fillCells(self, source, through, references, values)
 
-    def mergeAdd(self, address: RangeAddress) -> MergeRange:
+    def mergeAdd(self, address: CellRangeLike) -> MergeRange:
         """Merge a block of cells into one, anchored at its top-left, and return it.
 
         **The covered cells are discarded permanently, and unmerging does not restore
@@ -531,7 +531,7 @@ class Table:
                 self._cells.pop(reference, None)
         return merge
 
-    def mergeRemove(self, address: CellAddress) -> MergeRange:
+    def mergeRemove(self, address: CellReferenceLike) -> MergeRange:
         """Unmerge the block occupying a cell, and return the merge that was removed.
 
         Takes any cell of the block rather than its extent, since two merges can never
@@ -547,7 +547,7 @@ class Table:
         self.mergeRanges.remove(merge)
         return merge
 
-    def rangeSingle(self, address: RangeAddress, action: str) -> CellRange:
+    def rangeSingle(self, address: CellRangeLike, action: str) -> CellRange:
         """Return the one bounded rectangle an address names, inside this table.
 
         An unbounded range is refused rather than bounded by the table, because a block
@@ -566,7 +566,7 @@ class Table:
         refuseRangeOutside(self, item)
         return item
 
-    def mergeCovering(self, address: CellAddress) -> MergeRange | None:
+    def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
 
         The only way to tell a covered cell from an empty one, since a covered

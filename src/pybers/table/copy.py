@@ -27,8 +27,12 @@ __date__ = "2026/09/29"
 
 from typing import TYPE_CHECKING
 
-from pybers.addressing.ranges import CellRange, RangeAddress
-from pybers.addressing.reference import CellAddress, ReferenceError, toCellReference
+from pybers.addressing.ranges import CellRange, CellRangeLike
+from pybers.addressing.reference import (
+    CellReferenceLike,
+    ReferenceError,
+    toCellReference,
+)
 from pybers.formula.relocation import FormulaReferenceRelocation, clampFormulaRanges
 from pybers.table.bounds import refuseRangeOutside
 from pybers.table.fill import copyCellContent
@@ -47,8 +51,8 @@ if TYPE_CHECKING:
 
 def copyCells(
     table: Table,
-    source: RangeAddress,
-    anchor: CellAddress,
+    source: CellRangeLike,
+    anchor: CellReferenceLike,
     references: FormulaReferenceRelocation,
 ) -> CellRange:
     """Copy a block so its top-left lands on `anchor`, and return where it landed."""

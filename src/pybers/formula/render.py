@@ -47,8 +47,8 @@ from typing import assert_never
 
 from pybers.addressing.ranges import RangeEndpoint, renderEndpoint
 from pybers.addressing.reference import (
-    CellAddress,
     CellReference,
+    CellReferenceLike,
     tableNameSeparator,
     toCellReference,
 )
@@ -382,7 +382,7 @@ class Renderer:
 
 def renderFormula(
     formula: Formula,
-    host: CellAddress,
+    host: CellReferenceLike,
     *,
     tables: Mapping[str, str] | None = None,
 ) -> str:

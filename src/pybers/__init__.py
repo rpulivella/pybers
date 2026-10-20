@@ -34,11 +34,11 @@ __date__ = "2026/08/12"
 
 lazy from pybers.absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
-    CellAddress,
     CellRange,
+    CellRangeLike,
     CellRangeList,
     CellReference,
-    RangeAddress,
+    CellReferenceLike,
     ReferenceError,
     toCellRanges,
     toCellReference,
@@ -150,7 +150,7 @@ __all__ = [
     "NumbersVersion",
     "checkDocument",
     "Cell",
-    "CellAddress",
+    "CellReferenceLike",
     "CellDescription",
     "CellFormat",
     "CellKind",
@@ -159,7 +159,7 @@ __all__ = [
     "CellReference",
     "CellValue",
     "CellValueFill",
-    "RangeAddress",
+    "CellRangeLike",
     "ReferenceError",
     "toColumnLetter",
     "toColumnNumber",

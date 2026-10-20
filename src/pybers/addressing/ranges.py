@@ -13,6 +13,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-10-19  `CellRangeLike`, what a call accepts for a range, for PYB-217.
 2026-10-13  A range in the file marks an unbounded axis with a sentinel, for PYB-139.
 2026-09-13  A range endpoint past the last row is refused, for #67.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
@@ -33,8 +34,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from pybers.addressing.reference import (
-    CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
     absoluteMarker,
     cellPattern,
@@ -302,7 +303,7 @@ class CellRange:
             ((first.col, first.colAbsolute), (last.col, last.colAbsolute)),
         )
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether a cell falls inside this range, its edges included."""
         reference = toCellReference(address)
         withinRows = self.startRow is None or (
@@ -404,7 +405,7 @@ class CellRangeList:
         """Return the list as it would be written, in its own order."""
         return listSeparator.join(item.asReference() for item in self.ranges)
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether any range in the list covers a cell."""
         return any(item.covers(address) for item in self.ranges)
 
@@ -423,10 +424,10 @@ class CellRangeList:
 
 # What a caller may hand to anything that addresses more than one cell. A plain
 # string covers both a single range and a comma-separated list of them.
-RangeAddress = CellRange | CellRangeList | str
+CellRangeLike = CellRange | CellRangeList | str
 
 
-def toCellRanges(address: RangeAddress) -> tuple[CellRange, ...]:
+def toCellRanges(address: CellRangeLike) -> tuple[CellRange, ...]:
     """Return the ranges an address names, as a tuple even when there is one.
 
     One range and a list of them are treated the same way everywhere downstream, so

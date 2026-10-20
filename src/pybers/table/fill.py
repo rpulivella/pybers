@@ -33,7 +33,7 @@ __date__ = "2026/09/29"
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from pybers.addressing.ranges import CellRange, RangeAddress
+from pybers.addressing.ranges import CellRange, CellRangeLike
 from pybers.addressing.reference import CellReference, ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation, relocateFormula
 from pybers.table.bounds import listRangePositions
@@ -163,8 +163,8 @@ def copyCellContent(
 
 def fillCells(
     table: Table,
-    source: RangeAddress,
-    through: RangeAddress,
+    source: CellRangeLike,
+    through: CellRangeLike,
     references: FormulaReferenceRelocation,
     values: CellValueFill,
 ) -> int:

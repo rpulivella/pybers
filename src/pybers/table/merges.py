@@ -20,7 +20,7 @@ __date__ = "2026/09/29"
 from dataclasses import dataclass
 
 from pybers.addressing.ranges import CellRange
-from pybers.addressing.reference import CellAddress, CellReference, ReferenceError
+from pybers.addressing.reference import CellReference, CellReferenceLike, ReferenceError
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +69,7 @@ class MergeRange:
             raise ReferenceError(f"{self.extent} is unbounded and bounds no merge.")
         return (startRow, startCol, endRow, endCol)
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether this merge occupies a cell, its anchor included."""
         return self.extent.covers(address)
 

@@ -38,8 +38,8 @@ from pybers.addressing.lines import GridEdit, LineMapping, LinesUnchanged
 from pybers.addressing.ranges import (
     AxisBound,
     CellRange,
+    CellRangeLike,
     CellRangeList,
-    RangeAddress,
     RangeEndpoint,
     listSeparator,
     parseEndpoint,
@@ -48,8 +48,8 @@ from pybers.addressing.ranges import (
     toCellRanges,
 )
 from pybers.addressing.reference import (
-    CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
     absoluteMarker,
     alphabetSize,
@@ -65,14 +65,14 @@ from pybers.addressing.reference import (
 
 __all__ = [
     "AxisBound",
-    "CellAddress",
+    "CellReferenceLike",
     "CellRange",
     "CellRangeList",
     "CellReference",
     "GridEdit",
     "LineMapping",
     "LinesUnchanged",
-    "RangeAddress",
+    "CellRangeLike",
     "RangeEndpoint",
     "ReferenceError",
     "absoluteMarker",

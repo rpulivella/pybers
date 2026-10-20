@@ -30,10 +30,10 @@ __date__ = "2026/09/23"
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from pybers.addressing.ranges import CellRange, RangeAddress
+from pybers.addressing.ranges import CellRange, CellRangeLike
 from pybers.addressing.reference import (
-    CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
     toCellReference,
 )
@@ -232,8 +232,8 @@ def findStrandedCells(table: Table, move: CellsMove) -> list[Cell]:
 
 def moveCells(
     table: Table,
-    source: RangeAddress,
-    anchor: CellAddress,
+    source: CellRangeLike,
+    anchor: CellReferenceLike,
     references: FormulaReferenceRelocation,
 ) -> list[Cell]:
     """Move a block so its top-left lands on `anchor`, and return what it strands."""
