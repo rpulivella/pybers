@@ -30,7 +30,6 @@ from dataclasses import dataclass, field, fields, replace
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING, NoReturn
 
-from pybers._persistence.decimal128 import Decimal128, Decimal128Error
 from pybers.absence import UNDETERMINED
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
@@ -123,6 +122,9 @@ def toCellValue(
     if isinstance(value, datetime.date):
         return datetime.datetime.combine(value, datetime.time())
     if isinstance(value, Decimal):
+        # Local, so importing the model never loads the persistence layer.
+        from pybers._persistence.decimal128 import Decimal128, Decimal128Error
+
         try:
             Decimal128(value)
         except Decimal128Error as exc:
