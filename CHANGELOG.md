@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-217] Set a cell's value from the command line
 - [PYB-156] Make the repository public
 - [PYB-211] Give session tasks a status line, sections and a skill
 - [PYB-193] Stop callers editing a table's cells directly
