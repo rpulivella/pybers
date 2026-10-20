@@ -16,6 +16,8 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-10-20  `CellOffset`, a signed distance, and the arithmetic between it and an
+            address, for PYB-217.
 2026-10-20  `CellAddress`, a position alone, and the table and sheet a reference
             names, for PYB-217.
 2026-10-19  `CellReferenceLike`, what a call accepts for one cell, for PYB-217.
@@ -38,6 +40,7 @@ __date__ = "2026/09/01"
 
 import re
 from dataclasses import dataclass, field
+from typing import overload
 
 from pybers.errors import PybersError
 
@@ -187,9 +190,59 @@ class CellAddress:
         """Return this address as a (row, column) pair, both counted from one."""
         return (self.row, self.col)
 
+    def __add__(self, offset: CellOffset) -> CellAddress:
+        """Return the address `offset` away, refused when it leaves every table."""
+        if not isinstance(offset, CellOffset):
+            return NotImplemented
+        return CellAddress(self.row + offset.rows, self.col + offset.cols)
+
+    @overload
+    def __sub__(self, other: CellAddress) -> CellOffset: ...
+
+    @overload
+    def __sub__(self, other: CellOffset) -> CellAddress: ...
+
+    def __sub__(self, other: CellAddress | CellOffset) -> CellOffset | CellAddress:
+        """Return the distance to another address, or the address an offset back."""
+        if isinstance(other, CellAddress):
+            return CellOffset(self.row - other.row, self.col - other.col)
+        if isinstance(other, CellOffset):
+            return self + -other
+        return NotImplemented
+
     def __str__(self) -> str:
         """Return the address as it is written, `B3`."""
         return f"{toColumnLetter(self.col)}{self.row}"
+
+
+@dataclass(frozen=True, slots=True)
+class CellOffset:
+    """A signed distance between two addresses, in rows and columns, zero included.
+
+    Kept apart from `CellAddress` because an address counts from one and is bounded,
+    and a distance is neither, as a `timedelta` is kept apart from a `datetime`.
+    """
+
+    rows: int
+    cols: int
+
+    def __post_init__(self) -> None:
+        for axis, value in (("Rows", self.rows), ("Columns", self.cols)):
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise ReferenceError(f"{axis} {value!r} is not a whole number.")
+
+    def __add__(self, other: CellOffset) -> CellOffset:
+        if not isinstance(other, CellOffset):
+            return NotImplemented
+        return CellOffset(self.rows + other.rows, self.cols + other.cols)
+
+    def __sub__(self, other: CellOffset) -> CellOffset:
+        if not isinstance(other, CellOffset):
+            return NotImplemented
+        return CellOffset(self.rows - other.rows, self.cols - other.cols)
+
+    def __neg__(self) -> CellOffset:
+        return CellOffset(-self.rows, -self.cols)
 
 
 @dataclass(frozen=True, slots=True)

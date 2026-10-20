@@ -6,7 +6,7 @@ A cell's position, how it is pointed at, and the owners a reference names.
 built from a cell has to carry the sheet to say which.
 
 UPDATES
-2026-10-20  Written for PYB-217.
+2026-10-20  Written for PYB-217, the offset between two addresses included.
 """
 from __future__ import annotations
 
@@ -22,7 +22,13 @@ import pytest
 
 import pybers
 from conftest import findDocumentPath
-from pybers import CellAddress, CellReference, SheetReference, TableReference
+from pybers import (
+    CellAddress,
+    CellOffset,
+    CellReference,
+    SheetReference,
+    TableReference,
+)
 
 
 @pytest.fixture
@@ -123,3 +129,42 @@ def testATableOutsideADocumentHasNoSheet() -> None:
 def testAnAddressStandsWhereAReferenceIsTaken() -> None:
     table = pybers.Table(name="Table 1", rowCount=3, colCount=3)
     assert table.cell(CellAddress(2, 2)) is table.cell("B2")
+
+
+def testAnAddressPlusAnOffsetIsAnAddress() -> None:
+    assert CellAddress(3, 2) + CellOffset(1, -1) == CellAddress(4, 1)
+
+
+def testAnAddressMinusAnAddressIsTheOffsetBetweenThem() -> None:
+    assert CellAddress(5, 5) - CellAddress(3, 2) == CellOffset(2, 3)
+
+
+def testAnAddressMinusAnOffsetStepsBack() -> None:
+    assert CellAddress(3, 2) - CellOffset(1, 1) == CellAddress(2, 1)
+
+
+def testOffsetsAddSubtractAndNegate() -> None:
+    assert CellOffset(1, 2) + CellOffset(3, -4) == CellOffset(4, -2)
+    assert CellOffset(1, 2) - CellOffset(3, 4) == CellOffset(-2, -2)
+    assert -CellOffset(1, -2) == CellOffset(-1, 2)
+
+
+def testAnOffsetMayBeZeroOrNegative() -> None:
+    assert CellAddress(2, 2) + CellOffset(0, 0) == CellAddress(2, 2)
+    assert CellAddress(2, 2) - CellAddress(3, 3) == CellOffset(-1, -1)
+
+
+def testAnOffsetPastTheEdgeOfEveryTableIsRefused() -> None:
+    with pytest.raises(pybers.ReferenceError, match="before row 1"):
+        CellAddress(1, 1) + CellOffset(-1, 0)
+
+
+def testTwoAddressesDoNotAdd() -> None:
+    with pytest.raises(TypeError):
+        CellAddress(1, 1) + CellAddress(1, 1)  # type: ignore[operator]
+
+
+def testAnOffsetRefusesABooleanAxis() -> None:
+    with pytest.raises(pybers.ReferenceError, match="not a whole number"):
+        CellOffset(True, 0)
+
