@@ -384,6 +384,28 @@ Flags record which format layers exist:
 0x000b   a date format and a time format
 ```
 
+### A date has no time zone: it is floating wall-clock time
+
+Measured 2026-10-20 for PYB-218 against `72-date-time-zones` and `72b-date-time-zones-region`,
+saved by Numbers 15.4. `2026-10-20 09:00` typed on a Mac set to America/New_York and again on
+one set to America/Los_Angeles stores the same value, 814,179,600 seconds, where two moments
+would differ by 10,800. Reopened in Los Angeles, the New York cell still shows 09:00.
+
+**The stored seconds count the wall-clock time as if it were UTC**, from 2001-01-01 00:00,
+and nothing in the record or the document names a zone. Changing the document's language and
+region to English (Italy) leaves both values as they were. Text typed with a zone,
+`2026-10-20 09:00 PST`, stays text, and a date-time format applied afterward does not
+convert it. Apple Community reports that a zone typed in a longer form, such as
+`Jan 30, 2023 6:23:04 AM PST`, is converted on entry, which no fixture here measures.
+
+No function among the 389 Numbers offers names or converts a zone. `NOW()` and `TODAY()` read
+the clock of the Mac that recalculates, so their cached value is that Mac's wall-clock time,
+which is inferred rather than measured.
+
+**What this settles for pybers:** a date read is naive wall-clock time, and a time zone
+matters only when a caller writes a `datetime` that carries one. How pybers converts it is
+in `docs/decisions.md`.
+
 ### The trailing references do NOT start at a fixed offset
 
 They begin immediately after the value, and the value's width depends on the type:
