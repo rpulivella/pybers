@@ -176,10 +176,16 @@ without a time. A `float` is refused with a message naming `Decimal`, because Nu
 numbers as decimal128 and a binary float carries rounding error into a document that never
 had any.
 
-**A date and time always carries a time zone.** One with none is refused, so a written
-moment is never ambiguous. Whether Numbers stores a date in UTC or in some local time, and
-whether it keeps a date with no time zone at all, is not measured yet; PYB-218 measures
-both, and if Numbers does keep such a date, pybers represents it rather than refusing it.
+**A date is wall-clock time with no zone**, because that is all Numbers stores, as PYB-218
+measured. pybers reads one as a naive `datetime` and writes a naive one as it is. An aware
+`datetime` is converted to the document's time zone and its wall-clock time written, so a
+caller holding real moments never has to strip zones by hand. The document's time zone is a
+`tzinfo`, or a name handed unchanged to `zoneinfo.ZoneInfo`, so Python and not pybers decides
+which names are valid. It defaults to the machine's local zone, is set once with
+`pybers.open(path, timeZone=...)` for a result that does not depend on where the code runs,
+and lives only for the session, since the file has nowhere to keep it. Refusing an aware
+`datetime`, as openpyxl and pandas do for Excel, was weighed and rejected for the friction
+it puts on every caller.
 
 **A cell that changes kind takes Numbers' Automatic format for its new kind**, as a value
 typed into a fresh cell does. A boolean therefore shows TRUE or FALSE; a checkbox is a
