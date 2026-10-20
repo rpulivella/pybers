@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-20  A value of any kind is written into any cell, a `date` as midnight and an
+            aware `datetime` in the document's zone, for PYB-144.
 2026-10-20  A printed cell shows `value`, never the private field behind it,
             for PYB-225.
 2026-10-20  Setting `value` makes an `int` exact and refuses a `float` or a value
@@ -28,6 +30,7 @@ from dataclasses import dataclass, field, fields, replace
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING, NoReturn
 
+from pybers._persistence.decimal128 import Decimal128, Decimal128Error
 from pybers.absence import UNDETERMINED
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
@@ -46,6 +49,7 @@ from pybers.table.kinds import (
     findCellKind,
 )
 from pybers.table.merges import MergeRange
+from pybers.timezone import machineTimeZone, toWallClockTime
 
 if TYPE_CHECKING:
     # Guarded because `cells` imports this module, and the link back is a type
@@ -97,8 +101,14 @@ class CellCopy:
     borders: bool
 
 
-def toCellValue(value: object, address: CellAddress) -> CellValue:
-    """Return a value as a cell holds it, an `int` exact, refusing a `float`."""
+def toCellValue(
+    value: object, address: CellAddress, zone: datetime.tzinfo = machineTimeZone
+) -> CellValue:
+    """Return a value as a cell holds it: an `int` exact, a date as wall-clock time.
+
+    A `date` is midnight and an aware `datetime` is converted to `zone`, since a
+    cell stores wall-clock time alone. A `float` is refused.
+    """
     if isinstance(value, bool) or value is None:
         return value
     if isinstance(value, int):
@@ -108,11 +118,21 @@ def toCellValue(value: object, address: CellAddress) -> CellValue:
             f"{address} was given the float {value!r}, which carries binary rounding "
             f"error. Write Decimal({str(value)!r}) instead."
         )
-    if isinstance(value, Decimal | str | datetime.datetime | datetime.timedelta):
+    if isinstance(value, datetime.datetime):
+        return toWallClockTime(value, zone)
+    if isinstance(value, datetime.date):
+        return datetime.datetime.combine(value, datetime.time())
+    if isinstance(value, Decimal):
+        try:
+            Decimal128(value)
+        except Decimal128Error as exc:
+            raise WriteError(f"{address} cannot hold it: {exc}") from exc
+        return value
+    if isinstance(value, str | datetime.timedelta):
         return value
     raise WriteError(
         f"{address} was given a {type(value).__name__}. A cell holds a Decimal, an "
-        "int, a str, a bool, a datetime, a timedelta or None."
+        "int, a str, a bool, a datetime, a date, a timedelta or None."
     )
 
 
@@ -256,17 +276,23 @@ class Cell:
         return self._value
 
     @value.setter
-    def value(self, value: CellValue | int) -> None:
-        """Set this cell's value: an `int` exact, a `float` refused, a formula kept."""
+    def value(self, value: CellValue | int | datetime.date) -> None:
+        """Set this cell's value whatever it held, refusing a `float`."""
         self._valueChange(value)
+
+    @property
+    def timeZone(self) -> datetime.tzinfo:
+        """Return the zone an aware `datetime` written here is converted to."""
+        document = None if self.table is None else self.table.document
+        return machineTimeZone if document is None else document.timeZone
 
     def _valueChange(self, value: object, preview: bool = False) -> CellChange:
         """Set this cell's value and return the change, or only report it in preview.
 
-        An `int` is written as that exact number and a `float` is refused, because a
-        binary float carries rounding error into a document that never had any.
+        A value of another kind takes that kind's Automatic format when saved, so
+        a format chosen for the old kind goes with it.
         """
-        written = toCellValue(value, self.address)
+        written = toCellValue(value, self.address, self.timeZone)
         if self.formula is not None:
             refuseValueOverFormula(self.address)
         before = self.description.kind
@@ -274,6 +300,8 @@ class Cell:
         change = CellChange(self.reference, self._value, written, before, after)
         if not preview and change.changed:
             self._value = written
+            if after is not before:
+                self._stored = replace(self._stored, formatChosen=False)
         return change
 
     @property

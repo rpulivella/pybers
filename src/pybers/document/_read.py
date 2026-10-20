@@ -39,6 +39,7 @@ UPDATES
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-10-07  A package already read becomes a document through `readDocument`,
             for PYB-169.
+2026-10-20  `open` takes the time zone an aware date is written in, for PYB-144.
 """
 from __future__ import annotations
 
@@ -61,6 +62,7 @@ from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import ReadError
 from ..table._read import readTable
+from ..timezone import TimeZoneLike, machineTimeZone, toTimeZone
 from .sheets import Document, Sheet
 
 
@@ -92,15 +94,20 @@ def readSheet(
     return sheet
 
 
-def open(path: Path | str) -> Document:  # noqa: A001
-    """Read a `.numbers` file into a `Document`.
+def open(  # noqa: A001
+    path: Path | str, *, timeZone: TimeZoneLike = machineTimeZone
+) -> Document:
+    """Read a `.numbers` file into a `Document`, writing aware dates in `timeZone`.
 
-    Shadows the builtin deliberately: `pybers.open(path)` is the entry point the
-    library is meant to be used through, and it reads as it should at the call
-    site. The builtin is still reachable here as `builtins.open`.
+    Shadows the builtin deliberately, so the entry point reads as it should. The
+    zone defaults to the one pybers is running in, and naming one makes a script's
+    result the same wherever it runs.
     """
+    zone = toTimeZone(timeZone)
     source = Path(path)
-    return readDocument(readPackage(source), source)
+    document = readDocument(readPackage(source), source)
+    document.timeZone = zone
+    return document
 
 
 def readDocument(package: NumbersPackage, source: Path) -> Document:

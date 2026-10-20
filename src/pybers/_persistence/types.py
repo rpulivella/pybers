@@ -21,6 +21,7 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-10-20  A pop-up menu's items, for PYB-144.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-09-22  An identifier is asked for by its class, and nowhere else spells one,
             for PYB-113.
@@ -87,6 +88,7 @@ archiveTypes: frozendict[int, type[Message]] = frozendict({
     6010: tst.ConditionalStyleSetArchive,  # one cell's conditional highlighting rules
     6008: tstStyles.TableStylePresetArchive,  # one table style in the theme
     6204: tst.HiddenStateFormulaOwnerArchive,  # the formula owner of hidden rows
+    6206: tst.PopUpMenuModel,     # a pop-up menu's items
     6218: tst.RichTextPayloadArchive,
     6220: tst.FilterSetArchive,     # the filters a table's rows can be hidden by
     6247: tst.TableStyleNetworkArchive,  # the styles a table style preset names

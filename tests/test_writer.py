@@ -17,6 +17,7 @@ be parsed at all, so a byte difference on one is reported as a difference rather
 than assumed to be a harmless re-encoding.
 
 UPDATES
+2026-10-20  The refusals of a value of another kind went with them, for PYB-144.
 2026-10-09  A refused write names what the cell holds in words, for PYB-168.
 2026-09-14  Text, pooling and a cell that changes type, for #61.
 2026-09-14  A formula written into a row with no storage, for #78.
@@ -457,18 +458,6 @@ def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
         cell.value = Decimal("999")
 
 
-def test_aRefusedSaveLeavesTheFileExactlyAsItWas(tmp_path: Path) -> None:
-    """The refusal is worth nothing if half the package has already been written."""
-    working = copyDocument("65-series-base", tmp_path)
-    before = working.read_bytes()
-
-    document = pybers.open(working)
-    date = document.sheets[0].tables[0].cell("E2").value
-    document.sheets[0].tables[0].cell("A2").value = date
-    with pytest.raises(WriteError):
-        document.save()
-
-    assert working.read_bytes() == before
 
 
 def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
@@ -497,60 +486,12 @@ def test_writingSomethingNeitherTextNorANumberIsStillRefused(
         cell.value = [1, 2]  # type: ignore[assignment]
 
 
-def test_aDateWrittenOverANumberIsRefused(tmp_path: Path) -> None:
-    """PYB-137: a date patches in place over a date only, so any other is refused."""
-    working = copyDocument("65-series-base", tmp_path)
-    document = pybers.open(working)
-    date = document.sheets[0].tables[0].cell("E2").value
-    document.sheets[0].tables[0].cell("A2").value = date
-
-    with pytest.raises(WriteError, match="a date only into a cell holding a date"):
-        document.save()
 
 
-def test_aDurationWrittenOverANumberIsRefused(tmp_path: Path) -> None:
-    """PYB-137: a duration patches in place over a duration only, others are refused."""
-    working = copyDocument("68-series-kinds-base", tmp_path)
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    table.cell("A2").value = table.cell("U2").value
-
-    with pytest.raises(WriteError, match="a duration only into a cell"):
-        document.save()
 
 
-def test_aDateWithoutATimeZoneIsRefused(tmp_path: Path) -> None:
-    """PYB-137: a naive date has no seconds since 2001-01-01 UTC to write."""
-    working = copyDocument("65-series-base", tmp_path)
-    document = pybers.open(working)
-    cell = document.sheets[0].tables[0].cell("E2")
-    cell.value = cell.value.replace(tzinfo=None)
-
-    with pytest.raises(WriteError, match="no time zone"):
-        document.save()
 
 
-def test_changingATypeThisLibraryCannotMeasureIsStillRefused(
-    tmp_path: Path,
-) -> None:
-    """Text and numbers convert now; a date does not, and says so rather than guessing.
-
-    Narrowed for #61. A date's value is a double and its references sit in slots
-    this library has not identified, so retyping one would place them wrong and
-    raise nothing.
-    """
-    working = copyDocument("11-value-types-noformats", tmp_path)
-
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    dateCell = next(
-        cell for cell in table.cells.values()
-        if cell.value is not None and not isinstance(cell.value, (Decimal, str, bool))
-    )
-    dateCell.value = Decimal("1")
-
-    with pytest.raises(WriteError, match="a number only into a cell holding a number"):
-        document.save()
 
 
 # ── AC 5: the golden file ────────────────────────────────────────────────────
@@ -1365,16 +1306,3 @@ def test_aPlainNumericEditLeavesTheFormatListAlone(tmp_path: Path) -> None:
 
     assert readFormatEntries(working, None) == before
 
-
-def testARefusedWriteNamesWhatTheCellHoldsInWords(tmp_path: Path) -> None:
-    """The refusal once read "holds a value of type 0" and named a Python class."""
-    working = tmp_path / "working.numbers"
-    shutil.copy(findDocumentPath("19-formula-dragged"), working)
-    document = pybers.open(working)
-    document.sheets[0].tables[0].cell("B2").value = Decimal("42")
-    with pytest.raises(WriteError) as refused:
-        document.save()
-    assert str(refused.value) == (
-        "B2 is empty, and pybers can write a number only into a cell holding a "
-        "number, a currency amount or text."
-    )

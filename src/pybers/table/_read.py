@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-10-20  Format type 1 is the boolean family, for PYB-144.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-10-07  A row that fails to decode names its table by identifier, and a record
             of a type pybers does not recognize keeps that type, for PYB-169.
@@ -94,6 +95,7 @@ storedKinds: frozendict[int, CellKind] = frozendict({
 
 # The family each measured `format_type` belongs to, every one the documents carry.
 formatFamilies: frozendict[int, CellFormat] = frozendict({
+    1: CellFormat.BOOLEAN,
     256: CellFormat.NUMBER,
     257: CellFormat.CURRENCY,
     258: CellFormat.PERCENT,
