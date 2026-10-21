@@ -1,0 +1,319 @@
+# How Numbers makes 75-fraction-accuracy: 1.3141 in each column, given one choice from
+# the Fraction accuracy menu, in the order the menu lists them, to measure
+# `fraction_accuracy` for PYB-219's AC 4. Made by `.venv/bin/python3 -m
+# tools.local.golden_confirm measure 75-fraction-accuracy`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I2"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Up to 1 digit (7/8)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as 1.3141, Fraction, accuracy Up to 1 digit (7/8)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Up to 2 digits (23/24)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as 1.3141, Fraction, accuracy Up to 2 digits (23/24)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Up to 3 digits (445/553)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C2"
+value = 'input as 1.3141, Fraction, accuracy Up to 3 digits (445/553)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Halves'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D2"
+value = 'input as 1.3141, Fraction, accuracy Halves'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Quarters'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E2"
+value = 'input as 1.3141, Fraction, accuracy Quarters'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Eighths'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+value = 'input as 1.3141, Fraction, accuracy Eighths'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Sixteenths'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+value = 'input as 1.3141, Fraction, accuracy Sixteenths'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Tenths'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H2"
+value = 'input as 1.3141, Fraction, accuracy Tenths'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+value = '1.3141'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Data Format'
+value = 'Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Hundredths'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I2"
+value = 'input as 1.3141, Fraction, accuracy Hundredths'

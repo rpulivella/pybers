@@ -34,6 +34,7 @@ Runs on the repository's venv, which holds rich and pybers, and needs the Xcode
 command line tools for `helper-build`.
 
 UPDATES
+2026-10-21  A measurement's deadline grows with its steps, for PYB-219.
 2026-10-14  Moved here from `scripts/golden-confirm.py`, and run as a module,
             for PYB-204.
 2026-10-13  The repository root, a branch's ticket number and the help formatter
@@ -103,6 +104,8 @@ console: Console = Console()
 
 damageCheckGolden: str = "11-text-written-and-retyped.numbers"
 editDeadlineSeconds: float = 300.0
+# A custom format step drags and opens menus, and takes up to five seconds.
+editStepSeconds: float = 5.0
 
 
 def runGoldenConfirm(golden: Path, dryRun: bool) -> GoldenRun:
@@ -182,7 +185,8 @@ def runMeasure(arguments: argparse.Namespace) -> int:
             "documentPaths": copies,
             "savedCopyPath": str(saved),
             "steps": recipe.steps,
-        }, deadlineSeconds=editDeadlineSeconds, logPath=Path(work) / "helper.log")
+        }, deadlineSeconds=editDeadlineSeconds + editStepSeconds * len(recipe.steps),
+            logPath=Path(work) / "helper.log")
         problems = readProblems(result)
         if problems or not saved.is_file():
             console.print(

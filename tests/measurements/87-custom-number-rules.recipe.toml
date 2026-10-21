@@ -1,0 +1,516 @@
+# How Numbers makes 87-custom-number-rules: a custom number format per rule condition,
+# each rule at 100 adding its own marker, then one format with two rules, to measure
+# `conditions` for PYB-219's AC 3. Made by `.venv/bin/python3 -m
+# tools.local.golden_confirm measure 87-custom-number-rules`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '50'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Name'
+value = 'rule less than'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Rule'
+value = 'If less than'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'RuleValue'
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Text'
+value = ' lt'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as 50, custom format named rule less than: Rule If less than, then RuleValue 100, then Text  lt'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Name'
+value = 'rule less than or equal'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Rule'
+value = 'If less than or equal to'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'RuleValue'
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Text'
+value = ' le'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as 100, custom format named rule less than or equal: Rule If less than or equal to, then RuleValue 100, then Text  le'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+value = '150'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Name'
+value = 'rule greater than'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Rule'
+value = 'If greater than'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'RuleValue'
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Text'
+value = ' gt'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C2"
+value = 'input as 150, custom format named rule greater than: Rule If greater than, then RuleValue 100, then Text  gt'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Name'
+value = 'rule greater than or equal'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Rule'
+value = 'If greater than or equal to'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'RuleValue'
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Text'
+value = ' ge'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D2"
+value = 'input as 100, custom format named rule greater than or equal: Rule If greater than or equal to, then RuleValue 100, then Text  ge'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Name'
+value = 'rule equal'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Rule'
+value = 'If equal to'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'RuleValue'
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Text'
+value = ' eq'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E2"
+value = 'input as 100, custom format named rule equal: Rule If equal to, then RuleValue 100, then Text  eq'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '2.5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Name'
+value = 'rule fractional threshold'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Rule'
+value = 'If greater than'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'RuleValue'
+value = '2.25'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Text'
+value = ' gt'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+value = 'input as 2.5, custom format named rule fractional threshold: Rule If greater than, then RuleValue 2.25, then Text  gt'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+value = '1500'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Name'
+value = 'two rules'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Rule'
+value = 'If greater than'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'RuleValue'
+value = '100'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Text'
+value = ' big'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Rule'
+value = 'If greater than'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'RuleValue'
+value = '1000'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Text'
+value = ' huge'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+value = 'input as 1500, custom format named two rules: Rule If greater than, then RuleValue 100, then Text  big, then Rule If greater than, then RuleValue 1000, then Text  huge'

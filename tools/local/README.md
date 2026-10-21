@@ -49,3 +49,29 @@ even though nobody can run them without a local Numbers.
 Every extractor writes nothing unless `--write` is passed. The default run is a
 read-only report and the differential check at once, which is what makes regenerating on
 a newer Numbers reviewable rather than a silent replacement.
+
+## A measurement's recipe
+
+`golden_confirm.py measure <name>` makes `tests/measurements/<name>.numbers` in Numbers
+from `<name>.recipe.toml` beside it: a copy of `base` and any `documents`, then each
+`[[step]]` in order. Every step names its `document`, counted from 0, and the cell it
+acts on by `sheet`, `table` and `range`. A `dataFormatSet` or `customFormatEdit` step
+reads back what it changed, so a control Numbers did not take stops the run.
+
+```
+select           select the range
+menuPress        press menuItem: copy, paste, delete or autofillDown
+formatSet        set the range's format kind through AppleScript
+valueSet         type value into one cell, as a person would
+tableExtend      grow the table until it reaches the cell in range
+dataFormatSet    set one Data Format control, named by setting, to value
+customFormatEdit build a custom format, one part per step, named by setting
+```
+
+`dataFormatSet` names a control by the label Numbers shows beside it, such as
+`Decimals`, or by its caption, such as `Minimum`. A control with neither is
+`Unlabeled PopUpButton 1`, counted in screen order. A menu that titles two items alike
+takes ` #2` after the title for the second. `customFormatEdit` parts are `Open`, `Name`,
+`Type`, `Clear`, `Text`, `TextBefore`, `Token` for the last token's menu, `Rule`,
+`RuleValue` and `OK`, and any other setting drags the palette token it names into the
+newest format field.

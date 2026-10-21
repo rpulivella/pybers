@@ -17,6 +17,7 @@ Split by topic, this file is the index.
 | [findings-08-formula-text.md](findings-08-formula-text.md) | The operator table, which functions bracket their arguments, and the three node kinds where text and nodes are not inverses. |
 | [findings-09-cell-records.md](findings-09-cell-records.md) | Where a cell record keeps its formula key, which moves as the cell gains a fill, an alignment or conditional highlighting. |
 | [findings-10-creation.md](findings-10-creation.md) | What a new sheet and a new table consist of, how a created archive is registered, and the reset as Numbers encodes it. |
+| [findings-11-formats.md](findings-11-formats.md) | Every field of each format family's archive, the record bits a format sets, and which of them pybers writes. |
 | [findings-05-method.md](findings-05-method.md) | How these findings were produced, and the mistakes that produced them slowly. |
 
 ---

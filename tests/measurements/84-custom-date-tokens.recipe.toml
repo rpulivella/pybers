@@ -1,0 +1,1216 @@
+# How Numbers makes 84-custom-date-tokens: one moment under a custom Date & Time format
+# per style of each date token, to measure the patterns a custom date format stores for
+# PYB-219's AC 1. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure
+# 84-custom-date-tokens`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R2"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Name'
+value = 'Day of Week Sun'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Day of Week'
+value = 'Sun'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Week Sun: Type Date & Time, then Clear, then Day of Week Sun'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Name'
+value = 'Day of Week Sunday'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Day of Week'
+value = 'Sunday'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Week Sunday: Type Date & Time, then Clear, then Day of Week Sunday'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Name'
+value = 'Month 1'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Month'
+value = '1'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C2"
+value = 'input as 2026-10-21 14:30:15, custom format named Month 1: Type Date & Time, then Clear, then Month 1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Name'
+value = 'Month 01'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Month'
+value = '01'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D2"
+value = 'input as 2026-10-21 14:30:15, custom format named Month 01: Type Date & Time, then Clear, then Month 01'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Name'
+value = 'Month Jan'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Month'
+value = 'Jan'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E2"
+value = 'input as 2026-10-21 14:30:15, custom format named Month Jan: Type Date & Time, then Clear, then Month Jan'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Name'
+value = 'Month January'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Month'
+value = 'January'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+value = 'input as 2026-10-21 14:30:15, custom format named Month January: Type Date & Time, then Clear, then Month January'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Name'
+value = 'Day of Month 5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Day of Month'
+value = '5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Month 5: Type Date & Time, then Clear, then Day of Month 5'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Name'
+value = 'Day of Month 05'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Day of Month'
+value = '05'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Month 05: Type Date & Time, then Clear, then Day of Month 05'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Name'
+value = 'Year 14'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Year'
+value = '14'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I2"
+value = 'input as 2026-10-21 14:30:15, custom format named Year 14: Type Date & Time, then Clear, then Year 14'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Name'
+value = 'Year 2014'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Year'
+value = '2014'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J2"
+value = 'input as 2026-10-21 14:30:15, custom format named Year 2014: Type Date & Time, then Clear, then Year 2014'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Name'
+value = 'Era'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Era'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K2"
+value = 'input as 2026-10-21 14:30:15, custom format named Era: Type Date & Time, then Clear, then Era'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Name'
+value = 'Day of Year 5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Day of Year'
+value = '5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Year 5: Type Date & Time, then Clear, then Day of Year 5'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Name'
+value = 'Day of Year 05'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Day of Year'
+value = '05'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Year 05: Type Date & Time, then Clear, then Day of Year 05'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Name'
+value = 'Day of Year 005'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Day of Year'
+value = '005'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Year 005: Type Date & Time, then Clear, then Day of Year 005'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Name'
+value = 'Week of Year 2'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Week of Year'
+value = '2'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O2"
+value = 'input as 2026-10-21 14:30:15, custom format named Week of Year 2: Type Date & Time, then Clear, then Week of Year 2'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P1"
+setting = 'Name'
+value = 'Week of Year 02'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P1"
+setting = 'Week of Year'
+value = '02'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "P2"
+value = 'input as 2026-10-21 14:30:15, custom format named Week of Year 02: Type Date & Time, then Clear, then Week of Year 02'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q1"
+setting = 'Name'
+value = 'Week of Month'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q1"
+setting = 'Week of Month'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "Q2"
+value = 'input as 2026-10-21 14:30:15, custom format named Week of Month: Type Date & Time, then Clear, then Week of Month'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R1"
+value = '2026-10-21 14:30:15'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R1"
+setting = 'Name'
+value = 'Day of Week in Month'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R1"
+setting = 'Type'
+value = 'Date & Time'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R1"
+setting = 'Day of Week in Month'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "R2"
+value = 'input as 2026-10-21 14:30:15, custom format named Day of Week in Month: Type Date & Time, then Clear, then Day of Week in Month'

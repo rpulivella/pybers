@@ -1,0 +1,594 @@
+# How Numbers makes 81-control-formats: a slider and a stepper over custom ranges in
+# each format they offer, a pop-up menu that starts blank, a star rating and a checkbox,
+# to measure the control fields of the format archive for PYB-219's AC 1. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 81-control-formats`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K2"
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Data Format'
+value = 'Slider'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Minimum'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Maximum'
+value = '200'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Increment'
+value = '5'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Format'
+value = 'Number'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Decimals'
+value = '1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '50'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as 50, Data Format Slider, Minimum 0, Maximum 200, Increment 5, Format Number, Decimals 1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Data Format'
+value = 'Stepper'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Minimum'
+value = '-10'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Maximum'
+value = '10'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Increment'
+value = '0.5'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Format'
+value = 'Number'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '2.5'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as 2.5, Data Format Stepper, Minimum -10, Maximum 10, Increment 0.5, Format Number'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Data Format'
+value = 'Slider'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Minimum'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Maximum'
+value = '100'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Increment'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Format'
+value = 'Currency'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+value = '50'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C2"
+value = 'input as 50, Data Format Slider, Minimum 0, Maximum 100, Increment 1, Format Currency'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Data Format'
+value = 'Slider'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Minimum'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Maximum'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Increment'
+value = '0.05'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Format'
+value = 'Percentage'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+value = '0.5'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D2"
+value = 'input as 0.5, Data Format Slider, Minimum 0, Maximum 1, Increment 0.05, Format Percentage'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Data Format'
+value = 'Slider'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Minimum'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Maximum'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Increment'
+value = '0.25'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Format'
+value = 'Fraction'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+value = '0.5'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E2"
+value = 'input as 0.5, Data Format Slider, Minimum 0, Maximum 1, Increment 0.25, Format Fraction'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Data Format'
+value = 'Slider'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Minimum'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Maximum'
+value = '100'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Increment'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Format'
+value = 'Scientific'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '50'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+value = 'input as 50, Data Format Slider, Minimum 0, Maximum 100, Increment 1, Format Scientific'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Data Format'
+value = 'Stepper'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Minimum'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Maximum'
+value = '255'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Increment'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Format'
+value = 'Numeral System'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+value = '10'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+value = 'input as 10, Data Format Stepper, Minimum 0, Maximum 255, Increment 1, Format Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Data Format'
+value = 'Stepper'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Minimum'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Maximum'
+value = '100'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Increment'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Format'
+value = 'Currency'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+value = '50'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H2"
+value = 'input as 50, Data Format Stepper, Minimum 0, Maximum 100, Increment 1, Format Currency'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Data Format'
+value = 'Pop-Up Menu'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Unlabeled PopUpButton 1'
+value = 'Start with Blank'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+value = 'Item 1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I2"
+value = 'input as Item 1, Data Format Pop-Up Menu, Unlabeled PopUpButton 1 Start with Blank'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Data Format'
+value = 'Star Rating'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+value = '4'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J2"
+value = 'input as 4, Data Format Star Rating'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Data Format'
+value = 'Checkbox'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+value = 'FALSE'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K2"
+value = 'input as FALSE, Data Format Checkbox'
