@@ -55,7 +55,8 @@ Record layout, as far as it is needed to read a value:
 ```
 byte  0      storage version (5 in every file seen)
 byte  1      value TYPE (below)
-bytes 6-7    flags: which format layers exist, and at byte 6 0x80 a chosen format
+bytes 6-7    flags: one bit per kind whose format was chosen, and currency at byte
+             7 0x08. See findings-11-formats.md
 bytes 8-10   byte 8's low nibble names the value's width; byte 8's 0xE0 and every
              bit of bytes 9 and 10 each add one trailing reference (below)
 bytes 12+    the value, then the trailing references
@@ -386,13 +387,9 @@ like percent and unlike currency, formatting never changes the type.
 the same float64 as `11:00:00` past midnight; cells with no time hold exactly `00:00:00`.
 There is nowhere else for a time to live.
 
-Flags record which format layers exist:
-
-```
-0x0000   no format applied
-0x0008   a date format
-0x000b   a date format and a time format
-```
+Byte 6 sets `0x08` when the date format was chosen rather than inferred, and `0x0b`
+when the number and currency formats were chosen as well. See
+[formats](findings-11-formats.md).
 
 ### A date has no time zone: it is floating wall-clock time
 
@@ -482,15 +479,12 @@ For pybers this is a case to be careful about rather than to replicate: a caller
 number to a duration through this library should not silently lose the type the way the
 application does.
 
-**That warning indicator is not stored in the file.** Measured: no archive type appears in
-`15` that is absent from `16`, the `IMPORT_WARNING` and `COMMENT_STORAGE` data lists are both
-empty, and the flagged cell carries no flag bit its unflagged neighbor lacks, the neighbor
-has an extra bit, not one fewer. Numbers recomputes the indicator when it recalculates,
-knowing the operand was a duration and the result is not.
-
-So a round trip cannot drop it, which is one less thing to preserve. It also means pybers
-cannot surface it without performing the same inference, and that requires evaluating
-formulas, which is Numbers' job, not this library's.
+**That warning indicator is one bit in the record, byte 5 `0x02`.** No archive type
+appears in `15` that is absent from `16`, and the `IMPORT_WARNING` and `COMMENT_STORAGE`
+data lists are both empty. The flagged cell is the only record in the documents that sets
+byte 5 `0x02`, and its unflagged neighbor `K1` leaves it clear. One record does not settle
+the bit, so pybers carries it through and never sets it. See
+[formats](findings-11-formats.md).
 
 ### Three duration behaviors worth knowing
 
@@ -595,25 +589,14 @@ value  0        tail=[1, 4, 2]
 ```
 
 So a custom format with distinct presentations for positive, negative and zero is a **single**
-format archive containing all three, not three formats selected by sign. Anything modeling
-number formats needs that shape: one object, several conditional presentations.
+format archive containing all three, not three formats selected by sign. Its forms are
+decoded in [formats](findings-11-formats.md).
 
-### Format is carried by reference, gated by a bitmask
+### Format is carried by reference
 
-Bytes 6-7 are a flags bitmask that decides which trailing `uint32` references are present:
-
-```
-type  2, flags 0x0000 -> tail [1, 1]
-type 10, flags 0x0802 -> tail [2, K]        the common currency case
-type 10, flags 0x0803 -> tail [2, 1, K]     bit 0 adds one field
-type 10, flags 0x0882 -> tail [2, 11, 5]    bit 7 adds a different one
-```
-
-The last element varies with the format variant, so it reads as a key into the `FORMAT`
-`TableDataList`. **The individual flag bits are not decoded**, which bit implies which
-field is unknown, and guessing would be worse than saying so. A writer must not synthesize
-this bitmask until each bit is understood; round-tripping the original bytes is safe, and
-inventing them is not.
+Bytes 8 to 10 decide which trailing references are present, as recorded above, and the
+format references are keys into the `FORMAT` `TableDataList`. Bytes 6 and 7 do not add a
+reference: they mark which kinds' formats were chosen, and currency.
 
 ### There are TWO cell type enums and they do not agree
 
