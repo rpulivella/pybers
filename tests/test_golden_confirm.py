@@ -5,6 +5,8 @@ The golden confirmation report's text, as the report shows it.
 Only `lib/golden_confirm.py` is imported, so nothing here drives Numbers.
 
 UPDATES
+2026-10-21  The Data Format settings the helper names, and a recipe's setting key,
+            for PYB-219.
 2026-10-13  The late-import check moved to `test_tooling_layout.py`, which covers
             every script, for PYB-204.
 2026-10-13  Written for PYB-201.
@@ -54,3 +56,31 @@ def testAFormulaIsSpacedAroundEachOperator(formula: str, spaced: str) -> None:
 
 def testUnreadableFormulaTextIsShownAsWritten() -> None:
     assert report.formatSpacedFormula('="open') == '="open'
+
+
+def testDataFormatSettingsAreKeyedByTheNameTheHelperGave() -> None:
+    elements = [
+        {"role": "AXStaticText", "value": "Decimals:", "setting": ""},
+        {"role": "AXTextField", "value": "2", "setting": "Decimals"},
+        {"role": "AXPopUpButton", "value": "(100)",
+         "setting": "Unlabeled PopUpButton 1"},
+    ]
+    assert report.readDataFormatSettings(elements) == {
+        "Decimals": "2", "Unlabeled PopUpButton 1": "(100)",
+    }
+
+
+def testPopUpMenuItemsJoinUnderOneSetting() -> None:
+    elements = [
+        {"role": "AXTextField", "value": "Item 1", "setting": "Items"},
+        {"role": "AXTextField", "value": "Item 2", "setting": "Items"},
+    ]
+    assert report.readDataFormatSettings(elements) == {"Items": "Item 1, Item 2"}
+
+
+def testEveryCommittedRecipeHoldsOnlyKeysTheHelperTakes() -> None:
+    recipePaths = report.measurementDirectory.glob(f"*{report.recipeSuffix}")
+    names = sorted(path.name.removesuffix(report.recipeSuffix) for path in recipePaths)
+    recipes = [report.readMeasurementRecipe(name) for name in names]
+    steps = [step for recipe in recipes for step in recipe.steps]
+    assert any(step.get("setting") == "Rule" for step in steps)
