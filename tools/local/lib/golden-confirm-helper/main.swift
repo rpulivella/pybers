@@ -731,7 +731,7 @@ func postKey(_ key: CGKeyCode, flags: CGEventFlags = []) {
     Thread.sleep(forTimeInterval: 0.1)
 }
 
-// Focus set through Accessibility stays on a token whose menu just closed, so typing starts with a click.
+// Focus set through Accessibility stays on a token whose menu just closed, so inserting text starts with a click.
 func clickPointer(at point: CGPoint) {
     for type in [CGEventType.leftMouseDown, .leftMouseUp] {
         CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)!
@@ -796,7 +796,6 @@ func chooseTokenItem(_ token: AXUIElement, title: String, window: AXUIElement) t
     Thread.sleep(forTimeInterval: 0.5)
 }
 
-// Nil when the menu marks no item at all, as the date tokens' menus do, so nothing can be read back.
 // Nil when the menu marks no item at all, as the date tokens' menus do, so nothing can be read back.
 func readTokenItemMarked(_ token: AXUIElement, title: String, window: AXUIElement) -> Bool? {
     AXUIElementPerformAction(token, "AXShowMenu" as CFString)
