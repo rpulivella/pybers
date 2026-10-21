@@ -8,9 +8,11 @@
 // It performs only the operations named in `HelperOperation` and never runs a script
 // or command it is given (PYB-94 AC 15). Every AppleScript it sends is written here,
 // and the only values a request places into one are paths, cell names and cell values
-// it escapes.
+// it escapes. A Data Format value is only matched against a menu item or typed into a field.
 //
 // UPDATES
+// 2026-10-21  Names each Data Format control, a step sets one by its name, a step extends
+//             a table to a cell, and a step builds a custom format, for PYB-219.
 // 2026-09-30  Reads a date at the zone's offset now, which Numbers applies to every date, for PYB-137.
 // 2026-09-29  Edits copies of documents through named steps, to make a measurement, for PYB-118.
 // 2026-09-22  Reads a table's size and cell names, and names a closed Numbers, for PYB-111.
@@ -76,6 +78,9 @@ enum EditAction: String, Codable {
     case menuPress
     case formatSet
     case valueSet
+    case dataFormatSet
+    case tableExtend
+    case customFormatEdit
 }
 
 // `document` counts the request's `documentPaths` from zero; the first is the one saved.
@@ -88,6 +93,7 @@ struct EditStep: Codable {
     var menuItem: EditMenuItem?
     var format: EditCellFormat?
     var value: String?
+    var setting: String?
 }
 
 struct CellAddress: Codable {
@@ -132,6 +138,13 @@ struct InspectorElement: Codable {
     let title: String
     let label: String
     let value: String
+    var setting: String = ""
+}
+
+struct DataFormatControl {
+    let element: AXUIElement
+    let frame: CGRect
+    var reading: InspectorElement
 }
 
 struct CellReading: Codable {
@@ -533,7 +546,7 @@ func findDataFormatStart(_ elements: [AXUIElement]) -> Int? {
 }
 
 // The Cell tab can fill in after its press returns, so its section is awaited rather than assumed.
-func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
+func readDataFormatControls(in window: AXUIElement) throws -> [DataFormatControl] {
     var elements = collectElements(window)
     var rereads = 0
     while findDataFormatStart(elements) == nil, rereads < windowAttempts {
@@ -554,7 +567,7 @@ func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
                 + "\(Int(Double(windowAttempts) * retryPauseSeconds)) seconds",
             remedy: "rerun, then read helper.log"))
     }
-    var section: [InspectorElement] = []
+    var section: [DataFormatControl] = []
     for element in elements[(start + 1)...] {
         let role = readText(element, kAXRoleAttribute)
         if role == kAXDisclosureTriangleRole { break }
@@ -563,13 +576,412 @@ func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
         }
         guard [kAXStaticTextRole, kAXTextFieldRole, kAXPopUpButtonRole, kAXCheckBoxRole,
                kAXRadioButtonRole].contains(role) else { continue }
-        section.append(InspectorElement(
-            role: role,
-            title: readText(element, kAXTitleAttribute),
-            label: readText(element, kAXDescriptionAttribute),
-            value: readText(element, kAXValueAttribute)))
+        section.append(DataFormatControl(
+            element: element, frame: readFrame(element) ?? .zero,
+            reading: InspectorElement(
+                role: role,
+                title: readText(element, kAXTitleAttribute),
+                label: readText(element, kAXDescriptionAttribute),
+                value: readText(element, kAXValueAttribute))))
     }
+    section = orderOnScreen(section)
+    nameDataFormatControls(&section)
     return section
+}
+
+let rowTolerance: CGFloat = 8
+
+let captionGap: CGFloat = 12
+
+func orderOnScreen(_ section: [DataFormatControl]) -> [DataFormatControl] {
+    let placed = section.sorted { $0.frame.midY < $1.frame.midY }
+    var rows: [[DataFormatControl]] = []
+    for control in placed {
+        if let first = rows.last?.first, abs(control.frame.midY - first.frame.midY) < rowTolerance {
+            rows[rows.count - 1].append(control)
+        } else {
+            rows.append([control])
+        }
+    }
+    return rows.flatMap { $0.sorted { $0.frame.minX < $1.frame.minX } }
+}
+
+func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
+    try readDataFormatControls(in: window).map(\.reading)
+}
+
+// By position, since Currency lists its Decimals field last in the tree.
+func nameDataFormatControls(_ section: inout [DataFormatControl]) {
+    let texts = section.filter { $0.reading.role == kAXStaticTextRole }
+    var namedDataFormat = false
+    var unlabeled = 0
+    for position in section.indices where section[position].reading.role != kAXStaticTextRole {
+        let control = section[position]
+        let reading = control.reading
+        let name: String
+        if reading.role == kAXPopUpButtonRole, !namedDataFormat {
+            name = "Data Format"
+            namedDataFormat = true
+        } else if reading.role == kAXCheckBoxRole {
+            name = (reading.title.isEmpty ? reading.label : reading.title)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if let label = findRowLabel(of: control, in: section) {
+            name = label
+        } else if let caption = texts.first(where: { isCaption($0, of: control) }) {
+            name = caption.reading.value
+        } else if reading.role == kAXTextFieldRole {
+            name = "Items"
+        } else {
+            unlabeled += 1
+            name = "Unlabeled \(reading.role.dropFirst(2)) \(unlabeled)"
+        }
+        section[position].reading.setting = name
+    }
+}
+
+let labelOverlap: CGFloat = 2
+
+// Only the first control after a label takes it, so the negative style beside Decimals does not.
+func findRowLabel(of control: DataFormatControl, in section: [DataFormatControl]) -> String? {
+    let left = section.filter {
+        abs($0.frame.midY - control.frame.midY) < rowTolerance && $0.frame.maxX <= control.frame.minX + labelOverlap
+    }
+    guard let nearest = left.max(by: { $0.frame.maxX < $1.frame.maxX }),
+          nearest.reading.role == kAXStaticTextRole, nearest.reading.value.hasSuffix(":")
+    else { return nil }
+    return String(nearest.reading.value.dropLast())
+}
+
+func isCaption(_ text: DataFormatControl, of control: DataFormatControl) -> Bool {
+    let value = text.reading.value
+    return !value.hasSuffix(":") && value != "–" && !value.isEmpty
+        && text.frame.minY >= control.frame.maxY - rowTolerance
+        && text.frame.minY - control.frame.maxY < captionGap
+        && text.frame.midX >= control.frame.minX && text.frame.midX <= control.frame.maxX
+}
+
+func describeDataFormat(_ section: [DataFormatControl]) -> String {
+    section.map {
+        let role = $0.reading.role.dropFirst(2)
+        return $0.reading.setting.isEmpty
+            ? "\(role) '\($0.reading.value)'" : "\($0.reading.setting) \(role) = '\($0.reading.value)'"
+    }.joined(separator: ", ")
+}
+
+// MARK: Custom formats
+
+let deleteKey: CGKeyCode = 51
+let escapeKey: CGKeyCode = 53
+let rightArrowKey: CGKeyCode = 124
+let leftArrowKey: CGKeyCode = 123
+let aKey: CGKeyCode = 0
+
+func failCustomFormat(_ detail: String) -> HelperFailure {
+    HelperFailure(problem: HelperProblem(
+        kind: "customFormat", detail: detail, remedy: "look at the Create Custom Format dialog, then rerun"))
+}
+
+func openCustomFormat(in window: AXUIElement) throws {
+    guard let popUp = try readDataFormatControls(in: window).first(where: { $0.reading.setting == "Data Format" })
+    else { throw failCustomFormat("the Data Format menu was not found") }
+    try choosePopUpItem(popUp.element, title: "Create Custom Format…", setting: "Data Format")
+    Thread.sleep(forTimeInterval: 1.0)
+    _ = try findCustomFormatSheet(in: window)
+}
+
+func findCustomFormatSheet(in window: AXUIElement) throws -> AXUIElement {
+    let sheets = (readAttribute(window, kAXChildrenAttribute) as? [AXUIElement] ?? [])
+        .filter { readText($0, kAXRoleAttribute) == kAXSheetRole }
+    guard let sheet = sheets.first(where: { findFormatField(in: $0) != nil }) else {
+        throw failCustomFormat("the Create Custom Format dialog is not open")
+    }
+    return sheet
+}
+
+// A format field carries this help text, one for the format and one per rule after it.
+func listFormatFields(in sheet: AXUIElement) -> [AXUIElement] {
+    collectElements(sheet).filter {
+        readText($0, kAXRoleAttribute) == kAXTextFieldRole
+            && readText($0, kAXHelpAttribute).hasPrefix("Drag tokens")
+    }
+}
+
+// The newest rule's field, or the format's own while it has no rule, is the one a step edits.
+func findFormatField(in sheet: AXUIElement) -> AXUIElement? {
+    listFormatFields(in: sheet).last
+}
+
+func listRuleMenus(in sheet: AXUIElement) -> [AXUIElement] {
+    collectElements(sheet).filter {
+        readText($0, kAXRoleAttribute) == kAXPopUpButtonRole
+            && readText($0, kAXHelpAttribute).hasPrefix("Change the rule")
+    }
+}
+
+func listTokens(in field: AXUIElement) -> [AXUIElement] {
+    collectElements(field).filter { readText($0, kAXSubroleAttribute) == "AXTextAttachment" }
+}
+
+func postKey(_ key: CGKeyCode, flags: CGEventFlags = []) {
+    for isDown in [true, false] {
+        let event = CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: isDown)!
+        event.flags = flags
+        event.post(tap: .cghidEventTap)
+    }
+    Thread.sleep(forTimeInterval: 0.1)
+}
+
+// Focus set through Accessibility stays on a token whose menu just closed, so typing starts with a click.
+func clickPointer(at point: CGPoint) {
+    for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+        CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)!
+            .post(tap: .cghidEventTap)
+    }
+    Thread.sleep(forTimeInterval: 0.3)
+}
+
+// Accessibility offers no action that drops a token, so the drag is a real one.
+func dragPointer(from start: CGPoint, to end: CGPoint) {
+    CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: start, mouseButton: .left)!
+        .post(tap: .cghidEventTap)
+    for step in 1...20 {
+        let fraction = CGFloat(step) / 20
+        let point = CGPoint(x: start.x + (end.x - start.x) * fraction, y: start.y + (end.y - start.y) * fraction)
+        CGEvent(mouseEventSource: nil, mouseType: .leftMouseDragged, mouseCursorPosition: point, mouseButton: .left)!
+            .post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.03)
+    }
+    CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: end, mouseButton: .left)!
+        .post(tap: .cghidEventTap)
+    Thread.sleep(forTimeInterval: 1.0)
+}
+
+// A Number palette labels each token, and the Date & Time palette shows only examples.
+func findPaletteToken(_ name: String, in sheet: AXUIElement) throws -> AXUIElement {
+    let fields = listFormatFields(in: sheet)
+    let inField = fields.flatMap(listTokens)
+    let placed = collectElements(sheet).filter {
+        readText($0, kAXRoleAttribute) == kAXStaticTextRole
+            || readText($0, kAXSubroleAttribute) == "AXTextAttachment"
+    }.map { element in DataFormatControl(
+        element: element, frame: readFrame(element) ?? .zero,
+        reading: InspectorElement(role: readText(element, kAXRoleAttribute), title: "", label: "",
+                                  value: readText(element, kAXValueAttribute))) }
+    let fieldFrames = fields.compactMap(readFrame)
+    let palette = placed.filter { control in
+        readText(control.element, kAXSubroleAttribute) == "AXTextAttachment"
+            && !inField.contains { CFEqual($0, control.element) }
+            && !fieldFrames.contains { $0.intersects(control.frame) }
+    }
+    let named = palette.map { (control: $0, label: findRowLabel(of: $0, in: placed)) }
+    guard let token = named.first(where: { $0.label == name || $0.control.reading.value == name }) else {
+        let offered = named.map { ($0.label.map { "\($0): " } ?? "") + "'\($0.control.reading.value)'" }
+        throw failCustomFormat("the palette holds no \(name) token, among: " + offered.joined(separator: ", "))
+    }
+    return token.control.element
+}
+
+// A token's menu opens inside the document window, which keeps the menu bar out of the search.
+func chooseTokenItem(_ token: AXUIElement, title: String, window: AXUIElement) throws {
+    AXUIElementPerformAction(token, "AXShowMenu" as CFString)
+    Thread.sleep(forTimeInterval: 0.5)
+    let menus = collectElements(window).filter { readText($0, kAXRoleAttribute) == kAXMenuRole }
+    let items = menus.flatMap(collectElements).filter { readText($0, kAXRoleAttribute) == kAXMenuItemRole }
+    guard let item = items.first(where: { readText($0, kAXTitleAttribute) == title }) else {
+        postKey(escapeKey)
+        let titles = items.map { readText($0, kAXTitleAttribute) }.filter { !$0.isEmpty }
+        throw failCustomFormat("the token's menu holds no '\(title)', among: " + titles.joined(separator: ", "))
+    }
+    AXUIElementPerformAction(item, kAXPressAction as CFString)
+    Thread.sleep(forTimeInterval: 0.5)
+}
+
+// Nil when the menu marks no item at all, as the date tokens' menus do, so nothing can be read back.
+// Nil when the menu marks no item at all, as the date tokens' menus do, so nothing can be read back.
+func readTokenItemMarked(_ token: AXUIElement, title: String, window: AXUIElement) -> Bool? {
+    AXUIElementPerformAction(token, "AXShowMenu" as CFString)
+    Thread.sleep(forTimeInterval: 0.5)
+    let items = collectElements(window).filter { readText($0, kAXRoleAttribute) == kAXMenuRole }
+        .flatMap(collectElements).filter { readText($0, kAXRoleAttribute) == kAXMenuItemRole }
+    let marked = items.filter { !readText($0, kAXMenuItemMarkCharAttribute).isEmpty }
+    postKey(escapeKey)
+    return marked.isEmpty ? nil : marked.contains { readText($0, kAXTitleAttribute) == title }
+}
+
+// A toggle such as Hide Separator is retitled rather than marked, so a changed token also counts.
+func applyTokenItem(_ title: String, to token: AXUIElement, field: AXUIElement, window: AXUIElement) throws {
+    let before = readText(token, kAXValueAttribute)
+    try chooseTokenItem(token, title: title, window: window)
+    guard let after = listTokens(in: field).last else { throw failCustomFormat("the token vanished") }
+    if readText(after, kAXValueAttribute) != before { return }
+    guard readTokenItemMarked(after, title: title, window: window) != false else {
+        throw failCustomFormat("the token did not take '\(title)', and still reads '\(before)'")
+    }
+}
+
+// Each part reads back what it changed, so a dialog that ignored a step fails it.
+func editCustomFormat(_ part: String, value: String, in window: AXUIElement) throws {
+    let sheet = try findCustomFormatSheet(in: window)
+    guard let field = findFormatField(in: sheet) else { throw failCustomFormat("the format field is missing") }
+    switch part {
+    case "Name":
+        guard let name = collectElements(sheet).first(where: {
+            readText($0, kAXRoleAttribute) == kAXTextFieldRole
+                && readText($0, kAXHelpAttribute).hasPrefix("Type a name")
+        }) else { throw failCustomFormat("the Name field is missing") }
+        AXUIElementSetAttributeValue(name, kAXValueAttribute as CFString, value as CFString)
+        guard readText(name, kAXValueAttribute) == value else {
+            throw failCustomFormat("the Name field reads '\(readText(name, kAXValueAttribute))'")
+        }
+    case "Type":
+        guard let menu = collectElements(sheet).first(where: {
+            readText($0, kAXRoleAttribute) == kAXPopUpButtonRole
+                && readText($0, kAXHelpAttribute).hasPrefix("Choose a type")
+        }) else { throw failCustomFormat("the Type menu is missing") }
+        try choosePopUpItem(menu, title: value, setting: "Type")
+        Thread.sleep(forTimeInterval: 0.5)
+        guard readText(menu, kAXValueAttribute) == value else {
+            throw failCustomFormat("the Type menu reads '\(readText(menu, kAXValueAttribute))'")
+        }
+    case "Clear":
+        AXUIElementSetAttributeValue(field, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        postKey(aKey, flags: .maskCommand)
+        postKey(deleteKey)
+        guard readText(field, kAXValueAttribute).isEmpty else {
+            throw failCustomFormat("the format field still reads '\(readText(field, kAXValueAttribute))'")
+        }
+    case "Text", "TextBefore":
+        guard let frame = readFrame(field) else { throw failCustomFormat("the format field has no position") }
+        clickPointer(at: CGPoint(x: frame.maxX - 4, y: frame.midY))
+        postKey(part == "Text" ? rightArrowKey : leftArrowKey, flags: .maskCommand)
+        AXUIElementSetAttributeValue(field, kAXSelectedTextAttribute as CFString, value as CFString)
+        Thread.sleep(forTimeInterval: 0.5)
+        let shown = readText(field, kAXValueAttribute)
+        guard part == "Text" ? shown.hasSuffix(value) : shown.hasPrefix(value) else {
+            throw failCustomFormat("the format field reads '\(readText(field, kAXValueAttribute))'")
+        }
+    case "Rule":
+        let rulesBefore = listRuleMenus(in: sheet).count
+        guard let add = collectElements(sheet).first(where: {
+            readText($0, kAXRoleAttribute) == kAXButtonRole && readText($0, kAXTitleAttribute) == "Add a Rule"
+        }) else { throw failCustomFormat("the Add a Rule button is missing") }
+        AXUIElementPerformAction(add, kAXPressAction as CFString)
+        Thread.sleep(forTimeInterval: 1.0)
+        let menus = listRuleMenus(in: try findCustomFormatSheet(in: window))
+        guard menus.count == rulesBefore + 1, let menu = menus.last else {
+            throw failCustomFormat("Add a Rule left \(menus.count) rules")
+        }
+        try choosePopUpItem(menu, title: value, setting: "Rule")
+        Thread.sleep(forTimeInterval: 0.5)
+        guard readText(menu, kAXValueAttribute) == value else {
+            throw failCustomFormat("the rule reads '\(readText(menu, kAXValueAttribute))'")
+        }
+    case "RuleValue":
+        guard let input = collectElements(sheet).last(where: {
+            readText($0, kAXRoleAttribute) == kAXTextFieldRole
+                && readText($0, kAXHelpAttribute).hasPrefix("Type a value for this rule")
+        }) else { throw failCustomFormat("no rule has a value field") }
+        AXUIElementSetAttributeValue(input, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(input, kAXValueAttribute as CFString, value as CFString)
+        AXUIElementPerformAction(input, kAXConfirmAction as CFString)
+        Thread.sleep(forTimeInterval: 0.5)
+        // The field groups its digits as it shows them, so 1000 reads back as 1,000.
+        guard readText(input, kAXValueAttribute).replacingOccurrences(of: ",", with: "") == value else {
+            throw failCustomFormat("the rule's value reads '\(readText(input, kAXValueAttribute))'")
+        }
+    case "Token":
+        guard let last = listTokens(in: field).last else { throw failCustomFormat("the format field holds no token") }
+        try applyTokenItem(value, to: last, field: field, window: window)
+    case "OK":
+        guard let ok = collectElements(sheet).first(where: {
+            readText($0, kAXRoleAttribute) == kAXButtonRole && readText($0, kAXTitleAttribute) == "OK"
+        }) else { throw failCustomFormat("the OK button is missing") }
+        AXUIElementPerformAction(ok, kAXPressAction as CFString)
+        Thread.sleep(forTimeInterval: 1.0)
+        let open = (readAttribute(window, kAXChildrenAttribute) as? [AXUIElement] ?? [])
+            .contains { readText($0, kAXRoleAttribute) == kAXSheetRole && findFormatField(in: $0) != nil }
+        if open { throw failCustomFormat("the dialog stayed open after OK: " + readAlertText([sheet]).joined(separator: " ")) }
+    default:
+        let before = listTokens(in: field).count
+        let token = try findPaletteToken(part, in: sheet)
+        guard let from = readFrame(token), let to = readFrame(field) else {
+            throw failCustomFormat("the \(part) token has no position on screen")
+        }
+        dragPointer(from: CGPoint(x: from.midX, y: from.midY), to: CGPoint(x: to.maxX - 8, y: to.midY))
+        let tokens = listTokens(in: field)
+        guard tokens.count == before + 1, let dropped = tokens.last else {
+            throw failCustomFormat("dragging the \(part) token left the field with \(tokens.count) tokens")
+        }
+        if !value.isEmpty { try applyTokenItem(value, to: dropped, field: field, window: window) }
+    }
+}
+
+// Two negative styles are both titled (100), red and plain, so `(100) #2` names the second.
+func readItemChoice(_ value: String) -> (title: String, occurrence: Int) {
+    guard let marker = value.range(of: " #", options: .backwards),
+          let occurrence = Int(value[marker.upperBound...]), occurrence > 0
+    else { return (value, 1) }
+    return (String(value[..<marker.lowerBound]), occurrence)
+}
+
+func choosePopUpItem(_ popUp: AXUIElement, title choice: String, setting: String) throws {
+    let (title, occurrence) = readItemChoice(choice)
+    AXUIElementPerformAction(popUp, kAXPressAction as CFString)
+    Thread.sleep(forTimeInterval: 0.5)
+    let items = (readAttribute(popUp, kAXChildrenAttribute) as? [AXUIElement] ?? [])
+        .filter { readText($0, kAXRoleAttribute) == kAXMenuRole }
+        .flatMap { readAttribute($0, kAXChildrenAttribute) as? [AXUIElement] ?? [] }
+    let matching = items.filter { readText($0, kAXTitleAttribute) == title }
+    guard matching.count >= occurrence else {
+        // A menu left open blocks every AppleScript after it, so Escape follows the cancel.
+        AXUIElementPerformAction(popUp, kAXCancelAction as CFString)
+        postKey(escapeKey)
+        let titles = items.map { readText($0, kAXTitleAttribute) }.filter { !$0.isEmpty }
+        throw HelperFailure(problem: HelperProblem(
+            kind: "dataFormat",
+            detail: "the '\(setting)' menu holds no '\(choice)', among: " + titles.joined(separator: ", "),
+            remedy: "name an item the menu lists, then rerun"))
+    }
+    AXUIElementPerformAction(matching[occurrence - 1], kAXPressAction as CFString)
+}
+
+// Read back afterward, so a control Numbers did not take fails the step rather than the fixture.
+func setDataFormatControl(_ setting: String, to value: String, in window: AXUIElement) throws {
+    let section = try readDataFormatControls(in: window)
+    guard let control = section.first(where: { $0.reading.setting == setting }) else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "dataFormat",
+            detail: "no Data Format setting '\(setting)' among: " + describeDataFormat(section),
+            remedy: "name a setting the Data Format section shows for this format, then rerun"))
+    }
+    switch control.reading.role {
+    case kAXPopUpButtonRole:
+        try choosePopUpItem(control.element, title: value, setting: setting)
+    case kAXCheckBoxRole, kAXRadioButtonRole:
+        if control.reading.value != value {
+            AXUIElementPerformAction(control.element, kAXPressAction as CFString)
+        }
+    case kAXTextFieldRole:
+        AXUIElementSetAttributeValue(control.element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(control.element, kAXValueAttribute as CFString, value as CFString)
+        AXUIElementPerformAction(control.element, kAXConfirmAction as CFString)
+    default:
+        throw HelperFailure(problem: HelperProblem(
+            kind: "dataFormat",
+            detail: "'\(setting)' is a \(control.reading.role), which a step cannot set",
+            remedy: "set a pop-up, a checkbox, a radio button or a field"))
+    }
+    Thread.sleep(forTimeInterval: 1.0)
+    let after = try readDataFormatControls(in: window)
+    let wanted = control.reading.role == kAXPopUpButtonRole ? readItemChoice(value).title : value
+    guard let shown = after.first(where: { $0.reading.setting == setting }), shown.reading.value == wanted
+    else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "dataFormat",
+            detail: "'\(setting)' was set to '\(value)', and the section now reads: "
+                + describeDataFormat(after),
+            remedy: "spell the value as the section reads it, then rerun"))
+    }
 }
 
 // MARK: Capture
@@ -1062,6 +1474,24 @@ func formatRangeReference(_ step: EditStep, documentId: String) throws -> (table
     )
 }
 
+// Only letters then digits parse, so nothing else from a request reaches the script.
+func readCellPosition(_ cell: String) -> (row: Int, column: Int)? {
+    let letters = cell.prefix { $0.isASCII && $0.isUppercase }
+    guard !letters.isEmpty, let row = Int(cell.dropFirst(letters.count)), row > 0 else { return nil }
+    let column = letters.reduce(0) { $0 * 26 + Int($1.asciiValue! - 64) }
+    return (row, column)
+}
+
+func selectRange(_ step: EditStep, documentId: String) throws {
+    let (table, range) = try formatRangeReference(step, documentId: documentId)
+    _ = try runAppleScript(
+        "set t to \(table)\n"
+            + "set active sheet of document id \(quoteAppleScript(documentId)) to sheet "
+            + "\(quoteAppleScript(step.sheet ?? "")) of document id \(quoteAppleScript(documentId))\n"
+            + "set selection range of t to \(range) of t")
+    Thread.sleep(forTimeInterval: 0.5)
+}
+
 func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplication) throws {
     let (_, window) = try findDocumentWindow(documentId: documentId, pid: numbers.processIdentifier)
     AXUIElementPerformAction(window, kAXRaiseAction as CFString)
@@ -1069,13 +1499,40 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
     Thread.sleep(forTimeInterval: 0.5)
     switch step.action {
     case .select:
-        let (table, range) = try formatRangeReference(step, documentId: documentId)
+        try selectRange(step, documentId: documentId)
+    case .dataFormatSet:
+        guard let setting = step.setting, let value = step.value else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a dataFormatSet step needs a setting and a value",
+                remedy: "run the helper only through the golden confirmation"))
+        }
+        try selectRange(step, documentId: documentId)
+        try openCellTab(in: window)
+        try setDataFormatControl(setting, to: value, in: window)
+    case .customFormatEdit:
+        guard let part = step.setting else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a customFormatEdit step needs a setting",
+                remedy: "name a part of the Create Custom Format dialog"))
+        }
+        if part == "Open" {
+            try selectRange(step, documentId: documentId)
+            try openCellTab(in: window)
+            try openCustomFormat(in: window)
+        } else {
+            try editCustomFormat(part, value: step.value ?? "", in: window)
+        }
+    case .tableExtend:
+        let (table, _) = try formatRangeReference(step, documentId: documentId)
+        guard let (row, column) = step.range.flatMap(readCellPosition) else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a tableExtend step needs one cell, such as I2",
+                remedy: "name the last cell the table must reach"))
+        }
         _ = try runAppleScript(
             "set t to \(table)\n"
-                + "set active sheet of document id \(quoteAppleScript(documentId)) to sheet "
-                + "\(quoteAppleScript(step.sheet ?? "")) of document id \(quoteAppleScript(documentId))\n"
-                + "set selection range of t to \(range) of t")
-        Thread.sleep(forTimeInterval: 0.5)
+                + "if row count of t < \(row) then set row count of t to \(row)\n"
+                + "if column count of t < \(column) then set column count of t to \(column)")
     case .menuPress:
         guard let item = step.menuItem else {
             throw HelperFailure(problem: HelperProblem(

@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-21  The helper names each Data Format control, and a recipe step sets one,
+            for PYB-219.
 2026-10-14  A missing or stale helper states the miss and stops, as house rule 11
             asks, for PYB-204.
 2026-10-14  The confirmation's logic moved here from `golden_confirm.py`, for
@@ -119,6 +121,7 @@ recipeSuffix: str = ".recipe.toml"
 
 recipeStepKeys: frozenset[str] = frozenset({
     "action", "document", "sheet", "table", "range", "menuItem", "format", "value",
+    "setting",
 })
 
 
@@ -593,34 +596,15 @@ def readFileHash(path: Path) -> str:
 
 
 def readDataFormatSettings(elements: list[dict[str, str]]) -> dict[str, str]:
-    """Name each Data Format control by the label Numbers shows beside it."""
+    """Return each Data Format control's value under the name the helper gave it."""
     settings: dict[str, str] = {}
     items: list[str] = []
-    pendingLabel: str | None = None
-    unlabeled = 0
-    for position, element in enumerate(elements):
-        role, value = element["role"], element["value"]
-        following = elements[position + 1] if position + 1 < len(elements) else None
-        if role == "AXStaticText":
-            if value.endswith(":"):
-                pendingLabel = value[:-1]
-            continue
-        if role == "AXPopUpButton" and "Data Format" not in settings:
-            settings["Data Format"] = value
-        elif role == "AXCheckBox":
-            settings[(element["title"] or element["label"]).strip()] = value
-        elif pendingLabel is not None:
-            settings[pendingLabel] = value
-        elif (role == "AXTextField" and following is not None
-              and following["role"] == "AXStaticText"
-              and not following["value"].endswith(":") and following["value"] != "–"):
-            settings[following["value"]] = value
-        elif role == "AXTextField":
+    for element in elements:
+        name, value = element["setting"], element["value"]
+        if name == "Items":
             items.append(value)
-        else:
-            unlabeled += 1
-            settings[f"Unlabeled {role[2:]} {unlabeled}"] = value
-        pendingLabel = None
+        elif name:
+            settings[name] = value
     if items:
         settings["Items"] = ", ".join(items)
     return settings
