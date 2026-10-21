@@ -1,0 +1,305 @@
+# How Numbers makes 80-numeral-systems: numbers in bases from 2 to 36, with places
+# and both ways of writing a negative, to measure `base`, `base_places` and
+# `base_use_minus_sign` for PYB-219's AC 1. Made by `.venv/bin/python3 -m
+# tools.local.golden_confirm measure 80-numeral-systems`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '1234'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Data Format'
+value = 'Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Base'
+value = '8'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as 1234, Data Format Numeral System, Base 8'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '1234'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Data Format'
+value = 'Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Base'
+value = '36'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as 1234, Data Format Numeral System, Base 36'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+value = '1234'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Data Format'
+value = 'Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Base'
+value = '3'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Places'
+value = '9'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C2"
+value = 'input as 1234, Data Format Numeral System, Base 3, Places 9'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+value = '-5'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Data Format'
+value = 'Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Base'
+value = '2'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Places'
+value = '8'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Unlabeled RadioButton 2'
+value = '1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D2"
+value = 'input as -5, Data Format Numeral System, Base 2, Places 8, Unlabeled RadioButton 2 1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+value = '-5'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Data Format'
+value = 'Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Base'
+value = '2'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Places'
+value = '8'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Unlabeled RadioButton 1'
+value = '1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E2"
+value = 'input as -5, Data Format Numeral System, Base 2, Places 8, Unlabeled RadioButton 1 1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '-1234'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Data Format'
+value = 'Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Base'
+value = '16'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Unlabeled RadioButton 2'
+value = '1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+value = 'input as -1234, Data Format Numeral System, Base 16, Unlabeled RadioButton 2 1'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+value = '1234.75'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Data Format'
+value = 'Numeral System'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Base'
+value = '16'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+value = 'input as 1234.75, Data Format Numeral System, Base 16'

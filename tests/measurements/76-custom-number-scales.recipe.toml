@@ -1,0 +1,1012 @@
+# How Numbers makes 76-custom-number-scales: 1234567.891 in each column under a custom
+# format of its own, one per choice the Scale token offers, then a suffix and a prefix,
+# to measure a custom format's scale and literals for PYB-219's AC 3. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 76-custom-number-scales`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O2"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Name'
+value = 'scale Percent'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Scale'
+value = 'Percent'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as 1234567.891, custom format named scale Percent: Integer, then Scale Percent'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Name'
+value = 'scale Percent (%)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Scale'
+value = 'Percent (%)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as 1234567.891, custom format named scale Percent (%): Integer, then Scale Percent (%)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Name'
+value = 'scale Hundreds'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Scale'
+value = 'Hundreds'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C2"
+value = 'input as 1234567.891, custom format named scale Hundreds: Integer, then Scale Hundreds'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Name'
+value = 'scale Hundreds (C)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Scale'
+value = 'Hundreds (C)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D2"
+value = 'input as 1234567.891, custom format named scale Hundreds (C): Integer, then Scale Hundreds (C)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Name'
+value = 'scale Thousands'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Scale'
+value = 'Thousands'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E2"
+value = 'input as 1234567.891, custom format named scale Thousands: Integer, then Scale Thousands'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Name'
+value = 'scale Thousands (K)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Scale'
+value = 'Thousands (K)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+value = 'input as 1234567.891, custom format named scale Thousands (K): Integer, then Scale Thousands (K)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Name'
+value = 'scale Millions'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'Scale'
+value = 'Millions'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G2"
+value = 'input as 1234567.891, custom format named scale Millions: Integer, then Scale Millions'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Name'
+value = 'scale Millions (M)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'Scale'
+value = 'Millions (M)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H2"
+value = 'input as 1234567.891, custom format named scale Millions (M): Integer, then Scale Millions (M)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Name'
+value = 'scale Billions'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'Scale'
+value = 'Billions'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I2"
+value = 'input as 1234567.891, custom format named scale Billions: Integer, then Scale Billions'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Name'
+value = 'scale Billions (B)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'Scale'
+value = 'Billions (B)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J2"
+value = 'input as 1234567.891, custom format named scale Billions (B): Integer, then Scale Billions (B)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Name'
+value = 'scale Trillions'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'Scale'
+value = 'Trillions'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "K2"
+value = 'input as 1234567.891, custom format named scale Trillions: Integer, then Scale Trillions'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Name'
+value = 'scale Trillions (T)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'Scale'
+value = 'Trillions (T)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "L2"
+value = 'input as 1234567.891, custom format named scale Trillions (T): Integer, then Scale Trillions (T)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Name'
+value = 'scale Scientific'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'Scale'
+value = 'Scientific'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "M2"
+value = 'input as 1234567.891, custom format named scale Scientific: Integer, then Scale Scientific'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Name'
+value = 'suffix units'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Scale'
+value = 'Thousands'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'Text'
+value = ' units'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "N2"
+value = "input as 1234567.891, custom format named suffix units: Integer, then Scale Thousands, then text ' units'"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+value = '1234567.891'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Name'
+value = 'prefix about'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Text'
+value = 'about '
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "O2"
+value = "input as 1234567.891, custom format named prefix about: text 'about ', then Integer"
