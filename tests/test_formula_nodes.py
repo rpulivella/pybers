@@ -12,7 +12,7 @@ Two facts these tests depend on were measured against every document on
 2026-09-03 rather than read off the schema, which permits far more than Numbers
 writes. A formula-backed cell names its formula in the FIRST of its trailing
 references, established by reproducing every declared refcount in all nine tables
-that declare formulas. And `ASTStickyBits` never accompanies a single-cell
+that declare formulas. `ASTStickyBits` never accompanies a single-cell
 reference, 0 of 21 in the documents, so anchoring for one is read from the coordinate
 and nowhere else.
 

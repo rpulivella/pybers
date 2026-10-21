@@ -8,9 +8,9 @@ named that because it sits below the first one, and `20-formula-shapes` carries 
 whereas one that quotes the reader is a restatement.
 
 Two cases cannot come from a document at all, because Numbers will not create them:
-two tables on one sheet sharing a name, and two sheets sharing one. Those are built
-by hand, which is the honest way to test a defense against something the documents have
-no example of.
+two tables on one sheet sharing a name, and two sheets sharing one. Those are
+constructed in the test, which is the honest way to test a defense against something
+the documents have no example of.
 
 UPDATES
 2026-09-02  Written for #14.
@@ -165,8 +165,9 @@ def test_aSheetNameMatchesExactly() -> None:
 # ── AC 4: a repeated name raises rather than picking the first ───────────────
 
 def test_twoSheetsSharingANameSelectNeither() -> None:
-    """Built by hand: no document holds two sheets sharing a name, and nothing shows
-    Numbers preventing it either, so the case is covered rather than assumed away."""
+    """Constructed in the test: no document holds two sheets sharing a name, and
+    nothing shows Numbers preventing it either, so the case is covered rather than
+    assumed away."""
     document = Document(sheets=[Sheet(name="Summary"), Sheet(name="Summary")])
     with pytest.raises(SelectionError) as raised:
         document.sheet("Summary")

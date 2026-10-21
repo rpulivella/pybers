@@ -6,7 +6,7 @@ The comparison here is deliberately not a byte compare of the two files. The zip
 envelope is known to differ by the local extra fields `zipfile` cannot emit, which
 `test_persistence_container` pins exactly, and a byte compare at this level would fail
 for that reason on every document while saying nothing about the document inside.
-So this module compares the decoded archive stream: same members in the same
+This module compares the decoded archive stream: same members in the same
 order, same archives in the same order, same messages, same contents.
 
 Where two message bodies differ byte for byte the comparison does not stop there.

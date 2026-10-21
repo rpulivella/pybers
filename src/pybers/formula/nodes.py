@@ -11,7 +11,7 @@ Numbers could not resolve.
 
 Two consequences shape everything here. A formula cannot be modeled as a string
 without inventing a language to parse, losing the per-axis locking flags on the
-way through. And a walk over nodes is all that a reader or a rewriter needs,
+way through. A walk over nodes is all that a reader or a rewriter needs,
 which is why no parser appears in this library.
 
 **A reference is a distance, not a position.** An unlocked reference stores a

@@ -467,7 +467,7 @@ def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
 ) -> None:
     """The qualifier pattern stops at a comma, a bracket or a quote and nothing else.
 
-    So `1-Table 2::A1` read as a table called `1-Table 2`, and 1469 formulas in one
+    `1-Table 2::A1` read as a table called `1-Table 2`, and 1469 formulas in one
     real document failed to reparse on it. Found while measuring #67.
     """
     document = pybers.open(findDocumentPath("20-formula-shapes"))
@@ -668,7 +668,7 @@ def testAFunctionNumbersDoesNotKnowKeepsItsSpelling() -> None:
 def testAReservedFunctionIsWrittenBySpellingRatherThanByItsIndex() -> None:
     """Numbers declares an index for `ALTITUDE` and then refuses the name.
 
-    So the index is not what it writes, and writing one would produce a formula
+    The index is not what it writes, and writing one would produce a formula
     calling something else. Measured against `46-formula-rare-functions`.
     """
     stored = openFirstTable("46-formula-rare-functions").cell("B20").formula

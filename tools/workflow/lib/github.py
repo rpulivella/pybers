@@ -168,7 +168,7 @@ class GitHubHttpError(RuntimeError):
     it from the formatted message, silently conflates causes. On a PRIVATE
     repository GitHub answers **404** to a VALID token that lacks `repo` scope, and
     to a wrong owner or name, exactly as it does to a branch that is genuinely
-    absent. An expired or revoked token is **401**, not 404. So a guard matching on
+    absent. An expired or revoked token is **401**, not 404. A guard matching on
     the string "404" reports "no such thing" when the truth is "your token cannot
     see it", and sends someone off fixing the wrong problem. A message is prose and
     will be reworded; a status code is a value, so carry the value.

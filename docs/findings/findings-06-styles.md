@@ -89,7 +89,7 @@ file.
 
 **A 4pt inset is the default and needs no per-cell style**, the 4pt cell carries no cell
 style key of its own, where the 2pt and 0pt cells do. The value is not absent from the
-document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 times. So the
+document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 times. The
 default lives in the inherited style and the cell simply declines to override it.
 
 **Padding is always uniform in practice.** Across every fixture here, 3,368 cell styles carry
@@ -150,7 +150,7 @@ The border between F1 and G1 appears as **both** F1's right stroke and G1's left
 border between H1 and H2 appears as **both** H1's bottom and H2's top. A single visual line is
 two independent stored strokes on the facing edges.
 
-So **setting a border between two cells means writing both sides.** Writing one leaves the
+**Setting a border between two cells means writing both sides.** Writing one leaves the
 pair disagreeing, and which one Numbers renders is not something this fixture establishes.
 Reading has the mirror problem: a border reported from one cell's perspective may or may not
 be matched by its neighbor, and those are different document states.
@@ -231,7 +231,7 @@ Data/tile-pattern-16.png    239,547 bytes
 Three things follow, all verified.
 
 **The bytes are stored unmodified.** The embedded member is byte-identical to the source PNG
-by SHA-256, Numbers does not re-encode, resample or strip it. So an image survives a round
+by SHA-256, Numbers does not re-encode, resample or strip it. An image survives a round
 trip exactly, provided the member is carried through untouched.
 
 **The filename encodes the asset identifier.** `tile-pattern-16.png` is the original name plus
@@ -303,7 +303,7 @@ only as anonymous archives deduplicated by value and reached through a table's `
 
 Two details worth keeping. A **user-created** character style appears in the same registry as
 Apple's own (`'smallcap'`, made while building `09-text-capitalization`) so named styles are
-not a fixed built-in set. And `Table Style 1` through `Table Style 7` are **paragraph** styles
+not a fixed built-in set. `Table Style 1` through `Table Style 7` are **paragraph** styles
 despite the name, so the table styling vocabulary is expressed through named paragraph styles
 rather than through named table styles.
 
@@ -313,7 +313,7 @@ The layering machinery is real and already observed: a style may carry a `parent
 `is_variation`, and record an `override_count`, seen directly in the sheet tab colors of
 `26-multi-sheets` and in the table-level border settings of `29-style-border`.
 
-But it applies to **paragraph, character and list** styles only. A `NamedStyle` registry that
+However, it applies to **paragraph, character and list** styles only. A `NamedStyle` registry that
 covers those maps onto something Numbers really has. Extending it to cell styles would be
 inventing a concept the format does not carry, and any such feature has to be labeled a
 pybers concept rather than presented as a mapping, otherwise a round trip would promise a
@@ -373,7 +373,7 @@ Link                                'character-style-hyperlink'   special
 None                                'character-style-null'        special
 ```
 
-Only the two special system character styles are keyed. So the registry governs **paragraph
+Only the two special system character styles are keyed. The registry governs **paragraph
 and list styles**; for character styles a `name` appears to be sufficient on its own. Do not
 generalize the paragraph rule across style kinds. It was stated too broadly on first
 measurement and `32` corrected it.
@@ -420,7 +420,7 @@ key 1  variation of 'Table Style 2'    override_count=1   para: alignment
 ```
 
 The variation stores **only the overridden properties**. Everything else resolves through
-`parent`. So the chain is `cell -> variation -> named style`, and reading a cell's effective
+`parent`. The chain is `cell -> variation -> named style`, and reading a cell's effective
 formatting means walking it.
 
 ### `override_count` counts logical properties, not fields
@@ -429,7 +429,7 @@ Key 6 changed one thing (the color) and stores **two** fields, `font_color` and 
 which are the legacy and modern spellings of the same property. `override_count` is 1. Key 8
 changed three genuinely different things and reports 3.
 
-So the count cannot be derived by counting set fields, and should be preserved rather than
+The count cannot be derived by counting set fields, and should be preserved rather than
 recomputed.
 
 ### There is no unparented text style

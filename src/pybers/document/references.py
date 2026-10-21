@@ -129,7 +129,7 @@ class ReferenceLocation:
 def indexTablesByIdentity(document: Document) -> dict[str, Table]:
     """Return every table in a document, keyed by what a formula names it by.
 
-    A table built by hand has no identity until a document gives it one, and one
+    A table a script constructs has no identity until a document gives it one, and one
     that has none is left out rather than filed under the empty string.
     """
     return {

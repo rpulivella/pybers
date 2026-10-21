@@ -183,7 +183,7 @@ Observed, with readings of varying confidence:
 **Two structural facts, both certain and both consequential:**
 
 1. **Several entries may share one `feature_type`.** `914066` carries `(33,2)` *and*
-   `(33,0)`. So this cannot be modeled as a `dict[featureType, selector]`. It is an
+   `(33,0)`. This cannot be modeled as a `dict[featureType, selector]`. It is an
    ordered list, and pybers must treat it as one.
 2. **`font_features_null` is a distinct state from an absent list.** One style in `05`
    carries `font_features_null` with no `font_features` at all, which reads as features
@@ -243,7 +243,7 @@ cell selected        -> a variation of #903892, the table's BODY_TEXT_STYLE,
 paragraph selected   -> a variation in that cell's rich-text table_para_style run
 ```
 
-So setting tabs "on a cell" really sets them for **every paragraph in the table**, which is
+Setting tabs "on a cell" really sets them for **every paragraph in the table**, which is
 why Numbers shows the table style as dirty (`Table Style 2*` with an Update button). The
 cell-selected panel appears empty because it shows stops defined at that exact scope, and
 they went one level up.
@@ -272,7 +272,7 @@ space-filled leader.
 first_line_indent = 18.0     left_indent = 18.0     right_indent = 18.0      (0.25in each)
 ```
 
-Three independent floats, in points, exactly as labeled. But the **indent button** writes
+Three independent floats, in points, exactly as labeled. However, the **indent button** writes
 somewhere else entirely:
 
 ```
@@ -283,9 +283,9 @@ all three indent fields                 0.0
 
 `table_para_data.first` is an integer indent **level** (one press, then two) with **no point
 value stored anywhere**. It is the first time that run table has carried anything but
-`(0, 0)` in the whole corpus.
+`(0, 0)` in every document.
 
-So there are two independent indent mechanisms that look identical in the interface, and a
+There are two independent indent mechanisms that look identical in the interface, and a
 reader that consults only the paragraph style sees an unindented paragraph and renders it
 flush left. The list style is `'None'` throughout, so this is not list indentation.
 
@@ -334,7 +334,7 @@ cell style (shared with c7)          shadow: black, angle 46.98, offset 0, radiu
   run [17:41] 'only on these...'     shadow: blue              -> blue shadow
 ```
 
-So resolving a character's effective shadow means walking the cell's style **and** the
+Resolving a character's effective shadow means walking the cell's style **and** the
 character run, in that order, applying the `*_null` rule above at each step. The same is true
 of the outline. Text typed into the cell that is not yet part of a run picks up the
 cell-level value, which is exactly the black shadow the fixture's own label reports as
@@ -359,7 +359,7 @@ Four things this settles. A solid stroke has its **own pattern type** and leaves
 empty rather than filling it. `count` says how many of the six slots are live, and dashes use
 **two**, dash length then gap length. **Circular dots are a zero-length dash with a round
 cap**, the classic construction, not a distinct pattern kind: `0.001` is as close to zero as
-Numbers writes. And `cap` and `join` change with the preset, so they are part of the style
+Numbers writes. `cap` and `join` change with the preset, so they are part of the style
 rather than constants.
 
 Still open: every outline in `38` has `width: 1.0`, so whether the dash numbers are **points
@@ -378,7 +378,7 @@ dotted border   pattern { type: TSDPattern }        cap RoundCap  join RoundJoin
 no border       pattern { type: TSDEmptyPattern }   width 0
 ```
 
-So one stroke encoding serves shape borders, cell borders and text outlines. **The menus
+One stroke encoding serves shape borders, cell borders and text outlines. **The menus
 differ, not the format**: the cell Border Styles menu offers only solid, dashed, dotted and
 No Border, while the text-outline menu offers about ten, including five brush strokes.
 
@@ -410,7 +410,7 @@ so **a reader checking only the pattern would call a chalk stroke solid**, `smar
 has to be checked before the pattern is believed. `stroke_name` is an internal identifier,
 not a localized label: `'Chalk2'` carries a digit no menu shows. `cap` varies with the brush
 (`Calligraphy` uses `ButtCap` where the others use `RoundCap`), so it is part of the preset
-rather than a constant. And `random_seed` exists because these strokes are randomized,
+rather than a constant. `random_seed` exists because these strokes are randomized,
 preserving it is what keeps a document rendering identically, so it must be carried through
 rather than regenerated.
 
@@ -464,7 +464,7 @@ applied as a saved style     #974338  name='+5pt baseline' is_variation=False  o
                                       no parent
 ```
 
-So an ad-hoc formatting change is an **anonymous variation of the character style named
+An ad-hoc formatting change is an **anonymous variation of the character style named
 `'None'`**, while a style the user saved and named is a **root** with no parent. This is the
 third confirmation that there is no unparented text style: "no character style" is itself a
 named style called `'None'`, exactly as "no list" is a list style called `'None'` in `33`.
@@ -537,7 +537,7 @@ This affects **run-table indices only**. It is not a general Unicode defect:
   affected together: character and paragraph styles, language, bidi, drop cap, dictation,
   tracked insertions and deletions.
 
-So the conversion belongs at the boundary where a run table is read or written, not in the
+The conversion belongs at the boundary where a run table is read or written, not in the
 text handling generally. A model holding Python strings with Python offsets is the right
 shape; it just has to translate on the way in and out.
 
@@ -555,7 +555,7 @@ Arabic-Indic code points are gone from the value entirely; the numeral system is
 the format, consistent with the numeral-system discovery in `16-number-scientific-numeralsystems`.
 The text cell keeps the characters exactly, trailing space included.
 
-So a value's digits are **presentation**, and a round trip that reads a number and rewrites
+A value's digits are **presentation**, and a round trip that reads a number and rewrites
 it must not attempt to preserve the digit characters. There are none to preserve.
 
 ### Skin-tone emoji are a BASE plus a SEPARATE modifier code point
@@ -574,7 +574,7 @@ U+FE0F   BMP      VARIATION SELECTOR-16
 Three things follow. A skin-toned emoji is **two code points**, so a run boundary can legally
 fall between the base and its modifier, which renders as an unmodified emoji followed by an
 orphan modifier. The base is not always astral (`✊` is BMP) and the modifier is not always
-astral (`U+FE0F` is BMP), so **neither half can be predicted from the other**. And a
+astral (`U+FE0F` is BMP), so **neither half can be predicted from the other**. A
 grapheme cluster here spans up to 4 UTF-16 units, so grapheme-safe editing is a separate
 problem from the index conversion above.
 
@@ -592,7 +592,7 @@ stored          py 1     'é'  U+00E9
 NFD would be    py 2     'e' + U+0301 COMBINING ACUTE ACCENT
 ```
 
-So the decomposed form did not survive entry. The accented-Latin cell tells the same story:
+The decomposed form did not survive entry. The accented-Latin cell tells the same story:
 34 characters stored, 39 under NFD.
 
 A reader should therefore expect NFC, and a **writer must not emit decomposed sequences**
@@ -656,7 +656,7 @@ OverlappingFieldAttributeTable   a TSP.Range + a Reference
 ```
 
 Nineteen of the twenty-one key on a single `character_index`, so each is a **strict
-non-overlapping partition** of the text: a run ends where the next begins. But
+non-overlapping partition** of the text: a run ends where the next begins. However,
 `table_overlapping_highlight` and `table_pencil_annotation` use a `TSP.Range` instead,
 **because highlights can overlap each other and character styles cannot**.
 
@@ -671,13 +671,13 @@ optional KindType kind = 1 [default = TEXTBOX];
 ```
 
 None of the text boxes in `33` sets `kind` at all, because protobuf omits a field equal to its
-default. So **an absent `kind` means text box**, and a writer producing a cell's storage has
+default. **An absent `kind` means text box**, and a writer producing a cell's storage has
 to set `CELL` explicitly or it silently becomes something else.
 
 ### `table_para_starts` marks where list numbering RESTARTS
 
 The expanded `32-named-styles` gives this run table its first non-zero value anywhere in the
-corpus. Mapped against paragraph boundaries in a storage holding four different lists:
+documents. Mapped against paragraph boundaries in a storage holding four different lists:
 
 ```
 @0    para_starts (0,0)   list 'None'           "Hello I am set as the named style Text."
@@ -690,7 +690,7 @@ corpus. Mapped against paragraph boundaries in a storage holding four different 
 
 `first = 1` appears on exactly one paragraph, the first list item in the storage. Note that
 the numbered list at `@389` begins a different list style and still reads `(0, 0)`, and the
-fixture labels it "continuously numbered". So this is **not** a "list begins here" marker; it
+fixture labels it "continuously numbered". This is **not** a "list begins here" marker; it
 reads as a **restart-numbering flag**, which is why a continuing sequence leaves it at zero.
 
 One observation only, so treat the reading as provisional. What is certain is that the field
@@ -706,11 +706,11 @@ entries { character_index: 16  object: "9640819A-4879-4687-9E93-F31D6DF1F40A" }
 entries { character_index: 20 }
 ```
 
-Characters 16 to 20 of that text are the word **"with"**. So macOS tags dictated or
+Characters 16 to 20 of that text are the word **"with"**. macOS tags dictated or
 autocorrected text with a per-word UUID, and it persists in the saved document.
 
 Two consequences. It is **user-provenance metadata that travels with any shared file**, which
-is worth knowing before a library silently preserves or strips it. And because it is keyed by
+is worth knowing before a library silently preserves or strips it. Because it is keyed by
 character index, **any insertion or deletion must shift it exactly like a style run**, a
 structural edit that reindexes only the style tables leaves the UUID pointing at the wrong
 word.
@@ -721,7 +721,7 @@ A text box with no list still carries a `table_list_style` entry pointing at a
 `ListStyleArchive` **named `'None'`**. Likewise `table_drop_cap_style` is present on all
 fifteen with an entry that has a `character_index` and no `object`.
 
-So "no list" and "no drop cap" are things Numbers writes down rather than leaves out, and a
+"No list" and "no drop cap" are things Numbers writes down rather than leaves out, and a
 writer that omits the table is not producing the same document. This matches the
 `StandinCaptionArchive` pattern in
 [findings-07-drawables.md](findings-07-drawables.md), where an empty message is written purely
@@ -742,7 +742,7 @@ char.font_size  11.0      18.0
 para.outline_style  1     2
 ```
 
-And **`table_char_style` is absent entirely** from every text box, because none has
+**`table_char_style` is absent entirely** from every text box, because none has
 character-level formatting. This is consistent with character styles applying to selected text
 rather than to a container: with nothing selected and restyled, the table is simply not
 written.
@@ -759,7 +759,7 @@ character_index=380   hasObject=True   -> a named character style
 character_index=390   hasObject=False        back to the paragraph
 ```
 
-So the table is a sequence of overrides over a paragraph baseline, and a reader must treat a
+The table is a sequence of overrides over a paragraph baseline, and a reader must treat a
 missing object as "inherit" rather than skipping the entry or treating it as an error.
 
 ### Character styles live HERE, not in the table's style list
@@ -785,7 +785,7 @@ From `32-named-styles`, user-created styles alongside Apple's built-ins:
 'Italic'     built-in                      italic = True
 ```
 
-And anonymous character **variations**, exactly as paragraph styles do:
+Anonymous character **variations**, exactly as paragraph styles do:
 
 ```
 font_color + tsd_fill        override_count = 1     a color change
@@ -793,7 +793,7 @@ font_name SkolarSansLatn-El  override_count = 1     a weight change
 font_name + italic           override_count = 2
 ```
 
-So the reference-plus-variation model established for paragraph styles applies unchanged to
+The reference-plus-variation model established for paragraph styles applies unchanged to
 character styles. A color change again writes both `font_color` and `tsd_fill` and counts as
 one override.
 
@@ -829,7 +829,7 @@ SkolarSansLatn-Rg     bold=False  italic=False
 ```
 
 **Weight and slant are part of `font_name`** (the PostScript name) and `bold` / `italic` are
-independent booleans layered on top. So:
+independent booleans layered on top, which means:
 
 - `bold=True` on a regular face is **faux bold**, the same class of defect as the synthetic
   superscript and scaled small caps recorded above.

@@ -120,8 +120,8 @@ class Table:
     """A single table on a sheet, a sparse grid of cells plus its merged regions.
 
     `identifier` is what a formula in another table names this one by, and it lives
-    in the calculation engine rather than on the table, which is why a table built
-    by hand has none until a document gives it one.
+    in the calculation engine rather than on the table, which is why a table a script
+    constructs has none until a document gives it one.
     """
 
     name: str
