@@ -48,6 +48,8 @@ neither may be hand-edited, so a finding in either is noise by construction.
 Runs on the repository's venv, which holds rich.
 
 UPDATES
+2026-10-21  Fails the phrases the writing rules added, and a sentence opening
+            on a conjunction or a preamble, for PYB-249.
 2026-10-13  Moved here from `scripts/standards-check.py`, for PYB-204.
 2026-10-13  Typed strictly, since mypy reaches this file now that its name
             imports, for PYB-204.
@@ -263,6 +265,25 @@ bannedPhrases: tuple[tuple[re.Pattern[str], str], ...] = (
      "corporate filler, use use / apply / draw on / build on"),
     (re.compile(r"\bstanding\s+up\b", re.I),
      "corporate filler, use opening / building / bringing online"),
+    (re.compile(r"\bcircl(?:e|es|ed|ing)\s+back\b", re.I),
+     "corporate filler, name when and what instead"),
+    # Covers "no longer is the hard part" too, so that phrase reports once.
+    (re.compile(r"\bis\s+the\s+hard\s+part\b", re.I),
+     "banned phrase, state the claim directly"),
+    (re.compile(r"\bthe\s+(?:one|part)\s+that\s+matters\b", re.I),
+     "banned phrase, state the claim directly"),
+    (re.compile(r"\bcorp(?:us|uses|ora)\b", re.I),
+     "use reference materials, context files or archive"),
+    (re.compile(r"\bhand[-\s]+cod(?:e|ed|es|ing)\b|\bbuilt\s+by\s+hand\b", re.I),
+     "misrepresents how the code is made"),
+)
+
+# A sentence never opens on a conjunction or a preamble. Case-sensitive, because a
+# capital marks the opening: a wrapped line that starts `and` continues a sentence.
+sentenceOpenerRe = re.compile(
+    r"(?:^[ \t]*(?:[-*>][ \t]+|\d+\.[ \t]+)?|(?<=[.!?])[ \t\n]+)"
+    r"(And|But|So|Allow\s+me|Let\s+us)\b",
+    re.MULTILINE,
 )
 
 # "isn't just X, it's Y" and its variants.  Banned as a rhetorical move, not as
@@ -292,7 +313,7 @@ strandedPrepRe = re.compile(
 # A product never "lets" a user do something.  The JS/CSS keyword carve-out the
 # site needs does not arise here, because prose checks never see code.
 weakLetRe = re.compile(r"\b(lets?|letting)\b", re.IGNORECASE)
-letCarveOut = re.compile(r"\blet\s+(alone|us|me|it\s+be)\b", re.IGNORECASE)
+letCarveOut = re.compile(r"\blet\s+(alone|me|it\s+be)\b", re.IGNORECASE)
 
 semicolonMax: int = 1
 
@@ -354,7 +375,7 @@ def extractPythonProse(text: str) -> str:
     """Everything except docstrings and comments blanked, newlines preserved.
 
     The writing rules cover Python docstrings and comments, because a developer
-    reading source is an audience too.  But running the prose checks over raw
+    reading source is an audience too.  However, running the prose checks over raw
     Python would flag identifiers, string literals and keywords as if they were
     sentences.  Isolating the prose resolves both at once: the rules reach the
     prose, and code is never in scope to be misread as English.
@@ -540,11 +561,22 @@ def checkBannedPhrases(path: Path, prose: str, findings: list[Finding]) -> None:
         return
     for pattern, hint in bannedPhrases:
         for match in pattern.finditer(prose):
+            phrase = " ".join(match.group(0).split())
             findings.append(("FAIL", path, findLineNumber(prose, match.start()),
-                             f"'{match.group(0)}', {hint}"))
+                             f"'{phrase}', {hint}"))
     for match in notJustRe.finditer(prose):
         findings.append(("FAIL", path, findLineNumber(prose, match.start()),
                          f"'{match.group(0)}', state the claim directly"))
+
+
+def checkSentenceOpener(path: Path, prose: str, findings: list[Finding]) -> None:
+    """A sentence opens on its subject, never on And, But, So, Allow me or Let us."""
+    if isRuleDoc(path, "banned"):
+        return
+    for match in sentenceOpenerRe.finditer(prose):
+        opener = " ".join(match.group(1).split())
+        findings.append(("FAIL", path, findLineNumber(prose, match.start(1)),
+                         f"sentence opens with '{opener}', open on the subject"))
 
 
 def checkWeakLet(path: Path, prose: str, findings: list[Finding]) -> None:
@@ -675,8 +707,9 @@ def checkFile(path: Path, findings: list[Finding], text: str | None = None) -> N
     checkCoAuthored(path, body, local)
     checkHardBreak(path, body, local)
     for check in (checkContractions, checkBritish, checkEmDash, checkBannedPhrases,
-                  checkWeakLet, checkSplitVerb, checkStrandedPreposition,
-                  checkYearHyphen, checkEllipsis, checkSemicolons):
+                  checkSentenceOpener, checkWeakLet, checkSplitVerb,
+                  checkStrandedPreposition, checkYearHyphen, checkEllipsis,
+                  checkSemicolons):
         check(path, prose, local)
 
     # A file-level finding reports line 0 and cannot be suppressed this way, by
