@@ -5,7 +5,7 @@ The decimal128 type: its limits, its 16-byte form, and what it refuses.
 Two things are asserted that a round trip through our own codec cannot establish,
 because a codec can agree with itself while both halves are wrong. Every one of the
 6,091 decimal128 values in the documents re-encodes to the exact bytes Numbers
-wrote, and the decoder is pinned against buffers built by hand from the layout rather
+wrote, and the decoder is pinned against buffers assembled from the layout rather
 than produced by the encoder.
 
 UPDATES
@@ -85,8 +85,8 @@ def test_theFormatLimitsMatchTheStandardLibrary() -> None:
 def test_aValueDecodesExactlyRatherThanApproximately() -> None:
     """1234.5 is exact, which is the whole reason values are not floats.
 
-    Built by hand rather than read from a file, so this tests the decoder and not
-    a document: coefficient 12345 with exponent -1.
+    Assembled in the test rather than read from a file, so this tests the decoder and
+    not a document: coefficient 12345 with exponent -1.
     """
     raw = (12345).to_bytes(8, "little") + ((exponentBias - 1) << 49).to_bytes(
         8, "little"

@@ -10,7 +10,7 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 
 Both `33-textbox` and `34-shape` produce `TSWP.ShapeInfoArchive`, but it carries
 **`is_text_box`**, `True` for all fifteen drawables in `33`, `False` for every shape in `34`.
-So they share the archive and are distinguished by a field, which is why `ShapeStyleArchive`
+They share the archive and are distinguished by a field, which is why `ShapeStyleArchive`
 was the one style kind with no `name` in the naming survey. A connector is the exception: it
 is a `TSD.ConnectionLineArchive` and has no `is_text_box` at all.
 
@@ -45,7 +45,7 @@ nudges   stored x   Numbers displays   n / 72
 2.0 in  ->  144.00        100 in -> 7200.00        200 in -> 14400.00
 ```
 
-So the stored unit is **1/72 inch, the PostScript point**, confirmed at three scales three
+The stored unit is **1/72 inch, the PostScript point**, confirmed at three scales three
 orders of magnitude apart and on both axes. **One arrow-key nudge is exactly 1.0 point.**
 
 The third column is where a reader goes wrong. The stored positions are perfectly uniform, one point apart,
@@ -90,7 +90,7 @@ alone cannot:
 ```
 
 There is **no vertical-flip bit**. Numbers stores a vertical flip as bit 4 combined with a
-180 degree rotation, which is geometrically the same transform. So `flags=5, angle=180` is
+180 degree rotation, which is geometrically the same transform. `flags=5, angle=180` is
 ambiguous on its face and a reader cannot recover which of the two the user asked for,
 nor does it need to, since they render identically. A writer must not invent a second bit.
 
@@ -101,7 +101,7 @@ the fourth is a flip expressed through the rotation field.
 ### There are TWO flip mechanisms and Numbers uses only one
 
 `TSD.ShapeArchive.pathsource` carries `horizontalFlip` and `verticalFlip`, and both are
-**`False` on every shape and text box in the corpus**. The flip that Numbers actually writes
+**`False` on every shape and text box in the documents**. The flip that Numbers actually writes
 is `geometry.flags` bit 4. Images have no `pathsource` at all.
 
 A reader must therefore not treat the pathsource fields as authoritative, and a writer should
@@ -123,11 +123,11 @@ geometry.size            naturalSize          text
 ```
 
 Two things follow. When a width is explicit, `geometry.size.width` and `naturalSize.width`
-agree exactly, so the explicit width is stored twice. And the height, which `geometry` never
+agree exactly, so the explicit width is stored twice. The height, which `geometry` never
 carries for a text box, is here, growing in 12.0 point steps per wrapped line from a
 one-line height of 19.692.
 
-So **reporting a text box's footprint does not require laying out its text**: Numbers has
+**Reporting a text box's footprint does not require laying out its text**: Numbers has
 already cached the answer. It does mean a writer that changes text, font or width leaves a
 stale `naturalSize` behind unless it re-derives one, which is a layout problem this library
 cannot solve from the archive alone.
@@ -158,7 +158,7 @@ statement true of all of them is that **the path's bounding box maps onto `natur
 
 Shapes scale **uniformly**, because each is authored at its own natural aspect ratio. The
 text-box rectangle does not, because a rectangle has no aspect to preserve, `2.9053` against
-`0.1969` in the last row. So a reader cannot infer a single scale factor either; it has to
+`0.1969` in the last row. A reader cannot infer a single scale factor either; it has to
 map the extent on each axis independently.
 
 ### Control points fall OUTSIDE the shape, so min/max over stored points is wrong
@@ -172,7 +172,7 @@ nodes sit at the 45-degree diagonals (`50 ± 50/√2` is exactly 14.645 and 85.3
 control points pushed out to -4.882 to round the curve. Its true extent is `0..100`, which
 matches `naturalSize` at scale 1.0.
 
-So computing a shape's bounds means **evaluating the beziers**, not scanning the stored
+Computing a shape's bounds means **evaluating the beziers**, not scanning the stored
 coordinates. The naive minimum and maximum overstates this shape by about 10 percent, and
 the on-path-only version understates it by about 30 percent. Both are plausible numbers, and
 nothing raises, the characteristic failure of this format.
@@ -194,7 +194,7 @@ index 11   id 924010   'z brought to front, 72.1% opacity'
 ```
 
 `924010` was created first yet sits later in the list, and the two shapes overlap on the
-sheet. So **later in `drawable_infos` means nearer the front**, and reordering the list is
+sheet. **Later in `drawable_infos` means nearer the front**, and reordering the list is
 how Numbers records a z-order change.
 
 One detail is unresolved: the shape sent to back landed at index 10 rather than index 0, so
@@ -304,7 +304,7 @@ a parameter.
 annoymously custom saved style (no ability to name them)'`. Its style archive carries the
 full seven `shape_properties`, **no `name`, and no `is_variation`**.
 
-So explicitly saving a shape style as a reusable preset does not produce a named style. This
+Explicitly saving a shape style as a reusable preset does not produce a named style. This
 confirms from a second direction the naming survey in
 [findings-06-styles.md](findings-06-styles.md): only paragraph, character and list styles
 carry names, and a `NamedStyle` registry for shapes would be a pybers invention that no round
@@ -312,7 +312,7 @@ trip can persist.
 
 The default shapes in `34` each carry a complete anonymous style with all seven properties,
 while every modified one is a **variation overriding exactly one**, `stroke`, `shadow`,
-`reflection` or `opacity`. So the variation mechanism established for text in `32` is the
+`reflection` or `opacity`. The variation mechanism established for text in `32` is the
 same mechanism shapes use.
 
 ## Style archives are SHARED BY REFERENCE between drawables
@@ -326,7 +326,7 @@ styles. They have twelve, because unmodified shapes point at the **same archive*
 #903908   shapes [18, 19, 20]
 ```
 
-And `#903915` is doing double duty: it is the style of shapes `[8]` and `[9]` **and** the
+`#903915` is doing double duty: it is the style of shapes `[8]` and `[9]` **and** the
 `parent` that the variations on `[1] [2] [3] [4] [6] [7]` inherit from. A single archive
 therefore backs eight drawables at once, two directly and six by inheritance.
 
@@ -354,7 +354,7 @@ shadow      either an EMPTY sub-message     filled shapes carry an empty shadow;
             is_enabled: false               angle 315 offset 5 radius 1, switched off
 ```
 
-So `HasField("fill")` does not mean the shape is filled, a stroke with a color and a width
+`HasField("fill")` does not mean the shape is filled, a stroke with a color and a width
 does not mean it has a border, and a shadow with a color, angle, offset and radius does not
 mean it casts one. A reader must check **sub-message content** for `fill` and `reflection`,
 the **pattern type** for `stroke`, and **`is_enabled`** for `shadow`, and the three tests are
@@ -395,7 +395,7 @@ type: TSDCurvedShadow    color, angle 90, offset 1,  radius 15, opacity 1
                          curvedShadow { curve: -0.12309546 }
 ```
 
-So the common geometry (color, angle, offset, radius, opacity, `is_enabled`) applies to
+The common geometry (color, angle, offset, radius, opacity, `is_enabled`) applies to
 every kind, and `contactShadow` / `curvedShadow` add the one parameter their kind needs.
 A model with a flat "shadow" record would lose `height` and `curve`.
 
@@ -424,7 +424,7 @@ angle by analogy. Two adjacent fields, two different conventions, neither docume
 A reflection is by comparison trivial: `reflection { opacity: 0.5 }` and nothing else. `34`
 carries exactly one, so the only reflection parameter observed is its opacity.
 
-### A stroke carries a six-slot dash array that nothing in the corpus uses
+### A stroke carries a six-slot dash array that nothing in the documents uses
 
 Every stroke in `34` has the identical shape:
 
@@ -434,7 +434,7 @@ pattern { type, phase: 0, count: 0, pattern: 0 x6 }
 ```
 
 `pattern.pattern` is a **fixed six-element array** with a `count` saying how many slots are
-live, and `phase` for the dash offset. `count` is `0` in every style in the corpus, so a
+live, and `phase` for the dash offset. `count` is `0` in every style in the documents, so a
 dashed or dotted border is representable but **unexercised**, the layout of the array is
 inferred from the schema rather than measured, and needs its own fixture before a writer
 should emit one.
@@ -456,7 +456,7 @@ gradient and image fills    every fill in the fixture is a flat rgb color
 `head_line_end` and `tail_line_end` appear on the style **and** on `ShapeArchive`, and `34`
 resolves which one Numbers uses. Every `ShapeArchive` in the fixture sets exactly
 `style`, `pathsource` and `strokePatternOffsetDistance`, **the line-end fields on the shape
-itself are never set**, even on the lines that do carry arrowheads. So the style is where
+itself are never set**, even on the lines that do carry arrowheads. The style is where
 line ends live in practice, and the shape-level fields should be read as a fallback rather
 than written.
 
@@ -495,7 +495,7 @@ without Apple's engine. The `identifier` is a convenience, not the definition, a
 should draw the path and use the name only for reporting.
 
 Every arrowhead is authored in a **6 x 6 box** regardless of shape, scaled at draw time.
-`is_filled` distinguishes the open variants, whose paths are deliberately unclosed. And
+`is_filled` distinguishes the open variants, whose paths are deliberately unclosed.
 `end_point` is where the line attaches, which **may be negative**, `'open circle'` at
 `-0.3` and `'line'` at `-0.8` pull the line back so it does not show through the marker.
 
@@ -568,7 +568,7 @@ Data/tile-pattern-18.png             239,547     byte-identical to the source
 Data/tile-pattern-small-19.png        66,686
 ```
 
-Originals are stored **unmodified**, verified by hash in `28` and consistent here. But each
+Originals are stored **unmodified**, verified by hash in `28` and consistent here. However, each
 one gains a `-small` companion, and **the companion of the orientation image is LARGER than
 the original** (18 KB against 14 KB). "Small" means smaller *dimensions*, not fewer bytes:
 the source has large flat regions that compress extremely well and the re-encoded derivative
@@ -583,7 +583,7 @@ data.identifier          18  ->  Data/tile-pattern-18.png
 thumbnailData.identifier 19  ->  Data/tile-pattern-small-19.png
 ```
 
-So an image costs **two** package members and two asset identifiers, and the numeric suffix
+An image costs **two** package members and two asset identifiers, and the numeric suffix
 in each filename is the identifier that refers to it.
 
 Two consequences. A writer must not assume a derivative is smaller, and **regenerating
@@ -644,7 +644,7 @@ step.
 Twelve of the thirteen images have `aspect_ratio_locked: True`. The one that does not is
 precisely the squashed placement, `22.6 x 92.0` against a natural `800 x 500`.
 
-So the flag is the user having unlocked the proportions in the interface, not a derived fact.
+The flag is the user having unlocked the proportions in the interface, not a derived fact.
 It correlates with distortion here but does not define it: **the distortion is still only
 visible by comparing `size` to `naturalSize`**, and an unlocked image that happens to sit at
 its natural ratio is undistorted. A reader wanting "is this stretched" must compare the sizes;
@@ -662,7 +662,7 @@ the image's `naturalSize`, not normalized and not in points. An untraced image s
 one, describing the full rectangle, so its presence says nothing.
 
 `ImageArchive` also has a **`flags` field of its own**, distinct from `geometry.flags` and
-`0` on every image in the corpus. Nothing observed sets it, so its meaning is unestablished
+`0` on every image in the documents. Nothing observed sets it, so its meaning is unestablished
 and it must be carried through rather than reconstructed.
 
 `interpretsUntaggedImageDataAsGeneric` is `False` throughout, a color-management switch for
@@ -684,12 +684,12 @@ size 632.9x395.6   MASK pos=(-127.6,-97.0)  size=293.3x294.8    cropped AND scal
 **The image's `size` does not change when it is cropped**, it still describes the whole
 image. The mask's size is what the reader sees.
 
-So **the on-screen footprint of a cropped image is the MASK's size, not the image's**.
+**The on-screen footprint of a cropped image is the MASK's size, not the image's**.
 Reporting `size` for a cropped image would be wrong by a factor of three in these examples,
 and wrong silently, since both numbers are plausible.
 
 **Mask positions may be negative**, which places the visible window past the image's
-top-left corner. And the last example is cropped *and* scaled, so cropping and scaling are
+top-left corner. The last example is cropped *and* scaled, so cropping and scaling are
 independent transforms rather than alternatives, a reader has to resolve both.
 
 An uncropped image may still carry a mask covering the whole image, so the presence of a
@@ -707,7 +707,7 @@ mask naturalSize    293.34 x 294.76     the crop window
 mask geometry       pos + size          the crop window, positioned on the image
 ```
 
-So the path does **not** describe the crop. It is a plain rectangle covering the entire
+The path does **not** describe the crop. It is a plain rectangle covering the entire
 image, identical across cropped and uncropped placements alike, while the actual crop is the
 mask's `geometry`, position and size relative to the image's own top-left corner.
 
@@ -720,7 +720,7 @@ mask pos (-44.00, -44.76)   the window starts outside the image
 mask pos (-127.56,-96.98)   outside, and on an image also scaled to 632.9 x 395.6
 ```
 
-Every mask in the corpus is a rectangle. Masking to a **shape** would presumably use the
+Every mask in the documents is a rectangle. Masking to a **shape** would presumably use the
 path, which is what the field is for, but nothing here exercises it, so the rule "the crop
 is the geometry" is established only for rectangular crops and should not be assumed for a
 shape mask.

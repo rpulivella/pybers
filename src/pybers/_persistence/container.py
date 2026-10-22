@@ -10,8 +10,8 @@ Every member's storage method is recorded and replayed rather than assumed. In
 every file examined so far each member is STORED, because the IWA payload is
 already Snappy-compressed and deflating it again buys nothing. That is an
 observation about the files seen, though, not a guarantee about the format, and
-re-deflating a member Apple chose to store would change bytes for no reason. So
-the method travels with the member.
+re-deflating a member Apple chose to store would change bytes for no reason.
+The method travels with the member.
 
 This is the deliberate opposite of how the IWA frame flag is handled one layer
 down. There, an unknown value raises, because handling it would mean shipping an

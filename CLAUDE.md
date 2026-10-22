@@ -166,7 +166,7 @@ functions over explanation.
 - **Internal, twelve lines soft limit**, and only to record a measurement, an invariant,
   or a format trap that would otherwise be rediscovered the hard way.
 - **Longer than that belongs in `docs/findings/findings-*.md`** with a one-line pointer.
-  A docstring is the wrong container for a corpus survey.
+  A docstring is the wrong container for a survey across the documents.
 - **Comments are one line, and say why.** Never narrate code, restate a name, describe
   the current patch, leave removal breadcrumbs, or comment out code.
 - Module docstrings carry a dated `UPDATES` block. No contractions anywhere.

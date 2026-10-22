@@ -193,7 +193,7 @@ def testRichTextCellConsumesItsPayloadKey() -> None:
     and every reference on a rich-text cell was read one slot early, yielding plausible
     style keys that pointed at the wrong styles, with nothing raising.
 
-    Built by hand so it tests the decoder rather than a document.
+    Constructed in the test so it tests the decoder rather than a document.
     """
     from pybers._persistence.cells import decodeRecord
 

@@ -5,7 +5,7 @@ A merge whose covered positions carry records, which only an import produces.
 Numbers writes no record at a position its own merge covers. Excel writes a
 `<c>` element for every cell of a merged range, a covered one carrying a style
 and no value, and Numbers keeps each of them on import and across every later
-edit. So a document that began life as a spreadsheet holds records the reader
+edit. A document that began life as a spreadsheet holds records the reader
 had no cell to put them in, and refused to open at all.
 
 `22e-merge-imported` is that document, converted from a generated workbook.

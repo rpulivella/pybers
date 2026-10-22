@@ -40,7 +40,7 @@ be checked against a fixture where the tables hold visibly different text.
 briefly recorded as a deliberate character-spacing setting. It is a built-in template style's
 default, and the baseline proves it: nothing had been done to that file.
 
-**Check the baseline before attributing any value to a fixture's author.** The corpus is a
+**Check the baseline before attributing any value to a fixture's author.** The fixtures form a
 star around `00-baseline`, so anything the baseline also carries is Apple's, not ours. The
 same reasoning already retired the selection archives as noise; this is the general form of
 it.

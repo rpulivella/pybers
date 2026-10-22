@@ -34,13 +34,13 @@ direction around a format that is already a tree.
 and the value slot caches what it evaluated to.
 
 Two consequences. Reading a value never requires evaluating anything, because the answer is
-already stored. And **writing a formula means writing a plausible cached result too**, a
+already stored. **Writing a formula means writing a plausible cached result too**, a
 stale or missing one would display the wrong number until Numbers recalculated.
 
 **Opening the document is not when it recalculates**, measured 2026-09-02 against
 `tests/golden/20-formula-shapes-multisheet-edited.numbers`. That file's `A1:A10` were
 raised to 10055 while `A11`, holding `SUM(A1:A10)`, still displayed the cached 55 after
-a clean open with no warning. So the staleness above is not a transient a writer can
+a clean open with no warning. The staleness above is not a transient a writer can
 count on Numbers resolving: it survives on screen, and it reaches every formula
 depending on an edited cell, not only a formula the writer wrote itself.
 
@@ -128,10 +128,10 @@ absolute_row    { range_begin: 0 }
 four true for the locked one, so anchoring is expressed twice, in the field variant and in
 the bits.
 
-**That doubling belongs to RANGES only**, measured across the whole corpus on 2026-09-03
+**That doubling belongs to RANGES only**, measured across every document on 2026-09-03
 for PYB-41 and stated here because the paragraph above reads as a general rule and is not
 one. A range node carries both records. A single-cell reference carries the `absolute`
-flag on each coordinate and **no sticky bits at all**, 0 of 21 in the corpus. A reader
+flag on each coordinate and **no sticky bits at all**, 0 of 21 in the documents. A reader
 that took the bits as authoritative for a single-cell reference would find none and
 report every such reference unlocked, which is a plausible wrong answer rather than an
 error: the formula still resolves, simply to the wrong cell once it is moved.
@@ -230,7 +230,7 @@ on a range:
 ```
 cell_dependencies         CellDependenciesExpandedArchive, on the owner entry
 tiled_cell_dependencies   references to CellRecordTileArchive (type 4009), 32 columns
-                          per tile; every tile in the corpus begins at row 0, so the
+                          per tile; every tile in the documents begins at row 0, so the
                           row extent is NOT established
 ```
 
@@ -296,7 +296,7 @@ column = 32767      (0x7FFF, maximum int16)
 row    = 2147483647 (0x7FFFFFFF, maximum int32)
 ```
 
-So `#REF` is a coordinate deliberately pointing nowhere, and is recognizable structurally.
+`#REF` is a coordinate deliberately pointing nowhere, and is recognizable structurally.
 
 An **unknown function keeps its spelling**: node type `31` carries
 `unknown_function_node_string = "UNKNOWNFUNC"` with its argument count. Numbers preserves
@@ -309,7 +309,7 @@ one the file records.
 
 **The kind of error is not stored.** The `FORMULA_ERROR` data list is empty; an error cell is
 simply type 8 pointing at an ordinary formula. Division by zero is indistinguishable in the
-file from any other failure. Only `#REF` is visible, through those sentinels. So pybers can
+file from any other failure. Only `#REF` is visible, through those sentinels. pybers can
 report *that* a cell errored and, for broken references, *why*, but reproducing Numbers'
 error text for anything else would mean evaluating the formula.
 
@@ -329,7 +329,7 @@ error text for anything else would mean evaluating the formula.
 **An operator IS its node type, and carries nothing else**, added 2026-09-04 from
 PYB-41 along with types 3 and 6. `1+1` is type 1, `2*3` is type 3, `"a"&"b"` is type 6,
 and none of them holds a field beyond `AST_node_type`, arity being implied. Every
-FUNCTION, by contrast, is type 16 distinguished by a number. So the name map below is
+FUNCTION, by contrast, is type 16 distinguished by a number. The name map below is
 needed for functions only: operators need at most a node-type-to-symbol table, and that
 one is derivable from these fixtures rather than from Numbers.app.
 
@@ -350,7 +350,7 @@ wrong functions rather than a failure.
 
 Where the two formats DO agree is one level up: both store a formula together with the
 result it last computed. `.xlsx` writes `<f>B7*7</f><v>56</v>`, formula text beside a
-cached value, and Numbers writes a formula key beside a cached value. So interoperation
+cached value, and Numbers writes a formula key beside a cached value. Interoperation
 happens by translating at the boundary, not by sharing an encoding, which is why the
 tables were free to diverge and why building a Numbers formula out of a string cannot
 work. A string carries no per-axis anchoring, no distinction between an offset and a

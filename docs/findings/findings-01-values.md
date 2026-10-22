@@ -70,7 +70,7 @@ that look settled. `12-number-currency` disproved it: **every currency cell carr
 `10`, and 10 is outside the `CellType` enum entirely**, that enum stops at 9, and
 `CellValueType` puts currency at 9, not 10.
 
-So the storage byte is its own numbering that happens to agree with `CellType` over the
+The storage byte is its own numbering that happens to agree with `CellType` over the
 common types. Treat the enum as a useful guide and **not** as an exhaustive list, and expect
 further values that neither enum names. Anything reading this byte must handle an unknown
 value by preserving it rather than rejecting the cell.
@@ -97,7 +97,7 @@ unchanged.
 
 ## How many trailing references a record carries, and what byte 8 says about its value
 
-Measured for PYB-61 across every record in the corpus, 11,760 of them spanning all nine
+Measured for PYB-61 across every record in the documents, 11,760 of them spanning all nine
 cell types. Writing text over a number moves every trailing reference, because a
 decimal128 value is sixteen bytes and a pooled string key is four, so the count and the
 placement both have to be right before a type can change.
@@ -138,7 +138,7 @@ why the `0xE0` mask `findings-09` uses for the formula key slot is correct here 
 
 ### Which list each reference-bearing bit points into
 
-Measured for PYB-61 across the corpus. A bit is named by the `format_type` its key
+Measured for PYB-61 across the documents. A bit is named by the `format_type` its key
 resolves to, since a format entry states its own kind and a small key is otherwise a
 plausible entry in several lists at once.
 
@@ -332,7 +332,7 @@ Measured across `12-number-currency`, which carries nine currency variants besid
 sits at the same offset in the same decimal128 encoding in both, signs included, the three
 negative variants decode to `-1234.5` correctly from decimal128's sign bit.
 
-So currency is a **type marker plus a format reference over an ordinary number**. It needs no
+Currency is a **type marker plus a format reference over an ordinary number**. It needs no
 new value type in the model: `Decimal` already covers it. What it needs is somewhere to carry
 the currency code and the presentation, because those are not in the value.
 
@@ -374,7 +374,7 @@ consistent with what is on disk.
 
 This does **not** affect pybers, which stores and returns the underlying value and does not
 emulate how Numbers interprets typing. It affects *fixtures*: when a file is built by typing
-into Numbers, what ends up stored may not be what was typed. So a fixture label should record
+into Numbers, what ends up stored may not be what was typed. A fixture label should record
 **what is displayed**, which is checkable against a screenshot, rather than what was entered,
 which is not recoverable from the file.
 
@@ -432,7 +432,7 @@ expected content is known independently.
 ## Durations, and what finally settles the type-versus-format question
 
 From `15-duration-formats`. Every duration cell is **type 7** regardless of format, automatic
-units, weeks only, milliseconds abbreviated, no unit shown. So durations behave like percent
+units, weeks only, milliseconds abbreviated, no unit shown. Durations behave like percent
 and date.
 
 **Currency is therefore the only type in the entire set that changes its type byte for a
@@ -562,7 +562,7 @@ DURATION(,,,K1,,)   ->  6,174,000.01 s      K1 read as MINUTES
 DURATION(,,K1,,,)   ->  370,440,000.6 s     K1 read as HOURS
 ```
 
-So the signature is `DURATION(weeks, days, hours, minutes, seconds, milliseconds)`, derived
+The signature is `DURATION(weeks, days, hours, minutes, seconds, milliseconds)`, derived
 from two measurements rather than from documentation. It also corroborates the hours finding
 above independently.
 
@@ -588,7 +588,7 @@ value -1234.5   tail=[1, 4, 2]
 value  0        tail=[1, 4, 2]
 ```
 
-So a custom format with distinct presentations for positive, negative and zero is a **single**
+A custom format with distinct presentations for positive, negative and zero is a **single**
 format archive containing all three, not three formats selected by sign. Its forms are
 decoded in [formats](findings-11-formats.md).
 
@@ -633,7 +633,7 @@ model rather than leaving it to taste.
 
 A checkbox, star rating, slider, stepper and popup menu all store a **normal value**, bool,
 number, or string, and reference a `CONTROL_CELL_SPEC` separately. The control is how the
-value is edited, not what it is. So they need no new value type, only a reference to carry.
+value is edited, not what it is. They need no new value type, only a reference to carry.
 
 **A value the control cannot show is clamped or loses the control.** Measured 2026-10-20 for
 PYB-144 in `73-values-typed-over-controls`, typed into `11-value-types-noformats` by Numbers

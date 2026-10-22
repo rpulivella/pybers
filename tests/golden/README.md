@@ -72,7 +72,7 @@ other when reaching for something to test against.
 A created table carried a `table_id` unrelated to its formula-owner identity, so Numbers
 re-identified the table on open and dropped its dependency tiles, leaving every formula
 unevaluated and a reference to it reading `The formula contains an invalid reference`.
-And a formula that declares no precedents computes once, in whatever order Numbers
+A formula that declares no precedents computes once, in whatever order Numbers
 chooses: the same file read 8 at `A3` on one open and `Cell "B1" contains an error` on
 the next. Both are in findings-10-creation.md and findings-02-formulas.md.
 
@@ -152,7 +152,7 @@ exactly one of them while the other three still passed.
 Row 11 is the fixture's own six formulas plus the two cross-table ones. Column A holds 1
 through 10, and column H is empty except for `H10`, which is now 4, `H11`, which holds 53
 from its own cross-sheet formula, and `H12`, which holds the label text describing row 11.
-So row 11 should read **57, 58, 53, small, an error, 57, 42 and 53**, where the fixture
+Row 11 should read **57, 58, 53, small, an error, 57, 42 and 53**, where the fixture
 read 55, 56, 40, big, 110, 110, 42 and 53. `SUM` ignores text, which is why `H12` leaves
 `A11` and `F11` at 57 rather than failing them.
 
@@ -170,14 +170,14 @@ That was first written up here as a Numbers display convention, which was wrong.
 
 **A range records its anchoring twice, and Numbers believes the second copy.** The tract
 field variant carries it, and an `ASTStickyBits` message beside the tract repeats it. All
-9 ranges in the corpus carry those bits and none is without them. pybers patches the bytes
+9 ranges in the documents carry those bits and none is without them. pybers patches the bytes
 a node was read with, so a range read from a file kept its bits and a range built from
 text had none at all, and absent bits read as unanchored. The tract said absolute, the
 bits said relative, and Numbers showed what the bits said.
 
 The single-cell references were unaffected, which is why nothing caught this earlier: a
 single-cell reference carries anchoring only on its coordinates and never carries sticky
-bits, measured across all 21 in the corpus. The first anchored range pybers ever authored
+bits, measured across all 21 in the documents. The first anchored range pybers ever authored
 is the one written for this golden.
 
 `encodeStickyBits` now writes them from the same `Span.absolute` the tract comes from, so
@@ -264,7 +264,7 @@ built from.
 
 **The first attempt was wrong, and only Numbers could say so.** `L1` holds `=J1`, and
 row 2 labels it "produces cell ref error". Merging `I1:J1` covers `J1` and makes that
-reference invalid; unmerging makes it valid again. So a merge changes what a reference
+reference invalid; unmerging makes it valid again. A merge changes what a reference
 means, which changes a result, and the first candidates carried the result from before
 the change: the merged one displayed 0 where an error belonged and the unmerged one
 displayed the error where 0 belonged. `findings-03-structure.md` had recorded that a
