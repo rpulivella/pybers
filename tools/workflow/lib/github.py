@@ -658,7 +658,7 @@ def readIssueNodeId(token: str, number: int) -> str:
     )
     issue = data["repository"]["issue"]
     if issue is None:
-        raise RuntimeError(f"Issue {formatTicketRef(number)} was not found.")
+        raise RuntimeError(f"{formatTicketRef(number)} was not found.")
     return str(issue["id"])
 
 
@@ -729,7 +729,7 @@ def moveTicketStatus(token: str, number: int, status: str) -> None:
     coordinates = readBoardCoordinates(token)
     itemId = findBoardItem(token, coordinates, number)
     if itemId is None:
-        raise RuntimeError(f"Issue #{number} is not on the board.")
+        raise RuntimeError(f"{formatTicketRef(number)} is not on the board.")
     setBoardStatus(token, coordinates, itemId, status)
 
 
