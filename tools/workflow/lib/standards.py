@@ -48,6 +48,8 @@ neither may be hand-edited, so a finding in either is noise by construction.
 Runs on the repository's venv, which holds rich.
 
 UPDATES
+2026-10-21  Comments come from the tokenizer, so a `#` inside a string is not
+            read as one, for PYB-249.
 2026-10-21  Fails the phrases the writing rules added, and a sentence opening
             on a conjunction or a preamble, for PYB-249.
 2026-10-13  Moved here from `scripts/standards-check.py`, for PYB-204.
@@ -127,8 +129,11 @@ __date__ = "2026/08/27"
 import argparse
 import ast
 import contextlib
+import io
+import itertools
 import re
 import subprocess
+import tokenize
 from pathlib import Path
 
 from rich.console import Console
@@ -386,9 +391,14 @@ def extractPythonProse(text: str) -> str:
     syntax error still gets its comments checked instead of being skipped.
     """
     keep = ["\n" if character == "\n" else " " for character in text]
-
-    for match in re.finditer(r"#[^\n]*", text):
-        keep[match.start():match.end()] = text[match.start():match.end()]
+    offsets = list(itertools.accumulate((len(line) + 1 for line in text.split("\n")),
+                                        initial=0))
+    # A pattern read a `#` inside a string as a comment, and the tokenizer never does.
+    with contextlib.suppress(tokenize.TokenError, SyntaxError):
+        for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            if token.type == tokenize.COMMENT:
+                start = offsets[token.start[0] - 1] + token.start[1]
+                keep[start:start + len(token.string)] = token.string
 
     try:
         tree = ast.parse(text)

@@ -120,7 +120,7 @@ def testLetUsIsNoLongerExemptFromTheWeakLetCheck() -> None:
 
 @pytest.mark.parametrize(
     "source",
-    [f"x = 1  {chr(35)} So it runs.\n", 'def f():\n    """And this opens badly."""\n',
+    ["x = 1  # So it runs.\n", 'def f():\n    """And this opens badly."""\n',
      'def f():\n    """Run it.\n\n    But this opens badly.\n    """\n'],
     ids=["comment", "one-line docstring", "docstring paragraph"],
 )
@@ -139,3 +139,15 @@ def testAOneLineDocstringIsChecked() -> None:
 
 def testASentenceAfterAClosingQuoteIsChecked() -> None:
     assert findMessages('It ran." So it stopped.\n') != []
+
+
+def testAHashInsideAStringIsNotAComment() -> None:
+    findings: list = []
+    standards.checkFile(Path("sample.py"), findings, 'label = "# So it runs."\n')
+    assert findings == []
+
+
+def testAFileThatCannotTokenizeKeepsItsEarlierComments() -> None:
+    findings: list = []
+    standards.checkFile(Path("sample.py"), findings, "# It is load-bearing.\nx = (\n")
+    assert any("load-bearing" in finding[3] for finding in findings)
