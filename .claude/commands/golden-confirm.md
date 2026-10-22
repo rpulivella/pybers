@@ -5,21 +5,19 @@ argument-hint: <golden in tests/golden/, such as 11-text-written-and-retyped.num
 
 # /golden-confirm
 
-Open a temporary copy of a golden in running Numbers, check every cell its expected-values
-file names, and write a report. The report turns confirming a golden into reading one
+Open a temporary copy of a golden in running Numbers, check every cell of every table
+against what pybers reads from the golden, and write a report. The report turns confirming a golden into reading one
 page, rather than a manual session in Numbers.
 
 **It does not replace QA's confirmation.** Only Numbers can confirm a golden, and
-only a person can confirm what the screenshots show. A run that passes means Numbers read
-what the expected-values file says. The checks it leaves for QA remain yours.
+only a person can confirm what the screenshots show. A run that passes means Numbers and
+pybers read the golden alike. The checks it leaves for QA remain yours.
 
 ## Steps
 
 1. **Resolve the golden** from `$ARGUMENTS`. It must be a `.numbers` file in
-   `tests/golden/`, with `tests/golden/<golden>.expected.toml` beside it. If the file has
-   no expected values yet, write them from what the golden's row in
-   `tests/golden/README.md` records and what each formula computes, **never** from what
-   Numbers shows, since copying Numbers' output into the expectation proves nothing.
+   `tests/golden/`. Its expected values are generated from it on every run, so none is
+   ever written by hand.
 2. **Check the helper and its permissions:**
    ```
    .venv/bin/python3 -m tools.local.golden_confirm permissions

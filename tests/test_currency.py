@@ -262,11 +262,3 @@ def testTheCurrencyGoldenMatchesWhatThisLibraryProduces(tmp_path: Path) -> None:
         readPackage(golden), readPackage(writeCurrencyGolden(tmp_path))
     )
     assert not differences, "\n  ".join(differences)
-
-
-def testTheCurrencyGoldensExpectationsAreGeneratedNotWritten() -> None:
-    from tools.local.lib.golden_confirm import buildExpectedToml
-
-    golden = goldenDirectory / f"{goldenName}.numbers"
-    expected = golden.with_name(f"{goldenName}.expected.toml")
-    assert expected.read_text() == buildExpectedToml(golden)

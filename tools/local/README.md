@@ -53,9 +53,14 @@ a newer Numbers reviewable rather than a silent replacement.
 ## What a golden confirmation leaves behind
 
 `golden_confirm.py run <golden>` writes its report into `workarea/golden-confirm/<ticket>/<golden>/`,
-beside a copy of the golden that is safe to open and save, and `expectations.md`, the
-golden's expected values as a heading per cell with bullets, generated from its
-`.expected.toml`.
+beside a copy of the golden that is safe to open and save. Its expected values are
+generated from the golden by `lib/golden_expected.py` on every run, every filled cell of
+every table as pybers reads it, and written as `expectations.md`, to read beside the
+copy, and `expectations.toml`, their machine form.
+
+Every cell of every table is read through AppleScript for its value, formula and format,
+and a cell the expectations leave out must be empty. A currency or a control is read in
+the inspector too, since only the inspector shows its settings.
 
 ## A measurement's recipe
 
