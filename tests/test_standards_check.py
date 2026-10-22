@@ -116,3 +116,26 @@ def testLetUsIsNoLongerExemptFromTheWeakLetCheck() -> None:
     findings: list = []
     standards.checkFile(Path("sample.md"), findings, "This will let us ship.\n")
     assert any("weak" in finding[3] for finding in findings)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [f"x = 1  {chr(35)} So it runs.\n", 'def f():\n    """And this opens badly."""\n',
+     'def f():\n    """Run it.\n\n    But this opens badly.\n    """\n'],
+    ids=["comment", "one-line docstring", "docstring paragraph"],
+)
+def testAPythonSentenceOpeningOnABannedWordFails(source: str) -> None:
+    findings: list = []
+    standards.checkFile(Path("sample.py"), findings, source)
+    assert any("sentence opens" in finding[3] for finding in findings)
+
+
+def testAOneLineDocstringIsChecked() -> None:
+    findings: list = []
+    source = 'def f():\n    """It is load-bearing."""\n'
+    standards.checkFile(Path("sample.py"), findings, source)
+    assert any("load-bearing" in finding[3] for finding in findings)
+
+
+def testASentenceAfterAClosingQuoteIsChecked() -> None:
+    assert findMessages('It ran." So it stopped.\n') != []

@@ -280,8 +280,10 @@ bannedPhrases: tuple[tuple[re.Pattern[str], str], ...] = (
 
 # A sentence never opens on a conjunction or a preamble. Case-sensitive, because a
 # capital marks the opening: a wrapped line that starts `and` continues a sentence.
+# A comment's `#` and a docstring's opening quote stay in the prose view.
 sentenceOpenerRe = re.compile(
-    r"(?:^[ \t]*(?:[-*>][ \t]+|\d+\.[ \t]+)?|(?<=[.!?])[ \t\n]+)"
+    r"(?:^[ \t]*(?:#+[ \t]*|[\"'][ \t]*|[-*>][ \t]+|\d+\.[ \t]+)?"
+    r"|[.!?][\"'”’)\]]*[ \t\n]+)"
     r"(And|But|So|Allow\s+me|Let\s+us)\b",
     re.MULTILINE,
 )
@@ -413,6 +415,8 @@ def extractPythonProse(text: str) -> str:
     # proto import. Those are samples, not sentences, exactly as a markdown fence
     # is, so they come out before any prose rule sees them.
     out = "".join(keep)
+    # A docstring's own quotes go first, or a one-line docstring reads as a sample.
+    out = re.sub(r'"""|\'\'\'', blankSpan, out)
     out = re.sub(r"`[^`\n]*`", blankSpan, out)
     return re.sub(r'"[^"\n]*"', blankSpan, out)
 

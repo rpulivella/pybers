@@ -43,7 +43,7 @@ def testAnEditReachesTheModelNumbersReached(name: str) -> None:
 
 
 def testARangeGrowingPastTheInsertionMovesOnlyItsFarEnd() -> None:
-    """PYB-17 AC 2.i, the ticket's own example on a table built by hand."""
+    """PYB-17 AC 2.i, the ticket's own example on a table the test constructs."""
     table = pybers.Table("Ledger", rowCount=30, colCount=4)
     table.cell("D1").formulaText = "=SUM(C3:C25)"
     table.rowAdd(10)
