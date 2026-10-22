@@ -71,7 +71,7 @@ from .._persistence.index import ArchiveIndex
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
-from ._read import storedKinds
+from ._read import currencyFormatType, currencyTypeByte, storedKinds
 from ._refcounts import StringPool, stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
@@ -103,7 +103,6 @@ class RecordShape:
 
 
 numberTypeByte: int = 2
-currencyTypeByte: int = 10
 dateTypeByte: int = 5
 booleanTypeByte: int = 6
 durationTypeByte: int = 7
@@ -177,7 +176,8 @@ dateAndTimeFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
 def buildCurrencyFormat(code: str) -> tsk.FormatStructArchive:
     """Return the Currency format Numbers gives an amount in one currency."""
     return tsk.FormatStructArchive(
-        format_type=257, decimal_places=2, currency_code=code, negative_style=0,
+        format_type=currencyFormatType, decimal_places=2, currency_code=code,
+        negative_style=0,
         show_thousands_separator=False, use_accounting_style=False,
     )
 
@@ -345,7 +345,7 @@ def patchCurrencyCode(
     current = None if key is None else formatOf(key)
     if current is not None and current.currency_code == cell.value.currency:
         return raw
-    if current is not None and current.format_type != 257:
+    if current is not None and current.format_type != currencyFormatType:
         raise WriteError(
             f"{cell.address} shows its currency through a custom format, and pybers "
             f"cannot change it to {cell.value.currency} yet."
