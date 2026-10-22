@@ -3,6 +3,7 @@
 A cell value read from text: inferred from the text, or read as the kind named.
 
 UPDATES
+2026-10-22  A currency amount reads and prints, for PYB-220.
 2026-10-20  A boolean, a date and a duration read from text, and each value written
             as the text it reads back from, for PYB-144.
 2026-10-20  A kind no parser reads is one Numbers stores but text cannot name, for
@@ -57,13 +58,14 @@ def testTextThatIsNotTheKindNamedIsRefused() -> None:
 
 def testAKindNoParserReadsIsRefusedListingThoseThatDo() -> None:
     with pytest.raises(
-        pybers.WriteError, match="Use number, boolean, date, duration, text"
+        pybers.WriteError, match="Use number, currency, boolean, date, duration, text"
     ):
         parseCellValue("x", "rich-text")
 
 
 @pytest.mark.parametrize("value", [
-    Decimal("-3.50"), Decimal("1E+3"), "hello", True, False,
+    Decimal("-3.50"), Decimal("1E+3"), pybers.CurrencyAmount(Decimal("12.50"), "EUR"),
+    "hello", True, False,
     datetime.datetime(2026, 10, 20), datetime.datetime(2026, 10, 20, 9, 30, 15, 5),
     datetime.timedelta(minutes=90), datetime.timedelta(seconds=-55320),
     datetime.timedelta(days=71, hours=11, milliseconds=10), datetime.timedelta(0),

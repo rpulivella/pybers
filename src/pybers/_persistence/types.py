@@ -21,6 +21,7 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-10-22  Type 222, the custom format list, for PYB-220.
 2026-10-20  A pop-up menu's items, for PYB-144.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-09-22  An identifier is asked for by its class, and nowhere else spells one,
@@ -67,6 +68,7 @@ archiveTypes: frozendict[int, type[Message]] = frozendict({
     1: tn.DocumentArchive,          # the root: holds the ordered sheet list
     2: tn.SheetArchive,             # a tab: its name and its ordered drawables
     205: tsk.TreeNode,              # one entry in the sidebar's sheet and table tree
+    222: tsk.CustomFormatListArchive,  # the document's custom formats, by UUID
     401: tss.StylesheetArchive,     # the shared style registry
     2001: tswp.StorageArchive,      # rich text, and a sheet's headers and footers
     2022: tswp.ParagraphStyleArchive,  # a named text style, or a variation of one

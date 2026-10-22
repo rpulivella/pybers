@@ -50,6 +50,13 @@ Every extractor writes nothing unless `--write` is passed. The default run is a
 read-only report and the differential check at once, which is what makes regenerating on
 a newer Numbers reviewable rather than a silent replacement.
 
+## What a golden confirmation leaves behind
+
+`golden_confirm.py run <golden>` writes its report into `workarea/golden-confirm/<ticket>/<golden>/`,
+beside a copy of the golden that is safe to open and save, and `expectations.md`, the
+golden's expected values as a heading per cell with bullets, generated from its
+`.expected.toml`.
+
 ## A measurement's recipe
 
 `golden_confirm.py measure <name>` makes `tests/measurements/<name>.numbers` in Numbers

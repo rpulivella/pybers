@@ -23,6 +23,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-22  A document reads its locale's currency symbols and placement, for
+            PYB-220.
 2026-10-20  A document carries the time zone an aware `datetime` is written in, for
             PYB-144.
 2026-10-20  `cellSet` writes one cell by its reference, growing the table when asked
@@ -279,6 +281,20 @@ class Document:
     _timeZone: datetime.tzinfo = field(
         default=machineTimeZone, repr=False, compare=False
     )
+    # The document's own locale, which a currency's symbol and placement follow.
+    _currencySymbols: frozendict[str, str] = field(
+        default_factory=frozendict, repr=False, compare=False
+    )
+    _currencyPattern: str = field(default="", repr=False, compare=False)
+
+    @property
+    def currencyPattern(self) -> str:
+        """Return where this document's locale places a symbol, `¤` marking it."""
+        return self._currencyPattern
+
+    def currencySymbolFind(self, code: str) -> str | None:
+        """Return the symbol this document's locale writes a currency with, if any."""
+        return self._currencySymbols.get(code)
 
     @property
     def timeZone(self) -> datetime.tzinfo:

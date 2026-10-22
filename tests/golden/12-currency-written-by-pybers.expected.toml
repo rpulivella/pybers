@@ -1,0 +1,164 @@
+# What Numbers shows for 12-currency-written-by-pybers.numbers, generated from the golden by
+# `buildExpectedToml` in `tools/local/lib/golden_confirm.py`. Regenerate it
+# rather than editing it. Checked by
+# `.venv/bin/python3 -m tools.local.golden_confirm run 12-currency-written-by-pybers.numbers`.
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A1"
+value = 99.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "Swiss Franc (CHF)" }
+qa = ["written by pybers as 99.5 CHF over the plain number 1234.5"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B1"
+value = 12.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "US Dollar ($)" }
+qa = ["written by pybers as the number 12.5 into dollars, nothing else chosen"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C1"
+value = 1234.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "US Dollar ($)" }
+qa = ["input as 1234.5, Currency US Dollar ($), thousands separator"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D1"
+value = 7
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "Euro (€)" }
+qa = ["written by pybers as 7 EUR over dollars, separator, accounting style"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E1"
+value = 1234.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "US Dollar ($)" }
+qa = ["input as 1234.5, Currency US Dollar ($), 0 decimals, thousands separator"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F1"
+value = -1234.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "US Dollar ($)" }
+qa = ["input as -1234.5, Currency US Dollar ($), thousands separator, negatives as red (100)"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G1"
+value = -1234.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "US Dollar ($)" }
+qa = ["input as -1234.5, Currency US Dollar ($), negatives as (100)"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H1"
+value = 1234.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "Euro (€)" }
+qa = ["input as 1234.5, Currency Euro (€), nothing else chosen"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "I1"
+value = -1234.5
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "US Dollar ($)" }
+qa = ["input as -1234.5, Currency US Dollar ($), 5 decimals, thousands separator, accounting style"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "J1"
+value = 1000
+format = "currency"
+dataFormat = { "Data Format" = "Currency", "Currency" = "British Pound (£)" }
+qa = ["written by pybers as 1000 GBP into a cell holding nothing"]
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "A2"
+value = "written by pybers as 99.5 CHF over the plain number 1234.5"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "B2"
+value = "written by pybers as the number 12.5 into dollars, nothing else chosen"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "C2"
+value = "input as 1234.5, Currency US Dollar ($), thousands separator"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "D2"
+value = "written by pybers as 7 EUR over dollars, separator, accounting style"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "E2"
+value = "input as 1234.5, Currency US Dollar ($), 0 decimals, thousands separator"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "F2"
+value = "input as -1234.5, Currency US Dollar ($), thousands separator, negatives as red (100)"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "G2"
+value = "input as -1234.5, Currency US Dollar ($), negatives as (100)"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "H2"
+value = "input as 1234.5, Currency Euro (€), nothing else chosen"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "I2"
+value = "input as -1234.5, Currency US Dollar ($), 5 decimals, thousands separator, accounting style"
+format = "automatic"
+
+[[cell]]
+sheet = "Sheet 1"
+table = "Table 1"
+cell = "J2"
+value = "written by pybers as 1000 GBP into a cell holding nothing"
+format = "automatic"

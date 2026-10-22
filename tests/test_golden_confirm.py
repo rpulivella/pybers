@@ -5,6 +5,8 @@ The golden confirmation report's text, as the report shows it.
 Only `lib/golden_confirm.py` is imported, so nothing here drives Numbers.
 
 UPDATES
+2026-10-22  The expectations a run writes for a person read as headings and bullets,
+            for PYB-220.
 2026-10-21  The Data Format settings the helper names, and a recipe's setting key,
             for PYB-219.
 2026-10-13  The late-import check moved to `test_tooling_layout.py`, which covers
@@ -21,6 +23,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/13"
 
+
+from pathlib import Path
 
 import pytest
 
@@ -84,3 +88,14 @@ def testEveryCommittedRecipeHoldsOnlyKeysTheHelperTakes() -> None:
     recipes = [report.readMeasurementRecipe(name) for name in names]
     steps = [step for recipe in recipes for step in recipe.steps]
     assert any(step.get("setting") == "Rule" for step in steps)
+
+
+def testTheExpectationsReadAsOneShortEntryPerCell(tmp_path: Path) -> None:
+    golden = report.goldenDirectory / "12-currency-written-by-pybers.numbers"
+    written = report.writeExpectations(
+        golden, report.readExpectedValues(golden), tmp_path
+    ).read_text()
+    assert written.startswith("# 12-currency-written-by-pybers.numbers\n")
+    assert "### A1 · measured\n- value: `99.5`\n- format: currency\n" in written
+    assert "Swiss Franc (CHF)\n\n### A2 · describes A1\n" in written
+    assert "|" not in written

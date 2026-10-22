@@ -14,6 +14,8 @@ a value typed into a fresh cell takes it, and drops the control the old value ha
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-22  A `CurrencyAmount` writes as currency, and a new code keeps the other
+            settings of its format, for PYB-220.
 2026-10-20  Any value is written over any value, each kind's record shape held in
             one table, for PYB-144. A new cell's shape is a sibling's style alone.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
@@ -55,8 +57,10 @@ from .._persistence.cells import (
     dateFormatSlot,
     displayedKindSlot,
     durationFormatSlot,
+    findSlotValue,
     listReferenceSlots,
     numberFormatSlot,
+    patchSlotValue,
     referenceWidth,
     slotOrder,
     textFormatSlot,
@@ -65,8 +69,9 @@ from .._persistence.cells import (
 from .._persistence.decimal128 import Decimal128, encodedLength
 from .._persistence.index import ArchiveIndex
 from ..addressing.reference import originOffset
+from ..currency import CurrencyAmount
 from ..errors import WriteError
-from ._read import storedKinds
+from ._read import currencyFormatType, currencyTypeByte, storedKinds
 from ._refcounts import StringPool, stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
@@ -98,7 +103,6 @@ class RecordShape:
 
 
 numberTypeByte: int = 2
-currencyTypeByte: int = 10
 dateTypeByte: int = 5
 booleanTypeByte: int = 6
 durationTypeByte: int = 7
@@ -168,8 +172,26 @@ dateAndTimeFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
 )
 
 
+# As Numbers' menu writes it, in `88-formula-currency-results` and `12-number-currency`.
+def buildCurrencyFormat(code: str) -> tsk.FormatStructArchive:
+    """Return the Currency format Numbers gives an amount in one currency."""
+    return tsk.FormatStructArchive(
+        format_type=currencyFormatType, decimal_places=2, currency_code=code,
+        negative_style=0,
+        show_thousands_separator=False, use_accounting_style=False,
+    )
+
+
+# A currency amount a person formatted sets both, measured on all 296 such records.
+currencyChosenBit: int = 0x02
+currencyCellOffset: int = 7
+currencyCellBit: int = 0x08
+
+
 def findAutomaticFormat(value: CellValue) -> tsk.FormatStructArchive:
     """Return the format a value takes in a cell whose kind it changed."""
+    if isinstance(value, CurrencyAmount):
+        return buildCurrencyFormat(value.currency)
     if isinstance(value, str):
         return automaticTextFormat
     if isinstance(value, bool):
@@ -210,6 +232,8 @@ def formatStoredValue(record: CellRecord) -> str:
 
 def findWrittenTypeByte(value: CellValue) -> int:
     """Return the record type a value is stored as, a number as a plain number."""
+    if isinstance(value, CurrencyAmount):
+        return currencyTypeByte
     if isinstance(value, str):
         return stringTypeByte
     if isinstance(value, bool):
@@ -245,6 +269,8 @@ def encodeCellValue(
         return stringTypeByte, key.to_bytes(width, "little")
     if isinstance(value, bool):
         return booleanTypeByte, encodeSeconds(1.0 if value else 0.0)
+    if isinstance(value, CurrencyAmount):
+        return currencyTypeByte, Decimal128(value.amount).asBytes()
     if isinstance(value, Decimal):
         # A number over currency keeps its currency, which the format holds.
         kept = record.typeByte == currencyTypeByte and not borrowed
@@ -258,7 +284,7 @@ def encodeCellValue(
         return durationTypeByte, encodeSeconds(value.total_seconds())
     raise WriteError(
         f"{cell.address} was given a {type(value).__name__}, and pybers writes a "
-        "Decimal, a str, a bool, a datetime or a timedelta."
+        "Decimal, a CurrencyAmount, a str, a bool, a datetime or a timedelta."
     )
 
 
@@ -269,6 +295,7 @@ def buildWrittenRecord(
     *,
     borrowed: bool = False,
     formatFor: Callable[[tsk.FormatStructArchive], int | None] = lambda wanted: None,
+    formatOf: Callable[[int], tsk.FormatStructArchive | None] = lambda key: None,
 ) -> bytes:
     """Return this cell's record carrying its new value, retyped when its kind changed.
 
@@ -283,14 +310,57 @@ def buildWrittenRecord(
         record = decodeRecord(record.column, borrowShape(record))
     typeByte, encoded = encodeCellValue(cell, record, pool, borrowed)
     if typeByte == record.typeByte and not borrowed:
-        return patchValue(record, encoded)
+        patched = patchValue(record, encoded)
+        if isinstance(cell.value, CurrencyAmount):
+            patched = patchCurrencyCode(patched, record, cell, formatFor, formatOf)
+        return patched
     own = record.typeByte == stringTypeByte and not borrowed
     if own and pool is not None and isinstance(record.value, int):
         pool.release(record.value)
-    return retypeRecord(
+    retyped = retypeRecord(
         record, typeByte, encoded,
         formatKey=formatFor(findAutomaticFormat(cell.value)),
     )
+    if typeByte != currencyTypeByte:
+        return retyped
+    header = bytearray(retyped[:valueOffset])
+    header[chosenFormatOffset] |= currencyChosenBit
+    header[currencyCellOffset] |= currencyCellBit
+    return bytes(header) + retyped[valueOffset:]
+
+
+def patchCurrencyCode(
+    raw: bytes,
+    record: CellRecord,
+    cell: Cell,
+    formatFor: Callable[[tsk.FormatStructArchive], int | None],
+    formatOf: Callable[[int], tsk.FormatStructArchive | None],
+) -> bytes:
+    """Return a currency record naming its new currency, every other setting kept.
+
+    A custom format holds its currency in the document's list, which PYB-245 edits.
+    """
+    assert isinstance(cell.value, CurrencyAmount)
+    key = findSlotValue(record, currencyFormatSlot)
+    current = None if key is None else formatOf(key)
+    if current is not None and current.currency_code == cell.value.currency:
+        return raw
+    if current is not None and current.format_type != currencyFormatType:
+        raise WriteError(
+            f"{cell.address} shows its currency through a custom format, and pybers "
+            f"cannot change it to {cell.value.currency} yet."
+        )
+    wanted = buildCurrencyFormat(cell.value.currency)
+    if current is not None:
+        wanted.CopyFrom(current)
+        wanted.currency_code = cell.value.currency
+    fresh = formatFor(wanted)
+    if fresh is None or key is None:
+        raise WriteError(
+            f"{cell.address} names no currency format to change to "
+            f"{cell.value.currency}."
+        )
+    return patchSlotValue(raw, currencyFormatSlot, fresh)
 
 
 def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:

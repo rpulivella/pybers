@@ -37,12 +37,18 @@ One record holds an explicit bit over an archive identical to Automatic:
 `15-number-duration-formats` `K1`, `DUR2MINUTES(I1)`, sets `0x01` over format `256` with
 253 decimal places, where `J1`, `I1+10`, leaves it clear over the same entry.
 
-### Byte 7 `0x08`: a currency cell
+### Byte 7 `0x08`: a currency format chosen for a currency amount
 
-Set on all 294 type 10 records, in 9 documents, and on no other record. Every record
-that displays with the currency kind is type 10, and every type 10 record displays with
-it. A currency format is therefore three things written together: type 10, byte 7
+Set on all 296 records that are type 10 and carry byte 6 `0x02`, and on no other record.
+The 25 records holding a chosen currency format without being type 10, a percent that
+remembers a currency, leave it clear, and so do the two type 10 records whose currency
+came from a formula rather than a choice, `88-formula-currency-results` `C1` and `D1`.
+Every type 10 record displays with the currency kind. A currency amount a person
+formatted is therefore four things written together: type 10, byte 6 `0x02`, byte 7
 `0x08`, and the currency kind in the displayed slot.
+
+Byte 7 `0x80` is set on one record, `88-formula-currency-results` `D1`, `=SUM(A1,A1)`,
+and on no other, so what it records is not established.
 
 ### Byte 4 `0x02`: a custom format
 
@@ -99,6 +105,29 @@ The menu titles 2 and 3 alike, so the color is the only difference between them.
 | `negative_style` | 0 to 3 | `12-number-currency` `G1` and `F1`, `74-number-negatives` `F1` |
 | `show_thousands_separator` | both | `12-number-currency` `C1` |
 | `use_accounting_style` | both | `12-number-currency` `D1` |
+
+**A formula's currency result is stored as a currency amount only when currency
+survives the arithmetic.** Measured in `88-formula-currency-results`, over a euro amount
+in `A1` and a dollar amount in `B1`:
+
+| formula | stored as | shows |
+| --- | --- | --- |
+| `=A1*2`, `=SUM(A1,A1)` | type 10, naming `A1`'s euro format | €2469.00 |
+| `=A1+10`, `=A1/B1` | type 2, the Automatic number format | 1244.5, 12.345 |
+| `=A1+B1` | type 8, a formula error | nothing |
+| `=DOLLAR(1234.5)` | type 3, text | $1,234.50 |
+
+A result that stays currency names the same format entry as the amount it came from,
+so its code is that amount's code, and byte 6 is clear, since nobody chose it. Adding
+euros to dollars is refused by Numbers as an error. `CURRENCYCONVERT` stored a formula
+error in this run and in a second given a minute to resolve, so a converted result is
+not measured.
+
+**A currency's symbol comes from the document's locale.** The snapshot holds 23 symbols
+by code in `formatting_symbols.currency_symbols`, and they differ by region: the yen is
+`¥` under `en_US` in `82-currencies` and `JP¥` under `en_IT` in
+`72b-date-time-zones-region`. A currency with no entry, such as the Swedish krona, has
+no symbol there.
 
 **Choosing a currency does not choose its decimals.** `82-currencies` gives the yen and
 the won 2 decimal places, as it gives every currency measured, where neither is
@@ -392,7 +421,7 @@ and a document made under another calendar is not measured.
 | family | pybers writes | pybers carries through |
 | --- | --- | --- |
 | number | `decimal_places`, `negative_style`, `show_thousands_separator` | |
-| currency | `decimal_places`, `currency_code`, `negative_style`, `show_thousands_separator`, `use_accounting_style`, with type 10 and byte 7 `0x08` | |
+| currency | `decimal_places`, `currency_code`, `negative_style`, `show_thousands_separator`, `use_accounting_style`, with type 10 and bytes 6 `0x02` and 7 `0x08` | byte 7 `0x80` |
 | percent | `decimal_places`, `negative_style`, `show_thousands_separator` | |
 | scientific | `decimal_places`, with `negative_style` 0 and no separator | |
 | fraction | `fraction_accuracy` | |

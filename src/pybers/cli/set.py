@@ -97,7 +97,10 @@ def runSet(
         str,
         typer.Argument(
             metavar="VALUE",
-            help="The value as text: 42, TRUE, 2026-10-20 09:00, 1h 30m, or any text.",
+            help=(
+                "The value as text: 42, 42 EUR, TRUE, 2026-10-20 09:00, 1h 30m, or any "
+                "text."
+            ),
             show_default=False,
         ),
     ],
@@ -108,7 +111,7 @@ def runSet(
             metavar="KIND",
             help=(
                 "Read VALUE as this kind rather than inferring it. One of: number, "
-                "boolean, date, duration, text."
+                "currency, boolean, date, duration, text."
             ),
         ),
     ] = None,

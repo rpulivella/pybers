@@ -14,10 +14,11 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. `pybers set FILE CELL VALUE` sets one cell, whatever it held, reading the value as a number, a boolean, a date, a duration or text unless `--as` names the kind, and `--preview` shows the change without writing it:
+`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. `pybers set FILE CELL VALUE` sets one cell, whatever it held, reading the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind, and `--preview` shows the change without writing it:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B4" 1250.00 --in-place
+pybers set budget.numbers "Summary::Costs::G4" "1250.00 EUR" --in-place
 pybers set budget.numbers "Summary::Costs::C4" "2026-10-20 09:30" --in-place
 pybers set budget.numbers "Summary::Costs::D4" "1h 30m" --in-place
 pybers set budget.numbers "Summary::Costs::E4" TRUE --in-place
@@ -29,6 +30,7 @@ A date is stored as wall-clock time, as Numbers stores it. One given with an off
 `--as` specifies one of these kinds:
 
 - `number`: `1250.00`, `-3.5`, `1e3`
+- `currency`: an amount and the ISO 4217 code of a currency Numbers offers, `1250.00 EUR`
 - `boolean`: `TRUE` or `FALSE`, in any case
 - `date`: a date or a date and time in ISO 8601, `2026-10-20` or `2026-10-20 09:30`
 - `duration`: Numbers' own units, `1h 30m` or `2d 4h`, or a clock, `1:30`

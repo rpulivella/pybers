@@ -9,6 +9,7 @@ and needs no rule of its own. Seeds that begin no series return no continuation,
 a fill repeats them.
 
 UPDATES
+2026-10-22  A run of amounts in one currency continues, for PYB-220.
 2026-09-30  Written for PYB-137.
 """
 from __future__ import annotations
@@ -28,7 +29,12 @@ from collections.abc import Callable, Sequence
 from decimal import Decimal
 from itertools import pairwise
 
-type SeedValue = Decimal | str | bool | datetime.datetime | datetime.timedelta | None
+from pybers.currency import CurrencyAmount
+
+type SeedValue = (
+    Decimal | CurrencyAmount | str | bool
+    | datetime.datetime | datetime.timedelta | None
+)
 type SeriesContinuation = Callable[[int], SeedValue]
 
 # A full name comes before its abbreviation, so a lone `May` continues as `June`.
@@ -146,6 +152,22 @@ def findTextContinuation(seeds: Sequence[str]) -> SeriesContinuation | None:
     return findNumberedTextContinuation(seeds)
 
 
+def findCurrencyContinuation(
+    seeds: Sequence[CurrencyAmount],
+) -> SeriesContinuation | None:
+    """Continue amounts in one currency as numbers are, never a mix of currencies."""
+    codes = {seed.currency for seed in seeds}
+    if len(codes) != 1 or len(seeds) < 2:
+        return None
+    amounts = findNumberContinuation([seed.amount for seed in seeds])
+    if amounts is None:
+        return None
+    code = codes.pop()
+    return lambda offset: CurrencyAmount(
+        amounts(offset), code  # type: ignore[arg-type]
+    )
+
+
 def findSeriesContinuation(seeds: Sequence[SeedValue]) -> SeriesContinuation | None:
     """Return each value of the series the seeds begin, given its offset from the first.
 
@@ -160,6 +182,8 @@ def findSeriesContinuation(seeds: Sequence[SeedValue]) -> SeriesContinuation | N
         if len(seeds) < 2:
             return None
         return findNumberContinuation(seeds)  # type: ignore[arg-type]
+    if kinds == {CurrencyAmount}:
+        return findCurrencyContinuation(seeds)  # type: ignore[arg-type]
     if kinds == {datetime.datetime}:
         return findDateContinuation(seeds)  # type: ignore[arg-type]
     if kinds == {datetime.timedelta}:
