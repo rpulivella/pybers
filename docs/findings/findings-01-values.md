@@ -225,7 +225,7 @@ leaves it clear here.
 
 Setting it is a deliberate act with one purpose: forcing a number to render as text, or
 stopping a formula from evaluating so its own text shows. `Cell.textLiteralSet` does it,
-and every read cell reports the bit as `cell.description.formatChosen`, whatever its
+and every read cell reports the bit as `cell.presentation.formatChosen`, whatever its
 type. One record pairs it with a formula, `A2` of the golden
 `18-formula-attached-and-detached`, which Numbers accepted, so the writer carries the bit
 on a formula record rather than refusing one.

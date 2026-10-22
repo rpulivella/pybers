@@ -79,14 +79,14 @@ def testTheMeasuredLiteralReadsAsTextWithAChosenFormat() -> None:
 
     assert cell.value == "=SUM(A1:A5)"
     assert cell.formula is None
-    assert cell.description.formatChosen
+    assert cell.presentation.formatChosen
 
 
 def testAnOrdinaryStringReadsAsAutomatic() -> None:
     cell = openFirstTableCell("01-text-plain", "A1")
 
     assert isinstance(cell.value, str)
-    assert not cell.description.formatChosen
+    assert not cell.presentation.formatChosen
 
 
 @pytest.mark.parametrize("address", ["A1", "J1"])
@@ -128,7 +128,7 @@ def testAnOrdinaryStringIsStillWrittenAsAutomatic(address: str, tmp_path: Path) 
 
     assert not carriesChosenFormat(readRecordAt(working, address))
     reopened = pybers.open(working).sheets[0].tables[0].cell(address)
-    assert not reopened.description.formatChosen
+    assert not reopened.presentation.formatChosen
 
 
 def testLiteralTextReadsBackAsTheTextItWasGiven(tmp_path: Path) -> None:
@@ -139,7 +139,7 @@ def testLiteralTextReadsBackAsTheTextItWasGiven(tmp_path: Path) -> None:
     for address, text in literalCells:
         cell = table.cell(address)
         assert (cell.value, cell.formula) == (text, None)
-        assert cell.description.formatChosen
+        assert cell.presentation.formatChosen
 
 
 def testSavingLiteralTextAgainChangesNothing(tmp_path: Path) -> None:
@@ -168,11 +168,11 @@ def testNewTextInALiteralCellStaysLiteral(tmp_path: Path) -> None:
 def testLiteralTextOverAFormulaIsRefusedAndLeavesTheCellAlone() -> None:
     """AC 5. The formula is what would be lost."""
     cell = openFirstTableCell("18-formula-literals", "A1")
-    before = (cell.value, cell.formula, cell.description.formatChosen)
+    before = (cell.value, cell.formula, cell.presentation.formatChosen)
 
     with pytest.raises(pybers.WriteError, match="A1 is backed by a formula"):
         cell.textLiteralSet("=1+1")
-    assert (cell.value, cell.formula, cell.description.formatChosen) == before
+    assert (cell.value, cell.formula, cell.presentation.formatChosen) == before
 
 
 def testLiteralTextThatIsNotTextIsRefused() -> None:
@@ -180,7 +180,7 @@ def testLiteralTextThatIsNotTextIsRefused() -> None:
 
     with pytest.raises(pybers.WriteError, match="was given Decimal"):
         cell.textLiteralSet(Decimal("1"))  # type: ignore[arg-type]
-    assert not cell.description.formatChosen
+    assert not cell.presentation.formatChosen
 
 
 # ── The golden file ─────────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ def testAScriptWritesLabelsThatReadLikeFormulas(tmp_path: Path) -> None:
         "=total", "-net", "+gross"
     ]
     assert all(
-        reopened.cell(row=row, col=2).description.formatChosen for row in (1, 2, 3)
+        reopened.cell(row=row, col=2).presentation.formatChosen for row in (1, 2, 3)
     )
 
 
@@ -239,7 +239,7 @@ def testACliWritesLiteralTextAndPrintsItsFormat(tmp_path: Path) -> None:
     cell.textLiteralSet(arguments[3])
     document.save()
 
-    shown = "Text" if cell.description.formatChosen else "Automatic"
+    shown = "Text" if cell.presentation.formatChosen else "Automatic"
     printed = f"{arguments[2]} {cell.value} ({shown})"
     assert printed == "C1 =SUM(A1:A5) (Text)"
 
@@ -256,4 +256,4 @@ def testACliRefusingAFormulaCellPrintsWhy() -> None:
 def testEveryNameThisTicketAddsIsReachableFromPybersAlone() -> None:
     """Neither consumer imports anything deeper than `pybers`."""
     assert hasattr(pybers.Cell, "textLiteralSet")
-    assert hasattr(pybers.Cell, "description")
+    assert hasattr(pybers.Cell, "presentation")

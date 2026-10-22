@@ -71,7 +71,7 @@ from .._persistence.index import ArchiveIndex
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
-from ._read import currencyFormatType, currencyTypeByte, storedKinds
+from ._read import controlSlot, currencyFormatType, currencyTypeByte, storedKinds
 from ._refcounts import StringPool, stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
@@ -130,13 +130,6 @@ typeByteOffset: int = 1
 formatFlagsOffset: int = 6
 formatFlagsWidth: int = 2
 
-
-# The control a cell presents as, a `control_cell_spec_table` key. Measured against
-# 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
-# the table lists them and whose plain cells carry no such slot. A control describes
-# the value it was built for, so it does not survive that value being replaced: a
-# star rating left on a cell that became text makes Numbers present text as stars.
-controlSlot: tuple[int, int] = (9, 0x04)
 
 
 def findSlotKind(slot: tuple[int, int]) -> int:
@@ -366,7 +359,7 @@ def patchCurrencyCode(
 def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:
     """Return a record carrying the chosen-format bit its cell holds."""
     header = bytearray(raw[:valueOffset])
-    if cell.description.formatChosen:
+    if cell.presentation.formatChosen:
         header[chosenFormatOffset] |= chosenFormatBit
     else:
         header[chosenFormatOffset] &= ~chosenFormatBit
@@ -558,7 +551,6 @@ __all__ = [
     "borrowShape",
     "buildFreshRecord",
     "buildWrittenRecord",
-    "controlSlot",
     "findFormatKey",
     "findTemplateRecord",
     "findWrittenTypeByte",

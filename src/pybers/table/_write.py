@@ -65,7 +65,7 @@ from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
-from ._read import updateCellDescriptions
+from ._read import updateCellStorage
 from ._relocation import (
     applyBorderCopies,
     findBorderCopies,
@@ -119,11 +119,11 @@ class TableSave:
     written: dict[int, list[tuple[int, int]]] = field(default_factory=dict)
     saved: list[tuple[Table, tsp.Reference]] = field(default_factory=list)
 
-    def descriptionsUpdate(self, source: Path) -> None:
+    def storageUpdate(self, source: Path) -> None:
         """Describe every saved cell by its record, once the package is on disk."""
         for table, reference in self.saved:
             tableInfo = self.index.resolve(reference, tst.TableInfoArchive)
-            updateCellDescriptions(self.index, tableInfo, table, source)
+            updateCellStorage(self.index, tableInfo, table, source)
 
     def tableWrite(self, table: Table, reference: tsp.Reference) -> None:
         """Write one table back into its archives and tell the engine what moved."""

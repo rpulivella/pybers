@@ -7,6 +7,8 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-10-22  `CellPresentation`, a cell's format and its control, replacing the
+            description, whose kind is the cell's own, for PYB-255.
 2026-10-22  A `CurrencyAmount` is the currency kind, for PYB-220.
 2026-10-20  The boolean family, Numbers' Automatic format for TRUE and FALSE, for
             PYB-144.
@@ -33,6 +35,7 @@ from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
 from pybers.currency import CurrencyAmount
+from pybers.table.controls import CellControl
 
 if TYPE_CHECKING:
     from pybers.table.cell import CellValue
@@ -73,22 +76,33 @@ class CellFormat(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class CellDescription:
-    """A cell's stored kind, its format, and whether a person chose that format.
+class CellPresentation:
+    """How a cell shows its value: its format, whether a person chose it, its control.
 
     `format` is None when the record names none, and UNDETERMINED once an edit
-    changed the kind, since the save then chooses it. A failed formula is the
-    `ERROR` kind, and an `UNKNOWN` kind keeps the record's own type in
-    `unrecognizedTypeCode`.
+    changed the kind, since the save then chooses it. `control` is UNDETERMINED once
+    an edit changed the value, since the save keeps it only if it shows the value.
+    """
+
+    format: CellFormat | UNDETERMINED | None
+    formatChosen: bool
+    control: CellControl | UNDETERMINED | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CellStorage:
+    """What a cell's record stores beside its value, as read, copied or saved.
+
+    A failed formula is the `ERROR` kind, and an `UNKNOWN` kind keeps the record's
+    own type in `unrecognizedTypeCode`.
     """
 
     kind: CellKind
-    format: CellFormat | UNDETERMINED | None
-    formatChosen: bool
+    presentation: CellPresentation
     unrecognizedTypeCode: int | None = None
 
 
-emptyDescription: CellDescription = CellDescription(CellKind.EMPTY, None, False)
+emptyStorage: CellStorage = CellStorage(CellKind.EMPTY, CellPresentation(None, False))
 
 
 def findCellKind(
@@ -123,9 +137,10 @@ def findCellKind(
 
 
 __all__ = [
-    "CellDescription",
     "CellFormat",
     "CellKind",
-    "emptyDescription",
+    "CellPresentation",
+    "CellStorage",
+    "emptyStorage",
     "findCellKind",
 ]

@@ -89,7 +89,7 @@ def readOtherRecords(path: Path, address: str) -> dict[str, bytes]:
     return {
         str(cell.address): readRecordAt(path, str(cell.address)).raw
         for cell in table.cells.values()
-        if str(cell.address) != address and cell.description.kind is not CellKind.EMPTY
+        if str(cell.address) != address and cell.kind is not CellKind.EMPTY
     }
 
 
@@ -117,7 +117,7 @@ def testAnyValueIsWrittenIntoACellOfAnyKind(
 ) -> None:
     working = copyDocument(stem, tmp_path)
     before = openFirstTable(working)[1].cell(address)
-    assert before.description.kind is held
+    assert before.kind is held
     wanted = value
     if isinstance(before.value, CurrencyAmount) and isinstance(value, Decimal):
         wanted = CurrencyAmount(value, before.value.currency)
@@ -130,17 +130,17 @@ def testAnyValueIsWrittenIntoACellOfAnyKind(
         CellKind.CURRENCY if held is CellKind.CURRENCY and kind is CellKind.NUMBER
         else kind
     )
-    assert cell.description.kind is expected
+    assert cell.kind is expected
 
 
 def testTheCellReportsItsNewKindOnceSaved(tmp_path: Path) -> None:
     document, table = openFirstTable(copyDocument(baseStem, tmp_path))
     cell = table.cell("A1")
     cell.value = True
-    assert cell.description.format is pybers.UNDETERMINED
+    assert cell.presentation.format is pybers.UNDETERMINED
     document.save()
-    assert cell.description.kind is CellKind.BOOLEAN
-    assert cell.description.format is pybers.CellFormat.BOOLEAN
+    assert cell.kind is CellKind.BOOLEAN
+    assert cell.presentation.format is pybers.CellFormat.BOOLEAN
 
 
 # ── AC 3: exact read back ───────────────────────────────────────────────────
@@ -212,7 +212,7 @@ def testAValueThatCannotBeStoredIsRefusedAndTheTableKept(
         cell.value = value  # type: ignore[assignment]
     assert "A1" in str(refused.value)
     assert cell.value == Decimal("1234.5")
-    assert cell.description.kind is CellKind.NUMBER
+    assert cell.kind is CellKind.NUMBER
 
 
 def testAFloatIsRefusedNamingDecimal(tmp_path: Path) -> None:
@@ -303,7 +303,7 @@ def testAChosenTextFormatGoesWithTheTextItWasChosenFor(tmp_path: Path) -> None:
     table.cell("A1").textLiteralSet("=1+1")
     document.save()
     cell = writeAndReopen(working, "A1", Decimal("2"))
-    assert not cell.description.formatChosen
+    assert not cell.presentation.formatChosen
 
 
 def testTheFormatCountsMatchTheCellsAfterEveryKindIsWritten(tmp_path: Path) -> None:
@@ -414,7 +414,8 @@ def testAValueTheControlCannotShowDropsTheControlAndKeepsTheValue(
     cell = writeAndReopen(working, address, value)
     assert cell.value == value
     assert findSlotValue(readRecordAt(working, address), controlSlot) is None
-    assert cell.description.format in (pybers.CellFormat.NUMBER, pybers.CellFormat.TEXT)
+    shown = (pybers.CellFormat.NUMBER, pybers.CellFormat.TEXT)
+    assert cell.presentation.format in shown
 
 
 @pytest.mark.parametrize(("address", "value"), [

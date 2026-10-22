@@ -193,7 +193,7 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
                 item._identifier = None
         raise
     updateCellOrigins(document)
-    tables.descriptionsUpdate(target)
+    tables.storageUpdate(target)
 
 
 def updateCellOrigins(document: Document) -> None:

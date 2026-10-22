@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-10-22  Each cell's control read into its presentation, for PYB-255.
 2026-10-22  A currency record reads as a `CurrencyAmount` carrying its format's
             code, for PYB-220.
 2026-10-20  Format type 1 is the boolean family, for PYB-144.
@@ -76,9 +77,11 @@ from ..currency import CurrencyAmount
 from ..errors import ReadError
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
+from ._controls import readControls
 from .cell import Cell, CellValue
 from .cells import Table
-from .kinds import CellDescription, CellFormat, CellKind, emptyDescription
+from .controls import CellControl
+from .kinds import CellFormat, CellKind, CellPresentation, CellStorage, emptyStorage
 from .merges import MergeRange
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
@@ -240,17 +243,34 @@ def findDisplayedFormat(
     return formatFamilies.get(formatType, CellFormat.UNKNOWN)
 
 
-def readRecordDescription(
-    record: CellRecord, formatTypes: dict[int, int]
-) -> CellDescription:
+# The control a cell presents as, a `control_cell_spec_table` key. Measured against
+# 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
+# the table lists them and whose plain cells carry no such slot. A control describes
+# the value it was built for, so it does not survive that value being replaced: a
+# star rating left on a cell that became text makes Numbers present text as stars.
+controlSlot: tuple[int, int] = (9, 0x04)
+
+
+def findRecordControl(
+    record: CellRecord, controls: dict[int, CellControl]
+) -> CellControl | None:
+    """Return the control a record names, or None when it names none."""
+    key = findSlotValue(record, controlSlot)
+    return None if key is None else controls.get(key)
+
+
+def readRecordStorage(
+    record: CellRecord, formatTypes: dict[int, int], controls: dict[int, CellControl]
+) -> CellStorage:
     """Return what a record stores beyond its value."""
     kind = storedKinds.get(record.typeByte, CellKind.UNKNOWN)
-    return CellDescription(
-        kind=kind,
+    presentation = CellPresentation(
         format=findDisplayedFormat(record, formatTypes),
         formatChosen=carriesChosenFormat(record),
-        unrecognizedTypeCode=record.typeByte if kind is CellKind.UNKNOWN else None,
+        control=findRecordControl(record, controls),
     )
+    unrecognized = record.typeByte if kind is CellKind.UNKNOWN else None
+    return CellStorage(kind, presentation, unrecognized)
 
 
 def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
@@ -364,6 +384,7 @@ def readTable(
     )
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)
+    controls = readControls(index, dataStore)
     for reference, record in iterateCellRecords(index, model, source):
         # A merge imported from Excel keeps a style-only record at every covered
         # position, and the model has no cell there to hold one. The archive
@@ -372,7 +393,7 @@ def readTable(
             continue
         cell = table.cell(reference)
         value = readCellValue(record, strings, richText, currencyCodes)
-        setCellDescription(cell, record, value, formatTypes)
+        setCellStorage(cell, record, value, formatTypes, controls)
         cell._value = value
         # Each cell is given its own Formula even where the archive is shared, so
         # an edit to one cannot reach another. Frozen, so sharing would be safe
@@ -422,15 +443,16 @@ def iterateCellRecords(
                 yield CellAddress(row + originOffset, column), record
 
 
-def setCellDescription(
-    cell: Cell, record: CellRecord, value: CellValue, formatTypes: dict[int, int]
+def setCellStorage(
+    cell: Cell, record: CellRecord, value: CellValue, formatTypes: dict[int, int],
+    controls: dict[int, CellControl],
 ) -> None:
-    """Give a cell the description of its record and the value that record holds."""
-    cell._stored = readRecordDescription(record, formatTypes)
+    """Give a cell what its record stores and the value that record holds."""
+    cell._stored = readRecordStorage(record, formatTypes, controls)
     cell._storedValue = value
 
 
-def updateCellDescriptions(
+def updateCellStorage(
     index: ArchiveIndex, tableInfo: tst.TableInfoArchive, table: Table, source: Path
 ) -> None:
     """Describe every cell of a saved table by the record the save left it.
@@ -443,17 +465,18 @@ def updateCellDescriptions(
     richText = readRichTextTable(index, dataStore)
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)
+    controls = readControls(index, dataStore)
     described: set[CellAddress] = set()
     for reference, record in iterateCellRecords(index, model, source):
         cell = table.cells.get(reference)
         if cell is None:
             continue
         value = readCellValue(record, strings, richText, currencyCodes)
-        setCellDescription(cell, record, value, formatTypes)
+        setCellStorage(cell, record, value, formatTypes, controls)
         described.add(reference)
     for reference, cell in table.cells.items():
         if reference not in described:
-            cell._stored, cell._storedValue = emptyDescription, None
+            cell._stored, cell._storedValue = emptyStorage, None
 
 
 def resolveValue(

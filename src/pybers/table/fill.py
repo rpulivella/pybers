@@ -117,7 +117,7 @@ def findSeriesValues(
     for line in lines:
         cells = [table.cell(reference) for reference in line]
         if any(
-            cell.formula is not None or cell.description.kind in seriesBreakingKinds
+            cell.formula is not None or cell.kind in seriesBreakingKinds
             for cell in cells
         ):
             continue

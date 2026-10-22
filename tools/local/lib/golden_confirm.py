@@ -913,7 +913,7 @@ def buildExpectedToml(golden: Path) -> str:
                           f"cell = {formatTomlValue(name)}",
                           f"value = {formatTomlValue(value)}"]
                 if isinstance(value, str):
-                    chosen = table.cells[address].description.formatChosen
+                    chosen = table.cells[address].presentation.formatChosen
                     lines += [f'format = "{"text" if chosen else "automatic"}"']
                 if isinstance(value, pybers.CurrencyAmount):
                     menu = formatMenuCurrency(value.currency, document)

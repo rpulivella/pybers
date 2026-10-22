@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-22  `kind` and `presentation` replace `description`, and a control is
+            UNDETERMINED once the value changes, for PYB-255.
 2026-10-22  A cell holds a `CurrencyAmount`, and a number written into a currency
             cell keeps its currency, for PYB-220.
 2026-10-20  A value of any kind is written into any cell, a `date` as midnight and an
@@ -45,9 +47,10 @@ from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.style import Style
 from pybers.table.kinds import (
-    CellDescription,
     CellKind,
-    emptyDescription,
+    CellPresentation,
+    CellStorage,
+    emptyStorage,
     findCellKind,
 )
 from pybers.table.merges import MergeRange
@@ -194,7 +197,8 @@ class Cell:
     """One cell's value, optional formula, and style, at an address.
 
     `value` is the result Numbers last cached, never derived from `formula`, so the
-    two disagree until it recalculates. `description` says what the record stores.
+    two disagree until it recalculates. `kind` and `presentation` say what the
+    record stores and how it shows it.
     """
 
     address: CellAddress
@@ -202,9 +206,7 @@ class Cell:
     formula: Formula | None = None
     style: Style = field(default_factory=Style)
     # The record as read, copied or saved, its chosen format the one direct edit.
-    _stored: CellDescription = field(
-        default=emptyDescription, repr=False, kw_only=True
-    )
+    _stored: CellStorage = field(default=emptyStorage, repr=False, kw_only=True)
     # The value that record holds, so an edit since is told from it.
     _storedValue: CellValue = field(
         default=None, repr=False, compare=False, kw_only=True
@@ -312,29 +314,45 @@ class Cell:
             written = CurrencyAmount(written, self._value.currency)
         if self.formula is not None:
             refuseValueOverFormula(self.address)
-        before = self.description.kind
+        before = self.kind
         after = findCellKind(written, self._stored.kind, self._storedValue, False)
         change = CellChange(self.reference, self._value, written, before, after)
         if not preview and change.changed:
             self._value = written
             if after is not before:
-                self._stored = replace(self._stored, formatChosen=False)
+                self._formatChosenSet(False)
         return change
 
-    @property
-    def description(self) -> CellDescription:
-        """Return the kind this cell stores, its format, and whether that was chosen.
+    def _formatChosenSet(self, chosen: bool) -> None:
+        """Record whether a person chose this cell's format, the one direct edit."""
+        presentation = replace(self._stored.presentation, formatChosen=chosen)
+        self._stored = replace(self._stored, presentation=presentation)
 
-        The kind follows `value`, so text written over rich text reports text.
-        """
+    @property
+    def kind(self) -> CellKind:
+        """Return the kind of value this cell stores, following `value` once edited."""
         pending = (
             self.formula is not None and self._origin is None
             and self._copiedFrom is None
         )
-        kind = findCellKind(self.value, self._stored.kind, self._storedValue, pending)
-        if kind is self._stored.kind:
-            return self._stored
-        return CellDescription(kind, UNDETERMINED, self._stored.formatChosen)
+        return findCellKind(self.value, self._stored.kind, self._storedValue, pending)
+
+    @property
+    def presentation(self) -> CellPresentation:
+        """Return how this cell shows its value: its format and its control."""
+        presentation = self._stored.presentation
+        valueKept = isSameValue(self.value, self._storedValue)
+        if presentation.control is not None and not valueKept:
+            presentation = replace(presentation, control=UNDETERMINED)
+        if self.kind is not self._stored.kind:
+            presentation = replace(presentation, format=UNDETERMINED)
+        return presentation
+
+    @property
+    def unrecognizedTypeCode(self) -> int | None:
+        """Return the record type pybers does not know, when the kind is UNKNOWN."""
+        unknown = self.kind is CellKind.UNKNOWN
+        return self._stored.unrecognizedTypeCode if unknown else None
 
     def textLiteralSet(self, text: str) -> None:
         """Hold text Numbers will not interpret, as a cell formatted Text before typing.
@@ -353,7 +371,7 @@ class Cell:
                 "would discard it. Clear the formula first."
             )
         self._value = text
-        self._stored = replace(self._stored, formatChosen=True)
+        self._formatChosenSet(True)
 
     @property
     def tableNames(self) -> frozendict[str, str]:

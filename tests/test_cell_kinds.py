@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """\
-Each cell's stored kind and format, read through one frozen description.
+Each cell's stored kind, and its format read through one frozen presentation.
 
 The kind every record in the documents stores, the format families the labeled
 fixtures name, a kind following an edit, an unknown type carried through, and the
 few lines a script or a command line writes to ask a cell what it holds.
 
 UPDATES
+2026-10-22  The kind is the cell's own, and the format its presentation's, for
+            PYB-255.
 2026-10-12  A changed kind's format is UNDETERMINED, for PYB-190.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
-2026-10-07  The description's fields include `unrecognizedTypeCode`, for PYB-169.
+2026-10-07  An unknown kind keeps `unrecognizedTypeCode`, for PYB-169.
 2026-10-01  Written for PYB-141.
 """
 from __future__ import annotations
@@ -113,6 +115,11 @@ def forgeRecordType(path: Path, row: int, column: int, typeByte: int) -> None:
     raise AssertionError(f"Row {row} of {path.name} stores nothing.")
 
 
+def readStoredState(cell: pybers.Cell) -> tuple[object, ...]:
+    """Return everything a cell reports its record stores, to compare two cells."""
+    return (cell.kind, cell.presentation, cell.unrecognizedTypeCode)
+
+
 def findFirstEmptyRecord(path: Path) -> tuple[int, int]:
     """Return the first position of the first table whose record holds no value."""
     types = readStoredTypes(path)[0]
@@ -137,7 +144,7 @@ def testEveryCellReportsTheKindItsRecordStores(path: Path) -> None:
         for cell in table.gridIterate():
             stored = types.get((cell.address.row, cell.address.col))
             expected = CellKind.EMPTY if stored is None else recordKinds[stored]
-            assert cell.description.kind is expected, f"{table.name}!{cell.address}"
+            assert cell.kind is expected, f"{table.name}!{cell.address}"
 
 
 @pytest.mark.parametrize(
@@ -168,22 +175,24 @@ def testALabeledCellReportsTheKindAndFormatItsLabelNames(
     document: str, address: str, kind: CellKind, shown: CellFormat | None
 ) -> None:
     """AC 1 and AC 5: the format is the label's, and the kind is the stored type's."""
-    description = openFirstTable(document).cell(address).description
-    assert (description.kind, description.format) == (kind, shown)
+    cell = openFirstTable(document).cell(address)
+    assert (cell.kind, cell.presentation.format) == (kind, shown)
 
 
 def testAPercentageAndAPlainNumberAreBothNumbers() -> None:
     """AC 5."""
     table = openFirstTable("13-number-percent")
-    plain, percent = table.cell("A1").description, table.cell("B1").description
+    plain, percent = table.cell("A1"), table.cell("B1")
     assert plain.kind is percent.kind is CellKind.NUMBER
-    assert (plain.format, percent.format) == (CellFormat.NUMBER, CellFormat.PERCENT)
+    assert (plain.presentation.format, percent.presentation.format) == (
+        CellFormat.NUMBER, CellFormat.PERCENT
+    )
 
 
 def testEveryDateIsADateWhateverFormatShowsIt() -> None:
     """The constraint: a date is type 5 whatever format is applied."""
     row = list(openFirstTable("14-number-date").rows)[0]
-    assert {cell.description.kind for cell in row if cell.value is not None} == {
+    assert {cell.kind for cell in row if cell.value is not None} == {
         CellKind.DATE_TIME
     }
 
@@ -195,7 +204,7 @@ def testAnUnmeasuredTypeReportsUnknown(tmp_path: Path) -> None:
     forgeRecordType(working, row, column, unmeasuredTypeByte)
 
     cell = pybers.open(working).sheets[0].tables[0].cell(row=row, col=column)
-    assert (cell.description.kind, cell.value) == (CellKind.UNKNOWN, None)
+    assert (cell.kind, cell.value) == (CellKind.UNKNOWN, None)
 
 
 def testAnUnmeasuredTypeSurvivesASaveUnchanged(tmp_path: Path) -> None:
@@ -210,14 +219,14 @@ def testAnUnmeasuredTypeSurvivesASaveUnchanged(tmp_path: Path) -> None:
     table = document.sheets[0].tables[0]
     edited = next(
         cell for cell in table.gridIterate()
-        if cell.description.kind is CellKind.NUMBER and cell.formula is None
+        if cell.kind is CellKind.NUMBER and cell.formula is None
     )
     edited.value = Decimal("99")
     document.save()
 
     assert readRecordAt(working, address).raw == before
     reopened = pybers.open(working).sheets[0].tables[0].cell(address)
-    assert reopened.description.kind is CellKind.UNKNOWN
+    assert reopened.kind is CellKind.UNKNOWN
 
 
 def testAnUnmeasuredFormatTypeReportsAnUnknownFormat(tmp_path: Path) -> None:
@@ -230,8 +239,8 @@ def testAnUnmeasuredFormatTypeReportsAnUnknownFormat(tmp_path: Path) -> None:
                 entry.format.format_type = 999
 
     forgeDataList(working, "Table 1", forgePercent)
-    description = pybers.open(working).sheets[0].tables[0].cell("B1").description
-    assert (description.kind, description.format) == (
+    cell = pybers.open(working).sheets[0].tables[0].cell("B1")
+    assert (cell.kind, cell.presentation.format) == (
         CellKind.NUMBER, CellFormat.UNKNOWN
     )
 
@@ -240,7 +249,7 @@ def testRichTextOverwrittenWithPlainTextReportsText() -> None:
     """AC 4."""
     cell = openFirstTable("02-text-rich").cell("A1")
     cell.value = "Goodbye"
-    assert cell.description.kind is CellKind.TEXT
+    assert cell.kind is CellKind.TEXT
 
 
 def testRichTextGivenBackItsOwnTextIsRichAgain() -> None:
@@ -248,7 +257,7 @@ def testRichTextGivenBackItsOwnTextIsRichAgain() -> None:
     cell = openFirstTable("02-text-rich").cell("A1")
     cell.value = "Goodbye"
     cell.value = "Hello"
-    assert cell.description.kind is CellKind.RICH_TEXT
+    assert cell.kind is CellKind.RICH_TEXT
 
 
 @pytest.mark.parametrize(
@@ -267,21 +276,21 @@ def testAChangedValueReportsTheKindOfTheNewValue(
     """AC 4."""
     cell = openFirstTable("11-value-types-noformats").cell(address)
     cell.value = value
-    assert cell.description.kind is kind
+    assert cell.kind is kind
 
 
 def testACurrencyAmountChangedStaysCurrency() -> None:
     """AC 4: the writer keeps a currency record's type, so the kind says so."""
     cell = openFirstTable("12-number-currency").cell("B1")
     cell.value = Decimal("1")
-    assert cell.description.kind is CellKind.CURRENCY
+    assert cell.kind is CellKind.CURRENCY
 
 
 def testAChangedKindsFormatIsUndeterminedUntilTheSaveChoosesOne() -> None:
     """The format the record names belongs to the old kind, so it is not reported."""
     cell = openFirstTable("11-value-types-noformats").cell("A1")
     cell.value = "words"
-    assert cell.description.format is pybers.UNDETERMINED
+    assert cell.presentation.format is pybers.UNDETERMINED
 
 
 def testASavedCellIsDescribedByTheRecordTheSaveLeft(tmp_path: Path) -> None:
@@ -296,8 +305,10 @@ def testASavedCellIsDescribedByTheRecordTheSaveLeft(tmp_path: Path) -> None:
 
     reopened = pybers.open(working).sheets[0].tables[0]
     for address in ("A1", "I1", "J1", "B1"):
-        assert table.cell(address).description == reopened.cell(address).description
-    assert table.cell("A1").description.format is CellFormat.TEXT
+        assert readStoredState(table.cell(address)) == readStoredState(
+            reopened.cell(address)
+        )
+    assert table.cell("A1").presentation.format is CellFormat.TEXT
 
 
 def testARowInsertedIsDescribedAsAReopenDescribesIt(tmp_path: Path) -> None:
@@ -310,8 +321,10 @@ def testARowInsertedIsDescribedAsAReopenDescribesIt(tmp_path: Path) -> None:
 
     reopened = pybers.open(working).sheets[0].tables[0]
     assert {
-        str(cell.address): cell.description for cell in table.gridIterate()
-    } == {str(cell.address): cell.description for cell in reopened.gridIterate()}
+        str(cell.address): readStoredState(cell) for cell in table.gridIterate()
+    } == {
+        str(cell.address): readStoredState(cell) for cell in reopened.gridIterate()
+    }
 
 
 @pytest.mark.parametrize("operation", ["cellsMove", "cellsCopy"])
@@ -327,9 +340,11 @@ def testABlockMovedOrCopiedIsDescribedAsAReopenDescribesIt(
 
     reopened = pybers.open(working).sheets[0].tables[0]
     assert {
-        str(cell.address): cell.description for cell in table.gridIterate()
-    } == {str(cell.address): cell.description for cell in reopened.gridIterate()}
-    assert reopened.cell("F2").description.kind is CellKind.NUMBER
+        str(cell.address): readStoredState(cell) for cell in table.gridIterate()
+    } == {
+        str(cell.address): readStoredState(cell) for cell in reopened.gridIterate()
+    }
+    assert reopened.cell("F2").kind is CellKind.NUMBER
 
 
 def testAFormulaGivenACellWithNoRecordIsAnErrorBeforeTheSave(tmp_path: Path) -> None:
@@ -338,11 +353,11 @@ def testAFormulaGivenACellWithNoRecordIsAnErrorBeforeTheSave(tmp_path: Path) -> 
     document = pybers.open(working)
     cell = document.sheets[0].tables[0].cell("H1")
     cell.formulaSet("=1+1")
-    before = cell.description
+    before = cell.kind
     document.save()
 
-    reopened = pybers.open(working).sheets[0].tables[0].cell("H1").description
-    assert before.kind is cell.description.kind is reopened.kind is CellKind.ERROR
+    reopened = pybers.open(working).sheets[0].tables[0].cell("H1")
+    assert before is cell.kind is reopened.kind is CellKind.ERROR
 
 
 def testAFormulaGivenAStyledEmptyRecordStaysEmpty(tmp_path: Path) -> None:
@@ -352,27 +367,28 @@ def testAFormulaGivenAStyledEmptyRecordStaysEmpty(tmp_path: Path) -> None:
     document = pybers.open(working)
     cell = document.sheets[0].tables[0].cell(row=row, col=column)
     cell.formulaSet("=1+1")
-    before = cell.description
+    before = cell.kind
     document.save()
 
     reopened = pybers.open(working).sheets[0].tables[0].cell(row=row, col=column)
-    assert before.kind is reopened.description.kind is CellKind.EMPTY
+    assert before is reopened.kind is CellKind.EMPTY
 
 
-def testTheDescriptionIsOneFrozenObject() -> None:
+def testThePresentationIsOneFrozenObject() -> None:
     """AC 6."""
-    description = openFirstTable("21-formula-errors").cell("B1").description
+    presentation = openFirstTable("21-formula-errors").cell("B1").presentation
     with pytest.raises(dataclasses.FrozenInstanceError):
-        description.kind = CellKind.TEXT  # type: ignore[misc]
-    assert {field.name for field in dataclasses.fields(description)} == {
-        "kind", "format", "formatChosen", "unrecognizedTypeCode"
+        presentation.format = CellFormat.TEXT  # type: ignore[misc]
+    assert {field.name for field in dataclasses.fields(presentation)} == {
+        "format", "formatChosen", "control"
     }
 
 
-def testTheFlagsTheDescriptionReplacesAreGone() -> None:
-    """The constraint: no second copy of what the description says."""
+def testTheFlagsThePresentationReplacesAreGone() -> None:
+    """The constraint: no second copy of what the kind and presentation say."""
     cell = openFirstTable("02-text-rich").cell("A1")
-    for name in ("errored", "formatChosen", "_formatChosen", "_richText"):
+    gone = ("errored", "formatChosen", "_formatChosen", "_richText", "description")
+    for name in gone:
         assert not hasattr(cell, name), name
 
 
@@ -380,7 +396,7 @@ def testLiteralTextReportsAChosenFormat() -> None:
     """AC 6: the chosen format is read where the kind is."""
     cell = openFirstTable("11-value-types-noformats").cell("A1")
     cell.textLiteralSet("=1+1")
-    assert (cell.description.kind, cell.description.formatChosen) == (
+    assert (cell.kind, cell.presentation.formatChosen) == (
         CellKind.TEXT, True
     )
 
@@ -392,14 +408,14 @@ def testAFilledCopyReportsItsSourcesKind() -> None:
         "A2", "A2:A4", references=relative,
         values=pybers.CellValueFill.REPEAT_SOURCE_VALUE,
     )
-    assert table.cell("A4").description == table.cell("A2").description
-    assert table.cell("A4").description.kind is CellKind.RICH_TEXT
+    assert readStoredState(table.cell("A4")) == readStoredState(table.cell("A2"))
+    assert table.cell("A4").kind is CellKind.RICH_TEXT
 
 
 def testAScriptCountsTheCurrencyAmountsInATable() -> None:
     """The few lines a script author writes."""
     table = openFirstTable("12-number-currency")
-    kinds = Counter(cell.description.kind for cell in table.gridIterate())
+    kinds = Counter(cell.kind for cell in table.gridIterate())
     assert kinds[CellKind.CURRENCY] == 8
 
 
@@ -408,9 +424,9 @@ def testACommandLineListsEachCellsKindAsText() -> None:
     table = openFirstTable("21-formula-errors")
     shown = {
         str(cell.address): {
-            "kind": cell.description.kind.value,
+            "kind": cell.kind.value,
             "format": (
-                None if (shown := cell.description.format) is None else str(shown)
+                None if (shown := cell.presentation.format) is None else str(shown)
             ),
         }
         for cell in list(table.rows)[0]
