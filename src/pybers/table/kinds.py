@@ -7,6 +7,7 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-10-22  A `CurrencyAmount` is the currency kind, for PYB-220.
 2026-10-20  The boolean family, Numbers' Automatic format for TRUE and FALSE, for
             PYB-144.
 2026-10-12  A format the save will choose is UNDETERMINED, not None, for PYB-190.
@@ -31,6 +32,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
+from pybers.currency import CurrencyAmount
 
 if TYPE_CHECKING:
     from pybers.table.cell import CellValue
@@ -107,6 +109,8 @@ def findCellKind(
         return CellKind.EMPTY
     if isinstance(value, bool):
         return CellKind.BOOLEAN
+    if isinstance(value, CurrencyAmount):
+        return CellKind.CURRENCY
     if isinstance(value, Decimal):
         return CellKind.CURRENCY if stored is CellKind.CURRENCY else CellKind.NUMBER
     if isinstance(value, str):

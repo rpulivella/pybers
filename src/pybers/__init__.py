@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-22  The currency names re-exported, for PYB-220.
 2026-10-20  MachineTimeZone, TimeZoneError, TimeZoneLike and formatCellValue
             re-exported, for PYB-144.
 2026-10-20  `parseCellValue` re-exported, for PYB-217.
@@ -63,6 +64,13 @@ lazy from pybers.check import (
     CheckTable,
     NumbersVersion,
     checkDocument,
+)
+lazy from pybers.currency import (
+    Currency,
+    CurrencyAmount,
+    CurrencyError,
+    currencies,
+    findCurrency,
 )
 lazy from pybers.document import (
     Document,
@@ -151,6 +159,11 @@ __all__ = [
     "Formula",
     "formatCellValue",
     "parseCellValue",
+    "Currency",
+    "CurrencyAmount",
+    "CurrencyError",
+    "currencies",
+    "findCurrency",
     "parseFormula",
     "renderFormula",
     "Coordinate",

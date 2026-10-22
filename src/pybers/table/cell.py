@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-22  A cell holds a `CurrencyAmount`, and a number written into a currency
+            cell keeps its currency, for PYB-220.
 2026-10-20  A value of any kind is written into any cell, a `date` as midnight and an
             aware `datetime` in the document's zone, for PYB-144.
 2026-10-20  A printed cell shows `value`, never the private field behind it,
@@ -36,6 +38,7 @@ from pybers.addressing.reference import (
     CellAddress,
     CellReference,
 )
+from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
 from pybers.errors import WriteError
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
@@ -81,6 +84,7 @@ decimal128Context: Context = Context(prec=34, Emax=6144, Emin=-6143)
 # Decimal("0.1") does not. Never construct a cell value from a float.
 CellValue = (
     Decimal
+    | CurrencyAmount
     | str
     | bool
     | datetime.datetime
@@ -130,11 +134,19 @@ def toCellValue(
         except Decimal128Error as exc:
             raise WriteError(f"{address} cannot hold it: {exc}") from exc
         return value
+    if isinstance(value, CurrencyAmount):
+        try:
+            findCurrency(value.currency)
+        except CurrencyError as exc:
+            raise WriteError(f"{address} cannot hold {value}: {exc}") from exc
+        toCellValue(value.amount, address, zone)
+        return value
     if isinstance(value, str | datetime.timedelta):
         return value
     raise WriteError(
-        f"{address} was given a {type(value).__name__}. A cell holds a Decimal, an "
-        "int, a str, a bool, a datetime, a date, a timedelta or None."
+        f"{address} was given a {type(value).__name__}. A cell holds a Decimal, a "
+        "CurrencyAmount, an int, a str, a bool, a datetime, a date, a timedelta or "
+        "None."
     )
 
 
@@ -295,6 +307,9 @@ class Cell:
         a format chosen for the old kind goes with it.
         """
         written = toCellValue(value, self.address, self.timeZone)
+        # A number typed into a currency cell keeps its currency, as Numbers does.
+        if isinstance(written, Decimal) and isinstance(self._value, CurrencyAmount):
+            written = CurrencyAmount(written, self._value.currency)
         if self.formula is not None:
             refuseValueOverFormula(self.address)
         before = self.description.kind

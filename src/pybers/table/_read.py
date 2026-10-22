@@ -19,6 +19,8 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-10-22  A currency record reads as a `CurrencyAmount` carrying its format's
+            code, for PYB-220.
 2026-10-20  Format type 1 is the boolean family, for PYB-144.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-10-07  A row that fails to decode names its table by identifier, and a record
@@ -43,9 +45,11 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 from collections.abc import Iterator
+from decimal import Decimal
 from pathlib import Path
 from typing import cast
 
+from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import CellDecodeError, chooseOffsetUnit, decodeRow
@@ -54,11 +58,13 @@ from .._persistence.cells import (
     carriesChosenFormat,
     conditionalSlot,
     countedFormatSlots,
+    currencyFormatSlot,
     displayedKindSlot,
     findSlotValue,
 )
 from .._persistence.index import (
     ArchiveIndex,
+    findRoot,
     readDataList,
     readUuidValue,
     richTextListType,
@@ -66,6 +72,7 @@ from .._persistence.index import (
 )
 from ..addressing import CellRange
 from ..addressing.reference import CellAddress, originOffset
+from ..currency import CurrencyAmount
 from ..errors import ReadError
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
@@ -78,6 +85,7 @@ from .merges import MergeRange
 # rather than the value itself. See `pybers._persistence.cells`.
 stringKeyType: int = 3
 richTextKeyType: int = 9
+currencyTypeByte: int = 10
 
 # The kind each measured type byte stores. Type 8 is a failed formula, which holds no
 # value, so its formula key sits where a result would. See findings-01-values.md.
@@ -148,6 +156,68 @@ def readFormatTypes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, 
         int(entry.key): int(entry.format.format_type)
         for entry in dataList.entries if entry.HasField("format")
     }
+
+
+# The custom format type a Currency token gives; its code is in the document's list.
+customCurrencyFormatType: int = 274
+currencyFormatType: int = 257
+
+
+def readCustomCurrencyCodes(index: ArchiveIndex) -> dict[tuple[int, int], str]:
+    """Return each custom format's currency code, keyed by its UUID's two halves."""
+    reference = findRoot(index).super.custom_format_list
+    if not reference.identifier:
+        return {}
+    formats = index.resolve(reference, tsk.CustomFormatListArchive)
+    return {
+        (uuid.lower, uuid.upper): custom.default_format.currency_code
+        for uuid, custom in zip(formats.uuids, formats.custom_formats, strict=True)
+        if custom.default_format.currency_code
+    }
+
+
+def readCurrencyCodes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, str]:
+    """Return the currency code of each format entry that names one, by its key.
+
+    A Currency format holds its code itself, and a custom format holding a Currency
+    token holds it in the document's custom format list, as findings-11 records.
+    """
+    if not dataStore.format_table.identifier:
+        return {}
+    dataList = index.resolve(dataStore.format_table, tst.TableDataList)
+    codes: dict[int, str] = {}
+    custom: dict[tuple[int, int], str] | None = None
+    for entry in dataList.entries:
+        found = entry.format
+        if found.format_type == currencyFormatType and found.currency_code:
+            codes[int(entry.key)] = found.currency_code
+        elif found.format_type == customCurrencyFormatType:
+            if custom is None:
+                custom = readCustomCurrencyCodes(index)
+            code = custom.get((found.custom_uid.lower, found.custom_uid.upper))
+            if code:
+                codes[int(entry.key)] = code
+    return codes
+
+
+def readCellValue(
+    record: CellRecord,
+    strings: dict[int, str],
+    richText: dict[int, str],
+    currencyCodes: dict[int, str],
+) -> CellValue:
+    """Return a cell's value, a currency amount carrying the code its format holds.
+
+    A currency record whose format names no code it can follow keeps its `Decimal`,
+    carried through rather than given a currency it may not have.
+    """
+    value = resolveValue(record, strings, richText)
+    if record.typeByte == currencyTypeByte and isinstance(value, Decimal):
+        key = findSlotValue(record, currencyFormatSlot)
+        code = None if key is None else currencyCodes.get(key)
+        if code is not None:
+            return CurrencyAmount(value, code)
+    return value
 
 
 def findDisplayedFormat(
@@ -293,6 +363,7 @@ def readTable(
         _columnIdentities=columnIdentities,
     )
     formatTypes = readFormatTypes(index, dataStore)
+    currencyCodes = readCurrencyCodes(index, dataStore)
     for reference, record in iterateCellRecords(index, model, source):
         # A merge imported from Excel keeps a style-only record at every covered
         # position, and the model has no cell there to hold one. The archive
@@ -300,7 +371,7 @@ def readTable(
         if not table.addressable(reference):
             continue
         cell = table.cell(reference)
-        value = resolveValue(record, strings, richText)
+        value = readCellValue(record, strings, richText, currencyCodes)
         setCellDescription(cell, record, value, formatTypes)
         cell._value = value
         # Each cell is given its own Formula even where the archive is shared, so
@@ -371,12 +442,13 @@ def updateCellDescriptions(
     strings = readStringTable(index, dataStore)
     richText = readRichTextTable(index, dataStore)
     formatTypes = readFormatTypes(index, dataStore)
+    currencyCodes = readCurrencyCodes(index, dataStore)
     described: set[CellAddress] = set()
     for reference, record in iterateCellRecords(index, model, source):
         cell = table.cells.get(reference)
         if cell is None:
             continue
-        value = resolveValue(record, strings, richText)
+        value = readCellValue(record, strings, richText, currencyCodes)
         setCellDescription(cell, record, value, formatTypes)
         described.add(reference)
     for reference, cell in table.cells.items():

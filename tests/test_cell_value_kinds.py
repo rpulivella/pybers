@@ -7,6 +7,8 @@ a date, a duration, a checkbox, a star rating, a slider, a stepper and a pop-up 
 and whose `J1` has no record at all.
 
 UPDATES
+2026-10-22  A number written into a currency cell keeps its currency, for
+            PYB-220.
 2026-10-20  Written for PYB-144.
 """
 from __future__ import annotations
@@ -35,6 +37,7 @@ from pybers import CellKind
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
 from pybers._persistence.cells import countedFormatSlots, findSlotValue
+from pybers.currency import CurrencyAmount
 from pybers.table._records import controlSlot
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
@@ -113,12 +116,16 @@ def testAnyValueIsWrittenIntoACellOfAnyKind(
     tmp_path: Path,
 ) -> None:
     working = copyDocument(stem, tmp_path)
-    assert openFirstTable(working)[1].cell(address).description.kind is held
+    before = openFirstTable(working)[1].cell(address)
+    assert before.description.kind is held
+    wanted = value
+    if isinstance(before.value, CurrencyAmount) and isinstance(value, Decimal):
+        wanted = CurrencyAmount(value, before.value.currency)
 
     cell = writeAndReopen(working, address, value)
 
-    assert type(cell.value) is type(value)
-    assert cell.value == value
+    assert type(cell.value) is type(wanted)
+    assert cell.value == wanted
     expected = (
         CellKind.CURRENCY if held is CellKind.CURRENCY and kind is CellKind.NUMBER
         else kind

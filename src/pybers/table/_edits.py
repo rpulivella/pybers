@@ -9,6 +9,7 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-22  A save compares a currency cell through its code, for PYB-220.
 2026-10-20  A value of any kind is written over any other, releasing the control
             and rich text its record no longer specifies, and dropping a control
             that cannot show the value, for PYB-144.
@@ -83,7 +84,7 @@ from ..formula._write import (
 from ._conditions import ConditionalPlan, writeConditionalCounts
 from ._controls import checkControlShows
 from ._lines import GridMaps
-from ._read import readRichTextTable, readStringTable, resolveValue
+from ._read import readCellValue, readCurrencyCodes, readRichTextTable, readStringTable
 from ._records import (
     applyAutomaticFormat,
     applyChosenFormat,
@@ -217,6 +218,7 @@ def applyTableEdits(
     # key would make every text cell look edited on every save.
     strings = readStringTable(index, store)
     richText = readRichTextTable(index, store)
+    currencyCodes = readCurrencyCodes(index, store)
     pool = readFormulaPool(index, store)
     textPool = readStringPool(index, store)
     # Rewritten only when a written record moved a count.
@@ -253,6 +255,13 @@ def applyTableEdits(
         if cached not in formatKeys:
             formatKeys[cached] = findFormatKey(formatList, wanted)
         return formatKeys[cached]
+
+    def formatOf(key: int) -> tsk.FormatStructArchive | None:
+        """Return the format entry a key names, or None when the table names none."""
+        if formatList is None:
+            return None
+        found = [entry.format for entry in formatList.entries if int(entry.key) == key]
+        return found[0] if found else None
 
     def formatsCount(
         before: bytes | None, after: bytes | None, where: CellAddress
@@ -444,7 +453,7 @@ def applyTableEdits(
                 if cell is None:
                     continue
                 valueChanged = not isSameValue(
-                    resolveValue(record, strings, richText), cell.value
+                    readCellValue(record, strings, richText, currencyCodes), cell.value
                 )
                 edit = classifyFormulaEdit(cell.formula, record, pool)
                 chosenChanged = (
@@ -458,7 +467,10 @@ def applyTableEdits(
                 # Attaching a formula is a different act and is allowed.
                 if valueChanged:
                     patched = dropUnshownControl(
-                        buildWrittenRecord(cell, record, textPool, formatFor=formatFor),
+                        buildWrittenRecord(
+                            cell, record, textPool, formatFor=formatFor,
+                            formatOf=formatOf,
+                        ),
                         cell,
                     )
                     formatsCount(record.raw, patched, reference)
@@ -506,7 +518,8 @@ def applyTableEdits(
                         shape = buildFreshRecord(column)
                     replacements[column] = applyChosenFormat(
                         buildWrittenRecord(
-                            cell, shape, textPool, borrowed=True, formatFor=formatFor
+                            cell, shape, textPool, borrowed=True, formatFor=formatFor,
+                            formatOf=formatOf,
                         ),
                         cell,
                     )

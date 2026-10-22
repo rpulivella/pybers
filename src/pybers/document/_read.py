@@ -28,6 +28,7 @@ to a caller:
   that looks like a perfectly good number.
 
 UPDATES
+2026-10-22  The locale's currency symbols and placement are read, for PYB-220.
 2026-08-31  Written for #1: document, sheets, tables and cell values.
 2026-09-01  The package read here travels with the document, for #2.
 2026-09-03  Formulas, for #41. The key slot and the sticky-bits rule were
@@ -116,7 +117,15 @@ def readDocument(package: NumbersPackage, source: Path) -> Document:
     root = findRoot(index)
 
     # The package travels with the document because `Document.save` writes it back.
-    document = Document(_package=package, _sourcePath=source)
+    symbols = root.super.super.formatting_symbols
+    document = Document(
+        _package=package,
+        _sourcePath=source,
+        _currencySymbols=frozendict(
+            (each.code, each.symbol) for each in symbols.currency_symbols
+        ),
+        _currencyPattern=symbols.currency_pattern,
+    )
     identities = readTableIdentities(index)
     for reference in root.sheets:
         document.sheets.append(

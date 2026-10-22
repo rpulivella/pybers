@@ -10,6 +10,7 @@ named outright uses its own parser and refuses text that parser cannot read.
 printed by the command line is written again as the same value and kind.
 
 UPDATES
+2026-10-22  Reads and prints a currency amount, `1234.5 EUR`, for PYB-220.
 2026-10-20  A date, a duration and a boolean read from text, and each value
             written as the text it reads from, for PYB-144.
 2026-10-20  Written for PYB-217.
@@ -29,6 +30,7 @@ import re
 from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
 
+from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
 from pybers.errors import WriteError
 from pybers.table.cell import CellValue
 from pybers.table.kinds import CellKind
@@ -61,6 +63,23 @@ def parseNumber(text: str) -> Decimal:
     if not number.is_finite():
         raise ValueError(text)
     return number
+
+
+# An amount and the ISO code of a currency Numbers offers, `1234.5 EUR`.
+currencyWhole: re.Pattern[str] = re.compile(r"(\S+)\s+([A-Z]{3})")
+
+
+def parseCurrency(text: str) -> CurrencyAmount:
+    """Return the amount and currency text names, `1234.5 EUR`, as `str` prints one."""
+    found = currencyWhole.fullmatch(text.strip())
+    if found is None:
+        raise ValueError(text)
+    amount, code = found.groups()
+    try:
+        findCurrency(code)
+    except CurrencyError as exc:
+        raise ValueError(str(exc)) from exc
+    return CurrencyAmount(parseNumber(amount), code)
 
 
 def parseText(text: str) -> str:
@@ -121,6 +140,7 @@ def parseDurationNamed(text: str) -> datetime.timedelta:
 # A clock such as `1:30` is not inferred, since it reads as a time of day as well.
 valueParsers: frozendict[CellKind, Callable[[str], CellValue]] = frozendict({
     CellKind.NUMBER: parseNumber,
+    CellKind.CURRENCY: parseCurrency,
     CellKind.BOOLEAN: parseBoolean,
     CellKind.DATE_TIME: parseDateTime,
     CellKind.DURATION: parseDuration,
@@ -131,7 +151,8 @@ namedParsers: frozendict[CellKind, Callable[[str], CellValue]] = frozendict({
 })
 # What `--as` calls each kind; a kind's own value specifies it as well.
 kindNames: frozendict[str, CellKind] = frozendict({
-    "number": CellKind.NUMBER, "boolean": CellKind.BOOLEAN, "date": CellKind.DATE_TIME,
+    "number": CellKind.NUMBER, "currency": CellKind.CURRENCY,
+    "boolean": CellKind.BOOLEAN, "date": CellKind.DATE_TIME,
     "duration": CellKind.DURATION, "text": CellKind.TEXT,
 })
 
@@ -149,7 +170,8 @@ def parseCellValue(text: str, kind: CellKind | str | None = None) -> CellValue:
     try:
         return namedParsers[named](text)
     except ValueError as exc:
-        raise WriteError(f"{text!r} is not a {named.value}.") from exc
+        detail = "" if str(exc) == text else f" {exc}"
+        raise WriteError(f"{text!r} is not a {named.value}.{detail}") from exc
 
 
 def toValueKind(kind: CellKind | str) -> CellKind:
