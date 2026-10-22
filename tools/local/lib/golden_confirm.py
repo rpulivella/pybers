@@ -7,6 +7,9 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-22  A golden's expected values are generated from the golden, for PYB-220.
+2026-10-22  A run's folder holds a copy of the golden to open and its expectations
+            as headed Markdown, for PYB-220.
 2026-10-21  The helper names each Data Format control, and a recipe step sets one,
             for PYB-219.
 2026-10-14  A missing or stale helper states the miss and stops, as house rule 11
@@ -42,6 +45,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import pybers
 from pybers import CellRange, CellReference, MergeRange, PybersError
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
@@ -775,6 +779,9 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
     if outputDirectory.exists():
         shutil.rmtree(outputDirectory)
     outputDirectory.mkdir(parents=True)
+    # A copy to open by hand, since Numbers rewrites a document it saves.
+    shutil.copyfile(golden, outputDirectory / golden.name)
+    writeExpectations(golden, expected, outputDirectory)
     goldenHash = readFileHash(golden)
     with tempfile.TemporaryDirectory(prefix="pybers-golden-copy-") as work:
         copy = Path(work) / golden.name
@@ -866,6 +873,133 @@ def summarizeChecks(status: str, count: int, checked: int) -> str:
     return f"{status.capitalize()} {count} of {checked} {checks}."
 
 
+def formatTomlValue(value: object) -> str:
+    """Return a value as a TOML literal, text quoted with its escapes."""
+    if isinstance(value, pybers.CurrencyAmount):
+        value = value.amount
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def formatMenuCurrency(code: str, document: pybers.Document) -> str:
+    """Return a currency as Numbers' Currency menu titles it, `Swiss Franc (CHF)`."""
+    shown = document.currencySymbolFind(code) or code
+    return f"{pybers.findCurrency(code).name} ({shown})"
+
+
+def buildExpectedToml(golden: Path) -> str:
+    """Return expected values for every filled cell of a golden, read from the golden.
+
+    A cell with text beneath it is checked by a person against that label, which is
+    why a golden's labels must say what its cells hold.
+    """
+    document = pybers.open(golden)
+    lines = [
+        f"# What Numbers shows for {golden.name}, generated from the golden by",
+        "# `buildExpectedToml` in `tools/local/lib/golden_confirm.py`. Regenerate it",
+        "# rather than editing it. Checked by",
+        f"# `.venv/bin/python3 -m tools.local.golden_confirm run {golden.name}`.",
+    ]
+    for sheet in document.sheets:
+        for table in sheet.tables:
+            for address in sorted(table.cells, key=lambda each: (each.row, each.col)):
+                value = table.cells[address].value
+                if value is None:
+                    continue
+                name = str(address)
+                lines += ["", "[[cell]]", f"sheet = {formatTomlValue(sheet.name)}",
+                          f"table = {formatTomlValue(table.name)}",
+                          f"cell = {formatTomlValue(name)}",
+                          f"value = {formatTomlValue(value)}"]
+                if isinstance(value, str):
+                    chosen = table.cells[address].description.formatChosen
+                    lines += [f'format = "{"text" if chosen else "automatic"}"']
+                if isinstance(value, pybers.CurrencyAmount):
+                    menu = formatMenuCurrency(value.currency, document)
+                    lines += ['format = "currency"',
+                              f'dataFormat = {{ "Data Format" = "Currency", '
+                              f'"Currency" = {formatTomlValue(menu)} }}']
+                beneath = pybers.CellAddress(address.row + 1, address.col)
+                below = table.cells.get(beneath)
+                label = None if below is None else below.value
+                if isinstance(label, str) and not isinstance(value, str):
+                    lines.append(f"qa = [{formatTomlValue(label)}]")
+    return "\n".join(lines) + "\n"
+
+
+def listShown(cell: ExpectedCell) -> list[str]:
+    """Return what a cell should show, one labeled bullet per property."""
+    bullets = ["- empty"] if cell.empty else []
+    if cell.value is not None:
+        bullets.append(f"- value: {formatCodeSpan(cell.value)}")
+    if cell.formula is not None:
+        spaced = formatSpacedFormula(cell.formula)
+        bullets.append(f"- formula: {formatCodeSpan(spaced)}")
+    if cell.formatKind is not None:
+        bullets.append(f"- format: {cell.formatKind}")
+    for name, wanted in cell.dataFormat.items():
+        named = "data format" + ("" if name == "Data Format" else f" {name.lower()}")
+        bullets.append(f"- {named}: {wanted}")
+    return bullets
+
+
+def formatExpectedTable(table: ExpectedTable) -> str:
+    """Return a table's size and merges on one line, or nothing when none is named."""
+    parts = []
+    if table.rows is not None and table.columns is not None:
+        parts.append(f"{table.rows} rows × {table.columns} columns")
+    if table.merges is not None:
+        parts.append("merged " + (", ".join(sorted(table.merges)) or "nothing"))
+    return " · ".join(parts)
+
+
+def findDescribedCell(cell: ExpectedCell, cells: list[ExpectedCell]) -> str | None:
+    """Return the cell a text cell describes: the one whose person-check is its text."""
+    if not isinstance(cell.value, str):
+        return None
+    for other in cells:
+        sameTable = (other.sheet, other.table) == (cell.sheet, cell.table)
+        if sameTable and cell.value in other.qa:
+            return other.cell
+    return None
+
+
+def writeExpectations(golden: Path, expected: ExpectedValues, into: Path) -> Path:
+    """Write what Numbers should show, each cell followed by the cell describing it."""
+    describers = {
+        (c.sheet, c.table, described): c
+        for c in expected.cells
+        if (described := findDescribedCell(c, expected.cells)) is not None
+    }
+    lines = [f"# {golden.name}"]
+    places = list(dict.fromkeys(
+        [(t.sheet, t.table) for t in expected.tables]
+        + [(c.sheet, c.table) for c in expected.cells]
+    ))
+    for sheet, table in places:
+        lines += ["", f"## {sheet} › {table}"]
+        for each in expected.tables:
+            if (each.sheet, each.table) == (sheet, table) and formatExpectedTable(each):
+                lines += ["", formatExpectedTable(each)]
+        for cell in expected.cells:
+            if (cell.sheet, cell.table) != (sheet, table):
+                continue
+            if findDescribedCell(cell, expected.cells) is not None:
+                continue
+            describer = describers.get((sheet, table, cell.cell))
+            heading = f"### {cell.cell}" + (" · measured" if describer else "")
+            lines += ["", heading, *listShown(cell)]
+            if describer is not None:
+                lines += ["", f"### {describer.cell} · describes {cell.cell}",
+                          f"- value: {describer.value}"]
+                if describer.formatKind is not None:
+                    lines.append(f"- format: {describer.formatKind}")
+    path = into / "expectations.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
 def writeReport(run: GoldenRun) -> Path:
     """Write the Markdown report beside its screenshots, images linked relatively."""
     lines = [
@@ -873,6 +1007,9 @@ def writeReport(run: GoldenRun) -> Path:
         "",
         f"{run.ticket}, {datetime.now().strftime('%Y-%m-%d %H:%M')}, "
         f"Numbers {run.numbersVersion or 'unknown'}",
+        "",
+        f"Open [{run.golden.name}]({run.golden.name}), a copy safe to open and save, "
+        "beside [what it should show](expectations.md).",
         "",
     ]
     for problem in run.problems:
