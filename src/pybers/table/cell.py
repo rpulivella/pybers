@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-22  A reference beyond its table's grid shows as `#REF!`, and a table on
+            the formula's own sheet is named bare, as Numbers shows both, for PYB-255.
 2026-10-22  `kind` and `presentation` replace `description`, and a control the
             value it holds cannot show is dropped with its format, for PYB-255.
 2026-10-22  A cell holds a `CurrencyAmount`, and a number written into a currency
@@ -242,7 +244,9 @@ class Cell:
         """
         if self.formula is None:
             return None
-        return renderFormula(self.formula, self.address, tables=self.tableNames)
+        return renderFormula(
+            self.formula, self.address, tables=self.tableNames, sizes=self._tableSizes
+        )
 
     @formulaText.setter
     def formulaText(self, text: str) -> None:
@@ -390,14 +394,29 @@ class Cell:
 
     @property
     def tableNames(self) -> frozendict[str, str]:
-        """Return the names this cell's document knows its tables by, or nothing.
+        """Return the names a formula in this cell knows its document's tables by.
 
-        Computed from the document each time rather than cached, because a table
+        Computed from the sheet each time rather than cached, because a table
         renamed after a cached copy was taken would write a formula pointing at
         whichever table now answers to the old name.
         """
-        document = None if self.table is None else self.table.document
-        return frozendict() if document is None else document.tableIdentities
+        sheet = None if self.table is None else self.table.sheet
+        return frozendict() if sheet is None else sheet.tableIdentities
+
+    @property
+    def _tableSizes(self) -> dict[str | None, tuple[int, int]]:
+        """Return each table's rows and columns by identity, this cell's under None."""
+        if self.table is None:
+            return {}
+        sizes: dict[str | None, tuple[int, int]] = {
+            None: (self.table.rowCount, self.table.colCount)
+        }
+        document = self.table.document
+        if document is not None:
+            sizes |= {table.identifier: (table.rowCount, table.colCount)
+                      for sheet in document.sheets for table in sheet.tables
+                      if table.identifier}
+        return sizes
 
     @property
     def mergeAnchored(self) -> MergeRange | None:

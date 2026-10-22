@@ -38,8 +38,8 @@ addedFunctionFormulas: tuple[tuple[str, str], ...] = (
     ("C1", "=COMBINA(4,3)"), ("C2", "=GAMMA(5)"), ("C3", "=PHI(0)"),
     ("C4", "=FISHER(0.5)"), ("C5", "=FISHERINV(0.5)"), ("C6", "=PERMUTATIONA(3,2)"),
     ("C7", "=DAYS(DATE(2026,10,13),DATE(2026,1,1))"),
-    ("C8", "=PEARSON(Sheet 1::Table 1::A1:A5,Sheet 1::Table 1::A6:A10)"),
-    ("C9", "=RSQ(Sheet 1::Table 1::A1:A5,Sheet 1::Table 1::A6:A10)"),
+    ("C8", "=PEARSON(Table 1::A1:A5,Table 1::A6:A10)"),
+    ("C9", "=RSQ(Table 1::A1:A5,Table 1::A6:A10)"),
 )
 
 

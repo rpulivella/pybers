@@ -570,6 +570,6 @@ def testACliWritesAFormulaIntoANewTableAndPrintsIt(tmp_path: Path) -> None:
     document.save(tmp_path / "cli.numbers")
 
     printed = f"{table.name}::{arguments[2]} {cell.formulaText}"
-    assert printed == "Scratch::B2 =Sheet 2::Table 1::A1*2"
+    assert printed == "Scratch::B2 =Table 1::A1*2"
     reopened = pybers.open(tmp_path / "cli.numbers").sheet("Sheet 2").table("Scratch")
-    assert reopened.cell("B2").formulaText == "=Sheet 2::Table 1::A1*2"
+    assert reopened.cell("B2").formulaText == "=Table 1::A1*2"

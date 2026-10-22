@@ -109,8 +109,8 @@ def collectDocumentFormulas() -> list[
     found = []
     for path in allDocuments:
         document = pybers.open(path)
-        names = document.tableIdentities
         for sheet in document.sheets:
+            names = sheet.tableIdentities
             for table in sheet.tables:
                 for reference, cell in table.cells.items():
                     if cell.formula is not None:
@@ -400,7 +400,8 @@ def testAReferenceIntoAnotherTableCarriesThatTablesIdentity() -> None:
     assert table.cell("G11").formulaText == "=Table 2::A1"
     assert table.cell("H11").formulaText == "=Sheet 2::Table 1::A1"
 
-    parsed = parseFormula("=Table 2::A1", "G11", tables=document.tableIdentities)
+    names = document.sheet("Sheet 1").tableIdentities
+    parsed = parseFormula("=Table 2::A1", "G11", tables=names)
     assert reduceFormulaShape(parsed) == dropTypedWhitespace(table.cell("G11").formula)
     assert parsed.references[0].crossTable
 
@@ -436,7 +437,7 @@ def testATableNamedAnythingNumbersAllowsRoundTripsThroughTheText(
     rendered = source.cell("G11").formulaText
     assert rendered == f"={name}::A1"
     again = parseFormula("=" + f"{name}::A1", "G11",
-                         tables=document.tableIdentities)
+                         tables=document.sheet("Sheet 1").tableIdentities)
     assert reduceFormulaShape(again) == dropTypedWhitespace(source.cell("G11").formula)
 
 
@@ -450,7 +451,9 @@ def testATableNameWithOuterSpacesIsRefusedRatherThanMisread() -> None:
     document = pybers.open(findDocumentPath("20-formula-shapes"))
     document.sheet("Sheet 1").table("Table 2").name = "  padded  "
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
-        parseFormula("=  padded  ::A1", "G11", tables=document.tableIdentities)
+        parseFormula(
+            "=  padded  ::A1", "G11", tables=document.sheet("Sheet 1").tableIdentities
+        )
 
 
 @pytest.mark.parametrize(
@@ -471,7 +474,7 @@ def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
     real document failed to reparse on it. Found while measuring #67.
     """
     document = pybers.open(findDocumentPath("20-formula-shapes"))
-    formula = parseFormula(text, "A1", tables=document.tableIdentities)
+    formula = parseFormula(text, "A1", tables=document.sheet("Sheet 1").tableIdentities)
 
     assert any(
         reference.crossTable for reference in formula.references
@@ -484,7 +487,7 @@ def testAHyphenatedTableNameStillResolvesWhenTheDocumentNamesIt() -> None:
     document.sheet("Sheet 2").table("Table 1").name = "Table 1-1"
 
     formula = parseFormula(
-        "=Table 1-1::A1", "A1", tables=document.tableIdentities
+        "=Table 1-1::A1", "A1", tables=document.sheet("Sheet 1").tableIdentities
     )
 
     assert formula.references[0].crossTable
@@ -518,7 +521,7 @@ def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> No
     document.sheet("Sheet 2").table("Table 1").name = "Two"
 
     with pytest.raises(FormulaSyntaxError, match="past column 1000"):
-        parseFormula(text, "B5", tables=document.tableIdentities)
+        parseFormula(text, "B5", tables=document.sheet("Sheet 1").tableIdentities)
 
 
 def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
@@ -526,7 +529,7 @@ def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
     document = pybers.open(findDocumentPath("20-formula-shapes"))
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
         parseFormula(
-            "=Ledger::A1", "A1", tables=document.tableIdentities
+            "=Ledger::A1", "A1", tables=document.sheet("Sheet 1").tableIdentities
         )
 
 
@@ -749,7 +752,7 @@ goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 # The three formulas the golden was authored from, as text, in the order a reader
 # of `tests/golden/README.md` will find them described.
 authoredFormulas: tuple[tuple[str, str], ...] = (
-    ("B1", "=Sheet 1::Table 1::A11*2+1"),
+    ("B1", "=Table 1::A11*2+1"),
     ("C1", '=IF(SUM(A1:A10)>10,"big","small")'),
     ("D1", '=$A$1&" units"'),
 )
@@ -1031,3 +1034,29 @@ def testTheBracketGoldenHoldsWhatItClaimsTo() -> None:
         formula = table.cell(address).formula
         assert formula is not None
         assert any(node.nodeType == listNodeType for node in formula), address
+
+
+def testATableOnTheFormulasOwnSheetIsNamedBareAsNumbersShowsIt() -> None:
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
+    cell = document.sheet("Sheet 1").table("Table 2").cell("B1")
+    cell.formulaText = "=Table 1::A1"
+    assert cell.formulaText == "=Table 1::A1"
+    other = document.sheet("Sheet 2").table("Table 1").cell("B1")
+    other.formulaText = "=Sheet 1::Table 1::A1"
+    assert other.formulaText == "=Sheet 1::Table 1::A1"
+
+
+def testAReferenceBeyondItsTablesGridShowsAsRefAsNumbersShowsIt() -> None:
+    table = pybers.open(findDocumentPath("60b-move-cut-pasted")).sheets[0].tables[0]
+    assert table.colCount == 8
+    assert (table.cell("H10").formulaText, table.cell("H11").formulaText) == (
+        "=#REF!", "=#REF!"
+    )
+
+
+def testAFormulaAttachedOverChosenTextDropsTheTextFormat() -> None:
+    table = pybers.open(findDocumentPath("18-formula-literals")).sheets[0].tables[0]
+    cell = table.cell("A2")
+    assert cell.presentation.formatChosen
+    cell.formula = table.cell("A1").formula
+    assert not cell.presentation.formatChosen

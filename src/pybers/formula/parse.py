@@ -515,7 +515,7 @@ def parseFormula(
 
     `host` is the cell that will hold it, because an unlocked reference is an
     offset from there. `tables` maps a name to an identity, from
-    `Document.tableIdentities`, and `pieces` supplies an address by name for a
+    `Sheet.tableIdentities`, and `pieces` supplies an address by name for a
     `{placeholder}` in the text.
     """
     body = text.strip()

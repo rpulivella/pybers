@@ -50,12 +50,12 @@ measurementStem: str = "71-whole-axis-ranges-and-booleans"
 typedFormulas: tuple[tuple[str, str], ...] = (
     ("B1", "=SUM(C:D)"),
     ("B2", "=SUM(5:6)"),
-    ("B3", "=SUM(Sheet 1::Table 1::B:C)"),
-    ("B4", "=SUM(Sheet 1::Table 1::2:3)"),
+    ("B3", "=SUM(Table 1::B:C)"),
+    ("B4", "=SUM(Table 1::2:3)"),
     ("B5", "=TRUE"),
     ("B6", "=IF(FALSE,1,2)"),
-    ("B7", "=SUM(Sheet 1::Table 1::$B:$C)"),
-    ("B8", "=SUM(Sheet 1::Table 1::$2:$3)"),
+    ("B7", "=SUM(Table 1::$B:$C)"),
+    ("B8", "=SUM(Table 1::$2:$3)"),
 )
 
 # What Numbers 15.4 calculated for each when it saved the measurement.
@@ -110,7 +110,7 @@ def testEachFormulaEncodesAsNumbersStoredIt(address: str, text: str) -> None:
     cell = table.cell(address)
     stored = cell.formula
     assert stored is not None
-    parsed = parseFormula(text, cell.address, tables=document.tableIdentities)
+    parsed = parseFormula(text, cell.address, tables=cell.tableNames)
     assert [encodeFormulaNode(node) for node in parsed] == [
         readStoredNode(node) for node in stored
     ]
