@@ -230,7 +230,11 @@ forms, the shape Numbers stores. A shorthand parser may later build one, and the
 value stays what pybers stores.
 
 **Currency has one home** that the format code and the formula code share, since a
-formula's result can be a currency amount as well as a cell's value (PYB-220).
+formula's result can be a currency amount as well as a cell's value (PYB-220). A currency
+amount is one value, a `CurrencyAmount` holding a `Decimal` and an ISO 4217 code, because
+a Python caller expects an amount to carry its currency, as `py-moneyed`'s `Money` does.
+The code has one owner, the format entry Numbers stores it in, so the value is built from
+that entry on read rather than holding a copy.
 
 **No format bit is written before it is decoded.** PYB-219 decodes each family's archive
 and flag bits, and the format work splits by family on its findings.

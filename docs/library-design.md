@@ -21,7 +21,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
 | `Cell` | One cell: its value, formula, style and stored description | Owner |
 | `CellChange` | What a write did to one cell, or would do in a preview: value and kind before and after, and how far the table grew | Frozen |
-| `CellValue` | `Decimal`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
+| `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `Style` | A cell's appearance | Frozen |
@@ -78,7 +78,7 @@ Each command answers to one public call, and the call does the work.
 
 ## Writing a cell
 
-A value's kind follows its Python type, as the table above lists. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone pybers is running in.
+A value's kind follows its Python type, as the table above lists. A currency amount is a `CurrencyAmount`, a `Decimal` amount with the ISO 4217 code of its currency, `CurrencyAmount(Decimal("1250.00"), "EUR")`, which adds, subtracts and compares only with an amount in the same currency. A number written into a currency cell keeps that cell's currency, as typing into one in Numbers does, and `pybers.currencies` lists the 37 currencies Numbers offers. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone pybers is running in.
 
 - **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does, and loses any control the old value had.
 - **A value write never fails because of the cell's format.** A value of the cell's kind keeps its format and control.
