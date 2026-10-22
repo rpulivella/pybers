@@ -6,8 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
-2026-10-22  `kind` and `presentation` replace `description`, and a control is
-            UNDETERMINED once the value changes, for PYB-255.
+2026-10-22  `kind` and `presentation` replace `description`, and a control the
+            value it holds cannot show is dropped with its format, for PYB-255.
 2026-10-22  A cell holds a `CurrencyAmount`, and a number written into a currency
             cell keeps its currency, for PYB-220.
 2026-10-20  A value of any kind is written into any cell, a `date` as midnight and an
@@ -47,6 +47,7 @@ from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.style import Style
 from pybers.table.kinds import (
+    CellFormat,
     CellKind,
     CellPresentation,
     CellStorage,
@@ -306,7 +307,8 @@ class Cell:
         """Set this cell's value and return the change, or only report it in preview.
 
         A value of another kind takes that kind's Automatic format when saved, so
-        a format chosen for the old kind goes with it.
+        a format chosen for the old kind goes with it, as it does with a control that
+        cannot show the value. A currency amount's format is always a chosen one.
         """
         written = toCellValue(value, self.address, self.timeZone)
         # A number typed into a currency cell keeps its currency, as Numbers does.
@@ -319,9 +321,20 @@ class Cell:
         change = CellChange(self.reference, self._value, written, before, after)
         if not preview and change.changed:
             self._value = written
-            if after is not before:
-                self._formatChosenSet(False)
+            control = self._stored.presentation.control
+            dropped = control is not None and not self._controlKept()
+            if after is not before or dropped:
+                self._formatChosenSet(isinstance(written, CurrencyAmount))
         return change
+
+    def _controlKept(self) -> bool:
+        """Report whether a save keeps the stored control, which shows the value."""
+        control = self._stored.presentation.control
+        if control is None:
+            return False
+        if isSameValue(self.value, self._storedValue):
+            return True
+        return self.kind is self._stored.kind and control.showsValue(self.value)
 
     def _formatChosenSet(self, chosen: bool) -> None:
         """Record whether a person chose this cell's format, the one direct edit."""
@@ -341,11 +354,13 @@ class Cell:
     def presentation(self) -> CellPresentation:
         """Return how this cell shows its value: its format and its control."""
         presentation = self._stored.presentation
-        valueKept = isSameValue(self.value, self._storedValue)
-        if presentation.control is not None and not valueKept:
-            presentation = replace(presentation, control=UNDETERMINED)
+        if presentation.control is not None and not self._controlKept():
+            presentation = replace(presentation, control=None, format=UNDETERMINED)
         if self.kind is not self._stored.kind:
             presentation = replace(presentation, format=UNDETERMINED)
+        # None of the 897 formula records in the documents keeps a chosen Text format.
+        if self.formula is not None and presentation.format is CellFormat.TEXT:
+            presentation = replace(presentation, formatChosen=False)
         return presentation
 
     @property

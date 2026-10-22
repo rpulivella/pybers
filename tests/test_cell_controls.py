@@ -88,11 +88,27 @@ def testAnUnmeasuredControlIsCarriedByItsInteractionType() -> None:
     assert readControl(None, spec) == CellControlUnknown(99)  # type: ignore[arg-type]
 
 
-def testAControlIsUndeterminedOnceItsValueChanges(tmp_path: Path) -> None:
+def testAControlShowingTheNewValueIsKeptBeforeTheSave(tmp_path: Path) -> None:
     _, table = openFirstTable(copyDocument("11-value-types-noformats", tmp_path))
     cell = table.cell("G1")
     cell.value = Decimal(51)
-    assert cell.presentation.control is UNDETERMINED
+    assert isinstance(cell.presentation.control, CellControlSlider)
+
+
+def testAControlThatCannotShowTheValueGoesWithItsFormat(tmp_path: Path) -> None:
+    _, table = openFirstTable(copyDocument("11-value-types-noformats", tmp_path))
+    cell = table.cell("F1")
+    cell.value = Decimal(7)
+    presentation = cell.presentation
+    assert (presentation.control, presentation.format) == (None, UNDETERMINED)
+    assert not presentation.formatChosen
+
+
+def testAKindChangeDropsTheControl(tmp_path: Path) -> None:
+    _, table = openFirstTable(copyDocument("11-value-types-noformats", tmp_path))
+    cell = table.cell("G1")
+    cell.value = "words"
+    assert cell.presentation.control is None
 
 
 def testASavedControlIsReadAgainFromWhatTheSaveKept(tmp_path: Path) -> None:

@@ -14,6 +14,8 @@ a value typed into a fresh cell takes it, and drops the control the old value ha
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-22  The chosen bit set or cleared is the one for the slot a record shows,
+            and a retyped record keeps none, for PYB-255.
 2026-10-22  A `CurrencyAmount` writes as currency, and a new code keeps the other
             settings of its format, for PYB-220.
 2026-10-20  Any value is written over any value, each kind's record shape held in
@@ -57,6 +59,7 @@ from .._persistence.cells import (
     dateFormatSlot,
     displayedKindSlot,
     durationFormatSlot,
+    findChosenBit,
     findSlotValue,
     listReferenceSlots,
     numberFormatSlot,
@@ -357,12 +360,13 @@ def patchCurrencyCode(
 
 
 def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:
-    """Return a record carrying the chosen-format bit its cell holds."""
+    """Return a record carrying the chosen bit its cell holds, for the slot it shows."""
     header = bytearray(raw[:valueOffset])
+    chosenBit = findChosenBit(raw)
     if cell.presentation.formatChosen:
-        header[chosenFormatOffset] |= chosenFormatBit
+        header[chosenFormatOffset] |= chosenBit
     else:
-        header[chosenFormatOffset] &= ~chosenFormatBit
+        header[chosenFormatOffset] &= ~chosenBit
     return bytes(header) + raw[valueOffset:]
 
 
@@ -526,11 +530,9 @@ def retypeRecord(
 
     header = bytearray(record.raw[:valueOffset])
     header[typeByteOffset] = typeByte
-    chosen = header[chosenFormatOffset] & chosenFormatBit
     header[formatFlagsOffset:formatFlagsOffset + formatFlagsWidth] = bytes(
         formatFlagsWidth
     )
-    header[chosenFormatOffset] |= chosen
     header[valueKindOffset] = (
         header[valueKindOffset] & ~valueBitsMask | arriving.valueBits
     )

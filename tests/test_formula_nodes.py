@@ -36,6 +36,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from test_writer import listArchiveDifferences
 
 import pybers
 from conftest import findDocumentPath, readDataListBytes
@@ -805,8 +806,8 @@ def testAttachAndDetachMatchTheirGoldenFile(tmp_path: Path) -> None:
     table.cell("B1").formula = None
     document.save()
 
-    assert readDataListBytes(golden) == readDataListBytes(working)
-    assert readFormulaCellRegister(golden) == readFormulaCellRegister(working)
+    differences = listArchiveDifferences(readPackage(golden), readPackage(working))
+    assert not differences, "\n  ".join(differences)
 
 
 def testTheAttachGoldenHoldsWhatItClaimsTo() -> None:

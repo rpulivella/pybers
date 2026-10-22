@@ -432,3 +432,17 @@ def testACommandLineListsEachCellsKindAsText() -> None:
         for cell in list(table.rows)[0]
     }
     assert json.loads(json.dumps(shown))["B1"] == {"kind": "error", "format": None}
+
+
+@pytest.mark.parametrize(("document", "address", "chosen"), [
+    ("12-number-currency", "B1", True),
+    ("13-number-percent", "B1", True),
+    ("13-number-percent", "A1", False),
+    ("14-number-date", "C1", True),
+    ("14-number-date", "A1", False),
+])
+def testAFormatIsChosenByTheBitOfTheSlotItShows(
+    document: str, address: str, chosen: bool
+) -> None:
+    """findings-11-formats.md: byte 6 holds one chosen bit per format slot."""
+    assert openFirstTable(document).cell(address).presentation.formatChosen is chosen

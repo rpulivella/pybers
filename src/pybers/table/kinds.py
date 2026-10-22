@@ -80,13 +80,13 @@ class CellPresentation:
     """How a cell shows its value: its format, whether a person chose it, its control.
 
     `format` is None when the record names none, and UNDETERMINED once an edit
-    changed the kind, since the save then chooses it. `control` is UNDETERMINED once
-    an edit changed the value, since the save keeps it only if it shows the value.
+    changed the kind or dropped the control, since the save then chooses it. A
+    control is kept only while it can show the cell's value, as the save keeps it.
     """
 
     format: CellFormat | UNDETERMINED | None
     formatChosen: bool
-    control: CellControl | UNDETERMINED | None = None
+    control: CellControl | None = None
 
 
 @dataclass(frozen=True, slots=True)
