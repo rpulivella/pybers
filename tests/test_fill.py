@@ -7,6 +7,8 @@ they claim, the refusals that leave a table as it was, and the few lines a scrip
 or a command line writes to fill a block.
 
 UPDATES
+2026-10-22  The goldens' builders and comparisons moved to the golden builders,
+            for PYB-255.
 2026-09-30  Series continued by `CONTINUE_SERIES`, checked against the drag Numbers
             made in `65b-series-dragged`, for PYB-137.
 2026-09-29  Written for PYB-118, taking over the fill tests of `formulaFill`, and
@@ -29,6 +31,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import fillCase
 from structurefacts import readTableFacts
 
 import pybers
@@ -453,44 +456,16 @@ def testCopyingARecordNamingAnUnidentifiedEntryIsRefused(tmp_path: Path) -> None
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 
-@pytest.mark.parametrize(
-    ("name", "base", "source", "through", "rule"),
-    [
-        ("20-cells-filled-relative-by-pybers", "20-formula-shapes", "A11", "A11:D11",
-         relative),
-        ("20-cells-filled-named-by-pybers", "20-formula-shapes", "A11", "A11:D11",
-         named),
-        ("61-cells-filled-by-pybers", "61-move-styles-base", "B2:D3", "B2:H7",
-         relative),
-        ("63-cells-filled-by-pybers", "63d-fill-border-base", "B2:D3", "B2:D7",
-         relative),
-    ],
-)
-def testTheFillGoldensMatchWhatThisLibraryProduces(
-    name: str, base: str, source: str, through: str,
-    rule: FormulaReferenceRelocation, tmp_path: Path,
-) -> None:
-    """PYB-118 AC 6: each fill again, against the file Numbers confirmed."""
-    target = tmp_path / f"{name}.numbers"
-    fillAndSave(base, source, through, rule, target)
-    differences = listPackageDifferences(
-        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
-    )
-    assert [
-        difference for difference in differences if difference.identifier is not None
-    ] == []
-
-
 def testTheFillGoldensHoldWhatTheyClaimTo() -> None:
     """Guard the guard: a golden replaced by an unedited copy would pass above."""
     relativeTable = pybers.open(
         goldenDirectory / "20-cells-filled-relative-by-pybers.numbers"
     ).sheets[0].tables[0]
-    assert relativeTable.cell("D11").formulaText == "=SUM(D1:D10)"
+    assert relativeTable.cell("D1").formulaText == "=SUM(D3:D5)"
     namedTable = pybers.open(
         goldenDirectory / "20-cells-filled-named-by-pybers.numbers"
     ).sheets[0].tables[0]
-    assert namedTable.cell("D11").formulaText == "=SUM(A1:A10)"
+    assert namedTable.cell("D1").formulaText == "=SUM(A3:A5)"
     styled = pybers.open(
         goldenDirectory / "61-cells-filled-by-pybers.numbers"
     ).sheets[0].tables[0]
@@ -611,31 +586,6 @@ directionDocuments: dict[str, str] = {
 }
 
 
-def findSeedCount(index: int) -> int:
-    """Return how many seeds case `index` of the `66` bases holds."""
-    return 3 if index == 2 else 1 if index >= 15 else 2
-
-
-def fillCase(table: pybers.Table, direction: str, index: int) -> None:
-    """Fill one case of a `66` base the way its drag was made."""
-    count = findSeedCount(index)
-    if direction in ("down", "up"):
-        letter = chr(65 + index)
-        source = f"{letter}10:{letter}{9 + count}"
-        through = (
-            f"{letter}{10 + count}:{letter}21" if direction == "down"
-            else f"{letter}2:{letter}9"
-        )
-    else:
-        row = index + 1
-        source = f"J{row}:{chr(73 + count)}{row}"
-        through = (
-            f"{chr(74 + count)}{row}:U{row}" if direction == "right"
-            else f"B{row}:I{row}"
-        )
-    table.cellsFill(source, through, references=relative, values=series)
-
-
 @pytest.mark.parametrize("direction", ["down", "up", "right", "left"])
 def testAFillInEachDirectionIsWhatNumbersDragged(
     direction: str, tmp_path: Path
@@ -690,65 +640,6 @@ def testAFillOfThreeSeedsAndOfRichTextIsWhatNumbersDragged(tmp_path: Path) -> No
                 savedRecords[(row - 1, column)].typeByte
                 == draggedRecords[(row - 1, column)].typeByte
             ), (letter, row)
-
-
-seedCountsByColumn: dict[str, int] = {
-    "A": 2, "B": 1, "C": 2, "D": 3, "E": 3, "F": 3, "G": 3, "H": 3,
-}
-
-
-def fillSeriesGolden(name: str, target: Path) -> None:
-    """Fill a series golden's base the way the golden was made, and save it."""
-    if name.startswith("68"):
-        document, table = openTable("68-series-kinds-base")
-        for index in range(21):
-            letter = chr(65 + index)
-            count = 1 if letter in "QRST" else 2
-            table.cellsFill(
-                f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
-                references=relative, values=series,
-            )
-    elif name.startswith("67"):
-        document, table = openTable("67-series-rich-base")
-        for letter, count in seedCountsByColumn.items():
-            table.cellsFill(
-                f"{letter}2:{letter}{1 + count}", f"{letter}{2 + count}:{letter}13",
-                references=relative, values=series,
-            )
-    else:
-        direction = name.split("-")[3]
-        document, table = openTable(
-            "66-series-vertical-base" if direction in ("down", "up")
-            else "66-series-horizontal-base"
-        )
-        for index in range(20):
-            fillCase(table, direction, index)
-    document.save(target)
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "66-series-filled-down-by-pybers",
-        "66-series-filled-up-by-pybers",
-        "66-series-filled-right-by-pybers",
-        "66-series-filled-left-by-pybers",
-        "67-series-filled-by-pybers",
-        "68-series-filled-by-pybers",
-    ],
-)
-def testTheSeriesGoldensMatchWhatThisLibraryProduces(
-    name: str, tmp_path: Path
-) -> None:
-    """PYB-137 AC 4: each series fill again, against the file to be confirmed."""
-    target = tmp_path / f"{name}.numbers"
-    fillSeriesGolden(name, target)
-    differences = listPackageDifferences(
-        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
-    )
-    assert [
-        difference for difference in differences if difference.identifier is not None
-    ] == []
 
 
 def testTheSeriesGoldensHoldWhatTheyClaimTo() -> None:

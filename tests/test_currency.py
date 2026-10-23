@@ -8,6 +8,8 @@ typed. `86-custom-text-and-currency` holds a custom format with a Currency token
 `88-formula-currency-results` the results of formulas over a euro and a dollar amount.
 
 UPDATES
+2026-10-22  The golden's writes and comparison moved to the golden builders, for
+            PYB-255.
 2026-10-22  Written for PYB-220.
 """
 from __future__ import annotations
@@ -27,18 +29,14 @@ from pathlib import Path
 import pytest
 from test_cell_value_kinds import openFirstTable, readFormatEntry, writeAndReopen
 from test_cli_set import runSetCommand
-from test_writer import listArchiveDifferences, readRecordAt
+from test_writer import readRecordAt
 
 import pybers
 from conftest import copyDocument, findDocumentPath
 from pybers import CurrencyAmount, CurrencyError, currencies, findCurrency
-from pybers._persistence import readPackage
 from pybers.table.series import findSeriesContinuation
 
 sourceRoot: Path = Path(__file__).resolve().parent.parent / "src" / "pybers"
-goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
-goldenName: str = "12-currency-written-by-pybers"
-
 
 def readFirstTable(stem: str) -> pybers.Table:
     """Return the first table of a document as a fresh read finds it."""
@@ -227,38 +225,3 @@ def testAFillContinuesAmountsInOneCurrency() -> None:
     continuation = findSeriesContinuation(seeds)
     assert continuation is not None
     assert continuation(4) == CurrencyAmount(Decimal(5), "EUR")
-
-
-# ── The golden ──────────────────────────────────────────────────────────────
-
-# Each written value, and the label below it saying what was written, so the golden
-# labels its own contents as a measurement does.
-goldenWrites: tuple[tuple[str, Decimal | CurrencyAmount | str], ...] = (
-    ("A1", CurrencyAmount(Decimal("99.5"), "CHF")),
-    ("A2", "written by pybers as 99.5 CHF over the plain number 1234.5"),
-    ("B1", Decimal("12.5")),
-    ("B2", "written by pybers as the number 12.5 into dollars, nothing else chosen"),
-    ("D1", CurrencyAmount(Decimal("7"), "EUR")),
-    ("D2", "written by pybers as 7 EUR over dollars, separator, accounting style"),
-    ("J1", CurrencyAmount(Decimal("1000"), "GBP")),
-    ("J2", "written by pybers as 1000 GBP into a cell holding nothing"),
-)
-
-
-def writeCurrencyGolden(into: Path) -> Path:
-    """Write the golden's mutation into a fresh copy of its fixture, and return it."""
-    working = copyDocument("89-currency-formats", into)
-    document, table = openFirstTable(working)
-    for address, value in goldenWrites:
-        table.cell(address).value = value
-    document.save()
-    return working
-
-
-def testTheCurrencyGoldenMatchesWhatThisLibraryProduces(tmp_path: Path) -> None:
-    golden = goldenDirectory / f"{goldenName}.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-    differences = listArchiveDifferences(
-        readPackage(golden), readPackage(writeCurrencyGolden(tmp_path))
-    )
-    assert not differences, "\n  ".join(differences)

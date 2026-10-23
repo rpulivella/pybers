@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import pybers
+from conftest import findDocumentPath
 from pybers import CellControlSlider, CellFormat, CellKind
 from tools.local.lib import golden_confirm as report
 from tools.local.lib.golden_expected import (
@@ -79,7 +80,7 @@ def testEveryFilledCellOfEveryTableIsExpected() -> None:
     document = pybers.open(goldenDirectory / "12-currency-written-by-pybers.numbers")
     filled = sum(1 for sheet in document.sheets for table in sheet.tables
                  for cell in table.cells.values() if cell.value is not None)
-    assert sum(len(table.cells) for table in expected.tables) == filled == 20
+    assert sum(len(table.cells) for table in expected.tables) == filled == 8
 
 
 def testACurrencyAmountNamesTheCurrencyAsTheMenuTitlesIt() -> None:
@@ -92,9 +93,9 @@ def testAMeasuredCellIsLabeledByTheTextBeneathIt() -> None:
 
 
 def testALabelBeneathAnEmptyCellIsLeftItsOwnEntry() -> None:
-    expected = buildGolden("11-controls-written-by-pybers")
-    assert findCell(expected, "J2").label is None
-    assert all(cell.label != "J2" for cell in expected.tables[0].cells)
+    expected = buildExpectedValues(findDocumentPath("90-values-for-booleans"))
+    assert findCell(expected, "E2").label is None
+    assert all(cell.label != "E2" for cell in expected.tables[0].cells)
 
 
 def testATableNotLaidOutAsAMeasurementHasNoLabels() -> None:
@@ -103,7 +104,7 @@ def testATableNotLaidOutAsAMeasurementHasNoLabels() -> None:
 
 
 def testASliderIsExpectedWithItsRange() -> None:
-    cell = findCell(buildGolden("11-controls-written-by-pybers"), "G1")
+    cell = findCell(buildGolden("11-controls-written-by-pybers"), "C1")
     assert cell.control == CellControlSlider(Decimal(1), Decimal(100), Decimal(1))
 
 
@@ -112,7 +113,7 @@ def testTheMachineFormParsesAsTomlWithEveryCell(tmp_path: Path) -> None:
     written = tomllib.loads(writeExpectationsToml(expected, tmp_path).read_text())
     cells = written["table"][0]["cell"]
     assert len(cells) == len(expected.tables[0].cells)
-    slider = next(cell for cell in cells if cell["cell"] == "G1")
+    slider = next(cell for cell in cells if cell["cell"] == "C1")
     assert slider["control"] == {
         "kind": "slider", "minimum": "1", "maximum": "100", "increment": "1"
     }
@@ -123,7 +124,7 @@ def testTheExpectationsFlattenACellAndFoldItsLabel(tmp_path: Path) -> None:
     written = writeExpectations(expected, tmp_path).read_text()
     assert "### A1 · measured\n- value: `99.5`\n- kind: currency\n" in written
     assert "- currency: Swiss Franc (CHF)\n\n### A2 · describes A1\n" in written
-    assert "20 filled, every other cell empty" in written
+    assert "8 filled, every other cell empty" in written
     assert "|" not in written
 
 
@@ -225,3 +226,8 @@ def testACellAMergeCoversIsLeftToTheMergeCheck() -> None:
     reading["cellNames"] = [["A1", "A1"]]
     statuses = [check.status for check in report.checkTableGrid(table, reading)]
     assert "failed" not in statuses
+
+
+def testATableOfTextIsNotTakenForALabeledMeasurement() -> None:
+    expected = buildGolden("45-merged-by-pybers")
+    assert all(cell.label is None for table in expected.tables for cell in table.cells)

@@ -7,6 +7,8 @@ is the whole mechanism and a model that agreed with itself would prove nothing a
 what Numbers reads. See findings-01-values.md.
 
 UPDATES
+2026-10-22  The golden's writes and its comparison moved to the golden builders,
+            for PYB-255.
 2026-09-16  Written for PYB-83.
 """
 from __future__ import annotations
@@ -23,6 +25,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import buildGolden, findBuilder, literalCells, plainCell
 from test_format_refcounts import readDisplayedKind
 from test_writer import copyDocument, listArchiveDifferences, readRecordAt
 
@@ -36,13 +39,6 @@ from pybers._persistence.cells import (
 )
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
-
-# The golden: a literal retyping a number and one borrowing a shape, beside plain text.
-literalCells: tuple[tuple[str, str], ...] = (
-    ("A1", "=SUM(B1:C1)"),
-    ("J1", "=A1+1"),
-)
-plainCell: tuple[str, str] = ("B1", "=1+1")
 
 
 def assertLiteralRecord(path: Path, address: str) -> None:
@@ -59,16 +55,9 @@ def openFirstTableCell(stem: str, address: str) -> pybers.Cell:
     return pybers.open(findDocumentPath(stem)).sheets[0].tables[0].cell(address)
 
 
-def writeLiteralGolden(tmp_path: Path) -> Path:
-    """Write the golden's mutation into a fresh copy of its fixture, and return it."""
-    working = copyDocument("11-value-types-noformats", tmp_path)
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    for address, text in literalCells:
-        table.cell(address).textLiteralSet(text)
-    table.cell(plainCell[0]).value = plainCell[1]
-    document.save()
-    return working
+def writeLiteralGolden(into: Path) -> Path:
+    """Build the literal golden into a directory, and return the file written."""
+    return buildGolden(findBuilder("11-text-literal-written"), into)
 
 
 def testTheMeasuredLiteralReadsAsTextWithAChosenFormat() -> None:
@@ -184,19 +173,6 @@ def testLiteralTextThatIsNotTextIsRefused() -> None:
 
 
 # ── The golden file ─────────────────────────────────────────────────────────
-
-
-def testLiteralTextMatchesTheGoldenFile(tmp_path: Path) -> None:
-    golden = goldenDirectory / "11-text-literal-written.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    differences = listArchiveDifferences(
-        readPackage(golden), readPackage(writeLiteralGolden(tmp_path))
-    )
-    assert not differences, (
-        "the writer no longer produces the confirmed output:\n  "
-        + "\n  ".join(differences)
-    )
 
 
 def testTheLiteralGoldenHoldsWhatItClaimsTo() -> None:

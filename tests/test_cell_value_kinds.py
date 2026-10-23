@@ -7,6 +7,8 @@ a date, a duration, a checkbox, a star rating, a slider, a stepper and a pop-up 
 and whose `J1` has no record at all.
 
 UPDATES
+2026-10-22  The goldens' writes and their comparison moved to the golden
+            builders, for PYB-255.
 2026-10-22  A number written into a currency cell keeps its currency, for
             PYB-220.
 2026-10-20  Written for PYB-144.
@@ -27,6 +29,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import kindWrites
 from test_cell_kinds import findFirstEmptyRecord, forgeRecordType, unmeasuredTypeByte
 from test_format_refcounts import readDisplayedKind, readFormatLedger, readTableModels
 from test_writer import listArchiveDifferences, readRecordAt
@@ -463,64 +466,12 @@ def testAValueOfAnotherKindDropsTheControlAndReleasesIt(tmp_path: Path) -> None:
 
 # ── AC 6: the goldens ───────────────────────────────────────────────────────
 
-# Each golden's mutation, in the order it is written.
-goldenWrites: dict[str, tuple[tuple[str, Writable], ...]] = {
-    "11-dates-written-by-pybers": (
-        ("A1", datetime.datetime(2027, 1, 31)),
-        ("B1", datetime.datetime(2026, 10, 20, 9, 30)),
-        ("C1", datetime.datetime(2027, 6, 16)),
-        ("J1", datetime.datetime(2026, 12, 25, 18, 45)),
-    ),
-    "11-durations-written-by-pybers": (
-        ("A1", datetime.timedelta(minutes=90)),
-        ("D1", datetime.timedelta(hours=2)),
-        ("J1", datetime.timedelta(days=1, hours=2)),
-    ),
-    "11-controls-written-by-pybers": (
-        ("E1", False),
-        ("F1", Decimal("7")),
-        ("G1", Decimal("100")),
-        ("H1", Decimal("500")),
-        ("I1", "Banana"),
-    ),
-    "11-booleans-written-by-pybers": (
-        ("A1", True),
-        ("B1", False),
-        ("E1", False),
-        ("F1", True),
-        ("J1", True),
-    ),
-}
-
-
-def writeKindGolden(name: str, into: Path) -> Path:
-    """Write one golden's mutation into a fresh copy of its fixture, and return it."""
-    working = copyDocument(baseStem, into)
-    document, table = openFirstTable(working)
-    for address, value in goldenWrites[name]:
-        table.cell(address).value = value
-    document.save()
-    return working
-
-
-@pytest.mark.parametrize("name", goldenWrites)
-def testTheKindGoldensMatchWhatThisLibraryProduces(name: str, tmp_path: Path) -> None:
-    golden = goldenDirectory / f"{name}.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-    differences = listArchiveDifferences(
-        readPackage(golden), readPackage(writeKindGolden(name, tmp_path))
-    )
-    assert not differences, (
-        "the writer no longer produces the confirmed output:\n  "
-        + "\n  ".join(differences)
-    )
-
-
-@pytest.mark.parametrize("name", goldenWrites)
+@pytest.mark.parametrize("name", kindWrites)
 def testTheKindGoldensHoldWhatTheyClaimTo(name: str) -> None:
     golden = goldenDirectory / f"{name}.numbers"
     _, table = openFirstTable(golden)
-    for address, value in goldenWrites[name]:
+    _, writes = kindWrites[name]
+    for address, value in writes:
         assert table.cell(address).value == value
 
 

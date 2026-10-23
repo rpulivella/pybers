@@ -6,6 +6,7 @@ The archives a save writes for a move, the refusals that leave a table as it was
 and the few lines a script or a command line writes to move a block.
 
 UPDATES
+2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-23  Written for PYB-18.
 """
 from __future__ import annotations
@@ -395,28 +396,6 @@ def testAMovedImportedMergeCarriesTheRecordsItCovers(tmp_path: Path) -> None:
     assert {(4, 0), (4, 1)} <= records.keys()
     assert not {(0, 0), (0, 1)} & records.keys()
 
-
-goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
-
-
-@pytest.mark.parametrize(
-    ("name", "rule"),
-    [("60-move-cut-pasted-by-pybers", relative), ("60-move-dragged-by-pybers", named)],
-)
-def testTheMoveGoldensMatchWhatThisLibraryProduces(
-    name: str, rule: FormulaReferenceRelocation, tmp_path: Path
-) -> None:
-    """PYB-18 AC 7: each move again, against the file Numbers confirmed."""
-    document, table = openTable("60-move-base")
-    table.cellsMove("B2:D5", "F8", references=rule)
-    target = tmp_path / f"{name}.numbers"
-    document.save(target)
-    differences = listPackageDifferences(
-        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
-    )
-    assert [
-        difference for difference in differences if difference.identifier is not None
-    ] == []
 
 
 def testAScriptAuthorMovesABlockAndSaves(tmp_path: Path) -> None:

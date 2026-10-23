@@ -8,6 +8,7 @@ table Numbers inserted, whose owner held no dependency tile either, so replaying
 edit on `48` compares the tile pybers creates with the one Numbers created.
 
 UPDATES
+2026-10-22  The golden's tables are added by its builder, for PYB-255.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-15  Written for PYB-86.
 """
@@ -27,6 +28,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import addFormulaTables
 from google.protobuf import text_format
 
 import pybers
@@ -52,14 +54,7 @@ def openShapes() -> Document:
 
 def addFormulas(document: Document) -> Document:
     """Add the golden's two tables and their formulas, and return the document."""
-    inputs = document.sheet("Sheet 1").tableAdd("Inputs", rows=2, cols=2)
-    inputs.cell("A1").value = Decimal("5")
-    calc = document.sheet("Sheet 1").tableAdd("Calc", rows=3, cols=3)
-    calc.cell("A1").value = Decimal("2")
-    calc.cell("B1").formulaText = "=A1*3"
-    calc.cell("C1").formulaText = "=Table 2::A1"
-    calc.cell("A2").formulaText = "=Inputs::A1+1"
-    calc.cell("A3").formulaText = "=SUM(A1:B1)"
+    addFormulaTables(document)
     return document
 
 

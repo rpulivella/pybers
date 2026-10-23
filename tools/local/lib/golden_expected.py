@@ -91,13 +91,18 @@ def formatMenuCurrency(code: str, document: pybers.Document) -> str:
 def findLabels(table: pybers.Table) -> dict[pybers.CellAddress, pybers.CellAddress]:
     """Return each measured cell's label, when a table is laid out as a measurement.
 
-    A label beneath an empty cell describes nothing, so it is left its own entry.
+    A label beneath an empty cell describes nothing, so it is left its own entry. The
+    rows below the labels may hold what the measured cells read, but never text, which
+    is how a table of text data is told from a measurement.
     """
     filled = {address: cell for address, cell in table.cells.items()
               if cell.value is not None or cell.formula is not None}
     labels = [address for address in filled if address.row == labelRow]
-    if not labels or any(address.row > labelRow for address in filled) or not all(
-        isinstance(filled[label].value, str) for label in labels
+    textBelow = any(address.row > labelRow and isinstance(cell.value, str)
+                    for address, cell in filled.items())
+    if not labels or textBelow or not all(
+        isinstance(filled[label].value, str) and filled[label].formula is None
+        for label in labels
     ):
         return {}
     return {measured: label for label in labels
@@ -268,6 +273,8 @@ def writeExpectations(expected: ExpectedValues, into: Path) -> Path:
 
 __all__ = [
     "ExpectedCell",
+    "labelRow",
+    "measuredRow",
     "ExpectedTable",
     "ExpectedValues",
     "buildExpectedValues",

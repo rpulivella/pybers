@@ -17,6 +17,8 @@ be parsed at all, so a byte difference on one is reported as a difference rather
 than assumed to be a harmless re-encoding.
 
 UPDATES
+2026-10-22  The goldens' writes and comparisons moved to the golden builders, for
+            PYB-255.
 2026-10-20  The refusals of a value of another kind went with them, for PYB-144.
 2026-10-09  A refused write names what the cell holds in words, for PYB-168.
 2026-09-14  Text, pooling and a cell that changes type, for #61.
@@ -39,6 +41,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import createdRowFormulas
 
 import pybers
 from conftest import allDocuments, copyDocument, findDocumentPath
@@ -499,86 +502,22 @@ def test_writingSomethingNeitherTextNorANumberIsStillRefused(
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 
-def test_aNumericEditMatchesTheGoldenFile(tmp_path: Path) -> None:
-    """AC 5. One mutation against a document, compared to a file Numbers accepted.
-
-    Every other test here checks pybers against pybers, which can agree with itself
-    while both halves are wrong. This one compares against output that a human opened
-    in Numbers and confirmed, which is the only check that reaches outside this
-    library. Re-confirmed on 2026-09-02 in Numbers 15.3.1 after #25 added the dirty
-    set: it opened with no warning and no repair prompt, and the checkbox, the
-    three-star rating, the slider at 50, the stepper at 1 and the popup menu all
-    still render and still work. See `tests/golden/README.md`.
-
-    Compared with `archiveDifferences` rather than byte for byte, because the zip
-    envelope is known to differ by the local extra fields `zipfile` cannot emit.
-    """
-    golden = goldenDirectory / "11-value-types-noformats-A1-edited.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = copyDocument("11-value-types-noformats", tmp_path)
-    document = pybers.open(working)
-    document.sheets[0].tables[0].cell("A1").value = Decimal("98765.4321")
-    document.save()
-
-    differences = listArchiveDifferences(readPackage(golden), readPackage(working))
-    assert not differences, (
-        "the writer no longer produces the confirmed output:\n  "
-        + "\n  ".join(differences)
-    )
-
-
 def test_theGoldenFileHoldsWhatItClaimsTo() -> None:
     """Guard the guard: a golden that stopped holding the edit would pass silently.
 
     The test above compares two files this library produced. If the golden were
     replaced by an unedited copy, that comparison would still pass on the day the
     writer broke in the same direction, so the golden's own contents are asserted
-    here against the values confirmed on screen on 2026-09-01.
+    here.
     """
     table = pybers.open(
         goldenDirectory / "11-value-types-noformats-A1-edited.numbers"
     ).sheets[0].tables[0]
 
     assert table.cell("A1").value == Decimal("98765.4321")
-    # The label row is deliberately stale, which is how the edit is visible by eye.
-    assert table.cell("A2").value == "plain number 1234.5"
-    assert table.cell("B1").value == Decimal("42")
-    assert table.cell("E1").value is True
-    assert table.cell("I1").value == "Item 1"
-
-
-def test_aMultiSheetEditMatchesTheGoldenFile(tmp_path: Path) -> None:
-    """The same check one sheet wider, driven by `Document.cellsIterate`.
-
-    Every other edit test here changes one table on one sheet, so nothing covered
-    `applyDocumentEdits` walking sheets and filtering tables out of each drawable
-    list. That code decides which table an edit lands in, and its failure mode is the
-    format's usual one, a plausible file with the right number in the wrong table.
-
-    Confirmed on 2026-09-02 in Numbers 15.3.1, twice. The first confirmation found
-    all twelve edits in the right tables and every dependent formula displaying the
-    result it had cached BEFORE the edit. #25 added the dirty set, and the second
-    confirmation of this regenerated file shows row 11 recalculated: 10055, 10056,
-    10055, `big`, 20110, 20110, 1042 and 1053. See `tests/golden/README.md`.
-    """
-    golden = goldenDirectory / "20-formula-shapes-multisheet-edited.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = copyDocument("20-formula-shapes", tmp_path)
-    document = pybers.open(working)
-    for _, _, cell in document.cellsIterate():
-        # Rows 11 and 12 are the formula row and its labels. A formula-backed cell is
-        # refused rather than overwritten, and a label is not a number.
-        if isinstance(cell.value, Decimal) and cell.address.row <= 10:
-            cell.value = cell.value + Decimal(1000)
-    document.save()
-
-    differences = listArchiveDifferences(readPackage(golden), readPackage(working))
-    assert not differences, (
-        "the writer no longer produces the confirmed output:\n  "
-        + "\n  ".join(differences)
-    )
+    label = "written by pybers as 98765.4321 over number 1234.5"
+    assert table.cell("A2").value == label
+    assert table.colCount == 1
 
 
 def test_theMultiSheetGoldenHoldsWhatItClaimsTo() -> None:
@@ -822,41 +761,6 @@ def test_savingATableWhoseMergesDidNotChangeRewritesNothing(tmp_path: Path) -> N
     assert not listArchiveDifferences(readPackage(source), readPackage(working))
 
 
-def test_theMergeGoldensMatchWhatThisLibraryProduces(tmp_path: Path) -> None:
-    """AC 5 and AC 6, against two files Numbers opened and confirmed on 2026-09-02.
-
-    Merging `22b` and unmerging `22` are the two directions, and each golden should be
-    reproduced exactly by running the same operation again.
-    """
-    for golden, source, operation in (
-        ("22b-merged-by-pybers", "22b-merge-2x2-unmerged", "merge"),
-        ("22-unmerged-by-pybers", "22-merge-2x2", "unmerge"),
-    ):
-        expected = goldenDirectory / f"{golden}.numbers"
-        assert expected.is_file(), f"{expected.name} is missing; see the golden README"
-
-        directory = tmp_path / operation
-        directory.mkdir()
-        working = copyDocument(source, directory)
-        document = pybers.open(working)
-        table = document.sheet(1).table(1)
-        if operation == "merge":
-            for start in "ACEGI":
-                table.mergeAdd(f"{start}1:{chr(ord(start) + 1)}1")
-        else:
-            for merge in list(table.mergeRanges):
-                table.mergeRemove(merge.anchor)
-        document.save()
-
-        differences = listArchiveDifferences(
-            readPackage(expected), readPackage(working)
-        )
-        assert not differences, (
-            f"the writer no longer produces the confirmed {operation}:\n  "
-            + "\n  ".join(differences)
-        )
-
-
 def test_theMergeGoldensHoldWhatTheyClaimTo() -> None:
     """Guard the guard, including the part that looks like a bug and is not.
 
@@ -975,12 +879,7 @@ def findTile(path: Path, tableName: str) -> tst.Tile:
 unstoredRowCells: tuple[str, ...] = ("B1", "A2", "A3", "E10")
 
 # The golden's four, spread across three rows the file stored nothing for.
-createdRowFormulas: tuple[tuple[str, str], ...] = (
-    ("A3", "=1+1"),
-    ("C3", "=2*3"),
-    ("B7", "=SUM(A1:A2)"),
-    ("E10", "=A1*2"),
-)
+
 
 
 @pytest.mark.parametrize("address", unstoredRowCells)
@@ -1038,29 +937,6 @@ def test_aFormulaAlreadyInAStoredRowStillWritesUnchanged(tmp_path: Path) -> None
     document.save()
 
     assert len(findTile(working, "Table 2").rowInfos) == before
-
-
-def test_formulasInCreatedRowsMatchTheirGoldenFile(tmp_path: Path) -> None:
-    """The only test Numbers itself confirmed, and the first to build a tile row.
-
-    See `tests/golden/README.md` for the confirmation state of this file.
-    """
-    golden = goldenDirectory / "20-formula-rows-created.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = Path(
-        shutil.copy(findDocumentPath("20-formula-shapes"),
-                    tmp_path / "20.numbers")
-    )
-    document = pybers.open(working)
-    table = document.sheet("Sheet 1").table("Table 2")
-    for address, text in createdRowFormulas:
-        table.cell(address).formulaText = text
-    document.save()
-
-    assert findTile(golden, "Table 2").SerializeToString() == findTile(
-        working, "Table 2"
-    ).SerializeToString(), "the writer no longer produces the confirmed tile"
 
 
 def test_theCreatedRowGoldenHoldsWhatItClaimsTo() -> None:
@@ -1138,13 +1014,6 @@ def readRecordAt(
 # ── PYB-61: text, pooling, and a cell that changes type ──────────────────────
 
 # The golden's five, chosen to cover one criterion each.
-retypedCells: tuple[tuple[str, object], ...] = (
-    ("A1", "text over a number"),
-    ("B1", "text over a number"),
-    ("F1", "text over a control"),
-    ("A2", Decimal("98765.4321")),
-    ("J1", "into an empty cell"),
-)
 
 
 def test_theSameTextInTwoCellsIsPooledOnceWithACount(tmp_path: Path) -> None:

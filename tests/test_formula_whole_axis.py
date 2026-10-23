@@ -7,6 +7,8 @@ end, and a bare TRUE as a boolean node rather than a call. Both were measured by
 typing each formula into Numbers, in `71-whole-axis-ranges-and-booleans`.
 
 UPDATES
+2026-10-22  The golden's writes and comparison moved to the golden builders, for
+            PYB-255.
 2026-10-13  Each node compares with no field set aside, for PYB-200.
 2026-10-13  Written for PYB-139.
 """
@@ -20,14 +22,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/13"
 
-import shutil
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import typedFormulas
 
 import pybers
-from conftest import findDocumentPath, readDataListBytes
+from conftest import findDocumentPath
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers.addressing import CellReference
 from pybers.formula._write import encodeFormulaNode
@@ -47,16 +49,6 @@ measurementStem: str = "71-whole-axis-ranges-and-booleans"
 
 # What was typed into `Sheet 1 / Table 2`, as pybers renders it back: `Table 1` is
 # named with its sheet because `Sheet 2` holds a `Table 1` as well.
-typedFormulas: tuple[tuple[str, str], ...] = (
-    ("B1", "=SUM(C:D)"),
-    ("B2", "=SUM(5:6)"),
-    ("B3", "=SUM(Table 1::B:C)"),
-    ("B4", "=SUM(Table 1::2:3)"),
-    ("B5", "=TRUE"),
-    ("B6", "=IF(FALSE,1,2)"),
-    ("B7", "=SUM(Table 1::$B:$C)"),
-    ("B8", "=SUM(Table 1::$2:$3)"),
-)
 
 # What Numbers 15.4 calculated for each when it saved the measurement.
 calculatedByNumbers: dict[str, Decimal | bool] = {
@@ -77,15 +69,6 @@ def readStoredNode(node: FormulaNode) -> tsce.ASTNodeArrayArchive.ASTNodeArchive
     stored = tsce.ASTNodeArrayArchive.ASTNodeArchive()
     stored.ParseFromString(node.raw)
     return stored
-
-
-def authorTypedFormulas(working: Path) -> None:
-    """Write the measured formulas into `Sheet 1 / Table 2` of a copy, by text."""
-    document = pybers.open(working)
-    table = document.sheet("Sheet 1").table("Table 2")
-    for address, text in typedFormulas:
-        table.cell(address).formulaText = text
-    document.save()
 
 
 def testNumbersOwnFormulasRenderAsTheyWereTyped() -> None:
@@ -143,14 +126,6 @@ def testABooleanLiteralIgnoresCase(text: str, literal: bool) -> None:
 def testABareNumberStaysANumber() -> None:
     [node] = list(parseFormula("=5", CellReference.parse("A1")))
     assert (node.nodeType, node.content) == (numberNodeType, Decimal("5"))
-
-
-def testTheTypedFormulasMatchTheirGoldenFile(tmp_path: Path) -> None:
-    working = Path(
-        shutil.copy(findDocumentPath("20-formula-shapes"), tmp_path / "20.numbers")
-    )
-    authorTypedFormulas(working)
-    assert readDataListBytes(goldenDirectory / goldenName) == readDataListBytes(working)
 
 
 def testTheGoldenHoldsEveryTypedFormula() -> None:
