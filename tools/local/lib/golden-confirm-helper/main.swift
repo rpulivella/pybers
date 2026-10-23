@@ -80,6 +80,8 @@ enum EditAction: String, Codable {
     case valueSet
     case dataFormatSet
     case tableExtend
+    case tableAdd
+    case sheetAdd
     case customFormatEdit
 }
 
@@ -1562,6 +1564,30 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
             "set t to \(table)\n"
                 + "if row count of t < \(row) then set row count of t to \(row)\n"
                 + "if column count of t < \(column) then set column count of t to \(column)")
+    case .sheetAdd:
+        // A new sheet holds a table with a header row and column, which a measurement has none of.
+        guard let sheet = step.sheet else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a sheetAdd step needs the new sheet's name",
+                remedy: "name the sheet in the step's sheet"))
+        }
+        let document = "document id \(quoteAppleScript(documentId))"
+        _ = try runAppleScript(
+            "tell \(document) to set s to make new sheet with properties {name:\(quoteAppleScript(sheet))}\n"
+                + "set t to table 1 of s\n"
+                + "set header row count of t to 0\nset header column count of t to 0\nset footer row count of t to 0")
+    case .tableAdd:
+        guard let sheet = step.sheet, let table = step.table,
+              let (row, column) = step.range.flatMap(readCellPosition) else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a tableAdd step needs a sheet, a table and its last cell, such as B3",
+                remedy: "name the sheet, the new table and the cell it must reach"))
+        }
+        let target = "sheet \(quoteAppleScript(sheet)) of document id \(quoteAppleScript(documentId))"
+        _ = try runAppleScript(
+            "tell \(target) to set t to make new table with properties {name:\(quoteAppleScript(table))}\n"
+                + "set header row count of t to 0\nset header column count of t to 0\nset footer row count of t to 0\n"
+                + "set row count of t to \(row)\nset column count of t to \(column)")
     case .menuPress:
         guard let item = step.menuItem else {
             throw HelperFailure(problem: HelperProblem(

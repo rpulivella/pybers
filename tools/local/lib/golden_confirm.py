@@ -147,6 +147,9 @@ measurementDirectory: Path = repositoryRoot / "tests" / "measurements"
 recipeSuffix: str = ".recipe.toml"
 
 
+recipeDefaultKeys: tuple[str, ...] = ("document", "sheet", "table")
+
+
 recipeStepKeys: frozenset[str] = frozenset({
     "action", "document", "sheet", "table", "range", "menuItem", "format", "value",
     "setting",
@@ -461,7 +464,9 @@ def readMeasurementRecipe(name: str) -> MeasurementRecipe:
         raise GoldenConfirmError(f"{path.relative_to(repositoryRoot)} does not exist")
     with path.open("rb") as handle:
         recipe = tomllib.load(handle)
-    steps = recipe.get("step", [])
+    # A recipe may name its document, sheet and table once, for every step.
+    defaults = {key: recipe[key] for key in recipeDefaultKeys if key in recipe}
+    steps = [defaults | step for step in recipe.get("step", [])]
     for position, step in enumerate(steps, start=1):
         unknown = set(step) - recipeStepKeys
         if unknown:
