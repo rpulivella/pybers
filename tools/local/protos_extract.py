@@ -39,13 +39,15 @@ Usage:
     .venv/bin/python3 -m tools.local.protos_extract \
         --protodump ~/.local/share/protodump/protodump.py
     .venv/bin/python3 -m tools.local.protos_extract --write
-    .venv/bin/python3 -m tools.local.protos_extract --write --dry-run
+    .venv/bin/python3 -m tools.local.protos_extract --write --preview
 
 Runs on the repository's venv. protodump additionally requires protobuf and tqdm,
 generating Python from the dumped schemas requires protoc on PATH, and the type
 stubs beside it require mypy-protobuf's `protoc-gen-mypy` plugin there too.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-14  Moved here from `tools/protos-extract.py`, and run as a module, for PYB-204.
 2026-10-13  The repository root comes from `scripts/lib/shared.py`, for
             PYB-204.
@@ -204,8 +206,8 @@ def runExtract(arguments: argparse.Namespace) -> int:
             return 0
 
         dumped = sorted(extractedDirectory.glob("*.proto"))
-        if arguments.dryRun:
-            console.print("[yellow]Dry run. Nothing was written.[/]")
+        if arguments.preview:
+            console.print("[yellow]Preview. Nothing was written.[/]")
             console.print(
                 f"would write [bold]{len(dumped)}[/] schemas to "
                 f"{escape(str(schemaDirectory))}"
@@ -256,7 +258,7 @@ def buildParser() -> argparse.ArgumentParser:
         help="copy the dumped schemas into the repository "
         "(default is a read-only report)",
     )
-    parser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    parser.add_argument("--preview", dest="preview", action="store_true")
     parser.set_defaults(handler=runExtract)
     return parser
 

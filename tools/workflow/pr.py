@@ -42,6 +42,8 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-23  `close`, a pull request closed without merging, for PYB-156.
 2026-10-15  `create`, `ready` and `merge` no longer touch the session dashboard, which
             only its own command writes, for PYB-156.
@@ -267,8 +269,8 @@ def runCreate(arguments: argparse.Namespace) -> int:
         )
         return errorExitCode
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run, no pull request was opened.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. No pull request was opened.[/]")
         console.print(f"title: [bold]{escape(arguments.title)}[/]")
         console.print(
             f"[magenta]{escape(head)}[/] -> [cyan]{escape(arguments.base)}[/]"
@@ -443,8 +445,8 @@ def runEdit(arguments: argparse.Namespace) -> int:
         if refuseBody(body):
             return errorExitCode
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         if arguments.title is not None:
             console.print(f"would set title: [bold]{escape(arguments.title)}[/]")
         if body is not None:
@@ -495,8 +497,8 @@ def runReady(arguments: argparse.Namespace) -> int:
         )
         return 0
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         console.print(
             f"would mark [bold cyan]{formatPullRequestRef(summary.number)}[/] "
             "ready for review"
@@ -528,8 +530,8 @@ def runClose(arguments: argparse.Namespace) -> int:
         console.print(f"[yellow]{reference} is already {summary.state}.[/]")
         return 0
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         console.print(f"would close [bold cyan]{reference}[/] without merging")
         return 0
 
@@ -589,8 +591,8 @@ def runRerun(arguments: argparse.Namespace) -> int:
         )
         return 0
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         for run in stale:
             console.print(
                 f"would restart [bold]{escape(run.name)}[/]  {run.conclusion}"
@@ -685,8 +687,8 @@ def runMerge(arguments: argparse.Namespace) -> int:
         )
         return errorExitCode
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was merged.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was merged.[/]")
         showPullRequest(summary)
         console.print(f"method:  [cyan]{arguments.method}[/]")
         console.print(f"review:  {escape(approval)}")
@@ -818,7 +820,7 @@ def buildParser() -> argparse.ArgumentParser:
         default=defaultBaseBranch,
         help=f"target branch (default: {defaultBaseBranch})",
     )
-    createParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    createParser.add_argument("--preview", dest="preview", action="store_true")
     createParser.set_defaults(handler=runCreate)
 
     findParser = subparsers.add_parser(
@@ -867,7 +869,7 @@ def buildParser() -> argparse.ArgumentParser:
     editParser.add_argument(
         "--body-file", dest="bodyFile", help="file holding the replacement body"
     )
-    editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    editParser.add_argument("--preview", dest="preview", action="store_true")
     editParser.set_defaults(handler=runEdit)
 
     commentParser = subparsers.add_parser(
@@ -878,7 +880,7 @@ def buildParser() -> argparse.ArgumentParser:
         "--body-file", dest="bodyFile", required=True,
         help="drafted comment body, a file so lists and code fences survive",
     )
-    commentParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentParser.add_argument("--preview", dest="preview", action="store_true")
     commentParser.set_defaults(handler=runComment)
 
     commentListParser = subparsers.add_parser(
@@ -903,14 +905,14 @@ def buildParser() -> argparse.ArgumentParser:
     commentEditParser.add_argument(
         "--body-file", dest="bodyFile", required=True, help="revised comment body"
     )
-    commentEditParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentEditParser.add_argument("--preview", dest="preview", action="store_true")
     commentEditParser.set_defaults(handler=commands.runCommentEdit)
 
     commentDeleteParser = subparsers.add_parser(
         "comment-delete", help="delete a comment (permanent, no GitHub undo)"
     )
     commentDeleteParser.add_argument("commentId", type=int)
-    commentDeleteParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentDeleteParser.add_argument("--preview", dest="preview", action="store_true")
     commentDeleteParser.set_defaults(handler=commands.runCommentDelete)
 
     checksParser = subparsers.add_parser(
@@ -923,7 +925,7 @@ def buildParser() -> argparse.ArgumentParser:
         "rerun", help="restart a pull request's canceled or failed workflow runs"
     )
     rerunParser.add_argument("number", type=parsePullRequestNumber)
-    rerunParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    rerunParser.add_argument("--preview", dest="preview", action="store_true")
     rerunParser.set_defaults(handler=runRerun)
 
     logsParser = subparsers.add_parser(
@@ -938,14 +940,14 @@ def buildParser() -> argparse.ArgumentParser:
 
     readyParser = subparsers.add_parser("ready", help="take a draft out of draft")
     readyParser.add_argument("number", type=parsePullRequestNumber)
-    readyParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    readyParser.add_argument("--preview", dest="preview", action="store_true")
     readyParser.set_defaults(handler=runReady)
 
     closeParser = subparsers.add_parser(
         "close", help="close a pull request without merging it"
     )
     closeParser.add_argument("number", type=parsePullRequestNumber)
-    closeParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    closeParser.add_argument("--preview", dest="preview", action="store_true")
     closeParser.set_defaults(handler=runClose)
 
     mergeParser = subparsers.add_parser("merge", help="merge a pull request")
@@ -981,7 +983,7 @@ def buildParser() -> argparse.ArgumentParser:
         help="the Status to restore with --ticket-stays-open, "
              f"default {inProgressStatus}",
     )
-    mergeParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    mergeParser.add_argument("--preview", dest="preview", action="store_true")
     mergeParser.set_defaults(handler=runMerge)
 
     return parser

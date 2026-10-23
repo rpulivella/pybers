@@ -79,10 +79,10 @@ def testAClosedPullRequestIsANoOpThatSendsNothing(
     assert "PR #258 is already closed" in readOutput(capsys)
 
 
-def testADryRunSendsNothing(
+def testAPreviewSendsNothing(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    code, sent = runCloseOf(monkeypatch, "open", "--dry-run")
+    code, sent = runCloseOf(monkeypatch, "open", "--preview")
     assert (code, sent) == (0, [])
     assert "would close PR #258 without merging" in readOutput(capsys)
 

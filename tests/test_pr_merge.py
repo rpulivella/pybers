@@ -142,11 +142,11 @@ def testTheRepositoryNameIsComparedWhateverItsCase(
     assert deleted == [sharedName]
 
 
-def testADryRunOfAForksMergeSaysItDeletesNothing(
+def testAPreviewOfAForksMergeSaysItDeletesNothing(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code, deleted = runMergeOf(
-        monkeypatch, buildPayload("stranger/pybers"), "--dry-run"
+        monkeypatch, buildPayload("stranger/pybers"), "--preview"
     )
 
     output = readOutput(capsys)
@@ -201,7 +201,7 @@ def testTheAdministratorMergesTheirOwnUnapprovedPullRequest(
     ours = f"{pr.github.repositoryOwner}/{pr.github.repositoryName}"
 
     code, _ = runMergeOf(
-        monkeypatch, buildPayload(ours), "--dry-run", approvers=(), merger="contributor"
+        monkeypatch, buildPayload(ours), "--preview", approvers=(), merger="contributor"
     )
 
     assert code == 0

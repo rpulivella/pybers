@@ -30,6 +30,8 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-15  `start` no longer touches the session dashboard, for PYB-156.
 2026-10-14  `start` puts the ticket in focus on the dashboard, for PYB-211.
 2026-10-14  Moved here from `scripts/ticket.py`, and run as a module, for PYB-204.
@@ -165,8 +167,8 @@ def runCreate(arguments: argparse.Namespace) -> int:
     body = posted.text
     github.reportTidying(posted)
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was filed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was filed.[/]")
         console.print(f"label:  [magenta]{arguments.label}[/]")
         console.print(f"title:  [bold]{escape(arguments.title)}[/]")
         console.print(f"status: [cyan]{arguments.status}[/]")
@@ -174,7 +176,7 @@ def runCreate(arguments: argparse.Namespace) -> int:
         # markup=False because this is a PREVIEW of bytes about to be written:
         # rich reads square brackets as style tags, so a body carrying [hotfix]
         # or a path like /work/[slug] would display with those words missing.
-        # A dry run whose whole purpose is showing what will be written must not
+        # A preview whose whole purpose is showing what will be written must not
         # be the one place the text is altered.
         console.print(body, markup=False, highlight=False)
         return 0
@@ -233,8 +235,8 @@ def runStart(arguments: argparse.Namespace) -> int:
     token = github.resolveToken()
     summary = github.readTicket(token, arguments.number)
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         console.print(
             f"would assign {github.formatTicketRef(summary.number)} "
             f"to {arguments.assignee}"
@@ -282,8 +284,8 @@ def runEdit(arguments: argparse.Namespace) -> int:
         body = posted.text
         github.reportTidying(posted)
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         if arguments.title:
             console.print(f"would set title: [bold]{escape(arguments.title)}[/]")
         if arguments.label:
@@ -293,7 +295,7 @@ def runEdit(arguments: argparse.Namespace) -> int:
             # markup=False because this is a PREVIEW of bytes about to be written:
             # rich reads square brackets as style tags, so a body carrying [hotfix]
             # or a path like /work/[slug] would display with those words missing.
-            # A dry run whose whole purpose is showing what will be written must not
+            # A preview whose whole purpose is showing what will be written must not
             # be the one place the text is altered.
             console.print(body, markup=False, highlight=False)
         return 0
@@ -360,8 +362,8 @@ def runClose(arguments: argparse.Namespace) -> int:
     summary = github.readTicket(token, arguments.number)
     alreadyClosed = summary.state == "closed"
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         if alreadyClosed:
             console.print(
                 f"{github.formatTicketRef(summary.number)} is already closed; "
@@ -409,8 +411,8 @@ def runStatus(arguments: argparse.Namespace) -> int:
         console.print(f"The board offers: {', '.join(coordinates.statusOptionIds)}")
         return 1
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         console.print(
             f"would set {github.formatTicketRef(arguments.number)} "
             f"to [cyan]{arguments.setStatus}[/]"
@@ -530,8 +532,8 @@ def runBlock(arguments: argparse.Namespace) -> int:
     token = github.resolveToken()
     number = arguments.number
 
-    if arguments.dryRun:
-        console.print("[yellow]Dry run. Nothing was changed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was changed.[/]")
         for blocker in arguments.blockedBy:
             console.print(
                 f"would mark {github.formatTicketRef(number)} "
@@ -598,7 +600,7 @@ def buildParser() -> argparse.ArgumentParser:
     createParser.add_argument(
         "--status", default="Todo", help="starting Status (default: Todo)"
     )
-    createParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    createParser.add_argument("--preview", dest="preview", action="store_true")
     createParser.set_defaults(handler=runCreate)
 
     showParser = subparsers.add_parser(
@@ -635,7 +637,7 @@ def buildParser() -> argparse.ArgumentParser:
     startParser = subparsers.add_parser("start", help="assign and move to In Progress")
     startParser.add_argument("number", type=github.parseTicketNumber)
     startParser.add_argument("--assignee", default=github.repositoryOwner)
-    startParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    startParser.add_argument("--preview", dest="preview", action="store_true")
     startParser.set_defaults(handler=runStart)
 
     editParser = subparsers.add_parser("edit", help="revise a filed ticket")
@@ -647,7 +649,7 @@ def buildParser() -> argparse.ArgumentParser:
     editParser.add_argument(
         "--label", default=None, help=f"one of: {', '.join(github.validLabels)}"
     )
-    editParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    editParser.add_argument("--preview", dest="preview", action="store_true")
     editParser.set_defaults(handler=runEdit)
 
     commentParser = subparsers.add_parser(
@@ -658,7 +660,7 @@ def buildParser() -> argparse.ArgumentParser:
         "--body-file", dest="bodyFile", required=True,
         help="drafted comment body, a file so lists and code fences survive",
     )
-    commentParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentParser.add_argument("--preview", dest="preview", action="store_true")
     commentParser.set_defaults(handler=runComment)
 
     commentExportParser = subparsers.add_parser(
@@ -676,14 +678,14 @@ def buildParser() -> argparse.ArgumentParser:
     commentEditParser.add_argument(
         "--body-file", dest="bodyFile", required=True, help="revised comment body"
     )
-    commentEditParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentEditParser.add_argument("--preview", dest="preview", action="store_true")
     commentEditParser.set_defaults(handler=commands.runCommentEdit)
 
     commentDeleteParser = subparsers.add_parser(
         "comment-delete", help="delete a comment (permanent, no GitHub undo)"
     )
     commentDeleteParser.add_argument("commentId", type=int)
-    commentDeleteParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    commentDeleteParser.add_argument("--preview", dest="preview", action="store_true")
     commentDeleteParser.set_defaults(handler=commands.runCommentDelete)
 
     closeParser = subparsers.add_parser(
@@ -696,13 +698,13 @@ def buildParser() -> argparse.ArgumentParser:
         default="completed",
         help="completed for delivered work, not-planned for an abandoned ticket",
     )
-    closeParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    closeParser.add_argument("--preview", dest="preview", action="store_true")
     closeParser.set_defaults(handler=runClose)
 
     statusParser = subparsers.add_parser("status", help="move a ticket to a Status")
     statusParser.add_argument("number", type=github.parseTicketNumber)
     statusParser.add_argument("--set", dest="setStatus", required=True)
-    statusParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    statusParser.add_argument("--preview", dest="preview", action="store_true")
     statusParser.set_defaults(handler=runStatus)
 
     listParser = subparsers.add_parser("list", help="list tickets on the board")
@@ -730,7 +732,7 @@ def buildParser() -> argparse.ArgumentParser:
         metavar="N",
         help="issue numbers that no longer block this one",
     )
-    blockParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    blockParser.add_argument("--preview", dest="preview", action="store_true")
     blockParser.set_defaults(handler=runBlock)
 
     return parser

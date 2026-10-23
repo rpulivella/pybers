@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-22  A golden's expected values are generated from the golden, for PYB-220.
 2026-10-22  A run's folder holds a copy of the golden to open and its expectations
             as headed Markdown, for PYB-220.
@@ -250,7 +252,7 @@ class MeasurementRecipe:
 
 @dataclass(frozen=True)
 class HelperBuild:
-    """What `helper-build` produced, or would produce under `--dry-run`."""
+    """What `helper-build` produced, or would produce under `--preview`."""
 
     identity: str
     sourceHash: str
@@ -316,10 +318,10 @@ def findSigningIdentity(requested: str | None) -> str:
     return development[0][0]
 
 
-def buildHelper(identity: str, dryRun: bool) -> HelperBuild:
+def buildHelper(identity: str, preview: bool) -> HelperBuild:
     """Compile, sign and install the helper, replacing any installed build."""
     sourceHash = readHelperSourceHash()
-    if dryRun:
+    if preview:
         return HelperBuild(identity, sourceHash, helperBundle, installed=False)
     helperInstallDirectory.mkdir(parents=True, exist_ok=True)
     # Staged beside the install so the final move is a rename on one volume.
