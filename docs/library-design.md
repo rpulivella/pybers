@@ -19,7 +19,9 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `Sheet` | A tab, holding its tables in the order Numbers shows them | Owner |
 | `Table` | A grid of cells, with its size and its merges. `cells` is a read-only view, and a cell changes through the table | Owner |
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
-| `Cell` | One cell: its value, formula, style and stored description | Owner |
+| `Cell` | One cell: its value, kind, formula, style and presentation | Owner |
+| `CellPresentation` | How a cell shows its value: its format, whether a person chose it, and its control | Frozen |
+| `CellControl` | The control a cell presents its value through, beside its format: one dataclass per control under `CellControlBase`, `CellControlUnknown` included | Frozen |
 | `CellChange` | What a write did to one cell, or would do in a preview: value and kind before and after, and how far the table grew | Frozen |
 | `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
@@ -81,7 +83,7 @@ Each command answers to one public call, and the call does the work.
 A value's kind follows its Python type, as the table above lists. A currency amount is a `CurrencyAmount`, a `Decimal` amount with the ISO 4217 code of its currency, `CurrencyAmount(Decimal("1250.00"), "EUR")`, which adds, subtracts and compares only with an amount in the same currency. A number written into a currency cell keeps that cell's currency, as typing into one in Numbers does, and `pybers.currencies` lists the 37 currencies Numbers offers. A currency's symbol and where it sits come from the document's own locale, `document.currencySymbolFind("EUR")` and `document.currencyPattern`, never from a table pybers keeps. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone pybers is running in.
 
 - **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does, and loses any control the old value had.
-- **A value write never fails because of the cell's format.** A value of the cell's kind keeps its format and control.
+- **A value write never fails because of the cell's format.** A value of the cell's kind keeps its format, and keeps its control while the control can show it; a control that cannot, such as a slider given a number outside its range, is dropped with its format.
 - **A cell's kind and format always agree.** A format applied that cannot show the cell's value is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`.
 - **Formats apply over a range**, with `table.cellFormatApply(range, format)`, and `document.cellSet(reference, ...)` sets one cell's value, format and style in one call, returning the change. `document.cell(reference)` reaches a cell by a reference naming its table.
 - **A write reports each cell whose kind or format it changed**, and `preview=True` reports the same without writing.
