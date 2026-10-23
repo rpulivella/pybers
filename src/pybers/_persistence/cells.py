@@ -20,6 +20,8 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-10-22  A record's chosen format is the bit of the slot it displays with, for
+            PYB-255.
 2026-10-20  A date decodes as naive wall-clock time, for PYB-144.
 2026-10-01  The per-kind format slots and the displayed kind, gathered here from
             the writers, so the reader can follow them, for PYB-141.
@@ -84,9 +86,9 @@ valueOffset: int = 12
 formulaFlagOffset: int = 9
 formulaFlagBit: int = 0x02
 
-# Byte 6's high bit marks a format a person chose rather than one Numbers decided.
-# 108 text records carry it against 4515 that do not, and the Data Format inspector
-# reads `Text` with it and `Automatic` without. See findings-01-values.md.
+# Byte 6 marks each slot's format a person chose rather than one Numbers decided, and
+# its high bit is Text's: the Data Format inspector reads `Text` with it and
+# `Automatic` without. See findings-01-values.md and findings-11-formats.md.
 chosenFormatOffset: int = 6
 chosenFormatBit: int = 0x80
 
@@ -220,11 +222,22 @@ def carriesFormula(record: CellRecord) -> bool:
     )
 
 
+def findChosenBit(raw: bytes) -> int:
+    """Return byte 6's bit for the slot a record shows, Text's when it names none.
+
+    One bit per format slot, measured across 74,304 records in findings-11-formats.md.
+    """
+    displayed = findSlotValue(decodeRecord(0, raw), displayedKindSlot)
+    if displayed is None or not 1 <= displayed <= len(chosenFormatBits):
+        return chosenFormatBit
+    return chosenFormatBits[displayed - 1]
+
+
 def carriesChosenFormat(record: CellRecord) -> bool:
     """Report whether a cell record displays with a format a person chose."""
     return (
         len(record.raw) > chosenFormatOffset
-        and bool(record.raw[chosenFormatOffset] & chosenFormatBit)
+        and bool(record.raw[chosenFormatOffset] & findChosenBit(record.raw))
     )
 
 
@@ -272,6 +285,10 @@ countedFormatSlots: tuple[tuple[int, int], ...] = (
 # the record holds, and no refcount counts it. Read as a format key until
 # `54-format-star-rating` stored 5 where no list holds a key 5.
 displayedKindSlot: tuple[int, int] = (9, 0x10)
+
+
+# Byte 6's chosen bit for each slot of `countedFormatSlots`, in its order.
+chosenFormatBits: tuple[int, ...] = (0x01, 0x02, 0x08, 0x04, 0x80, 0x20)
 
 
 def listReferenceSlots(raw: bytes) -> list[tuple[int, int]]:

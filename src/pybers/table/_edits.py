@@ -82,15 +82,20 @@ from ..formula._write import (
     readFormulaPool,
 )
 from ._conditions import ConditionalPlan, writeConditionalCounts
-from ._controls import checkControlShows
+from ._controls import readControls
 from ._lines import GridMaps
-from ._read import readCellValue, readCurrencyCodes, readRichTextTable, readStringTable
+from ._read import (
+    controlSlot,
+    readCellValue,
+    readCurrencyCodes,
+    readRichTextTable,
+    readStringTable,
+)
 from ._records import (
     applyAutomaticFormat,
     applyChosenFormat,
     buildFreshRecord,
     buildWrittenRecord,
-    controlSlot,
     findFormatKey,
     findTemplateRecord,
     findWrittenTypeByte,
@@ -243,6 +248,7 @@ def applyTableEdits(
         index.resolve(store.control_cell_spec_table, tst.TableDataList)
         if store.HasField("control_cell_spec_table") else None
     )
+    controls = readControls(index, store)
     controlsMoved = False
     controlsReleased: set[int] = set()
     richTextReleased: set[int] = set()
@@ -311,9 +317,8 @@ def applyTableEdits(
     def dropUnshownControl(raw: bytes, cell: Cell) -> bytes:
         """Return the record without a control that cannot show the cell's value."""
         control = findSlotValue(decodeRecord(0, raw), controlSlot)
-        if control is None or controlList is None:
-            return raw
-        if checkControlShows(index, controlList, control, cell.value):
+        shown = None if control is None else controls.get(control)
+        if shown is None or shown.showsValue(cell.value):
             return raw
         return applyAutomaticFormat(raw, cell.value, formatFor)
 
@@ -457,7 +462,7 @@ def applyTableEdits(
                 )
                 edit = classifyFormulaEdit(cell.formula, record, pool)
                 chosenChanged = (
-                    cell.description.formatChosen != carriesChosenFormat(record)
+                    cell.presentation.formatChosen != carriesChosenFormat(record)
                 )
                 if not valueChanged and edit == "none" and not chosenChanged:
                     continue

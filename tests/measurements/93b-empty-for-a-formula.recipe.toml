@@ -1,0 +1,16 @@
+# How Numbers makes 93b-empty-for-a-formula: an empty cell, for a formula to be written into, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 93b-empty-for-a-formula`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "A2"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "nothing"

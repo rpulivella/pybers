@@ -7,6 +7,7 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-10-22  `--golden-write`, which writes each golden from its builder, for PYB-255.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-16  `allDocuments` and `findDocumentPath` gathered here for PYB-90, so a
             test finds a document without knowing whether it is an origin.
@@ -27,6 +28,8 @@ __date__ = "2026/09/07"
 
 import shutil
 from pathlib import Path
+
+import pytest
 
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import NumbersPackage, readPackage
@@ -127,3 +130,11 @@ def readRecordedColumns(path: Path, row: int) -> set[int]:
     if row not in recorded:
         raise AssertionError(f"No table in {path.name} holds row {row}.")
     return recorded[row]
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add `--golden-write`, which writes each golden from its builder."""
+    parser.addoption(
+        "--golden-write", action="store_true",
+        help="write each selected golden from tests/golden/builders.py",
+    )

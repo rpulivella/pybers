@@ -7,6 +7,7 @@ leave a table as it was, and the few lines a script or a command line writes to
 copy a block.
 
 UPDATES
+2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-29  Written for PYB-136.
 """
 from __future__ import annotations
@@ -338,25 +339,6 @@ def testCopyTakesTheArgumentsMoveTakes() -> None:
     assert listParameters(pybers.Table.cellsCopy) == listParameters(
         pybers.Table.cellsMove
     )
-
-
-@pytest.mark.parametrize(
-    ("name", "rule"),
-    [("64-cells-copied-relative-by-pybers", relative),
-     ("64-cells-copied-named-by-pybers", named)],
-)
-def testTheCopyGoldensMatchWhatThisLibraryProduces(
-    name: str, rule: FormulaReferenceRelocation, tmp_path: Path
-) -> None:
-    """PYB-136 AC 8: each copy again, against the file Numbers confirmed."""
-    target = tmp_path / f"{name}.numbers"
-    copyAndSave("60-move-base", rule, target)
-    differences = listPackageDifferences(
-        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
-    )
-    assert [
-        difference for difference in differences if difference.identifier is not None
-    ] == []
 
 
 def testTheCopyGoldensHoldWhatTheyClaimTo() -> None:

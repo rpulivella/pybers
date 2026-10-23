@@ -65,7 +65,7 @@ from ..errors import WriteError
 from ..formula._read import readFormula
 from ._conditions import readConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
-from ._records import controlSlot
+from ._read import controlSlot
 from ._refcounts import countedStyleSlots
 from ._strokes import copyStrokeEdges, listStrokeLayers, moveStrokeEdges
 from ._structure import rowsPerBucket

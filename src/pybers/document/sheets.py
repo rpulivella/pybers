@@ -23,6 +23,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-22  `Sheet.tableIdentities`, the names a formula on one sheet uses,
+            replacing `Document.tableIdentities`, for PYB-255.
 2026-10-22  A document reads its locale's currency symbols and placement, for
             PYB-220.
 2026-10-20  A document carries the time zone an aware `datetime` is written in, for
@@ -220,6 +222,32 @@ class Sheet:
             )
         return self.table(found.table.name).cell(found)
 
+    @property
+    def tableIdentities(self) -> frozendict[str, str]:
+        """Return every table's identity under each name a formula on this sheet uses.
+
+        Every table answers to `Sheet 2::Table 1`. A bare name reaches this sheet's
+        table of that name, otherwise the document's only table of that name, which is
+        how Numbers shows `Table 1::A1` on Sheet 1 when Sheet 2 holds one too.
+        """
+        sheets = [self] if self.document is None else self.document.sheets
+        seen: Counter[str] = Counter(
+            table.name for sheet in sheets for table in sheet.tables
+        )
+        names: dict[str, str] = {}
+        for sheet in sheets:
+            for table in sheet.tables:
+                if not table.identifier:
+                    continue
+                names[f"{sheet.name}{tableNameSeparator}{table.name}"] = (
+                    table.identifier
+                )
+                if seen[table.name] == 1:
+                    names[table.name] = table.identifier
+        names |= {table.name: table.identifier for table in self.tables
+                  if table.identifier}
+        return frozendict(names)
+
     def tableAdd(
         self, name: str, rows: int, cols: int, position: Position | None = None
     ) -> Table:
@@ -315,30 +343,6 @@ class Document:
         return selectItem(
             self.sheets, nameOrPosition, "sheet", "this document", foldCase=False
         )
-
-    @property
-    def tableIdentities(self) -> frozendict[str, str]:
-        """Return the identity of every table, under each name that names it alone.
-
-        A formula naming another table writes `Table 2::A1`, and qualifies it as
-        `Sheet 2::Table 1::A1` when a bare name would be ambiguous. Both spellings
-        appear here for a table whose name is unique, and only the qualified one for
-        a name two tables share, which `20-formula-shapes` is the example of.
-        """
-        qualified: dict[str, str] = {}
-        seen: Counter[str] = Counter(
-            table.name for sheet in self.sheets for table in sheet.tables
-        )
-        for sheet in self.sheets:
-            for table in sheet.tables:
-                if not table.identifier:
-                    continue
-                qualified[f"{sheet.name}{tableNameSeparator}{table.name}"] = (
-                    table.identifier
-                )
-                if seen[table.name] == 1:
-                    qualified[table.name] = table.identifier
-        return frozendict(qualified)
 
     def sheetAdd(self, name: str, position: int | None = None) -> Sheet:
         """Add an empty sheet, last or at a position counted from one, and return it.
@@ -448,7 +452,7 @@ class Document:
     def tableFor(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.
 
-        The reverse of `tableIdentities`, and the reason renaming a table cannot
+        The reverse of `Sheet.tableIdentities`, and the reason renaming a table cannot
         break a formula pointing into it: the archive stores this, never the name.
         """
         # Imported inside for the reason `save` is: `references` builds on this

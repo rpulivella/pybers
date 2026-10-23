@@ -6,6 +6,10 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-22  A reference beyond its table's grid shows as `#REF!`, and a table on
+            the formula's own sheet is named bare, as Numbers shows both, for PYB-255.
+2026-10-22  `kind` and `presentation` replace `description`, and a control the
+            value it holds cannot show is dropped with its format, for PYB-255.
 2026-10-22  A cell holds a `CurrencyAmount`, and a number written into a currency
             cell keeps its currency, for PYB-220.
 2026-10-20  A value of any kind is written into any cell, a `date` as midnight and an
@@ -45,9 +49,11 @@ from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.style import Style
 from pybers.table.kinds import (
-    CellDescription,
+    CellFormat,
     CellKind,
-    emptyDescription,
+    CellPresentation,
+    CellStorage,
+    emptyStorage,
     findCellKind,
 )
 from pybers.table.merges import MergeRange
@@ -194,7 +200,8 @@ class Cell:
     """One cell's value, optional formula, and style, at an address.
 
     `value` is the result Numbers last cached, never derived from `formula`, so the
-    two disagree until it recalculates. `description` says what the record stores.
+    two disagree until it recalculates. `kind` and `presentation` say what the
+    record stores and how it shows it.
     """
 
     address: CellAddress
@@ -202,9 +209,7 @@ class Cell:
     formula: Formula | None = None
     style: Style = field(default_factory=Style)
     # The record as read, copied or saved, its chosen format the one direct edit.
-    _stored: CellDescription = field(
-        default=emptyDescription, repr=False, kw_only=True
-    )
+    _stored: CellStorage = field(default=emptyStorage, repr=False, kw_only=True)
     # The value that record holds, so an edit since is told from it.
     _storedValue: CellValue = field(
         default=None, repr=False, compare=False, kw_only=True
@@ -239,7 +244,9 @@ class Cell:
         """
         if self.formula is None:
             return None
-        return renderFormula(self.formula, self.address, tables=self.tableNames)
+        return renderFormula(
+            self.formula, self.address, tables=self.tableNames, sizes=self._tableSizes
+        )
 
     @formulaText.setter
     def formulaText(self, text: str) -> None:
@@ -304,7 +311,8 @@ class Cell:
         """Set this cell's value and return the change, or only report it in preview.
 
         A value of another kind takes that kind's Automatic format when saved, so
-        a format chosen for the old kind goes with it.
+        a format chosen for the old kind goes with it, as it does with a control that
+        cannot show the value. A currency amount's format is always a chosen one.
         """
         written = toCellValue(value, self.address, self.timeZone)
         # A number typed into a currency cell keeps its currency, as Numbers does.
@@ -312,29 +320,58 @@ class Cell:
             written = CurrencyAmount(written, self._value.currency)
         if self.formula is not None:
             refuseValueOverFormula(self.address)
-        before = self.description.kind
+        before = self.kind
         after = findCellKind(written, self._stored.kind, self._storedValue, False)
         change = CellChange(self.reference, self._value, written, before, after)
         if not preview and change.changed:
             self._value = written
-            if after is not before:
-                self._stored = replace(self._stored, formatChosen=False)
+            control = self._stored.presentation.control
+            dropped = control is not None and not self._controlKept()
+            if after is not before or dropped:
+                self._formatChosenSet(isinstance(written, CurrencyAmount))
         return change
 
-    @property
-    def description(self) -> CellDescription:
-        """Return the kind this cell stores, its format, and whether that was chosen.
+    def _controlKept(self) -> bool:
+        """Report whether a save keeps the stored control, which shows the value."""
+        control = self._stored.presentation.control
+        if control is None:
+            return False
+        if isSameValue(self.value, self._storedValue):
+            return True
+        return self.kind is self._stored.kind and control.showsValue(self.value)
 
-        The kind follows `value`, so text written over rich text reports text.
-        """
+    def _formatChosenSet(self, chosen: bool) -> None:
+        """Record whether a person chose this cell's format, the one direct edit."""
+        presentation = replace(self._stored.presentation, formatChosen=chosen)
+        self._stored = replace(self._stored, presentation=presentation)
+
+    @property
+    def kind(self) -> CellKind:
+        """Return the kind of value this cell stores, following `value` once edited."""
         pending = (
             self.formula is not None and self._origin is None
             and self._copiedFrom is None
         )
-        kind = findCellKind(self.value, self._stored.kind, self._storedValue, pending)
-        if kind is self._stored.kind:
-            return self._stored
-        return CellDescription(kind, UNDETERMINED, self._stored.formatChosen)
+        return findCellKind(self.value, self._stored.kind, self._storedValue, pending)
+
+    @property
+    def presentation(self) -> CellPresentation:
+        """Return how this cell shows its value: its format and its control."""
+        presentation = self._stored.presentation
+        if presentation.control is not None and not self._controlKept():
+            presentation = replace(presentation, control=None, format=UNDETERMINED)
+        if self.kind is not self._stored.kind:
+            presentation = replace(presentation, format=UNDETERMINED)
+        # None of the 897 formula records in the documents keeps a chosen Text format.
+        if self.formula is not None and presentation.format is CellFormat.TEXT:
+            presentation = replace(presentation, formatChosen=False)
+        return presentation
+
+    @property
+    def unrecognizedTypeCode(self) -> int | None:
+        """Return the record type pybers does not know, when the kind is UNKNOWN."""
+        unknown = self.kind is CellKind.UNKNOWN
+        return self._stored.unrecognizedTypeCode if unknown else None
 
     def textLiteralSet(self, text: str) -> None:
         """Hold text Numbers will not interpret, as a cell formatted Text before typing.
@@ -353,18 +390,33 @@ class Cell:
                 "would discard it. Clear the formula first."
             )
         self._value = text
-        self._stored = replace(self._stored, formatChosen=True)
+        self._formatChosenSet(True)
 
     @property
     def tableNames(self) -> frozendict[str, str]:
-        """Return the names this cell's document knows its tables by, or nothing.
+        """Return the names a formula in this cell knows its document's tables by.
 
-        Computed from the document each time rather than cached, because a table
+        Computed from the sheet each time rather than cached, because a table
         renamed after a cached copy was taken would write a formula pointing at
         whichever table now answers to the old name.
         """
-        document = None if self.table is None else self.table.document
-        return frozendict() if document is None else document.tableIdentities
+        sheet = None if self.table is None else self.table.sheet
+        return frozendict() if sheet is None else sheet.tableIdentities
+
+    @property
+    def _tableSizes(self) -> dict[str | None, tuple[int, int]]:
+        """Return each table's rows and columns by identity, this cell's under None."""
+        if self.table is None:
+            return {}
+        sizes: dict[str | None, tuple[int, int]] = {
+            None: (self.table.rowCount, self.table.colCount)
+        }
+        document = self.table.document
+        if document is not None:
+            sizes |= {table.identifier: (table.rowCount, table.colCount)
+                      for sheet in document.sheets for table in sheet.tables
+                      if table.identifier}
+        return sizes
 
     @property
     def mergeAnchored(self) -> MergeRange | None:

@@ -2,9 +2,9 @@
 """\
 pybers golden confirmation tool
 
-Opens a temporary copy of a golden in running Numbers, checks the cells and tables a
-golden's expected-values file names, and writes a report a developer reads in place of a
-manual session in Numbers. Backs the /golden-confirm skill (PYB-94).
+Opens a temporary copy of a golden in running Numbers, checks every cell of every
+table against what pybers reads from the golden, and writes a report a developer reads
+in place of a manual session in Numbers. Backs the /golden-confirm skill (PYB-94).
 
 Everything that needs Accessibility, Screen Recording or control of Numbers happens in
 pybersdev-golden-confirm.app, built from tools/local/lib/golden-confirm-helper/ by the
@@ -36,6 +36,8 @@ command line tools for `helper-build`.
 UPDATES
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
+2026-10-22  A golden's expected values are generated from it on every run, for
+            PYB-255.
 2026-10-21  A measurement's deadline grows with its steps, for PYB-219.
 2026-10-14  Moved here from `scripts/golden-confirm.py`, and run as a module,
             for PYB-204.
@@ -74,7 +76,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.markup import escape
 
-# Internal on purpose: pybers exposes no archives, and round-trip tests share this.
 from tools.local.lib.golden_confirm import (
     GoldenConfirmError,
     GoldenRun,
@@ -88,15 +89,18 @@ from tools.local.lib.golden_confirm import (
     findGolden,
     findSigningIdentity,
     holdDisplayAwake,
+    listInspectedCells,
     maxCaptures,
     measurementDirectory,
-    readExpectedValues,
     readMeasurementRecipe,
     readProblems,
     readTicketKey,
     reportRoot,
     requestHelper,
 )
+
+# Internal on purpose: pybers exposes no archives, and round-trip tests share this.
+from tools.local.lib.golden_expected import buildExpectedValues
 from tools.workflow.lib.shared import (
     RichHelpFormatter,
     repositoryRoot,
@@ -113,13 +117,13 @@ editStepSeconds: float = 5.0
 def runGoldenConfirm(golden: Path, preview: bool) -> GoldenRun:
     """Confirm one golden in running Numbers and return every check it made."""
     ticket = readTicketKey()
-    expectedCells = readExpectedValues(golden).cells
-    sheets = list(dict.fromkeys(cell.sheet for cell in expectedCells))
-    captureCount = len(sheets) + len(expectedCells)
+    expected = buildExpectedValues(golden)
+    sheets = list(dict.fromkeys(table.sheet for table in expected.tables))
+    captureCount = len(sheets) + len(listInspectedCells(expected))
     if captureCount > maxCaptures:
         raise GoldenConfirmError(
             f"checking these cells takes {captureCount} screenshots, over the limit of "
-            f"{maxCaptures}; split the expected-values file"
+            f"{maxCaptures}, since each currency or control is read in the inspector"
         )
     outputDirectory = reportRoot / ticket / golden.stem
     run = GoldenRun(golden, ticket, outputDirectory, captureCount, [])

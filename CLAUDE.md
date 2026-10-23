@@ -188,8 +188,10 @@ functions over explanation.
 
 - **The base test**: read a real fixture and write it back unchanged, and the archives
   are identical.
-- **Every mutation earns a golden file**: real fixture in, one mutation, confirmed once
-  in real Numbers, then locked in as a permanent regression check.
+- **Every mutation earns a golden file**: a fixture or measurement in, one mutation,
+  built only by its builder in `tests/golden/builders.py`, confirmed once in real Numbers,
+  then locked in as a permanent regression check. Numbers makes fixtures and measurements,
+  and whatever pybers writes is a golden, never a measurement.
 - **Each feature earns a scenario test per consumer.** Write the few lines a script
   author would write, and the few a CLI or TUI would write, then test those. Both
   consumers exist from day one, so an API reading well from only one of them is

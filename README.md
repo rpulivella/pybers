@@ -54,7 +54,7 @@ from decimal import Decimal
 document = pybers.open("budget.numbers", timeZone="America/New_York")
 
 for sheet, table, cell in document.cellsIterate():
-    print(sheet.name, table.name, cell.address, cell.value, cell.description.kind)
+    print(sheet.name, table.name, cell.address, cell.value, cell.kind)
 
 costs = document.sheet("Summary").table("Costs")
 print(len(costs.cells), "cells hold something")

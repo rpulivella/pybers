@@ -17,6 +17,7 @@ reference, 0 of 21 in the documents, so anchoring for one is read from the coord
 and nowhere else.
 
 UPDATES
+2026-10-22  The goldens' comparisons moved to the golden builders, for PYB-255.
 2026-09-03  Written for #41.
 2026-09-29  The fill tests moved to `test_fill.py` with `cellsFill`, for PYB-118.
 """
@@ -544,7 +545,7 @@ def testErroredCellReportsErroredAndInventsNoKind() -> None:
     table = openFirstTable("21-formula-errors")
     errored = {
         str(reference): cell for reference, cell in table.cells.items()
-        if cell.description.kind is pybers.CellKind.ERROR
+        if cell.kind is pybers.CellKind.ERROR
     }
     assert errored, "21-formula-errors carries error cells"
     for cell in errored.values():
@@ -559,61 +560,12 @@ def testAnOrdinaryFormulaCellIsNotReportedAsErrored() -> None:
     """Guard the guard: a flag that were always true would pass the test above."""
     cell = openFirstTable("18-formula-literals").cell("A1")
     assert cell.formula is not None
-    assert cell.description.kind is not pybers.CellKind.ERROR
+    assert cell.kind is not pybers.CellKind.ERROR
 
 
 # ── AC 5: the golden files ───────────────────────────────────────────────────
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
-
-
-def testChangedLiteralMatchesItsGoldenFile(tmp_path: Path) -> None:
-    """One literal changed, compared against output confirmed in Numbers itself.
-
-    Every other test here checks pybers against pybers, which can agree with
-    itself while both halves are wrong. See `tests/golden/README.md` for the
-    confirmation state of this file.
-    """
-    golden = goldenDirectory / "18-formula-literals-A1-changed.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = shutil.copy(findDocumentPath("18-formula-literals"),
-                          tmp_path / "18.numbers")
-    document = pybers.open(working)
-    cell = document.sheets[0].tables[0].cell("A1")
-    nodes = list(cell.formula.nodes)
-    nodes[1] = dataclasses.replace(nodes[1], content=Decimal(5))
-    cell.formula = Formula(nodes=tuple(nodes))
-    document.save()
-
-    assert readDataListBytes(golden) == readDataListBytes(Path(working)), (
-        "the writer no longer produces the confirmed formula lists"
-    )
-
-
-def testNarrowedSharedRangeMatchesItsGoldenFile(tmp_path: Path) -> None:
-    """One of two cells sharing an archive, narrowed, against confirmed output."""
-    golden = goldenDirectory / "19-formula-dragged-F2-narrowed.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = shutil.copy(findDocumentPath("19-formula-dragged"),
-                          tmp_path / "19.numbers")
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    nodes = list(table.cell("F2").formula.nodes)
-    extent = nodes[0].content
-    nodes[0] = dataclasses.replace(
-        nodes[0],
-        content=dataclasses.replace(
-            extent, columns=dataclasses.replace(extent.columns, end=3)
-        ),
-    )
-    table.cell("F2").formula = Formula(nodes=tuple(nodes))
-    document.save()
-
-    assert readDataListBytes(golden) == readDataListBytes(Path(working)), (
-        "the writer no longer produces the confirmed formula lists"
-    )
 
 
 def testTheGoldenFilesHoldWhatTheyClaimTo() -> None:
@@ -787,45 +739,21 @@ def testChangingOneCellsFormulaLeavesTheRegisterAlone(tmp_path: Path) -> None:
     assert readFormulaCellRegister(working) == before
 
 
-def testAttachAndDetachMatchTheirGoldenFile(tmp_path: Path) -> None:
-    """The pair above, against output confirmed in Numbers itself.
-
-    Confirmed 2026-09-04 on the third attempt. The first two produced a file that
-    read back perfectly through pybers and was wrong in Numbers, which is what a
-    golden exists to catch. See `tests/golden/README.md`.
-    """
-    golden = goldenDirectory / "18-formula-attached-and-detached.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = Path(shutil.copy(findDocumentPath("18-formula-literals"),
-                               tmp_path / "18.numbers"))
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    table.cell("A2").formula = table.cell("A1").formula
-    table.cell("B1").formula = None
-    document.save()
-
-    assert readDataListBytes(golden) == readDataListBytes(working)
-    assert readFormulaCellRegister(golden) == readFormulaCellRegister(working)
-
-
 def testTheAttachGoldenHoldsWhatItClaimsTo() -> None:
-    """Guard the guard, against the values confirmed on screen on 2026-09-04."""
+    """Guard the guard: the golden holds the attach and the detach it claims."""
     table = pybers.open(
         goldenDirectory / "18-formula-attached-and-detached.numbers"
     ).sheets[0].tables[0]
 
-    assert table.cell("A2").formula is not None, "A2 gained a formula"
-    assert table.cell("B1").formula is None, "B1 lost one"
-    assert table.cell("B1").value == Decimal(6)
-    # Untouched cells keep their own formulas.
-    assert table.cell("C1").formula is not None
-    assert table.cell("G1").value == "ab"
+    assert table.cell("B1").formulaText == "=1+1", "B1 gained A1's formula"
+    assert table.cell("C1").formula is None, "C1 lost its formula"
+    assert table.cell("C1").value == Decimal(6)
+    assert table.cell("A1").formulaText == "=1+1", "A1 keeps its own"
 
     expanded, tiled = readFormulaCellRegister(
         goldenDirectory / "18-formula-attached-and-detached.numbers"
     )
-    assert (1, 0) in expanded and (0, 1) not in expanded
+    assert (0, 1) in expanded and (0, 2) not in expanded
     assert expanded == tiled
 
 
@@ -877,6 +805,6 @@ def testACreatedFormulaStoresNoResultOfItsOwn(tmp_path: Path) -> None:
 
     after = pybers.open(working).sheets[0].tables[0].cell("H1")
     assert after.value is None, "no result is stored, because none was computed"
-    assert after.description.kind is pybers.CellKind.ERROR, (
+    assert after.kind is pybers.CellKind.ERROR, (
         "which is the pending state, not a failure"
     )

@@ -6,6 +6,8 @@ Records by position, header buckets, hidden lines, tiles, declared references,
 the engine's registers, and the goldens confirmed in Numbers.
 
 UPDATES
+2026-10-22  The goldens' edits and comparison moved to the golden builders, for
+            PYB-255.
 2026-09-21  Split out of `test_structure` for PYB-17.
 """
 from __future__ import annotations
@@ -22,6 +24,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from golden.builders import buildGolden, findBuilder
 from structurefacts import (
     baseFixture,
     measuredEdits,
@@ -182,43 +185,23 @@ def testTilesAreCreatedAndDroppedAsNumbersDoes(
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
-# Each golden and the edit that made it. An added line takes a random identity, as
-# Numbers gives one, so the UID map is the one archive allowed to differ.
-goldenEdits: dict[str, tuple[Callable[[pybers.Table], object], set[str]]] = {
-    "56-row-added-by-pybers": (
-        lambda table: table.rowAdd(3), {"TST.ColumnRowUIDMapArchive"}
-    ),
-    "56-row-removed-by-pybers": (lambda table: table.rowRemove(8), set()),
-    "56-column-added-by-pybers": (
-        lambda table: table.columnAdd("E"), {"TST.ColumnRowUIDMapArchive"}
-    ),
-    "56-column-removed-by-pybers": (lambda table: table.columnRemove("E"), set()),
-}
-
-
-@pytest.mark.parametrize("name", sorted(goldenEdits))
-def testTheStructureGoldensMatchWhatThisLibraryProduces(
+@pytest.mark.parametrize("name", [
+    "56-column-added-by-pybers", "56-column-removed-by-pybers",
+    "56-row-added-by-pybers", "56-row-removed-by-pybers",
+])
+def testAStructureGoldenKeepsTheStoredLinesInTheirOrder(
     name: str, tmp_path: Path
 ) -> None:
-    """PYB-17 AC 6: each edit again, against the file Numbers confirmed."""
-    edit, allowed = goldenEdits[name]
-    expected = goldenDirectory / f"{name}.numbers"
-    document = openBase()
-    table = document.sheet(1).table("Table 1")
-    stored = set(table._rowIdentities) | set(table._columnIdentities)
-    edit(table)
-    target = tmp_path / f"{name}.numbers"
-    document.save(target)
-    differences = listPackageDifferences(readPackage(expected), readPackage(target))
-    assert {
-        difference.typeName for difference in differences
-        if difference.identifier is not None
-    } <= allowed
-    golden = pybers.open(expected).sheet(1).table("Table 1")
+    """PYB-17 AC 6: the lines the base stored keep their order in the golden."""
+    stored = openBase().sheet(1).table("Table 1")
+    lines = set(stored._rowIdentities) | set(stored._columnIdentities)
+    written = buildGolden(findBuilder(name), tmp_path)
+    built = pybers.open(written).sheet(1).table("Table 1")
+    golden = pybers.open(goldenDirectory / f"{name}.numbers").sheet(1).table("Table 1")
     for ours, theirs in (
-        (table._rowIdentities, golden._rowIdentities),
-        (table._columnIdentities, golden._columnIdentities),
+        (built._rowIdentities, golden._rowIdentities),
+        (built._columnIdentities, golden._columnIdentities),
     ):
-        assert [line for line in ours if line in stored] == [
-            line for line in theirs if line in stored
+        assert [line for line in ours if line in lines] == [
+            line for line in theirs if line in lines
         ]

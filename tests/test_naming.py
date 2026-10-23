@@ -8,6 +8,7 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-10-22  `pytest_addoption`, a hook pytest finds by name, is exempt, for PYB-255.
 2026-10-14  `record` and `sort` are verbs, for PYB-211.
 2026-10-14  Checks `tools/` too, which the move from `scripts/` brought into reach,
             for PYB-204.
@@ -61,8 +62,9 @@ leadingVerbs: frozenset[str] = frozenset({
     "verify", "wait", "walk", "write",
 })
 
-# `main` is looked up by name, and a fixture's name is the value a test receives.
-exemptNames: frozenset[str] = frozenset({"main"})
+# `main` and a pytest hook are looked up by name, and a fixture's name is the value a
+# test receives.
+exemptNames: frozenset[str] = frozenset({"main", "pytest_addoption"})
 
 
 def findVerblessFunctions(path: Path) -> list[str]:

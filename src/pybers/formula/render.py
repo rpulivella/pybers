@@ -21,6 +21,7 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-10-22  A reference beyond its table's grid renders as `#REF!`, for PYB-255.
 2026-10-13  A node renders by matching what it holds, checked exhaustive by
             mypy, for PYB-139.
 2026-10-13  A boolean literal renders as TRUE or FALSE, for PYB-139.
@@ -125,20 +126,41 @@ def collectBoundNames(formula: Formula) -> dict[int, str]:
     return names
 
 
+def checkOutsideTable(
+    row: int | None, column: int | None, size: tuple[int, int] | None
+) -> bool:
+    """Report whether a resolved cell lies beyond its table's rows or columns."""
+    if size is None:
+        return False
+    rows, columns = size
+    return (row is not None and not 1 <= row <= rows) or (
+        column is not None and not 1 <= column <= columns
+    )
+
+
 def renderAddress(
-    node: FormulaNode, host: CellAddress, names: Mapping[str, str]
+    node: FormulaNode, host: CellAddress, names: Mapping[str, str],
+    sizes: Mapping[str | None, tuple[int, int]] | None = None,
 ) -> str:
-    """Return the text of one reference or range node, from the cell holding it."""
+    """Return the text of one reference or range node, from the cell holding it.
+
+    A reference to a cell beyond its table's grid shows as `#REF!`, as Numbers shows
+    the one a move left at `H10` in `60b-move-cut-pasted`.
+    """
     content = node.content
     if isinstance(content, FormulaReference) and content.broken:
         return brokenReferenceText
     if isinstance(content, FormulaReference):
         column = content.column
         row = content.row
+        resolvedRow = None if row is None else row.resolve(host.row)
+        resolvedColumn = None if column is None else column.resolve(host.col)
+        if checkOutsideTable(resolvedRow, resolvedColumn,
+                             (sizes or {}).get(content.tableId)):
+            return brokenReferenceText
         body = renderEndpoint(
             RangeEndpoint(
-                None if row is None else row.resolve(host.row),
-                None if column is None else column.resolve(host.col),
+                resolvedRow, resolvedColumn,
                 row.absolute if row is not None else False,
                 column.absolute if column is not None else False,
             )
@@ -174,7 +196,7 @@ def qualifyAddress(
     if name is None:
         raise FormulaError(
             f"This formula reaches into table {tableId}, and no name was given "
-            "for it. Pass `tables=document.tableIdentities` to name it."
+            "for it. Pass `tables=sheet.tableIdentities` to name it."
         )
     return f"{name}{tableNameSeparator}{body}"
 
@@ -201,6 +223,7 @@ class Renderer:
     formula: Formula
     host: CellAddress
     names: Mapping[str, str]
+    sizes: Mapping[str | None, tuple[int, int]] = field(default_factory=dict)
     symbols: dict[int, str] = field(default_factory=dict)
     stack: list[Rendered] = field(default_factory=list)
     bindings: list[tuple[str, str, bool]] = field(default_factory=list)
@@ -247,7 +270,7 @@ class Renderer:
                 self.stack.append(Rendered(quoteString(content)))
             case FormulaReference() | FormulaRange():
                 self.stack.append(
-                    Rendered(renderAddress(node, self.host, self.names))
+                    Rendered(renderAddress(node, self.host, self.names, self.sizes))
                 )
             case FormulaGroup():
                 self.stepGroup(content)
@@ -385,24 +408,27 @@ def renderFormula(
     host: CellReferenceLike,
     *,
     tables: Mapping[str, str] | None = None,
+    sizes: Mapping[str | None, tuple[int, int]] | None = None,
 ) -> str:
     """Return the text Numbers displays for a formula held in one cell.
 
     `host` is the cell holding it, because an unlocked reference is an offset from
     there and one archive shows differently in each cell it was dragged into.
-    `tables` names the tables a formula reaches into, from `Document.tableIdentities`.
+    `tables` names the tables a formula reaches into, from `Sheet.tableIdentities`,
+    and `sizes` gives each its rows and columns, under None for the host's own.
     """
     return Renderer(
         formula=formula,
         host=toCellReference(host).address,
         names=findShortestNames(tables),
+        sizes=sizes or {},
     ).render()
 
 
 def findShortestNames(tables: Mapping[str, str] | None) -> dict[str, str]:
     """Return the shortest name each table identity answers to, keyed by identity.
 
-    The inverse of `Document.tableIdentities`, which carries both `Table 2` and
+    The inverse of `Sheet.tableIdentities`, which carries both `Table 2` and
     `Sheet 1::Table 2` for the same table, so that a formula reads `Table 2::A1`
     where that is unambiguous and qualifies further only where it has to.
     """

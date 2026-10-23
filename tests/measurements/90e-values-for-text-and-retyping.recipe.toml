@@ -1,0 +1,62 @@
+# How Numbers makes 90e-values-for-text-and-retyping: two numbers, a star rating, text and an empty cell, for text and a number to be written over, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 90e-values-for-text-and-retyping`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "E2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "1234.5"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "number 1234.5"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "42"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "number 42"
+
+[[step]]
+action = "dataFormatSet"
+range = "C1"
+setting = "Data Format"
+value = "Star Rating"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "3"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "star rating of 3"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "words"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "text words"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "nothing"

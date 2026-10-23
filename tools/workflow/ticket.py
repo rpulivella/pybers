@@ -422,7 +422,7 @@ def runStatus(arguments: argparse.Namespace) -> int:
     itemId = github.findBoardItem(token, coordinates, arguments.number)
     if itemId is None:
         console.print(
-            f"[red]Issue {github.formatTicketRef(arguments.number)} "
+            f"[red]{github.formatTicketRef(arguments.number)} "
             "is not on the board.[/]"
         )
         return 1

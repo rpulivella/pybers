@@ -176,13 +176,13 @@ def testTheReaderKeepsTheTypeOfARecordItDoesNotRecognize(tmp_path: Path) -> None
     rewriteFirstRow(package, lambda rowInfo: retypeEmptyRecord(rowInfo, 4))
     document = pybers.open(writePackageCopy(package, tmp_path))
     found = [
-        cell.description
+        cell.unrecognizedTypeCode
         for sheet in document.sheets
         for table in sheet.tables
         for cell in table.cells.values()
-        if cell.description.kind is pybers.CellKind.UNKNOWN
+        if cell.kind is pybers.CellKind.UNKNOWN
     ]
-    assert [description.unrecognizedTypeCode for description in found] == [4]
+    assert found == [4]
 
 
 def testAFailureKeepsItsErrorToRaise(tmp_path: Path) -> None:

@@ -1,0 +1,51 @@
+# How Numbers makes 94-values-for-a-named-fill: a sum over three numbers beside three empty cells, for a fill that keeps naming its cells, each labeled beneath. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 94-values-for-a-named-fill`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "D5"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "=SUM(A3:A5)"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "formula =SUM(A3:A5)"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "A3"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "A4"
+value = "2"
+
+[[step]]
+action = "valueSet"
+range = "A5"
+value = "3"

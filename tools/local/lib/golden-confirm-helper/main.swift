@@ -80,6 +80,8 @@ enum EditAction: String, Codable {
     case valueSet
     case dataFormatSet
     case tableExtend
+    case tableAdd
+    case sheetAdd
     case customFormatEdit
 }
 
@@ -163,6 +165,14 @@ struct TableReading: Codable {
     let rowCount: Int
     let columnCount: Int
     let cellNames: [[String]]
+    let cellFacts: [[CellFact]]
+}
+
+// What AppleScript answers for one cell without the inspector, so every cell is read.
+struct CellFact: Codable {
+    let value: CellValue
+    let formula: String?
+    let formatKind: String?
 }
 
 struct SheetCapture: Codable {
@@ -1196,7 +1206,9 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         let savedCopyPath = try checkTemporaryPath(request.savedCopyPath, field: "savedCopyPath")
         let captureDirectory = try checkCaptureDirectory(request.captureDirectory)
         let cells = request.cells ?? []
-        let sheets = cells.map(\.sheet).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        let tables = request.tables ?? []
+        let sheets = (tables.map(\.sheet) + cells.map(\.sheet))
+            .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         let captureCount = sheets.count + cells.count
         guard captureCount <= (request.maxCaptures ?? 0) else {
             throw HelperFailure(problem: HelperProblem(
@@ -1328,7 +1340,9 @@ func inspectDocument(
     let (windowId, window) = try findDocumentWindow(documentId: documentId, pid: numbers.processIdentifier)
 
     for sheet in sheets {
-        let first = cells.first { $0.sheet == sheet }!
+        // Any cell of the sheet brings it forward, and A1 exists in every table.
+        let first = cells.first { $0.sheet == sheet }
+            ?? tables.first { $0.sheet == sheet }.map { CellAddress(sheet: $0.sheet, table: $0.table, cell: "A1") }!
         try selectCell(first, documentId: documentId)
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["sheet", sheet]))
@@ -1399,18 +1413,36 @@ func readTable(_ address: TableAddress, documentId: String) throws -> TableReadi
         "set t to table \(quoteAppleScript(address.table)) of sheet \(quoteAppleScript(address.sheet)) "
             + "of document id \(quoteAppleScript(documentId))\n"
             + "set names to {}\n"
+            + "set grid to {}\n"
             + "repeat with r in rows of t\n"
             + "set end of names to name of cells of r\n"
+            + "set kinds to {}\n"
+            + "repeat with c in cells of r\n"
+            + "set end of kinds to (format of c) as text\n"
             + "end repeat\n"
-            + "return {row count of t, column count of t, names}")
+            + "set end of grid to {value of cells of r, formula of cells of r, kinds}\n"
+            + "end repeat\n"
+            + "return {row count of t, column count of t, names, grid}")
     let rows = facts.atIndex(3)
     let cellNames = (0..<(rows?.numberOfItems ?? 0)).map { row in
         let names = rows?.atIndex(row + 1)
         return (0..<(names?.numberOfItems ?? 0)).map { names?.atIndex($0 + 1)?.stringValue ?? "" }
     }
+    let grid = facts.atIndex(4)
+    let cellFacts = (0..<(grid?.numberOfItems ?? 0)).map { row -> [CellFact] in
+        let columns = grid?.atIndex(row + 1)
+        let values = columns?.atIndex(1), formulas = columns?.atIndex(2), kinds = columns?.atIndex(3)
+        return (0..<(values?.numberOfItems ?? 0)).map { column in
+            CellFact(
+                value: values?.atIndex(column + 1).map(readCellValue) ?? CellValue(kind: "empty", text: ""),
+                formula: formulas?.atIndex(column + 1).flatMap(readOptionalText),
+                formatKind: kinds?.atIndex(column + 1)?.stringValue)
+        }
+    }
     return TableReading(
         address: address, rowCount: Int(facts.atIndex(1)?.int32Value ?? 0),
-        columnCount: Int(facts.atIndex(2)?.int32Value ?? 0), cellNames: cellNames)
+        columnCount: Int(facts.atIndex(2)?.int32Value ?? 0), cellNames: cellNames,
+        cellFacts: cellFacts)
 }
 
 func selectCell(_ address: CellAddress, documentId: String) throws {
@@ -1532,6 +1564,30 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
             "set t to \(table)\n"
                 + "if row count of t < \(row) then set row count of t to \(row)\n"
                 + "if column count of t < \(column) then set column count of t to \(column)")
+    case .sheetAdd:
+        // A new sheet holds a table with a header row and column, which a measurement has none of.
+        guard let sheet = step.sheet else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a sheetAdd step needs the new sheet's name",
+                remedy: "name the sheet in the step's sheet"))
+        }
+        let document = "document id \(quoteAppleScript(documentId))"
+        _ = try runAppleScript(
+            "tell \(document) to set s to make new sheet with properties {name:\(quoteAppleScript(sheet))}\n"
+                + "set t to table 1 of s\n"
+                + "set header row count of t to 0\nset header column count of t to 0\nset footer row count of t to 0")
+    case .tableAdd:
+        guard let sheet = step.sheet, let table = step.table,
+              let (row, column) = step.range.flatMap(readCellPosition) else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a tableAdd step needs a sheet, a table and its last cell, such as B3",
+                remedy: "name the sheet, the new table and the cell it must reach"))
+        }
+        let target = "sheet \(quoteAppleScript(sheet)) of document id \(quoteAppleScript(documentId))"
+        _ = try runAppleScript(
+            "tell \(target) to set t to make new table with properties {name:\(quoteAppleScript(table))}\n"
+                + "set header row count of t to 0\nset header column count of t to 0\nset footer row count of t to 0\n"
+                + "set row count of t to \(row)\nset column count of t to \(column)")
     case .menuPress:
         guard let item = step.menuItem else {
             throw HelperFailure(problem: HelperProblem(

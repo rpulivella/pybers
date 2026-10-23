@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-22  The cell controls and CellPresentation re-exported, replacing
+            CellDescription, for PYB-255.
 2026-10-22  The currency names re-exported, for PYB-220.
 2026-10-20  MachineTimeZone, TimeZoneError, TimeZoneLike and formatCellValue
             re-exported, for PYB-144.
@@ -113,9 +115,17 @@ lazy from pybers.style import Style
 lazy from pybers.table import (
     Cell,
     CellChange,
-    CellDescription,
+    CellControl,
+    CellControlBase,
+    CellControlCheckbox,
+    CellControlPopUpMenu,
+    CellControlSlider,
+    CellControlStarRating,
+    CellControlStepper,
+    CellControlUnknown,
     CellFormat,
     CellKind,
+    CellPresentation,
     CellValue,
     CellValueFill,
     MergeRange,
@@ -178,8 +188,16 @@ __all__ = [
     "checkDocument",
     "Cell",
     "CellChange",
+    "CellControl",
+    "CellControlBase",
+    "CellControlCheckbox",
+    "CellControlPopUpMenu",
+    "CellControlSlider",
+    "CellControlStarRating",
+    "CellControlStepper",
+    "CellControlUnknown",
     "CellReferenceLike",
-    "CellDescription",
+    "CellPresentation",
     "CellFormat",
     "CellKind",
     "CellRange",

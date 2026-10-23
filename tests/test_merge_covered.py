@@ -14,6 +14,7 @@ which produces a covered record. Both measured 2026-09-07; see
 docs/findings/findings-03-structure.md.
 
 UPDATES
+2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-07  Written for #49.
 """
 from __future__ import annotations
@@ -26,7 +27,6 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/07"
 
-import shutil
 from pathlib import Path
 
 import pytest
@@ -47,7 +47,6 @@ from pybers.table import MergeRange, Table
 
 importedFixture: Path = findDocumentPath("22e-merge-imported")
 overpaintFixture: Path = findDocumentPath("22c-merge-overpaints")
-goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # The covered positions of the imported fixture's three merges, A1:B1, C1:E1
 # and F1:G1. G1 is absent: Excel gave it a style AND a value, and Numbers
@@ -142,25 +141,3 @@ def testAMergeAlreadyInTheFileIsNotTreatedAsAdded() -> None:
         assert len(findAddedMerges(table, model)) == 1
         return
     raise AssertionError("No table model in the imported fixture.")
-
-
-def testAMergeOverACoveredRecordMatchesItsGoldenFile(tmp_path: Path) -> None:
-    """Dropping a real record is stricter than Numbers itself, so it earns a golden.
-
-    Every other check here compares pybers against pybers, which can agree with
-    itself while both halves are wrong. See `tests/golden/README.md` for the
-    confirmation state of this file.
-    """
-    golden = goldenDirectory / "22c-merged-by-pybers.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = Path(
-        shutil.copy(overpaintFixture, tmp_path / "22c.numbers")
-    )
-    document = pybers.open(working)
-    document.sheets[0].tables[0].mergeAdd("L3:M3")
-    document.save()
-
-    assert listPackageDifferences(readPackage(golden), readPackage(working)) == [], (
-        "the writer no longer produces the merge Numbers confirmed"
-    )

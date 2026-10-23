@@ -127,7 +127,7 @@ def listUnrecognizedCells(document: Document) -> list[CheckCell]:
         for sheet in document.sheets
         for table in sheet.tables
         for reference, cell in table.cells.items()
-        if (unrecognized := cell.description.unrecognizedTypeCode) is not None
+        if (unrecognized := cell.unrecognizedTypeCode) is not None
     ]
 
 

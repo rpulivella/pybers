@@ -74,7 +74,7 @@ def testTextIsWrittenToANewDocumentLeavingTheOriginal(
 def testAsTextKeepsANumberAsText(working: Path) -> None:
     runSetCommand(str(working), "Table 2::B2", "042", "--as", "text", "--in-place")
     cell = readCell(working, "Table 2::B2")
-    assert (cell.value, cell.description.kind) == ("042", pybers.CellKind.TEXT)
+    assert (cell.value, cell.kind) == ("042", pybers.CellKind.TEXT)
 
 
 def testTextThatIsNotTheKindNamedIsRefused(working: Path) -> None:

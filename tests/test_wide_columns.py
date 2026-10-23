@@ -14,6 +14,7 @@ address, with four cells cleared from the last row so an empty slot in the wide
 form is covered too.
 
 UPDATES
+2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-06  Written for #48.
 """
 from __future__ import annotations
@@ -48,7 +49,6 @@ from pybers.table._tiles import rewriteRow
 
 wideFixture: Path = findDocumentPath("45-columns-over-255")
 narrowMeasurement: Path = findDocumentPath("11-value-types-noformats")
-goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 tileTypeId: int = findArchiveTypeId(tst.Tile)
 
@@ -261,22 +261,3 @@ def testAFormulaStillCannotReachAColumnPastTwoFiftyFive(tmp_path: Path) -> None:
     findFirstTable(document).cell("KJ7").formula = borrowed.cell("E2").formula
     with pytest.raises(WriteError, match="No dependency tile covers"):
         document.save()
-
-
-def testAWideRowEditMatchesItsGoldenFile(tmp_path: Path) -> None:
-    """The rebuilt word offsets are checked against Numbers, not against pybers.
-
-    Every other test here compares pybers with pybers, which can agree with itself
-    while both halves are wrong. See `tests/golden/README.md`.
-    """
-    golden = goldenDirectory / "45-merged-by-pybers.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    target = Path(shutil.copy(wideFixture, tmp_path / "45.numbers"))
-    document = pybers.open(target)
-    findFirstTable(document).mergeAdd(wideMerge)
-    document.save()
-
-    assert listPackageDifferences(readPackage(golden), readPackage(target)) == [], (
-        "the writer no longer produces the wide-row edit Numbers confirmed"
-    )

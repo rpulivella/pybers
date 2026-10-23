@@ -51,4 +51,4 @@ def testOneTypedTimeStoresOneValueInEveryZoneAndRegion(
 def testATypedZoneLeavesTheTimeAsText() -> None:
     cell = pybers.open(findDocumentPath("72-date-time-zones")).cell("Table 1::C1")
     assert cell.value == "2026-10-20 09:00 PST"
-    assert cell.description.kind is pybers.CellKind.TEXT
+    assert cell.kind is pybers.CellKind.TEXT

@@ -5,6 +5,7 @@ Borders, bands, spills and merges carried through a structural edit.
 Each against one edit Numbers made to `57-structure-refusals-base`.
 
 UPDATES
+2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-29  A line added beside one with no border, for PYB-118.
 2026-09-21  Split out of `test_structure` for PYB-17.
 """
@@ -28,8 +29,6 @@ from structurefacts import (
 
 import pybers
 from conftest import findDocumentPath
-from pybers._persistence import readPackage
-from pybers._persistence.difference import listPackageDifferences
 from pybers.errors import WriteError
 
 # One edit each against the table of `57-structure-refusals-base` it belongs to,
@@ -140,22 +139,10 @@ def testALineAddedBesideOneWithNoBorderGainsNone(
     assert readTableFacts(target)["Table 1"]["strokes"] == expected
 
 
-def testTheBorderGoldenMatchesWhatThisLibraryProduces(tmp_path: Path) -> None:
+def testTheBorderGoldenHoldsTheStrokesNumbersConfirmed() -> None:
     """A row and a column added beside lines with no border, as Numbers confirmed."""
     name = "61-lines-added-beside-no-border-by-pybers"
-    document = pybers.open(findDocumentPath("61-move-styles-base"))
-    table = document.sheet(1).table("Table 1")
-    table.rowAdd(2)
-    table.columnAdd(2)
-    target = tmp_path / f"{name}.numbers"
-    document.save(target)
     golden = Path(__file__).resolve().parent / "golden" / f"{name}.numbers"
-    differences = listPackageDifferences(readPackage(golden), readPackage(target))
-    # An added line takes a random identity, so only the UID map may differ.
-    assert {
-        difference.typeName for difference in differences
-        if difference.identifier is not None
-    } <= {"TST.ColumnRowUIDMapArchive"}
     assert readTableFacts(golden)["Table 1"]["strokes"] == {
         "left": [(3, [(3, 1, 3.0)])], "right": [(3, [(3, 1, 3.0)])],
         "top": [(3, [(3, 1, 3.0)])], "bottom": [(3, [(3, 1, 3.0)])],

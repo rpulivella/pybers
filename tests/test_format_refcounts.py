@@ -7,6 +7,7 @@ compares what the file declares with what its cells actually reference rather th
 asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
+2026-10-22  The goldens' comparisons moved to the golden builders, for PYB-255.
 2026-10-20  A borrowed shape keeps no format, and a copy reaches the guard, for PYB-144.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-15  Written for PYB-89, with the kind a cell displays with for its AC 7,
@@ -31,7 +32,7 @@ from pathlib import Path
 
 import pytest
 from test_formula_nodes import readFormulaCellRegister
-from test_writer import copyDocument, listArchiveDifferences, readRecordAt, retypedCells
+from test_writer import copyDocument, readRecordAt
 
 import pybers
 from conftest import allDocuments, findDocumentPath
@@ -373,23 +374,9 @@ def test_aBorrowedShapeKeepsNoFormatOfTheCellItCameFrom() -> None:
     assert shaped.value == record.value
 
 
-def test_theRetypedGoldenCountsEveryFormatByItsCells(tmp_path: Path) -> None:
-    """AC 5. The golden is reproduced, and every count it stores matches its cells."""
+def test_theRetypedGoldenCountsEveryFormatByItsCells() -> None:
+    """AC 5. Every count the golden stores matches its cells."""
     golden = goldenDirectory / "11-text-written-and-retyped.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = copyDocument("11-value-types-noformats", tmp_path)
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    for address, value in retypedCells:
-        table.cell(address).value = value
-    document.save()
-
-    differences = listArchiveDifferences(readPackage(golden), readPackage(working))
-    assert not differences, (
-        "the writer no longer produces the confirmed output:\n  "
-        + "\n  ".join(differences)
-    )
     declared, claims = readFormatLedger(golden, "Table 1")
     assert declared == {key: claims[key] for key in declared}
 
@@ -730,17 +717,8 @@ def test_aMergeReleasesTheRichTextOfACellItCovers(tmp_path: Path) -> None:
     assert findDisagreeingPools(working) == []
 
 
-def test_theMergedOverFormulaGoldenIsWhatTheWriterProduces(tmp_path: Path) -> None:
-    """PYB-92 AC 5.i, against the file Numbers opened, and its counts read directly."""
+def test_theMergedOverFormulaGoldenCountsItsPoolsAndDropsTheFormula() -> None:
+    """PYB-92 AC 5.i, its counts read directly from the file Numbers opened."""
     golden = goldenDirectory / "18-merged-over-a-formula.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = copyDocument("18-formula-literals", tmp_path)
-    document = pybers.open(working)
-    document.sheets[0].tables[0].mergeAdd("A1:B1")
-    document.save()
-
-    differences = listArchiveDifferences(readPackage(golden), readPackage(working))
-    assert not differences, "\n  ".join(differences)
     assert findDisagreeingPools(golden) == []
     assert (0, 1) not in readFormulaCellRegister(golden)[0]

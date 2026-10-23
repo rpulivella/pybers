@@ -39,7 +39,7 @@ def testAScriptSetsACellAndTheSaveKeepsIt(working: Path) -> None:
     document.cellSet("Table 2::B2", Decimal("1250.00"))
     document.save()
     cell = pybers.open(working).cell("Table 2::B2")
-    assert (cell.value, cell.description.kind) == (Decimal("1250.00"), CellKind.NUMBER)
+    assert (cell.value, cell.kind) == (Decimal("1250.00"), CellKind.NUMBER)
 
 
 def testTheChangeSaysWhatTheCellHeldAndHolds(working: Path) -> None:

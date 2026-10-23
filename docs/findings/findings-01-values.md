@@ -225,10 +225,10 @@ leaves it clear here.
 
 Setting it is a deliberate act with one purpose: forcing a number to render as text, or
 stopping a formula from evaluating so its own text shows. `Cell.textLiteralSet` does it,
-and every read cell reports the bit as `cell.description.formatChosen`, whatever its
-type. One record pairs it with a formula, `A2` of the golden
-`18-formula-attached-and-detached`, which Numbers accepted, so the writer carries the bit
-on a formula record rather than refusing one.
+and a cell showing text reports it as `cell.presentation.formatChosen`, which for any
+other cell reports its own slot's bit, as findings-11-formats.md records. None of the
+897 formula records in the documents carries it, so a formula given to a cell drops a
+chosen Text format.
 
 **Pressing return does not interpret stored text, even under Automatic.** Measured
 2026-09-17 on the golden `11-text-literal-written` and on a new document made in Numbers:

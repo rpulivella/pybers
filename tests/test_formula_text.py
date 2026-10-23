@@ -11,6 +11,8 @@ Node arrays are asserted as `(nodeType, content)` pairs, because `FormulaNode`
 excludes its archive bytes from equality and a parsed node has none to carry.
 
 UPDATES
+2026-10-22  The goldens' writes and comparisons moved to the golden builders, for
+            PYB-255.
 2026-09-11  Brackets, which are a node rather than a derivation, for #67.
 2026-09-08  Written for #45.
 """
@@ -24,14 +26,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-import shutil
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import authoredFormulas, bracketedFormulas
 
 import pybers
-from conftest import allDocuments, findDocumentPath, readDataListBytes
+from conftest import allDocuments, findDocumentPath
 from pybers import (
     CellRange,
     CellReference,
@@ -109,8 +111,8 @@ def collectDocumentFormulas() -> list[
     found = []
     for path in allDocuments:
         document = pybers.open(path)
-        names = document.tableIdentities
         for sheet in document.sheets:
+            names = sheet.tableIdentities
             for table in sheet.tables:
                 for reference, cell in table.cells.items():
                     if cell.formula is not None:
@@ -400,7 +402,8 @@ def testAReferenceIntoAnotherTableCarriesThatTablesIdentity() -> None:
     assert table.cell("G11").formulaText == "=Table 2::A1"
     assert table.cell("H11").formulaText == "=Sheet 2::Table 1::A1"
 
-    parsed = parseFormula("=Table 2::A1", "G11", tables=document.tableIdentities)
+    names = document.sheet("Sheet 1").tableIdentities
+    parsed = parseFormula("=Table 2::A1", "G11", tables=names)
     assert reduceFormulaShape(parsed) == dropTypedWhitespace(table.cell("G11").formula)
     assert parsed.references[0].crossTable
 
@@ -436,7 +439,7 @@ def testATableNamedAnythingNumbersAllowsRoundTripsThroughTheText(
     rendered = source.cell("G11").formulaText
     assert rendered == f"={name}::A1"
     again = parseFormula("=" + f"{name}::A1", "G11",
-                         tables=document.tableIdentities)
+                         tables=document.sheet("Sheet 1").tableIdentities)
     assert reduceFormulaShape(again) == dropTypedWhitespace(source.cell("G11").formula)
 
 
@@ -450,7 +453,9 @@ def testATableNameWithOuterSpacesIsRefusedRatherThanMisread() -> None:
     document = pybers.open(findDocumentPath("20-formula-shapes"))
     document.sheet("Sheet 1").table("Table 2").name = "  padded  "
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
-        parseFormula("=  padded  ::A1", "G11", tables=document.tableIdentities)
+        parseFormula(
+            "=  padded  ::A1", "G11", tables=document.sheet("Sheet 1").tableIdentities
+        )
 
 
 @pytest.mark.parametrize(
@@ -471,7 +476,7 @@ def testArithmeticBeforeACrossTableReferenceIsNotEatenByTheTableName(
     real document failed to reparse on it. Found while measuring #67.
     """
     document = pybers.open(findDocumentPath("20-formula-shapes"))
-    formula = parseFormula(text, "A1", tables=document.tableIdentities)
+    formula = parseFormula(text, "A1", tables=document.sheet("Sheet 1").tableIdentities)
 
     assert any(
         reference.crossTable for reference in formula.references
@@ -484,7 +489,7 @@ def testAHyphenatedTableNameStillResolvesWhenTheDocumentNamesIt() -> None:
     document.sheet("Sheet 2").table("Table 1").name = "Table 1-1"
 
     formula = parseFormula(
-        "=Table 1-1::A1", "A1", tables=document.tableIdentities
+        "=Table 1-1::A1", "A1", tables=document.sheet("Sheet 1").tableIdentities
     )
 
     assert formula.references[0].crossTable
@@ -518,7 +523,7 @@ def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> No
     document.sheet("Sheet 2").table("Table 1").name = "Two"
 
     with pytest.raises(FormulaSyntaxError, match="past column 1000"):
-        parseFormula(text, "B5", tables=document.tableIdentities)
+        parseFormula(text, "B5", tables=document.sheet("Sheet 1").tableIdentities)
 
 
 def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
@@ -526,7 +531,7 @@ def testATableNameTheDocumentDoesNotCarryIsRefused() -> None:
     document = pybers.open(findDocumentPath("20-formula-shapes"))
     with pytest.raises(FormulaSyntaxError, match="not a table this document"):
         parseFormula(
-            "=Ledger::A1", "A1", tables=document.tableIdentities
+            "=Ledger::A1", "A1", tables=document.sheet("Sheet 1").tableIdentities
         )
 
 
@@ -748,40 +753,6 @@ goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 # The three formulas the golden was authored from, as text, in the order a reader
 # of `tests/golden/README.md` will find them described.
-authoredFormulas: tuple[tuple[str, str], ...] = (
-    ("B1", "=Sheet 1::Table 1::A11*2+1"),
-    ("C1", '=IF(SUM(A1:A10)>10,"big","small")'),
-    ("D1", '=$A$1&" units"'),
-)
-
-
-def authorFormulas(working: Path) -> None:
-    """Write the golden's three formulas into a copy of `20-formula-shapes`."""
-    document = pybers.open(working)
-    table = document.sheet("Sheet 1").table("Table 2")
-    for address, text in authoredFormulas:
-        table.cell(address).formulaText = text
-    document.save()
-
-
-def testFormulasAuthoredAsTextMatchTheirGoldenFile(tmp_path: Path) -> None:
-    """Three formulas written as text, against output confirmed in Numbers itself.
-
-    Every other test here checks pybers against pybers, which can agree with
-    itself while both halves are wrong. See `tests/golden/README.md` for the
-    confirmation state of this file.
-    """
-    golden = goldenDirectory / "20-formula-authored-as-text.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = Path(shutil.copy(findDocumentPath("20-formula-shapes"),
-                               tmp_path / "20.numbers"))
-    authorFormulas(working)
-    assert readDataListBytes(golden) == readDataListBytes(working), (
-        "the writer no longer produces the confirmed formula lists"
-    )
-
-
 def testTheAuthoredGoldenHoldsWhatItClaimsTo() -> None:
     """Guard the guard: a golden replaced by an unedited copy would pass silently.
 
@@ -984,42 +955,6 @@ def testAListNodeCarriesItsOwnCountThroughTheArchive() -> None:
 
 # ── PYB-67: the golden, which is the only test Numbers itself confirmed ──────
 
-# One bracket per open question: redundant, required by precedence, around an
-# atom (a shape the documents never show), and required by associativity alone
-# (the shape Numbers recorded no node for).
-bracketedFormulas: tuple[tuple[str, str], ...] = (
-    ("B1", "=22+(3/12)"),
-    ("C1", "=(1+2)*3"),
-    ("D1", "=(5)"),
-    ("E1", "=1-(2-3)"),
-)
-
-
-def authorBrackets(working: Path) -> None:
-    """Write the golden's four bracketed formulas into `20-formula-shapes`."""
-    document = pybers.open(working)
-    table = document.sheet("Sheet 1").table("Table 2")
-    for address, text in bracketedFormulas:
-        table.cell(address).formulaText = text
-    document.save()
-
-
-def testBracketedFormulasMatchTheirGoldenFile(tmp_path: Path) -> None:
-    """Four brackets written into a real file, against output Numbers accepted.
-
-    See `tests/golden/README.md` for the confirmation state of this file.
-    """
-    golden = goldenDirectory / "20-formula-brackets.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    working = Path(shutil.copy(findDocumentPath("20-formula-shapes"),
-                               tmp_path / "20.numbers"))
-    authorBrackets(working)
-    assert readDataListBytes(golden) == readDataListBytes(working), (
-        "the writer no longer produces the confirmed bracket nodes"
-    )
-
-
 def testTheBracketGoldenHoldsWhatItClaimsTo() -> None:
     """Guard the guard: an unedited copy in its place would pass silently."""
     golden = goldenDirectory / "20-formula-brackets.numbers"
@@ -1031,3 +966,29 @@ def testTheBracketGoldenHoldsWhatItClaimsTo() -> None:
         formula = table.cell(address).formula
         assert formula is not None
         assert any(node.nodeType == listNodeType for node in formula), address
+
+
+def testATableOnTheFormulasOwnSheetIsNamedBareAsNumbersShowsIt() -> None:
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
+    cell = document.sheet("Sheet 1").table("Table 2").cell("B1")
+    cell.formulaText = "=Table 1::A1"
+    assert cell.formulaText == "=Table 1::A1"
+    other = document.sheet("Sheet 2").table("Table 1").cell("B1")
+    other.formulaText = "=Sheet 1::Table 1::A1"
+    assert other.formulaText == "=Sheet 1::Table 1::A1"
+
+
+def testAReferenceBeyondItsTablesGridShowsAsRefAsNumbersShowsIt() -> None:
+    table = pybers.open(findDocumentPath("60b-move-cut-pasted")).sheets[0].tables[0]
+    assert table.colCount == 8
+    assert (table.cell("H10").formulaText, table.cell("H11").formulaText) == (
+        "=#REF!", "=#REF!"
+    )
+
+
+def testAFormulaAttachedOverChosenTextDropsTheTextFormat() -> None:
+    table = pybers.open(findDocumentPath("18-formula-literals")).sheets[0].tables[0]
+    cell = table.cell("A2")
+    assert cell.presentation.formatChosen
+    cell.formula = table.cell("A1").formula
+    assert not cell.presentation.formatChosen

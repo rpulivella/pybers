@@ -8,6 +8,7 @@ formulas read across tables and sheets, so anything a created table disturbed in
 engine would show there. The golden was made from it the same way.
 
 UPDATES
+2026-10-22  The golden's tables are added by its builder, for PYB-255.
 2026-09-14  Written for PYB-63.
 """
 
@@ -25,6 +26,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import addTables as addGoldenTables
 
 import pybers
 from conftest import findDocumentPath, readArchiveBodies
@@ -53,14 +55,7 @@ def openShapes() -> Document:
 
 def addTables(document: Document) -> Document:
     """Add the golden's three tables and their values, and return the document."""
-    first = document.sheet("Sheet 1").tableAdd("Table 1", rows=3, cols=4)
-    first.cell("A1").value = "text in a created table"
-    first.cell("B2").value = Decimal("12.5")
-    second = document.sheet("Sheet 1").tableAdd("table 2", rows=2, cols=3)
-    second.cell("C2").value = "second created"
-    output = document.sheetAdd("Fresh").tableAdd("Output", rows=5, cols=2)
-    output.cell("A1").value = Decimal("1")
-    output.cell("B5").value = "last cell"
+    addGoldenTables(document)
     return document
 
 
