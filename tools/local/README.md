@@ -67,7 +67,8 @@ the inspector too, since only the inspector shows its settings.
 `golden_confirm.py measure <name>` makes `tests/measurements/<name>.numbers` in Numbers
 from `<name>.recipe.toml` beside it: a copy of `base` and any `documents`, then each
 `[[step]]` in order. Every step names its `document`, counted from 0, and the cell it
-acts on by `sheet`, `table` and `range`. A `dataFormatSet` or `customFormatEdit` step
+acts on by `sheet`, `table` and `range`, which a recipe may name once at its top for every
+step. A `dataFormatSet` or `customFormatEdit` step
 reads back what it changed, so a control Numbers did not take stops the run.
 
 ```
@@ -76,6 +77,8 @@ menuPress        press menuItem: copy, paste, delete or autofillDown
 formatSet        set the range's format kind through AppleScript
 valueSet         type value into one cell, as a person would
 tableExtend      grow the table until it reaches the cell in range
+tableAdd         add the table named by table to sheet, reaching the cell in range
+sheetAdd         add the sheet named by sheet, its table holding no header
 dataFormatSet    set one Data Format control, named by setting, to value
 customFormatEdit build a custom format, one part per step, named by setting
 ```

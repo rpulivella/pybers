@@ -1,9 +1,10 @@
 # Fixtures: the origins
 
 A fixture is a document no other document here was made from: the control every measurement
-starts from, or a document that came from outside, by import or from real use. A document made
-from one of these by a single change is a measurement, in
-[`tests/measurements/`](../measurements/README.md). What each established is indexed in
+starts from, or a document that came from outside, by import or from real use. A document
+Numbers made from one of these is a measurement, in
+[`tests/measurements/`](../measurements/README.md), and a document pybers wrote from one is a
+golden, in [`tests/golden/`](../golden/README.md). What each established is indexed in
 [FINDINGS.md](../../docs/findings/FINDINGS.md).
 
 Tests name a document by its stem through `findDocumentPath` in `tests/conftest.py`, so a test

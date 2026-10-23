@@ -40,7 +40,7 @@ A competent Python developer would assume none of these:
 - **A number is `Decimal`, never `float`**, because Numbers stores decimal128.
 - **A formula is a tree of nodes.** The file holds no formula text, so nothing here parses or edits one as a string.
 - **Writing changes the archives that were read**, never new ones built from the model, and anything pybers does not understand is carried through untouched.
-- **Every change to what pybers writes earns a golden**: a real document, one mutation, opened in Numbers and confirmed by a maintainer, then kept as a regression test. [The golden README](tests/golden/README.md) says how, and `/golden-confirm` drives Numbers through it.
+- **Every change to what pybers writes earns a golden**: a real document, one mutation written by its builder in `tests/golden/builders.py`, opened in Numbers and confirmed by a maintainer, then kept as a regression test. [The golden README](tests/golden/README.md) says how, and `/golden-confirm` drives Numbers through it.
 - **Each feature is tested from both of its users**, a script calling `import pybers` and a command run in a terminal. The library prints nothing, and what a command prints follows [the command-line design](docs/cli-design.md).
 - **Functions, variables and parameters are camelCase**, methods are named subject first and verb last (`rowAdd`), and type names lead with their base noun (`Table`, `TableRow`). ruff and mypy are configured for it.
 - **The prose gate checks every comment, docstring and document** the way ruff checks code, because a wrong comment is a defect here.
