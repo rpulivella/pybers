@@ -1,0 +1,41 @@
+# How Numbers makes 93-formulas-for-attaching: a formula, text and a second formula, for a formula to be attached and one detached, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 93-formulas-for-attaching`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "C2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "=1+1"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "formula =1+1"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "1+1"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "text 1+1"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "=2*3"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "formula =2*3"

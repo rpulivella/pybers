@@ -1,0 +1,86 @@
+# How Numbers makes 91-controls-for-values: one cell under each control, for values to be written over them, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 91-controls-for-values`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "E2"
+
+[[step]]
+action = "dataFormatSet"
+range = "A1"
+setting = "Data Format"
+value = "Checkbox"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "TRUE"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "checkbox, checked"
+
+[[step]]
+action = "dataFormatSet"
+range = "B1"
+setting = "Data Format"
+value = "Star Rating"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "3"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "star rating of 3"
+
+[[step]]
+action = "dataFormatSet"
+range = "C1"
+setting = "Data Format"
+value = "Slider"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "50"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "slider at 50, range 1 to 100 by 1"
+
+[[step]]
+action = "dataFormatSet"
+range = "D1"
+setting = "Data Format"
+value = "Stepper"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "stepper at 1, range 1 to 100 by 1"
+
+[[step]]
+action = "dataFormatSet"
+range = "E1"
+setting = "Data Format"
+value = "Pop-Up Menu"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "pop-up menu of Item 1 to Item 3"

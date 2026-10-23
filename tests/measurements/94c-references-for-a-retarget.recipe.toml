@@ -1,0 +1,137 @@
+# How Numbers makes 94c-references-for-a-retarget: two references into its own table, one to a second table and one to a second sheet, eight empty cells and the numbers they read, each labeled beneath. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 94c-references-for-a-retarget`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "L8"
+
+[[step]]
+action = "tableAdd"
+table = "Table 2"
+range = "A1"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "7"
+table = "Table 2"
+
+[[step]]
+action = "sheetAdd"
+sheet = "Sheet 2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "5"
+sheet = "Sheet 2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "=SUM(A3:A7)"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "formula =SUM(A3:A7)"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "=A3*2"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "formula =A3*2"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "=Table 2::A1"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "formula =Table 2::A1"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "=Sheet 2::Table 1::A1"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "formula =Sheet 2::Table 1::A1"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "F2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "G2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "H2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "I2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "J2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "K2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "L2"
+value = "nothing"
+
+[[step]]
+action = "valueSet"
+range = "A3"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "A4"
+value = "2"
+
+[[step]]
+action = "valueSet"
+range = "A5"
+value = "3"
+
+[[step]]
+action = "valueSet"
+range = "A6"
+value = "4"
+
+[[step]]
+action = "valueSet"
+range = "A7"
+value = "5"

@@ -1,14 +1,22 @@
-# Measurements: one change from an origin
+# Measurements: what Numbers does, labeled
 
-A measurement is a document made from another document here by exactly one change, so that a
-diff against its origin shows where that change lives. Origins are in
+A measurement is a document Numbers made from a fixture, by hand or by the helper following
+a recipe beside it, whose cells label their own contents. It is evidence of what Numbers
+does, so nothing pybers wrote is a measurement: that is a golden, in
+[`tests/golden/`](../golden/README.md). Origins are in
 [`tests/fixtures/`](../fixtures/README.md). What each established is indexed in
-[FINDINGS.md](../../docs/findings/FINDINGS.md).
+[FINDINGS.md](../../docs/findings/FINDINGS.md), and a measurement made for one golden to
+edit names that golden below.
 
 ## Making one
 
-- **Save As from the origin, then make one change.** A new document renumbers every object
-  identifier, so it cannot be compared; a Save As copy kept 36 of 37 members named alike.
+- **By recipe where the helper can make it**:
+  `.venv/bin/python3 -m tools.local.golden_confirm measure <name>` makes `<name>.numbers`
+  from `<name>.recipe.toml`, so the document can be made again and its making is read in
+  one file.
+- **By hand, Save As from the origin, then make one change.** A new document renumbers
+  every object identifier, so it cannot be compared; a Save As copy kept 36 of 37 members
+  named alike.
 - **A star, not a chain.** Derive from the origin directly, never from the previous
   measurement, or isolating one change means unpicking the ones before it.
 - **Label what each cell displays**, in text beside it. What was typed cannot be recovered
@@ -122,6 +130,21 @@ diff against its origin shows where that change lives. Origins are in
 | `87-custom-number-rules` | `00-baseline` | a custom number format for every rule condition, and one with two rules, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
 | `88-formula-currency-results` | `00-baseline` | a euro and a dollar amount, and formulas over them and the currency functions, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
 | `89-currency-formats` | `00-baseline` | one amount under each currency format `12-number-currency` covers, labeled with what was typed and chosen, and an empty column, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `90-values-for-booleans` | `00-baseline` | two numbers, a checked checkbox, a star rating and an empty cell, each labeled, for `11-booleans-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90b-values-for-dates` | `00-baseline` | two numbers, a date and an empty cell, each labeled, for `11-dates-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90c-values-for-durations` | `00-baseline` | a number, a duration and an empty cell, each labeled, for `11-durations-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90d-values-for-literal-text` | `00-baseline` | two numbers and an empty cell, each labeled, for `11-text-literal-written`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90e-values-for-text-and-retyping` | `00-baseline` | two numbers, a star rating, text and an empty cell, each labeled, for `11-text-written-and-retyped`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90f-number-for-an-edit` | `00-baseline` | one labeled number, for `11-value-types-noformats-A1-edited`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `91-controls-for-values` | `00-baseline` | one cell under each control, each labeled, for `11-controls-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `92-values-for-currency` | `00-baseline` | a number, dollars, accounting-style dollars and an empty cell, each labeled, for `12-currency-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93-formulas-for-attaching` | `00-baseline` | a formula, text and a second formula, each labeled, for `18-formula-attached-and-detached`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93b-empty-for-a-formula` | `00-baseline` | one labeled empty cell, for `18-formula-created-in-empty-cell`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93c-formula-for-a-literal-change` | `00-baseline` | one labeled formula, for `18-formula-literals-A1-changed`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93d-formulas-for-a-merge` | `00-baseline` | two labeled formulas side by side, for `18-merged-over-a-formula`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `94-values-for-a-named-fill` | `00-baseline` | a labeled sum over three numbers beside three labeled empty cells, for `20-cells-filled-named-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `94b-values-for-a-relative-fill` | `00-baseline` | the same, with numbers under each empty cell, for `20-cells-filled-relative-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `94c-references-for-a-retarget` | `00-baseline` | references into its own table, a second table and a second sheet, beside eight labeled empty cells and the numbers they read, for `20-formula-retargeted`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
 
 `tile-pattern.png` and `orientation-test.png` are the source images, each generated by a
 script.

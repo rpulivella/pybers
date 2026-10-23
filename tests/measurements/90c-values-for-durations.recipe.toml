@@ -1,0 +1,36 @@
+# How Numbers makes 90c-values-for-durations: a number, a duration and an empty cell, for durations to be written over, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 90c-values-for-durations`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "C2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "1234.5"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "number 1234.5"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "20m"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "duration 20m"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "nothing"
