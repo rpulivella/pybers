@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-255] Make goldens label their contents and generate their checks
 - [PYB-220] Give currency one home shared by formats and formulas
 - [PYB-249] Fail every phrase the writing rules ban
 - [PYB-219] Decode the format archives Numbers stores for each family
