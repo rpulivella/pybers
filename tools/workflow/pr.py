@@ -33,6 +33,7 @@ Usage:
     .venv/bin/python3 -m tools.workflow.pr export-as-source 8 --body
     .venv/bin/python3 -m tools.workflow.pr export-as-source 8 --title
     .venv/bin/python3 -m tools.workflow.pr ready 8
+    .venv/bin/python3 -m tools.workflow.pr close 8
     .venv/bin/python3 -m tools.workflow.pr rerun 8
     .venv/bin/python3 -m tools.workflow.pr logs 8 --context 30
     .venv/bin/python3 -m tools.workflow.pr merge 8 --subject "[14] feat: add a thing"
@@ -41,6 +42,7 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-10-23  `close`, a pull request closed without merging, for PYB-156.
 2026-10-15  `create`, `ready` and `merge` no longer touch the session dashboard, which
             only its own command writes, for PYB-156.
 2026-10-14  `merge` refuses a pull request with no approving review unless its
@@ -126,6 +128,7 @@ from tools.workflow.lib.pull_request import (
     PullRequestSummary,
     assertBranchIsPushed,
     checkHeadIsOurs,
+    closePullRequest,
     confirmChecksPassed,
     confirmMergeApproved,
     createDraftPullRequest,
@@ -512,6 +515,34 @@ def runReady(arguments: argparse.Namespace) -> int:
         f"[bold cyan]{formatPullRequestRef(summary.number)}[/]"
     )
     console.print(summary.url)
+    return 0
+
+
+def runClose(arguments: argparse.Namespace) -> int:
+    """Close an open pull request without merging it."""
+    token = github.resolveToken()
+    summary = readPullRequest(token, arguments.number)
+    reference = formatPullRequestRef(summary.number)
+
+    if summary.state != "open":
+        console.print(f"[yellow]{reference} is already {summary.state}.[/]")
+        return 0
+
+    if arguments.dryRun:
+        console.print("[yellow]Dry run. Nothing was changed.[/]")
+        console.print(f"would close [bold cyan]{reference}[/] without merging")
+        return 0
+
+    closed = closePullRequest(token, summary.number)
+    if closed.state != "closed":
+        console.print(
+            f"[red]{reference} is still {closed.state} after the close reported "
+            "success.[/]"
+        )
+        return errorExitCode
+
+    console.print(f"[green]Closed[/] [bold cyan]{reference}[/] without merging")
+    console.print(closed.url)
     return 0
 
 
@@ -909,6 +940,13 @@ def buildParser() -> argparse.ArgumentParser:
     readyParser.add_argument("number", type=parsePullRequestNumber)
     readyParser.add_argument("--dry-run", dest="dryRun", action="store_true")
     readyParser.set_defaults(handler=runReady)
+
+    closeParser = subparsers.add_parser(
+        "close", help="close a pull request without merging it"
+    )
+    closeParser.add_argument("number", type=parsePullRequestNumber)
+    closeParser.add_argument("--dry-run", dest="dryRun", action="store_true")
+    closeParser.set_defaults(handler=runClose)
 
     mergeParser = subparsers.add_parser("merge", help="merge a pull request")
     mergeParser.add_argument("number", type=parsePullRequestNumber)
