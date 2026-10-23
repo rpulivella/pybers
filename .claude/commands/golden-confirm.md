@@ -30,7 +30,7 @@ what the expected-values file says. The checks it leaves for QA remain yours.
    asks for to the user rather than working around it.
 3. **Preview, then run:**
    ```
-   .venv/bin/python3 -m tools.local.golden_confirm run <golden> --dry-run
+   .venv/bin/python3 -m tools.local.golden_confirm run <golden> --preview
    .venv/bin/python3 -m tools.local.golden_confirm run <golden>
    ```
    Numbers opens a copy hidden, and shows on screen for about a second. The run survives

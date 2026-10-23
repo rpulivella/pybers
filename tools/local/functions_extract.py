@@ -51,13 +51,15 @@ Usage:
     .venv/bin/python3 -m tools.local.functions_extract \
         --numbers "/Applications/Numbers.app"
     .venv/bin/python3 -m tools.local.functions_extract --write
-    .venv/bin/python3 -m tools.local.functions_extract --write --dry-run
+    .venv/bin/python3 -m tools.local.functions_extract --write --preview
 
 Runs on the repository's venv. Needs no other tooling: the Mach-O parsing and the
 AArch64 decoding are both Python, so there is no objdump, no c++filt and no
 architecture-specific toolchain to install.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-14  Moved here from `tools/functions-extract.py`, and run as a module,
             for PYB-204.
 2026-10-13  The repository root and the help formatter come from
@@ -218,7 +220,7 @@ def main() -> int:
         help=f"write {generatedPath.relative_to(repositoryRoot)}",
     )
     parser.add_argument(
-        "--dry-run",
+        "--preview",
         action="store_true",
         help="with --write, print what would be written and write nothing",
     )
@@ -250,7 +252,7 @@ def main() -> int:
         return 0
 
     source = renderModule(table)
-    if arguments.dry_run:
+    if arguments.preview:
         console.print("\n[bold]Would write[/]")
         console.print(source, markup=False, highlight=False)
         return 0

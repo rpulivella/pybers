@@ -57,7 +57,7 @@ means fetching the current body, changing part of it, and writing the whole thin
    .venv/bin/python3 -m tools.workflow.ticket edit <N> --title "<new title>"
    .venv/bin/python3 -m tools.workflow.ticket edit <N> --label <label>
    ```
-   Flags combine, and `--dry-run` previews any of them. `edit` reads the ticket back and
+   Flags combine, and `--preview` previews any of them. `edit` reads the ticket back and
    verifies what landed against what was sent, so a write that lost a concurrent change
    fails loudly instead of passing silently.
 7. **Delete the local copy as soon as the edit reports the write verified.** A ticket's

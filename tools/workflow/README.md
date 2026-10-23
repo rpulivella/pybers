@@ -23,7 +23,7 @@ dashboard         the session dashboard's status line, task order and merges
 A folder lists only the commands a person runs. Their logic sits in `lib/`, where a test
 reaches it, and a command is tested only for its own handling. A new command goes here
 when every repository could use it, and in `tools/local/` when only one can. Run it,
-`--dry-run` included, before calling it done.
+`--preview` included, before calling it done.
 
 ## GitHub Authentication
 
@@ -45,7 +45,7 @@ reach a user-owned Project board.
 4. `rich` output, never bordered. Arbitrary text prints with `markup=False` or through
    `escape()`, because rich silently consumes square brackets it reads as markup.
 5. Logic returns its result and never prints.
-6. `--dry-run` on anything that changes state.
+6. `--preview` on anything that changes state.
 7. The dunder header block on every file.
 8. A message states what it found and stops, with no remedy, command or file name.
 9. A long-running command logs to `workarea/logs/<command>-<timestamp>.log` rather than
