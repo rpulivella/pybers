@@ -15,6 +15,8 @@ Usage:
     .venv/bin/python3 -m tools.workflow.dashboard merged PYB-193 210
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-15  The only writer of the dashboard, run explicitly, for PYB-156.
 2026-10-14  Written for PYB-211.
 """
@@ -50,9 +52,9 @@ from tools.workflow.lib.shared import RichHelpFormatter, errorExitCode
 console = Console()
 
 
-def saveDashboard(board: Dashboard, dryRun: bool) -> None:
-    """Write the dashboard, or print it under `--dry-run`."""
-    if dryRun:
+def saveDashboard(board: Dashboard, preview: bool) -> None:
+    """Write the dashboard, or print it under `--preview`."""
+    if preview:
         console.print(renderBoard(board), markup=False, highlight=False)
         return
     if writeDashboard(board):
@@ -75,7 +77,7 @@ def runSync(arguments: argparse.Namespace) -> int:
     """Rewrite the status line for the ticket in focus, and the queue's notes."""
     board = readDashboard()
     updateDashboard(github.resolveToken(), board)
-    saveDashboard(board, arguments.dryRun)
+    saveDashboard(board, arguments.preview)
     return 0
 
 
@@ -83,7 +85,7 @@ def runFocus(arguments: argparse.Namespace) -> int:
     """Put a ticket in focus off its branch, or `none` to clear it."""
     board = readDashboard()
     updateDashboard(github.resolveToken(), board, arguments.key)
-    saveDashboard(board, arguments.dryRun)
+    saveDashboard(board, arguments.preview)
     return 0
 
 
@@ -91,7 +93,7 @@ def runMerged(arguments: argparse.Namespace) -> int:
     """Record a merged ticket at the top of the recent list."""
     board = readDashboard()
     recordMerge(board, arguments.key, arguments.pullRequest)
-    saveDashboard(board, arguments.dryRun)
+    saveDashboard(board, arguments.preview)
     return 0
 
 
@@ -114,7 +116,7 @@ def buildParser() -> argparse.ArgumentParser:
     merged.add_argument("pullRequest", type=int, help="its pull request's number")
     merged.set_defaults(handler=runMerged)
     for command in (sync, focus, merged):
-        command.add_argument("--dry-run", dest="dryRun", action="store_true")
+        command.add_argument("--preview", dest="preview", action="store_true")
     return parser
 
 

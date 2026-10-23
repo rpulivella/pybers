@@ -6,6 +6,8 @@ An issue and a pull request share one comment thread on GitHub, so commenting on
 either is the same request with a different reference in what it prints.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-13  Moved here from `ticket.py`, so `pr.py` imports a library rather than
             another command, for PYB-204.
 """
@@ -90,8 +92,8 @@ def postCommentFromFile(arguments: argparse.Namespace, reference: str) -> int:
     if posted is None:
         return 1
     body = posted.text
-    if arguments.dryRun:
-        console.print(f"[yellow]Dry run[/] comment on {reference}:")
+    if arguments.preview:
+        console.print(f"[yellow]Preview[/] of the comment on {reference}:")
         console.print(body, markup=False, highlight=False)
         return 0
     token = github.resolveToken()
@@ -129,8 +131,10 @@ def runCommentEdit(arguments: argparse.Namespace) -> int:
     if posted is None:
         return 1
     body = posted.text
-    if arguments.dryRun:
-        console.print(f"[yellow]Dry run[/] rewrite of comment {arguments.commentId}:")
+    if arguments.preview:
+        console.print(
+            f"[yellow]Preview[/] of the rewrite of comment {arguments.commentId}:"
+        )
         console.print(body, markup=False, highlight=False)
         return 0
     token = github.resolveToken()
@@ -144,7 +148,7 @@ def runCommentDelete(arguments: argparse.Namespace) -> int:
     """Remove one comment, after printing what is about to be lost.
 
     GitHub keeps no copy and offers no undo, so the body is shown first. A
-    `--dry-run` shows it without removing anything.
+    `--preview` shows it without removing anything.
     """
     token = github.resolveToken()
     comment = github.readComment(token, arguments.commentId)
@@ -153,8 +157,8 @@ def runCommentDelete(arguments: argparse.Namespace) -> int:
         f"comment [bold cyan]{comment.id}[/] by {escape(comment.author)}:"
     )
     console.print(comment.body, markup=False, highlight=False)
-    if arguments.dryRun:
-        console.print("[yellow]Dry run: nothing was removed.[/]")
+    if arguments.preview:
+        console.print("[yellow]Preview. Nothing was removed.[/]")
         return 0
     github.deleteComment(token, arguments.commentId)
     console.print("[green]Deleted.[/]")
