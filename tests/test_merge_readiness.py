@@ -7,6 +7,7 @@ or a pull request. What needs GitHub is the half that gathers the facts, and it 
 the workflows that prove that.
 
 UPDATES
+2026-10-23  A deleted golden is not counted as touched, for PYB-255.
 2026-09-17  Written for PYB-76.
 """
 from __future__ import annotations
@@ -21,6 +22,8 @@ __date__ = "2026/09/17"
 
 from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 from tools.local.lib import readiness as checks  # noqa: E402
@@ -307,3 +310,18 @@ def testOnlyAFailureOrADecisionBecomesAnAnnotation() -> None:
         "::error title=Checklist::1 checkbox is unresolved",
         "::warning title=Base Branch::2 commits behind",
     ]
+
+
+def testAGoldenTheBranchDeletedIsNotCountedAsTouched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def gitStandIn(arguments: list[str]) -> str:
+        if "--name-only" in arguments:
+            deleted = "tests/golden/20-formula-filled-across.numbers"
+            kept = "tests/golden/20-sheets-added.numbers"
+            return kept if "--diff-filter=d" in arguments else f"{deleted}\n{kept}"
+        return ""
+
+    monkeypatch.setattr(checks, "runGit", gitStandIn)
+    facts = checks.collectBranchFacts("develop", 262, "chore/255-x", "a" * 40)
+    assert facts.goldensTouched == ["20-sheets-added.numbers"]
