@@ -139,7 +139,7 @@
     },
     "CellForm": {
       "type": "object",
-      "description": "One cell as the JSON form holds it, in the order `pybers show` prints it.",
+      "description": "One cell as the JSON form holds it, in the order PYB-260's `pybers show` uses.",
       "properties": {
         "address": {
           "type": "string",
@@ -1052,6 +1052,9 @@
       "type": "object",
       "description": "One table of the document a part came from, as its formulas name and size it.",
       "properties": {
+        "sheetPosition": {
+          "type": "integer"
+        },
         "sheetName": {
           "type": "string"
         },
@@ -1069,6 +1072,7 @@
         }
       },
       "required": [
+        "sheetPosition",
         "sheetName",
         "name",
         "identifier",

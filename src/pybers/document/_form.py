@@ -12,6 +12,8 @@ document, which is why the directory is whole rather than the tables a part reac
 Private. The JSON form's half of the document feature, beside `_read` and `_write`.
 
 UPDATES
+2026-10-26  A directory entry carries its sheet's position, so two sheets sharing a
+            name read back apart, for PYB-259.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -27,7 +29,7 @@ __date__ = "2026/10/24"
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from pybers.document.sheets import Document, Sheet
+from pybers.document.sheets import Document, Sheet, firstPosition
 from pybers.table._form import TableForm, assignFormulas, buildTable, buildTableForm
 from pybers.table.cells import Table
 
@@ -52,8 +54,12 @@ class DocumentForm:
 
 @dataclass(frozen=True, slots=True)
 class TableEntry:
-    """One table of the document a part came from, as its formulas name and size it."""
+    """One table of the document a part came from, as its formulas name and size it.
 
+    Its sheet's position as well as its name, since two sheets may share a name.
+    """
+
+    sheetPosition: int
     sheetName: str
     name: str
     identifier: str
@@ -80,9 +86,10 @@ def listTableEntries(document: Document | None) -> tuple[TableEntry, ...]:
     if document is None:
         return ()
     return tuple(
-        TableEntry(sheet.name, table.name, table.identifier, table.rowCount,
-                   table.colCount)
-        for sheet in document.sheets for table in sheet.tables
+        TableEntry(position, sheet.name, table.name, table.identifier,
+                   table.rowCount, table.colCount)
+        for position, sheet in enumerate(document.sheets, start=firstPosition)
+        for table in sheet.tables
     )
 
 
@@ -130,22 +137,27 @@ def buildStandInDocument(
     """Return a document holding the built sheets among stand-ins for every other table.
 
     Sheets and tables follow the directory's order, a stand-in taking the place of each
-    table not built, and every formula is parsed once the whole document is linked.
+    table not built. A built sheet takes the place of the sheet holding its tables,
+    found by their identities, and every formula is parsed once the whole document is
+    linked.
     """
     built = {table.identifier: table for _, tables in parts
              for table, _, _ in tables if table.identifier}
-    named = {sheet.name: sheet for sheet, _ in parts}
-    document = Document()
+    owners = {table.identifier: sheet for sheet, tables in parts
+              for table, _, _ in tables if table.identifier}
+    bySheet: dict[int, list[TableEntry]] = {}
     for entry in entries:
-        sheet = named.get(entry.sheetName) or findSheet(document, entry.sheetName)
-        placeSheet(document, sheet)
-        table = built.pop(entry.identifier, None)
-        sheet.tables.append(table if table is not None else Table(
-            name=entry.name, rowCount=entry.rowCount, colCount=entry.colCount,
-            identifier=entry.identifier,
-        ))
+        bySheet.setdefault(entry.sheetPosition, []).append(entry)
+    document = Document()
+    for group in bySheet.values():
+        owner = next((owners[each.identifier] for each in group
+                      if each.identifier in owners), None)
+        sheet = Sheet(name=group[0].sheetName) if owner is None else owner
+        document.sheets.append(sheet)
+        sheet.tables.extend(findStandIn(built, each) for each in group)
     for sheet, tables in parts:
-        placeSheet(document, sheet)
+        if not any(each is sheet for each in document.sheets):
+            document.sheets.append(sheet)
         sheet.tables.extend(
             table for table, _, _ in tables
             if not any(each is table for each in sheet.tables)
@@ -157,16 +169,13 @@ def buildStandInDocument(
     return document
 
 
-def findSheet(document: Document, name: str) -> Sheet:
-    """Return the stand-in sheet of a name, adding it to the document if absent."""
-    found = next((sheet for sheet in document.sheets if sheet.name == name), None)
-    return Sheet(name=name) if found is None else found
-
-
-def placeSheet(document: Document, sheet: Sheet) -> None:
-    """Add a sheet to the document being assembled, unless it is there already."""
-    if not any(each is sheet for each in document.sheets):
-        document.sheets.append(sheet)
+def findStandIn(built: dict[str, Table], entry: TableEntry) -> Table:
+    """Return the table built for a directory entry, or an empty stand-in for it."""
+    table = built.get(entry.identifier)
+    if table is not None:
+        return table
+    return Table(name=entry.name, rowCount=entry.rowCount, colCount=entry.colCount,
+                 identifier=entry.identifier)
 
 
 __all__ = [

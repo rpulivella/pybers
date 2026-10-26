@@ -54,7 +54,7 @@ valuelessKinds: frozenset[CellKind] = frozenset(
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CellForm:
-    """One cell as the JSON form holds it, in the order `pybers show` prints it."""
+    """One cell as the JSON form holds it, in the order PYB-260's `pybers show` uses."""
 
     address: CellAddress
     value: CellValue

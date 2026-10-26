@@ -213,3 +213,11 @@ def testAFormulasValueSaysItIsCached() -> None:
     cell = findTable("20-formula-shapes", "Sheet 1", "Table 1").cell("A11")
     tree = readTree(pybers.formatJsonForm(cell))["table"]["cells"][0]
     assert (tree["valueCached"], tree["formulaText"]) == (True, cell.formulaText)
+
+
+def testASheetSharingItsNameWithAnotherReadsBackAsItself() -> None:
+    document = pybers.open(findDocumentPath("20-formula-shapes"))
+    first, second = document.sheets[0], document.sheets[1]
+    second.name = first.name
+    assert pybers.parseJsonForm(pybers.formatJsonForm(first)) == first
+    assert pybers.parseJsonForm(pybers.formatJsonForm(second)) == second
