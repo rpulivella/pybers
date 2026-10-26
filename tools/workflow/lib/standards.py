@@ -48,6 +48,7 @@ neither may be hand-edited, so a finding in either is noise by construction.
 Runs on the repository's venv, which holds rich.
 
 UPDATES
+2026-10-26  The exemption for `standards-check.py`, which no longer exists, removed.
 2026-10-21  Comments come from the tokenizer, so a `#` inside a string is not
             read as one, for PYB-249.
 2026-10-21  Fails the phrases the writing rules added, and a sentence opening
@@ -373,8 +374,6 @@ def isRuleDoc(path: Path, check: str) -> bool:
     if check not in ruleDocExemptChecks:
         return False
     normalized = path.as_posix()
-    if path.name == "standards-check.py":
-        return True
     return any(marker in normalized for marker in ruleDocPaths)
 
 
