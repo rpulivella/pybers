@@ -7,6 +7,7 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-10-24  `kindValueTypes`, the type each kind's value holds, for PYB-259.
 2026-10-22  `CellPresentation`, a cell's format and its control, replacing the
             description, whose kind is the cell's own, for PYB-255.
 2026-10-22  A `CurrencyAmount` is the currency kind, for PYB-220.
@@ -136,6 +137,23 @@ def findCellKind(
     return CellKind.UNKNOWN
 
 
+# The type a value of each kind holds, the inverse of `findCellKind`. Measured across
+# every document in the tests on 2026-10-24: an error, an empty and an unknown cell
+# hold None, and each other kind one type.
+kindValueTypes: frozendict[CellKind, type] = frozendict({
+    CellKind.EMPTY: type(None),
+    CellKind.NUMBER: Decimal,
+    CellKind.CURRENCY: CurrencyAmount,
+    CellKind.TEXT: str,
+    CellKind.RICH_TEXT: str,
+    CellKind.DATE_TIME: datetime.datetime,
+    CellKind.DURATION: datetime.timedelta,
+    CellKind.BOOLEAN: bool,
+    CellKind.ERROR: type(None),
+    CellKind.UNKNOWN: type(None),
+})
+
+
 __all__ = [
     "CellFormat",
     "CellKind",
@@ -143,4 +161,5 @@ __all__ = [
     "CellStorage",
     "emptyStorage",
     "findCellKind",
+    "kindValueTypes",
 ]

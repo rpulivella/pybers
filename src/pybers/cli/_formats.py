@@ -3,12 +3,13 @@
 The formats every command offers, the option that chooses one, and how each is written.
 
 A command passes its result and its own text renderer to `printResult`, and never
-builds JSON itself, so `--format` means the same in every command. JSON keys are
-the library's own field names, `None` is `null`, and a sentinel is its name, so the
-reasons a value is missing survive. Objects stay as the library returned them until
-the encoder reaches each one. See `docs/cli-design.md`.
+builds JSON itself: `--format json` is `pybers.formatJsonForm`, the library's one
+serializer, so a command's JSON and a script's are the same text. See
+`docs/cli-design.md`.
 
 UPDATES
+2026-10-24  JSON written by `pybers.formatJsonForm`, keeping only the choice of
+            format here, for PYB-259.
 2026-10-20  A date and a duration as the text `pybers set` reads, for PYB-144.
 2026-10-20  A Decimal as its exact digits, and a cell's address or reference as
             its text, for PYB-217.
@@ -24,13 +25,9 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/12"
 
-import dataclasses
-import datetime
-import json
 from collections.abc import Callable
-from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 from rich.console import RenderableType
@@ -52,38 +49,14 @@ FormatOption = Annotated[
 ]
 
 
-def encodeJsonValue(value: object) -> Any:
-    """Return what the JSON encoder writes for a value it cannot write itself."""
-    if isinstance(value, sentinel):
-        return repr(value)
-    # A number as its exact digits, so no float ever stands between the cell and JSON.
-    if isinstance(value, Decimal):
-        return str(value)
-    if isinstance(value, datetime.datetime | datetime.timedelta):
-        return pybers.formatCellValue(value)
-    if isinstance(value, pybers.CellAddress | pybers.CellReference):
-        return str(value)
-    if isinstance(value, frozendict):
-        return dict(value)
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {
-            field.name: getattr(value, field.name)
-            for field in dataclasses.fields(value) if field.repr
-        }
-    raise TypeError(f"pybers has no JSON form for {type(value).__name__}.")
-
-
 def printResult[T](
     result: T, outputFormat: OutputFormat, renderText: Callable[[T], RenderableType]
 ) -> None:
     """Print a command's result on stdout in the format asked for."""
     if outputFormat is OutputFormat.JSON:
-        text = json.dumps(
-            result, default=encodeJsonValue, ensure_ascii=False, indent=2
-        )
-        console.out(text, highlight=False)
+        console.out(pybers.formatJsonForm(result), highlight=False)
     else:
         console.print(renderText(result))
 
 
-__all__ = ["FormatOption", "OutputFormat", "encodeJsonValue", "printResult"]
+__all__ = ["FormatOption", "OutputFormat", "printResult"]

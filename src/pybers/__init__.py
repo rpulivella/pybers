@@ -13,7 +13,7 @@ the full origin story and design contract.
 UPDATES
 2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
             for PYB-259.
-2026-10-24  `CellControlType` re-exported, for PYB-259.
+2026-10-24  `CellControlType` and the JSON form's names re-exported, for PYB-259.
 2026-10-22  The cell controls and CellPresentation re-exported, replacing
             CellDescription, for PYB-255.
 2026-10-22  The currency names re-exported, for PYB-220.
@@ -113,6 +113,12 @@ lazy from pybers.formula import (
     renderFormula,
 )
 lazy from pybers.geometry import Position
+lazy from pybers.interchange import (
+    JsonFormError,
+    formatJsonForm,
+    jsonFormVersion,
+    parseJsonForm,
+)
 lazy from pybers.table import (
     Cell,
     CellChange,
@@ -169,6 +175,10 @@ __all__ = [
     "FormulaLambda",
     "Formula",
     "formatCellValue",
+    "formatJsonForm",
+    "JsonFormError",
+    "jsonFormVersion",
+    "parseJsonForm",
     "parseCellValue",
     "Currency",
     "CurrencyAmount",

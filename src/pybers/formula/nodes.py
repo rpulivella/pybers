@@ -34,6 +34,7 @@ row of `None` means the whole column rather than row zero. The same rule
 as a sentinel line, read here as `None`.
 
 UPDATES
+2026-10-24  A node's raw bytes kept in the JSON form, for PYB-259.
 2026-10-13  A boolean literal and a range reaching every row or column, for PYB-139.
 2026-09-18  A broken reference names the rows and columns it lost, for PYB-17.
 2026-09-11  Apple's list node is a bracket the author typed, for #67. It
@@ -74,6 +75,7 @@ from pybers.formula.functions import (
     findFunctionName,
     findFunctionNamed,
 )
+from pybers.interchange._tree import jsonFormKept
 
 # The node types this model gives meaning to. Every other type is carried through
 # untouched: the node message has 45 fields and the documents use 16, so a model
@@ -520,12 +522,14 @@ class FormulaNode:
 
     `raw` is the node's archive bytes as read, kept so a node this model does not
     interpret survives a rewrite exactly. Excluded from equality, being provenance
-    rather than content.
+    rather than content, and kept in the JSON form, which carries it through too.
     """
 
     nodeType: int
     content: NodeContent = None
-    raw: bytes = field(default=b"", compare=False, repr=False)
+    raw: bytes = field(
+        default=b"", compare=False, repr=False, metadata={jsonFormKept: True}
+    )
 
     @property
     def recognized(self) -> bool:

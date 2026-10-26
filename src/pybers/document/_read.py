@@ -28,6 +28,7 @@ to a caller:
   that looks like a perfectly good number.
 
 UPDATES
+2026-10-24  The sheets and tables linked by `Document._ownersLink`, for PYB-259.
 2026-10-22  The locale's currency symbols and placement are read, for PYB-220.
 2026-08-31  Written for #1: document, sheets, tables and cell values.
 2026-09-01  The package read here travels with the document, for #2.
@@ -131,12 +132,7 @@ def readDocument(package: NumbersPackage, source: Path) -> Document:
         document.sheets.append(
             readSheet(index, reference.identifier, source, identities)
         )
-    # Linked after the sheets are in, so a cell can name another table without the
-    # caller passing the names, and so `Table.document` is never half a document.
-    for sheet in document.sheets:
-        sheet.document = document
-        for table in sheet.tables:
-            table.document = document
+    document._ownersLink()
     return document
 
 

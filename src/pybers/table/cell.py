@@ -7,6 +7,7 @@ text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
 2026-10-24  The unread `style` scaffold removed, for PYB-259.
+2026-10-24  `valueCached`, whether a formula's value is the cached one, for PYB-259.
 2026-10-22  A reference beyond its table's grid shows as `#REF!`, and a table on
             the formula's own sheet is named bare, as Numbers shows both, for PYB-255.
 2026-10-22  `kind` and `presentation` replace `description`, and a control the
@@ -299,6 +300,11 @@ class Cell:
     def value(self, value: CellValue | int | datetime.date) -> None:
         """Set this cell's value whatever it held, refusing a `float`."""
         self._valueChange(value)
+
+    @property
+    def valueCached(self) -> bool:
+        """Report whether `value` is the one Numbers last cached for a formula."""
+        return self.formula is not None
 
     @property
     def timeZone(self) -> datetime.tzinfo:

@@ -10,6 +10,8 @@ named outright uses its own parser and refuses text that parser cannot read.
 printed by the command line is written again as the same value and kind.
 
 UPDATES
+2026-10-24  A duration read from ISO 8601 as well, as the JSON form writes it, for
+            PYB-259.
 2026-10-22  Reads and prints a currency amount, `1234.5 EUR`, for PYB-220.
 2026-10-20  A date, a duration and a boolean read from text, and each value
             written as the text it reads from, for PYB-144.
@@ -32,6 +34,7 @@ from decimal import Decimal, InvalidOperation
 
 from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
 from pybers.errors import WriteError
+from pybers.interchange._leaves import parseIsoDuration
 from pybers.table.cell import CellValue
 from pybers.table.kinds import CellKind
 
@@ -109,7 +112,13 @@ def toMicroseconds(amount: str, unit: int) -> int:
 
 
 def parseDuration(text: str) -> datetime.timedelta:
-    """Return the duration units name, as Numbers writes them: `1h 30m`, `-2d 4h`."""
+    """Return the duration units name, `1h 30m` or `-2d 4h`, or ISO 8601, `PT1H30M`.
+
+    ISO 8601 is how the JSON form writes a duration, so what `--format json` prints
+    is written back as the same duration rather than as text.
+    """
+    if text.strip().lstrip("-").startswith("P"):
+        return parseIsoDuration(text)
     found = durationWhole.fullmatch(text.strip())
     if found is None:
         raise ValueError(text)

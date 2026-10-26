@@ -23,6 +23,9 @@ golden_confirm.py    confirm a golden in running Numbers and write a report of w
                      Numbers shows, through a helper app that holds the permissions
                      so Terminal holds none. Backs `/golden-confirm`, and nothing in
                      the preflight, CI or the suite runs it
+jsonform_schema.py   generate the JSON Schema of pybers' JSON form from the model.
+                     Writes src/pybers/interchange/schema.json, which a test holds
+                     to the model
 merge_readiness.py   gather a branch's facts, check a pull request, and post one
                      verdict as a comment. `collect` runs on the branch with no
                      write access, and `report` runs this repository's code over
