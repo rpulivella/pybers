@@ -78,7 +78,7 @@ Each command answers to one public call, and the call does the work.
 
 ## Writing a cell
 
-A value's kind follows its Python type, as the table above lists. A currency amount is a `CurrencyAmount`, a `Decimal` amount with the ISO 4217 code of its currency, `CurrencyAmount(Decimal("1250.00"), "EUR")`, which adds, subtracts and compares only with an amount in the same currency. A number written into a currency cell keeps that cell's currency, as typing into one in Numbers does, and `pybers.currencies` lists the 37 currencies Numbers offers. A currency's symbol and where it sits come from the document's own locale, `document.currencySymbolFind("EUR")` and `document.currencyPattern`, never from a table pybers keeps. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone pybers is running in.
+A value's kind follows its Python type, as the table above lists. A currency amount is a `CurrencyAmount`, a `Decimal` amount with the ISO 4217 code of its currency, `CurrencyAmount(Decimal("1250.00"), "EUR")`, which adds, subtracts and compares only with an amount in the same currency. A number written into a currency cell keeps that cell's currency, as typing into one in Numbers does, and `pybers.currencies` lists the 37 currencies Numbers offers. A currency's symbol and where it sits come from the document's own locale, `document.currencySymbolFind("EUR")` and `document.currencyPattern`,, never from a table pybers keeps. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone pybers is running in.
 
 - **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does, and loses any control the old value had.
 - **A value write never fails because of the cell's format.** A value of the cell's kind keeps its format, and keeps its control while the control can show it; a control that cannot, such as a slider given a number outside its range, is dropped with its format.
@@ -88,6 +88,10 @@ A value's kind follows its Python type, as the table above lists. A currency amo
 - **A table's structure is readable**: each column's kind and format, and the cells that differ from them.
 
 The reasoning is in `decisions.md`, under writing values and formats.
+
+## The JSON form
+
+`pybers.formatJsonForm(subject)` returns a document, a sheet, a table, a table narrowed to one range, or a cell as JSON text, and `pybers.parseJsonForm(text)` reads it back into an equal model. It is the one serializer, so a command's `--format json` and a script's output are the same text, and any other value a call returns, a `Check` or a `CellChange`, is written by the same rules. Every number is a JSON number with its exact digits, read back exactly with `json.loads(text, parse_float=Decimal, parse_int=Decimal)`. The rule each value follows is in `decisions.md`, and `pybers/interchange/schema.json` describes the form.
 
 ## What is stored
 
