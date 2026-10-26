@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-259] Define the JSON form of a document
 - [PYB-255] Make goldens label their contents and generate their checks
 - [PYB-220] Give currency one home shared by formats and formulas
 - [PYB-249] Fail every phrase the writing rules ban
