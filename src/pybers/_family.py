@@ -3,12 +3,16 @@
 A closed family of frozen dataclasses: an abstract base and the union a `match` uses.
 
 The base gives every member its behavior, and the union is what mypy checks a `match`
-against for exhaustiveness. `checkFamily` runs once at import, so a member that is not
-a frozen, slotted dataclass, or that the union forgets, stops the import.
+against for exhaustiveness. Each member names itself by a class attribute the base
+declares, its discriminator, which the JSON form writes beside its fields.
+`checkFamily` runs once at import, so a member that is not a frozen, slotted
+dataclass, that the union forgets, or whose discriminator is missing or repeated,
+stops the import.
 
 Private. Infrastructure the model families share.
 
 UPDATES
+2026-10-24  A family names its members by a discriminator, for PYB-259.
 2026-10-22  Written for PYB-255.
 """
 from __future__ import annotations
@@ -21,7 +25,11 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/22"
 
+from enum import StrEnum
 from typing import TypeAliasType, get_args
+
+# Each family's base and the attribute its members name themselves by.
+familyDiscriminators: dict[type[FamilyMember], str] = {}
 
 
 class FamilyMember:
@@ -42,7 +50,9 @@ class FamilyMember:
             )
 
 
-def checkFamily(base: type[FamilyMember], union: TypeAliasType) -> None:
+def checkFamily(
+    base: type[FamilyMember], union: TypeAliasType, discriminator: str
+) -> None:
     """Refuse a family whose members and union disagree, or whose member is mutable."""
     members = get_args(union.__value__) or (union.__value__,)
     # By name, since `slots=True` leaves the class it replaced among the subclasses.
@@ -57,6 +67,22 @@ def checkFamily(base: type[FamilyMember], union: TypeAliasType) -> None:
         slotted = "__slots__" in vars(member)
         if parameters is None or not parameters.frozen or not slotted:
             raise TypeError(f"{member.__name__} is not a frozen, slotted dataclass")
+    names = [getattr(member, discriminator, None) for member in members]
+    if not all(isinstance(name, StrEnum) for name in names):
+        raise TypeError(f"Every member of {union.__name__} must set {discriminator}")
+    if len(set(names)) != len(names):
+        raise TypeError(f"Two members of {union.__name__} share a {discriminator}")
+    familyDiscriminators[base] = discriminator
 
 
-__all__ = ["FamilyMember", "checkFamily"]
+def findFamilyDiscriminator(member: type) -> str | None:
+    """Return the attribute a family member names itself by, or None for no member."""
+    for base, discriminator in familyDiscriminators.items():
+        if issubclass(member, base):
+            return discriminator
+    return None
+
+
+__all__ = [
+    "FamilyMember", "checkFamily", "familyDiscriminators", "findFamilyDiscriminator",
+]

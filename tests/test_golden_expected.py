@@ -6,6 +6,7 @@ A reading here is a dictionary of the shape the helper returns, so nothing drive
 Numbers.
 
 UPDATES
+2026-10-24  The machine form is the golden's JSON form, for PYB-259.
 2026-10-22  Written for PYB-255.
 """
 from __future__ import annotations
@@ -18,7 +19,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/22"
 
-import tomllib
+import json
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -33,7 +34,7 @@ from tools.local.lib.golden_expected import (
     ExpectedValues,
     buildExpectedValues,
     writeExpectations,
-    writeExpectationsToml,
+    writeExpectationsJson,
 )
 
 goldenDirectory: Path = report.goldenDirectory
@@ -108,15 +109,19 @@ def testASliderIsExpectedWithItsRange() -> None:
     assert cell.control == CellControlSlider(Decimal(1), Decimal(100), Decimal(1))
 
 
-def testTheMachineFormParsesAsTomlWithEveryCell(tmp_path: Path) -> None:
+def testTheMachineFormIsTheGoldensJsonForm(tmp_path: Path) -> None:
     expected = buildGolden("11-controls-written-by-pybers")
-    written = tomllib.loads(writeExpectationsToml(expected, tmp_path).read_text())
-    cells = written["table"][0]["cell"]
-    assert len(cells) == len(expected.tables[0].cells)
-    slider = next(cell for cell in cells if cell["cell"] == "C1")
-    assert slider["control"] == {
-        "kind": "slider", "minimum": "1", "maximum": "100", "increment": "1"
-    }
+    written = writeExpectationsJson(expected, tmp_path).read_text()
+    document = pybers.open(goldenDirectory / "11-controls-written-by-pybers.numbers")
+    assert written == pybers.formatJsonForm(document) + "\n"
+
+
+def testAControlIsExpectedByTheNamesItsJsonFormGives() -> None:
+    cell = findCell(buildGolden("11-controls-written-by-pybers"), "C1")
+    assert cell.control is not None
+    tree = json.loads(pybers.formatJsonForm(cell.control), parse_int=Decimal)
+    assert tree == {"controlType": "slider", "minimum": Decimal(1),
+                    "maximum": Decimal(100), "increment": Decimal(1)}
 
 
 def testTheExpectationsFlattenACellAndFoldItsLabel(tmp_path: Path) -> None:

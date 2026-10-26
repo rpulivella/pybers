@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """\
-What a golden should show in Numbers, generated from the golden on every run.
+What a golden should show in Numbers, generated from its JSON form on every run.
 
-Every filled cell of every table is read through pybers, as a cell's JSON form would
-hold it: its kind, value, formula, format and control. Numbers is the independent
-reader, so a check compares the two. A measurement labels each value in row 1 with
-text in row 2, and such a label is shown beside the cell it describes.
+The golden is written as its JSON form and read back, and every filled cell of every
+table of what reads back is expected: its kind, value, formula, format and control.
+What the JSON form loses therefore fails the check rather than passing unseen. Numbers
+is the independent reader, so a check compares the two. A measurement labels each
+value in row 1 with text in row 2, and such a label is shown beside the cell it
+describes.
 
 UPDATES
+2026-10-24  Generated from the golden's JSON form, its machine form that form
+            itself, and every value and control written by its rules, for PYB-259.
 2026-10-22  Written for PYB-255.
 """
 from __future__ import annotations
@@ -22,21 +26,13 @@ __date__ = "2026/10/22"
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import assert_never
 
 import pybers
 from pybers import (
     UNDETERMINED,
     CellControl,
-    CellControlCheckbox,
-    CellControlPopUpMenu,
-    CellControlSlider,
-    CellControlStarRating,
-    CellControlStepper,
-    CellControlUnknown,
     CellFormat,
     CellKind,
     CurrencyAmount,
@@ -76,10 +72,11 @@ class ExpectedTable:
 
 @dataclass(frozen=True, slots=True)
 class ExpectedValues:
-    """Everything a golden should show, table by table."""
+    """Everything a golden should show, table by table, and its JSON form."""
 
     golden: Path
     tables: tuple[ExpectedTable, ...]
+    jsonForm: str
 
 
 def formatMenuCurrency(code: str, document: pybers.Document) -> str:
@@ -128,16 +125,19 @@ def readExpectedCell(
 
 
 def buildExpectedValues(golden: Path) -> ExpectedValues:
-    """Return what every table of a golden should show, read from the golden."""
+    """Return what every table of a golden should show, read through its JSON form."""
     document = pybers.open(golden)
+    jsonForm = pybers.formatJsonForm(document)
+    readBack = pybers.parseJsonForm(jsonForm)
+    assert isinstance(readBack, pybers.Document)
     tables = []
-    for sheet in document.sheets:
+    for sheet in readBack.sheets:
         for table in sheet.tables:
             labels = findLabels(table)
             cells = tuple(
                 readExpectedCell(cell, document, labels.get(address))
                 for address, cell in sorted(
-                    table.cells.items(), key=lambda each: (each[0].row, each[0].col))
+                    table.cells.items(), key=lambda each: each[0].asRowColumn())
                 if cell.value is not None or cell.formula is not None
             )
             tables.append(ExpectedTable(
@@ -146,48 +146,31 @@ def buildExpectedValues(golden: Path) -> ExpectedValues:
                 merges=tuple(str(merge.extent) for merge in table.mergeRanges),
                 cells=cells,
             ))
-    return ExpectedValues(golden, tuple(tables))
+    return ExpectedValues(golden, tuple(tables), jsonForm)
+
+
+def readJsonTree(value: object) -> object:
+    """Return a value as the JSON form writes it, each number a Decimal."""
+    return json.loads(
+        pybers.formatJsonForm(value), parse_float=Decimal, parse_int=Decimal
+    )
 
 
 def formatValue(value: pybers.CellValue) -> str:
-    """Return a value as a TOML literal, a duration as its seconds."""
-    match value:
-        case bool():
-            return "true" if value else "false"
-        case CurrencyAmount():
-            return str(value.amount)
-        case Decimal():
-            return str(value)
-        case str():
-            return json.dumps(value, ensure_ascii=False)
-        case datetime():
-            return value.isoformat()
-        case timedelta():
-            return str(Decimal(str(value.total_seconds())))
-        case _:
-            return json.dumps(str(value), ensure_ascii=False)
+    """Return a value as the JSON form writes it, a currency amount by its amount."""
+    shown = value.amount if isinstance(value, CurrencyAmount) else value
+    return pybers.formatJsonForm(shown)
 
 
 def listControlFields(control: CellControl) -> list[tuple[str, str]]:
-    """Return a control's kind and settings, as a cell's JSON form names them."""
-    match control:
-        case CellControlCheckbox():
-            return [("kind", "checkbox")]
-        case CellControlStarRating():
-            return [("kind", "star rating")]
-        case CellControlSlider(minimum, maximum, increment):
-            return [("kind", "slider"), ("minimum", str(minimum)),
-                    ("maximum", str(maximum)), ("increment", str(increment))]
-        case CellControlStepper(minimum, maximum, increment):
-            return [("kind", "stepper"), ("minimum", str(minimum)),
-                    ("maximum", str(maximum)), ("increment", str(increment))]
-        case CellControlPopUpMenu(items, startsWithFirstItem):
-            return [("kind", "pop-up menu"), ("items", ", ".join(items)),
-                    ("starts with", "first item" if startsWithFirstItem else "blank")]
-        case CellControlUnknown(interactionType):
-            return [("kind", f"unknown interaction type {interactionType}")]
-        case _:
-            assert_never(control)
+    """Return a control's type and settings, by the names its JSON form gives them."""
+    tree = readJsonTree(control)
+    assert isinstance(tree, dict)
+    return [
+        (name, ", ".join(map(str, setting)) if isinstance(setting, list)
+         else str(setting).lower() if isinstance(setting, bool) else str(setting))
+        for name, setting in tree.items()
+    ]
 
 
 def formatFormat(cell: ExpectedCell) -> str:
@@ -196,35 +179,10 @@ def formatFormat(cell: ExpectedCell) -> str:
     return f"{family}, {'chosen' if cell.formatChosen else 'automatic'}"
 
 
-def writeExpectationsToml(expected: ExpectedValues, into: Path) -> Path:
-    """Write the expected values as TOML, the machine form of the Markdown."""
-    lines = [f"# What {expected.golden.name} should show, generated from it by",
-             "# `buildExpectedValues` in `tools/local/lib/golden_expected.py`."]
-    for table in expected.tables:
-        merges = ", ".join(json.dumps(merge) for merge in table.merges)
-        lines += ["", "[[table]]", f"sheet = {json.dumps(table.sheet)}",
-                  f"table = {json.dumps(table.table)}", f"rows = {table.rows}",
-                  f"columns = {table.columns}", f"merges = [{merges}]"]
-        for cell in table.cells:
-            lines += ["", "[[table.cell]]", f"cell = {json.dumps(cell.cell)}",
-                      f'kind = "{cell.kind.value}"']
-            if cell.value is not None:
-                lines.append(f"value = {formatValue(cell.value)}")
-            if isinstance(cell.value, CurrencyAmount):
-                lines.append(f'currency = "{cell.value.currency}"')
-            if cell.formula is not None:
-                lines.append(f"formula = {json.dumps(cell.formula)}")
-            if cell.format is not None:
-                lines.append(f'format = "{cell.format.value}"')
-            lines.append(f"formatChosen = {'true' if cell.formatChosen else 'false'}")
-            if cell.control is not None:
-                fields = ", ".join(f"{json.dumps(name)} = {json.dumps(setting)}"
-                                   for name, setting in listControlFields(cell.control))
-                lines.append(f"control = {{ {fields} }}")
-            if cell.label is not None:
-                lines.append(f"label = {json.dumps(cell.label)}")
-    path = into / "expectations.toml"
-    path.write_text("\n".join(lines) + "\n")
+def writeExpectationsJson(expected: ExpectedValues, into: Path) -> Path:
+    """Write the machine form of the expectations, which is the golden's JSON form."""
+    path = into / "expectations.json"
+    path.write_text(expected.jsonForm + "\n")
     return path
 
 
@@ -242,8 +200,7 @@ def listCellBullets(cell: ExpectedCell) -> list[str]:
         bullets.append(f"- currency: {cell.currencyMenu}")
     if cell.control is not None:
         for name, setting in listControlFields(cell.control):
-            named = "control" if name == "kind" else f"control {name}"
-            bullets.append(f"- {named}: {setting}")
+            bullets.append(f"- {name}: {setting}")
     return bullets
 
 
@@ -281,5 +238,5 @@ __all__ = [
     "formatValue",
     "listControlFields",
     "writeExpectations",
-    "writeExpectationsToml",
+    "writeExpectationsJson",
 ]

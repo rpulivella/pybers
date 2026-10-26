@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-24  The unread `style` scaffold removed, for PYB-259.
+2026-10-24  `valueCached`, whether a formula's value is the cached one, for PYB-259.
 2026-10-22  A reference beyond its table's grid shows as `#REF!`, and a table on
             the formula's own sheet is named bare, as Numbers shows both, for PYB-255.
 2026-10-22  `kind` and `presentation` replace `description`, and a control the
@@ -47,7 +49,6 @@ from pybers.errors import WriteError
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
-from pybers.style import Style
 from pybers.table.kinds import (
     CellFormat,
     CellKind,
@@ -197,7 +198,7 @@ class CellChange:
 
 @dataclass(slots=True)
 class Cell:
-    """One cell's value, optional formula, and style, at an address.
+    """One cell's value and optional formula, at an address.
 
     `value` is the result Numbers last cached, never derived from `formula`, so the
     two disagree until it recalculates. `kind` and `presentation` say what the
@@ -207,7 +208,6 @@ class Cell:
     address: CellAddress
     _value: CellValue = field(default=None, kw_only=True)
     formula: Formula | None = None
-    style: Style = field(default_factory=Style)
     # The record as read, copied or saved, its chosen format the one direct edit.
     _stored: CellStorage = field(default=emptyStorage, repr=False, kw_only=True)
     # The value that record holds, so an edit since is told from it.
@@ -300,6 +300,11 @@ class Cell:
     def value(self, value: CellValue | int | datetime.date) -> None:
         """Set this cell's value whatever it held, refusing a `float`."""
         self._valueChange(value)
+
+    @property
+    def valueCached(self) -> bool:
+        """Report whether `value` is the one Numbers last cached for a formula."""
+        return self.formula is not None
 
     @property
     def timeZone(self) -> datetime.tzinfo:

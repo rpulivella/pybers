@@ -3,6 +3,7 @@
 A cell's printed form: its public fields, a private field shown under its public name.
 
 UPDATES
+2026-10-24  The cell's unread style no longer printed or tested, for PYB-259.
 2026-10-20  Written for PYB-225.
 """
 from __future__ import annotations
@@ -39,11 +40,10 @@ def testAPrintedCellShowsNoPrivateField() -> None:
     assert not privateField.search(repr(buildCell()))
 
 
-def testAPrintedCellShowsItsAddressFormulaAndStyle() -> None:
+def testAPrintedCellShowsItsAddressAndFormula() -> None:
     printed = repr(buildCell())
     assert "address=CellAddress(row=2, col=2)" in printed
     assert "formula=None" in printed
-    assert "style=Style(" in printed
 
 
 def testNoCellInADocumentPrintsAPrivateField() -> None:

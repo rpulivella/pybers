@@ -12,6 +12,7 @@ drag repeats the same way except where a column continues a series, the case
 `CONTINUE_SERIES` covers, in any one direction. See findings-03-structure.md.
 
 UPDATES
+2026-10-24  A filled cell copies no style, since a cell holds none yet, for PYB-259.
 2026-10-14  Checks a range against the grid through `bounds`, for PYB-193.
 2026-10-01  A filled cell copies its source's record description, for PYB-141.
 2026-09-30  `CONTINUE_SERIES` continues each column that begins a series, for
@@ -139,7 +140,6 @@ def copyCellContent(
     from pybers.table.cell import CellCopy
 
     target._value = source._value
-    target.style = source.style
     target._stored = source._stored
     target._storedValue = source._storedValue
     formula, conditions = source.formula, source._conditions

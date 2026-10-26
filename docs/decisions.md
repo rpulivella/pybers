@@ -314,6 +314,78 @@ pybers borrows from CSS elsewhere too: a created table starts from a reset in th
 a CSS reset, and an item on a sheet is placed by the anchor names of `background-position`.
 The selector type is built in PYB-223.
 
+## The JSON form, decided 2026-10-24
+
+One JSON structure for a document and each part of it, which every tool reading or
+writing pybers' data agrees on, built in PYB-259. `pybers.formatJsonForm` writes it and
+`pybers.parseJsonForm` reads it back into an equal model. A model with unsaved edits
+reads back with the same form but compares unequal, since equality includes the stored
+record a save replaces, and the form carries what a cell shows rather than that record.
+It is the only serializer pybers holds: `--format json` in every command, the golden
+confirmations and any script reach it, so no two of them can disagree.
+`src/pybers/interchange/schema.json` describes it, generated from the model.
+
+**A key is the model's own public name.** `Cell` writes `value`, `kind`, `formulaText`,
+`valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, the order
+`pybers show` prints them in once PYB-260 builds it. What describes where a value sits rather than what it is,
+such as `Cell.table` or `Cell.reference`, is left out, and so is the session's time
+zone, which the file has nowhere to keep. A document's language and region joins the
+form as its locale identifier when PYB-272 models it, rather than as the currency
+symbols pybers reads from it today. Each feature owns the form of its own types,
+beside its archive halves, and the mechanism in `pybers/interchange` knows no feature.
+
+**Each value follows one rule.**
+
+| kind | value |
+|---|---|
+| number | a bare JSON number with its exact digits, read back with `parse_float=Decimal` and `parse_int=Decimal`, never a string and never a float |
+| currency | `{"amount": …, "currency": "CHF"}`, the amount as a number is |
+| text, rich text | its plain text |
+| date and time | ISO 8601 with no offset, `2026-10-24T13:45:00`, since a cell stores wall-clock time |
+| duration | ISO 8601 in days, hours, minutes and seconds, `P1DT2H30M`, since a month has no fixed length |
+| boolean | `true` or `false` |
+| empty, error, unknown | `null`, an unknown cell carrying its `unrecognizedTypeCode` |
+
+A formula's `value` is the one Numbers last cached, and `valueCached` says so. It is
+read-only, so a reader may leave it out, and a reader refuses one contradicting the
+formula. A formula given no value is held uncalculated. A sentinel is its name, an
+address its text, and a member of a closed family carries its discriminator first, a
+public property of the family's base named for its subject: `controlType` for a control,
+and `formatFamily` for the format family PYB-145 builds.
+
+**A formula is its text, and its nodes too where the text loses them.** `formulaText`
+is what Numbers displays. Where it would not parse back to the stored nodes, such as a
+formula holding typed whitespace or a broken reference, `formula` carries the nodes by
+their type codes, and otherwise `"WITHHELD"`. A reader uses the nodes only when they show
+as the text, and refuses the cell otherwise.
+
+**A part carries its document's table directory.** A sheet, table, range or cell names
+every table of its document, with its sheet and size, and reading the part back rebuilds
+the rest as empty stand-ins. Whether Numbers writes a table's name bare or with its sheet
+depends on every table in the document, so a part read alone parses its formulas exactly
+as the whole document would.
+
+**`formatChosen` stays until the format family replaces it.** The chosen bit and a
+format's settings are independent in the file, and an Automatic format holds settings of
+its own, so a bare `automatic` would lose both. PYB-145 settles a `CellFormatAutomatic`
+that carries them.
+
+**Styles, rich text and drawables follow the same rules, built by their own tickets.**
+A cell carries `cellStyle`, the properties set on the cell alone, since Numbers never
+names a cell style, and `paragraphStyle`, the named style it follows and the variation
+set on the cell alone. The document carries its named styles once, in `styles`, and a
+cell names the one it uses. Rich text carries each paragraph with its paragraph style and
+each run with its character style, its offsets counted in Python characters, converted
+from the UTF-16 code units the file stores where pybers reads and writes them. A text box
+carries its text by the same rules, and a sheet its `drawables` in z-order. A cell's
+borders are `borders`, and a table's lines and banding its `tableStyle`. The form never
+carries a style, text or drawable pybers did not read.
+
+**Any change to the form's shape is a new version.** `jsonFormVersion` opens every form
+and is a whole number. Adding, removing or renaming a key, or changing the rule a value
+follows, changes the generated schema, which a test holds to the committed one, and moves
+the version by one. A reader refuses any version but its own.
+
 ---
 
 ## Deliberately not here

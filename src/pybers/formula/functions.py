@@ -120,9 +120,8 @@ class NumbersFunction:
         return self.unbounded or argumentCount <= self.maximumArguments
 
 
-# Read-only, because one shared mapping handed out mutable is the same defect
-# the frozen `Style` contract exists to prevent: an edit at one call site would
-# silently rename a function everywhere.
+# Read-only, because one shared mapping handed out mutable means an edit at one
+# call site would silently rename a function everywhere.
 functionsByName: Final[frozendict[str, NumbersFunction]] = frozendict({
     name: NumbersFunction(
         name, index, minimum, maximum, repeating, FunctionAvailability(availability)

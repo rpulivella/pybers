@@ -23,6 +23,9 @@ golden_confirm.py    confirm a golden in running Numbers and write a report of w
                      Numbers shows, through a helper app that holds the permissions
                      so Terminal holds none. Backs `/golden-confirm`, and nothing in
                      the preflight, CI or the suite runs it
+jsonform_schema.py   generate the JSON Schema of pybers' JSON form from the model.
+                     Writes src/pybers/interchange/schema.json, which a test holds
+                     to the model
 merge_readiness.py   gather a branch's facts, check a pull request, and post one
                      verdict as a comment. `collect` runs on the branch with no
                      write access, and `report` runs this repository's code over
@@ -54,9 +57,9 @@ a newer Numbers reviewable rather than a silent replacement.
 
 `golden_confirm.py run <golden>` writes its report into `workarea/golden-confirm/<ticket>/<golden>/`,
 beside a copy of the golden that is safe to open and save. Its expected values are
-generated from the golden by `lib/golden_expected.py` on every run, every filled cell of
-every table as pybers reads it, and written as `expectations.md`, to read beside the
-copy, and `expectations.toml`, their machine form.
+generated from the golden's JSON form by `lib/golden_expected.py` on every run, every
+filled cell of every table as pybers reads it back from that form, and written as
+`expectations.md`, to read beside the copy, and `expectations.json`, the JSON form itself.
 
 Every cell of every table is read through AppleScript for its value, formula and format,
 and a cell the expectations leave out must be empty. A currency or a control is read in

@@ -1,0 +1,1160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pybers JSON form",
+  "description": "A Numbers document, or a sheet, table, range or cell of one, as pybers writes and reads it. See docs/decisions.md for the rule each value follows.",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/DocumentJsonForm"
+    },
+    {
+      "$ref": "#/$defs/SheetJsonForm"
+    },
+    {
+      "$ref": "#/$defs/TableJsonForm"
+    },
+    {
+      "$ref": "#/$defs/RangeJsonForm"
+    },
+    {
+      "$ref": "#/$defs/CellJsonForm"
+    }
+  ],
+  "$defs": {
+    "CellControlCheckbox": {
+      "type": "object",
+      "description": "A checkbox, over a true or false value.",
+      "properties": {
+        "controlType": {
+          "const": "checkbox"
+        }
+      },
+      "required": [
+        "controlType"
+      ],
+      "additionalProperties": false
+    },
+    "CellControlPopUpMenu": {
+      "type": "object",
+      "description": "A pop-up menu of text items, which starts with its first item or blank.",
+      "properties": {
+        "controlType": {
+          "const": "pop-up-menu"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startsWithFirstItem": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "controlType",
+        "items",
+        "startsWithFirstItem"
+      ],
+      "additionalProperties": false
+    },
+    "CellControlSlider": {
+      "type": "object",
+      "description": "A slider, from its minimum to its maximum in steps of its increment.",
+      "properties": {
+        "controlType": {
+          "const": "slider"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "increment": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "controlType",
+        "minimum",
+        "maximum",
+        "increment"
+      ],
+      "additionalProperties": false
+    },
+    "CellControlStarRating": {
+      "type": "object",
+      "description": "A star rating, over a number from 0 to 5.",
+      "properties": {
+        "controlType": {
+          "const": "star-rating"
+        }
+      },
+      "required": [
+        "controlType"
+      ],
+      "additionalProperties": false
+    },
+    "CellControlStepper": {
+      "type": "object",
+      "description": "A stepper, from its minimum to its maximum in steps of its increment.",
+      "properties": {
+        "controlType": {
+          "const": "stepper"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "increment": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "controlType",
+        "minimum",
+        "maximum",
+        "increment"
+      ],
+      "additionalProperties": false
+    },
+    "CellControlUnknown": {
+      "type": "object",
+      "description": "A control pybers has not measured, carried through by its interaction type.",
+      "properties": {
+        "controlType": {
+          "const": "unknown"
+        },
+        "interactionType": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "controlType",
+        "interactionType"
+      ],
+      "additionalProperties": false
+    },
+    "CellForm": {
+      "type": "object",
+      "description": "One cell as the JSON form holds it, in the order PYB-260's `pybers show` uses.",
+      "properties": {
+        "address": {
+          "type": "string",
+          "examples": [
+            "B3"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/CurrencyAmount"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?$"
+            },
+            {
+              "type": "string",
+              "pattern": "^(-)?P(?!$)(?:(\\d+)D)?(?:T(?=\\d)(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)(?:\\.(\\d{1,6}))?S)?)?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/CellKind"
+        },
+        "formulaText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valueCached": {
+          "type": "boolean",
+          "readOnly": true
+        },
+        "presentation": {
+          "$ref": "#/$defs/CellPresentation"
+        },
+        "unrecognizedTypeCode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "formula": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Formula"
+            },
+            {
+              "const": "WITHHELD"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "address",
+        "value",
+        "kind",
+        "formulaText",
+        "presentation"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "empty"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "number"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "currency"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/CurrencyAmount"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "rich-text"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "date-time"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "duration"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^(-)?P(?!$)(?:(\\d+)D)?(?:T(?=\\d)(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)(?:\\.(\\d{1,6}))?S)?)?$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "boolean"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "error"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CellFormat": {
+      "enum": [
+        "number",
+        "boolean",
+        "currency",
+        "percent",
+        "scientific",
+        "fraction",
+        "numeral-system",
+        "custom-number",
+        "text",
+        "date-time",
+        "duration",
+        "checkbox",
+        "star-rating",
+        "unknown"
+      ]
+    },
+    "CellJsonForm": {
+      "type": "object",
+      "description": "One cell, inside the table holding it.",
+      "properties": {
+        "jsonFormVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "sheetName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cell": {
+          "type": "string",
+          "examples": [
+            "B3"
+          ]
+        },
+        "table": {
+          "$ref": "#/$defs/TableForm"
+        },
+        "documentTables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableEntry"
+          }
+        }
+      },
+      "required": [
+        "jsonFormVersion",
+        "sheetName",
+        "cell",
+        "table",
+        "documentTables"
+      ],
+      "additionalProperties": false
+    },
+    "CellKind": {
+      "enum": [
+        "empty",
+        "number",
+        "currency",
+        "text",
+        "rich-text",
+        "date-time",
+        "duration",
+        "boolean",
+        "error",
+        "unknown"
+      ]
+    },
+    "CellPresentation": {
+      "type": "object",
+      "description": "How a cell shows its value: its format, whether a person chose it, its control.",
+      "properties": {
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellFormat"
+            },
+            {
+              "const": "UNDETERMINED"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "formatChosen": {
+          "type": "boolean"
+        },
+        "control": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellControlCheckbox"
+            },
+            {
+              "$ref": "#/$defs/CellControlStarRating"
+            },
+            {
+              "$ref": "#/$defs/CellControlSlider"
+            },
+            {
+              "$ref": "#/$defs/CellControlStepper"
+            },
+            {
+              "$ref": "#/$defs/CellControlPopUpMenu"
+            },
+            {
+              "$ref": "#/$defs/CellControlUnknown"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "formatChosen"
+      ],
+      "additionalProperties": false
+    },
+    "Coordinate": {
+      "type": "object",
+      "description": "One axis of a reference, and the only thing that knows what its number is.",
+      "properties": {
+        "value": {
+          "type": "integer"
+        },
+        "absolute": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "CurrencyAmount": {
+      "type": "object",
+      "description": "An exact amount in one currency, which adds and compares only with its own.",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "DocumentForm": {
+      "type": "object",
+      "description": "One document as the JSON form holds it.",
+      "properties": {
+        "sheets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SheetForm"
+          }
+        }
+      },
+      "required": [
+        "sheets"
+      ],
+      "additionalProperties": false
+    },
+    "DocumentJsonForm": {
+      "type": "object",
+      "description": "A whole document.",
+      "properties": {
+        "jsonFormVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "document": {
+          "$ref": "#/$defs/DocumentForm"
+        }
+      },
+      "required": [
+        "jsonFormVersion",
+        "document"
+      ],
+      "additionalProperties": false
+    },
+    "Formula": {
+      "type": "object",
+      "description": "One cell's formula, as the postfix node array the file stores.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FormulaNode"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FormulaBinding": {
+      "type": "object",
+      "description": "The name `LET` gives a value, and the number every use of it carries.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": "integer"
+        },
+        "continuation": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "symbol"
+      ],
+      "additionalProperties": false
+    },
+    "FormulaFunctionCall": {
+      "type": "object",
+      "description": "A call to one of Apple's built-in functions, stored as its index.",
+      "properties": {
+        "index": {
+          "type": "integer"
+        },
+        "argumentCount": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "argumentCount"
+      ],
+      "additionalProperties": false
+    },
+    "FormulaGroup": {
+      "type": "object",
+      "description": "A bracketed sub-expression, and how many values its brackets enclose.",
+      "properties": {
+        "argumentCount": {
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FormulaLambda": {
+      "type": "object",
+      "description": "A `LAMBDA`'s parameter names, and the number the first of them takes.",
+      "properties": {
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "firstSymbol": {
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FormulaNode": {
+      "type": "object",
+      "description": "One node of a formula, in the postfix order the file stores.",
+      "properties": {
+        "nodeType": {
+          "type": "integer"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/FormulaFunctionCall"
+            },
+            {
+              "$ref": "#/$defs/FormulaGroup"
+            },
+            {
+              "$ref": "#/$defs/FormulaUnknownCall"
+            },
+            {
+              "$ref": "#/$defs/FormulaReference"
+            },
+            {
+              "$ref": "#/$defs/FormulaRange"
+            },
+            {
+              "$ref": "#/$defs/FormulaBinding"
+            },
+            {
+              "$ref": "#/$defs/FormulaVariable"
+            },
+            {
+              "$ref": "#/$defs/FormulaLambda"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raw": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      },
+      "required": [
+        "nodeType"
+      ],
+      "additionalProperties": false
+    },
+    "FormulaRange": {
+      "type": "object",
+      "description": "A rectangle of cells named from inside a formula.",
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tableId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FormulaReference": {
+      "type": "object",
+      "description": "A reference to one cell from inside a formula.",
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Coordinate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "row": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Coordinate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tableId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "broken": {
+          "type": "boolean"
+        },
+        "loss": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FormulaReferenceLoss"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FormulaReferenceLoss": {
+      "type": "object",
+      "description": "The rows and columns a broken reference named before they were removed.",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "range": {
+          "type": "boolean"
+        },
+        "columnsAbsolute": {
+          "type": "boolean"
+        },
+        "rowsAbsolute": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FormulaUnknownCall": {
+      "type": "object",
+      "description": "A function Numbers itself could not resolve, which keeps its spelling.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "argumentCount": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "argumentCount"
+      ],
+      "additionalProperties": false
+    },
+    "FormulaVariable": {
+      "type": "object",
+      "description": "One use of a name a `LET` or a `LAMBDA` bound, stored as its number alone.",
+      "properties": {
+        "symbol": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "additionalProperties": false
+    },
+    "MergeRange": {
+      "type": "object",
+      "description": "A rectangular block of cells merged into one, anchored at its top-left cell.",
+      "properties": {
+        "extent": {
+          "type": "string",
+          "examples": [
+            "B3:D9"
+          ]
+        }
+      },
+      "required": [
+        "extent"
+      ],
+      "additionalProperties": false
+    },
+    "RangeJsonForm": {
+      "type": "object",
+      "description": "The cells of one range, inside the table holding them.",
+      "properties": {
+        "jsonFormVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "sheetName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "extent": {
+          "type": "string",
+          "examples": [
+            "B3:D9"
+          ]
+        },
+        "table": {
+          "$ref": "#/$defs/TableForm"
+        },
+        "documentTables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableEntry"
+          }
+        }
+      },
+      "required": [
+        "jsonFormVersion",
+        "sheetName",
+        "extent",
+        "table",
+        "documentTables"
+      ],
+      "additionalProperties": false
+    },
+    "SheetForm": {
+      "type": "object",
+      "description": "One sheet as the JSON form holds it, its tables in the order Numbers keeps.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableForm"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "tables"
+      ],
+      "additionalProperties": false
+    },
+    "SheetJsonForm": {
+      "type": "object",
+      "description": "One sheet and its tables.",
+      "properties": {
+        "jsonFormVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "sheet": {
+          "$ref": "#/$defs/SheetForm"
+        },
+        "documentTables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableEntry"
+          }
+        }
+      },
+      "required": [
+        "jsonFormVersion",
+        "sheet",
+        "documentTables"
+      ],
+      "additionalProperties": false
+    },
+    "Span": {
+      "type": "object",
+      "description": "One axis of a range: where it begins, where it ends, and whether it is fixed.",
+      "properties": {
+        "begin": {
+          "type": "integer"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "absolute": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "begin"
+      ],
+      "additionalProperties": false
+    },
+    "TableEntry": {
+      "type": "object",
+      "description": "One table of the document a part came from, as its formulas name and size it.",
+      "properties": {
+        "sheetPosition": {
+          "type": "integer"
+        },
+        "sheetName": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "identifier": {
+          "type": "string"
+        },
+        "rowCount": {
+          "type": "integer"
+        },
+        "colCount": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sheetPosition",
+        "sheetName",
+        "name",
+        "identifier",
+        "rowCount",
+        "colCount"
+      ],
+      "additionalProperties": false
+    },
+    "TableForm": {
+      "type": "object",
+      "description": "One table as the JSON form holds it, its cells in row order.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "identifier": {
+          "type": "string"
+        },
+        "rowCount": {
+          "type": "integer"
+        },
+        "colCount": {
+          "type": "integer"
+        },
+        "mergeRanges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MergeRange"
+          }
+        },
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CellForm"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "identifier",
+        "rowCount",
+        "colCount",
+        "mergeRanges",
+        "cells"
+      ],
+      "additionalProperties": false
+    },
+    "TableJsonForm": {
+      "type": "object",
+      "description": "One table, and the sheet it sits on.",
+      "properties": {
+        "jsonFormVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "sheetName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "table": {
+          "$ref": "#/$defs/TableForm"
+        },
+        "documentTables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableEntry"
+          }
+        }
+      },
+      "required": [
+        "jsonFormVersion",
+        "sheetName",
+        "table",
+        "documentTables"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

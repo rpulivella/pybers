@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""A sheet holds tables (row/column grids) and graphical objects (things that float on
-the sheet at an absolute position, text boxes, images, shapes) side by side, since
-Numbers places both on the same sheet independently. A document is a list of sheets.
+"""A sheet holds tables, and a document is a list of sheets.
 
 `Document` is the only handle a caller ever holds. It is what `pybers.open` returns,
 what every edit reaches through, and what `save` writes back. See CLAUDE.md, "Document
@@ -23,6 +21,9 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-24  The unread `graphicalObjects` scaffold removed, and the table naming
+            rule a function the JSON form shares, and `_ownersLink` the one
+            linking the reader and the JSON form share, for PYB-259.
 2026-10-22  `Sheet.tableIdentities`, the names a formula on one sheet uses,
             replacing `Document.tableIdentities`, for PYB-255.
 2026-10-22  A document reads its locale's currency symbols and placement, for
@@ -71,7 +72,6 @@ from pybers.addressing.reference import (
     tableNameSeparator,
     toCellReference,
 )
-from pybers.drawable import GraphicalObject
 from pybers.errors import PybersError
 from pybers.geometry import Position
 from pybers.table.cell import Cell, CellChange, toCellValue
@@ -177,13 +177,36 @@ def selectItem[NamedT: Named](
     )
 
 
+
+def findTableIdentities(
+    sheets: Sequence[Sheet], local: Sheet
+) -> frozendict[str, str]:
+    """Return each table's identity under every name a formula on `local` uses.
+
+    One owner for the naming rule, shared by `Sheet.tableIdentities` and by the JSON
+    form, which must know the names a reader of only part of a document will have.
+    """
+    seen: Counter[str] = Counter(
+        table.name for sheet in sheets for table in sheet.tables
+    )
+    names: dict[str, str] = {}
+    for sheet in sheets:
+        for table in sheet.tables:
+            if not table.identifier:
+                continue
+            names[f"{sheet.name}{tableNameSeparator}{table.name}"] = table.identifier
+            if seen[table.name] == 1:
+                names[table.name] = table.identifier
+    names |= {table.name: table.identifier for table in local.tables
+              if table.identifier}
+    return frozendict(names)
+
 @dataclass(slots=True)
 class Sheet:
-    """One sheet (tab) in a document: its tables and its floating graphical objects."""
+    """One sheet (tab) in a document, and its tables."""
 
     name: str
     tables: list[Table] = field(default_factory=list)
-    graphicalObjects: list[GraphicalObject] = field(default_factory=list)
     # The archive this sheet was read from or saved as, and None until it has one.
     # Excluded from equality and `repr` for the reason `Document._package` is.
     _identifier: int | None = field(default=None, repr=False, compare=False)
@@ -231,22 +254,7 @@ class Sheet:
         how Numbers shows `Table 1::A1` on Sheet 1 when Sheet 2 holds one too.
         """
         sheets = [self] if self.document is None else self.document.sheets
-        seen: Counter[str] = Counter(
-            table.name for sheet in sheets for table in sheet.tables
-        )
-        names: dict[str, str] = {}
-        for sheet in sheets:
-            for table in sheet.tables:
-                if not table.identifier:
-                    continue
-                names[f"{sheet.name}{tableNameSeparator}{table.name}"] = (
-                    table.identifier
-                )
-                if seen[table.name] == 1:
-                    names[table.name] = table.identifier
-        names |= {table.name: table.identifier for table in self.tables
-                  if table.identifier}
-        return frozendict(names)
+        return findTableIdentities(sheets, self)
 
     def tableAdd(
         self, name: str, rows: int, cols: int, position: Position | None = None
@@ -465,6 +473,17 @@ class Document:
                 f"No table in this document carries the identity {identity!r}."
             )
         return table
+
+    def _ownersLink(self) -> None:
+        """Point every sheet and table at this document, once all of them are in.
+
+        Linked only then, so a cell can name another table without the caller
+        passing the names, and so `Table.document` is never half a document.
+        """
+        for sheet in self.sheets:
+            sheet.document = self
+            for table in sheet.tables:
+                table.document = self
 
     def cellsIterate(self) -> Iterator[tuple[Sheet, Table, Cell]]:
         """Yield every STORED cell with the sheet and table holding it.

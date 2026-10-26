@@ -69,6 +69,16 @@ costs.rowAdd(6)
 document.save()
 ```
 
+Any document, sheet, table, range or cell has one JSON form, and reads back from it:
+
+```python
+import json
+
+text = pybers.formatJsonForm(costs)
+form = json.loads(text, parse_float=Decimal, parse_int=Decimal)  # every number exact
+assert pybers.parseJsonForm(text) == costs
+```
+
 A table's `cells` maps each address to its cell and is read-only: a cell changes through the table, as `costs.cell("B4")` does above, so no edit can leave a table holding something that is not one of its cells.
 
 A cell takes a value of any kind, whatever it held, and reads it back as the same Python type: `Decimal` for a number, `str`, `bool`, `datetime` for a date and time, and `timedelta` for a duration. Numeric values are `Decimal`, never `float`, because Numbers stores them as decimal128 and a binary float would add rounding error the document never had. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one is written as the time it was in the document's zone, the one pybers is running in unless `pybers.open` specifies another.
@@ -81,15 +91,17 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Adding and deleting rows and columns, with every formula and merge following
 - Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does
 - Merging and unmerging cells, and creating sheets and tables
+- Writing a document or any part of one as JSON, and reading it back exactly
 
 ### Planned
 
 - A command-line app that exports a document as JSON ([PYB-142](https://github.com/rpulivella/pybers/issues/142))
 - A terminal interface for browsing a document read-only ([PYB-171](https://github.com/rpulivella/pybers/issues/171))
 - Showing a value in any format the Data Format menu offers ([PYB-145](https://github.com/rpulivella/pybers/issues/145))
-- Cell styling: fills, padding and alignment, borders, and named cell styles ([PYB-126](https://github.com/rpulivella/pybers/issues/126), [PYB-122](https://github.com/rpulivella/pybers/issues/122), [PYB-128](https://github.com/rpulivella/pybers/issues/128))
-- Rich text: styled runs inside a cell, named paragraph styles, OpenType features, tracking and leading ([PYB-125](https://github.com/rpulivella/pybers/issues/125), [PYB-119](https://github.com/rpulivella/pybers/issues/119), [PYB-129](https://github.com/rpulivella/pybers/issues/129), [PYB-131](https://github.com/rpulivella/pybers/issues/131))
-- Table appearance: banding, gridlines and outlines ([PYB-123](https://github.com/rpulivella/pybers/issues/123))
+- Cell styling: fills, padding and alignment, borders, and named cell styles ([PYB-265](https://github.com/rpulivella/pybers/issues/265), [PYB-266](https://github.com/rpulivella/pybers/issues/266), [PYB-128](https://github.com/rpulivella/pybers/issues/128))
+- Rich text: styled runs inside a cell, named paragraph styles, OpenType features, tracking and leading ([PYB-270](https://github.com/rpulivella/pybers/issues/270), [PYB-268](https://github.com/rpulivella/pybers/issues/268), [PYB-129](https://github.com/rpulivella/pybers/issues/129), [PYB-131](https://github.com/rpulivella/pybers/issues/131))
+- Table appearance: banding, gridlines and outlines ([PYB-266](https://github.com/rpulivella/pybers/issues/266), [PYB-267](https://github.com/rpulivella/pybers/issues/267))
+- Text boxes and the other objects floating on a sheet ([PYB-271](https://github.com/rpulivella/pybers/issues/271))
 - Placing anything on a sheet by a named anchor, at the sizes Numbers draws ([PYB-87](https://github.com/rpulivella/pybers/issues/87))
 - Calculating formula values, so a document read without opening Numbers shows what Numbers would ([PYB-196](https://github.com/rpulivella/pybers/issues/196), [PYB-197](https://github.com/rpulivella/pybers/issues/197), [PYB-198](https://github.com/rpulivella/pybers/issues/198))
 - A release on PyPI ([PYB-148](https://github.com/rpulivella/pybers/issues/148))

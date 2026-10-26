@@ -6,6 +6,8 @@ Each test edits a copy of `20-formula-shapes`, whose `Table 2` is ten rows by fi
 columns and named on one sheet only, while `Table 1` is named on two.
 
 UPDATES
+2026-10-24  A number read back as the JSON number it is printed as, and a duration
+            as ISO 8601, for PYB-259.
 2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
             aware date is written in, for PYB-144.
 2026-10-20  Written for PYB-217.
@@ -142,10 +144,10 @@ def testJsonReportsTheChangeAsTheLibraryReturnsIt(working: Path) -> None:
     result = runSetCommand(
         str(working), "Table 2::B2", "1.50", "--preview", "--format", "json"
     )
-    assert json.loads(result.stdout) == {
+    assert json.loads(result.stdout, parse_float=Decimal) == {
         "reference": "Sheet 1::Table 2::B2",
         "valueBefore": None,
-        "valueAfter": "1.50",
+        "valueAfter": Decimal("1.50"),
         "kindBefore": "empty",
         "kindAfter": "number",
         "rowsAdded": 0,
@@ -215,7 +217,7 @@ def testWhatJsonPrintsIsTextSetWritesBackUnchanged(working: Path) -> None:
         str(working), "Table 2::B2", "2d 4h 0.5s", "--preview", "--format", "json"
     )
     printed = json.loads(result.stdout)["valueAfter"]
-    assert printed == "2d 4h 0.5s"
+    assert printed == "P2DT4H0.5S"
     runSetCommand(str(working), "Table 2::B2", printed, "--in-place")
     assert readCell(working, "Table 2::B2").value == datetime.timedelta(
         days=2, hours=4, milliseconds=500

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Absolute placement for objects that float on a sheet (text boxes, images, shapes)
-as opposed to cells, which are placed by row/column in a table's grid.
+"""A place on a sheet in points, as opposed to a cell's place in a table's grid.
 
 UPDATES
+2026-10-24  `Size` removed with the drawable scaffold that alone used it, for
+            PYB-259.
 2026-09-08  Moved out of `pybers.model` for #58, unchanged.
 2026-08-12  Initial scaffold.
 """
@@ -27,10 +28,3 @@ class Position:
     x: float
     y: float
 
-
-@dataclass(frozen=True, slots=True)
-class Size:
-    """A width/height in points."""
-
-    width: float
-    height: float
