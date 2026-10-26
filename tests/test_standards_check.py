@@ -6,6 +6,7 @@ A code span at the start of a line, blanked to spaces, once made the line read a
 indented code block, so the whole sentence escaped every check.
 
 UPDATES
+2026-10-26  A split verb warns on a time adverb alone.
 2026-10-21  Every phrase the writing rules added, and a sentence opening on a
             conjunction or a preamble, each on one line and across a wrap, for
             PYB-249.
@@ -151,3 +152,28 @@ def testAFileThatCannotTokenizeKeepsItsEarlierComments() -> None:
     findings: list = []
     standards.checkFile(Path("sample.py"), findings, "# It is load-bearing.\nx = (\n")
     assert any("load-bearing" in finding[3] for finding in findings)
+
+
+def findWarnings(text: str) -> list[str]:
+    """Return every warning the gate reports for one Markdown text."""
+    findings: list = []
+    standards.checkFile(Path("sample.md"), findings, text)
+    return [finding[3] for finding in findings if finding[0] == "WARN"]
+
+
+@pytest.mark.parametrize("sentence", [
+    "The table is currently sorted by name.\n",
+    "The value was previously cached by Numbers.\n",
+])
+def testATimeAdverbInsideAVerbWarns(sentence: str) -> None:
+    assert any(warning.startswith("split verb") for warning in findWarnings(sentence))
+
+
+@pytest.mark.parametrize("sentence", [
+    "A schema can only express what the file stores.\n",
+    "The writer must never round a number.\n",
+    "The cell is also shared by the formula.\n",
+])
+def testAnyOtherAdverbInsideAVerbPasses(sentence: str) -> None:
+    warnings = findWarnings(sentence)
+    assert not any(warning.startswith("split verb") for warning in warnings)

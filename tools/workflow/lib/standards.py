@@ -48,6 +48,8 @@ neither may be hand-edited, so a finding in either is noise by construction.
 Runs on the repository's venv, which holds rich.
 
 UPDATES
+2026-10-26  The split-verb check warns on a time adverb alone, as wingmate's MWM-49
+            found.
 2026-10-26  The exemption for `standards-check.py`, which no longer exists, removed.
 2026-10-21  Comments come from the tokenizer, so a `#` inside a string is not
             read as one, for PYB-249.
@@ -604,11 +606,22 @@ def checkWeakLet(path: Path, prose: str, findings: list[Finding]) -> None:
                          "ability"))
 
 
+# Time adverbs read better before the auxiliary. Any other adverb, `can only express`,
+# is correct English where it stands, and warning on it taught readers to ignore
+# the check.
+frontableAdverbs: frozenset[str] = frozenset({
+    "currently", "recently", "presently", "previously", "formerly", "initially",
+    "originally", "subsequently", "momentarily", "shortly", "lately",
+})
+
+
 def checkSplitVerb(path: Path, prose: str, findings: list[Finding]) -> None:
-    """The adverb belongs before the auxiliary, not inside the verb."""
+    """A time adverb belongs before the auxiliary, not inside the verb."""
     if isRuleDoc(path, "splitVerb"):
         return
     for match in splitVerbRe.finditer(prose):
+        if match.group(2).lower() not in frontableAdverbs:
+            continue
         findings.append(("WARN", path, findLineNumber(prose, match.start()),
                          f"split verb '{match.group(0).strip()}'"))
 
