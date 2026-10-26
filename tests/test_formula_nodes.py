@@ -17,6 +17,7 @@ reference, 0 of 21 in the documents, so anchoring for one is read from the coord
 and nowhere else.
 
 UPDATES
+2026-10-26  A comment no longer names the removed `Style` type, for PYB-259.
 2026-10-22  The goldens' comparisons moved to the golden builders, for PYB-255.
 2026-09-03  Written for #41.
 2026-09-29  The fill tests moved to `test_fill.py` with `cellsFill`, for PYB-118.
@@ -280,8 +281,8 @@ def testFormulaIsFrozenSoASharedOneCannotBeEditedThroughACell() -> None:
 
     Numbers shares one archive between every cell a formula was dragged into, so
     a model handing out something mutable would turn one edit into a silent edit
-    of all of them. This is the same defect the frozen `Style` closes, and the
-    format creates the hazard rather than any implementation inviting it.
+    of all of them. Numbers shares a style the same way, so the format creates the
+    hazard rather than any implementation inviting it.
     """
     formula = openFirstTable("19-formula-dragged").cell("E2").formula
     assert formula is not None

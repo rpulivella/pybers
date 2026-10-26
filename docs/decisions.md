@@ -318,14 +318,16 @@ The selector type is built in PYB-223.
 
 One JSON structure for a document and each part of it, which every tool reading or
 writing pybers' data agrees on, built in PYB-259. `pybers.formatJsonForm` writes it and
-`pybers.parseJsonForm` reads it back into an equal model. It is the only serializer
-pybers holds: `--format json` in every command, the golden confirmations and any script
-reach it, so no two of them can disagree. `src/pybers/interchange/schema.json` describes
-it, generated from the model.
+`pybers.parseJsonForm` reads it back into an equal model. A model with unsaved edits
+reads back with the same form but compares unequal, since equality includes the stored
+record a save replaces, and the form carries what a cell shows rather than that record.
+It is the only serializer pybers holds: `--format json` in every command, the golden
+confirmations and any script reach it, so no two of them can disagree.
+`src/pybers/interchange/schema.json` describes it, generated from the model.
 
 **A key is the model's own public name.** `Cell` writes `value`, `kind`, `formulaText`,
-`valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, in the order
-`pybers show` prints them. What describes where a value sits rather than what it is,
+`valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, the order
+`pybers show` prints them in once PYB-260 builds it. What describes where a value sits rather than what it is,
 such as `Cell.table` or `Cell.reference`, is left out, and so is the session's time
 zone, which the file has nowhere to keep. A document's language and region joins the
 form as its locale identifier when PYB-272 models it, rather than as the currency
