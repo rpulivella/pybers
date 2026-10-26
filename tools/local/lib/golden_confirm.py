@@ -7,6 +7,7 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-24  The expectations' machine form is the golden's JSON form, for PYB-259.
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
 2026-10-22  Every cell of every table is checked against what pybers reads from the
@@ -80,7 +81,7 @@ from tools.local.lib.golden_expected import (
     buildExpectedValues,
     formatValue,
     writeExpectations,
-    writeExpectationsToml,
+    writeExpectationsJson,
 )
 from tools.workflow.lib.shared import readTicketNumber, repositoryRoot
 
@@ -828,7 +829,7 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
     # A copy to open by hand, since Numbers rewrites a document it saves.
     shutil.copyfile(golden, outputDirectory / golden.name)
     writeExpectations(expected, outputDirectory)
-    writeExpectationsToml(expected, outputDirectory)
+    writeExpectationsJson(expected, outputDirectory)
     goldenHash = readFileHash(golden)
     with tempfile.TemporaryDirectory(prefix="pybers-golden-copy-") as work:
         copy = Path(work) / golden.name

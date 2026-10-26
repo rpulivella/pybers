@@ -57,9 +57,9 @@ a newer Numbers reviewable rather than a silent replacement.
 
 `golden_confirm.py run <golden>` writes its report into `workarea/golden-confirm/<ticket>/<golden>/`,
 beside a copy of the golden that is safe to open and save. Its expected values are
-generated from the golden by `lib/golden_expected.py` on every run, every filled cell of
-every table as pybers reads it, and written as `expectations.md`, to read beside the
-copy, and `expectations.toml`, their machine form.
+generated from the golden's JSON form by `lib/golden_expected.py` on every run, every
+filled cell of every table as pybers reads it back from that form, and written as
+`expectations.md`, to read beside the copy, and `expectations.json`, the JSON form itself.
 
 Every cell of every table is read through AppleScript for its value, formula and format,
 and a cell the expectations leave out must be empty. A currency or a control is read in
