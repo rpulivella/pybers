@@ -537,7 +537,7 @@ class FormulaNode:
 class Formula:
     """One cell's formula, as the postfix node array the file stores.
 
-    Frozen for the same reason `Style` is: Numbers shares one archive between every
+    Frozen because Numbers shares one archive between every
     cell a formula was dragged into, so a mutable one would turn a single edit into
     a silent edit of all of them. Replace it on the cell to change it.
     """

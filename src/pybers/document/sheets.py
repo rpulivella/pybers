@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""A sheet holds tables (row/column grids) and graphical objects (things that float on
-the sheet at an absolute position, text boxes, images, shapes) side by side, since
-Numbers places both on the same sheet independently. A document is a list of sheets.
+"""A sheet holds tables, and a document is a list of sheets.
 
 `Document` is the only handle a caller ever holds. It is what `pybers.open` returns,
 what every edit reaches through, and what `save` writes back. See CLAUDE.md, "Document
@@ -23,6 +21,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-24  The unread `graphicalObjects` scaffold removed, for PYB-259.
 2026-10-22  `Sheet.tableIdentities`, the names a formula on one sheet uses,
             replacing `Document.tableIdentities`, for PYB-255.
 2026-10-22  A document reads its locale's currency symbols and placement, for
@@ -71,7 +70,6 @@ from pybers.addressing.reference import (
     tableNameSeparator,
     toCellReference,
 )
-from pybers.drawable import GraphicalObject
 from pybers.errors import PybersError
 from pybers.geometry import Position
 from pybers.table.cell import Cell, CellChange, toCellValue
@@ -179,11 +177,10 @@ def selectItem[NamedT: Named](
 
 @dataclass(slots=True)
 class Sheet:
-    """One sheet (tab) in a document: its tables and its floating graphical objects."""
+    """One sheet (tab) in a document, and its tables."""
 
     name: str
     tables: list[Table] = field(default_factory=list)
-    graphicalObjects: list[GraphicalObject] = field(default_factory=list)
     # The archive this sheet was read from or saved as, and None until it has one.
     # Excluded from equality and `repr` for the reason `Document._package` is.
     _identifier: int | None = field(default=None, repr=False, compare=False)

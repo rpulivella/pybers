@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
+            for PYB-259.
 2026-10-22  The cell controls and CellPresentation re-exported, replacing
             CellDescription, for PYB-255.
 2026-10-22  The currency names re-exported, for PYB-220.
@@ -81,7 +83,6 @@ lazy from pybers.document import (
     Sheet,
     open,
 )
-lazy from pybers.drawable import GraphicalObject, Image, Shape, TextBox
 lazy from pybers.errors import PybersError, ReadError, WriteError
 lazy from pybers.formula import (
     ArgumentCountError,
@@ -110,8 +111,7 @@ lazy from pybers.formula import (
     parseFormula,
     renderFormula,
 )
-lazy from pybers.geometry import Position, Size
-lazy from pybers.style import Style
+lazy from pybers.geometry import Position
 lazy from pybers.table import (
     Cell,
     CellChange,
@@ -135,7 +135,6 @@ lazy from pybers.table import (
     formatCellValue,
     parseCellValue,
 )
-lazy from pybers.text import Paragraph, RichText, TextRun
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
 __all__ = [
@@ -216,22 +215,13 @@ __all__ = [
     "open",
     "toCellRanges",
     "toCellReference",
-    "GraphicalObject",
-    "Image",
     "MergeRange",
-    "Paragraph",
     "Position",
-    "RichText",
     "SelectionError",
-    "Shape",
     "Sheet",
-    "Size",
-    "Style",
     "Table",
     "TableRow",
     "TableRows",
-    "TextBox",
-    "TextRun",
     "Document",
     "ReferenceLocation",
     "MachineTimeZone",

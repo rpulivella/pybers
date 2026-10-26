@@ -19,15 +19,13 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `Sheet` | A tab, holding its tables in the order Numbers shows them | Owner |
 | `Table` | A grid of cells, with its size and its merges. `cells` is a read-only view, and a cell changes through the table | Owner |
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
-| `Cell` | One cell: its value, kind, formula, style and presentation | Owner |
+| `Cell` | One cell: its value, kind, formula and presentation | Owner |
 | `CellPresentation` | How a cell shows its value: its format, whether a person chose it, and its control | Frozen |
 | `CellControl` | The control a cell presents its value through, beside its format: one dataclass per control under `CellControlBase`, `CellControlUnknown` included | Frozen |
 | `CellChange` | What a write did to one cell, or would do in a preview: value and kind before and after, and how far the table grew | Frozen |
 | `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
-| `Style` | A cell's appearance | Frozen |
-| `RichText` | Text with styled runs | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
 | `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |
 | `CellReference` | How something points at a cell: an address, `$` per axis, and the table it specifies when its context needs one | Frozen |

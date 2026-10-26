@@ -105,7 +105,7 @@ Seven facts that make the obvious approach wrong. Each is measured; see the find
   exactly, which is why earlier fixtures validated and proved nothing.
 - **Numbers shares style archives by reference.** Twelve styles back twenty-one shapes,
   so handing out a mutable decoded object turns one edit into a silent restyle of
-  seven. The frozen-`Style` contract holds on the READ path, not only when writing.
+  seven. The frozen-style contract holds on the READ path, not only when writing.
 
 **A wrong offset yields a wrong number, not an exception.** That is why every claim
 about the format is measured against a fixture that labels its own contents.
