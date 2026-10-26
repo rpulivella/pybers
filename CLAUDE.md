@@ -110,6 +110,19 @@ Seven facts that make the obvious approach wrong. Each is measured; see the find
 **A wrong offset yields a wrong number, not an exception.** That is why every claim
 about the format is measured against a fixture that labels its own contents.
 
+## References
+
+Projects read for how others understood the format, and never a source of code. A claim from one
+is measured against a fixture here before pybers relies on it, as the findings record.
+
+- **numbers-parser** (https://github.com/masaccio/numbers-parser): the reverse
+  engineering pybers stands on, credited in `README.md` and `docs/decisions.md`. Its
+  class names were read for interpretation only.
+- **cupertino-files** (https://github.com/den-frie-vilje/cupertino-files): a TypeScript
+  library for all three iWork formats, MIT-licensed. Its `docs/FORMAT.md` is a second
+  reading of the same format, and its guide a model for a documentation site. Not a
+  source of pybers, so not credited in the README.
+
 ## Correctness
 
 - Working on the happy path is not sufficient. Enumerate the boundary, lifecycle and
