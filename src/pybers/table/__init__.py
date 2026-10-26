@@ -20,6 +20,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-10-24  `CellControlType`, the type a control names itself by, for PYB-259.
 2026-10-22  The controls a cell presents its value through, and
             `CellPresentation` replacing `CellDescription`, for PYB-255.
 2026-10-20  `formatCellValue`, the text a value reads back from, for PYB-144.
@@ -53,6 +54,7 @@ from pybers.table.controls import (
     CellControlSlider,
     CellControlStarRating,
     CellControlStepper,
+    CellControlType,
     CellControlUnknown,
 )
 from pybers.table.fill import CellValueFill
@@ -74,6 +76,7 @@ __all__ = [
     "CellControlSlider",
     "CellControlStarRating",
     "CellControlStepper",
+    "CellControlType",
     "CellControlUnknown",
     "CellValue",
     "CellValueFill",

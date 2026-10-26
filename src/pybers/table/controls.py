@@ -9,6 +9,7 @@ outside a range control, measured in `73-values-typed-over-controls`, while pybe
 clamps, so a control that cannot show a value is dropped by the save.
 
 UPDATES
+2026-10-24  Each control names its type, `controlType`, for PYB-259.
 2026-10-22  Written for PYB-255.
 """
 from __future__ import annotations
@@ -24,7 +25,8 @@ __date__ = "2026/10/22"
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import TYPE_CHECKING, final
+from enum import StrEnum
+from typing import TYPE_CHECKING, ClassVar, final
 
 from pybers._family import FamilyMember, checkFamily
 from pybers.currency import CurrencyAmount
@@ -35,6 +37,17 @@ if TYPE_CHECKING:
 starRatingMaximum: Decimal = Decimal(5)
 
 
+class CellControlType(StrEnum):
+    """The type of control a cell presents its value through."""
+
+    CHECKBOX = "checkbox"
+    STAR_RATING = "star-rating"
+    SLIDER = "slider"
+    STEPPER = "stepper"
+    POP_UP_MENU = "pop-up-menu"
+    UNKNOWN = "unknown"
+
+
 def findRangeAmount(value: CellValue) -> Decimal | None:
     """Return the number a range control positions, or None for any other value."""
     if isinstance(value, CurrencyAmount):
@@ -43,9 +56,10 @@ def findRangeAmount(value: CellValue) -> Decimal | None:
 
 
 class CellControlBase(FamilyMember, ABC):
-    """A control a cell presents its value through."""
+    """A control a cell presents its value through, named by its `controlType`."""
 
     __slots__ = ()
+    controlType: ClassVar[CellControlType]
 
     @abstractmethod
     def showsValue(self, value: CellValue) -> bool:
@@ -57,6 +71,8 @@ class CellControlBase(FamilyMember, ABC):
 class CellControlCheckbox(CellControlBase):
     """A checkbox, over a true or false value."""
 
+    controlType: ClassVar[CellControlType] = CellControlType.CHECKBOX
+
     def showsValue(self, value: CellValue) -> bool:
         """Report that a checkbox shows any value, as a typed value keeps it."""
         return True
@@ -66,6 +82,8 @@ class CellControlCheckbox(CellControlBase):
 @dataclass(frozen=True, slots=True)
 class CellControlStarRating(CellControlBase):
     """A star rating, over a number from 0 to 5."""
+
+    controlType: ClassVar[CellControlType] = CellControlType.STAR_RATING
 
     def showsValue(self, value: CellValue) -> bool:
         """Report whether a number lies within the stars, or the value is not one."""
@@ -77,6 +95,8 @@ class CellControlStarRating(CellControlBase):
 @dataclass(frozen=True, slots=True)
 class CellControlSlider(CellControlBase):
     """A slider, from its minimum to its maximum in steps of its increment."""
+
+    controlType: ClassVar[CellControlType] = CellControlType.SLIDER
 
     minimum: Decimal
     maximum: Decimal
@@ -93,6 +113,8 @@ class CellControlSlider(CellControlBase):
 class CellControlStepper(CellControlBase):
     """A stepper, from its minimum to its maximum in steps of its increment."""
 
+    controlType: ClassVar[CellControlType] = CellControlType.STEPPER
+
     minimum: Decimal
     maximum: Decimal
     increment: Decimal
@@ -108,6 +130,8 @@ class CellControlStepper(CellControlBase):
 class CellControlPopUpMenu(CellControlBase):
     """A pop-up menu of text items, which starts with its first item or blank."""
 
+    controlType: ClassVar[CellControlType] = CellControlType.POP_UP_MENU
+
     items: tuple[str, ...]
     startsWithFirstItem: bool
 
@@ -121,6 +145,8 @@ class CellControlPopUpMenu(CellControlBase):
 class CellControlUnknown(CellControlBase):
     """A control pybers has not measured, carried through by its interaction type."""
 
+    controlType: ClassVar[CellControlType] = CellControlType.UNKNOWN
+
     interactionType: int
 
     def showsValue(self, value: CellValue) -> bool:
@@ -133,7 +159,7 @@ type CellControl = (
     | CellControlStepper | CellControlPopUpMenu | CellControlUnknown
 )
 
-checkFamily(CellControlBase, CellControl)
+checkFamily(CellControlBase, CellControl, "controlType")
 
 
 __all__ = [
@@ -144,5 +170,6 @@ __all__ = [
     "CellControlSlider",
     "CellControlStarRating",
     "CellControlStepper",
+    "CellControlType",
     "CellControlUnknown",
 ]

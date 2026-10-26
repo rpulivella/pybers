@@ -13,6 +13,7 @@ the full origin story and design contract.
 UPDATES
 2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
             for PYB-259.
+2026-10-24  `CellControlType` re-exported, for PYB-259.
 2026-10-22  The cell controls and CellPresentation re-exported, replacing
             CellDescription, for PYB-255.
 2026-10-22  The currency names re-exported, for PYB-220.
@@ -122,6 +123,7 @@ lazy from pybers.table import (
     CellControlSlider,
     CellControlStarRating,
     CellControlStepper,
+    CellControlType,
     CellControlUnknown,
     CellFormat,
     CellKind,
@@ -194,6 +196,7 @@ __all__ = [
     "CellControlSlider",
     "CellControlStarRating",
     "CellControlStepper",
+    "CellControlType",
     "CellControlUnknown",
     "CellReferenceLike",
     "CellPresentation",

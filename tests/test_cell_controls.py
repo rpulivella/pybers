@@ -6,6 +6,7 @@ A cell's control, read from its spec beside the format that shows its value.
 `11-value-types-noformats` holds one of each control over its plain value.
 
 UPDATES
+2026-10-24  A family names each member by its discriminator, for PYB-259.
 2026-10-22  Written for PYB-255.
 """
 from __future__ import annotations
@@ -20,7 +21,9 @@ __date__ = "2026/10/22"
 
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import StrEnum
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from test_cell_value_kinds import openFirstTable
@@ -147,7 +150,7 @@ def testAFamilyMissingAMemberStopsTheImport() -> None:
 
     type ShapeAny = Square
     with pytest.raises(TypeError, match="disagree on .*Circle"):
-        checkFamily(Shape, ShapeAny)
+        checkFamily(Shape, ShapeAny, "shapeType")
 
 
 def testAMutableMemberStopsTheImport() -> None:
@@ -160,7 +163,51 @@ def testAMutableMemberStopsTheImport() -> None:
 
     type ShapeAny = Square
     with pytest.raises(TypeError, match="Square is not a frozen, slotted dataclass"):
-        checkFamily(Shape, ShapeAny)
+        checkFamily(Shape, ShapeAny, "shapeType")
+
+
+class ShapeType(StrEnum):
+    """The types the families built in these tests name their members by."""
+
+    SQUARE = "square"
+    CIRCLE = "circle"
+
+
+def testAMemberNamingNoTypeStopsTheImport() -> None:
+    class Shape(FamilyMember):
+        __slots__ = ()
+
+    @dataclass(frozen=True, slots=True)
+    class Square(Shape):
+        side: int
+
+    type ShapeAny = Square
+    with pytest.raises(TypeError, match="must set shapeType"):
+        checkFamily(Shape, ShapeAny, "shapeType")
+
+
+def testTwoMembersNamingOneTypeStopTheImport() -> None:
+    class Shape(FamilyMember):
+        __slots__ = ()
+
+    @dataclass(frozen=True, slots=True)
+    class Square(Shape):
+        shapeType: ClassVar[ShapeType] = ShapeType.SQUARE
+        side: int
+
+    @dataclass(frozen=True, slots=True)
+    class Box(Shape):
+        shapeType: ClassVar[ShapeType] = ShapeType.SQUARE
+        side: int
+
+    type ShapeAny = Square | Box
+    with pytest.raises(TypeError, match="share a shapeType"):
+        checkFamily(Shape, ShapeAny, "shapeType")
+
+
+def testEachControlNamesItsOwnType() -> None:
+    slider = CellControlSlider(Decimal(0), Decimal(9), Decimal(1))
+    assert slider.controlType is pybers.CellControlType.SLIDER
 
 
 @pytest.mark.parametrize(("value", "shown"), [
