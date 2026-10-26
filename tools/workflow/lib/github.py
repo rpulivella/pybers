@@ -12,6 +12,7 @@ a missing token is a loud failure, never a guess:
     2. a GITHUB_TOKEN= line in the git-ignored .dev.vars at the repository root
 
 UPDATES
+2026-10-26  Setting a board Status reads it back and fails loudly if it did not land.
 2026-10-14  `readAuthenticatedLogin` and `readPermission`, for a merge's approval
             gate, for PYB-156.
 2026-10-14  `readBoardStatus`, a ticket's Status for the dashboard, for PYB-211.
@@ -588,7 +589,7 @@ def setBoardStatus(
     itemId: str,
     status: str,
 ) -> None:
-    """Set a board item's Status to one of the pipeline's named options."""
+    """Set a board item's Status to one of the named options, and verify it landed."""
     optionId = coordinates.statusOptionIds.get(status)
     if optionId is None:
         known = ", ".join(coordinates.statusOptionIds)
@@ -612,6 +613,24 @@ def setBoardStatus(
             "optionId": optionId,
         },
     )
+    # A reply without errors is not proof, so the board is read back and must agree.
+    query = """
+    query($itemId: ID!) {
+      node(id: $itemId) {
+        ... on ProjectV2Item {
+          fieldValueByName(name: "Status") {
+            ... on ProjectV2ItemFieldSingleSelectValue { name }
+          }
+        }
+      }
+    }
+    """
+    node = requestGraphql(token, query, {"itemId": itemId}).get("node") or {}
+    landed = (node.get("fieldValueByName") or {}).get("name", "")
+    if landed != status:
+        raise RuntimeError(
+            f"Status reads {landed!r} on the board after setting {status!r}."
+        )
 
 
 def findBoardItem(token: str, coordinates: BoardCoordinates, number: int) -> str | None:
