@@ -7,6 +7,7 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-10-27  `renderPlain`, a command's output without color, for PYB-260.
 2026-10-22  `--golden-write`, which writes each golden from its builder, for PYB-255.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-16  `allDocuments` and `findDocumentPath` gathered here for PYB-90, so a
@@ -60,6 +61,20 @@ def findDocumentPath(stem: str) -> Path:
     ]
     assert len(found) == 1, f"{stem}.numbers is in {len(found)} document directories"
     return found[0]
+
+
+def renderPlain(renderable: object) -> str:
+    """Return what a renderable prints on a terminal without color."""
+    # Imported here, so a suite run without the `cli` extra still collects.
+    import io
+
+    from rich.console import Console
+
+    from pybers.cli._console import theme
+
+    buffer = io.StringIO()
+    Console(file=buffer, width=100, no_color=True, theme=theme).print(renderable)
+    return buffer.getvalue()
 
 
 def copyDocument(stem: str, into: Path) -> Path:

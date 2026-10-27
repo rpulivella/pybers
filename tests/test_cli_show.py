@@ -28,9 +28,9 @@ import pytest
 from typer.testing import CliRunner, Result
 
 import pybers
-from conftest import copyDocument, findDocumentPath
+from conftest import copyDocument, findDocumentPath, renderPlain
 from pybers.cli._app import app
-from pybers.cli.show import formatControl, formatFormat
+from pybers.cli.show import formatCell, formatControl, formatFormat, formatSheet
 
 runner: CliRunner = CliRunner()
 
@@ -163,6 +163,25 @@ def testATableShowsItsSizeMergesAndEachCell() -> None:
         "",
     ]
     assert findLines(result, "Cell") == ["Cell: Sheet 1::Table 2::A1"]
+
+
+def testATableListsEachOfItsMerges() -> None:
+    result = runShowCommand(findDocumentPath("22-merge-2x2"), "Table 1")
+    assert findLines(result, "Merges") == [
+        "Merges: A1:B1, C1:D1, E1:F1, G1:H1, I1:J1",
+    ]
+
+
+def testASheetHoldingNoTablesSaysSo() -> None:
+    printed = renderPlain(formatSheet(pybers.Sheet(name="Empty")))
+    assert printed.splitlines() == ["Sheet: Empty", "Tables: none"]
+
+
+def testAFormatASaveHasNotChosenReadsUnknown() -> None:
+    cell = pybers.open(shapesPath).cell("Sheet 1::Table 1::A1")
+    cell.value = "text"
+    assert cell.presentation.format is pybers.UNDETERMINED
+    assert "Format: unknown" in renderPlain(formatCell(cell)).splitlines()
 
 
 def testASheetShowsEachOfItsTables() -> None:
