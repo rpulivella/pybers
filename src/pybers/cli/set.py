@@ -6,6 +6,8 @@ The command reads the text into a value, makes one `cellSet` call, and saves onl
 when the cell changed and the call was not a preview.
 
 UPDATES
+2026-10-27  Report lines shared with `show`, growth by one row reading `1 row`,
+            for PYB-260.
 2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
             aware date is written in, for PYB-144.
 2026-10-20  Written for PYB-217.
@@ -31,6 +33,7 @@ import pybers
 from pybers.cli._common import reportPybersErrors
 from pybers.cli._console import statusConsole
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
+from pybers.cli._report import formatCount, formatLine
 
 
 def formatValue(value: pybers.CellValue, kind: pybers.CellKind) -> Text:
@@ -42,16 +45,15 @@ def formatValue(value: pybers.CellValue, kind: pybers.CellKind) -> Text:
 def formatChange(change: pybers.CellChange) -> Group:
     """Return the report lines of one cell's change."""
     lines = [
-        Text.assemble(("Cell: ", "label"), (str(change.reference), "identifier")),
-        Text.assemble(("Before: ", "label"))
-        + formatValue(change.valueBefore, change.kindBefore),
-        Text.assemble(("After: ", "label"))
-        + formatValue(change.valueAfter, change.kindAfter),
+        formatLine("Cell", (str(change.reference), "identifier")),
+        formatLine("Before") + formatValue(change.valueBefore, change.kindBefore),
+        formatLine("After") + formatValue(change.valueAfter, change.kindAfter),
     ]
     if change.rowsAdded or change.colsAdded:
-        lines.append(Text.assemble(
-            ("Grown: ", "label"),
-            (f"{change.rowsAdded} rows, {change.colsAdded} columns", "value"),
+        lines.append(formatLine(
+            "Grown",
+            f"{formatCount(change.rowsAdded, 'row')}, "
+            f"{formatCount(change.colsAdded, 'column')}",
         ))
     return Group(*lines)
 

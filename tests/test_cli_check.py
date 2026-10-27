@@ -3,6 +3,7 @@
 `pybers check`, run the way a person reporting a bug runs it.
 
 UPDATES
+2026-10-27  A size of one row reads `1 row`, for PYB-260.
 2026-10-12  The JSON form and an uninstalled pybers's version, for PYB-187.
 2026-10-12  Each reason a part is missing prints as the design says, for PYB-190.
 2026-10-07  Written for PYB-169.
@@ -298,7 +299,7 @@ def testANameInBracketsPrintsAsWritten() -> None:
     names = pybers.CheckNames((pybers.CheckSheet("[bold]Q3", (table,)),), ())
     printed = renderPlain(formatCheck(replace(found, names=names)))
     assert "\n[bold]Q3\n" in printed
-    assert "└ [draft]: 1 rows, 1 columns" in printed
+    assert "└ [draft]: 1 row, 1 column" in printed
 
 
 @pytest.mark.parametrize(
