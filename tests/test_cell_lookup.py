@@ -6,6 +6,7 @@ A cell reached by a reference, each owner taking its part and handing the rest d
 `Table 2`, so it holds a table name that is unique and one that is shared.
 
 UPDATES
+2026-10-27  Each listed table name quoted, for PYB-260.
 2026-10-20  Written for PYB-217.
 """
 from __future__ import annotations
@@ -74,7 +75,7 @@ def testASharedTableNameIsRefusedWithTheNamesThatMatch(
 ) -> None:
     with pytest.raises(pybers.SelectionError) as raised:
         document.cell("Table 1::B3")
-    assert "Sheet 1::Table 1, Sheet 2::Table 1" in str(raised.value)
+    assert "'Sheet 1::Table 1', 'Sheet 2::Table 1'" in str(raised.value)
 
 
 def testAnUnknownTableIsRefusedWithTheTablesThatExist(
@@ -83,7 +84,7 @@ def testAnUnknownTableIsRefusedWithTheTablesThatExist(
     with pytest.raises(pybers.SelectionError) as raised:
         document.cell("Ledger::B3")
     assert "'Ledger'" in str(raised.value)
-    assert "Sheet 1::Table 2" in str(raised.value)
+    assert "'Sheet 1::Table 2'" in str(raised.value)
 
 
 def testADocumentRefusesAReferenceNamingNoTable(document: pybers.Document) -> None:
