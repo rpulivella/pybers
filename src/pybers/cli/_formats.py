@@ -8,6 +8,7 @@ serializer, so a command's JSON and a script's are the same text. See
 `docs/cli-design.md`.
 
 UPDATES
+2026-10-27  A table printed narrowed to a range, for PYB-260.
 2026-10-24  JSON written by `pybers.formatJsonForm`, keeping only the choice of
             format here, for PYB-259.
 2026-10-20  A date and a duration as the text `pybers set` reads, for PYB-144.
@@ -50,11 +51,18 @@ FormatOption = Annotated[
 
 
 def printResult[T](
-    result: T, outputFormat: OutputFormat, renderText: Callable[[T], RenderableType]
+    result: T,
+    outputFormat: OutputFormat,
+    renderText: Callable[[T], RenderableType],
+    *,
+    extent: pybers.CellRange | None = None,
 ) -> None:
-    """Print a command's result on stdout in the format asked for."""
+    """Print a command's result on stdout in the format asked for.
+
+    `extent` narrows a table to one range, as `pybers.formatJsonForm` takes it.
+    """
     if outputFormat is OutputFormat.JSON:
-        console.out(pybers.formatJsonForm(result), highlight=False)
+        console.out(pybers.formatJsonForm(result, extent), highlight=False)
     else:
         console.print(renderText(result))
 

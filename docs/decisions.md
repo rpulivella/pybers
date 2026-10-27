@@ -326,8 +326,8 @@ confirmations and any script reach it, so no two of them can disagree.
 `src/pybers/interchange/schema.json` describes it, generated from the model.
 
 **A key is the model's own public name.** `Cell` writes `value`, `kind`, `formulaText`,
-`valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, the order
-`pybers show` prints them in once PYB-260 builds it. What describes where a value sits rather than what it is,
+`valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, in the order
+`pybers show` prints them. What describes where a value sits rather than what it is,
 such as `Cell.table` or `Cell.reference`, is left out, and so is the session's time
 zone, which the file has nowhere to keep. A document's language and region joins the
 form as its locale identifier when PYB-272 models it, rather than as the currency
