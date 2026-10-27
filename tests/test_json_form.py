@@ -3,6 +3,7 @@
 The JSON form of a document and its parts: what it holds, and that it reads back.
 
 UPDATES
+2026-10-27  A table's `reference` is where it sits, not what it holds, for PYB-260.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -115,7 +116,7 @@ def testATableOnNoSheetNamesNone() -> None:
     (pybers.Cell, CellForm, {"table", "reference", "tableNames", "timeZone",
                              "mergeAnchored"}),
     # Back-pointers and views derived from the declared size and the cells.
-    (pybers.Table, TableForm, {"document", "sheet", "extent", "rows"}),
+    (pybers.Table, TableForm, {"document", "sheet", "extent", "rows", "reference"}),
     (pybers.Sheet, SheetForm, {"document", "tableIdentities"}),
     # A session's time zone, which the file has nowhere to keep, and the slice of the
     # document's language and region pybers reads, which PYB-272 models whole.

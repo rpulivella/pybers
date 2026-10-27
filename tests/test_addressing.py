@@ -7,6 +7,8 @@ conversion or a dropped locking marker both produce a real address that names th
 wrong cell. Parsing what each type emits and comparing is what catches that.
 
 UPDATES
+2026-10-27  A range names its table as a reference does, and a table refuses
+            a range naming another, for PYB-260.
 2026-09-13  The far end of both axes, found reviewing #67.
 2026-09-01  Written for #9.
 """
@@ -171,6 +173,22 @@ def test_aRangeRoundTripsThroughItsWrittenForm() -> None:
         assert CellRange.parse(written).asReference() == written
 
 
+@pytest.mark.parametrize(("written", "table"), [
+    ("Q3::B2:D5", "Q3"),
+    ("Budget::Q3::B", "Budget::Q3"),
+    ("B2:D5", None),
+])
+def test_aRangeNamesItsTableAsFarAsItsTextDoes(written: str, table: str | None) -> None:
+    found = CellRange.parse(written)
+    assert (None if found.table is None else str(found.table)) == table
+    assert str(found) == written
+    assert CellRange.parse(str(found)) == found
+
+
+def test_aRangeNamingATableDiffersFromOneNamingNone() -> None:
+    assert CellRange.parse("Q3::B2:D5") != CellRange.parse("B2:D5")
+
+
 # ── AC 4: unbounded on one axis, and distinguishable ─────────────────────────
 
 def test_aWholeColumnAndAWholeRowAreUnboundedOnTheOtherAxis() -> None:
@@ -252,6 +270,18 @@ def test_aTableReturnsTheCellsARangeCovers() -> None:
     table = buildSampleTable()
     covered = [str(cell.address) for cell in table.range("A1:B2")]
     assert covered == ["A1", "B1", "A2", "B2"]
+
+
+def test_aTableTakesARangeNamingItself() -> None:
+    table = buildSampleTable()
+    covered = [str(cell.address) for cell in table.range(f"{table.name}::A1:B1")]
+    assert covered == ["A1", "B1"]
+
+
+def test_aTableRefusesARangeNamingAnotherTable() -> None:
+    table = buildSampleTable()
+    with pytest.raises(pybers.ReferenceError, match="names another table"):
+        table.range("Elsewhere::A1:B2")
 
 
 def test_aTableReturnsTheCellsEveryRangeInAListCovers() -> None:
