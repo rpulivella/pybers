@@ -398,12 +398,16 @@ region. Numbers stores the same formula nodes in every locale and only displays 
 the region's separators and the language's function names, so the text pybers reads and
 writes names the formula exactly, and one form serves every document.
 
-**A region pybers offers comes from a document Numbers wrote for it.** The locale snapshot
-is macOS's locale data, which pybers cannot regenerate, so changing a region copies the
-snapshot, `locale_identifier`, `document_language` and `has_user_defined_locale` as they
-stand in the measurement Numbers saved for that region, and pybers composes none of them. The regions
-offered are the eight measured, one or more per inhabited continent, and any other is
-refused, naming those eight.
+**A region's locale fields are composed from macOS's locale data, never copied.** Numbers
+takes them from macOS's ICU, so a local extractor reads that data on a Mac into a table
+committed to the package, as `functions_extract.py` reads the Numbers app, and a release
+ships whatever table is committed. pybers builds each field from it as it builds any
+other, and copies no bytes from another document, here or anywhere. Babel was the other
+candidate, and its CLDR, a release behind macOS's and without Apple's tailoring, disagrees
+with Numbers in 5 of 96 measured fields. A test holds the fields composed for each
+measured region equal to those Numbers wrote. Once, and again when the extracted data
+changes or a new major version of Numbers ships, every region the table holds is tried in
+Numbers, and a region Numbers does not accept is refused.
 
 **A region change marks every formula for recalculation**, as an edit marks the cells it
 changes. A result such as `DOLLAR` or `FIXED` depends on the region, and pybers calculates

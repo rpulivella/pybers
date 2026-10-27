@@ -132,6 +132,37 @@ measurement. What a cell displays changes through the snapshot alone:
 
 The currencies show without grouping, as `B1` and `C1` were formatted with none.
 
+## Where the locale data comes from
+
+Numbers takes the snapshot from macOS's ICU, the data in `/usr/share/icu/icudt78l.dat`
+read through `libicucore`. On macOS 26.6.1, `u_getVersion` reports ICU 78.1 and
+`ulocdata_getCLDRVersion` reports CLDR 48, with Apple's own tailoring on top, which
+Foundation's `Locale` reads.
+
+Babel 2.18.0, the Python library over CLDR, bundles CLDR 47. Composing nine fields and
+three currency symbols for each of the eight regions from Babel agrees with what Numbers
+wrote in 91 of 96, and Foundation on the same Mac returns what Numbers wrote for all five
+that differ:
+
+| Locale | Field | Numbers and Foundation | Babel |
+| --- | --- | --- | --- |
+| `ja_JP` | `currency_pattern` | `¤#,##0` | `¤#,##0.00` |
+| `ja_JP` | the yen's symbol | `¥` | `￥`, the full-width form |
+| `en_ZA` | `am_symbol` | `AM` | `am` |
+| `en_IN` | `am_symbol` | `AM` | `am` |
+| `en_AU` | `short_date_pattern` | `d/M/y` | `d/M/yy` |
+
+`ja_JP`'s pattern shows the yen's zero decimals, which Babel applies only when it
+formats. The rest are a CLDR release apart or Apple's tailoring.
+
+CLDR has released twice a year since version 36 on 4 October 2019, in the spring and the
+autumn, with point releases between: 46 on 24 October 2024, 47 on 13 March 2025, 48 on
+29 October 2025 and 49 on 22 October 2026. macOS 26.6.1 carries 48, one release behind
+the newest. Locale data therefore drifts by a release every six months, and a document
+Numbers saves follows whichever release the Mac saving it carries.
+
+---
+
 ## Not yet explained
 
 - `95d`, `95e`, `95f`, `95g`, `95h` and `95i` changed their `documentUUID` and
