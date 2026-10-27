@@ -28,6 +28,7 @@ to a caller:
   that looks like a perfectly good number.
 
 UPDATES
+2026-10-27  The document's locale identifier is read, for PYB-272.
 2026-10-24  The sheets and tables linked by `Document._ownersLink`, for PYB-259.
 2026-10-22  The locale's currency symbols and placement are read, for PYB-220.
 2026-08-31  Written for #1: document, sheets, tables and cell values.
@@ -118,7 +119,8 @@ def readDocument(package: NumbersPackage, source: Path) -> Document:
     root = findRoot(index)
 
     # The package travels with the document because `Document.save` writes it back.
-    symbols = root.super.super.formatting_symbols
+    locale = root.super.super
+    symbols = locale.formatting_symbols
     document = Document(
         _package=package,
         _sourcePath=source,
@@ -126,6 +128,7 @@ def readDocument(package: NumbersPackage, source: Path) -> Document:
             (each.code, each.symbol) for each in symbols.currency_symbols
         ),
         _currencyPattern=symbols.currency_pattern,
+        _localeIdentifier=locale.locale_identifier,
     )
     identities = readTableIdentities(index)
     for reference in root.sheets:

@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-27  `localeIdentifier`, the language and region a document shows its
+            values in, for PYB-272.
 2026-10-27  `partSelect`, the sheet, table, range or cell a selector names, and
             every refusal listing names quoting each, for PYB-260.
 2026-10-24  The unread `graphicalObjects` scaffold removed, and the table naming
@@ -337,6 +339,15 @@ class Document:
         default_factory=frozendict, repr=False, compare=False
     )
     _currencyPattern: str = field(default="", repr=False, compare=False)
+    _localeIdentifier: str | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def localeIdentifier(self) -> str | None:
+        """Return the language and region this document shows its values in, `en_IT`.
+
+        None for a document built in memory, which has none until it is saved.
+        """
+        return self._localeIdentifier
 
     @property
     def currencyPattern(self) -> str:
