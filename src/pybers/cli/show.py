@@ -177,11 +177,10 @@ def formatPart(part: DocumentPart) -> RenderableType:
 
 
 def findRangeTable(document: pybers.Document, extent: pybers.CellRange) -> pybers.Table:
-    """Return the table a selected range names, with the sheet `partSelect` names."""
-    named = extent.table
-    if named is None or named.sheet is None:
-        raise pybers.SelectionError(f"{extent} names no sheet and table.")
-    return document.sheet(named.sheet.name).table(named.name)
+    """Return a selected range's table, which `partSelect` names with its sheet."""
+    table = document.partSelect(str(extent.table))
+    assert isinstance(table, pybers.Table)
+    return table
 
 
 def printRange(
