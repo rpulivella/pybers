@@ -388,6 +388,30 @@ the version by one. A reader refuses any version but its own.
 
 ---
 
+## A document's language and region, decided 2026-10-27
+
+A document is changed to a language and region as Numbers changes it, for PYB-272, and
+`docs/findings/findings-12-language-and-region.md` records what Numbers rewrites.
+
+**Formula text stays in its English, `en_US` form** whatever the document's language and
+region. Numbers stores the same formula nodes in every locale and only displays them with
+the region's separators and the language's function names, so the text pybers reads and
+writes names the formula exactly, and one form serves every document.
+
+**A region pybers offers comes from a document Numbers wrote for it.** The locale snapshot
+is macOS's locale data, which pybers cannot regenerate, so changing a region copies the
+snapshot, `locale_identifier`, `document_language` and `has_user_defined_locale` as they
+stand in the measurement Numbers saved for that region, and pybers composes none of them. The regions
+offered are the eight measured, one or more per inhabited continent, and any other is
+refused, naming those eight.
+
+**A region change marks every formula for recalculation**, as an edit marks the cells it
+changes. A result such as `DOLLAR` or `FIXED` depends on the region, and pybers calculates
+nothing, so Numbers recalculates them when it opens the document. The golden for each
+region confirms that Numbers does.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on
