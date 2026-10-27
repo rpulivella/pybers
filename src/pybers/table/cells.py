@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-27  `reference`, how to point at the table, and a range naming another
+            table refused, for PYB-260.
 2026-10-20  `Cell` moved to `cell`, keeping this module within its limit, for
             PYB-217.
 2026-10-20  A cell sits at a `CellAddress`, and `cell.reference` names it from
@@ -63,7 +65,7 @@ __date__ = "2026/09/02"
 
 import uuid
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -288,17 +290,17 @@ class Table:
         """
         return [self.cell(reference) for reference in listRangePositions(self, address)]
 
+    @property
+    def reference(self) -> TableReference:
+        """Return how to point at this table from anywhere: its name and its sheet's."""
+        sheet = self.sheet
+        return TableReference(
+            sheet=None if sheet is None else SheetReference(sheet.name), name=self.name
+        )
+
     def _addressQualify(self, address: CellAddress) -> CellReference:
         """Return a reference to an address here, naming this table and its sheet."""
-        sheet = self.sheet
-        return CellReference(
-            address.row,
-            address.col,
-            table=TableReference(
-                sheet=None if sheet is None else SheetReference(sheet.name),
-                name=self.name,
-            ),
-        )
+        return CellReference(address.row, address.col, table=self.reference)
 
     def _addressResolve(self, reference: CellReferenceLike) -> CellAddress:
         """Return where a reference points in this table, refusing one naming another.
@@ -307,17 +309,27 @@ class Table:
         is taken from the directory it is used in.
         """
         found = toCellReference(reference)
-        named = found.table
+        self._tableNamedCheck(found.table, found)
+        return found.address
+
+    def _rangeResolve(self, item: CellRange) -> CellRange:
+        """Return a range as this table's own, refusing one naming another table."""
+        self._tableNamedCheck(item.table, item)
+        return replace(item, table=None)
+
+    def _tableNamedCheck(self, named: TableReference | None, found: object) -> None:
+        """Refuse a reference or a range naming a table other than this one."""
         if named is None:
-            return found.address
+            return
         sheet = self.sheet
         if named.name.casefold() == self.name.casefold() and (
             named.sheet is None
             or (sheet is not None and named.sheet.name == sheet.name)
         ):
-            return found.address
-        here = self.name if sheet is None else f"{sheet.name}::{self.name}"
-        raise ReferenceError(f"{found} names another table, and this is {here}.")
+            return
+        raise ReferenceError(
+            f"{found} names another table, and this is {self.reference}."
+        )
 
     def addressable(self, address: CellReferenceLike) -> bool:
         """Report whether an address names a cell this table can hand over.
@@ -427,7 +439,7 @@ class Table:
             raise ReferenceError(
                 f"A {action} covers one block, and {address} names {len(ranges)}."
             )
-        item = ranges[0]
+        item = self._rangeResolve(ranges[0])
         if item.rowsUnbounded or item.colsUnbounded:
             raise ReferenceError(
                 f"{item} is unbounded, and a {action} covers a fixed block of cells."

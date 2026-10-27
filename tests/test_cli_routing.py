@@ -3,6 +3,7 @@
 `pybers FILE` runs `check --names`, and every command is still reached by its name.
 
 UPDATES
+2026-10-27  A size of one row reads `1 row`, for PYB-260.
 2026-10-12  Written for PYB-187.
 """
 from __future__ import annotations
@@ -32,7 +33,7 @@ def testAFileAloneRunsCheckWithNames() -> None:
     result = runner.invoke(app, [str(baselinePath)])
     assert result.exit_code == 0
     assert "Readable: yes" in result.stdout
-    assert "└ Table 1: 1 rows, 1 columns" in result.stdout
+    assert "└ Table 1: 1 row, 1 column" in result.stdout
 
 
 def testNoArgumentsPrintsTheHelp() -> None:

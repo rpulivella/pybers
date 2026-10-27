@@ -139,7 +139,7 @@
     },
     "CellForm": {
       "type": "object",
-      "description": "One cell as the JSON form holds it, in the order PYB-260's `pybers show` uses.",
+      "description": "One cell as the JSON form holds it, in the order `pybers show` prints it.",
       "properties": {
         "address": {
           "type": "string",

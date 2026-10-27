@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-27  `partSelect`, the sheet, table, range or cell a selector names, and
+            every refusal listing names quoting each, for PYB-260.
 2026-10-24  The unread `graphicalObjects` scaffold removed, and the table naming
             rule a function the JSON form shares, and `_ownersLink` the one
             linking the reader and the JSON form share, for PYB-259.
@@ -65,6 +67,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
     CellReferenceLike,
     lastColumn,
@@ -103,17 +106,17 @@ class Named(Protocol):
     name: str
 
 
-def listNames(items: Sequence[Named]) -> str:
-    """Return the names present, for an error message that says what to ask for."""
-    if not items:
-        return "nothing"
-    return ", ".join(repr(item.name) for item in items)
+def listPresent(kind: str, names: Sequence[str]) -> str:
+    """Return the sentence ending a refusal with the names present, to ask for one."""
+    if not names:
+        return f"It holds no {kind}s."
+    return f"The {kind}s are {', '.join(repr(name) for name in names)}."
 
 
-def selectByName[NamedT: Named](
+def findByName[NamedT: Named](
     items: Sequence[NamedT], name: str, kind: str, within: str, foldCase: bool
-) -> NamedT:
-    """Return the one item carrying a name, raising when none or several do.
+) -> NamedT | None:
+    """Return the one item carrying a name, None when none does, refusing several.
 
     Case folding is a per-kind fact rather than a convenience. Numbers treats two
     table names differing only in case as one name and will not create both, so
@@ -127,18 +130,26 @@ def selectByName[NamedT: Named](
         for position, item in enumerate(items, start=firstPosition)
         if (item.name.casefold() if foldCase else item.name) == wanted
     ]
-    if not matched:
-        raise SelectionError(
-            f"No {kind} in {within} is named {name!r}. "
-            f"Present: {listNames(items)}."
-        )
     if len(matched) > 1:
         positions = ", ".join(str(position) for position, _ in matched)
         raise SelectionError(
             f"{len(matched)} {kind}s in {within} are named {name!r}, at positions "
             f"{positions}. Reach one by position instead."
         )
-    return matched[0][1]
+    return matched[0][1] if matched else None
+
+
+def selectByName[NamedT: Named](
+    items: Sequence[NamedT], name: str, kind: str, within: str, foldCase: bool
+) -> NamedT:
+    """Return the one item carrying a name, raising when none or several do."""
+    found = findByName(items, name, kind, within, foldCase)
+    if found is None:
+        raise SelectionError(
+            f"No {kind} in {within} is named {name!r}. "
+            f"{listPresent(kind, [item.name for item in items])}"
+        )
+    return found
 
 
 def selectByPosition[NamedT: Named](
@@ -225,6 +236,10 @@ class Sheet:
         return selectItem(
             self.tables, nameOrPosition, "table", repr(self.name), foldCase=True
         )
+
+    def _tableFind(self, name: str) -> Table | None:
+        """Return this sheet's table of a name, None when none has it."""
+        return findByName(self.tables, name, "table", repr(self.name), foldCase=True)
 
     def cell(self, reference: CellReferenceLike) -> Cell:
         """Return the cell a reference names on this sheet, its table named in it.
@@ -352,6 +367,10 @@ class Document:
             self.sheets, nameOrPosition, "sheet", "this document", foldCase=False
         )
 
+    def _sheetFind(self, name: str) -> Sheet | None:
+        """Return the one sheet of a name, None when none has it, refusing several."""
+        return findByName(self.sheets, name, "sheet", "this document", foldCase=False)
+
     def sheetAdd(self, name: str, position: int | None = None) -> Sheet:
         """Add an empty sheet, last or at a position counted from one, and return it.
 
@@ -429,33 +448,56 @@ class Document:
             )
         if found.sheet is not None:
             return self.sheet(found.sheet.name).table(found.table.name)
-        wanted = found.table.name.casefold()
+        return self._tableRequire(found.table.name)
+
+    def _tableFind(self, name: str) -> Table | None:
+        """Return the one table of a name in the document, None when no table has it.
+
+        A name two sheets share is refused with both qualified names, so no caller
+        settles an ambiguity by taking the first.
+        """
+        wanted = name.casefold()
         matches = [
-            (sheet, table)
-            for sheet in self.sheets
-            for table in sheet.tables
+            (sheet, table) for sheet in self.sheets for table in sheet.tables
             if table.name.casefold() == wanted
         ]
-        if len(matches) == 1:
-            return matches[0][1]
-        if matches:
+        if len(matches) > 1:
             shared = ", ".join(
-                f"{sheet.name}{tableNameSeparator}{table.name}"
+                repr(f"{sheet.name}{tableNameSeparator}{table.name}")
                 for sheet, table in matches
             )
             raise SelectionError(
-                f"{found.table.name!r} names a table on more than one sheet. Name "
-                f"one of them: {shared}."
+                f"{name!r} names a table on more than one sheet. Name one of them: "
+                f"{shared}."
             )
-        every = ", ".join(
+        return matches[0][1] if matches else None
+
+    def _tableRequire(self, name: str) -> Table:
+        """Return the one table of a name in the document, refusing a name none has."""
+        table = self._tableFind(name)
+        if table is None:
+            raise SelectionError(
+                f"No table in this document is named {name!r}. "
+                f"{listPresent('table', self._tableNamesList())}"
+            )
+        return table
+
+    def _tableNamesList(self) -> list[str]:
+        """Return every table's name qualified by its sheet's, in the sheets' order."""
+        return [
             f"{sheet.name}{tableNameSeparator}{table.name}"
-            for sheet in self.sheets
-            for table in sheet.tables
-        )
-        raise SelectionError(
-            f"No table in this document is named {found.table.name!r}. The tables "
-            f"are {every}."
-        )
+            for sheet in self.sheets for table in sheet.tables
+        ]
+
+    def partSelect(self, selector: str) -> Sheet | Table | CellRange | Cell:
+        """Return the sheet, table, range or cell a selector names, such as `Q3::B2:D5`.
+
+        A range names its sheet and table. A name is read as the widest part it names,
+        a sheet before a table, so a table sharing its sheet's name is `Q3::Q3`.
+        """
+        from pybers.document.selection import selectPart
+
+        return selectPart(self, selector)
 
     def tableFor(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.

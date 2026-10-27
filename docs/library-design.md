@@ -64,8 +64,9 @@ One syntax, Numbers' own, parsed by the library for every caller:
 | `Q*::*` | Every table of every sheet whose name starts with `Q` |
 | `Budget::*, Notes::Table 1` | Several selectors at once |
 
+- **`document.partSelect(selector)` returns the sheet, table or cell a selector names, or a `CellRange` naming its sheet and table**, one to three names joined by `::`. A name is read as the widest part it names, a sheet before a table and a table before a cell, so a narrower part is always reachable by naming more of its path.
 - **An address names, never counts.** A sheet or table in an address is reached by its name, so nobody writing one has to know whether a count starts at 0 or 1.
-- **An ambiguous address is refused**, listing the matches.
+- **An ambiguous address is refused**, listing the matches, and a name that matches nothing is refused listing what the document holds, each name quoted.
 - **A wildcard matches names in the shell's style**, with `*` and `?`.
 
 ## One call per command

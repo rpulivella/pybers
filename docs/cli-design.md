@@ -24,7 +24,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `diff A B` | The cells that differ between two documents |
 | `visinum FILE [ADDRESS]` | The read-only terminal browser |
 
-`check`, `set` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
+`check`, `show`, `set` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
 
 - **The default action** comes from a `TyperGroup` subclass that routes a first argument naming no command to `check --names`. A file named like a command is reached as `./check`.
 - **`python -m pybers`** runs the same command.
@@ -56,6 +56,10 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **Each line opens with the shortest label that names its value**, then `: ` and the value: `Readable: yes`, `OS: macOS-26.6.1`.
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
+- **A count names its noun in the number it agrees with**: `1 row`, `10 rows`, through `formatCount` in `pybers.cli._report`, which holds every line more than one command prints.
+- **A flag reads `yes` or `no`.**
+- **Several parts print one after another, a blank line between each**, and each opens with a line naming it in full: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`.
+- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`. A format or a control prints its family, then each setting in parentheses: `slider (minimum 0, maximum 100, increment 1)`, and `tests/test_cli_show.py` fails for one whose settings it does not print.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
   ```
@@ -146,3 +150,4 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 | [jq and yq](https://jqlang.org/manual/) | A path syntax, and a lossless round trip, which yq's in-place mode lacks |
 | [VisiData](https://www.visidata.org/docs/api/) | A browser over the same engine, opening at a given cell |
 | [ruff](https://docs.astral.sh/ruff/linter/), [git diff](https://git-scm.com/docs/git-diff) | Exit status 1 for a finding, 2 for a usage error |
+| [The Rust compiler](https://rustc-dev-guide.rust-lang.org/diagnostics.html) | The standard for every message: one that stands on its own, the place it points at, and a fix offered apart from the fault |

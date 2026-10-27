@@ -6,6 +6,7 @@ Each test edits a copy of `20-formula-shapes`, whose `Table 2` is ten rows by fi
 columns and named on one sheet only, while `Table 1` is named on two.
 
 UPDATES
+2026-10-27  Each listed table name quoted, for PYB-260.
 2026-10-24  A number read back as the JSON number it is printed as, and a duration
             as ISO 8601, for PYB-259.
 2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
@@ -137,7 +138,7 @@ def testExtendGrowsTheTableToHoldTheCell(working: Path) -> None:
 def testAnAmbiguousTableIsRefusedListingTheMatches(working: Path) -> None:
     result = runSetCommand(str(working), "Table 1::B2", "1", "--in-place")
     assert result.exit_code == 1
-    assert "Sheet 1::Table 1, Sheet 2::Table 1" in result.stderr
+    assert "'Sheet 1::Table 1', 'Sheet 2::Table 1'" in result.stderr
 
 
 def testJsonReportsTheChangeAsTheLibraryReturnsIt(working: Path) -> None:

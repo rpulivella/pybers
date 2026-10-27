@@ -6,6 +6,8 @@ Its own module so that copying, filling and moving import it at the top: the tab
 needs these too, and reaching them through `cells` made each a cycle.
 
 UPDATES
+2026-10-27  A whole row or column is checked on its bounded axis, and a range
+            naming another table refused, for PYB-260.
 2026-10-14  Moved here from `cells.py`, for PYB-193.
 """
 from __future__ import annotations
@@ -31,7 +33,8 @@ def listRangePositions(table: Table, address: CellRangeLike) -> list[CellAddress
     """Return the positions ranges cover, checking every range before returning any."""
     extent = table.extent
     items = []
-    for item in toCellRanges(address):
+    for named in toCellRanges(address):
+        item = table._rangeResolve(named)
         if item.rowsUnbounded or item.colsUnbounded:
             if extent is None:
                 continue
@@ -44,11 +47,16 @@ def listRangePositions(table: Table, address: CellRangeLike) -> list[CellAddress
 
 
 def refuseRangeOutside(table: Table, item: CellRange) -> None:
-    """Refuse a bounded range with a corner outside a table's declared grid."""
+    """Refuse a range with a corner outside a table's declared grid.
+
+    A whole row or column is bounded by the grid first, so only its bounded axis
+    can reach outside, and the refusal names the range as it was written.
+    """
     extent = table.extent
+    bounded = item if extent is None else item.boundedBy(extent)
     if extent is None or not all(
         corner is not None and extent.covers(corner)
-        for corner in (item.start, item.end)
+        for corner in (bounded.start, bounded.end)
     ):
         raise ReferenceError(
             f"{item} reaches outside {table.name!r}, which is {table.rowCount} "

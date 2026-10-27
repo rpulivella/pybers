@@ -3,6 +3,8 @@
 The rule each value follows in the JSON form, and what reading one refuses.
 
 UPDATES
+2026-10-27  A range narrowing a table may name it, and not another, for
+            PYB-260.
 2026-10-24  Written for PYB-259, taking the value rules `test_cli_formats` held.
 """
 from __future__ import annotations
@@ -237,6 +239,16 @@ def testOnlyATableIsNarrowedToARange() -> None:
 def testATableIsNarrowedToOneRangeAlone() -> None:
     with pytest.raises(pybers.JsonFormError, match="names 2"):
         pybers.formatJsonForm(buildTable(Decimal(1)), "A1, B2")
+
+
+def testATableIsNarrowedByARangeNamingIt() -> None:
+    table = buildTable(Decimal(1), Decimal(2))
+    assert readTree(pybers.formatJsonForm(table, "Values::A2"))["extent"] == "A2"
+
+
+def testATableIsNotNarrowedByARangeNamingAnother() -> None:
+    with pytest.raises(pybers.ReferenceError, match="names another table"):
+        pybers.formatJsonForm(buildTable(Decimal(1)), "Elsewhere::A1")
 
 
 def testACellOutsideAnyTableHasNoForm() -> None:

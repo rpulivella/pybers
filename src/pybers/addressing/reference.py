@@ -16,6 +16,8 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-10-27  `splitTableName`, the table a reference or a range names, for
+            PYB-260.
 2026-10-20  A reference reads the table and sheet its text names, for PYB-217.
 2026-10-20  `CellOffset`, a signed distance, and the arithmetic between it and an
             address, for PYB-217.
@@ -282,6 +284,16 @@ class TableReference:
         return f"{self.sheet}{tableNameSeparator}{self.name}"
 
 
+def splitTableName(text: str) -> tuple[TableReference | None, str]:
+    """Return the table written before the last `::`, if any, and what follows it."""
+    tableName, separator, rest = text.strip().rpartition(tableNameSeparator)
+    if not separator:
+        return None, rest
+    sheetName, sheetSeparator, name = tableName.rpartition(tableNameSeparator)
+    sheet = SheetReference(sheetName) if sheetSeparator else None
+    return TableReference(sheet=sheet, name=name), rest
+
+
 @dataclass(frozen=True, slots=True)
 class CellReference:
     """How something points at a cell: its address, a lock per axis, and a table.
@@ -319,14 +331,7 @@ class CellReference:
         part of what was written and has to survive being read back out. A table is
         named as far as the text names it, and no further.
         """
-        text = reference.strip()
-        tableName, separator, cellText = text.rpartition(tableNameSeparator)
-        table = None
-        if separator:
-            sheetName, sheetSeparator, name = tableName.rpartition(tableNameSeparator)
-            table = TableReference(
-                sheet=SheetReference(sheetName) if sheetSeparator else None, name=name
-            )
+        table, cellText = splitTableName(reference)
         match = cellPattern.match(cellText.strip())
         if match is None:
             raise ReferenceError(f"{reference!r} is not an A1-style cell reference.")

@@ -9,6 +9,8 @@ pybers opened the document, and 1 means it could not, or that the file could not
 be checked.
 
 UPDATES
+2026-10-27  Report lines and the sheet outline shared with `show`, a size of one
+            row reading `1 row`, for PYB-260.
 2026-10-12  `--format json` prints the same facts, and an uninstalled pybers reads
             unknown, for PYB-187.
 2026-10-12  A part a check could not determine reads unknown, for PYB-190.
@@ -36,12 +38,7 @@ import pybers
 from pybers.cli._common import findCommandSettings, reportPybersErrors
 from pybers.cli._console import TreeCompact, statusConsole
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
-
-
-def formatLine(label: str, *value: str | tuple[str, str]) -> Text:
-    """Return `label: value`, the label dimmed and a bare string as a bold value."""
-    parts = [(part, "value") if isinstance(part, str) else part for part in value]
-    return Text.assemble((f"{label}: ", "label"), *parts)
+from pybers.cli._report import formatLine, formatSheetTree
 
 
 def formatPybersVersion(found: str | pybers.UNDETERMINED) -> str:
@@ -84,28 +81,13 @@ def formatReadable(failure: pybers.CheckFailure | None) -> list[Text]:
     ]
 
 
-def formatTable(table: pybers.CheckTable) -> Text:
-    """Return a table as `name: 10 rows, 7 columns`."""
-    return Text.assemble(
-        (table.name, "value"),
-        (": ", "label"),
-        (f"{table.rowCount} rows, {table.colCount} columns", "value"),
-    )
-
-
 def formatSheets(
     sheets: tuple[pybers.CheckSheet, ...] | pybers.UNDETERMINED,
 ) -> list[RenderableType]:
     """Return the sheets heading, then one tree per sheet holding its tables."""
     if sheets is pybers.UNDETERMINED:
         return [formatLine("Sheets", "unknown")]
-    shown: list[RenderableType] = [Text("Sheets:", "label")]
-    for sheet in sheets:
-        tree = TreeCompact(Text(sheet.name, "value"), guide_style="label")
-        for table in sheet.tables:
-            tree.add(formatTable(table))
-        shown.append(tree)
-    return shown
+    return [Text("Sheets:", "label"), *(formatSheetTree(sheet) for sheet in sheets)]
 
 
 def formatUnrecognizedCells(

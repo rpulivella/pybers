@@ -13,6 +13,7 @@ constructed in the test, which is the honest way to test a defense against somet
 the documents have no example of.
 
 UPDATES
+2026-10-27  An empty container says it holds none, for PYB-260.
 2026-09-02  Written for #14.
 """
 from __future__ import annotations
@@ -137,10 +138,10 @@ def test_askingAnEmptyContainerSaysNothingIsPresent() -> None:
     """An empty list still has to produce a sentence, not a dangling colon."""
     with pytest.raises(SelectionError) as raised:
         Sheet(name="Empty").table("Anything")
-    assert "Present: nothing." in str(raised.value)
+    assert str(raised.value).endswith("It holds no tables.")
     with pytest.raises(SelectionError) as raised:
         Document().sheet("Anything")
-    assert "Present: nothing." in str(raised.value)
+    assert str(raised.value).endswith("It holds no sheets.")
 
 
 def test_aTableNameMatchesRegardlessOfCase() -> None:

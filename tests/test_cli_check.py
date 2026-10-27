@@ -3,6 +3,8 @@
 `pybers check`, run the way a person reporting a bug runs it.
 
 UPDATES
+2026-10-27  A size of one row reads `1 row`, and `renderPlain` shared from
+            `conftest`, for PYB-260.
 2026-10-12  The JSON form and an uninstalled pybers's version, for PYB-187.
 2026-10-12  Each reason a part is missing prints as the design says, for PYB-190.
 2026-10-07  Written for PYB-169.
@@ -33,11 +35,10 @@ from rich.text import Text
 from typer.testing import CliRunner
 
 import pybers
-from conftest import findDocumentPath
+from conftest import findDocumentPath, renderPlain
 from pybers._persistence import readPackage, writePackage
 from pybers.cli import main
 from pybers.cli._app import HelpSection, app
-from pybers.cli._console import theme
 from pybers.cli.check import formatCheck
 
 baselinePath: Path = findDocumentPath("00-baseline")
@@ -285,20 +286,13 @@ def testHelpAndUsageErrorsDrawNoBorders(arguments: list[str]) -> None:
     assert not set(output) & set("╭╮╰╯│─━┃┏┓┗┛")
 
 
-def renderPlain(renderable: object) -> str:
-    """Return what a renderable prints on a terminal without color."""
-    buffer = io.StringIO()
-    Console(file=buffer, width=100, no_color=True, theme=theme).print(renderable)
-    return buffer.getvalue()
-
-
 def testANameInBracketsPrintsAsWritten() -> None:
     found = pybers.checkDocument(baselinePath)
     table = pybers.CheckTable("[draft]", 1, 1)
     names = pybers.CheckNames((pybers.CheckSheet("[bold]Q3", (table,)),), ())
     printed = renderPlain(formatCheck(replace(found, names=names)))
     assert "\n[bold]Q3\n" in printed
-    assert "└ [draft]: 1 rows, 1 columns" in printed
+    assert "└ [draft]: 1 row, 1 column" in printed
 
 
 @pytest.mark.parametrize(

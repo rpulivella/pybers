@@ -11,6 +11,7 @@ draws the title over the table. `tests/test_cli_check.py` fails if a Typer relea
 brings the borders back. See `docs/cli-design.md`.
 
 UPDATES
+2026-10-27  `show` registered, for PYB-260.
 2026-10-20  `set` registered, for PYB-217.
 2026-10-12  A first argument naming no command runs check --names on it, for PYB-187.
 2026-10-07  Written for PYB-169.
@@ -40,6 +41,7 @@ from typer._click import Command, Context
 from pybers.cli._common import CommandSettings
 from pybers.cli.check import runCheck
 from pybers.cli.set import runSet
+from pybers.cli.show import runShow
 
 
 class HelpSection:
@@ -121,6 +123,7 @@ def runPybers(
 
 app.command("check")(runCheck)
 app.command("set")(runSet)
+app.command("show")(runShow)
 
 
 __all__ = ["app"]

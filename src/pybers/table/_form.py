@@ -12,6 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
+2026-10-27  The order `pybers show` prints, now that it is built, for PYB-260.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -54,7 +55,7 @@ valuelessKinds: frozenset[CellKind] = frozenset(
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CellForm:
-    """One cell as the JSON form holds it, in the order PYB-260's `pybers show` uses."""
+    """One cell as the JSON form holds it, in the order `pybers show` prints it."""
 
     address: CellAddress
     value: CellValue

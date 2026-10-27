@@ -14,6 +14,8 @@ and this package owns only the mechanism, so a feature adding a field adds no co
 here.
 
 UPDATES
+2026-10-27  A range narrowing a table may name it, and one naming another is
+            refused, for PYB-260.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -112,7 +114,7 @@ def buildJsonForm(subject: object, extent: CellRangeLike | None) -> object:
             if extent is None:
                 table = buildTableForm(subject)
                 return TableJsonForm(jsonFormVersion, sheetName, table, entries)
-            narrowed = findOneRange(extent)
+            narrowed = subject._rangeResolve(findOneRange(extent))
             table = buildTableForm(subject, narrowed)
             return RangeJsonForm(jsonFormVersion, sheetName, narrowed, table, entries)
         case Cell(table=None):
