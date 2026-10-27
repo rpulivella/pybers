@@ -21,8 +21,9 @@ functions_extract.py derive the table of formula functions, each with its index,
                      src/pybers/_generated/functions.py
 golden_confirm.py    confirm a golden in running Numbers and write a report of what
                      Numbers shows, through a helper app that holds the permissions
-                     so Terminal holds none. Backs `/golden-confirm`, and nothing in
-                     the preflight, CI or the suite runs it
+                     so Terminal holds none. Backs `/golden-confirm`, and its
+                     `measure` backs `/fixture-create`. Nothing in the preflight, CI
+                     or the suite runs it
 jsonform_schema.py   generate the JSON Schema of pybers' JSON form from the model.
                      Writes src/pybers/interchange/schema.json, which a test holds
                      to the model
