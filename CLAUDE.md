@@ -169,6 +169,10 @@ is measured against a fixture here before pybers relies on it, as the findings r
 pybers in a terminal. Read it before writing a command, and add a convention there
 before a second command needs it.
 
+**The Rust compiler's diagnostics are the standard every message is measured
+against**: a message that stands on its own, the place it points at, and a fix
+offered apart from the fault. Its guide is in the inspirations of `docs/cli-design.md`.
+
 ## Comments and docstrings
 
 Verbosity is this repository's standing failure. Prefer precise names and small
