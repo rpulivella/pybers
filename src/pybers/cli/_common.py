@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """\
-What every command shares: the root options, and how a pybers error reaches a person.
+What every command shares: the root options, where a write goes, and how a pybers
+error reaches a person.
 
 The root callback stores `CommandSettings` on Typer's context object, which is
 how Typer hands a group's options down to its commands.
 
 UPDATES
+2026-10-28  Where a write goes, shared by `set` and `locale`, for PYB-272.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -21,6 +23,7 @@ __date__ = "2026/10/07"
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 
 import typer
 from rich.text import Text
@@ -56,4 +59,30 @@ def reportPybersErrors(context: typer.Context) -> Generator[None]:
         raise typer.Exit(1) from exc
 
 
-__all__ = ["CommandSettings", "findCommandSettings", "reportPybersErrors"]
+def findSaveTarget(
+    documentPath: Path, inPlace: bool, output: Path | None, preview: bool
+) -> Path | None:
+    """Return where the document is written, None for a preview, or refuse the flags."""
+    if inPlace and output is not None:
+        raise typer.BadParameter("Give --in-place or -o, not both.")
+    if output is not None and output.exists():
+        raise typer.BadParameter(
+            f"{output} already exists. Use --in-place to change a document where it "
+            "is, or name a new file."
+        )
+    if inPlace:
+        return documentPath
+    if output is None and not preview:
+        raise typer.BadParameter(
+            "Name where the document is written, with --in-place or -o NEW, or show "
+            "the change alone with --preview."
+        )
+    return output
+
+
+__all__ = [
+    "CommandSettings",
+    "findCommandSettings",
+    "findSaveTarget",
+    "reportPybersErrors",
+]

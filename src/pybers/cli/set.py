@@ -6,6 +6,7 @@ The command reads the text into a value, makes one `cellSet` call, and saves onl
 when the cell changed and the call was not a preview.
 
 UPDATES
+2026-10-28  Where a write goes shared with `locale`, for PYB-272.
 2026-10-27  Report lines shared with `show`, growth by one row reading `1 row`,
             for PYB-260.
 2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
@@ -30,7 +31,7 @@ from rich.console import Group
 from rich.text import Text
 
 import pybers
-from pybers.cli._common import reportPybersErrors
+from pybers.cli._common import findSaveTarget, reportPybersErrors
 from pybers.cli._console import statusConsole
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
 from pybers.cli._report import formatCount, formatLine
@@ -56,27 +57,6 @@ def formatChange(change: pybers.CellChange) -> Group:
             f"{formatCount(change.colsAdded, 'column')}",
         ))
     return Group(*lines)
-
-
-def findSaveTarget(
-    documentPath: Path, inPlace: bool, output: Path | None, preview: bool
-) -> Path | None:
-    """Return where the document is written, None for a preview, or refuse the flags."""
-    if inPlace and output is not None:
-        raise typer.BadParameter("Give --in-place or -o, not both.")
-    if output is not None and output.exists():
-        raise typer.BadParameter(
-            f"{output} already exists. Use --in-place to change a document where it "
-            "is, or name a new file."
-        )
-    if inPlace:
-        return documentPath
-    if output is None and not preview:
-        raise typer.BadParameter(
-            "Name where the document is written, with --in-place or -o NEW, or show "
-            "the change alone with --preview."
-        )
-    return output
 
 
 def runSet(
