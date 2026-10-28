@@ -238,6 +238,9 @@ functions over explanation.
 
 - Mutate the archives that were read rather than constructing new ones, so whatever the
   model does not yet represent survives untouched.
+- **Compose every field pybers writes from the model and the data it is measured
+  against, never by copying bytes or captured archives from another document.** A cell's
+  value, a formula and a locale are each built as Numbers builds them.
 - Stage a complete package outside the destination and install it atomically. Unique
   temporary paths, cleaned on success and on failure alike.
 - Never write into a `.numbers` file the user may have open.
