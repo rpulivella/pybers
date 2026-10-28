@@ -20,11 +20,12 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `show FILE [SELECTOR]` | A small part of a document, for reading |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o` |
 | `set FILE ADDRESS VALUE` | One cell's value or formula |
+| `locale FILE [LOCALE]` | A document's language and region, or a change to it, and the regions offered |
 | `import FILE DATA` | Data brought into a document, at addresses or as a new one |
 | `diff A B` | The cells that differ between two documents |
 | `visinum FILE [ADDRESS]` | The read-only terminal browser |
 
-`check`, `show`, `set` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
+`check`, `show`, `set`, `locale` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
 
 - **The default action** comes from a `TyperGroup` subclass that routes a first argument naming no command to `check --names`. A file named like a command is reached as `./check`.
 - **`python -m pybers`** runs the same command.

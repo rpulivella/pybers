@@ -23,6 +23,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellPresentation` | How a cell shows its value: its format, whether a person chose it, and its control | Frozen |
 | `CellControl` | The control a cell presents its value through, beside its format: one dataclass per control under `CellControlBase`, `CellControlUnknown` included | Frozen |
 | `CellChange` | What a write did to one cell, or would do in a preview: value and kind before and after, and how far the table grew | Frozen |
+| `LocaleChange` | What a region change did to a document, or would do in a preview: its locale before and after | Frozen |
 | `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
@@ -89,6 +90,10 @@ A value's kind follows its Python type, as the table above lists. A currency amo
 - **A table's structure is readable**: each column's kind and format, and the cells that differ from them.
 
 The reasoning is in `decisions.md`, under writing values and formats.
+
+## A document's language and region
+
+`document.localeIdentifier` is the language and region a document shows its values in, such as `de_DE`, and `document.localeSet("de_DE")` changes it as Numbers' Language & Region does, returning a `LocaleChange`, with `preview=True` changing nothing. `pybers.locales` lists the regions offered, and any other is refused with a `LocaleError` naming the closest. The save builds each locale field from a table pybers reads from macOS's own locale data before a release, and marks every formula for recalculation, since a result such as `DOLLAR` follows the region. The reasoning is in `decisions.md`, under a document's language and region.
 
 ## The JSON form
 

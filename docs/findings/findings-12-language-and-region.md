@@ -155,6 +155,27 @@ that differ:
 `ja_JP`'s pattern shows the yen's zero decimals, which Babel applies only when it
 formats. The rest are a CLDR release apart or Apple's tailoring.
 
+**Every field can be composed from macOS itself.** Read through ICU's C interface,
+with two values taken from Foundation, the 48 fields of each measured region match what
+Numbers wrote, all 384 across the eight:
+
+- 46 fields come from ICU: the names through `udat_getSymbols`, the date and time
+  patterns through `udat_toPattern`, the number symbols through `unum_getSymbol`, the
+  number patterns through `unum_toPattern`, the numbering system through `unumsys`, and
+  the currency code through `ucurr_forLocale`. `calendar` is `gregorian` throughout.
+- `currency_symbols` lists every currency ICU knows, current or historic, whose symbol
+  in the region differs from its ISO code, by `ucurr_getName`, sorted by code.
+- `version` is CoreFoundation's `kCFCoreFoundationVersionNumber`, 5026.6, written with
+  two decimals as `5026.60`.
+- `infinity_symbol` is `NSNumberFormatter`'s `positiveInfinitySymbol`, `+∞` in every
+  region, even where ICU and CoreFoundation write `∞` and the region's own plus sign
+  differs, as under `ar_SA`, `fa_IR` and `he_IL`.
+
+`tools/local/locales_extract.py` reads these into `src/pybers/_generated/locales.py`
+for each of 335 regions: every locale ICU holds data of its own for, with a region, in a
+language Numbers' Language menu offers, Chinese left out until a measurement shows how
+Numbers writes its script subtag.
+
 CLDR has released twice a year since version 36 on 4 October 2019, in the spring and the
 autumn, with point releases between: 46 on 24 October 2024, 47 on 13 March 2025, 48 on
 29 October 2025 and 49 on 22 October 2026. macOS 26.6.1 carries 48, one release behind

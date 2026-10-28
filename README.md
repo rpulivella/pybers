@@ -10,7 +10,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 [![health](https://github.com/rpulivella/pybers/actions/workflows/health.yml/badge.svg?branch=develop)](https://github.com/rpulivella/pybers/actions/workflows/health.yml)
 [![License](https://img.shields.io/github/license/rpulivella/pybers)](LICENSE)
 
-> **Status, 27 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has three commands, `pybers check`, `pybers show` and `pybers set`, and nothing is on PyPI yet.
+> **Status, 28 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has four commands, `pybers check`, `pybers show`, `pybers set` and `pybers locale`, and nothing is on PyPI yet.
 
 ## Command line
 
@@ -205,7 +205,17 @@ $ pybers show shapes.numbers "Table 2" --format json
 
 </details>
 
-All three install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
+`pybers locale FILE` prints a document's language and region and the regions pybers offers, by language, and `pybers locale FILE LOCALE` changes it as Numbers' Language & Region does, writing the way `pybers set` writes:
+
+```console
+$ pybers locale budget.numbers de_DE --in-place
+Before: en_US
+After: de_DE
+```
+
+The document then shows its numbers, dates and currencies as Germany writes them, `1.234,50 €`, and Numbers recalculates every formula when it opens it, since a result such as `DOLLAR` follows the region. pybers builds each locale field from macOS's own locale data, read into pybers before a release, so it writes a region exactly as Numbers would, on any system pybers runs on.
+
+All four install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
 
 ## Python library
 
@@ -234,6 +244,7 @@ costs.cell("E4").value = True
 document.cellSet("Summary::Costs::B6", Decimal("300.00"))
 costs.cell("B5").formulaText = "=SUM(B1:B4)"
 costs.rowAdd(6)
+document.localeSet("de_DE")  # Numbers' Language & Region, one of pybers.locales
 
 document.save()
 ```
@@ -264,6 +275,7 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does
 - Merging and unmerging cells, and creating sheets and tables
 - Showing any sheet, table, range or cell at the command line, as text or as its JSON form
+- Changing a document's language and region as Numbers does, in any of 335 regions
 - Writing a document or any part of one as JSON, and reading it back exactly
 
 ### Planned
