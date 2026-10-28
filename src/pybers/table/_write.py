@@ -14,6 +14,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-10-28  `formulasMark`, every formula of a table marked for
+            recalculation, for PYB-272.
 2026-10-01  A save describes each cell it wrote once the package is on disk, for
             PYB-141.
 2026-09-29  A copied cell's borders are drawn after every edit, for PYB-136.
@@ -198,6 +200,14 @@ class TableSave:
         if edits.written or moved or recalculated:
             self.written[reference.identifier] = (
                 edits.written + sorted(moved) + recalculated
+            )
+
+    def formulasMark(self, table: Table, identifier: int) -> None:
+        """Mark every formula of a table for recalculation, as a region change needs."""
+        formulas = listModelFormulas(table)
+        if formulas:
+            self.written[identifier] = sorted(
+                {*self.written.get(identifier, []), *formulas}
             )
 
 

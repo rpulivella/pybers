@@ -19,6 +19,8 @@ Numbers opens with its charts, conditional formats and print settings quietly
 gone, rather than as an error.
 
 UPDATES
+2026-10-28  A changed region is written, marking every formula for
+            recalculation, for PYB-272.
 2026-09-01  Written for #2: the unchanged round trip.
 2026-09-01  Numeric edits reach the tile they came from, for #2.
 2026-09-02  Edited cells are marked for recalculation, for #25.
@@ -68,6 +70,7 @@ from ..errors import WriteError
 from ..table._write import TableSave, openTableSave
 from ..table.cells import Table
 from ._create import createSheets
+from ._locale import writeLocale
 from .sheets import Document, Sheet
 
 
@@ -84,6 +87,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave
     tables = openTableSave(document, registry)
     root = findRoot(index)
     tableInfoTypeId = findArchiveTypeId(tst.TableInfoArchive)
+    written: list[tuple[Table, int]] = []
 
     # Strict, because `createSheets` has made the two lists one list, and a plain
     # `zip` would stop at the shorter side in silence if that ever stopped holding.
@@ -101,7 +105,11 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave
             )
         for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
             tables.tableWrite(table, tableReference)
+            written.append((table, tableReference.identifier))
 
+    if writeLocale(document, index):
+        for table, identifier in written:
+            tables.formulasMark(table, identifier)
     requestRecalculation(index, tables.written)
     registry.save()
     return tables
