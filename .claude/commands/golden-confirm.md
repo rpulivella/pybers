@@ -31,8 +31,9 @@ pybers read the golden alike. The checks it leaves for QA remain yours.
    .venv/bin/python3 -m tools.local.golden_confirm run <golden> --preview
    .venv/bin/python3 -m tools.local.golden_confirm run <golden>
    ```
-   Numbers opens a copy hidden, and shows on screen for about a second. The run survives
-   switching desktops and full-screen apps, so the developer can keep working.
+   Numbers opens a copy hidden, and shows on screen for a moment at each screenshot, since
+   a hidden window cannot be captured. Between screenshots it stays hidden, so the
+   developer can keep working.
 4. **Relay the result:** the passed, failed and left-for-QA counts, every failure
    verbatim, and the report path
    `workarea/golden-confirm/PYB-<N>/<golden>/report.md`. Name each check left for QA
