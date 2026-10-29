@@ -6,6 +6,7 @@ A reading here is a dictionary of the shape the helper returns, so nothing drive
 Numbers.
 
 UPDATES
+2026-10-29  A formula checked as Numbers saved it, for PYB-272.
 2026-10-24  The machine form is the golden's JSON form, for PYB-259.
 2026-10-22  Written for PYB-255.
 """
@@ -165,15 +166,15 @@ def buildTable(*cells: ExpectedCell) -> ExpectedTable:
 def testAGridMatchingWhatPybersReadPassesInOneCheck() -> None:
     table = buildTable(buildCell())
     reading = buildReading([[buildFact("number", "1.0"), buildFact()]])
-    checks = report.checkTableGrid(table, reading)
+    checks = report.checkTableGrid(table, reading, {})
     assert [check.status for check in checks] == ["passed"] * 3
     assert "1 of them filled" in checks[0].detail
 
 
 def testAValueInACellPybersReadAsEmptyFails() -> None:
     reading = buildReading([[buildFact("number", "1.0"), buildFact("text", "stray")]])
-    failed = [check for check in report.checkTableGrid(buildTable(buildCell()), reading)
-              if check.status == "failed"]
+    checks = report.checkTableGrid(buildTable(buildCell()), reading, {})
+    failed = [check for check in checks if check.status == "failed"]
     assert [(check.subject, check.detail) for check in failed] == [
         ("Sheet 1 / Table 1 / B1", "value text `stray`, expected empty")
     ]
@@ -183,24 +184,46 @@ def testAFormatOtherThanTheOneExpectedFails() -> None:
     reading = buildReading([[buildFact("number", "1.0", formatKind="percent"),
                              buildFact()]])
     failed = [check.detail for check in
-              report.checkTableGrid(buildTable(buildCell()), reading)
+              report.checkTableGrid(buildTable(buildCell()), reading, {})
               if check.status == "failed"]
     assert failed == ["format `percent`, expected `automatic`"]
 
 
-def testAFormulaNumbersDoesNotHoldFails() -> None:
+def testAFormulaNumbersDidNotSaveFails() -> None:
     cell = buildCell(formula="=1+1", value=Decimal(2))
     reading = buildReading([[buildFact("number", "2.0"), buildFact()]])
-    failed = [check.detail for check in report.checkTableGrid(buildTable(cell), reading)
+    failed = [check.detail for check in
+              report.checkTableGrid(buildTable(cell), reading, {})
               if check.status == "failed"]
-    assert failed == ["formula nothing, expected `=1+1`"]
+    assert failed == ["formula nothing as Numbers saved it, expected `=1+1`"]
+
+
+def testAFormulaShownInAnotherLanguageIsLeftForAPerson() -> None:
+    cell = buildCell(formula="=SUM(1,2,3)", value=Decimal(6))
+    reading = buildReading([[buildFact("number", "6.0", formula="=SUMME(1;2;3)"),
+                             buildFact()]])
+    checks = report.checkTableGrid(buildTable(cell), reading, {"A1": "=SUM(1,2,3)"})
+    assert "failed" not in [check.status for check in checks]
+    assert ("qa", "Numbers shows the formula as `=SUMME(1;2;3)`, in the document's "
+                  "language and region") in [(c.status, c.detail) for c in checks]
+
+
+def testAFormulaWithNoSavedCopyFails() -> None:
+    cell = buildCell(formula="=1+1", value=Decimal(2))
+    reading = buildReading([[buildFact("number", "2.0", formula="=1+1"), buildFact()]])
+    failed = [check.detail for check in
+              report.checkTableGrid(buildTable(cell), reading, None)
+              if check.status == "failed"]
+    assert failed == ["Numbers saved no copy to read its formula from"]
 
 
 def testARecalculatedFormulaValueIsLeftForAPersonShowingBothSides() -> None:
     cell = buildCell(formula="=SUM(B1:B10)", value=Decimal(56))
     reading = buildReading([[buildFact("number", "0.0", formula="=SUM(B1:B10)"),
                              buildFact()]])
-    checks = report.checkTableGrid(buildTable(cell), reading)
+    checks = report.checkTableGrid(
+        buildTable(cell), reading, {"A1": cell.formula} if cell.formula else {}
+    )
     recalculated = "Numbers recalculated it to number `0.0`, where pybers stored `56`"
     assert ("qa", recalculated) in [(check.status, check.detail) for check in checks]
     assert "failed" not in [check.status for check in checks]
@@ -210,7 +233,9 @@ def testAnErrorCellIsCheckedByItsFormulaAlone() -> None:
     cell = buildCell(kind=CellKind.ERROR, value=None, formula="=1/0", format=None)
     reading = buildReading([[buildFact("text", "#DIV/0!", formula="=1/0"),
                              buildFact()]])
-    checks = report.checkTableGrid(buildTable(cell), reading)
+    checks = report.checkTableGrid(
+        buildTable(cell), reading, {"A1": cell.formula} if cell.formula else {}
+    )
     statuses = [check.status for check in checks]
     assert "failed" not in statuses
 
@@ -229,7 +254,7 @@ def testACellAMergeCoversIsLeftToTheMergeCheck() -> None:
     reading = buildReading([[buildFact("number", "1.0"),
                              buildFact("number", "1.0")]])
     reading["cellNames"] = [["A1", "A1"]]
-    statuses = [check.status for check in report.checkTableGrid(table, reading)]
+    statuses = [check.status for check in report.checkTableGrid(table, reading, {})]
     assert "failed" not in statuses
 
 

@@ -10,19 +10,19 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 [![health](https://github.com/rpulivella/pybers/actions/workflows/health.yml/badge.svg?branch=develop)](https://github.com/rpulivella/pybers/actions/workflows/health.yml)
 [![License](https://img.shields.io/github/license/rpulivella/pybers)](LICENSE)
 
-> **Status, 27 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has three commands, `pybers check`, `pybers show` and `pybers set`, and nothing is on PyPI yet.
+> **Status, 28 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has four commands, `pybers check`, `pybers show`, `pybers set` and `pybers locale`, and nothing is on PyPI yet.
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. `pybers set FILE CELL VALUE` sets one cell, whatever it held, reading the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind, and `--preview` shows the change without writing it:
+`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. `pybers set FILE CELL VALUE` sets one cell, whatever it held, reading the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
 ```bash
-pybers set budget.numbers "Summary::Costs::B4" 1250.00 --in-place
-pybers set budget.numbers "Summary::Costs::G4" "1250.00 EUR" --in-place
-pybers set budget.numbers "Summary::Costs::C4" "2026-10-20 09:30" --in-place
-pybers set budget.numbers "Summary::Costs::D4" "1h 30m" --in-place
-pybers set budget.numbers "Summary::Costs::E4" TRUE --in-place
-pybers set budget.numbers "Summary::Costs::F4" 1:30 --as duration --in-place
+pybers set budget.numbers "Summary::Costs::B4" 1250.00
+pybers set budget.numbers "Summary::Costs::G4" "1250.00 EUR"
+pybers set budget.numbers "Summary::Costs::C4" "2026-10-20 09:30"
+pybers set budget.numbers "Summary::Costs::D4" "1h 30m"
+pybers set budget.numbers "Summary::Costs::E4" TRUE
+pybers set budget.numbers "Summary::Costs::F4" 1:30 --as duration
 ```
 
 A date is stored as wall-clock time, as Numbers stores it. One given with an offset, such as `2026-10-20T16:00Z`, is written as the time it was in the zone pybers is running in, or in the zone `--time-zone America/New_York` specifies.
@@ -36,10 +36,11 @@ A date is stored as wall-clock time, as Numbers stores it. One given with an off
 - `duration`: Numbers' own units, `1h 30m` or `2d 4h`, or a clock, `1:30`
 - `text`: anything, kept exactly as given
 
-`pybers show FILE` prints each sheet of a document with its tables and their sizes, and `pybers show FILE SELECTOR` prints what a selector names: a sheet, a table, a range or one cell, addressed as `pybers set` addresses a cell. A name is read as the widest part it names, a sheet before a table and a table before a cell, so a table sharing its sheet's name is reached as `Summary::Summary`. `pybers show` never writes to the document.
+`pybers show FILE` prints a document's language and region and each sheet with its tables and their sizes, and `pybers show FILE SELECTOR` prints what a selector names: a sheet, a table, a range or one cell, addressed as `pybers set` addresses a cell. A name is read as the widest part it names, a sheet before a table and a table before a cell, so a table sharing its sheet's name is reached as `Summary::Summary`. `pybers show` never writes to the document.
 
 ```console
 $ pybers show shapes.numbers
+Locale: en_US
 Sheets:
 Sheet 1
 ├ Table 1: 12 rows, 8 columns
@@ -91,7 +92,7 @@ Unrecognized type code: none
 ```console
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 {
-  "jsonFormVersion": 1,
+  "jsonFormVersion": 2,
   "sheetName": "Sheet 1",
   "cell": "A11",
   "table": {
@@ -149,7 +150,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 ```console
 $ pybers show shapes.numbers "Table 2" --format json
 {
-  "jsonFormVersion": 1,
+  "jsonFormVersion": 2,
   "sheetName": "Sheet 1",
   "table": {
     "name": "Table 2",
@@ -205,7 +206,17 @@ $ pybers show shapes.numbers "Table 2" --format json
 
 </details>
 
-All three install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
+`pybers locale FILE` prints a document's language and region and the regions pybers offers, by language, and `pybers locale FILE LOCALE` changes it as Numbers' Language & Region does, writing as `pybers set` writes:
+
+```console
+$ pybers locale budget.numbers de_DE
+Before: en_US
+After: de_DE
+```
+
+The document then shows its numbers, dates and currencies as Germany writes them, `1.234,50 €`, and Numbers recalculates every formula when it opens it, since a result such as `DOLLAR` follows the region. pybers builds each locale field from macOS's own locale data, read into pybers before a release, so it writes a region exactly as Numbers would, on any system pybers runs on.
+
+All four install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
 
 ## Python library
 
@@ -234,6 +245,7 @@ costs.cell("E4").value = True
 document.cellSet("Summary::Costs::B6", Decimal("300.00"))
 costs.cell("B5").formulaText = "=SUM(B1:B4)"
 costs.rowAdd(6)
+document.localeSet("de_DE")  # Numbers' Language & Region, one of pybers.locales
 
 document.save()
 ```
@@ -264,6 +276,7 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does
 - Merging and unmerging cells, and creating sheets and tables
 - Showing any sheet, table, range or cell at the command line, as text or as its JSON form
+- Changing a document's language and region as Numbers does, in any of 335 regions
 - Writing a document or any part of one as JSON, and reading it back exactly
 
 ### Planned

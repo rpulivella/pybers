@@ -6,6 +6,8 @@ The command reads the text into a value, makes one `cellSet` call, and saves onl
 when the cell changed and the call was not a preview.
 
 UPDATES
+2026-10-28  Where a write goes shared with `locale`, FILE itself unless `-o`
+            names a new one, for PYB-272.
 2026-10-27  Report lines shared with `show`, growth by one row reading `1 row`,
             for PYB-260.
 2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
@@ -30,8 +32,13 @@ from rich.console import Group
 from rich.text import Text
 
 import pybers
-from pybers.cli._common import reportPybersErrors
-from pybers.cli._console import statusConsole
+from pybers.cli._common import (
+    OutputOption,
+    PreviewOption,
+    findSaveTarget,
+    reportPybersErrors,
+    reportWrite,
+)
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
 from pybers.cli._report import formatCount, formatLine
 
@@ -56,27 +63,6 @@ def formatChange(change: pybers.CellChange) -> Group:
             f"{formatCount(change.colsAdded, 'column')}",
         ))
     return Group(*lines)
-
-
-def findSaveTarget(
-    documentPath: Path, inPlace: bool, output: Path | None, preview: bool
-) -> Path | None:
-    """Return where the document is written, None for a preview, or refuse the flags."""
-    if inPlace and output is not None:
-        raise typer.BadParameter("Give --in-place or -o, not both.")
-    if output is not None and output.exists():
-        raise typer.BadParameter(
-            f"{output} already exists. Use --in-place to change a document where it "
-            "is, or name a new file."
-        )
-    if inPlace:
-        return documentPath
-    if output is None and not preview:
-        raise typer.BadParameter(
-            "Name where the document is written, with --in-place or -o NEW, or show "
-            "the change alone with --preview."
-        )
-    return output
 
 
 def runSet(
@@ -128,24 +114,16 @@ def runSet(
             ),
         ),
     ] = None,
-    inPlace: Annotated[
-        bool, typer.Option("--in-place", help="Write the change into FILE itself.")
-    ] = False,
-    output: Annotated[
-        Path | None,
-        typer.Option("-o", metavar="NEW", help="Write the changed document to NEW."),
-    ] = None,
+    output: OutputOption = None,
+    preview: PreviewOption = False,
     extend: Annotated[
         bool,
         typer.Option("--extend", help="Grow the table when CELL lies outside it."),
     ] = False,
-    preview: Annotated[
-        bool, typer.Option("--preview", help="Show the change and write nothing.")
-    ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
     """Set one cell's value, its kind inferred from VALUE unless --as names one."""
-    target = findSaveTarget(documentPath, inPlace, output, preview)
+    target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
         document = (
             pybers.open(documentPath) if timeZone is None
@@ -157,19 +135,10 @@ def runSet(
             extend=extend,
             preview=preview,
         )
-        if target is not None and not preview and change.changed:
+        if target is not None and change.changed:
             document.save(target)
     printResult(change, outputFormat, formatChange)
-    if preview:
-        statusConsole.print(Text("Nothing written: a preview.", "detail"))
-    elif not change.changed:
-        statusConsole.print(
-            Text("Nothing written: the cell already holds that.", "detail")
-        )
-    elif target is not None:
-        statusConsole.print(
-            Text.assemble(("Written: ", "label"), (str(target), "value"))
-        )
+    reportWrite(change.changed, target, "the cell already holds that.")
 
 
 __all__ = ["runSet"]

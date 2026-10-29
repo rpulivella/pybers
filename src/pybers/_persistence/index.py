@@ -15,6 +15,7 @@ member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-10-28  `findRootIdentifier`, so a save can write the root, for PYB-272.
 2026-09-22  A random UUID is generated here, where both creators find it, for PYB-113.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Every write, addition and removal within one save passes through the
@@ -196,8 +197,8 @@ def generateUuid() -> tsp.UUID:
     return message
 
 
-def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
-    """Return the document's root `TN.DocumentArchive`.
+def findRootIdentifier(index: ArchiveIndex) -> int:
+    """Return the identifier of the document's root `TN.DocumentArchive`.
 
     Found by type rather than by position or by member name. Exactly one archive
     in a document carries this type, verified across every document, so
@@ -212,7 +213,13 @@ def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
         raise ReadError(
             f"Expected exactly one TN.DocumentArchive, found {len(roots)}."
         )
-    return index.identifierResolve(roots[0].identifier, tn.DocumentArchive)
+    identifier: int = roots[0].identifier
+    return identifier
+
+
+def findRoot(index: ArchiveIndex) -> tn.DocumentArchive:
+    """Return the document's root `TN.DocumentArchive`."""
+    return index.identifierResolve(findRootIdentifier(index), tn.DocumentArchive)
 
 
 def readDataList(
@@ -231,4 +238,11 @@ def readDataList(
     return {entry.key: entry for entry in dataList.entries}
 
 
-__all__ = ["ArchiveIndex", "assignUuid", "findRoot", "readDataList", "readUuidValue"]
+__all__ = [
+    "ArchiveIndex",
+    "assignUuid",
+    "findRoot",
+    "findRootIdentifier",
+    "readDataList",
+    "readUuidValue",
+]

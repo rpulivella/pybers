@@ -245,8 +245,10 @@ bare `pybers FILE` already covers looking at one document. `set` infers a value'
 `--as` overrides the inference; should inference prove unreliable, `set` falls back to text
 unless `--as` names a kind. The inference is one table of parsers built on the standard
 library, tried in order, rather than a chain of conditions. `set --format` sets a format by
-its text form. `--preview` shows a change and writes nothing, the flag named for what it
-does.
+its text form. A writing verb changes FILE itself, since the verb names the act, as a
+database tool changes the database it is given. `--preview` writes nothing, the flag named
+for what it does, and `-o NEW` writes a new document instead, refusing any file that
+exists, so no option changes its meaning with the file it is given.
 
 ---
 
@@ -329,9 +331,8 @@ confirmations and any script reach it, so no two of them can disagree.
 `valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, in the order
 `pybers show` prints them. What describes where a value sits rather than what it is,
 such as `Cell.table` or `Cell.reference`, is left out, and so is the session's time
-zone, which the file has nowhere to keep. A document's language and region joins the
-form as its locale identifier when PYB-272 models it, rather than as the currency
-symbols pybers reads from it today. Each feature owns the form of its own types,
+zone, which the file has nowhere to keep. A document carries its language and region as
+its `localeIdentifier`, rather than as the currency symbols pybers reads from it. Each feature owns the form of its own types,
 beside its archive halves, and the mechanism in `pybers/interchange` knows no feature.
 
 **Each value follows one rule.**
@@ -385,6 +386,34 @@ carries a style, text or drawable pybers did not read.
 and is a whole number. Adding, removing or renaming a key, or changing the rule a value
 follows, changes the generated schema, which a test holds to the committed one, and moves
 the version by one. A reader refuses any version but its own.
+
+---
+
+## A document's language and region, decided 2026-10-27
+
+A document is changed to a language and region as Numbers changes it, for PYB-272, and
+`docs/findings/findings-12-language-and-region.md` records what Numbers rewrites.
+
+**Formula text stays in its English, `en_US` form** whatever the document's language and
+region. Numbers stores the same formula nodes in every locale and only displays them with
+the region's separators and the language's function names, so the text pybers reads and
+writes names the formula exactly, and one form serves every document.
+
+**A region's locale fields are composed from macOS's locale data, never copied.** Numbers
+takes them from macOS's ICU, so a local extractor reads that data on a Mac into a table
+committed to the package, as `functions_extract.py` reads the Numbers app, and a release
+ships whatever table is committed. pybers builds each field from it as it builds any
+other, and copies no bytes from another document, here or anywhere. Babel was the other
+candidate, and its CLDR, a release behind macOS's and without Apple's tailoring, disagrees
+with Numbers in 5 of 96 measured fields. A test holds the fields composed for each
+measured region equal to those Numbers wrote. Once, and again when the extracted data
+changes or a new major version of Numbers ships, every region the table holds is tried in
+Numbers, and a region Numbers does not accept is refused.
+
+**A region change marks every formula for recalculation**, as an edit marks the cells it
+changes. A result such as `DOLLAR` or `FIXED` depends on the region, and pybers calculates
+nothing, so Numbers recalculates them when it opens the document. The golden for each
+region confirms that Numbers does.
 
 ---
 

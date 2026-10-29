@@ -6,6 +6,8 @@ Each test edits a copy of `20-formula-shapes`, whose `Table 2` is ten rows by fi
 columns and named on one sheet only, while `Table 1` is named on two.
 
 UPDATES
+2026-10-28  A write changes FILE itself unless `-o` names a new one, for
+            PYB-272.
 2026-10-27  Each listed table name quoted, for PYB-260.
 2026-10-24  A number read back as the JSON number it is printed as, and a duration
             as ISO 8601, for PYB-259.
@@ -32,7 +34,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 import pybers
-from conftest import copyDocument
+from conftest import copyDocument, readPlainText
 from pybers.cli._app import app
 
 runner: CliRunner = CliRunner()
@@ -55,7 +57,7 @@ def readCell(path: Path, reference: str) -> pybers.Cell:
 
 
 def testANumberIsWrittenInPlaceAndReported(working: Path) -> None:
-    result = runSetCommand(str(working), "Table 2::B2", "42", "--in-place")
+    result = runSetCommand(str(working), "Table 2::B2", "42")
     assert result.exit_code == 0
     assert result.stdout.splitlines() == [
         "Cell: Sheet 1::Table 2::B2", "Before: none (empty)", "After: 42 (number)",
@@ -75,7 +77,7 @@ def testTextIsWrittenToANewDocumentLeavingTheOriginal(
 
 
 def testAsTextKeepsANumberAsText(working: Path) -> None:
-    runSetCommand(str(working), "Table 2::B2", "042", "--as", "text", "--in-place")
+    runSetCommand(str(working), "Table 2::B2", "042", "--as", "text")
     cell = readCell(working, "Table 2::B2")
     assert (cell.value, cell.kind) == ("042", pybers.CellKind.TEXT)
 
@@ -83,7 +85,7 @@ def testAsTextKeepsANumberAsText(working: Path) -> None:
 def testTextThatIsNotTheKindNamedIsRefused(working: Path) -> None:
     before = working.read_bytes()
     result = runSetCommand(
-        str(working), "Table 2::B2", "abc", "--as", "number", "--in-place"
+        str(working), "Table 2::B2", "abc", "--as", "number"
     )
     assert result.exit_code == 1
     assert "pybers set: 'abc' is not a number." in result.stderr
@@ -100,18 +102,20 @@ def testAPreviewReportsTheChangeAndWritesNothing(working: Path) -> None:
 
 
 def testAChangeThatAltersNothingWritesNothingAndSaysSo(working: Path) -> None:
-    runSetCommand(str(working), "Table 2::B2", "42", "--in-place")
+    runSetCommand(str(working), "Table 2::B2", "42")
     before = working.read_bytes()
-    result = runSetCommand(str(working), "Table 2::B2", "42", "--in-place")
+    result = runSetCommand(str(working), "Table 2::B2", "42")
     assert result.exit_code == 0
     assert "Nothing written: the cell already holds that." in result.stderr
     assert working.read_bytes() == before
 
 
-@pytest.mark.parametrize("flags", [[], ["--in-place", "-o", "elsewhere.numbers"]])
-def testAWriteMustNameExactlyOneTarget(working: Path, flags: list[str]) -> None:
-    result = runSetCommand(str(working), "Table 2::B2", "1", *flags)
+def testAPreviewAndANewFileTogetherAreRefused(working: Path) -> None:
+    result = runSetCommand(
+        str(working), "Table 2::B2", "1", "--preview", "-o", "elsewhere.numbers"
+    )
     assert result.exit_code == 2
+    assert "Give -o or --preview, not both." in readPlainText(result.stderr)
 
 
 def testAnOutputThatExistsIsRefused(working: Path, tmp_path: Path) -> None:
@@ -123,20 +127,20 @@ def testAnOutputThatExistsIsRefused(working: Path, tmp_path: Path) -> None:
 
 
 def testACellOutsideItsTableIsRefusedNamingTheSize(working: Path) -> None:
-    result = runSetCommand(str(working), "Table 2::G12", "x", "--in-place")
+    result = runSetCommand(str(working), "Table 2::G12", "x")
     assert result.exit_code == 1
     assert "10 rows by 5 columns" in result.stderr
 
 
 def testExtendGrowsTheTableToHoldTheCell(working: Path) -> None:
-    result = runSetCommand(str(working), "Table 2::G12", "x", "--in-place", "--extend")
+    result = runSetCommand(str(working), "Table 2::G12", "x", "--extend")
     assert result.exit_code == 0
     assert "Grown: 2 rows, 2 columns" in result.stdout
     assert readCell(working, "Table 2::G12").value == "x"
 
 
 def testAnAmbiguousTableIsRefusedListingTheMatches(working: Path) -> None:
-    result = runSetCommand(str(working), "Table 1::B2", "1", "--in-place")
+    result = runSetCommand(str(working), "Table 1::B2", "1")
     assert result.exit_code == 1
     assert "'Sheet 1::Table 1', 'Sheet 2::Table 1'" in result.stderr
 
@@ -167,7 +171,7 @@ def testJsonReportsTheChangeAsTheLibraryReturnsIt(working: Path) -> None:
 def testADateADurationAndABooleanAreInferred(
     working: Path, text: str, value: object, shown: str
 ) -> None:
-    result = runSetCommand(str(working), "Table 2::B2", text, "--in-place")
+    result = runSetCommand(str(working), "Table 2::B2", text)
     assert result.exit_code == 0
     assert result.stdout.splitlines()[-1].startswith(f"After: {shown} (")
     assert readCell(working, "Table 2::B2").value == value
@@ -183,19 +187,19 @@ def testADateADurationAndABooleanAreInferred(
 def testAsOverridesTheInference(
     working: Path, text: str, kind: str, value: object
 ) -> None:
-    runSetCommand(str(working), "Table 2::B2", text, "--as", kind, "--in-place")
+    runSetCommand(str(working), "Table 2::B2", text, "--as", kind)
     assert readCell(working, "Table 2::B2").value == value
 
 
 def testAClockIsTextUnlessADurationIsNamed(working: Path) -> None:
-    runSetCommand(str(working), "Table 2::B2", "1:30", "--in-place")
+    runSetCommand(str(working), "Table 2::B2", "1:30")
     assert readCell(working, "Table 2::B2").value == "1:30"
 
 
 def testTimeZoneWritesAnOffsetDateAsThatZonesWallClock(working: Path) -> None:
     result = runSetCommand(
         str(working), "Table 2::B2", "2026-10-20T16:00Z",
-        "--time-zone", "America/Los_Angeles", "--in-place",
+        "--time-zone", "America/Los_Angeles",
     )
     assert result.exit_code == 0
     assert "After: 2026-10-20 09:00:00 (date-time)" in result.stdout
@@ -206,7 +210,7 @@ def testAZoneNoOneKnowsIsRefusedAndNothingWritten(working: Path) -> None:
     before = working.read_bytes()
     result = runSetCommand(
         str(working), "Table 2::B2", "2026-10-20T16:00Z",
-        "--time-zone", "Mars/Olympus", "--in-place",
+        "--time-zone", "Mars/Olympus",
     )
     assert result.exit_code == 1
     assert "'Mars/Olympus' specifies no time zone" in result.stderr
@@ -219,7 +223,7 @@ def testWhatJsonPrintsIsTextSetWritesBackUnchanged(working: Path) -> None:
     )
     printed = json.loads(result.stdout)["valueAfter"]
     assert printed == "P2DT4H0.5S"
-    runSetCommand(str(working), "Table 2::B2", printed, "--in-place")
+    runSetCommand(str(working), "Table 2::B2", printed)
     assert readCell(working, "Table 2::B2").value == datetime.timedelta(
         days=2, hours=4, milliseconds=500
     )

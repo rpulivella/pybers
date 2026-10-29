@@ -11,6 +11,11 @@
 // it escapes. A Data Format value is only matched against a menu item or typed into a field.
 //
 // UPDATES
+// 2026-10-29  A failed capture logs every error and the window's state, and Numbers is
+//             shown for each capture, which a hidden window refuses, its effect on
+//             the frontmost app logged, for PYB-272.
+// 2026-10-29  A request reads cells as text alone, and a failed capture is a problem that
+//             leaves the readings, for PYB-272.
 // 2026-10-21  Names each Data Format control, a step sets one by its name, a step extends
 //             a table to a cell, and a step builds a custom format, for PYB-219.
 // 2026-09-30  Reads a date at the zone's offset now, which Numbers applies to every date, for PYB-137.
@@ -119,6 +124,8 @@ struct HelperRequest: Codable {
     var cells: [CellAddress]?
     var tables: [TableAddress]?
     var maxCaptures: Int?
+    // Read each cell through AppleScript alone, with no inspector and no capture.
+    var textOnly: Bool?
     var freshNumbers: Bool?
     var documentPaths: [String]?
     var steps: [EditStep]?
@@ -1009,6 +1016,19 @@ func readFrame(_ element: AXUIElement) -> CGRect? {
 
 // Captured at the display's own pixels and kept lossless, so graphical detail stays sharp.
 // ScreenCaptureKit captures one window whether it is hidden or covered, which `screencapture -l` cannot.
+// Every error ScreenCaptureKit reports, the underlying ones included, so a log says why.
+func describeError(_ error: Error) -> String {
+    let error = error as NSError
+    var parts = ["\(error.domain) \(error.code): \(error.localizedDescription)"]
+    if let underlying = error.userInfo[NSUnderlyingErrorKey] as? Error {
+        parts.append("underlying " + describeError(underlying))
+    }
+    for each in (error.userInfo[NSMultipleUnderlyingErrorsKey] as? [Error]) ?? [] {
+        parts.append("underlying " + describeError(each))
+    }
+    return parts.joined(separator: "; ")
+}
+
 func captureWindowImage(id windowId: Int) -> (CGImage?, String, Bool) {
     var image: CGImage?
     var said = ""
@@ -1028,7 +1048,10 @@ func captureWindowImage(id windowId: Int) -> (CGImage?, String, Bool) {
         configuration.showsCursor = false
         SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { captured, error in
             image = captured
-            said = error.map { "\($0)" } ?? "window on screen \(window.isOnScreen)"
+            let state = "window \(windowId) on screen \(window.isOnScreen), frame \(window.frame), "
+                + "layer \(window.windowLayer), owner \(window.owningApplication?.bundleIdentifier ?? "none"), "
+                + "requested \(configuration.width)x\(configuration.height)"
+            said = error.map { "\(describeError($0)); \(state)" } ?? state
             streamFailed = (error as NSError?).map {
                 $0.domain == SCStreamErrorDomain && $0.code == streamStartFailedError
             } ?? false
@@ -1045,6 +1068,17 @@ func captureWindow(
     var captured: CGImage?
     var said = ""
     var streamFailed = false
+    // ScreenCaptureKit refuses a hidden app's window, measured 2026-10-29 on macOS 26.6.1,
+    // so Numbers is shown for the capture alone and hidden again.
+    let hidden = NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
+    // Showing Numbers leaves the developer's app in front, measured 2026-10-29, logged.
+    let front = NSWorkspace.shared.frontmostApplication
+    if hidden { setNumbersHidden(pid: pid, false) }
+    defer {
+        if hidden { setNumbersHidden(pid: pid, true) }
+        writeLog("front before capture \(front?.bundleIdentifier ?? "none"), after "
+            + "\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none")")
+    }
     // A window not yet drawn captures on a later try.
     for _ in 0..<windowAttempts {
         (captured, said, streamFailed) = captureWindowImage(id: windowId)
@@ -1052,9 +1086,8 @@ func captureWindow(
         Thread.sleep(forTimeInterval: streamFailed ? streamRetryPauseSeconds : retryPauseSeconds)
     }
     let counts = countNumbersWindows(pid: pid)
-    let hidden = NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
     writeLog("captured \((path as NSString).lastPathComponent): \(captured != nil) (\(said)), "
-        + "Numbers hidden \(hidden), windows on screen \(counts.onScreen) of \(counts.all)")
+        + "Numbers hidden before \(hidden), windows on screen \(counts.onScreen) of \(counts.all)")
     let failure = HelperFailure(problem: HelperProblem(
         kind: "capture",
         detail: "the Numbers window could not be captured to \((path as NSString).lastPathComponent): \(said)",
@@ -1111,7 +1144,7 @@ func readNumbersHidden(pid: pid_t) -> Bool {
     (readAttribute(AXUIElementCreateApplication(pid), kAXHiddenAttribute) as? Bool) ?? false
 }
 
-// Hidden, Numbers stays out of the developer's way and still draws what the helper captures.
+// Hidden, Numbers stays out of the developer's way between captures, which show it.
 @discardableResult
 func setNumbersHidden(pid: pid_t, _ hidden: Bool) -> Bool {
     let status = AXUIElementSetAttributeValue(
@@ -1209,7 +1242,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         let tables = request.tables ?? []
         let sheets = (tables.map(\.sheet) + cells.map(\.sheet))
             .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        let captureCount = sheets.count + cells.count
+        let textOnly = request.textOnly ?? false
+        let captureCount = textOnly ? 0 : sheets.count + cells.count
         guard captureCount <= (request.maxCaptures ?? 0) else {
             throw HelperFailure(problem: HelperProblem(
                 kind: "captureLimit",
@@ -1248,7 +1282,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         try inspectDocument(
             documentPath: documentPath, savedCopyPath: savedCopyPath,
             captureDirectory: captureDirectory, cells: cells, tables: request.tables ?? [],
-            sheets: sheets, numbers: numbers, result: &result)
+            sheets: textOnly ? [] : sheets, textOnly: textOnly, numbers: numbers,
+            result: &result)
     } catch let failure as HelperFailure {
         result.problems.append(failure.problem)
     } catch let failure as AppleScriptError {
@@ -1324,7 +1359,7 @@ func openDocument(
 
 func inspectDocument(
     documentPath: String, savedCopyPath: String, captureDirectory: String,
-    cells: [CellAddress], tables: [TableAddress], sheets: [String],
+    cells: [CellAddress], tables: [TableAddress], sheets: [String], textOnly: Bool,
     numbers: NSRunningApplication, result: inout HelperResult
 ) throws {
     let documentId = try openDocument(documentPath, numbers: numbers, result: &result)
@@ -1346,9 +1381,15 @@ func inspectDocument(
         try selectCell(first, documentId: documentId)
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["sheet", sheet]))
-        try captureWindow(
-            id: Int(windowId), window: window, crop: nil, to: path, pid: numbers.processIdentifier)
-        result.sheetCaptures.append(SheetCapture(sheet: sheet, path: path))
+        // A capture that fails is recorded, and the readings that need none go on.
+        do {
+            try captureWindow(
+                id: Int(windowId), window: window, crop: nil, to: path,
+                pid: numbers.processIdentifier)
+            result.sheetCaptures.append(SheetCapture(sheet: sheet, path: path))
+        } catch let failure as HelperFailure {
+            result.problems.append(failure.problem)
+        }
     }
 
     for address in cells {
@@ -1360,15 +1401,23 @@ func inspectDocument(
         reading.formula = facts.atIndex(2).flatMap(readOptionalText)
         reading.formatKind = facts.atIndex(3)?.stringValue
         reading.value = facts.atIndex(4).map(readCellValue)
+        if textOnly {
+            result.cells.append(reading)
+            continue
+        }
         try selectCell(address, documentId: documentId)
         try openCellTab(in: window)
         reading.dataFormat = try readDataFormat(in: window)
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["cell", address.sheet, address.table, address.cell]))
-        try captureWindow(
-            id: Int(windowId), window: window, crop: findDataFormatFrame(in: window), to: path,
-            pid: numbers.processIdentifier)
-        reading.inspectorCapture = path
+        do {
+            try captureWindow(
+                id: Int(windowId), window: window, crop: findDataFormatFrame(in: window),
+                to: path, pid: numbers.processIdentifier)
+            reading.inspectorCapture = path
+        } catch let failure as HelperFailure {
+            result.problems.append(failure.problem)
+        }
         result.cells.append(reading)
     }
 

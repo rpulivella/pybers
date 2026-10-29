@@ -19,10 +19,16 @@ protos_extract.py    dump the iWork protobuf schemas pybers builds on, and diff 
 functions_extract.py derive the table of formula functions, each with its index,
                      name and the argument counts it accepts. Writes
                      src/pybers/_generated/functions.py
+locales_extract.py   read each region's formatting symbols from macOS's own ICU,
+                     as Numbers reads them. Writes src/pybers/_generated/locales.py
+locales_sweep.py     change a document to each region the locale table holds, open
+                     it in Numbers through the golden-confirm helper, and check what
+                     it shows. Writes workarea/locale-sweep/
 golden_confirm.py    confirm a golden in running Numbers and write a report of what
                      Numbers shows, through a helper app that holds the permissions
-                     so Terminal holds none. Backs `/golden-confirm`, and nothing in
-                     the preflight, CI or the suite runs it
+                     so Terminal holds none. Backs `/golden-confirm`, and its
+                     `measure` backs `/fixture-create`. Nothing in the preflight, CI
+                     or the suite runs it
 jsonform_schema.py   generate the JSON Schema of pybers' JSON form from the model.
                      Writes src/pybers/interchange/schema.json, which a test holds
                      to the model
@@ -34,9 +40,10 @@ merge_readiness.py   gather a branch's facts, check a pull request, and post one
 
 ## Reading a binary is not running one
 
-Both extractors open the application read-only and parse it as data. Nothing loads,
-links, executes or modifies any part of Numbers, which is the line CLAUDE.md draws when
-it rejects an approach that would execute an unsigned copy of the app.
+The function and schema extractors open the application read-only and parse it as
+data, and the locale extractor calls macOS's own ICU and Foundation for theirs. Nothing
+loads, links, executes or modifies any part of Numbers, which is the line CLAUDE.md
+draws when it rejects an approach that would execute an unsigned copy of the app.
 
 The technique of finding values in compiled code rather than in a published table comes
 from the numbers-parser project and from `protodump.py` by Peter Sobot, credited in each

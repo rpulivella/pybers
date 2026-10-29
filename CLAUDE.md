@@ -79,6 +79,11 @@ mypy in one pass and reports all four.
   with an explicit invalidation contract.
 - Reuse existing operations. Do not write a second implementation because the caller is
   the reader, the writer, a CLI, or a test.
+- **A function earns its place** by having two or more callers, by being an entry point a
+  caller outside the package uses, through `import pybers`, the command line or an MCP
+  server, by naming a step its one caller would otherwise need a comment for, or by being
+  the designated place one concern is decided, which its docstring says. A single-caller
+  function that only forwards one call, and is none of these, is inlined.
 - Place code with the feature that owns it. `_persistence` and `_engine` are
   infrastructure used by more than one feature, never a dumping ground.
 - **A feature's model types never import its archive halves at module scope.** A
@@ -238,6 +243,9 @@ functions over explanation.
 
 - Mutate the archives that were read rather than constructing new ones, so whatever the
   model does not yet represent survives untouched.
+- **Compose every field pybers writes from the model and the data it is measured
+  against, never by copying bytes or captured archives from another document.** A cell's
+  value, a formula and a locale are each built as Numbers builds them.
 - Stage a complete package outside the destination and install it atomically. Unique
   temporary paths, cleaned on success and on failure alike.
 - Never write into a `.numbers` file the user may have open.

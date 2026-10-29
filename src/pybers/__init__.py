@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-10-28  `LocaleChange`, `LocaleError` and `locales` re-exported, for PYB-272.
 2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
             for PYB-259.
 2026-10-24  `CellControlType` and the JSON form's names re-exported, for PYB-259.
@@ -79,9 +80,12 @@ lazy from pybers.currency import (
 )
 lazy from pybers.document import (
     Document,
+    LocaleChange,
+    LocaleError,
     ReferenceLocation,
     SelectionError,
     Sheet,
+    locales,
     open,
 )
 lazy from pybers.errors import PybersError, ReadError, WriteError
@@ -236,6 +240,9 @@ __all__ = [
     "TableRow",
     "TableRows",
     "Document",
+    "LocaleChange",
+    "LocaleError",
+    "locales",
     "ReferenceLocation",
     "MachineTimeZone",
     "TimeZoneError",

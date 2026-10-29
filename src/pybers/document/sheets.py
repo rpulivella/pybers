@@ -21,6 +21,9 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-10-28  `localeSet`, a change of language and region, for PYB-272.
+2026-10-27  `localeIdentifier`, the language and region a document shows its
+            values in, for PYB-272.
 2026-10-27  `partSelect`, the sheet, table, range or cell a selector names, and
             every refusal listing names quoting each, for PYB-260.
 2026-10-24  The unread `graphicalObjects` scaffold removed, and the table naming
@@ -84,6 +87,7 @@ from pybers.timezone import TimeZoneLike, machineTimeZone, toTimeZone
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.
     from pybers._persistence import NumbersPackage
+    from pybers.document.locale import LocaleChange
     from pybers.document.references import ReferenceLocation
 
 # Sheets and tables both count from one, matching the rest of the model and matching
@@ -337,6 +341,46 @@ class Document:
         default_factory=frozendict, repr=False, compare=False
     )
     _currencyPattern: str = field(default="", repr=False, compare=False)
+    _localeIdentifier: str | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def localeIdentifier(self) -> str | None:
+        """Return the language and region this document shows its values in, `en_IT`.
+
+        None for a document built in memory, which has none until it is saved.
+        """
+        return self._localeIdentifier
+
+    def localeSet(self, identifier: str, *, preview: bool = False) -> LocaleChange:
+        """Change the language and region this document shows its values in, `de_DE`.
+
+        The save writes the region as Numbers writes it and marks every formula, so
+        Numbers recalculates a result such as `DOLLAR` that depends on it.
+        """
+        from pybers.document.locale import LocaleChange, findLocaleSymbols
+
+        findLocaleSymbols(identifier)
+        change = LocaleChange(self._localeIdentifier, identifier)
+        if not preview and change.changed:
+            self._localeAssign(identifier)
+        return change
+
+    def _localeAssign(self, identifier: str | None) -> None:
+        """Hold a region, with the currency symbols and placement pybers has for it.
+
+        A region the table does not hold, read from a file or a JSON form, keeps the
+        identifier alone, since only its own document knows its symbols.
+        """
+        from pybers.document.locale import findLocaleSymbols, locales
+
+        self._localeIdentifier = identifier
+        if identifier not in locales:
+            return
+        symbols = findLocaleSymbols(identifier)
+        currencySymbols = symbols["currency_symbols"]
+        assert isinstance(currencySymbols, tuple)
+        self._currencySymbols = frozendict(currencySymbols)
+        self._currencyPattern = str(symbols["currency_pattern"])
 
     @property
     def currencyPattern(self) -> str:

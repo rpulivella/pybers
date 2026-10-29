@@ -9,6 +9,7 @@ and a control prints every setting its form holds. `tests/test_cli_show.py` fail
 when the form gains a field this command does not print.
 
 UPDATES
+2026-10-28  A document's outline opens with its locale, for PYB-272.
 2026-10-27  Written for PYB-260.
 """
 from __future__ import annotations
@@ -167,8 +168,12 @@ def formatPart(part: DocumentPart) -> RenderableType:
     """Return what a selector named as the lines a person reads."""
     match part:
         case pybers.Document():
+            locale = part.localeIdentifier
             trees = [formatSheetTree(each) for each in part.sheets]
-            return Group(Text("Sheets:", "label"), *trees)
+            return Group(
+                formatLine("Locale", (locale, "identifier") if locale else "none"),
+                Text("Sheets:", "label"), *trees,
+            )
         case pybers.Sheet():
             return formatSheet(part)
         case pybers.Table():

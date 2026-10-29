@@ -12,6 +12,7 @@ document, which is why the directory is whole rather than the tables a part reac
 Private. The JSON form's half of the document feature, beside `_read` and `_write`.
 
 UPDATES
+2026-10-28  A document carries its locale identifier, for PYB-272.
 2026-10-26  A directory entry carries its sheet's position, so two sheets sharing a
             name read back apart, for PYB-259.
 2026-10-24  Written for PYB-259.
@@ -47,8 +48,9 @@ class SheetForm:
 
 @dataclass(frozen=True, slots=True)
 class DocumentForm:
-    """One document as the JSON form holds it."""
+    """One document as the JSON form holds it, its language and region first."""
 
+    localeIdentifier: str | None
     sheets: tuple[SheetForm, ...]
 
 
@@ -70,7 +72,8 @@ class TableEntry:
 def buildDocumentForm(document: Document) -> DocumentForm:
     """Return a document's form."""
     return DocumentForm(
-        sheets=tuple(buildSheetForm(sheet) for sheet in document.sheets)
+        localeIdentifier=document.localeIdentifier,
+        sheets=tuple(buildSheetForm(sheet) for sheet in document.sheets),
     )
 
 
@@ -95,10 +98,12 @@ def listTableEntries(document: Document | None) -> tuple[TableEntry, ...]:
 
 def buildDocument(form: DocumentForm, path: str) -> Document:
     """Return the document a form describes."""
-    return buildStandInDocument([
+    document = buildStandInDocument([
         buildSheetTables(sheet, f"{path}.sheets[{index}]")
         for index, sheet in enumerate(form.sheets)
     ], ())
+    document._localeAssign(form.localeIdentifier)
+    return document
 
 
 def buildSheet(form: SheetForm, entries: Sequence[TableEntry], path: str) -> Sheet:

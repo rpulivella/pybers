@@ -7,6 +7,7 @@ first alone, and its `A11` holds `=SUM(A1:A10)`. `81-control-formats` holds a ce
 for each control, a slider in `A1` and a pop-up menu in `I1`.
 
 UPDATES
+2026-10-28  A document's outline opens with its locale, for PYB-272.
 2026-10-27  Written for PYB-260.
 """
 from __future__ import annotations
@@ -63,6 +64,7 @@ def testADocumentShowsEachSheetWithItsTablesAndSizes() -> None:
     result = runShowCommand(shapesPath)
     assert result.exit_code == 0
     assert result.stdout.splitlines() == [
+        "Locale: en_US",
         "Sheets:",
         "Sheet 1",
         "├ Table 1: 12 rows, 8 columns",

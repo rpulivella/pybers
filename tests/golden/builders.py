@@ -8,6 +8,7 @@ so no golden is made any other way. A test asserting what a golden holds reads i
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-10-29  A golden for each measured region, for PYB-272.
 2026-10-22  Written for PYB-255, gathering the builders the tests held.
 """
 from __future__ import annotations
@@ -424,6 +425,15 @@ def removeMerges(document: pybers.Document) -> None:
         table.mergeRemove(merge.anchor)
 
 
+def setLocale(identifier: str) -> Callable[[pybers.Document], None]:
+    """Return a mutation changing the document's language and region."""
+
+    def mutate(document: pybers.Document) -> None:
+        document.localeSet(identifier)
+
+    return mutate
+
+
 def mergeRange(extent: str) -> Callable[[pybers.Document], None]:
     """Return a mutation merging one range of the first table."""
 
@@ -549,7 +559,15 @@ def fillKindSeries(document: pybers.Document) -> None:
         )
 
 
+# The regions findings-12-language-and-region.md measures, besides the base's en_US.
+measuredLocales: tuple[str, ...] = (
+    "de_DE", "en_GB", "ja_JP", "en_ZA", "pt_BR", "en_AU", "en_IN",
+)
+
 goldens: tuple[GoldenBuilder, ...] = (
+    *(GoldenBuilder(f"95-region-{identifier.lower().replace('_', '-')}-by-pybers",
+                    "95-region-base", setLocale(identifier), labeled=True)
+      for identifier in measuredLocales),
     *(GoldenBuilder(name, source, writeValues(writes), labeled=True)
       for name, (source, writes) in kindWrites.items()),
     GoldenBuilder("12-currency-written-by-pybers", "92-values-for-currency",
