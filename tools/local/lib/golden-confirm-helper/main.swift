@@ -11,6 +11,8 @@
 // it escapes. A Data Format value is only matched against a menu item or typed into a field.
 //
 // UPDATES
+// 2026-10-29  A request reads cells as text alone, and a failed capture is a problem that
+//             leaves the readings, for PYB-272.
 // 2026-10-21  Names each Data Format control, a step sets one by its name, a step extends
 //             a table to a cell, and a step builds a custom format, for PYB-219.
 // 2026-09-30  Reads a date at the zone's offset now, which Numbers applies to every date, for PYB-137.
@@ -119,6 +121,8 @@ struct HelperRequest: Codable {
     var cells: [CellAddress]?
     var tables: [TableAddress]?
     var maxCaptures: Int?
+    // Read each cell through AppleScript alone, with no inspector and no capture.
+    var textOnly: Bool?
     var freshNumbers: Bool?
     var documentPaths: [String]?
     var steps: [EditStep]?
@@ -1209,7 +1213,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         let tables = request.tables ?? []
         let sheets = (tables.map(\.sheet) + cells.map(\.sheet))
             .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        let captureCount = sheets.count + cells.count
+        let textOnly = request.textOnly ?? false
+        let captureCount = textOnly ? 0 : sheets.count + cells.count
         guard captureCount <= (request.maxCaptures ?? 0) else {
             throw HelperFailure(problem: HelperProblem(
                 kind: "captureLimit",
@@ -1248,7 +1253,8 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
         try inspectDocument(
             documentPath: documentPath, savedCopyPath: savedCopyPath,
             captureDirectory: captureDirectory, cells: cells, tables: request.tables ?? [],
-            sheets: sheets, numbers: numbers, result: &result)
+            sheets: textOnly ? [] : sheets, textOnly: textOnly, numbers: numbers,
+            result: &result)
     } catch let failure as HelperFailure {
         result.problems.append(failure.problem)
     } catch let failure as AppleScriptError {
@@ -1324,7 +1330,7 @@ func openDocument(
 
 func inspectDocument(
     documentPath: String, savedCopyPath: String, captureDirectory: String,
-    cells: [CellAddress], tables: [TableAddress], sheets: [String],
+    cells: [CellAddress], tables: [TableAddress], sheets: [String], textOnly: Bool,
     numbers: NSRunningApplication, result: inout HelperResult
 ) throws {
     let documentId = try openDocument(documentPath, numbers: numbers, result: &result)
@@ -1346,9 +1352,15 @@ func inspectDocument(
         try selectCell(first, documentId: documentId)
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["sheet", sheet]))
-        try captureWindow(
-            id: Int(windowId), window: window, crop: nil, to: path, pid: numbers.processIdentifier)
-        result.sheetCaptures.append(SheetCapture(sheet: sheet, path: path))
+        // A capture that fails is recorded, and the readings that need none go on.
+        do {
+            try captureWindow(
+                id: Int(windowId), window: window, crop: nil, to: path,
+                pid: numbers.processIdentifier)
+            result.sheetCaptures.append(SheetCapture(sheet: sheet, path: path))
+        } catch let failure as HelperFailure {
+            result.problems.append(failure.problem)
+        }
     }
 
     for address in cells {
@@ -1360,15 +1372,23 @@ func inspectDocument(
         reading.formula = facts.atIndex(2).flatMap(readOptionalText)
         reading.formatKind = facts.atIndex(3)?.stringValue
         reading.value = facts.atIndex(4).map(readCellValue)
+        if textOnly {
+            result.cells.append(reading)
+            continue
+        }
         try selectCell(address, documentId: documentId)
         try openCellTab(in: window)
         reading.dataFormat = try readDataFormat(in: window)
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["cell", address.sheet, address.table, address.cell]))
-        try captureWindow(
-            id: Int(windowId), window: window, crop: findDataFormatFrame(in: window), to: path,
-            pid: numbers.processIdentifier)
-        reading.inspectorCapture = path
+        do {
+            try captureWindow(
+                id: Int(windowId), window: window, crop: findDataFormatFrame(in: window),
+                to: path, pid: numbers.processIdentifier)
+            reading.inspectorCapture = path
+        } catch let failure as HelperFailure {
+            result.problems.append(failure.problem)
+        }
         result.cells.append(reading)
     }
 
