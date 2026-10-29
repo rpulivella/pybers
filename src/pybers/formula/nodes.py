@@ -34,6 +34,7 @@ row of `None` means the whole column rather than row zero. The same rule
 as a sentinel line, read here as `None`.
 
 UPDATES
+2026-10-29  `mapFormulaNodes`, the one walk a rewrite makes, for PYB-278.
 2026-10-24  A node's raw bytes kept in the JSON form, for PYB-259.
 2026-10-13  A boolean literal and a range reaching every row or column, for PYB-139.
 2026-09-18  A broken reference names the rows and columns it lost, for PYB-17.
@@ -60,7 +61,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/03"
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -585,3 +586,16 @@ class Formula:
             for node in self.nodes
         )
 
+
+def mapFormulaNodes(
+    formula: Formula, rewrite: Callable[[FormulaNode], FormulaNode]
+) -> Formula:
+    """Return a formula with each node rewritten, or the same one when none changed.
+
+    The designated place a rewrite walks a formula's nodes, returning the very formula
+    it was given when every node comes back as itself, so a caller tests `is`.
+    """
+    nodes = tuple(rewrite(node) for node in formula.nodes)
+    if all(new is old for new, old in zip(nodes, formula.nodes, strict=True)):
+        return formula
+    return Formula(nodes)
