@@ -245,8 +245,10 @@ bare `pybers FILE` already covers looking at one document. `set` infers a value'
 `--as` overrides the inference; should inference prove unreliable, `set` falls back to text
 unless `--as` names a kind. The inference is one table of parsers built on the standard
 library, tried in order, rather than a chain of conditions. `set --format` sets a format by
-its text form. `--preview` shows a change and writes nothing, the flag named for what it
-does.
+its text form. A writing verb changes FILE itself, since the verb names the act, as a
+database tool changes the database it is given. `--preview` writes nothing, the flag named
+for what it does, and `-o NEW` writes a new document instead, refusing any file that
+exists, so no option changes its meaning with the file it is given.
 
 ---
 
@@ -329,9 +331,8 @@ confirmations and any script reach it, so no two of them can disagree.
 `valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, in the order
 `pybers show` prints them. What describes where a value sits rather than what it is,
 such as `Cell.table` or `Cell.reference`, is left out, and so is the session's time
-zone, which the file has nowhere to keep. A document's language and region joins the
-form as its locale identifier when PYB-272 models it, rather than as the currency
-symbols pybers reads from it today. Each feature owns the form of its own types,
+zone, which the file has nowhere to keep. A document carries its language and region as
+its `localeIdentifier`, rather than as the currency symbols pybers reads from it. Each feature owns the form of its own types,
 beside its archive halves, and the mechanism in `pybers/interchange` knows no feature.
 
 **Each value follows one rule.**

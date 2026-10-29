@@ -42,7 +42,7 @@ A command parses its arguments, calls the library once, formats what comes back,
 
 ## Writing
 
-- **A write specifies its target**: `--in-place` changes the file given, and `-o NEW` writes a new document beside it. A command that writes requires one of the two, and `-o` refuses a file that already exists.
+- **A writing verb changes FILE itself**, since the verb is the act, as `sqlite-utils insert` and `git commit` are. `-o NEW` writes a new document beside it instead and refuses a file that already exists, any file, and `--preview` writes nothing. The two together are refused. `pybers.cli._common` owns the rule, both options and the report of what was written, so no command decides it.
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
 - **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
 - **`set --format SPEC`** sets how the cells show their value, SPEC being a format's text form, tagged by its family.
@@ -141,10 +141,9 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 
 | Project | What pybers took |
 | ------- | ---------------- |
-| [sqlite-utils](https://sqlite-utils.datasette.io/en/stable/cli.html) | Each command mirrors one library call, and output formats are flags |
+| [sqlite-utils](https://sqlite-utils.datasette.io/en/stable/cli.html) | Each command mirrors one library call, output formats are flags, and a writing command changes the file it names |
 | [uv](https://docs.astral.sh/uv/reference/cli/) | Workflows as top-level verbs, nouns only for resources |
 | [pandoc](https://pandoc.org/MANUAL.html) | The output format inferred from `-o`, and binary output kept off stdout |
-| [Miller](https://miller.readthedocs.io/en/latest/file-formats/) | Writing in place only when asked |
 | [csvkit](https://csvkit.readthedocs.io/en/latest/scripts/in2csv.html) | stdin and stdout so commands compose, and one verb rather than a binary per job |
 | [numbers-parser](https://github.com/masaccio/numbers-parser) | Formulas or values as a CSV choice |
 | [openpyxl](https://openpyxl.readthedocs.io/en/stable/tutorial.html), [pandas](https://pandas.pydata.org/docs/reference/api/pandas.read_excel.html), [polars](https://docs.pola.rs/api/python/stable/reference/api/polars.read_excel.html) | Names rather than indices, whose bases they disagree on, and no silent overwrite |
