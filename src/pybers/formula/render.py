@@ -21,6 +21,8 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-10-29  `renderNumber` declared the designated place a number is spelled,
+            for PYB-278.
 2026-10-22  A reference beyond its table's grid renders as `#REF!`, for PYB-255.
 2026-10-13  A node renders by matching what it holds, checked exhaustive by
             mypy, for PYB-139.
@@ -202,7 +204,10 @@ def qualifyAddress(
 
 
 def renderNumber(value: Decimal) -> str:
-    """Return a literal as it was written, without normalizing what it says."""
+    """Return a literal as it was written, without normalizing what it says.
+
+    This is the designated place a formula spells a number.
+    """
     return str(value)
 
 

@@ -6,6 +6,7 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-10-29  `reference` builds its own reference, for PYB-278.
 2026-10-24  The unread `style` scaffold removed, for PYB-259.
 2026-10-24  `valueCached`, whether a formula's value is the cached one, for PYB-259.
 2026-10-22  A reference beyond its table's grid shows as `#REF!`, and a table on
@@ -287,9 +288,8 @@ class Cell:
         Built from the owners on every call, so renaming the table or the sheet, or an
         edit that moves the cell, never leaves a stale copy behind.
         """
-        if self.table is None:
-            return CellReference(self.address.row, self.address.col)
-        return self.table._addressQualify(self.address)
+        table = None if self.table is None else self.table.reference
+        return CellReference(self.address.row, self.address.col, table=table)
 
     @property
     def value(self) -> CellValue:

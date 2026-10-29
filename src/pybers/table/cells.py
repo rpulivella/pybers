@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-10-29  A cell builds its own reference, for PYB-278.
 2026-10-27  `reference`, how to point at the table, and a range naming another
             table refused, for PYB-260.
 2026-10-20  `Cell` moved to `cell`, keeping this module within its limit, for
@@ -72,7 +73,6 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
-    CellReference,
     CellReferenceLike,
     ReferenceError,
     SheetReference,
@@ -297,10 +297,6 @@ class Table:
         return TableReference(
             sheet=None if sheet is None else SheetReference(sheet.name), name=self.name
         )
-
-    def _addressQualify(self, address: CellAddress) -> CellReference:
-        """Return a reference to an address here, naming this table and its sheet."""
-        return CellReference(address.row, address.col, table=self.reference)
 
     def _addressResolve(self, reference: CellReferenceLike) -> CellAddress:
         """Return where a reference points in this table, refusing one naming another.
