@@ -12,6 +12,7 @@ written here holds for writing, reading and validating alike.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-10-29  The duration leaf named for ISO 8601, for PYB-278.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -91,7 +92,7 @@ def formatTreeKind(tree: Tree) -> str:
             return "an object"
 
 
-def formatDuration(duration: datetime.timedelta) -> str:
+def formatIsoDuration(duration: datetime.timedelta) -> str:
     """Return a duration as ISO 8601, `P1DT2H30M` or `-PT0.5S`, to the microsecond."""
     total = duration // datetime.timedelta(microseconds=1)
     sign, total = ("-" if total < 0 else ""), abs(total)
@@ -122,7 +123,7 @@ def parseIsoDuration(text: str) -> datetime.timedelta:
     return -duration if parts["sign"] else duration
 
 
-def parseDuration(tree: Tree, path: str) -> datetime.timedelta:
+def parseIsoDurationLeaf(tree: Tree, path: str) -> datetime.timedelta:
     """Return the duration a tree's ISO 8601 text gives, refusing it by its path."""
     text = readString(tree, path, "an ISO 8601 duration such as P1DT2H30M")
     try:
@@ -183,7 +184,7 @@ leafRules: tuple[LeafRule, ...] = (
         {"type": "string", "pattern": dateTimePattern},
     ),
     LeafRule(
-        datetime.timedelta, formatDuration, parseDuration,
+        datetime.timedelta, formatIsoDuration, parseIsoDurationLeaf,
         # Without Python's group names, which a JSON Schema pattern cannot carry.
         {"type": "string",
          "pattern": f"^{re.sub(r'\?P<\w+>', '', durationPattern.pattern)}$"},
@@ -209,9 +210,9 @@ __all__ = [
     "Tree",
     "formatTreeKind",
     "findLeafRule",
-    "formatDuration",
+    "formatIsoDuration",
     "leafRules",
-    "parseDuration",
     "parseIsoDuration",
+    "parseIsoDurationLeaf",
     "readString",
 ]
