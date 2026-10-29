@@ -20,6 +20,7 @@ from pybers._persistence.rows import StoredTiles
 
 
 def buildTile(*localRows: int) -> tst.Tile:
+    """Return a tile storing an empty row at each local index given."""
     tile = tst.Tile()
     for local in localRows:
         tile.rowInfos.add(tile_row_index=local)

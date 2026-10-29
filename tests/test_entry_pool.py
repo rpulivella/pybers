@@ -25,15 +25,18 @@ from pybers.errors import WriteError
 
 
 def writeText(entry: ListEntry, text: str) -> None:
+    """Put a string into its entry, as the string pool does."""
     entry.string = text
 
 
 def buildPool(spend: Callable[[ListEntry], None] | None = None) -> EntryPool[str]:
+    """Return an empty string pool over a list of its own."""
     dataList = tst.TableDataList(listType=tst.TableDataList.STRING, nextListID=1)
     return EntryPool(dataList=dataList, noun="string", write=writeText, spend=spend)
 
 
 def findEntry(pool: EntryPool[str], key: int) -> ListEntry:
+    """Return the entry a key names, failing the test when there is none."""
     entry = pool.entryFind(key)
     assert entry is not None
     return entry
