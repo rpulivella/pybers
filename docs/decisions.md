@@ -417,6 +417,26 @@ region confirms that Numbers does.
 
 ---
 
+## A formula's nodes have no one visitor, decided 2026-10-29
+
+Four operations walk a formula's nodes: reading them from the archive, encoding them back
+into it, and two rewrites, restructuring after a row or column edit and relocating after
+a move, fill or paste. For PYB-278 they were weighed as one visitor and are kept apart.
+
+**Reading and encoding translate, and a visitor would hide the translation.** Reading
+dispatches on the stored node type, an integer, to build a node's content, and encoding
+matches on that content to patch the stored node. The two run in opposite directions over
+different types, so a visitor over one would describe neither. Each keeps one exhaustive
+dispatch, and mypy checks that encoding's `match` covers every kind of content.
+
+**The rewrites share one walk, `mapFormulaNodes`.** Restructuring, relocating and
+clamping a pasted range to its table's edge each rewrite a node's reference or range and
+leave every other node alone. The walk returns the formula it was given when no node
+changed, which is how a caller tells that nothing moved. Each rewrite then names only
+what it does to one node.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

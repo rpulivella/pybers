@@ -13,6 +13,7 @@ table save in `_write`, which knows what every formula reads.
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-10-29  One `countLineRecords`, mapped or not, for PYB-278.
 2026-09-22  The merge store moves in `_merges`, for PYB-113.
 2026-09-22  Nothing is imported from table creation: the UID map is written by `_lines`,
             for PYB-113.
@@ -33,9 +34,9 @@ __date__ = "2026/09/18"
 from collections import Counter
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRow
 from .._persistence.index import ArchiveIndex, readUuidValue
 from .._persistence.metadata import PackageRegistry
+from .._persistence.rows import readStoredTiles
 from ..addressing.reference import originOffset
 from ._conditions import ConditionalPlan, buildConditionalPlan
 from ._lines import (
@@ -99,28 +100,27 @@ def applyBandCounts(model: tst.TableModelArchive, maps: GridMaps) -> None:
             setattr(model, name, count)
 
 
-def countSurvivingCells(
-    index: ArchiveIndex, store: tst.DataStore, maps: GridMaps
+def countLineRecords(
+    index: ArchiveIndex, store: tst.DataStore, maps: GridMaps | None = None
 ) -> tuple[Counter[int], Counter[int]]:
-    """Return how many records each new row and each new column will hold."""
-    tileSize = store.tiles.tile_size
+    """Return how many records each row and each column holds, through `maps` if given.
+
+    A record on a line the maps remove is not counted.
+    """
     rows: Counter[int] = Counter()
     columns: Counter[int] = Counter()
-    for entry in store.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        for rowInfo in tile.rowInfos:
-            row = maps.rows.lineMap(entry.tileid * tileSize + rowInfo.tile_row_index)
-            if row is None:
+    for stored in readStoredTiles(index, store):
+        row = stored.row if maps is None else maps.rows.lineMap(stored.row)
+        if row is None:
+            continue
+        for record in stored.records:
+            column = (
+                record.column if maps is None else maps.columns.lineMap(record.column)
+            )
+            if column is None:
                 continue
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                column = maps.columns.lineMap(record.column)
-                if column is None:
-                    continue
-                rows[row] += 1
-                columns[column] += 1
+            rows[row] += 1
+            columns[column] += 1
     return rows, columns
 
 
@@ -195,7 +195,7 @@ def applyGridStructure(
     archives it points at are written here.
     """
     store = model.base_data_store
-    rowCounts, columnCounts = countSurvivingCells(index, store, maps)
+    rowCounts, columnCounts = countLineRecords(index, store, maps)
     # Read before the UID map is rewritten, since a broken rule records the lines
     # as they were stored.
     storedRows, storedColumns = readLineIdentities(index, model)

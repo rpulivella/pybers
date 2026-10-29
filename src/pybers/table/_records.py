@@ -14,6 +14,8 @@ a value typed into a fresh cell takes it, and drops the control the old value ha
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-29  A format keyed through the format pool, and a template found
+            through `StoredTiles`, for PYB-278.
 2026-10-22  The chosen bit set or cleared is the one for the slot a record shows,
             and a retyped record keeps none, for PYB-255.
 2026-10-22  A `CurrencyAmount` writes as currency, and a new code keeps the other
@@ -46,7 +48,7 @@ from decimal import Decimal
 
 from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
+from .._persistence import decodeRecord
 from .._persistence.cells import (
     CellRecord,
     appleEpoch,
@@ -71,11 +73,13 @@ from .._persistence.cells import (
 )
 from .._persistence.decimal128 import Decimal128, encodedLength
 from .._persistence.index import ArchiveIndex
+from .._persistence.pool import EntryPool
+from .._persistence.rows import readStoredTiles
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
 from ._read import controlSlot, currencyFormatType, currencyTypeByte, storedKinds
-from ._refcounts import StringPool, stringTypeByte
+from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
 
@@ -247,7 +251,7 @@ def encodeSeconds(seconds: float) -> bytes:
 
 
 def encodeCellValue(
-    cell: Cell, record: CellRecord, pool: StringPool | None, borrowed: bool
+    cell: Cell, record: CellRecord, pool: EntryPool[str] | None, borrowed: bool
 ) -> tuple[int, bytes]:
     """Return the record type a cell's value is stored as, and its value bytes."""
     value = cell.value
@@ -287,7 +291,7 @@ def encodeCellValue(
 def buildWrittenRecord(
     cell: Cell,
     record: CellRecord,
-    pool: StringPool | None,
+    pool: EntryPool[str] | None,
     *,
     borrowed: bool = False,
     formatFor: Callable[[tsk.FormatStructArchive], int | None] = lambda wanted: None,
@@ -393,22 +397,15 @@ def patchValue(record: CellRecord, encoded: bytes) -> bytes:
 
 
 def findFormatKey(
-    dataList: tst.TableDataList, wanted: tsk.FormatStructArchive
+    pool: EntryPool[tsk.FormatStructArchive], wanted: tsk.FormatStructArchive
 ) -> int:
     """Return a key naming exactly this format, creating an entry when none does.
 
     Counts nothing: `moveFormatReferences` counts the record that names the key, so
     looking a format up once for many cells counts every cell.
     """
-    for entry in dataList.entries:
-        if entry.HasField("format") and entry.format == wanted:
-            return int(entry.key)
-    fresh = dataList.entries.add()
-    fresh.key = dataList.nextListID
-    fresh.refcount = 0
-    fresh.format.CopyFrom(wanted)
-    dataList.nextListID += 1
-    return int(fresh.key)
+    key = pool.keyFind(wanted)
+    return pool.entryAdd(wanted, 0) if key is None else key
 
 
 def findTemplateRecord(
@@ -423,18 +420,13 @@ def findTemplateRecord(
     borrowed is the style, never the value or the format.
     """
     fallback: CellRecord | None = None
-    for entry in store.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        for rowInfo in tile.rowInfos:
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                if carriesFormula(record) or record.typeByte not in recordShapes:
-                    continue
-                if record.typeByte == typeByte:
-                    return record
-                fallback = fallback or record
+    for stored in readStoredTiles(index, store):
+        for record in stored.records:
+            if carriesFormula(record) or record.typeByte not in recordShapes:
+                continue
+            if record.typeByte == typeByte:
+                return record
+            fallback = fallback or record
     return fallback
 
 
@@ -443,11 +435,6 @@ def findTemplateRecord(
 plainNumberRecord: bytes = bytes.fromhex(
     "0502000000000000013000002a0000000000000000000000000040300100000001000000"
 )
-
-
-def buildFreshRecord(column: int) -> CellRecord:
-    """Return Numbers' plain-number record, to shape a cell in a table holding none."""
-    return decodeRecord(column, plainNumberRecord)
 
 
 def borrowShape(record: CellRecord) -> bytes:
@@ -551,13 +538,13 @@ def retypeRecord(
 __all__ = [
     "applyChosenFormat",
     "borrowShape",
-    "buildFreshRecord",
     "buildWrittenRecord",
     "findFormatKey",
     "findTemplateRecord",
     "findWrittenTypeByte",
     "numberTypeByte",
     "patchRichTextKey",
+    "plainNumberRecord",
     "recordShapes",
     "applyAutomaticFormat",
 ]

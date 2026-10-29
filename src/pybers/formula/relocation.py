@@ -12,6 +12,8 @@ was stored as `SUM(E7:E12)`, not `SUM(E7:E18)`. A single reference past the edge
 kept, and shows an error.
 
 UPDATES
+2026-10-29  Relocating and clamping walk the nodes through `mapFormulaNodes`,
+            for PYB-278.
 2026-09-29  A formula keeps its named cells from a new host with no block moved,
             which is how a fill copies one, for PYB-118.
 2026-09-23  Written for PYB-18.
@@ -37,6 +39,7 @@ from pybers.formula.nodes import (
     FormulaRange,
     FormulaReference,
     Span,
+    mapFormulaNodes,
 )
 
 
@@ -162,21 +165,28 @@ def relocateFormula(
     `60c-move-dragged` left `SUM(B1:B6)` where it was. With no `move`, every
     reference keeps the cell it named.
     """
-    nodes = []
-    for node in formula.nodes:
-        content = node.content
-        moved: object = content
-        if isinstance(content, FormulaReference):
-            moved = relocateReference(content, host, landed, move, hostInTarget)
-        elif isinstance(content, FormulaRange):
-            moved = relocateRange(content, host, landed, move, hostInTarget)
-        if moved is not content:
-            assert isinstance(moved, FormulaReference | FormulaRange)
-            node = FormulaNode(node.nodeType, moved, node.raw)
-        nodes.append(node)
-    if all(new is old for new, old in zip(nodes, formula.nodes, strict=True)):
-        return formula
-    return Formula(tuple(nodes))
+    return mapFormulaNodes(
+        formula, lambda node: relocateNode(node, host, landed, move, hostInTarget)
+    )
+
+
+def relocateNode(
+    node: FormulaNode,
+    host: CellAddress,
+    landed: CellAddress,
+    move: FormulaBlockMove | None,
+    hostInTarget: bool,
+) -> FormulaNode:
+    """Return one node naming the cells it named, or the same node when none moved."""
+    content = node.content
+    moved: FormulaReference | FormulaRange
+    if isinstance(content, FormulaReference):
+        moved = relocateReference(content, host, landed, move, hostInTarget)
+    elif isinstance(content, FormulaRange):
+        moved = relocateRange(content, host, landed, move, hostInTarget)
+    else:
+        return node
+    return node if moved is content else FormulaNode(node.nodeType, moved, node.raw)
 
 
 def clampSpan(span: Span | None, host: int, count: int) -> Span | None:
@@ -194,21 +204,24 @@ def clampFormulaRanges(
     formula: Formula, host: CellAddress, rowCount: int, columnCount: int
 ) -> Formula:
     """Return a formula whose ranges in its own table stop at that table's edge."""
-    nodes = []
-    for node in formula.nodes:
-        content = node.content
-        if isinstance(content, FormulaRange) and content.tableId is None:
-            clamped = FormulaRange(
-                clampSpan(content.columns, host.col, columnCount),
-                clampSpan(content.rows, host.row, rowCount),
-                content.tableId,
-            )
-            if clamped != content:
-                node = FormulaNode(node.nodeType, clamped, node.raw)
-        nodes.append(node)
-    if all(new is old for new, old in zip(nodes, formula.nodes, strict=True)):
-        return formula
-    return Formula(tuple(nodes))
+    return mapFormulaNodes(
+        formula, lambda node: clampNode(node, host, rowCount, columnCount)
+    )
+
+
+def clampNode(
+    node: FormulaNode, host: CellAddress, rowCount: int, columnCount: int
+) -> FormulaNode:
+    """Return one node whose range in its own table stops at that table's edge."""
+    content = node.content
+    if not isinstance(content, FormulaRange) or content.tableId is not None:
+        return node
+    clamped = FormulaRange(
+        clampSpan(content.columns, host.col, columnCount),
+        clampSpan(content.rows, host.row, rowCount),
+        content.tableId,
+    )
+    return node if clamped == content else FormulaNode(node.nodeType, clamped, node.raw)
 
 
 __all__ = [

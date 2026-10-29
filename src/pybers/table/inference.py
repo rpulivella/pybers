@@ -10,6 +10,8 @@ named outright uses its own parser and refuses text that parser cannot read.
 printed by the command line is written again as the same value and kind.
 
 UPDATES
+2026-10-29  The duration parser and formatter named for the units a person
+            types, for PYB-278.
 2026-10-24  A duration read from ISO 8601 as well, as the JSON form writes it, for
             PYB-259.
 2026-10-22  Reads and prints a currency amount, `1234.5 EUR`, for PYB-220.
@@ -111,7 +113,7 @@ def toMicroseconds(amount: str, unit: int) -> int:
     return int(exact)
 
 
-def parseDuration(text: str) -> datetime.timedelta:
+def parseUnitDuration(text: str) -> datetime.timedelta:
     """Return the duration units name, `1h 30m` or `-2d 4h`, or ISO 8601, `PT1H30M`.
 
     ISO 8601 is how the JSON form writes a duration, so what `--format json` prints
@@ -135,7 +137,7 @@ def parseDurationNamed(text: str) -> datetime.timedelta:
     """Return the duration units or a clock name, `1h 30m` or `1:30`."""
     found = durationClock.fullmatch(text.strip())
     if found is None:
-        return parseDuration(text)
+        return parseUnitDuration(text)
     sign, hours, minutes, seconds = found.groups()
     total = (
         toMicroseconds(hours, durationUnits["h"])
@@ -152,7 +154,7 @@ valueParsers: frozendict[CellKind, Callable[[str], CellValue]] = frozendict({
     CellKind.CURRENCY: parseCurrency,
     CellKind.BOOLEAN: parseBoolean,
     CellKind.DATE_TIME: parseDateTime,
-    CellKind.DURATION: parseDuration,
+    CellKind.DURATION: parseUnitDuration,
     CellKind.TEXT: parseText,
 })
 namedParsers: frozendict[CellKind, Callable[[str], CellValue]] = frozendict({
@@ -194,7 +196,7 @@ def toValueKind(kind: CellKind | str) -> CellKind:
     return named
 
 
-def formatDuration(value: datetime.timedelta) -> str:
+def formatUnitDuration(value: datetime.timedelta) -> str:
     """Return a duration in the units Numbers writes, `1h 30m`, never `-1 day, 8:38`."""
     total = abs(value) // datetime.timedelta(microseconds=1)
     parts = []
@@ -217,7 +219,7 @@ def formatCellValue(value: CellValue) -> str:
     if isinstance(value, datetime.datetime):
         return value.isoformat(sep=" ")
     if isinstance(value, datetime.timedelta):
-        return formatDuration(value)
+        return formatUnitDuration(value)
     return str(value)
 
 

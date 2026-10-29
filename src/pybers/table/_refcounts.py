@@ -5,11 +5,13 @@ The refcounts a table's lists keep: which records claim which entry, and how man
 A format, a style, a pooled string and a rich-text payload each carry a refcount of
 the records naming them. A record written moves the counts its slots changed, a
 record removed releases what it named, and an entry released to 0 that no record
-still names is removed at the end of the save, as Numbers removes it.
+still names is removed at the end of the save, as Numbers removes it. Each list is
+an `EntryPool`, which keys, claims and releases its entries.
 
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-29  Every list is an `EntryPool`, for PYB-278.
 2026-10-01  The per-kind format slots moved to `_persistence.cells`, for PYB-141.
 2026-09-29  A copied record claims its string and style entries, a copied
             rich-text cell gains an entry of its own, and a spent one is removed
@@ -27,16 +29,19 @@ __status__ = "Development"
 __date__ = "2026/09/22"
 
 from collections import Counter
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from collections.abc import Iterable
 
+from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
+from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
+from .._persistence import decodeRecord
 from .._persistence.cells import CellRecord, countedFormatSlots, listReferenceSlots
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
+from .._persistence.pool import EntryPool, ListEntry
+from .._persistence.rows import StoredTiles
 from ..errors import WriteError
 from ._read import readStringTable
 
@@ -55,89 +60,9 @@ richTextTypeByte: int = 9
 countedStyleSlots: tuple[tuple[int, int], ...] = ((8, 0x20), (8, 0x40))
 
 
-@dataclass
-class StringPool:
-    """A table's pooled strings, and the one place a written one is added.
-
-    The counterpart of `FormulaPool` and shaped like it on purpose. Numbers points
-    every cell holding the same text at ONE entry and keeps a refcount, so writing
-    an entry per cell diverges from what Numbers itself writes the moment the same
-    label appears twice.
-
-    A shared entry is never overwritten. Changing the text of one cell that shares
-    an entry with six others must not rewrite all seven, which is the same aliasing
-    hazard the frozen model closes on the read side.
-    """
-
-    dataList: tst.TableDataList
-    stored: dict[int, str]
-    touched: bool = False
-    released: set[int] = field(default_factory=set)
-
-    def entryFor(self, key: int) -> tst.TableDataList.ListEntry | None:
-        """Return one pooled entry by key, or None when the table has no such key."""
-        for entry in self.dataList.entries:
-            if entry.key == key:
-                return entry
-        return None
-
-    def keyFor(self, text: str, previous: int | None = None) -> int:
-        """Return the key a cell should name, sharing an entry when one matches.
-
-        `previous` is the key the cell names now, released when it stops naming it.
-        """
-        self.touched = True
-        for key, stored in self.stored.items():
-            entry = self.entryFor(key)
-            if stored != text or entry is None:
-                continue
-            if key == previous:
-                return key
-            entry.refcount += 1
-            if previous is not None:
-                self.release(previous)
-            return key
-
-        existing = self.entryFor(previous) if previous is not None else None
-        if existing is not None and existing.refcount <= 1:
-            existing.string = text
-            self.stored[existing.key] = text
-            return existing.key
-        if previous is not None:
-            self.release(previous)
-        fresh = self.dataList.entries.add()
-        fresh.key = self.dataList.nextListID
-        fresh.refcount = 1
-        fresh.string = text
-        self.dataList.nextListID += 1
-        self.stored[fresh.key] = text
-        return fresh.key
-
-    def claim(self, key: int) -> None:
-        """Add one cell's claim on a stored string, as a copied record makes."""
-        entry = self.entryFor(key)
-        if entry is None:
-            raise WriteError(
-                f"A copied record names string {key}, which is not stored."
-            )
-        self.touched = True
-        entry.refcount += 1
-
-    def release(self, key: int) -> None:
-        """Give up one cell's claim on a stored string.
-
-        An entry released to 0 stays until the save ends, so text written later in
-        the same save can still share it. `removeSpentEntries` decides then.
-        """
-        entry = self.entryFor(key)
-        if entry is None:
-            return
-        self.touched = True
-        entry.refcount = max(0, entry.refcount - 1)
-        self.released.add(key)
-
-
-def readStringPool(index: ArchiveIndex, store: tst.DataStore) -> StringPool | None:
+def readStringPool(
+    index: ArchiveIndex, store: tst.DataStore
+) -> EntryPool[str] | None:
     """Return the table's string pool, or None when it carries no string list.
 
     A table that has never held text carries no list to write into, which is a
@@ -145,10 +70,24 @@ def readStringPool(index: ArchiveIndex, store: tst.DataStore) -> StringPool | No
     """
     if not store.stringTable.identifier:
         return None
-    return StringPool(
+    return EntryPool(
         dataList=index.resolve(store.stringTable, tst.TableDataList),
+        noun="string",
+        write=writeStringEntry,
         stored=readStringTable(index, store),
     )
+
+
+def writeStringEntry(entry: ListEntry, text: str) -> None:
+    """Put a pooled string into its entry."""
+    entry.string = text
+
+
+def readCountedPool(
+    index: ArchiveIndex, reference: tsp.Reference, noun: str
+) -> EntryPool[object]:
+    """Return a list pybers claims and releases entries of but never adds to."""
+    return EntryPool(dataList=index.resolve(reference, tst.TableDataList), noun=noun)
 
 
 def countFormatClaims(raw: bytes) -> Counter[int]:
@@ -161,67 +100,43 @@ def countFormatClaims(raw: bytes) -> Counter[int]:
     )
 
 
+def readFormatPool(
+    index: ArchiveIndex, store: tst.DataStore
+) -> EntryPool[tsk.FormatStructArchive] | None:
+    """Return the table's format list, or None when it carries none."""
+    if not store.format_table.identifier:
+        return None
+    dataList = index.resolve(store.format_table, tst.TableDataList)
+    return EntryPool(
+        dataList=dataList,
+        noun="format",
+        write=lambda entry, wanted: entry.format.CopyFrom(wanted),
+        stored={
+            int(entry.key): entry.format
+            for entry in dataList.entries if entry.HasField("format")
+        },
+    )
+
+
 def moveFormatReferences(
-    dataList: tst.TableDataList, before: bytes | None, after: bytes | None, where: str
-) -> set[int]:
+    pool: EntryPool[tsk.FormatStructArchive],
+    before: bytes | None,
+    after: bytes | None,
+    where: str,
+) -> None:
     """Move refcounts from the formats a record named to those it names now.
 
     `before` is None for a record no cell owned, and `after` for one being removed.
     Only a slot that changed moves a count, so an entry no written record touches
     keeps the count Numbers wrote even where that count disagrees with its cells.
-    Returns the keys whose counts moved.
     """
     change = countFormatClaims(after) if after is not None else Counter()
     change.subtract(countFormatClaims(before) if before is not None else Counter())
-    entries = {int(entry.key): entry for entry in dataList.entries}
-    moved: set[int] = set()
     for key, delta in change.items():
-        if not delta:
-            continue
-        entry = entries.get(key)
-        if entry is None:
-            if delta < 0:
-                continue
-            raise WriteError(
-                f"{where} would name format {key}, which its table's format list "
-                "does not hold."
-            )
-        entry.refcount = max(0, entry.refcount + delta)
-        moved.add(key)
-    return moved
-
-
-def removeSpentEntries(
-    dataList: tst.TableDataList,
-    released: set[int],
-    tiles: list[tst.Tile],
-    claims: Callable[[CellRecord], Iterable[int]],
-) -> set[int]:
-    """Remove each entry this save released to 0 that no record still names.
-
-    Numbers removes such an entry on save and never reuses its key, measured for a
-    format in `54c-format-star-rating-cleared` and a string in `54b`. A count
-    Numbers wrote can already undercount its cells, so the records are read rather
-    than the count trusted: removing an entry a cell still names would orphan it.
-    Returns the keys removed.
-    """
-    spent = {
-        int(entry.key) for entry in dataList.entries
-        if entry.key in released and entry.refcount == 0
-    }
-    if not spent:
-        return spent
-    for tile in tiles:
-        for rowInfo in tile.rowInfos:
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                spent.difference_update(claims(record))
-    for position in reversed(range(len(dataList.entries))):
-        if dataList.entries[position].key in spent:
-            del dataList.entries[position]
-    return spent
+        if delta > 0:
+            pool.claim(key, delta, where)
+        elif delta < 0:
+            pool.release(key, -delta)
 
 
 def listStringClaims(record: CellRecord) -> Iterable[int]:
@@ -249,31 +164,19 @@ def listRichTextClaims(record: CellRecord) -> Iterable[int]:
     return ()
 
 
-def claimEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
-    """Add one reference per key given, and say whether any count moved."""
-    named = Counter(keys)
-    moved = False
-    for entry in dataList.entries:
-        if entry.key in named:
-            entry.refcount += named[entry.key]
-            moved = True
-    return moved
-
-
-def copyRichText(
-    registry: PackageRegistry, dataList: tst.TableDataList, key: int
-) -> int:
+def copyRichText(registry: PackageRegistry, pool: EntryPool[int], key: int) -> int:
     """Give a copied rich-text cell an entry of its own, and return its key.
 
     Numbers' fill gave each copy its own payload and storage, beside the original
     and sharing its style sheet and styles, measured 2026-09-29 in `63e`. Sharing
-    one entry would let an edit to one cell rewrite the other.
+    one entry would turn an edit to one cell into an edit of the other.
     """
     index = registry.index
-    source = next((entry for entry in dataList.entries if entry.key == key), None)
+    source = pool.entryFind(key)
     if source is None:
         raise WriteError(
-            f"A copied record names rich text {key}, which is not stored."
+            f"A copied record would name rich text {key}, which its table does not "
+            "hold."
         )
     payload = tst.RichTextPayloadArchive()
     payload.CopyFrom(
@@ -287,12 +190,21 @@ def copyRichText(
         registry, source.rich_text_payload.identifier, payload
     )
     index.archiveWrite(identifier, payload, [payload.storage.identifier])
-    entry = dataList.entries.add()
-    entry.key = dataList.nextListID
-    entry.refcount = 1
+    return pool.entryAdd(identifier, 1)
+
+
+def readRichTextPool(index: ArchiveIndex, store: tst.DataStore) -> EntryPool[int]:
+    """Return the table's rich-text list, each entry naming its payload archive."""
+    return EntryPool(
+        dataList=index.resolve(store.rich_text_table, tst.TableDataList),
+        noun="rich text",
+        write=writeRichTextEntry,
+    )
+
+
+def writeRichTextEntry(entry: ListEntry, identifier: int) -> None:
+    """Point an entry at the payload archive it holds."""
     entry.rich_text_payload.identifier = identifier
-    dataList.nextListID += 1
-    return int(entry.key)
 
 
 def isArchiveReferenced(index: ArchiveIndex, target: int) -> bool:
@@ -306,10 +218,7 @@ def isArchiveReferenced(index: ArchiveIndex, target: int) -> bool:
 
 
 def removeSpentRichText(
-    registry: PackageRegistry,
-    dataList: tst.TableDataList,
-    released: set[int],
-    tiles: list[tst.Tile],
+    registry: PackageRegistry, pool: EntryPool[int], tiles: StoredTiles
 ) -> None:
     """Remove each spent rich-text entry with every archive only it held.
 
@@ -322,11 +231,11 @@ def removeSpentRichText(
         int(entry.key): index.resolve(
             entry.rich_text_payload, tst.RichTextPayloadArchive
         ).storage.identifier
-        for entry in dataList.entries if entry.key in released
+        for entry in pool.dataList.entries if entry.key in pool.released
     }
     payloads = {int(entry.key): entry.rich_text_payload.identifier
-                for entry in dataList.entries}
-    for key in removeSpentEntries(dataList, released, tiles, listRichTextClaims):
+                for entry in pool.dataList.entries}
+    for key in pool.spentRemove(tiles, listRichTextClaims):
         held = registry.strongReferencesOf(storages[key])
         registry.archiveRemove(payloads[key])
         registry.archiveRemove(storages[key])
@@ -335,20 +244,7 @@ def removeSpentRichText(
                 registry.archiveRemove(target)
 
 
-def releaseEntries(dataList: tst.TableDataList, keys: Iterable[int]) -> bool:
-    """Release one reference per key given, and say whether any count moved."""
-    named = Counter(keys)
-    moved = False
-    for entry in dataList.entries:
-        if entry.key in named:
-            entry.refcount = max(0, entry.refcount - named[entry.key])
-            moved = True
-    return moved
-
-
 __all__ = [
-    "StringPool",
-    "claimEntries",
     "countFormatClaims",
     "countedStyleSlots",
     "copyRichText",
@@ -356,10 +252,11 @@ __all__ = [
     "listStringClaims",
     "listStyleClaims",
     "moveFormatReferences",
+    "readCountedPool",
+    "readFormatPool",
+    "readRichTextPool",
     "readStringPool",
-    "releaseEntries",
     "removeSpentRichText",
-    "removeSpentEntries",
     "richTextTypeByte",
     "stringTypeByte",
 ]

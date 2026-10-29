@@ -14,6 +14,8 @@ when it empties.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-29  `TileRange.rows` and `rowFor`, the walk and the row a placement
+            takes, for PYB-278.
 2026-09-22  The tile pass that uses these primitives is named `_edits`, for PYB-113.
 2026-09-22  Archives written through the save's index, for PYB-109.
 2026-09-21  Split out of `_write` for PYB-17.
@@ -32,7 +34,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRow
+from .._persistence import decodeRow
 from .._persistence.cells import (
     CellRecord,
     conditionalSlot,
@@ -42,6 +44,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
+from .._persistence.rows import StoredTiles, TileRow
 from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ._conditions import (
@@ -166,41 +169,39 @@ def moveGridRecords(
     ids left holding nothing, tile 0 aside, which a table always keeps.
     """
     tileSize = store.tiles.tile_size
-    tiles = dict(tileRange.tiles)
-    moved: list[tuple[int, tst.TileRowInfo, tst.Tile]] = []
+    walked = tileRange.rows
+    moved: list[tuple[int, tst.TileRowInfo]] = []
     storedRecords: dict[int, list[CellRecord]] = {}
-    for tileid, tile in tiles.items():
-        for rowInfo in tile.rowInfos:
-            stored = tileid * tileSize + rowInfo.tile_row_index
-            row = maps.rows.lineMap(stored)
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            records = decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
-            storedRecords[stored] = records
-            for record in records:
-                column = maps.columns.lineMap(record.column)
-                if row is None or column is None:
-                    reference = CellAddress(
-                        stored + originOffset, record.column + originOffset
-                    )
-                    release(record, reference)
-            if row is None:
-                continue
-            # Rules first, while each record still sits where it was stored, since a
-            # relative rule is worked out from the cell it colors.
-            if plan is not None:
-                rewriteConditionalRow(rowInfo, unit, stored, plan)
-            if maps.columns.changed:
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRowColumns(
-                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit,
-                    maps.columns, table.colCount,
+    for stored in walked:
+        row = maps.rows.lineMap(stored.row)
+        records = stored.records
+        storedRecords[stored.row] = records
+        for record in records:
+            column = maps.columns.lineMap(record.column)
+            if row is None or column is None:
+                reference = CellAddress(
+                    stored.row + originOffset, record.column + originOffset
                 )
-            rowInfo.cell_count = len(
-                decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
+                release(record, reference)
+        if row is None:
+            continue
+        # Rules first, while each record still sits where it was stored, since a
+        # relative rule is worked out from the cell it colors.
+        if plan is not None:
+            rewriteConditionalRow(stored, plan)
+        rowInfo = stored.info
+        if maps.columns.changed:
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRowColumns(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, stored.unit,
+                maps.columns, table.colCount,
             )
-            moved.append((row, rowInfo, tile))
+        rowInfo.cell_count = len(stored.records)
+        moved.append((row, rowInfo))
 
-    copies: dict[int, list[tst.TileRowInfo]] = {tileid: [] for tileid in tiles}
-    for row, rowInfo, _ in moved:
+    copies: dict[int, list[tst.TileRowInfo]] = {
+        tileid: [] for tileid, _ in walked.tiles
+    }
+    for row, rowInfo in moved:
         # A row carries its own offset width, so it may sit in any tile.
         tileRange.tileFor(row // tileSize)
         copies.setdefault(row // tileSize, [])
@@ -222,18 +223,18 @@ def moveGridRecords(
     }
 
 
-def rewriteConditionalRow(
-    rowInfo: tst.TileRowInfo, unit: int, row: int, plan: ConditionalPlan
-) -> None:
+def rewriteConditionalRow(stored: TileRow, plan: ConditionalPlan) -> None:
     """Point every record of one stored row at the rule its old rule became."""
     replacements = {}
-    for record in decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit):
-        rewritten = rewriteConditionalRecord(record, row, plan)
+    for record in stored.records:
+        rewritten = rewriteConditionalRecord(record, stored.row, plan)
         if rewritten is not None:
             replacements[record.column] = rewritten
     if replacements:
+        rowInfo = stored.info
         rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
-            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit, replacements
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, stored.unit,
+            replacements,
         )
 
 
@@ -280,21 +281,12 @@ def addInheritedRecords(
     for (row, column), raw in inherited.items():
         byRow.setdefault(row, {})[column] = raw
     for row, placed in sorted(byRow.items()):
-        tile = tileRange.tileFor(row // tileSize)
-        if not any(held.tile_row_index == row % tileSize for held in tile.rowInfos):
-            createRowStorage(tile, row % tileSize)
-        # Found again rather than taken from the creation, because a repeated field
-        # stores a copy of what is inserted into it.
-        rowInfo = next(
-            held for held in tile.rowInfos if held.tile_row_index == row % tileSize
-        )
-        unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
+        target = tileRange.rowFor(row)
+        rowInfo = target.info
         rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
-            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit, placed
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, target.unit, placed
         )
-        rowInfo.cell_count = len(
-            decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
-        )
+        rowInfo.cell_count = len(target.records)
 
 
 @dataclass
@@ -311,6 +303,22 @@ class TileRange:
     registry: PackageRegistry
     store: tst.DataStore
     tiles: dict[int, tst.Tile] = field(default_factory=dict)
+
+    @property
+    def rows(self) -> StoredTiles:
+        """Return the tiles held now, to walk row by row."""
+        return StoredTiles(self.store.tiles.tile_size, tuple(self.tiles.items()))
+
+    def rowFor(self, row: int) -> TileRow:
+        """Return a row's storage, creating its tile or the row when absent."""
+        tileSize = self.store.tiles.tile_size
+        tile = self.tileFor(row // tileSize)
+        if not any(held.tile_row_index == row % tileSize for held in tile.rowInfos):
+            createRowStorage(tile, row % tileSize)
+        # Found after creation, because a repeated field stores a copy of its input.
+        return TileRow(row, tile, next(
+            held for held in tile.rowInfos if held.tile_row_index == row % tileSize
+        ))
 
     def tileFor(self, tileid: int) -> tst.Tile:
         """Return the tile holding a block of rows, creating it if the file lacks it."""

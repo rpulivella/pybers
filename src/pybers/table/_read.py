@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-10-29  A table's records walked through `StoredTiles`, for PYB-278.
 2026-10-22  Each cell's control read into its presentation, for PYB-255.
 2026-10-22  A currency record reads as a `CurrencyAmount` carrying its format's
             code, for PYB-220.
@@ -53,7 +54,7 @@ from typing import cast
 from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import CellDecodeError, chooseOffsetUnit, decodeRow
+from .._persistence import CellDecodeError
 from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
@@ -71,6 +72,7 @@ from .._persistence.index import (
     richTextListType,
     stringListType,
 )
+from .._persistence.rows import readStoredTiles
 from ..addressing import CellRange
 from ..addressing.reference import CellAddress, originOffset
 from ..currency import CurrencyAmount
@@ -410,37 +412,20 @@ def iterateCellRecords(
     index: ArchiveIndex, model: tst.TableModelArchive, source: Path
 ) -> Iterator[tuple[CellAddress, CellRecord]]:
     """Yield every record a table stores, with the cell it belongs to."""
-    dataStore = model.base_data_store
-    tileSize = dataStore.tiles.tile_size
-    # The tile LIST is authoritative. Its `tileid` gives the row range, and the
-    # archive identifiers are not in row order, so nothing here may iterate
-    # archives as found. See findings-03-structure.md.
-    for entry in dataStore.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        firstRow = entry.tileid * tileSize
-        for rowInfo in tile.rowInfos:
-            # `tile_row_index` is LOCAL to its tile, so a document row is the
-            # tile's own id times the tile size plus the local index. Reading it
-            # as a document row gives eight different rows on an eight-tile table
-            # and raises nothing. See findings-03-structure.md.
-            row = firstRow + rowInfo.tile_row_index
-            try:
-                records = decodeRow(
-                    rowInfo.cell_offsets,
-                    rowInfo.cell_storage_buffer,
-                    chooseOffsetUnit(
-                        rowInfo.has_wide_offsets, tile.should_use_wide_rows
-                    ),
-                )
-            except CellDecodeError as exc:
-                raise ReadError(
-                    # By identifier, never by name, so a check report stays publishable.
-                    f"{source}, table {model.table_id}, row "
-                    f"{row + originOffset}: {exc}"
-                ) from exc
-            for record in records:
-                column = record.column + originOffset
-                yield CellAddress(row + originOffset, column), record
+    for stored in readStoredTiles(index, model.base_data_store):
+        try:
+            records = stored.records
+        except CellDecodeError as exc:
+            raise ReadError(
+                # By identifier, never by name, so a check report stays publishable.
+                f"{source}, table {model.table_id}, row "
+                f"{stored.row + originOffset}: {exc}"
+            ) from exc
+        for record in records:
+            yield (
+                CellAddress(stored.row + originOffset, record.column + originOffset),
+                record,
+            )
 
 
 def setCellStorage(
