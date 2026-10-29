@@ -3,6 +3,7 @@
 The rule each value follows in the JSON form, and what reading one refuses.
 
 UPDATES
+2026-10-28  Version 2, whose document names its locale, for PYB-272.
 2026-10-27  A range narrowing a table may name it, and not another, for
             PYB-260.
 2026-10-24  Written for PYB-259, taking the value rules `test_cli_formats` held.
@@ -221,9 +222,12 @@ def testAValueOfTheWrongKindIsRefusedNamingWhatItMustBe() -> None:
     ('{"jsonFormVersion": 1, "jsonFormVersion": 1}', "appears twice"),
     ('{"jsonFormVersion": NaN}', "no number NaN"),
     ('{"jsonFormVersion": 99, "document": {"sheets": []}}', "jsonFormVersion being 99"),
-    ('{"jsonFormVersion": 1, "document": {"sheets": [], "extra": 1}}',
-     "no key 'extra'"),
-    ('{"jsonFormVersion": 1, "document": {}}', "sheets is missing"),
+    ('{"jsonFormVersion": 2, "document": {"localeIdentifier": null, "sheets": [], '
+     '"extra": 1}}', "no key 'extra'"),
+    ('{"jsonFormVersion": 2, "document": {"localeIdentifier": null}}',
+     "sheets is missing"),
+    ('{"jsonFormVersion": 2, "document": {"sheets": []}}',
+     "localeIdentifier is missing"),
 ])
 def testTextThatIsNotTheFormIsRefusedSayingWhy(text: str, refusal: str) -> None:
     with pytest.raises(pybers.JsonFormError, match=refusal):

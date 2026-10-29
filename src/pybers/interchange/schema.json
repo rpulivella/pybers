@@ -464,7 +464,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "sheetName": {
           "anyOf": [
@@ -602,8 +602,18 @@
     },
     "DocumentForm": {
       "type": "object",
-      "description": "One document as the JSON form holds it.",
+      "description": "One document as the JSON form holds it, its language and region first.",
       "properties": {
+        "localeIdentifier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "sheets": {
           "type": "array",
           "items": {
@@ -612,6 +622,7 @@
         }
       },
       "required": [
+        "localeIdentifier",
         "sheets"
       ],
       "additionalProperties": false
@@ -622,7 +633,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -940,7 +951,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "sheetName": {
           "anyOf": [
@@ -1003,7 +1014,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1126,7 +1137,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "sheetName": {
           "anyOf": [

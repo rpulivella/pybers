@@ -10,6 +10,7 @@ tables, against which its formulas' text is read.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-10-28  Version 2, a document carrying its locale identifier, for PYB-272.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -32,7 +33,7 @@ from pybers.interchange._tree import jsonFormConst
 from pybers.table._form import TableForm
 
 # Any change to the form's shape is a new version, recorded in `docs/decisions.md`.
-jsonFormVersion: Final[int] = 1
+jsonFormVersion: Final[int] = 2
 
 
 @dataclass(frozen=True, slots=True)

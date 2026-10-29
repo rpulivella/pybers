@@ -162,3 +162,12 @@ def testADocumentBuiltInMemoryTakesARegion() -> None:
     document = pybers.Document()
     assert document.localeSet("en_GB").changed
     assert document.currencySymbolFind("USD") == "US$"
+
+
+def testTheJsonFormCarriesTheLocaleAndReadsItBack() -> None:
+    document = pybers.open(findDocumentPath("95b-region-de-de"))
+    text = pybers.formatJsonForm(document)
+    readBack = pybers.parseJsonForm(text)
+    assert isinstance(readBack, pybers.Document)
+    assert readBack.localeIdentifier == "de_DE"
+    assert readBack.currencyPattern == document.currencyPattern

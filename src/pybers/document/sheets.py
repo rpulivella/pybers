@@ -359,16 +359,28 @@ class Document:
         """
         from pybers.document.locale import LocaleChange, findLocaleSymbols
 
-        symbols = findLocaleSymbols(identifier)
+        findLocaleSymbols(identifier)
         change = LocaleChange(self._localeIdentifier, identifier)
-        if preview or not change.changed:
-            return change
+        if not preview and change.changed:
+            self._localeAssign(identifier)
+        return change
+
+    def _localeAssign(self, identifier: str | None) -> None:
+        """Hold a region, with the currency symbols and placement pybers has for it.
+
+        A region the table does not hold, read from a file or a JSON form, keeps the
+        identifier alone, since only its own document knows its symbols.
+        """
+        from pybers.document.locale import findLocaleSymbols, locales
+
         self._localeIdentifier = identifier
+        if identifier not in locales:
+            return
+        symbols = findLocaleSymbols(identifier)
         currencySymbols = symbols["currency_symbols"]
         assert isinstance(currencySymbols, tuple)
         self._currencySymbols = frozendict(currencySymbols)
         self._currencyPattern = str(symbols["currency_pattern"])
-        return change
 
     @property
     def currencyPattern(self) -> str:

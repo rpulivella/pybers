@@ -3,8 +3,7 @@
 The JSON form of a document and its parts: what it holds, and that it reads back.
 
 UPDATES
-2026-10-27  A document's `localeIdentifier` stays out of the form until PYB-272
-            models the locale whole.
+2026-10-28  A document's `localeIdentifier` is in its form, for PYB-272.
 2026-10-27  A table's `reference` is where it sits, not what it holds, for PYB-260.
 2026-10-24  Written for PYB-259.
 """
@@ -120,10 +119,9 @@ def testATableOnNoSheetNamesNone() -> None:
     # Back-pointers and views derived from the declared size and the cells.
     (pybers.Table, TableForm, {"document", "sheet", "extent", "rows", "reference"}),
     (pybers.Sheet, SheetForm, {"document", "tableIdentities"}),
-    # A session's time zone, which the file has nowhere to keep, and the slice of the
-    # document's language and region pybers reads, which PYB-272 models whole.
-    (pybers.Document, DocumentForm,
-     {"timeZone", "currencyPattern", "localeIdentifier"}),
+    # A session's time zone, which the file has nowhere to keep, and the currency
+    # placement the document's `localeIdentifier` decides.
+    (pybers.Document, DocumentForm, {"timeZone", "currencyPattern"}),
 ])
 def testEveryPublicNameOfAnOwnerIsInItsForm(
     model: type, form: type, excluded: set[str]
