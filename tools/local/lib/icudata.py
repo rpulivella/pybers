@@ -70,6 +70,11 @@ numberStyles: dict[str, int] = {
     "currency_pattern": 2,
 }
 decimalStyle: int = 1
+currencyStyle: int = 2
+# ICU's number format attributes, from unumberformat.h.
+maximumFractionDigits: int = 6
+minimumFractionDigits: int = 7
+minimumGroupingDigits: int = 22
 allCurrencyKinds: int = 0x7FFFFFFF
 symbolName: int = 0
 bufferLength: int = 1024
@@ -91,6 +96,9 @@ icuSignatures: tuple[Signature, ...] = (
     ("unum_toPattern", number, (pointer, ctypes.c_int8, pointer, number, status)),
     ("unum_getSymbol", number, (pointer, number, pointer, number, status)),
     ("unum_close", None, (pointer,)),
+    ("unum_setAttribute", None, (pointer, number, number)),
+    ("unum_formatDouble", number, (pointer, ctypes.c_double, pointer, number, pointer,
+                                   status)),
     ("ucurr_forLocale", number, (text, pointer, number, status)),
     ("ucurr_openISOCurrencies", pointer, (ctypes.c_uint32, status)),
     ("ucurr_getName", pointer, (pointer, text, number, ctypes.POINTER(ctypes.c_int8),
@@ -300,6 +308,27 @@ class Icu:
         self.library.unum_close(handle)
         return pattern
 
+    def valueFormat(
+        self, identifier: str, value: float, style: int, fractionDigits: int
+    ) -> str:
+        """Return a number as a region shows it in a style, to a count of decimals."""
+        handle = self.numberFormatOpen(identifier.encode(), style)
+        for attribute in (minimumFractionDigits, maximumFractionDigits):
+            self.library.unum_setAttribute(handle, attribute, fractionDigits)
+        # Numbers groups a four-digit number where CLDR's minimum grouping would not.
+        self.library.unum_setAttribute(handle, minimumGroupingDigits, 1)
+        buffer = (ctypes.c_uint16 * bufferLength)()
+        failure = ctypes.c_int(0)
+        # A field position sits between the buffer and the status, unlike other calls.
+        length = self.library.unum_formatDouble(
+            handle, value, ctypes.addressof(buffer), bufferLength, None,
+            ctypes.byref(failure),
+        )
+        self.library.unum_close(handle)
+        if failure.value > 0:
+            raise IcuError(f"ICU could not format {value} for {identifier}.")
+        return ctypes.string_at(buffer, 2 * length).decode("utf-16-le")
+
     def numberingSystemRead(self, locale: bytes) -> str:
         """Return the digits a region writes, `latn` for 0 to 9."""
         failure = ctypes.c_int(0)
@@ -343,4 +372,12 @@ class Icu:
         return found
 
 
-__all__ = ["Field", "Icu", "IcuError", "IcuVersions", "menuLanguages"]
+__all__ = [
+    "Field",
+    "Icu",
+    "IcuError",
+    "IcuVersions",
+    "currencyStyle",
+    "decimalStyle",
+    "menuLanguages",
+]
