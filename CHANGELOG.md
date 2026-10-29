@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-272] Change a document's language and region as Numbers does
 - [PYB-260] Show part of a document at the command line
 - [PYB-259] Define the JSON form of a document
 - [PYB-255] Make goldens label their contents and generate their checks
