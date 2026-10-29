@@ -18,6 +18,8 @@ count is refused rather than guessed.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-29  Lines counted by the one `countLineRecords`, and records walked
+            through `StoredTiles`, for PYB-278.
 2026-10-01  The format slots are read from `_persistence.cells`, for PYB-141.
 2026-09-29  A copy carries every position of a merge it copies, as a move does,
             so what an import stores under covered cells goes with it, for PYB-136.
@@ -43,7 +45,6 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRow
 from .._persistence.cells import (
     CellRecord,
     carriesFormula,
@@ -60,6 +61,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
+from .._persistence.rows import readStoredTiles
 from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ..formula._read import readFormula
@@ -68,11 +70,10 @@ from ._lines import GridMaps
 from ._read import controlSlot
 from ._refcounts import countedStyleSlots
 from ._strokes import copyStrokeEdges, listStrokeLayers, moveStrokeEdges
-from ._structure import rowsPerBucket
+from ._structure import countLineRecords, rowsPerBucket
 from ._tiles import (
     TileRange,
     buildTileRange,
-    createRowStorage,
     rewriteRow,
     writeTileRange,
 )
@@ -221,15 +222,9 @@ def placeRecords(
     tileSize = store.tiles.tile_size
     created = False
     for row in sorted(set(removals) | set(placements)):
-        tileid = row // tileSize
-        created |= tileid not in tileRange.tiles
-        tile = tileRange.tileFor(tileid)
-        if not any(held.tile_row_index == row % tileSize for held in tile.rowInfos):
-            createRowStorage(tile, row % tileSize)
-        # Found after creation, because a repeated field stores a copy of its input.
-        rowInfo = next(
-            held for held in tile.rowInfos if held.tile_row_index == row % tileSize
-        )
+        created |= row // tileSize not in tileRange.tiles
+        target = tileRange.rowFor(row)
+        tile, rowInfo = target.tile, target.info
         placed = placements.get(row, {})
         slots = len(rowInfo.cell_offsets) // offsetWidth
         beyond = [column for column in placed if column >= slots]
@@ -238,14 +233,11 @@ def placeRecords(
                 f"A record would land in column {min(beyond) + originOffset}, past "
                 f"the {slots} offset slots row {row + originOffset} carries."
             )
-        unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
         rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
-            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit, placed,
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, target.unit, placed,
             frozenset(removals.get(row, set()) - placed.keys()),
         )
-        rowInfo.cell_count = len(
-            decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
-        )
+        rowInfo.cell_count = len(target.records)
         if not rowInfo.cell_count:
             tile.rowInfos.remove(rowInfo)
         tile.numrows = len(tile.rowInfos)
@@ -269,18 +261,12 @@ def moveCellRecords(
     Lifted before any is placed, so a block overlapping where it was never
     overwrites a record it has yet to move.
     """
-    tileSize = store.tiles.tile_size
     tileRange = buildTileRange(index, registry, store)
     lifted: dict[tuple[int, int], CellRecord] = {}
-    for tileid, tile in tileRange.tiles.items():
-        for rowInfo in tile.rowInfos:
-            row = tileid * tileSize + rowInfo.tile_row_index
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                if (row, record.column) in moves:
-                    lifted[(row, record.column)] = record
+    for stored in tileRange.rows:
+        for record in stored.records:
+            if (stored.row, record.column) in moves:
+                lifted[(stored.row, record.column)] = record
 
     removals: dict[int, set[int]] = {}
     placements: dict[int, dict[int, bytes]] = {}
@@ -333,22 +319,16 @@ def copyCellRecords(
     Every record is read before any is placed, so a source that is also filled is
     copied as it stood.
     """
-    tileSize = store.tiles.tile_size
     tileRange = buildTileRange(index, registry, store)
     records = copies.records
     wanted = set(records) | {
         stored for stored in records.values() if stored is not None
     }
     found: dict[tuple[int, int], CellRecord] = {}
-    for tileid, tile in tileRange.tiles.items():
-        for rowInfo in tile.rowInfos:
-            row = tileid * tileSize + rowInfo.tile_row_index
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                if (row, record.column) in wanted:
-                    found[(row, record.column)] = record
+    for stored in tileRange.rows:
+        for record in stored.records:
+            if (stored.row, record.column) in wanted:
+                found[(stored.row, record.column)] = record
 
     missing = [
         stored for landed, stored in records.items()
@@ -396,62 +376,36 @@ def applyConditionChanges(
     plan = readConditionalPlan(index, registry, store)
     if plan is None or not plan.rules:
         return
-    tileSize = store.tiles.tile_size
-    tiles = []
+    tiles = readStoredTiles(index, store)
     changed = False
-    for entry in store.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        tiles.append(tile)
-        for rowInfo in tile.rowInfos:
-            row = entry.tileid * tileSize + rowInfo.tile_row_index
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            replacements = {}
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                key = findSlotValue(record, conditionalSlot)
-                cell = table.cells.get(
-                    CellAddress(row + originOffset, record.column + originOffset)
-                )
-                if key is None or key not in plan.rules or cell is None:
-                    continue
-                stored = tuple(
-                    readFormula(rule.predicate.formula)
-                    for rule in plan.rules[key].rules.rule
-                )
-                if not cell._conditions or cell._conditions == stored:
-                    continue
-                moved = plan.keyForConditions(key, cell._conditions)
-                replacements[record.column] = patchSlotValue(
-                    record.raw, conditionalSlot, moved
-                )
-            if replacements:
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
-                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit,
-                    replacements,
-                )
-                changed = True
+    for walked in tiles:
+        replacements = {}
+        for record in walked.records:
+            key = findSlotValue(record, conditionalSlot)
+            cell = table.cells.get(
+                CellAddress(walked.row + originOffset, record.column + originOffset)
+            )
+            if key is None or key not in plan.rules or cell is None:
+                continue
+            stored = tuple(
+                readFormula(rule.predicate.formula)
+                for rule in plan.rules[key].rules.rule
+            )
+            if not cell._conditions or cell._conditions == stored:
+                continue
+            moved = plan.keyForConditions(key, cell._conditions)
+            replacements[record.column] = patchSlotValue(
+                record.raw, conditionalSlot, moved
+            )
+        if replacements:
+            rowInfo = walked.info
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, walked.unit,
+                replacements,
+            )
+            changed = True
     if changed:
         writeConditionalCounts(plan, tiles)
-
-
-def countLineRecords(
-    index: ArchiveIndex, store: tst.DataStore
-) -> tuple[Counter[int], Counter[int]]:
-    """Return how many records each row and each column holds."""
-    tileSize = store.tiles.tile_size
-    rows: Counter[int] = Counter()
-    columns: Counter[int] = Counter()
-    for entry in store.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        for rowInfo in tile.rowInfos:
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                rows[entry.tileid * tileSize + rowInfo.tile_row_index] += 1
-                columns[record.column] += 1
-    return rows, columns
 
 
 def carriesOnlyCount(header: tst.HeaderStorageBucket.Header) -> bool:
@@ -519,10 +473,7 @@ def applyCellCopies(
     )
     plan = readConditionalPlan(index, registry, store)
     if plan is not None and plan.rules:
-        writeConditionalCounts(
-            plan,
-            [index.resolve(entry.tile, tst.Tile) for entry in store.tiles.tiles],
-        )
+        writeConditionalCounts(plan, readStoredTiles(index, store))
     return copied
 
 

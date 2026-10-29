@@ -9,6 +9,7 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-10-29  Every list claimed and released through an `EntryPool`, for PYB-278.
 2026-10-22  A save compares a currency cell through its code, for PYB-220.
 2026-10-20  A value of any kind is written over any other, releasing the control
             and rich text its record no longer specifies, and dropping a control
@@ -58,7 +59,7 @@ from dataclasses import dataclass
 
 from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRecord, decodeRow
+from .._persistence import decodeRecord
 from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
@@ -70,10 +71,11 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
+from .._persistence.pool import EntryPool
+from .._persistence.rows import StoredTiles, iterateTileRows
 from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ..formula._write import (
-    FormulaPool,
     attachFormulaKey,
     buildFormulaRecord,
     classifyFormulaEdit,
@@ -81,6 +83,7 @@ from ..formula._write import (
     patchFormulaKey,
     readFormulaPool,
 )
+from ..formula.nodes import Formula
 from ._conditions import ConditionalPlan, writeConditionalCounts
 from ._controls import readControls
 from ._lines import GridMaps
@@ -94,24 +97,24 @@ from ._read import (
 from ._records import (
     applyAutomaticFormat,
     applyChosenFormat,
-    buildFreshRecord,
     buildWrittenRecord,
     findFormatKey,
     findTemplateRecord,
     findWrittenTypeByte,
     patchRichTextKey,
+    plainNumberRecord,
 )
 from ._refcounts import (
-    claimEntries,
     copyRichText,
     countFormatClaims,
     listRichTextClaims,
     listStringClaims,
     listStyleClaims,
     moveFormatReferences,
+    readCountedPool,
+    readFormatPool,
+    readRichTextPool,
     readStringPool,
-    releaseEntries,
-    removeSpentEntries,
     removeSpentRichText,
 )
 from ._relocation import (
@@ -171,7 +174,7 @@ class TableEdits:
 
 
 def applyFormulaEdit(
-    edit: str, raw: bytes, record: CellRecord, cell: Cell, pool: FormulaPool
+    edit: str, raw: bytes, record: CellRecord, cell: Cell, pool: EntryPool[Formula]
 ) -> bytes:
     """Carry out one cell's formula change against the record and the pool together.
 
@@ -226,74 +229,57 @@ def applyTableEdits(
     currencyCodes = readCurrencyCodes(index, store)
     pool = readFormulaPool(index, store)
     textPool = readStringPool(index, store)
-    # Rewritten only when a written record moved a count.
-    formatList = (
-        index.resolve(store.format_table, tst.TableDataList)
-        if store.format_table.identifier else None
-    )
+    # Each list is rewritten only when a written record moved one of its counts.
+    formatPool = readFormatPool(index, store)
     formatKeys: dict[bytes, int] = {}
-    formatsMoved: set[int] = set()
-    tiles: list[tst.Tile] = []
-    styleList = (
-        index.resolve(store.styleTable, tst.TableDataList)
+    walkedTiles: list[tuple[int, tst.Tile]] = []
+    stylePool = (
+        readCountedPool(index, store.styleTable, "style")
         if store.styleTable.identifier else None
     )
-    stylesMoved = False
-    richTextList = (
-        index.resolve(store.rich_text_table, tst.TableDataList)
-        if store.HasField("rich_text_table") else None
+    richTextPool = (
+        readRichTextPool(index, store) if store.HasField("rich_text_table") else None
     )
-    richTextMoved = False
-    controlList = (
-        index.resolve(store.control_cell_spec_table, tst.TableDataList)
+    controlPool = (
+        readCountedPool(index, store.control_cell_spec_table, "control")
         if store.HasField("control_cell_spec_table") else None
     )
     controls = readControls(index, store)
-    controlsMoved = False
-    controlsReleased: set[int] = set()
-    richTextReleased: set[int] = set()
 
     def formatFor(wanted: tsk.FormatStructArchive) -> int | None:
         """Return the key naming exactly this format, caching the lookup."""
-        if formatList is None:
+        if formatPool is None:
             return None
         cached = wanted.SerializeToString(deterministic=True)
         if cached not in formatKeys:
-            formatKeys[cached] = findFormatKey(formatList, wanted)
+            formatKeys[cached] = findFormatKey(formatPool, wanted)
         return formatKeys[cached]
 
     def formatOf(key: int) -> tsk.FormatStructArchive | None:
         """Return the format entry a key names, or None when the table names none."""
-        if formatList is None:
-            return None
-        found = [entry.format for entry in formatList.entries if int(entry.key) == key]
-        return found[0] if found else None
+        entry = None if formatPool is None else formatPool.entryFind(key)
+        return None if entry is None else entry.format
 
     def formatsCount(
         before: bytes | None, after: bytes | None, where: CellAddress
     ) -> None:
         """Move the format refcounts one written or removed record changed."""
-        if formatList is not None:
-            formatsMoved.update(
-                moveFormatReferences(formatList, before, after, str(where))
-            )
+        if formatPool is not None:
+            moveFormatReferences(formatPool, before, after, str(where))
 
     def releaseRecord(record: CellRecord, reference: CellAddress) -> bool:
         """Release every list entry a removed record names, reporting a formula."""
-        nonlocal stylesMoved, richTextMoved, controlsMoved
         formatsCount(record.raw, None, reference)
-        if textPool is not None:
-            for key in listStringClaims(record):
-                textPool.release(key)
-        if styleList is not None:
-            stylesMoved |= releaseEntries(styleList, listStyleClaims(record))
-        if richTextList is not None:
-            richTextMoved |= releaseEntries(richTextList, listRichTextClaims(record))
-            richTextReleased.update(listRichTextClaims(record))
-        control = findSlotValue(record, controlSlot)
-        if controlList is not None and control is not None:
-            controlsMoved |= releaseEntries(controlList, [control])
-            controlsReleased.add(control)
+        claimed = (
+            (textPool, listStringClaims(record)),
+            (stylePool, listStyleClaims(record)),
+            (richTextPool, listRichTextClaims(record)),
+            (controlPool, listControlClaims(record)),
+        )
+        for listPool, keys in claimed:
+            if listPool is not None:
+                for key in keys:
+                    listPool.release(key)
         if pool is not None and carriesFormula(record):
             pool.release(record.references[findFormulaKeySlot(record)])
             return True
@@ -301,18 +287,16 @@ def applyTableEdits(
 
     def releaseReplaced(record: CellRecord, written: bytes) -> None:
         """Release the control and rich text a rewrite of a record no longer names."""
-        nonlocal richTextMoved, controlsMoved
         after = decodeRecord(record.column, written)
         control = findSlotValue(record, controlSlot)
         if (
-            controlList is not None and control is not None
+            controlPool is not None and control is not None
             and findSlotValue(after, controlSlot) is None
         ):
-            controlsMoved |= releaseEntries(controlList, [control])
-            controlsReleased.add(control)
-        if richTextList is not None and after.typeByte != record.typeByte:
-            richTextMoved |= releaseEntries(richTextList, listRichTextClaims(record))
-            richTextReleased.update(listRichTextClaims(record))
+            controlPool.release(control)
+        if richTextPool is not None and after.typeByte != record.typeByte:
+            for key in listRichTextClaims(record):
+                richTextPool.release(key)
 
     def dropUnshownControl(raw: bytes, cell: Cell) -> bytes:
         """Return the record without a control that cannot show the cell's value."""
@@ -329,26 +313,26 @@ def applyTableEdits(
 
     def claimRecord(record: CellRecord, reference: CellAddress) -> bytes:
         """Claim every list entry a duplicated record names, and return it to place."""
-        nonlocal stylesMoved, richTextMoved, controlsMoved
         raw = record.raw
         formatsCount(None, raw, reference)
-        if textPool is not None:
-            for key in listStringClaims(record):
-                textPool.claim(key)
-        if styleList is not None:
-            stylesMoved |= claimEntries(styleList, listStyleClaims(record))
+        claimed = (
+            (textPool, listStringClaims(record)),
+            (stylePool, listStyleClaims(record)),
+            (controlPool, listControlClaims(record)),
+        )
+        for listPool, keys in claimed:
+            if listPool is not None:
+                for key in keys:
+                    listPool.claim(key)
         if pool is not None and carriesFormula(record):
             pool.claim(record.references[findFormulaKeySlot(record)])
-        control = findSlotValue(record, controlSlot)
-        if controlList is not None and control is not None:
-            controlsMoved |= claimEntries(controlList, [control])
-        if richTextList is not None:
+        if richTextPool is not None:
             for key in listRichTextClaims(record):
-                duplicate = copyRichText(registry, richTextList, key)
+                duplicate = copyRichText(registry, richTextPool, key)
                 raw = patchRichTextKey(raw, duplicate)
                 # The tile pass reads values through this table, so it learns the copy.
                 richText[duplicate] = richText[key]
-                richTextMoved = True
+                richTextPool.touched = True
         return raw
 
     restructured = maps.changed
@@ -411,7 +395,7 @@ def applyTableEdits(
 
     for entry in store.tiles.tiles:
         tile = index.resolve(entry.tile, tst.Tile)
-        tiles.append(tile)
+        walkedTiles.append((entry.tileid, tile))
         firstRow = entry.tileid * tileSize
         touched = restructured or bool(moves) or bool(copies)
 
@@ -421,7 +405,7 @@ def applyTableEdits(
         createdRows: set[int] = set()
         if pool is not None:
             stored = frozenset(
-                firstRow + rowInfo.tile_row_index for rowInfo in tile.rowInfos
+                walked.row for walked in iterateTileRows(entry.tileid, tile, tileSize)
             )
             for missing in findRowsNeedingStorage(table, firstRow, tileSize, stored):
                 if not tile.rowInfos and table.colCount > narrowRowSlots:
@@ -435,18 +419,13 @@ def applyTableEdits(
                 createdRows.add(missing)
                 touched = True
 
-        for rowInfo in tile.rowInfos:
-            offsetUnit = chooseOffsetUnit(
-                rowInfo.has_wide_offsets, tile.should_use_wide_rows
-            )
-            row = firstRow + rowInfo.tile_row_index
+        for walked in iterateTileRows(entry.tileid, tile, tileSize):
+            rowInfo, offsetUnit, row = walked.info, walked.unit, walked.row
             replacements: dict[int, bytes] = {}
             removals = frozenset(
                 column for (swallowedRow, column) in swallowed if swallowedRow == row
             )
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, offsetUnit
-            ):
+            for record in walked.records:
                 reference = CellAddress(
                     row + originOffset, record.column + originOffset
                 )
@@ -487,12 +466,7 @@ def applyTableEdits(
                     elif edit == "detach":
                         formulaRemoved.append((row, record.column))
                 replacements[record.column] = applyChosenFormat(patched, cell)
-            present = frozenset(
-                record.column
-                for record in decodeRow(
-                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, offsetUnit
-                )
-            )
+            present = frozenset(record.column for record in walked.records)
             # A cell the model gave a formula to but the file has no record for.
             # The loop above cannot see these: it walks records, and these have
             # none. Skipped when a merge swallowed the position, which is an
@@ -520,7 +494,7 @@ def applyTableEdits(
                         index, store, findWrittenTypeByte(cell.value)
                     )
                     if shape is None:
-                        shape = buildFreshRecord(column)
+                        shape = decodeRecord(column, plainNumberRecord)
                     replacements[column] = applyChosenFormat(
                         buildWrittenRecord(
                             cell, shape, textPool, borrowed=True, formatFor=formatFor,
@@ -556,37 +530,36 @@ def applyTableEdits(
         if touched:
             index.archiveWrite(entry.tile.identifier, tile)
 
+    tiles = StoredTiles(tileSize, tuple(walkedTiles))
     if plan is not None and restructured:
         writeConditionalCounts(plan, tiles)
 
-    if formatList is not None and formatsMoved:
-        removeSpentEntries(
-            formatList, formatsMoved, tiles,
-            lambda record: countFormatClaims(record.raw).keys(),
+    if formatPool is not None and formatPool.touched:
+        formatPool.spentRemove(
+            tiles, lambda record: countFormatClaims(record.raw).keys()
         )
-        index.archiveWrite(store.format_table.identifier, formatList)
+        index.archiveWrite(store.format_table.identifier, formatPool.dataList)
 
-    if styleList is not None and stylesMoved:
-        index.archiveWrite(store.styleTable.identifier, styleList)
+    if stylePool is not None and stylePool.touched:
+        index.archiveWrite(store.styleTable.identifier, stylePool.dataList)
 
-    if richTextList is not None and richTextMoved:
-        removeSpentRichText(registry, richTextList, richTextReleased, tiles)
+    if richTextPool is not None and richTextPool.touched:
+        removeSpentRichText(registry, richTextPool, tiles)
         richTextId = store.rich_text_table.identifier
         index.archiveWrite(
-            richTextId, richTextList,
-            registry.referencesReconcile(richTextId, richTextList),
+            richTextId, richTextPool.dataList,
+            registry.referencesReconcile(richTextId, richTextPool.dataList),
         )
 
-    if controlList is not None and controlsMoved:
+    if controlPool is not None and controlPool.touched:
         # Numbers removed the control no cell named, measured in `63b-fill-menu-down`.
-        removeSpentEntries(controlList, controlsReleased, tiles, listControlClaims)
-        index.archiveWrite(store.control_cell_spec_table.identifier, controlList)
+        controlPool.spentRemove(tiles, listControlClaims)
+        index.archiveWrite(
+            store.control_cell_spec_table.identifier, controlPool.dataList
+        )
 
     if textPool is not None and textPool.touched:
-        for key in removeSpentEntries(
-            textPool.dataList, textPool.released, tiles, listStringClaims
-        ):
-            textPool.stored.pop(key, None)
+        textPool.spentRemove(tiles, listStringClaims)
         index.archiveWrite(store.stringTable.identifier, textPool.dataList)
 
     if pool is not None and pool.touched:

@@ -23,6 +23,7 @@ Private. Reached from the structural pass in `_structure` and the tile pass in
 `_edits`.
 
 UPDATES
+2026-10-29  Rule counts walk the rows through `StoredTiles`, for PYB-278.
 2026-09-24  A rule is rebuilt from the conditions its cell holds after a move,
             for PYB-18.
 2026-09-22  The tile pass that reaches this is named `_edits`, for PYB-113.
@@ -41,12 +42,11 @@ __status__ = "Development"
 __date__ = "2026/09/21"
 
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRow
 from .._persistence.cells import (
     CellRecord,
     conditionalSlot,
@@ -57,6 +57,7 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
+from .._persistence.rows import StoredTiles
 from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ..formula._read import readFormula
@@ -343,22 +344,18 @@ def rewriteConditionalRecord(
     return raw
 
 
-def writeConditionalCounts(plan: ConditionalPlan, tiles: Iterable[tst.Tile]) -> None:
+def writeConditionalCounts(plan: ConditionalPlan, tiles: StoredTiles) -> None:
     """Set every rule's refcount from the cells naming it, and drop the unnamed ones.
 
     Counted rather than tracked, since the records are the truth and a rule a cell
     stopped naming is exactly the one Numbers removed when its reference moved.
     """
     claims: Counter[int] = Counter()
-    for tile in tiles:
-        for rowInfo in tile.rowInfos:
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                key = findSlotValue(record, conditionalSlot)
-                if key is not None:
-                    claims[key] += 1
+    for stored in tiles:
+        for record in stored.records:
+            key = findSlotValue(record, conditionalSlot)
+            if key is not None:
+                claims[key] += 1
     kept = []
     for entry in plan.dataList.entries:
         if claims[int(entry.key)]:
