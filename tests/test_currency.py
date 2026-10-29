@@ -213,7 +213,7 @@ def testAScriptTotalsACurrencyColumn() -> None:
 
 def testTheCommandLineWritesAndReportsACurrencyAmount(tmp_path: Path) -> None:
     working = copyDocument("20-formula-shapes", tmp_path)
-    result = runSetCommand(str(working), "Table 2::B2", "1234.5 EUR", "--in-place")
+    result = runSetCommand(str(working), "Table 2::B2", "1234.5 EUR")
     assert result.exit_code == 0
     assert "After: 1234.5 EUR (currency)" in result.stdout
     cell = pybers.open(working).cell("Table 2::B2")

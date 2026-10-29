@@ -7,7 +7,8 @@ The root callback stores `CommandSettings` on Typer's context object, which is
 how Typer hands a group's options down to its commands.
 
 UPDATES
-2026-10-28  Where a write goes, shared by `set` and `locale`, for PYB-272.
+2026-10-28  Where a write goes, its two options and its report, shared by `set`
+            and `locale`, FILE itself unless `-o` names a new one, for PYB-272.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations
@@ -24,6 +25,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.text import Text
@@ -59,30 +61,55 @@ def reportPybersErrors(context: typer.Context) -> Generator[None]:
         raise typer.Exit(1) from exc
 
 
+OutputOption = Annotated[
+    Path | None,
+    typer.Option(
+        "-o", metavar="NEW", help="Write the changed document to NEW, not to FILE."
+    ),
+]
+PreviewOption = Annotated[
+    bool, typer.Option("--preview", help="Show the change and write nothing.")
+]
+
+
 def findSaveTarget(
-    documentPath: Path, inPlace: bool, output: Path | None, preview: bool
+    documentPath: Path, output: Path | None, preview: bool
 ) -> Path | None:
-    """Return where the document is written, None for a preview, or refuse the flags."""
-    if inPlace and output is not None:
-        raise typer.BadParameter("Give --in-place or -o, not both.")
+    """Return where a writing verb writes, None for a preview, or refuse the flags.
+
+    A writing verb changes FILE itself, since the verb is the act. `-o` names a new
+    document instead, and never one that exists, whatever it is.
+    """
+    if preview and output is not None:
+        raise typer.BadParameter("Give -o or --preview, not both.")
     if output is not None and output.exists():
         raise typer.BadParameter(
-            f"{output} already exists. Use --in-place to change a document where it "
-            "is, or name a new file."
+            f"{output} already exists. Name a new file, or leave out -o to change "
+            f"{documentPath} itself."
         )
-    if inPlace:
-        return documentPath
-    if output is None and not preview:
-        raise typer.BadParameter(
-            "Name where the document is written, with --in-place or -o NEW, or show "
-            "the change alone with --preview."
+    if preview:
+        return None
+    return documentPath if output is None else output
+
+
+def reportWrite(changed: bool, target: Path | None, unchanged: str) -> None:
+    """Say on stderr whether a writing verb wrote, and where, or why it did not."""
+    if not changed:
+        statusConsole.print(Text(f"Nothing written: {unchanged}", "detail"))
+    elif target is None:
+        statusConsole.print(Text("Nothing written: a preview.", "detail"))
+    else:
+        statusConsole.print(
+            Text.assemble(("Written: ", "label"), (str(target), "value"))
         )
-    return output
 
 
 __all__ = [
     "CommandSettings",
+    "OutputOption",
+    "PreviewOption",
     "findCommandSettings",
     "findSaveTarget",
     "reportPybersErrors",
+    "reportWrite",
 ]

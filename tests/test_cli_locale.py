@@ -42,8 +42,8 @@ def runLocaleCommand(*arguments: str | Path) -> Result:
     return runner.invoke(app, ["locale", *(str(each) for each in arguments)])
 
 
-def testACommandChangesADocumentsRegionInPlace(working: Path) -> None:
-    result = runLocaleCommand(working, "de_DE", "--in-place")
+def testACommandChangesTheDocumentItNames(working: Path) -> None:
+    result = runLocaleCommand(working, "de_DE")
     assert result.exit_code == 0
     assert result.stdout.splitlines() == ["Before: en_US", "After: de_DE"]
     assert f"Written: {working}" in result.stderr
@@ -69,14 +69,14 @@ def testAPreviewWritesNothing(working: Path) -> None:
 
 def testTheRegionADocumentHoldsWritesNothing(working: Path) -> None:
     before = working.read_bytes()
-    result = runLocaleCommand(working, "en_US", "--in-place")
+    result = runLocaleCommand(working, "en_US")
     assert result.exit_code == 0
     assert "Nothing written: the document already uses that region." in result.stderr
     assert working.read_bytes() == before
 
 
 def testARegionPybersDoesNotOfferIsRefused(working: Path) -> None:
-    result = runLocaleCommand(working, "de_XX", "--in-place")
+    result = runLocaleCommand(working, "de_XX")
     assert result.exit_code == 1
     assert result.stdout == ""
     assert result.stderr.startswith(
@@ -85,10 +85,13 @@ def testARegionPybersDoesNotOfferIsRefused(working: Path) -> None:
     assert pybers.open(working).localeIdentifier == "en_US"
 
 
-def testAChangeNamesWhereItIsWritten(working: Path) -> None:
-    result = runLocaleCommand(working, "de_DE")
+def testANewFileThatExistsIsRefusedLeavingIt(working: Path, tmp_path: Path) -> None:
+    existing = copyDocument("00-baseline", tmp_path)
+    before = existing.read_bytes()
+    result = runLocaleCommand(working, "de_DE", "-o", existing)
     assert result.exit_code == 2
-    assert "--in-place" in result.stderr
+    assert "already exists" in result.stderr
+    assert existing.read_bytes() == before
 
 
 def testWithNoRegionTheCommandListsEveryRegionOffered(working: Path) -> None:

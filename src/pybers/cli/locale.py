@@ -28,8 +28,14 @@ from rich.console import Group
 from rich.text import Text
 
 import pybers
-from pybers.cli._common import findSaveTarget, reportPybersErrors
-from pybers.cli._console import TreeCompact, statusConsole
+from pybers.cli._common import (
+    OutputOption,
+    PreviewOption,
+    findSaveTarget,
+    reportPybersErrors,
+    reportWrite,
+)
+from pybers.cli._console import TreeCompact
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
 from pybers.cli._report import formatCount, formatLine
 
@@ -89,16 +95,8 @@ def runLocale(
             show_default=False,
         ),
     ] = None,
-    inPlace: Annotated[
-        bool, typer.Option("--in-place", help="Write the change into FILE itself.")
-    ] = False,
-    output: Annotated[
-        Path | None,
-        typer.Option("-o", metavar="NEW", help="Write the changed document to NEW."),
-    ] = None,
-    preview: Annotated[
-        bool, typer.Option("--preview", help="Show the change and write nothing.")
-    ] = False,
+    output: OutputOption = None,
+    preview: PreviewOption = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
     """Show a document's language and region, or change it to LOCALE."""
@@ -108,23 +106,14 @@ def runLocale(
         listing = LocaleListing(document.localeIdentifier, pybers.locales)
         printResult(listing, outputFormat, formatListing)
         return
-    target = findSaveTarget(documentPath, inPlace, output, preview)
+    target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
         document = pybers.open(documentPath)
         change = document.localeSet(identifier, preview=preview)
-        if target is not None and not preview and change.changed:
+        if target is not None and change.changed:
             document.save(target)
     printResult(change, outputFormat, formatChange)
-    if preview:
-        statusConsole.print(Text("Nothing written: a preview.", "detail"))
-    elif not change.changed:
-        statusConsole.print(
-            Text("Nothing written: the document already uses that region.", "detail")
-        )
-    elif target is not None:
-        statusConsole.print(
-            Text.assemble(("Written: ", "label"), (str(target), "value"))
-        )
+    reportWrite(change.changed, target, "the document already uses that region.")
 
 
 __all__ = ["runLocale"]
