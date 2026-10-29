@@ -184,13 +184,37 @@ Numbers saves follows whichever release the Mac saving it carries.
 
 ---
 
+## Every region pybers offers opens in Numbers as macOS formats it
+
+On 29 October 2026, `tools/local/locales_sweep.py` changed a copy of `95-region-base` to
+each of the 335 regions with `localeSet`, and opened each in Numbers Creator Studio 15.4
+through the golden-confirm helper. **All 335 opened without an alert, and all 335 showed
+their five checked cells as macOS's ICU formats them for that region:**
+
+- `A1`, 1234.5 to two decimals, in the region's digits and separators;
+- `F1` and `G1`, formula text in the region's digits, with `;` between arguments
+  wherever the decimal separator is not a point;
+- `H1`, `DOLLAR` recalculated in the region's own currency, which is how the sweep
+  confirms that Numbers recalculates a formula pybers marked;
+- `I1`, `FIXED` recalculated with the region's grouping.
+
+Three things Numbers does differently from ICU's own formatting, found by the sweep:
+
+- **Numbers groups a four-digit number** where CLDR's minimum grouping would not, so
+  `es_ES`, `it_IT`, `pl_PL`, `pt_PT` and 19 others show `1.234,50` where ICU writes
+  `1234,50`.
+- **Formula text uses the region's digits**: `=١٫٥+٢` under `ar_SA`, with `;` between
+  arguments since the Arabic decimal separator is `٫`.
+- **`DOLLAR` formats its result itself**, its symbol and bidirectional marks placed as
+  Numbers places them, `kr 1 234,50` under `nb_NO` where ICU writes `1 234,50 kr`.
+
+---
+
 ## Not yet explained
 
 - `95d`, `95e`, `95f`, `95g`, `95h` and `95i` changed their `documentUUID` and
   `DocumentIdentifier`, and `95d`, `95e`, `95h` and `95i` their theme archive, which
   `95b` and `95c` did not. `95e` to `95i` were saved with ⌘S, so the change follows
   from something other than the choice made, and it touches none of the locale's fields.
-- Whether Numbers recalculates a document whose region pybers changed, leaving the
-  cached results as they were, is not yet measured. The golden AC 10 asks for answers it.
 - The rest of each change is view state, previews and tree nodes, which change on every
   save.
