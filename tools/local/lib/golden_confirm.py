@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-29  A formula is compared as Numbers saved it, its shown text in the
+            document's language left for a person, for PYB-272.
 2026-10-24  The expectations' machine form is the golden's JSON form, for PYB-259.
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
@@ -43,7 +45,7 @@ import subprocess
 import tempfile
 import tomllib
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -663,9 +665,15 @@ def listCoveredCells(merges: tuple[str, ...]) -> frozenset[str]:
 
 
 def checkTableGrid(
-    expected: ExpectedTable, reading: dict[str, Any]
+    expected: ExpectedTable, reading: dict[str, Any],
+    savedFormulas: Mapping[str, str] | None,
 ) -> list[Check]:
-    """Compare every cell of a table with what pybers read, a check per difference."""
+    """Compare every cell of a table with what pybers read, a check per difference.
+
+    A formula is compared as Numbers saved it, read back through pybers, since the text
+    Numbers shows follows the document's language and region. None for `savedFormulas`
+    means Numbers saved no copy to read it from.
+    """
     subject = f"{expected.sheet} / {expected.table}"
     checks: list[Check] = []
     filled = {cell.cell: cell for cell in expected.cells}
@@ -693,12 +701,24 @@ def checkTableGrid(
                 checks.append(Check("failed", f"{subject} / {name}",
                                     f"value {formatReadingValue(fact['value'])}, "
                                     f"expected {wanted}"))
-            formula = readFormulaText(fact.get("formula") or "") or None
+            shown = readFormulaText(fact.get("formula") or "") or None
             wantedFormula = None if cell is None else cell.formula
-            if formula != wantedFormula:
+            if savedFormulas is None:
+                if wantedFormula is not None:
+                    checks.append(Check(
+                        "failed", f"{subject} / {name}",
+                        "Numbers saved no copy to read its formula from",
+                    ))
+            elif (saved := savedFormulas.get(name)) != wantedFormula:
                 checks.append(Check("failed", f"{subject} / {name}",
-                                    f"formula {formatCodeSpan(formula)}, expected "
-                                    f"{formatCodeSpan(wantedFormula)}"))
+                                    f"formula {formatCodeSpan(saved)} as Numbers saved "
+                                    f"it, expected {formatCodeSpan(wantedFormula)}"))
+            elif shown != wantedFormula:
+                checks.append(Check(
+                    "qa", f"{subject} / {name}",
+                    f"Numbers shows the formula as {formatCodeSpan(shown)}, in the "
+                    "document's language and region",
+                ))
             names = None if cell is None else findNumbersFormat(cell)
             found = fact.get("formatKind") or ""
             if names is not None and found != names[0]:
@@ -803,6 +823,17 @@ def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
     return [str(difference) for difference in listPackageDifferences(before, after)]
 
 
+def readSavedFormulas(saved: Path) -> dict[tuple[str, str], dict[str, str]]:
+    """Return each formula of the copy Numbers saved, by table and cell."""
+    return {
+        (sheet.name, table.name): {
+            str(address): cell.formulaText for address, cell in table.cells.items()
+            if cell.formulaText is not None
+        }
+        for sheet in pybers.open(saved).sheets for table in sheet.tables
+    }
+
+
 def listInspectedCells(
     expected: ExpectedValues,
 ) -> list[tuple[ExpectedTable, ExpectedCell]]:
@@ -860,6 +891,10 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
                 "passed" if opened == "opened" else "failed", "document",
                 f"Numbers {opened} the copy" + (f": {alert}" if alert else ""),
             ))
+        savedFormulas = (
+            readSavedFormulas(saved) if result.get("savedCopy") and saved.is_file()
+            else None
+        )
         tableReadings = {
             (r["address"]["sheet"], r["address"]["table"]): r
             for r in result.get("tables", [])
@@ -872,7 +907,11 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
                         "failed", f"{table.sheet} / {table.table}",
                         "the helper returned no reading for it"))
                 continue
-            run.checks.extend(checkTableGrid(table, tableReading))
+            run.checks.extend(checkTableGrid(
+                table, tableReading,
+                None if savedFormulas is None
+                else savedFormulas.get((table.sheet, table.table), {}),
+            ))
             run.checks.extend(listLabelChecks(table))
         readings = {
             (r["address"]["sheet"], r["address"]["table"], r["address"]["cell"]): r
