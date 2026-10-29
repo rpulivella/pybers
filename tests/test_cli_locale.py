@@ -25,7 +25,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 import pybers
-from conftest import copyDocument
+from conftest import copyDocument, readPlainText
 from pybers.cli._app import app
 
 runner: CliRunner = CliRunner()
@@ -90,7 +90,9 @@ def testANewFileThatExistsIsRefusedLeavingIt(working: Path, tmp_path: Path) -> N
     before = existing.read_bytes()
     result = runLocaleCommand(working, "de_DE", "-o", existing)
     assert result.exit_code == 2
-    assert "already exists" in result.stderr
+    assert "already exists. Name a new file, or leave out -o" in readPlainText(
+        result.stderr
+    )
     assert existing.read_bytes() == before
 
 

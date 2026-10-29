@@ -34,7 +34,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 import pybers
-from conftest import copyDocument
+from conftest import copyDocument, readPlainText
 from pybers.cli._app import app
 
 runner: CliRunner = CliRunner()
@@ -115,7 +115,7 @@ def testAPreviewAndANewFileTogetherAreRefused(working: Path) -> None:
         str(working), "Table 2::B2", "1", "--preview", "-o", "elsewhere.numbers"
     )
     assert result.exit_code == 2
-    assert "Give -o or --preview, not both." in result.stderr
+    assert "Give -o or --preview, not both." in readPlainText(result.stderr)
 
 
 def testAnOutputThatExistsIsRefused(working: Path, tmp_path: Path) -> None:

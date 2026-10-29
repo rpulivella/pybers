@@ -7,6 +7,8 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-10-29  `readPlainText`, a command's output without color or wrapping, for
+            PYB-272.
 2026-10-27  `renderPlain`, a command's output without color, for PYB-260.
 2026-10-22  `--golden-write`, which writes each golden from its builder, for PYB-255.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
@@ -61,6 +63,18 @@ def findDocumentPath(stem: str) -> Path:
     ]
     assert len(found) == 1, f"{stem}.numbers is in {len(found)} document directories"
     return found[0]
+
+
+def readPlainText(text: str) -> str:
+    """Return a command's output without terminal codes, its words joined by one space.
+
+    Typer colors and wraps a usage error to the terminal, which differs on CI, and Rich
+    decodes every code it may write.
+    """
+    # Imported here, so a suite run without the `cli` extra still collects.
+    from rich.text import Text
+
+    return " ".join(Text.from_ansi(text).plain.split())
 
 
 def renderPlain(renderable: object) -> str:
