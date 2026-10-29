@@ -12,7 +12,8 @@
 //
 // UPDATES
 // 2026-10-29  A failed capture logs every error and the window's state, and Numbers is
-//             shown for each capture, which a hidden window refuses, for PYB-272.
+//             shown for each capture, which a hidden window refuses, its effect on
+//             the frontmost app logged, for PYB-272.
 // 2026-10-29  A request reads cells as text alone, and a failed capture is a problem that
 //             leaves the readings, for PYB-272.
 // 2026-10-21  Names each Data Format control, a step sets one by its name, a step extends
@@ -1070,8 +1071,14 @@ func captureWindow(
     // ScreenCaptureKit refuses a hidden app's window, measured 2026-10-29 on macOS 26.6.1,
     // so Numbers is shown for the capture alone and hidden again.
     let hidden = NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
+    // Showing Numbers leaves the developer's app in front, measured 2026-10-29, logged.
+    let front = NSWorkspace.shared.frontmostApplication
     if hidden { setNumbersHidden(pid: pid, false) }
-    defer { if hidden { setNumbersHidden(pid: pid, true) } }
+    defer {
+        if hidden { setNumbersHidden(pid: pid, true) }
+        writeLog("front before capture \(front?.bundleIdentifier ?? "none"), after "
+            + "\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none")")
+    }
     // A window not yet drawn captures on a later try.
     for _ in 0..<windowAttempts {
         (captured, said, streamFailed) = captureWindowImage(id: windowId)
