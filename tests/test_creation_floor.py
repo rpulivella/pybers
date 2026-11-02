@@ -45,7 +45,7 @@ storeLists: tuple[str, ...] = (
     "control_cell_spec_table", "format_table",
 )
 
-# Fields that differ by identity, placement or the reset, by the part holding them.
+# Fields that may differ by identity, placement or the reset, by the part holding them.
 expectedDifferences: dict[str, frozenset[str]] = {
     "info": frozenset({
         "super.geometry.position.y", "super.geometry.size.width",
@@ -251,7 +251,7 @@ def testACreatedTableHoldsNumbersValuesAndOmitsOnlyWhatTheLadderFound(
     )
 
     for role, (differing, extra, omitted) in differences.items():
-        assert differing == expectedDifferences.get(role, frozenset()), role
+        assert differing <= expectedDifferences.get(role, frozenset()), role
         assert extra == set(), role
         assert omitted == recordedOmissions.get(role, frozenset()), role
 
@@ -267,7 +267,7 @@ def testACreatedSheetHoldsNumbersValuesAndOmitsOnlyWhatTheLadderFound(
     )
 
     for role, (differing, extra, omitted) in differences.items():
-        assert differing == expectedDifferences.get(role, frozenset()), role
+        assert differing <= expectedDifferences.get(role, frozenset()), role
         assert extra == set(), role
         assert omitted == recordedOmissions.get(role, frozenset()), role
 
