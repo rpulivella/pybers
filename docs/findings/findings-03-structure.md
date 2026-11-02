@@ -188,7 +188,7 @@ wherever it moves. An added line takes a fresh UUID, and the sorted list stays s
 **Numbers maintains the counts it keeps by index**: each header bucket re-indexes and
 recounts `numberOfCells`, each tile row recounts `cell_count`, and the stroke sidecar
 takes the new size. The layout cache's `rows_fitting_entries` hold column indices and
-go stale; a created table carries that cache empty, which Numbers accepts.
+go stale; a created table carries no cache, which Numbers rebuilds.
 
 **The engine moves every coordinate**, in the table's registers, its merge owner and its
 `cell_errors`. A one-cell range such as `SUM(A2:A2)` is registered as a cell edge rather

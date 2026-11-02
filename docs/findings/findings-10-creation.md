@@ -120,7 +120,7 @@ both as weak external references.
 
 The engine's owner of kind 8 records its edge to the owner of kind 35 as an integer,
 `internal_owner_id_for_edge`, and each dependency tile names its owner the same way, so an
-internal owner id is renumbered inside archive bodies as well as in `owner_id_map`. Those
+internal owner id appears inside archive bodies as well as in `owner_id_map`. Those
 records are identical in every fixture whatever the table's size.
 
 `number_of_formulas` grows by four per table: 7 for one, 15 for three, 39 for nine.
@@ -188,7 +188,7 @@ that one cell compute.
 Measured for PYB-86 by bisection: a created table holding no formula is repaired the same
 way, a formula pybers writes into a table Numbers made evaluates correctly, and the repair
 is indifferent to the pybers reset styles, to row height and column width, and to the
-table title. Everything else about a created table already matched a Numbers-inserted one,
+table title. Everything else about the table under test matched a Numbers-inserted one,
 archive for archive.
 
 Two consequences follow. A table identity is a **version 4 UUID in file byte order**,
@@ -199,3 +199,89 @@ slot Numbers writes does. Neither was the cause, and both are now what pybers wr
 The same save raises `number_of_formulas` from 7 to 8 and drops `owner_id_map` entry 34,
 which no owner archive names. `49` and `50` drop it too, so it is a leftover Numbers culls
 on any save rather than part of the edit.
+
+## The least a created table and sheet hold
+
+Found for PYB-276 on 2 November 2026 in Numbers 15.4, by removing one group at a time from
+what pybers wrote and confirming each removal before the next. Every rung was
+`20-formula-shapes` with two created tables holding cross-table formulas and two created
+sheets. Numbers opened each rung, one value was typed, and the document was saved, then
+the saved file was compared with what was sent: each created table's `table_id` and owner
+family, the formulas' values before and after the edit, and every field of every created
+archive.
+
+**A field Numbers restores as it would write it is derivable, and pybers omits it. A field
+Numbers leaves absent, or restores with another value, is state, and pybers writes it.**
+Numbers raises no warning either way, so only the comparison tells them apart.
+
+### What a created table holds
+
+| archive or field | why it is written |
+| --- | --- |
+| `TableInfoArchive.super` and `tableModel` | required by the schema |
+| `geometry.flags` 3 and `exterior_text_wrap` | restored at 0, and with a margin of 0 rather than 12 |
+| the model's required fields, `table_name`, sizes and `table_id` | required, and `table_id` names the owner family |
+| `header_rows_frozen`, `header_columns_frozen` and both `repeating_header_*_enabled` | left absent, so a header row added later would neither freeze nor repeat |
+| every style slot the theme's preset fills | the category, label and pivot slots were left absent |
+| `base_column_row_uids` and its map | pybers keys every line's identity on it |
+| `table_style_preset`, weak | names the preset the reset styles vary |
+| two header buckets and the first tile | required by the data store |
+| the string, style, formula and pre-BNC format lists | required by the data store |
+| the control-spec list | without it Numbers opened clean and dropped every formula in the table |
+| the BNC format list | pybers names a value's Automatic format in it |
+| the owner of kind 1: uid, internal id, kind and `formula_owner` | the identity `table_id` names |
+| the three reset styles, whole | each property is the reset, and `pybers-base` without `tabs` was recounted to 56 overrides |
+
+### What a created table leaves to Numbers
+
+Each group was absent from the rung named, and Numbers rebuilt it on save on the table's
+own owner base, adding no owner and changing no field pybers sent.
+
+| rung | group |
+| --- | --- |
+| 1 | `field_infos` on every created archive |
+| 2 | every optional nested message left empty |
+| 3 | every optional scalar at its schema default, but those the table above holds and every coordinate's `row`, `column` and `owner_index` |
+| 4 | the summary model and its 17 archives, rebuilt identical on the owner at base + 9 |
+| 5 | the category order and its UID map |
+| 6 | the category owner, group-by and group node, rebuilt as base + 8 onto the owner of kind 8 |
+| 7 | the hidden states at base + 4 and base + 11, their formula owners and filter sets |
+| 8 | the sort rule tracker and `sort_order` |
+| 9 to 11 | the ten owners besides kind 1, their tiles, and every model field naming them |
+| 12 | the rich-text, comment, conditional-style, formula-error, import-warning and multiple-choice lists |
+| 13 | the title and caption standins, the title still hidden |
+| 14 | the layout cache |
+| 15 | the stroke sidecar |
+| 16 | the ranges and empty dependency sets of the owner of kind 1 |
+| 17 | the header name manager's slot |
+| 18 | the table's sidebar node |
+| 21 | `storage_version_pre_bnc`, restored as 4 |
+
+**An absent default is not the schema's default to Numbers.** With `row: 0` and `column:
+0` absent from the group-by's coordinates, Numbers rebuilt the whole registration onto
+other coordinates, so a coordinate is always written.
+
+**A merge pybers writes into a created table states the merge owner.** The model carries
+no `merge_owner` until a table holds a merge, and `merge_owner.owner_id` is required, so
+the merge writer states it at base + 5 with the first merge. Numbers kept it and the merge
+with no owner of kind 5 registered.
+
+### What a created sheet holds
+
+The name, the style, the reset's page setup and six empty header and footer storages.
+`is_autofit_on` and `show_page_numbers` are written although false, since Numbers read
+either absent as true and printed the sheet scaled with page numbers. The storages are
+written because Numbers rebuilding them put a page number in the center footer. The
+guides (rung 19), and `page_order`, `layout_direction`, `uses_single_header_footer` and
+`should_print_comments` at their defaults (rung 3), are left to Numbers.
+
+**A created archive takes the version Numbers writes its type at**, one per type across
+all 187 documents, measured on 2 November 2026, with two exceptions. A BNC data list, the
+control-spec and format lists, carries (3, 2, 10) where the others carry (1, 0, 5). The
+model carries (10, 0, 3) in the six documents built from `45-columns-over-255`, 300
+columns, and `58-buckets-base`, 100,000 rows, and (3, 2, 10) everywhere else. What
+selects it was unmeasured as of 2 November 2026, so pybers writes (3, 2, 10), and a
+created table of either size has not been opened in Numbers.
+
+`tests/test_creation_floor.py` compares a created table with `48-table-inserted` and a
+created sheet with `49-sheet-inserted`, field for field, and pins every omission above.
