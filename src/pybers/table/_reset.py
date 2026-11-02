@@ -10,6 +10,8 @@ per document and found again by name. See docs/decisions.md.
 Private. Part of the table feature's archive half, reached by table creation.
 
 UPDATES
+2026-11-02  The reset's table and cell properties applied in one place each, which a
+            created theme's table preset shares, for PYB-261.
 2026-11-02  Each style is composed field by field rather than copied from a
             template, for PYB-276.
 2026-09-22  Split out of table creation for PYB-113.
@@ -109,26 +111,36 @@ def findNamedStyle(index: ArchiveIndex, stylesheetId: int) -> int | None:
     return None
 
 
-def composeTableStyle(parent: int, stylesheet: int) -> tst.TableStyleArchive:
-    """Return the reset's table style: no strokes and no border."""
-    style = tst.TableStyleArchive(override_count=tableStyleOverrides)
-    style.super.parent.identifier = parent
-    style.super.is_variation = True
-    style.super.stylesheet.identifier = stylesheet
+def applyResetTable(style: tst.TableStyleArchive) -> None:
+    """Give a table style the reset's properties: no strokes and no border."""
     properties = style.table_properties
     properties.v_strokes_visible = False
     properties.h_strokes_visible = False
     properties.table_border_visible = False
+
+
+def applyResetCell(style: tst.CellStyleArchive) -> None:
+    """Give a cell style the reset's properties: text that does not wrap."""
+    style.cell_properties.text_wrap = False
+
+
+def composeTableStyle(parent: int, stylesheet: int) -> tst.TableStyleArchive:
+    """Return the reset's table style, a variation of a theme's table style."""
+    style = tst.TableStyleArchive(override_count=tableStyleOverrides)
+    style.super.parent.identifier = parent
+    style.super.is_variation = True
+    style.super.stylesheet.identifier = stylesheet
+    applyResetTable(style)
     return style
 
 
 def composeCellStyle(parent: int, stylesheet: int) -> tst.CellStyleArchive:
-    """Return the reset's cell style: text that does not wrap."""
+    """Return the reset's cell style, a variation of a theme's cell style."""
     style = tst.CellStyleArchive(override_count=cellStyleOverrides)
     style.super.parent.identifier = parent
     style.super.is_variation = True
     style.super.stylesheet.identifier = stylesheet
-    style.cell_properties.text_wrap = False
+    applyResetCell(style)
     return style
 
 
@@ -311,8 +323,12 @@ def findSlotStyle(slot: str, styles: DocumentStyles, reset: ResetStyles) -> int:
 
 __all__ = [
     "DocumentStyles",
+    "applyResetCell",
+    "applyResetTable",
+    "composeBaseStyle",
     "ResetStyles",
     "createResetStyles",
+    "namedStyleKey",
     "findDocumentStyles",
     "findSlotStyle",
 ]
