@@ -2,12 +2,15 @@
 """\
 How every golden is built: its source document and the mutation pybers writes into it.
 
+A golden with no source starts from a document `pybers.create` made.
+
 The one place a golden's construction is written down. `test_goldens.py` rebuilds each
 from here and compares the whole archive, and `--golden-write` writes each from here,
 so no golden is made any other way. A test asserting what a golden holds reads its
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-02  A golden can start from a created document, for PYB-261.
 2026-10-29  A golden for each measured region, for PYB-272.
 2026-10-22  Written for PYB-255, gathering the builders the tests held.
 """
@@ -45,17 +48,20 @@ relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
 named = FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 repeat = CellValueFill.REPEAT_SOURCE_VALUE
 series = CellValueFill.CONTINUE_SERIES
+# The region a golden starting from a created document is created in.
+createdLocale: str = "en_US"
 
 @dataclass(frozen=True, slots=True)
 class GoldenBuilder:
     """One golden: its name, the document it starts from, and what pybers writes.
 
-    `labeled` marks a source laid out as a measurement, whose label beneath each
-    cell the mutation changes is rewritten to say what pybers wrote.
+    A source of None starts from a document created in `createdLocale`. `labeled`
+    marks a source laid out as a measurement, whose label beneath each cell the
+    mutation changes is rewritten to say what pybers wrote.
     """
 
     name: str
-    source: str
+    source: str | None
     mutate: Callable[[pybers.Document], None]
     labeled: bool = False
 
@@ -120,9 +126,15 @@ def writeGoldenLabels(
 
 
 def buildGolden(builder: GoldenBuilder, into: Path) -> Path:
-    """Write a golden's mutation into a fresh copy of its source, and return it."""
-    working = copyDocument(builder.source, into)
+    """Write a golden's mutation into its source or a created document, return it."""
     with holdSeededIdentities(builder.name):
+        if builder.source is None:
+            working = into / f"{builder.name}.numbers"
+            document = pybers.create(createdLocale)
+            builder.mutate(document)
+            document.save(working)
+            return working
+        working = copyDocument(builder.source, into)
         document = pybers.open(working)
         table = findFirstTable(document)
         before = readMeasuredCells(table) if builder.labeled else {}
@@ -564,7 +576,12 @@ measuredLocales: tuple[str, ...] = (
     "de_DE", "en_GB", "ja_JP", "en_ZA", "pt_BR", "en_AU", "en_IN",
 )
 
+def writeNothing(document: pybers.Document) -> None:
+    """Write nothing, for a golden that is its starting document."""
+
+
 goldens: tuple[GoldenBuilder, ...] = (
+    GoldenBuilder("00-created-blank-by-pybers", None, writeNothing),
     *(GoldenBuilder(f"95-region-{identifier.lower().replace('_', '-')}-by-pybers",
                     "95-region-base", setLocale(identifier), labeled=True)
       for identifier in measuredLocales),

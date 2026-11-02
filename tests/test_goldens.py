@@ -67,6 +67,7 @@ def testEachGoldenIsWhatItsBuilderWrites(
 
 def listStaleLabels(builder: GoldenBuilder, golden: Path) -> list[str]:
     """Return each measured cell whose label no longer says what it holds."""
+    assert builder.source is not None, f"{builder.name} is labeled but has no source"
     sourceTable = findFirstTable(pybers.open(findDocumentPath(builder.source)))
     source = readMeasuredCells(sourceTable)
     built = readMeasuredCells(findFirstTable(pybers.open(golden)))

@@ -23,6 +23,7 @@ over what, and `test_goldens.py` fails when a label no longer says so.
 
 | File | Built from | Mutation | Confirmed |
 | --- | --- | --- | --- |
+| `00-created-blank-by-pybers.numbers` | `pybers.create("en_US")` | none: one sheet holding no table in the reset's page setup, and a theme of 30 color slots offering one preset of each kind a person adds, in the pybers reset. The first golden holding nothing Numbers wrote | 2026-11-02, Numbers 15.4: `/golden-confirm` passed every check, Quick Look shows the empty page, and the maintainer inserted every kind of object into a copy, each plain but not broken, with none of Apple's styles offered |
 | `11-value-types-noformats-A1-edited.numbers` | `90f-number-for-an-edit` | `A1` set to `Decimal("98765.4321")` over the number 1234.5, each changed cell's label rewritten beneath it | 2026-10-23, Numbers 15.4: `/golden-confirm` passed every check, and a developer confirmed by eye `A1` reading 98765.4321 |
 | `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after PYB-25, Numbers 15.3.1 |
 | `22b-merged-by-pybers.numbers` | `22b-merge-2x2-unmerged.numbers` | five merges added across row 1 | 2026-09-02, Numbers 15.3.1 |
