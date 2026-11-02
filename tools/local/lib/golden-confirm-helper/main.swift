@@ -11,6 +11,9 @@
 // it escapes. A Data Format value is only matched against a menu item or typed into a field.
 //
 // UPDATES
+// 2026-11-02  Automation is checked by asking Numbers its name, since the permission
+//             call answers a running Numbers as not running, and a Numbers whose
+//             process has gone counts as closed though macOS still lists it, for PYB-276.
 // 2026-10-29  A failed capture logs every error and the window's state, and Numbers is
 //             shown for each capture, which a hidden window refuses, its effect on
 //             the frontmost app logged, for PYB-272.
@@ -37,8 +40,8 @@ let appleScriptTimeoutSeconds = 60
 let windowAttempts = 20
 let otherDesktopAttempts = 3
 let connectionInvalidError = -609
-// What Automation's permission check answers for an app that is not running.
-let processNotFoundError: OSStatus = -600
+// How long the automation check waits for Numbers to answer, so a prompt can be seen.
+let automationProbeSeconds = 30
 let quitTimeoutSeconds = 10
 let retryPauseSeconds = 0.5
 // A capture stream that failed to start stayed failed through 11 s of 0.5 s retries, 2026-09-22.
@@ -269,23 +272,35 @@ func findGrantProblems() -> [HelperProblem] {
     return problems
 }
 
+// macOS kept listing a Numbers whose process had gone, not terminated, 2026-11-02.
+func findRunningNumbers() -> NSRunningApplication? {
+    NSRunningApplication.runningApplications(withBundleIdentifier: numbersBundleIdentifier)
+        .first { kill($0.processIdentifier, 0) == 0 }
+}
+
 func findAutomationProblem() -> HelperProblem? {
-    let target = NSAppleEventDescriptor(bundleIdentifier: numbersBundleIdentifier)
-    // Asking is the only way macOS offers to grant Automation; Settings cannot add it.
-    let status = AEDeterminePermissionToAutomateTarget(
-        target.aeDesc, typeWildCard, typeWildCard, true)
-    switch status {
-    case noErr:
-        return nil
-    case processNotFoundError:
+    // AEDeterminePermissionToAutomateTarget answers -600 for a running Numbers Creator
+    // Studio on macOS 26.6.1, 2026-11-02, so the check sends Numbers a harmless event.
+    if findRunningNumbers() == nil {
         return HelperProblem(
             kind: "numbersNotRunning",
             detail: "Numbers is not running, so whether the helper may control it is unknown",
             remedy: "open Numbers, then rerun")
-    default:
+    }
+    do {
+        _ = try runAppleScript("get name", timeoutSeconds: automationProbeSeconds)
+        return nil
+    } catch let error as AppleScriptError {
         return HelperProblem(
             kind: "automation",
-            detail: "pybersdev-golden-confirm may not control Numbers (status \(status))",
+            detail: "pybersdev-golden-confirm may not control Numbers "
+                + "(error \(error.number): \(error.message))",
+            remedy: "System Settings, Privacy & Security, Automation: enable Numbers "
+                + "under pybersdev-golden-confirm")
+    } catch {
+        return HelperProblem(
+            kind: "automation",
+            detail: "pybersdev-golden-confirm could not ask Numbers its name: \(error)",
             remedy: "System Settings, Privacy & Security, Automation: enable Numbers "
                 + "under pybersdev-golden-confirm")
     }
@@ -1155,8 +1170,7 @@ func setNumbersHidden(pid: pid_t, _ hidden: Bool) -> Bool {
 }
 
 func launchNumbers() throws -> (NSRunningApplication, Bool) {
-    if let running = NSRunningApplication.runningApplications(
-        withBundleIdentifier: numbersBundleIdentifier).first {
+    if let running = findRunningNumbers() {
         return (running, false)
     }
     guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: numbersBundleIdentifier)
@@ -1250,8 +1264,7 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
                 detail: "this run needs \(captureCount) captures, over the limit of \(request.maxCaptures ?? 0)",
                 remedy: "check fewer cells in one run"))
         }
-        if request.freshNumbers == true, !NSRunningApplication.runningApplications(
-            withBundleIdentifier: numbersBundleIdentifier).isEmpty {
+        if request.freshNumbers == true, findRunningNumbers() != nil {
             throw HelperFailure(problem: HelperProblem(
                 kind: "numbersRunning",
                 detail: "Numbers is already running, and a damaged document can hang it",
