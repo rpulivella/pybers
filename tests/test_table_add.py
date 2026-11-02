@@ -8,6 +8,7 @@ formulas read across tables and sheets, so anything a created table disturbed in
 engine would show there. The golden was made from it the same way.
 
 UPDATES
+2026-11-02  A created table registers one owner and no header slot, for PYB-276.
 2026-10-22  The golden's tables are added by its builder, for PYB-255.
 2026-09-14  Written for PYB-63.
 """
@@ -45,7 +46,6 @@ from pybers.table import Table
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 metadataMember: str = "Index/Metadata.iwa"
-ownerKinds: frozenset[int] = frozenset({1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 35})
 
 
 def openShapes() -> Document:
@@ -340,35 +340,58 @@ def testAPositionThatIsNotAPositionIsRefused() -> None:
 # ── Registration ─────────────────────────────────────────────────────────────
 
 
-def testACreatedTableRegistersElevenOwnersOnItsIdentity(tmp_path: Path) -> None:
+def testACreatedTableRegistersOneOwnerCarryingItsIdentityAlone(tmp_path: Path) -> None:
     path = saveWithTables(tmp_path)
     reopened = pybers.open(path).sheet("Fresh").table("Output")
     index = ArchiveIndex(readPackage(path))
     words = [int(reopened.identifier[at : at + 8], 16) for at in range(0, 32, 8)]
     base = words[0] | words[1] << 32 | words[2] << 64 | words[3] << 96
 
-    kinds = set()
-    for reference in findCalculationEngine(
-        index
-    ).dependency_tracker.formula_owner_dependencies:
-        owner = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
-        value = owner.formula_owner_uid.upper << 64 | owner.formula_owner_uid.lower
-        if 0 <= value - base < 0x100:
-            assert value - base == (0 if owner.owner_kind == 1 else owner.owner_kind)
-            kinds.add(owner.owner_kind)
-    assert kinds == ownerKinds
+    family = [
+        owner
+        for reference in findCalculationEngine(
+            index
+        ).dependency_tracker.formula_owner_dependencies
+        if 0 <= (
+            (owner := index.resolve(reference, tsce.FormulaOwnerDependenciesArchive))
+            .formula_owner_uid.upper << 64 | owner.formula_owner_uid.lower
+        ) - base < 0x100
+    ]
+    assert [owner.owner_kind for owner in family] == [1]
+    assert {descriptor.name for descriptor, _ in family[0].ListFields()} == {
+        "formula_owner_uid", "internal_formula_owner_id", "owner_kind", "formula_owner"
+    }
 
 
-def testEveryCreatedTableGetsItsOwnHeaderNameSlot(tmp_path: Path) -> None:
-    index = ArchiveIndex(readPackage(saveWithTables(tmp_path)))
-    names = index.resolve(
-        findCalculationEngine(index).header_name_manager, tst.HeaderNameMgrArchive
-    )
+def testAMergeInACreatedTableNamesTheMergeOwnerNumbersWould(tmp_path: Path) -> None:
+    document = openShapes()
+    document.sheet(1).tableAdd("Merged", rows=2, cols=2).mergeAdd("A1:B1")
+    document.save(tmp_path / "merged.numbers")
 
-    slots = [entry.per_table_precedent.column for entry in names.per_tables]
+    reopened = pybers.open(tmp_path / "merged.numbers").sheet(1).table("Merged")
+    _, _, model = findTableArchives(tmp_path / "merged.numbers", "Sheet 1", "Merged")
+    words = [int(reopened.identifier[at : at + 8], 16) for at in range(0, 32, 8)]
+    owner = model.merge_owner.owner_id
 
-    assert len(slots) == 6
-    assert len(set(slots)) == 6
+    assert [str(merge.extent) for merge in reopened.mergeRanges] == ["A1:B1"]
+    assert [owner.uuid_w0, owner.uuid_w1, owner.uuid_w2, owner.uuid_w3] == [
+        words[0] + 5, *words[1:]
+    ]
+
+
+def testACreatedTableTakesNoHeaderNameSlot(tmp_path: Path) -> None:
+    """Numbers gives a table its slot on its next save, measured for PYB-276."""
+    before = ArchiveIndex(readPackage(findDocumentPath("20-formula-shapes")))
+    after = ArchiveIndex(readPackage(saveWithTables(tmp_path)))
+
+    slots = [
+        len(index.resolve(
+            findCalculationEngine(index).header_name_manager, tst.HeaderNameMgrArchive
+        ).per_tables)
+        for index in (before, after)
+    ]
+
+    assert slots[0] == slots[1]
 
 
 def testACreatedTableFollowsTheRegistryRules(tmp_path: Path) -> None:
