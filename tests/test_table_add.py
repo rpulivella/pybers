@@ -23,6 +23,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/14"
 
+from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from golden.builders import addTables as addGoldenTables
 
 import pybers
 from conftest import findDocumentPath, readArchiveBodies
+from pybers import CellValueFill, FormulaReferenceRelocation
 from pybers._engine import findCalculationEngine
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
@@ -46,6 +48,7 @@ from pybers.table import Table
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 metadataMember: str = "Index/Metadata.iwa"
+relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
 
 
 def openShapes() -> Document:
@@ -392,6 +395,45 @@ def testATileIsCreatedOnlyWhereARowLands(tmp_path: Path) -> None:
         (0, 0), (1792, 7)
     ]
     assert store.nextRowStripID == 8
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda table: table.rowAdd(2),
+        lambda table: table.rowRemove(2),
+        lambda table: table.columnAdd("B"),
+        lambda table: table.columnRemove("D"),
+        lambda table: table.mergeAdd("C3:D3"),
+        lambda table: table.cellsMove(
+            "A1:B1", "A3", references=relative
+        ),
+        lambda table: table.cellsCopy(
+            "A1:B1", "A3", references=relative
+        ),
+        lambda table: table.cellsFill(
+            "A1:B1", "A1:B4",
+            references=relative, values=CellValueFill.REPEAT_SOURCE_VALUE,
+        ),
+    ],
+    ids=["rowAdd", "rowRemove", "columnAdd", "columnRemove", "mergeAdd", "cellsMove",
+         "cellsCopy", "cellsFill"],
+)
+def testEveryEditWorksOnATableCreatedInAnEarlierSave(
+    tmp_path: Path, edit: Callable[[Table], object]
+) -> None:
+    """A created table has no sidecar or extents until Numbers saves it."""
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Fresh", rows=4, cols=4)
+    added.cell("A1").value = Decimal("1")
+    added.cell("B1").formulaText = "=A1*2"
+    document.save(tmp_path / "first.numbers")
+    later = pybers.open(tmp_path / "first.numbers")
+    table = later.sheet(1).table("Fresh")
+    edit(table)
+    later.save(tmp_path / "second.numbers")
+
+    assert pybers.open(tmp_path / "second.numbers").sheet(1).table("Fresh") == table
 
 
 def testAMergeInACreatedTableNamesTheMergeOwnerNumbersWould(tmp_path: Path) -> None:
