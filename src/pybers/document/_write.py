@@ -19,6 +19,7 @@ Numbers opens with its charts, conditional formats and print settings quietly
 gone, rather than as an error.
 
 UPDATES
+2026-11-02  A created document saves, for PYB-261.
 2026-10-28  A changed region is written, marking every formula for
             recalculation, for PYB-272.
 2026-09-01  Written for #2: the unchanged round trip.
@@ -180,8 +181,7 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
     if package is None:
         raise WriteError(
             "This document carries no archives, so there is nothing to write. Only "
-            "a document from `pybers.open` can be saved, and building one from "
-            "scratch is not supported."
+            "a document from `pybers.open` or `pybers.create` can be saved."
         )
     # Created sheets and tables change both the package and the model's identifiers,
     # so a save that fails part way undoes both rather than leaving a retry to
