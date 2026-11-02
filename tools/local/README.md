@@ -88,6 +88,9 @@ formatSet        set the range's format kind through AppleScript
 valueSet         type value into one cell, as a person would
 tableExtend      grow the table until it reaches the cell in range
 tableAdd         add the table named by table to sheet, reaching the cell in range
+tableDelete      delete the table named by table from sheet
+drawableAdd      add a drawable to sheet: text item, shape, line, chart, or an image
+                 from the PNG or SVG in value
 sheetAdd         add the sheet named by sheet, its table holding no header
 dataFormatSet    set one Data Format control, named by setting, to value
 customFormatEdit build a custom format, one part per step, named by setting
