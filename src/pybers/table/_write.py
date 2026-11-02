@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-02  The model is written when a write created a tile, for PYB-276.
 2026-10-28  `formulasMark`, every formula of a table marked for
             recalculation, for PYB-272.
 2026-10-01  A save describes each cell it wrote once the package is on disk, for
@@ -169,13 +170,14 @@ class TableSave:
         if borderCopies:
             applyBorderCopies(index, self.registry, model, borderCopies)
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
-        if moved or swallowed or maps.changed or moves or copies:
-            # A structural edit or a moved block can create and remove tiles and
+        reshaped = maps.changed or moves or copies or edits.tilesCreated
+        if moved or swallowed or reshaped:
+            # A structural edit, a moved block or a created tile changes the tiles and
             # buckets, which the model has to declare as it points at them.
             index.archiveWrite(
                 modelIdentifier, model,
                 self.registry.referencesReconcile(modelIdentifier, model)
-                if maps.changed or moves or copies else None,
+                if reshaped else None,
             )
         # The engine's register of formula-bearing cells, which is a separate
         # fact from a cell having moved and is what makes a newly attached

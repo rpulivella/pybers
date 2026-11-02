@@ -363,6 +363,37 @@ def testACreatedTableRegistersOneOwnerCarryingItsIdentityAlone(tmp_path: Path) -
     }
 
 
+def testAValueAndAFormulaBeyondTheFirstTileSurviveASave(tmp_path: Path) -> None:
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Long", rows=3000, cols=4)
+    added.cell("A1").value = Decimal("7")
+    added.cell("A300").value = Decimal("9")
+    added.cell("D2000").formulaText = "=A1*2"
+    document.save(tmp_path / "long.numbers")
+
+    reopened = pybers.open(tmp_path / "long.numbers").sheet(1).table("Long")
+
+    assert reopened.cell("A300").value == Decimal("9")
+    assert reopened.cell("D2000").formulaText == "=A1*2"
+
+
+def testATileIsCreatedOnlyWhereARowLands(tmp_path: Path) -> None:
+    """Tiles are sparse, as Numbers keeps them, see findings-03-structure.md."""
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Long", rows=3000, cols=4)
+    added.cell("A2000").value = Decimal("9")
+    document.save(tmp_path / "long.numbers")
+
+    _, _, model = findTableArchives(tmp_path / "long.numbers", "Sheet 1", "Long")
+    store = model.base_data_store
+
+    assert [entry.tileid for entry in store.tiles.tiles] == [0, 7]
+    assert [(node.key, node.value) for node in store.rowTileTree.nodes] == [
+        (0, 0), (1792, 7)
+    ]
+    assert store.nextRowStripID == 8
+
+
 def testAMergeInACreatedTableNamesTheMergeOwnerNumbersWould(tmp_path: Path) -> None:
     document = openShapes()
     document.sheet(1).tableAdd("Merged", rows=2, cols=2).mergeAdd("A1:B1")
