@@ -14,6 +14,8 @@ when it empties.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-02  A wide row grows to its last record and an empty tile takes a wide
+            first row, where a record past the end was dropped, for PYB-276.
 2026-10-29  `TileRange.rows` and `rowFor`, the walk and the row a placement
             takes, for PYB-278.
 2026-09-22  The tile pass that uses these primitives is named `_edits`, for PYB-113.
@@ -40,6 +42,7 @@ from .._persistence.cells import (
     conditionalSlot,
     emptyOffset,
     findSlotValue,
+    offsetUnitWord,
     offsetWidth,
 )
 from .._persistence.index import ArchiveIndex
@@ -59,37 +62,46 @@ from .cells import Table
 # `01-text-plain`, `11-value-types-noformats` and `18-formula-literals` alike.
 narrowRowSlots: int = 255
 
-def createRowStorage(tile: tst.Tile, tileRowIndex: int) -> tst.TileRowInfo:
+# Both pre-BNC fields of a wide row, in `45-columns-over-255` and in the first row
+# Numbers wrote into a created 300-column table, 2026-11-02.
+wideRowPreBnc: bytes = bytes.fromhex("f09fa4a0")
+
+def createRowStorage(
+    tile: tst.Tile, tileRowIndex: int, wide: bool = False
+) -> tst.TileRowInfo:
     """Add an empty row to a tile, shaped like the rows already in it.
 
-    The offset array's length is copied from a sibling rather than computed: a
-    narrow row carries a fixed 255 slots whatever the column count, and the one
-    wide row measured carries one slot per column, so a rule fitted to that single
-    sample would be a guess. A tile holding no row takes the narrow shape Numbers
-    writes for a first row, which the caller allows only where 255 slots suffice.
+    A narrow row carries a fixed 255 slots, so a sibling's length is copied. A tile
+    holding no row takes the narrow shape Numbers writes for a first row, or with
+    `wide` the wide one, which starts with no slot and grows to its last record.
 
     `numrows` is corrected because Numbers keeps it accurate, and `numCells`,
     `maxRow` and `maxColumn` are left alone because Numbers writes zero in all
     three on tiles full of data.
     """
-    sibling = tile.rowInfos[0] if tile.rowInfos else None
-    slots = (
-        len(sibling.cell_offsets) // offsetWidth if sibling is not None
-        else narrowRowSlots
-    )
+    match tile.rowInfos:
+        case [sibling, *_]:
+            wide = sibling.has_wide_offsets
+            slots = len(sibling.cell_offsets) // offsetWidth
+            storageVersion = sibling.storage_version
+        case _:
+            slots = 0 if wide else narrowRowSlots
+            storageVersion = tile.storage_version
     empty = emptyOffset.to_bytes(offsetWidth, "little") * slots
-    created = tst.TileRowInfo()
-    created.tile_row_index = tileRowIndex
-    created.cell_count = 0
-    created.cell_storage_buffer_pre_bnc = b""
-    created.cell_offsets_pre_bnc = empty
-    created.storage_version = (
-        sibling.storage_version if sibling is not None else tile.storage_version
+    created = tst.TileRowInfo(
+        tile_row_index=tileRowIndex,
+        cell_count=0,
+        cell_storage_buffer_pre_bnc=b"",
+        cell_offsets_pre_bnc=empty,
+        storage_version=storageVersion,
+        cell_storage_buffer=b"",
+        cell_offsets=empty,
     )
-    created.cell_storage_buffer = b""
-    created.cell_offsets = empty
-    if sibling is not None and sibling.has_wide_offsets:
+    if wide:
+        created.cell_storage_buffer_pre_bnc = wideRowPreBnc
+        created.cell_offsets_pre_bnc = wideRowPreBnc
         created.has_wide_offsets = True
+        tile.should_use_wide_rows = True
 
     at = len(tile.rowInfos)
     for position, existing in enumerate(tile.rowInfos):
@@ -120,6 +132,15 @@ def rewriteRow(
     record at all rather than an empty one.
     """
     slots = len(offsets) // offsetWidth
+    beyond = [column for column in replacements if column >= slots]
+    if beyond and offsetUnit != offsetUnitWord:
+        raise WriteError(
+            f"Column {max(beyond) + originOffset} is past the {slots} offset slots a "
+            "narrow row carries, and widening a narrow row is not supported."
+        )
+    # A wide row carries one slot per column through its last record, as Numbers
+    # writes one, so it grows to hold a record past its end.
+    slots = max([slots, *(column + 1 for column in beyond)])
     existing = {
         record.column: record for record in decodeRow(offsets, buffer, offsetUnit)
     }

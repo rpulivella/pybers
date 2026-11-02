@@ -436,6 +436,63 @@ def testEveryEditWorksOnATableCreatedInAnEarlierSave(
     assert pybers.open(tmp_path / "second.numbers").sheet(1).table("Fresh") == table
 
 
+def readFirstRow(path: Path, table: str) -> tuple[tst.Tile, tst.TileRowInfo]:
+    """Return a table's first tile and the first row it stores."""
+    index, _, model = findTableArchives(path, "Sheet 1", table)
+    tile = index.resolve(model.base_data_store.tiles.tiles[0].tile, tst.Tile)
+    return tile, tile.rowInfos[0]
+
+
+def testAFirstRowOverTwoFiftyFiveColumnsIsWrittenWide(tmp_path: Path) -> None:
+    """Shaped as Numbers wrote one typed into a created 300-column table."""
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Wide", rows=3, cols=300)
+    added.cell("A1").value = Decimal("5")
+    added.cell("KJ1").value = Decimal("9")
+    document.save(tmp_path / "wide.numbers")
+
+    reopened = pybers.open(tmp_path / "wide.numbers").sheet(1).table("Wide")
+    tile, row = readFirstRow(tmp_path / "wide.numbers", "Wide")
+
+    assert (reopened.cell("A1").value, reopened.cell("KJ1").value) == (5, 9)
+    assert tile.should_use_wide_rows
+    assert row.has_wide_offsets
+    assert len(row.cell_offsets) // 2 == 296
+    assert row.cell_offsets_pre_bnc == row.cell_storage_buffer_pre_bnc == bytes.fromhex(
+        "f09fa4a0"
+    )
+
+
+def testAWideRowGrowsToARecordPastItsEnd(tmp_path: Path) -> None:
+    document = openShapes()
+    document.sheet(1).tableAdd("Wide", rows=3, cols=300).cell("KJ1").value = 9
+    document.save(tmp_path / "first.numbers")
+    later = pybers.open(tmp_path / "first.numbers")
+    later.sheet(1).table("Wide").cell("KN1").value = Decimal("4")
+    later.save(tmp_path / "second.numbers")
+
+    reopened = pybers.open(tmp_path / "second.numbers").sheet(1).table("Wide")
+    _, row = readFirstRow(tmp_path / "second.numbers", "Wide")
+
+    assert (reopened.cell("KJ1").value, reopened.cell("KN1").value) == (9, 4)
+    assert len(row.cell_offsets) // 2 == 300
+
+
+def testARecordPastANarrowRowIsRefusedAndWritesNothing(tmp_path: Path) -> None:
+    document = openShapes()
+    document.sheet(1).tableAdd("Grown", rows=2, cols=4).cell("A1").value = 1
+    document.save(tmp_path / "narrow.numbers")
+    grown = pybers.open(tmp_path / "narrow.numbers")
+    table = grown.sheet(1).table("Grown")
+    table.columnAdd("E", count=296)
+    table.cell("KN1").value = Decimal("4")
+
+    with pytest.raises(WriteError, match="narrow row"):
+        grown.save(tmp_path / "refused.numbers")
+
+    assert not (tmp_path / "refused.numbers").exists()
+
+
 def testAMergeInACreatedTableNamesTheMergeOwnerNumbersWould(tmp_path: Path) -> None:
     document = openShapes()
     document.sheet(1).tableAdd("Merged", rows=2, cols=2).mergeAdd("A1:B1")

@@ -10,7 +10,8 @@ Private. Part of the table feature's archive half.
 
 UPDATES
 2026-11-02  A value or formula in a block of rows no tile stores gains its tile,
-            rather than being dropped or refused, for PYB-276.
+            rather than being dropped or refused, and a first row over 255 columns
+            is written wide, for PYB-276.
 2026-10-29  Every list claimed and released through an `EntryPool`, for PYB-278.
 2026-10-22  A save compares a currency cell through its code, for PYB-220.
 2026-10-20  A value of any kind is written over any other, releasing the control
@@ -76,7 +77,6 @@ from .._persistence.metadata import PackageRegistry
 from .._persistence.pool import EntryPool
 from .._persistence.rows import StoredTiles, iterateTileRows
 from ..addressing.reference import CellAddress, originOffset
-from ..errors import WriteError
 from ..formula._write import (
     attachFormulaKey,
     buildFormulaRecord,
@@ -403,14 +403,9 @@ def applyTableEdits(
                 walked.row for walked in iterateTileRows(entry.tileid, tile, tileSize)
             )
             for missing in findRowsNeedingStorage(table, firstRow, tileSize, stored):
-                if not tile.rowInfos and table.colCount > narrowRowSlots:
-                    raise WriteError(
-                        f"Row {missing + originOffset} of {table.name!r} is the first "
-                        f"row of an empty tile in a table of {table.colCount} columns. "
-                        "Writing that row for more than 255 columns is not "
-                        "supported."
-                    )
-                createRowStorage(tile, missing - firstRow)
+                createRowStorage(
+                    tile, missing - firstRow, wide=table.colCount > narrowRowSlots
+                )
                 createdRows.add(missing)
                 touched = True
 
