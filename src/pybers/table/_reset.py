@@ -298,13 +298,15 @@ def findSlotStyle(slot: str, styles: DocumentStyles, reset: ResetStyles) -> int:
     The table style, every cell style and every text style but the title's take the
     reset. The title's two take the theme's own, since a title stays hidden.
     """
-    if slot == "table_style":
-        return reset.tableStyle
-    if slot in ("table_name_style", "table_name_shape_style"):
-        return int(getattr(styles.network, slot).identifier)
-    if slot.endswith("_text_style"):
-        return reset.textStyle
-    return reset.cellStyle
+    match slot:
+        case "table_style":
+            return reset.tableStyle
+        case "table_name_style" | "table_name_shape_style":
+            return int(getattr(styles.network, slot).identifier)
+        case _ if slot.endswith("_text_style"):
+            return reset.textStyle
+        case _:
+            return reset.cellStyle
 
 
 __all__ = [
