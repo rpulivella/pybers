@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-02  A document holding no table needs no engine, for PYB-261.
 2026-11-02  The model is written when a write created a tile, for PYB-276.
 2026-10-28  `formulasMark`, every formula of a table marked for
             recalculation, for PYB-272.
@@ -48,6 +49,7 @@ from .._engine import (
     FormulaDependencies,
     TableOwner,
     findCalculationEngine,
+    findCalculationEngineHeld,
     findOwnerEntry,
     listRegisteredCells,
     moveOwnerCoordinates,
@@ -216,10 +218,22 @@ class TableSave:
 def openTableSave(document: Document, registry: PackageRegistry) -> TableSave:
     """Create every table the model gained, then read the engine the save writes to.
 
-    Read after creation, since a created table registers owners of its own.
+    Read after creation, since a created table registers owners of its own. A
+    document holding no table may hold no engine, as a created one does.
     """
-    createTables(document, registry)
     index = registry.index
+    holdsTable = any(sheet.tables for sheet in document.sheets)
+    if findCalculationEngineHeld(index) is None:
+        if holdsTable:
+            raise WriteError(
+                "This document holds no calculation engine, so a table cannot be "
+                "added to it. Creating the engine a created document's first table "
+                "needs is not supported yet."
+            )
+        return TableSave(
+            index=index, registry=registry, entries={}, ownerIds={}, extents={}
+        )
+    createTables(document, registry)
     engine = findCalculationEngine(index)
     # A formula names the table it reads by identity, and the engine by internal
     # owner id, so declaring what a formula reads needs both halves in hand.

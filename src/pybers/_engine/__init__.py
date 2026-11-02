@@ -43,6 +43,7 @@ from .dependencies import (
 from .owners import (
     TableOwner,
     findCalculationEngine,
+    findCalculationEngineHeld,
     findOwnerEntry,
     readTableIdentities,
     readTableOwnerEntries,
@@ -69,6 +70,7 @@ __all__ = [
     "SpanEdge",
     "TableOwner",
     "findCalculationEngine",
+    "findCalculationEngineHeld",
     "findOwnerEntry",
     "listRegisteredCells",
     "readTableIdentities",

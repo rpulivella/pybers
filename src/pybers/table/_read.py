@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-11-02  A table of a document never saved names none, for PYB-261.
 2026-10-29  A table's records walked through `StoredTiles`, for PYB-278.
 2026-10-22  Each cell's control read into its presentation, for PYB-255.
 2026-10-22  A currency record reads as a `CurrencyAmount` carrying its format's
@@ -360,7 +361,7 @@ def readConditionFormulas(
 def readTable(
     index: ArchiveIndex,
     tableInfo: tst.TableInfoArchive,
-    source: Path,
+    source: Path | None,
     identifier: str = "",
 ) -> Table:
     """Build one `Table` from its `TST.TableInfoArchive`."""
@@ -409,7 +410,7 @@ def readTable(
 
 
 def iterateCellRecords(
-    index: ArchiveIndex, model: tst.TableModelArchive, source: Path
+    index: ArchiveIndex, model: tst.TableModelArchive, source: Path | None
 ) -> Iterator[tuple[CellAddress, CellRecord]]:
     """Yield every record a table stores, with the cell it belongs to."""
     for stored in readStoredTiles(index, model.base_data_store):
@@ -418,7 +419,7 @@ def iterateCellRecords(
         except CellDecodeError as exc:
             raise ReadError(
                 # By identifier, never by name, so a check report stays publishable.
-                f"{source}, table {model.table_id}, row "
+                f"{source or 'An unsaved document'}, table {model.table_id}, row "
                 f"{stored.row + originOffset}: {exc}"
             ) from exc
         for record in records:
