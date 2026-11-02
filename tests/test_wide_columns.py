@@ -14,6 +14,7 @@ address, with four cells cleared from the last row so an empty slot in the wide
 form is covered too.
 
 UPDATES
+2026-11-02  A formula past column 255 is registered in its column's tile, for PYB-276.
 2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-06  Written for #48.
 """
@@ -38,10 +39,13 @@ from conftest import (
     readRecordedColumns,
     readRecordedRows,
 )
+from pybers._engine import findCalculationEngine, readTableOwnerEntries
+from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage, writePackage
 from pybers._persistence.cells import chooseOffsetUnit, offsetUnitByte, offsetUnitWord
 from pybers._persistence.difference import listPackageDifferences
+from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import findArchiveTypeId
 from pybers.addressing.reference import CellReference, originOffset
 from pybers.errors import ReadError, WriteError
@@ -197,9 +201,8 @@ def testARecordTheOffsetUnitCannotNameIsRefused() -> None:
 def widelyMerged(tmp_path: Path) -> Path:
     """The wide fixture with one merge past column 255, written and closed.
 
-    A merge is the only edit that reaches `rewriteRow` on this document: every
-    cell is text, so a value write refuses, and a formula attach refuses because
-    no dependency tile covers these columns. Measured 2026-09-08 for #53.
+    A merge reaches `rewriteRow` here without changing any cell, since every cell is
+    text and a value write refuses. Measured 2026-09-08 for #53.
     """
     target = Path(shutil.copy(wideFixture, tmp_path / "45-merged.numbers"))
     document = pybers.open(target)
@@ -248,16 +251,24 @@ def testTheRowsTheEditDidNotTouchAreUnchanged(widelyMerged: Path) -> None:
     }
 
 
-def testAFormulaStillCannotReachAColumnPastTwoFiftyFive(tmp_path: Path) -> None:
-    """Refuse rather than leave this document half-edited.
-
-    Registering a formula in one of the engine's two registers and not the other
-    would leave a stale result Numbers never recalculates, so the write refuses
-    instead. Borrowed from `19` because this fixture holds no formula to copy.
-    """
+def testAFormulaPastColumnTwoFiftyFiveIsRegisteredInItsColumnsTile(
+    tmp_path: Path,
+) -> None:
+    """Borrowed from `19` because this fixture holds no formula to copy."""
     borrowed = findFirstTable(pybers.open(findDocumentPath("19-formula-dragged")))
     target = Path(shutil.copy(wideFixture, tmp_path / "45-formula.numbers"))
     document = pybers.open(target)
     findFirstTable(document).cell("KJ7").formula = borrowed.cell("E2").formula
-    with pytest.raises(WriteError, match="No dependency tile covers"):
-        document.save()
+    document.save()
+
+    index = ArchiveIndex(readPackage(target))
+    tiles = [
+        index.resolve(reference, tsce.CellRecordTileArchive)
+        for entry in readTableOwnerEntries(index, findCalculationEngine(index)).values()
+        for reference in entry.dependencies.tiled_cell_dependencies.cell_record_tiles
+    ]
+    assert any(
+        (tile.tile_row_begin, tile.tile_column_begin) == (0, 288)
+        and (6, 295) in {(record.row, record.column) for record in tile.cell_records}
+        for tile in tiles
+    )
