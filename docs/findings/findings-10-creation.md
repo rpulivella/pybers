@@ -279,9 +279,10 @@ guides (rung 19), and `page_order`, `layout_direction`, `uses_single_header_foot
 all 187 documents, measured on 2 November 2026, with two exceptions. A BNC data list, the
 control-spec and format lists, carries (3, 2, 10) where the others carry (1, 0, 5). The
 model carries (10, 0, 3) in the six documents built from `45-columns-over-255`, 300
-columns, and `58-buckets-base`, 100,000 rows, and (3, 2, 10) everywhere else. What
-selects it was unmeasured as of 2 November 2026, so pybers writes (3, 2, 10), and a
-created table of either size has not been opened in Numbers.
+columns, and `58-buckets-base`, 100,000 rows, and (3, 2, 10) everywhere else. pybers
+writes (3, 2, 10) for every created model. Numbers opened a created table of 300 columns
+and one of 100,000 rows written so, computed the formulas typed into each, kept both
+identities, and saved both models at (10, 0, 3) itself, measured on 2 November 2026.
 
 `tests/test_creation_floor.py` compares a created table with `48-table-inserted` and a
 created sheet with `49-sheet-inserted`, field for field, and pins every omission above.
