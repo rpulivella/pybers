@@ -9,6 +9,7 @@ available, because the cell looks correct to anyone who clicks it. Measured for
 PYB-42, and recorded in findings-02-formulas.md.
 
 UPDATES
+2026-11-02  A created tile is composed from its body, for PYB-276.
 2026-09-22  Split out of the engine module for PYB-113, the tile's type identifier
             asked of the registry.
 """
@@ -27,10 +28,8 @@ from collections.abc import Mapping
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
 from .._generated import TSCEArchives_pb2 as tsce
-from .._generated import TSPArchiveMessages_pb2 as tspArchive
-from .._persistence import PackageRegistry, createArchive
+from .._persistence import PackageRegistry, composeArchive
 from .._persistence.index import ArchiveIndex
-from .._persistence.types import findArchiveTypeId
 from ..errors import WriteError
 from .dependencies import FormulaDependencies
 from .owners import TableOwner
@@ -41,10 +40,6 @@ from .ranges import rewriteRangeDependencies
 # columns 0, 32, 64 and so on to 224, and every tile in the documents begins at row
 # zero, so the row extent of a tile is not established and is never assumed here.
 dependencyTileColumns: int = 32
-
-
-# The version of the tile Numbers created in `55-table-inserted-formula`.
-cellRecordTileVersion: tuple[int, ...] = (1, 0, 5)
 
 
 # The generated container both copies of that register are held in. Named so the
@@ -164,14 +159,7 @@ def registerFormulaCells(
             continue
         rewriteCellRecords(tile.cell_records, inTile, outTile)
         if identifier == createdTile:
-            info = tspArchive.ArchiveInfo(identifier=identifier)
-            message = info.message_infos.add(
-                type=findArchiveTypeId(tsce.CellRecordTileArchive), length=0
-            )
-            message.version.extend(cellRecordTileVersion)
-            registry.archiveAdd(
-                componentId, createArchive(info, [tile.SerializeToString()]), tile
-            )
+            registry.archiveAdd(componentId, composeArchive(identifier, tile), tile)
             continue
         index.archiveWrite(identifier, tile)
     index.archiveWrite(owner.identifier, owner.dependencies, ownerReferences)

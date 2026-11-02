@@ -8,6 +8,7 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-11-02  `compose` is a verb, for PYB-276.
 2026-10-22  `pytest_addoption`, a hook pytest finds by name, is exempt, for PYB-255.
 2026-10-14  `record` and `sort` are verbs, for PYB-211.
 2026-10-14  Checks `tools/` too, which the move from `scripts/` brought into reach,
@@ -43,7 +44,8 @@ leadingVerbs: frozenset[str] = frozenset({
     "borrow", "build", "carries", "check", "choose", "claim", "clamp", "classify",
     "close",
     "collect",
-    "compare", "compress", "confirm", "convert", "copy", "count", "create", "decode",
+    "compare", "compose", "compress", "confirm", "convert", "copy", "count", "create",
+    "decode",
     "decompress",
     "delete", "detach", "drop", "edit", "emit", "encode", "expand", "extract",
     "fill", "find", "forge", "format", "generate", "hold", "index", "is", "iterate",
