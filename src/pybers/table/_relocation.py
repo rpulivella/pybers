@@ -18,6 +18,8 @@ count is refused rather than guessed.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-02  A table with no stroke sidecar, as a created one is, moves and copies
+            no border, for PYB-276.
 2026-10-29  Lines counted by the one `countLineRecords`, and records walked
             through `StoredTiles`, for PYB-278.
 2026-10-01  The format slots are read from `_persistence.cells`, for PYB-141.
@@ -484,6 +486,9 @@ def applyBorderCopies(
     copies: CellMoves,
 ) -> None:
     """Give every copied cell exactly its source's borders, as a paste did in `64f`."""
+    # A created table has no sidecar until Numbers saves it, so no border to copy.
+    if not model.HasField("stroke_sidecar"):
+        return
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
     copyStrokeEdges(index, registry, sidecar, copies)
     index.archiveWrite(
@@ -502,11 +507,13 @@ def applyCellMoves(
     moved = moveCellRecords(index, registry, store, moves)
     recountLineHeaders(index, store, moved.rows, moved.columns)
 
-    sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    moveStrokeEdges(index, registry, sidecar, moves)
-    index.archiveWrite(
-        model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
-    )
+    # A created table has no sidecar until Numbers saves it, so no border to move.
+    if model.HasField("stroke_sidecar"):
+        sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
+        moveStrokeEdges(index, registry, sidecar, moves)
+        index.archiveWrite(
+            model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
+        )
     return moved
 
 

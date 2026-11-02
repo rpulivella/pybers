@@ -8,6 +8,7 @@ formulas read across tables and sheets, so anything a created table disturbed in
 engine would show there. The golden was made from it the same way.
 
 UPDATES
+2026-11-02  A created table registers one owner and no header slot, for PYB-276.
 2026-10-22  The golden's tables are added by its builder, for PYB-255.
 2026-09-14  Written for PYB-63.
 """
@@ -22,6 +23,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/14"
 
+from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 
@@ -30,6 +32,7 @@ from golden.builders import addTables as addGoldenTables
 
 import pybers
 from conftest import findDocumentPath, readArchiveBodies
+from pybers import CellValueFill, FormulaReferenceRelocation
 from pybers._engine import findCalculationEngine
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers._generated import TSPMessages_pb2 as tsp
@@ -45,7 +48,7 @@ from pybers.table import Table
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 
 metadataMember: str = "Index/Metadata.iwa"
-ownerKinds: frozenset[int] = frozenset({1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 35})
+relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
 
 
 def openShapes() -> Document:
@@ -340,35 +343,185 @@ def testAPositionThatIsNotAPositionIsRefused() -> None:
 # ── Registration ─────────────────────────────────────────────────────────────
 
 
-def testACreatedTableRegistersElevenOwnersOnItsIdentity(tmp_path: Path) -> None:
+def testACreatedTableRegistersOneOwnerCarryingItsIdentityAlone(tmp_path: Path) -> None:
     path = saveWithTables(tmp_path)
     reopened = pybers.open(path).sheet("Fresh").table("Output")
     index = ArchiveIndex(readPackage(path))
     words = [int(reopened.identifier[at : at + 8], 16) for at in range(0, 32, 8)]
     base = words[0] | words[1] << 32 | words[2] << 64 | words[3] << 96
 
-    kinds = set()
-    for reference in findCalculationEngine(
-        index
-    ).dependency_tracker.formula_owner_dependencies:
-        owner = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
-        value = owner.formula_owner_uid.upper << 64 | owner.formula_owner_uid.lower
-        if 0 <= value - base < 0x100:
-            assert value - base == (0 if owner.owner_kind == 1 else owner.owner_kind)
-            kinds.add(owner.owner_kind)
-    assert kinds == ownerKinds
+    family = [
+        owner
+        for reference in findCalculationEngine(
+            index
+        ).dependency_tracker.formula_owner_dependencies
+        if 0 <= (
+            (owner := index.resolve(reference, tsce.FormulaOwnerDependenciesArchive))
+            .formula_owner_uid.upper << 64 | owner.formula_owner_uid.lower
+        ) - base < 0x100
+    ]
+    assert [owner.owner_kind for owner in family] == [1]
+    assert {descriptor.name for descriptor, _ in family[0].ListFields()} == {
+        "formula_owner_uid", "internal_formula_owner_id", "owner_kind", "formula_owner"
+    }
 
 
-def testEveryCreatedTableGetsItsOwnHeaderNameSlot(tmp_path: Path) -> None:
-    index = ArchiveIndex(readPackage(saveWithTables(tmp_path)))
-    names = index.resolve(
-        findCalculationEngine(index).header_name_manager, tst.HeaderNameMgrArchive
+def testAValueAndAFormulaBeyondTheFirstTileSurviveASave(tmp_path: Path) -> None:
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Long", rows=3000, cols=4)
+    added.cell("A1").value = Decimal("7")
+    added.cell("A300").value = Decimal("9")
+    added.cell("D2000").formulaText = "=A1*2"
+    document.save(tmp_path / "long.numbers")
+
+    reopened = pybers.open(tmp_path / "long.numbers").sheet(1).table("Long")
+
+    assert reopened.cell("A300").value == Decimal("9")
+    assert reopened.cell("D2000").formulaText == "=A1*2"
+
+
+def testATileIsCreatedOnlyWhereARowLands(tmp_path: Path) -> None:
+    """Tiles are sparse, as Numbers keeps them, see findings-03-structure.md."""
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Long", rows=3000, cols=4)
+    added.cell("A2000").value = Decimal("9")
+    document.save(tmp_path / "long.numbers")
+
+    _, _, model = findTableArchives(tmp_path / "long.numbers", "Sheet 1", "Long")
+    store = model.base_data_store
+
+    assert [entry.tileid for entry in store.tiles.tiles] == [0, 7]
+    assert [(node.key, node.value) for node in store.rowTileTree.nodes] == [
+        (0, 0), (1792, 7)
+    ]
+    assert store.nextRowStripID == 8
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda table: table.rowAdd(2),
+        lambda table: table.rowRemove(2),
+        lambda table: table.columnAdd("B"),
+        lambda table: table.columnRemove("D"),
+        lambda table: table.mergeAdd("C3:D3"),
+        lambda table: table.cellsMove(
+            "A1:B1", "A3", references=relative
+        ),
+        lambda table: table.cellsCopy(
+            "A1:B1", "A3", references=relative
+        ),
+        lambda table: table.cellsFill(
+            "A1:B1", "A1:B4",
+            references=relative, values=CellValueFill.REPEAT_SOURCE_VALUE,
+        ),
+    ],
+    ids=["rowAdd", "rowRemove", "columnAdd", "columnRemove", "mergeAdd", "cellsMove",
+         "cellsCopy", "cellsFill"],
+)
+def testEveryEditWorksOnATableCreatedInAnEarlierSave(
+    tmp_path: Path, edit: Callable[[Table], object]
+) -> None:
+    """A created table has no sidecar or extents until Numbers saves it."""
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Fresh", rows=4, cols=4)
+    added.cell("A1").value = Decimal("1")
+    added.cell("B1").formulaText = "=A1*2"
+    document.save(tmp_path / "first.numbers")
+    later = pybers.open(tmp_path / "first.numbers")
+    table = later.sheet(1).table("Fresh")
+    edit(table)
+    later.save(tmp_path / "second.numbers")
+
+    assert pybers.open(tmp_path / "second.numbers").sheet(1).table("Fresh") == table
+
+
+def readFirstRow(path: Path, table: str) -> tuple[tst.Tile, tst.TileRowInfo]:
+    """Return a table's first tile and the first row it stores."""
+    index, _, model = findTableArchives(path, "Sheet 1", table)
+    tile = index.resolve(model.base_data_store.tiles.tiles[0].tile, tst.Tile)
+    return tile, tile.rowInfos[0]
+
+
+def testAFirstRowOverTwoFiftyFiveColumnsIsWrittenWide(tmp_path: Path) -> None:
+    """Shaped as Numbers wrote one typed into a created 300-column table."""
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Wide", rows=3, cols=300)
+    added.cell("A1").value = Decimal("5")
+    added.cell("KJ1").value = Decimal("9")
+    document.save(tmp_path / "wide.numbers")
+
+    reopened = pybers.open(tmp_path / "wide.numbers").sheet(1).table("Wide")
+    tile, row = readFirstRow(tmp_path / "wide.numbers", "Wide")
+
+    assert (reopened.cell("A1").value, reopened.cell("KJ1").value) == (5, 9)
+    assert tile.should_use_wide_rows
+    assert row.has_wide_offsets
+    assert len(row.cell_offsets) // 2 == 296
+    assert row.cell_offsets_pre_bnc == row.cell_storage_buffer_pre_bnc == bytes.fromhex(
+        "f09fa4a0"
     )
 
-    slots = [entry.per_table_precedent.column for entry in names.per_tables]
 
-    assert len(slots) == 6
-    assert len(set(slots)) == 6
+def testAWideRowGrowsToARecordPastItsEnd(tmp_path: Path) -> None:
+    document = openShapes()
+    document.sheet(1).tableAdd("Wide", rows=3, cols=300).cell("KJ1").value = 9
+    document.save(tmp_path / "first.numbers")
+    later = pybers.open(tmp_path / "first.numbers")
+    later.sheet(1).table("Wide").cell("KN1").value = Decimal("4")
+    later.save(tmp_path / "second.numbers")
+
+    reopened = pybers.open(tmp_path / "second.numbers").sheet(1).table("Wide")
+    _, row = readFirstRow(tmp_path / "second.numbers", "Wide")
+
+    assert (reopened.cell("KJ1").value, reopened.cell("KN1").value) == (9, 4)
+    assert len(row.cell_offsets) // 2 == 300
+
+
+def testARecordPastANarrowRowIsRefusedAndWritesNothing(tmp_path: Path) -> None:
+    document = openShapes()
+    document.sheet(1).tableAdd("Grown", rows=2, cols=4).cell("A1").value = 1
+    document.save(tmp_path / "narrow.numbers")
+    grown = pybers.open(tmp_path / "narrow.numbers")
+    table = grown.sheet(1).table("Grown")
+    table.columnAdd("E", count=296)
+    table.cell("KN1").value = Decimal("4")
+
+    with pytest.raises(WriteError, match="narrow row"):
+        grown.save(tmp_path / "refused.numbers")
+
+    assert not (tmp_path / "refused.numbers").exists()
+
+
+def testAMergeInACreatedTableNamesTheMergeOwnerNumbersWould(tmp_path: Path) -> None:
+    document = openShapes()
+    document.sheet(1).tableAdd("Merged", rows=2, cols=2).mergeAdd("A1:B1")
+    document.save(tmp_path / "merged.numbers")
+
+    reopened = pybers.open(tmp_path / "merged.numbers").sheet(1).table("Merged")
+    _, _, model = findTableArchives(tmp_path / "merged.numbers", "Sheet 1", "Merged")
+    words = [int(reopened.identifier[at : at + 8], 16) for at in range(0, 32, 8)]
+    owner = model.merge_owner.owner_id
+
+    assert [str(merge.extent) for merge in reopened.mergeRanges] == ["A1:B1"]
+    assert [owner.uuid_w0, owner.uuid_w1, owner.uuid_w2, owner.uuid_w3] == [
+        words[0] + 5, *words[1:]
+    ]
+
+
+def testACreatedTableTakesNoHeaderNameSlot(tmp_path: Path) -> None:
+    """Numbers gives a table its slot on its next save, measured for PYB-276."""
+    before = ArchiveIndex(readPackage(findDocumentPath("20-formula-shapes")))
+    after = ArchiveIndex(readPackage(saveWithTables(tmp_path)))
+
+    slots = [
+        len(index.resolve(
+            findCalculationEngine(index).header_name_manager, tst.HeaderNameMgrArchive
+        ).per_tables)
+        for index in (before, after)
+    ]
+
+    assert slots[0] == slots[1]
 
 
 def testACreatedTableFollowsTheRegistryRules(tmp_path: Path) -> None:

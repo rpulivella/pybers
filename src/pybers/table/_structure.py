@@ -13,6 +13,8 @@ table save in `_write`, which knows what every formula reads.
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-11-02  A table with no stroke sidecar or layout cache, as a created one is,
+            gains neither from a structural edit, for PYB-276.
 2026-10-29  One `countLineRecords`, mapped or not, for PYB-278.
 2026-09-22  The merge store moves in `_merges`, for PYB-113.
 2026-09-22  Nothing is imported from table creation: the UID map is written by `_lines`,
@@ -220,13 +222,15 @@ def applyGridStructure(
     remapHeaders([columnBucket], maps.columns, columnCounts)
     index.archiveWrite(store.columnHeaders.identifier, columnBucket)
 
-    sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    applyStrokeLayers(index, registry, sidecar, maps)
-    sidecar.row_count = table.rowCount
-    sidecar.column_count = table.colCount
-    index.archiveWrite(
-        model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
-    )
+    # A created table has no sidecar until Numbers saves it, so no border to move.
+    if model.HasField("stroke_sidecar"):
+        sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
+        applyStrokeLayers(index, registry, sidecar, maps)
+        sidecar.row_count = table.rowCount
+        sidecar.column_count = table.colCount
+        index.archiveWrite(
+            model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
+        )
 
     model.number_of_rows = table.rowCount
     model.number_of_columns = table.colCount
@@ -235,11 +239,12 @@ def applyGridStructure(
     remapMergeStore(model, maps)
 
     # A cache Numbers refills, measured holding column indices that an edit makes
-    # stale. A created table carries it empty, which Numbers already accepts.
-    cache = info.layout_engine.width_height_cache
-    del cache.rows_fitting_entries[:]
-    cache.columns_count = table.colCount
-    index.archiveWrite(infoIdentifier, info)
+    # stale. A created table carries none, which Numbers rebuilds.
+    if info.HasField("layout_engine"):
+        cache = info.layout_engine.width_height_cache
+        del cache.rows_fitting_entries[:]
+        cache.columns_count = table.colCount
+        index.archiveWrite(infoIdentifier, info)
     return plan
 
 

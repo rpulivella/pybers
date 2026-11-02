@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-276] Compose a created sheet and table instead of copying one
 - [PYB-278] Remove duplicated code and functions that only forward
 - [PYB-272] Change a document's language and region as Numbers does
 - [PYB-260] Show part of a document at the command line

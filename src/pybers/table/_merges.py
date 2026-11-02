@@ -10,6 +10,8 @@ type.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-02  A table that has never held a merge gains its merge owner with the first,
+            for PYB-276.
 2026-09-22  Split out of the table writer and the structural edit for PYB-113.
 """
 from __future__ import annotations
@@ -25,7 +27,7 @@ __date__ = "2026/09/22"
 from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence.index import wordBits, wordMask
+from .._persistence.index import assignUuidWords, readUuidValue
 from ..addressing.reference import originOffset
 from ._lines import GridMaps
 from ._read import readMerges
@@ -35,6 +37,9 @@ from .merges import MergeRange
 # A merge is written as `SUM($A$1:$B$1)`, so it carries SUM's index in Apple's
 # own function table. The number is theirs and is not derivable from the schemas.
 sumFunctionIndex: int = 168
+
+# The owner kind a table's merges are registered under, measured in findings-10.
+mergeOwnerKind: int = 5
 
 
 def writeMergeFormula(
@@ -56,11 +61,9 @@ def writeMergeFormula(
 
     node = pair.formula.AST_node_array.AST_node.add()
     node.AST_node_type = tsce.ASTNodeArrayArchive.COLON_TRACT_NODE
-    identifier = node.AST_cross_table_reference_extra_info.table_id
-    identifier.uuid_w0 = ownerUid.lower & wordMask
-    identifier.uuid_w1 = ownerUid.lower >> wordBits
-    identifier.uuid_w2 = ownerUid.upper & wordMask
-    identifier.uuid_w3 = ownerUid.upper >> wordBits
+    assignUuidWords(
+        node.AST_cross_table_reference_extra_info.table_id, readUuidValue(ownerUid)
+    )
     node.AST_sticky_bits.begin_row_is_absolute = True
     node.AST_sticky_bits.begin_column_is_absolute = True
     node.AST_sticky_bits.end_row_is_absolute = True
@@ -139,6 +142,11 @@ def applyMerges(
     if wanted == sorted(str(merge.extent) for merge in stored):
         return frozenset()
 
+    if not model.HasField("merge_owner"):
+        # Numbers' own merge owner sits at the table's base plus its kind.
+        assignUuidWords(
+            model.merge_owner.owner_id, readUuidValue(ownerUid) + mergeOwnerKind
+        )
     store = model.merge_owner.formula_store
     del store.formulas[:]
     for merge in table.mergeRanges:

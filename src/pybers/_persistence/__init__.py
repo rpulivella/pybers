@@ -70,12 +70,13 @@ from .iwa import (
     writeArchives,
     writeIWAFile,
 )
-from .metadata import MetadataError, PackageRegistry, findMemberName
+from .metadata import MetadataError, PackageRegistry, composeArchive, findMemberName
 from .varint import VarintError, readVarint, writeVarint
 
 __all__ = [
     "carriesFormula",
     "Archive",
+    "composeArchive",
     "createArchive",
     "MetadataError",
     "PackageRegistry",

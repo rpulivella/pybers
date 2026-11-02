@@ -9,6 +9,9 @@ available, because the cell looks correct to anyone who clicks it. Measured for
 PYB-42, and recorded in findings-02-formulas.md.
 
 UPDATES
+2026-11-02  A cell is registered in the tile its 128-row by 32-column block names,
+            created when missing, for PYB-276.
+2026-11-02  A created tile is composed from its body, for PYB-276.
 2026-09-22  Split out of the engine module for PYB-113, the tile's type identifier
             asked of the registry.
 """
@@ -27,24 +30,18 @@ from collections.abc import Mapping
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
 from .._generated import TSCEArchives_pb2 as tsce
-from .._generated import TSPArchiveMessages_pb2 as tspArchive
-from .._persistence import PackageRegistry, createArchive
+from .._persistence import PackageRegistry, composeArchive
 from .._persistence.index import ArchiveIndex
-from .._persistence.types import findArchiveTypeId
-from ..errors import WriteError
 from .dependencies import FormulaDependencies
 from .owners import TableOwner
 from .ranges import rewriteRangeDependencies
 
-# The calculation engine tiles its register of formula-bearing cells 32 columns
-# wide. Measured 2026-09-04: `40-table-bands` carries eight tiles beginning at
-# columns 0, 32, 64 and so on to 224, and every tile in the documents begins at row
-# zero, so the row extent of a tile is not established and is never assumed here.
+# The calculation engine tiles its register of formula-bearing cells in blocks of
+# 128 rows by 32 columns. Measured 2026-11-02: Numbers registered formulas it was
+# typed at rows 129, 200 and 260 and column 38 in tiles beginning at rows 128 and 256
+# and column 32, and ignored one pybers registered at row 129 in the tile at row 0.
+dependencyTileRows: int = 128
 dependencyTileColumns: int = 32
-
-
-# The version of the tile Numbers created in `55-table-inserted-formula`.
-cellRecordTileVersion: tuple[int, ...] = (1, 0, 5)
 
 
 # The generated container both copies of that register are held in. Named so the
@@ -88,10 +85,14 @@ def rewriteCellRecords(
             edges.internal_owner_id_for_edge.append(cell.owner)
 
 
+def findTileOrigin(row: int, column: int) -> tuple[int, int]:
+    """Return the first row and column of the dependency tile a cell belongs in."""
+    return row - row % dependencyTileRows, column - column % dependencyTileColumns
+
+
 def checkTileCovers(tile: tsce.CellRecordTileArchive, row: int, column: int) -> bool:
-    """Return whether a dependency tile's band holds a cell."""
-    band = range(tile.tile_column_begin, tile.tile_column_begin + dependencyTileColumns)
-    return column in band and row >= tile.tile_row_begin
+    """Return whether a dependency tile's block holds a cell."""
+    return findTileOrigin(row, column) == (tile.tile_row_begin, tile.tile_column_begin)
 
 
 def registerFormulaCells(
@@ -109,8 +110,8 @@ def registerFormulaCells(
     shows the formula in Numbers' formula bar while the cell keeps its old value.
     See findings-02-formulas.md, which records all three attempts.
 
-    An owner with no tile gains the one at column 0, which is the only tile creation
-    measured, in findings-10-creation.md. Coordinates count from zero here.
+    A cell whose block has no tile gains one, as Numbers creates it, measured in
+    findings-02-formulas.md. Coordinates count from zero here.
     """
     if not added and not removed:
         return
@@ -119,33 +120,27 @@ def registerFormulaCells(
         reference.identifier: index.resolve(reference, tsce.CellRecordTileArchive)
         for reference in references
     }
-    firstTile = not tiles and any(
-        column < dependencyTileColumns for _, column in added
-    )
-    uncovered = sorted(
-        (row, column) for row, column in added
-        if not (firstTile and column < dependencyTileColumns)
-        and not any(checkTileCovers(tile, row, column) for tile in tiles.values())
-    )
-    if uncovered:
-        raise WriteError(
-            f"No dependency tile covers {uncovered}, so a formula written there would "
-            "be registered in one of the engine's two registers and not the other. "
-            "Creating a tile beyond column 0 is not supported."
-        )
-
+    stored = {(tile.tile_row_begin, tile.tile_column_begin) for tile in tiles.values()}
     componentId = registry.componentRequire(owner.identifier)
-    createdTile: int | None = None
-    gained: list[int] = []
-    if firstTile:
-        createdTile = registry.identifierAllocate()
-        tiles[createdTile] = tsce.CellRecordTileArchive(
+    created: list[int] = []
+    for origin in sorted({findTileOrigin(*cell) for cell in added} - stored):
+        identifier = registry.identifierAllocate()
+        tiles[identifier] = tsce.CellRecordTileArchive(
             internal_owner_id=owner.dependencies.internal_formula_owner_id,
-            tile_column_begin=0,
-            tile_row_begin=0,
+            tile_row_begin=origin[0],
+            tile_column_begin=origin[1],
         )
-        references.add(identifier=createdTile)
-        gained.append(createdTile)
+        created.append(identifier)
+    if created:
+        # Numbers lists an owner's tiles by row, then column, measured 2026-11-02.
+        ordered = sorted(
+            tiles,
+            key=lambda key: (tiles[key].tile_row_begin, tiles[key].tile_column_begin),
+        )
+        del references[:]
+        for identifier in ordered:
+            references.add(identifier=identifier)
+    gained = list(created)
 
     rewriteCellRecords(owner.dependencies.cell_dependencies.cell_record,
                        added, removed)
@@ -160,18 +155,11 @@ def registerFormulaCells(
             if checkTileCovers(tile, *cell)
         }
         outTile = [cell for cell in removed if checkTileCovers(tile, *cell)]
-        if identifier != createdTile and not inTile and not outTile:
+        if identifier not in created and not inTile and not outTile:
             continue
         rewriteCellRecords(tile.cell_records, inTile, outTile)
-        if identifier == createdTile:
-            info = tspArchive.ArchiveInfo(identifier=identifier)
-            message = info.message_infos.add(
-                type=findArchiveTypeId(tsce.CellRecordTileArchive), length=0
-            )
-            message.version.extend(cellRecordTileVersion)
-            registry.archiveAdd(
-                componentId, createArchive(info, [tile.SerializeToString()]), tile
-            )
+        if identifier in created:
+            registry.archiveAdd(componentId, composeArchive(identifier, tile), tile)
             continue
         index.archiveWrite(identifier, tile)
     index.archiveWrite(owner.identifier, owner.dependencies, ownerReferences)

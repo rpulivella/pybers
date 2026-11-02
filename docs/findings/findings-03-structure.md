@@ -188,7 +188,7 @@ wherever it moves. An added line takes a fresh UUID, and the sorted list stays s
 **Numbers maintains the counts it keeps by index**: each header bucket re-indexes and
 recounts `numberOfCells`, each tile row recounts `cell_count`, and the stroke sidecar
 takes the new size. The layout cache's `rows_fitting_entries` hold column indices and
-go stale; a created table carries that cache empty, which Numbers accepts.
+go stale; a created table carries no cache, which Numbers rebuilds.
 
 **The engine moves every coordinate**, in the table's registers, its merge owner and its
 `cell_errors`. A one-cell range such as `SUM(A2:A2)` is registered as a cell edge rather
@@ -219,7 +219,15 @@ its neighbor's border.
 values scattered through it held tiles 0 to 7, then 15, 16, 24 and on. A tile is
 created where a row lands, and removed when it empties. `rowTileTree` lists only
 the tiles that exist, and `nextRowStripID` is the highest tile id plus one, not
-the tile count.
+the tile count. pybers creates the tile a written row needs the same way, since a
+row in a tile the file lacks was dropped in silence until PYB-276.
+
+**A wide row carries one offset slot per column through its last record.** With
+values typed at `A1` and `KJ1` of a created 300-column table on 2 November 2026,
+Numbers wrote 296 two-byte slots counting words, `has_wide_offsets` on the row and
+`should_use_wide_rows` on the tile, and filled both pre-BNC fields with the four bytes
+`f09fa4a0`, as every row of `45-columns-over-255` holds them. A narrow row keeps its
+fixed 255 slots, and pybers refuses a record past them rather than drop it.
 
 **Row headers are kept in buckets of 65,536 rows.** A table holds one bucket
 until its row count is SET past 65,536, when it holds sixteen, and it keeps

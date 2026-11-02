@@ -229,9 +229,8 @@ on a range:
 
 ```
 cell_dependencies         CellDependenciesExpandedArchive, on the owner entry
-tiled_cell_dependencies   references to CellRecordTileArchive (type 4009), 32 columns
-                          per tile; every tile in the documents begins at row 0, so the
-                          row extent is NOT established
+tiled_cell_dependencies   references to CellRecordTileArchive (type 4009), one per
+                          block of 128 rows by 32 columns that holds a formula
 ```
 
 Three attempts, and the two failures are the useful part:
@@ -247,8 +246,15 @@ Three attempts, and the two failures are the useful part:
 renders correctly today while the document claims a formula that no longer exists, so
 the half that looked confirmed was passing by luck.
 
-`40-table-bands` is the only fixture with more than one tile: eight of them, at columns
-0, 32, 64, 96, 128, 160, 192 and 224.
+**A tile holds 128 rows by 32 columns, and a cell outside its block is never
+evaluated.** `40-table-bands` carries tiles at columns 0, 32 and so on to 224, and no
+fixture registers a formula below row 128. Measured for PYB-276 on 2 November 2026: with
+formulas typed at rows 129, 200 and 260 and column 38 of a created table, Numbers
+registered them in new tiles beginning at rows 128 and 256 and at column 32, and one typed
+at column 296 in a tile beginning at column 288. A formula pybers registered at row 129
+in the tile at row 0 never recomputed, whether the table was composed or copied from a
+template, while one at row 128 did. **An owner lists its tiles by row, then column**,
+whatever order created them.
 
 ### A registered formula still has to say what it reads, or it computes once
 

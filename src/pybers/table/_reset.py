@@ -10,6 +10,8 @@ per document and found again by name. See docs/decisions.md.
 Private. Part of the table feature's archive half, reached by table creation.
 
 UPDATES
+2026-11-02  Each style is composed field by field rather than copied from a
+            template, for PYB-276.
 2026-09-22  Split out of table creation for PYB-113.
 """
 from __future__ import annotations
@@ -23,7 +25,8 @@ __status__ = "Development"
 __date__ = "2026/09/14"
 
 from dataclasses import dataclass
-from pathlib import Path
+
+from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSPMessages_pb2 as tsp
@@ -32,24 +35,20 @@ from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence.index import ArchiveIndex, findRoot, generateUuid
-from .._persistence.metadata import PackageRegistry
-from .._persistence.template import ArchiveTemplate, copyTemplates, readTemplates
+from .._persistence.metadata import PackageRegistry, composeArchive
 from .._persistence.types import findArchiveTypeId, readArchiveTypeId
 from ..errors import WriteError
 
-templateDirectory: Path = Path(__file__).resolve().parent / "_templates"
-
-
-# The style objects the style templates name that belong to the document, as
-# `48-table-inserted` numbered them.
-templateStylesheet: int = 905039
-templateListStyle: int = 903872
-templateTableStyle: int = 904074
-templateCellStyle: int = 904075
-
-
 baseStyleName: str = "pybers-base"
 namedStyleKey: str = "text-{}-paragraphstyle"
+
+# The properties each variation overrides, as `52-table-reset-styled` counted them.
+tableStyleOverrides: int = 3
+cellStyleOverrides: int = 1
+baseStyleOverrides: int = 57
+
+character = tswp.CharacterStylePropertiesArchive
+paragraph = tswp.ParagraphStylePropertiesArchive
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,56 +109,156 @@ def findNamedStyle(index: ArchiveIndex, stylesheetId: int) -> int | None:
     return None
 
 
+def composeTableStyle(parent: int, stylesheet: int) -> tst.TableStyleArchive:
+    """Return the reset's table style: no strokes and no border."""
+    style = tst.TableStyleArchive(override_count=tableStyleOverrides)
+    style.super.parent.identifier = parent
+    style.super.is_variation = True
+    style.super.stylesheet.identifier = stylesheet
+    properties = style.table_properties
+    properties.v_strokes_visible = False
+    properties.h_strokes_visible = False
+    properties.table_border_visible = False
+    return style
+
+
+def composeCellStyle(parent: int, stylesheet: int) -> tst.CellStyleArchive:
+    """Return the reset's cell style: text that does not wrap."""
+    style = tst.CellStyleArchive(override_count=cellStyleOverrides)
+    style.super.parent.identifier = parent
+    style.super.is_variation = True
+    style.super.stylesheet.identifier = stylesheet
+    style.cell_properties.text_wrap = False
+    return style
+
+
+def composeBlack(color: tsp.Color) -> None:
+    """Make a color opaque black in sRGB, as `53-paragraph-style-named` states it."""
+    color.model = tsp.Color.rgb
+    color.r, color.g, color.b, color.a = 0.0, 0.0, 0.0, 1.0
+    color.rgbspace = tsp.Color.srgb
+    color.headroom = 1.0
+
+
+def composeBaseStyle(
+    key: str, stylesheet: int, listStyle: int
+) -> tswp.ParagraphStyleArchive:
+    """Return `pybers-base`: Avenir Next 11 pt on exact 15.5 pt lines.
+
+    Numbers resolves every property of a named root style, so all 57 are stated, as
+    `53-paragraph-style-named` holds them. See docs/decisions.md.
+    """
+    style = tswp.ParagraphStyleArchive()
+    style.super.name = baseStyleName
+    style.super.style_identifier = key
+    style.super.stylesheet.identifier = stylesheet
+    chars = style.char_properties
+    chars.bold = False
+    chars.italic = False
+    chars.font_size = 11.0
+    chars.font_name = "AvenirNext-Regular"
+    composeBlack(chars.font_color)
+    chars.language_null = True
+    chars.superscript = character.kNoScript
+    chars.underline = character.kNoUnderline
+    chars.strikethru = character.kNoStrikethru
+    chars.capitalization = character.kNoCaps
+    chars.baseline_shift = 0.0
+    chars.kerning = 0.0
+    chars.ligatures = character.kStandardLigatures
+    chars.shadow_null = True
+    chars.strikethru_color_null = True
+    chars.strikethru_width = 1.0
+    chars.background_color_null = True
+    chars.tracking = 0.0
+    chars.underline_color_null = True
+    chars.underline_width = 1.0
+    chars.word_strikethru = False
+    chars.word_underline = False
+    chars.font_features_null = True
+    chars.writing_direction = tswp.kWritingDirectionNatural
+    chars.emphasis_marks_null = True
+    chars.compatibility_font_name_null = True
+    chars.is_named_point_size = False
+    chars.capitalization_uses_linguistics = False
+    chars.tsd_stroke_null = True
+    composeBlack(chars.tsd_fill.color)
+    chars.tsd_fill_should_fill_text_container = False
+    paras = style.para_properties
+    paras.alignment = paragraph.TATvalue4
+    paras.decimal_tab = "."
+    paras.default_tab_stops = 36.0
+    paras.fill_null = True
+    paras.first_line_indent = 0.0
+    paras.hyphenate = True
+    paras.keep_lines_together = False
+    paras.keep_with_next = False
+    paras.left_indent = 0.0
+    paras.line_spacing.mode = tswp.LineSpacingArchive.kExactLineSpacing
+    paras.line_spacing.amount = 15.5
+    paras.page_break_before = False
+    paras.deprecated_borders = paragraph.PBTvalue0
+    paras.historical_rule_offset.x = 0.0
+    paras.historical_rule_offset.y = 0.0
+    paras.rule_width = 1.0
+    paras.right_indent = 0.0
+    paras.space_after = 0.0
+    paras.space_before = 0.0
+    paras.tabs.SetInParent()
+    paras.widow_control = True
+    paras.outline_level = 0xFFFFFFFF
+    paras.outline_style = paragraph.OSTvalue0
+    paras.stroke_null = True
+    paras.list_style.identifier = listStyle
+    paras.following_style_null = True
+    paras.show_in_bookmarks_list = True
+    paras.show_in_toc_navigator = False
+    paras.border_positions = 0
+    paras.rounded_corners = False
+    style.override_count = baseStyleOverrides
+    return style
+
+
 def createResetStyles(
     index: ArchiveIndex, registry: PackageRegistry, styles: DocumentStyles
 ) -> ResetStyles:
     """Create the reset's two variations, and `pybers-base` unless it exists."""
     network = styles.network
-    bodyText = index.resolve(network.body_text_style, tswp.ParagraphStyleArchive)
-    templates = readTemplates(templateDirectory / "styles")
-    existing = findNamedStyle(index, styles.stylesheet)
-    if existing is not None:
-        templates = [
-            template for template in templates if template.role != "text-style"
-        ]
-    copies = copyTemplates(
-        registry,
-        templates,
-        {
-            templateStylesheet: styles.stylesheet,
-            templateTableStyle: network.table_style.identifier,
-            templateCellStyle: network.body_cell_style.identifier,
-            templateListStyle: bodyText.para_properties.list_style.identifier,
-        },
-    )
     stylesheet = index.resolve(
         tsp.Reference(identifier=styles.stylesheet), tss.StylesheetArchive
     )
-    keys = {entry.identifier for entry in stylesheet.identifier_to_style_map}
+    existing = findNamedStyle(index, styles.stylesheet)
+    created: list[tuple[int, Message]] = [
+        (registry.identifierAllocate(), body) for body in (
+            composeTableStyle(network.table_style.identifier, styles.stylesheet),
+            composeCellStyle(network.body_cell_style.identifier, styles.stylesheet),
+        )
+    ]
     if existing is None:
-        textCopy = copies["text-style"]
+        keys = {entry.identifier for entry in stylesheet.identifier_to_style_map}
         key = next(
             namedStyleKey.format(number)
             for number in range(len(keys) + 1)
             if namedStyleKey.format(number) not in keys
         )
-        body = textCopy.body
-        if not isinstance(body, tswp.ParagraphStyleArchive):
-            raise WriteError("The text style template is not a paragraph style.")
-        body.super.style_identifier = key
+        bodyText = index.resolve(network.body_text_style, tswp.ParagraphStyleArchive)
+        textId = registry.identifierAllocate()
+        created.append((textId, composeBaseStyle(
+            key, styles.stylesheet, bodyText.para_properties.list_style.identifier
+        )))
         stylesheet.identifier_to_style_map.add(
-            identifier=key, style=tsp.Reference(identifier=textCopy.identifier)
+            identifier=key, style=tsp.Reference(identifier=textId)
         )
     reset = ResetStyles(
-        tableStyle=copies["table-style"].identifier,
-        cellStyle=copies["cell-style"].identifier,
-        textStyle=copies["text-style"].identifier if existing is None else existing,
+        tableStyle=created[0][0],
+        cellStyle=created[1][0],
+        textStyle=created[2][0] if existing is None else existing,
     )
 
     componentId = registry.componentRequire(styles.stylesheet)
-    copies.place(registry, {"DocumentStylesheet": componentId})
-    created = [copy.identifier for copy in copies.copies.values()]
-    for identifier in created:
+    for identifier, body in created:
+        archive = composeArchive(identifier, body, weak={styles.stylesheet})
+        registry.archiveAdd(componentId, archive, body)
         stylesheet.styles.add(identifier=identifier)
         registry.objectUuidAdd(componentId, identifier, generateUuid())
     for parent, child in (
@@ -179,11 +278,9 @@ def createResetStyles(
         entry.children.add(identifier=child)
     references = registry.strongReferencesOf(styles.stylesheet)
     references.extend(
-        identifier for identifier in created if identifier not in references
+        identifier for identifier, _ in created if identifier not in references
     )
-    registry.archiveReplace(
-        styles.stylesheet, stylesheet, references
-    )
+    registry.archiveReplace(styles.stylesheet, stylesheet, references)
 
     if existing is None:
         themeId, theme = findTheme(index)
@@ -195,43 +292,27 @@ def createResetStyles(
     return reset
 
 
-def bindStyles(
-    template: ArchiveTemplate, styles: DocumentStyles, reset: ResetStyles
-) -> dict[int, int]:
-    """Bind every style the table model template names to what the reset puts there.
+def findSlotStyle(slot: str, styles: DocumentStyles, reset: ResetStyles) -> int:
+    """Return the style the reset puts in one of a table model's style slots.
 
     The table style, every cell style and every text style but the title's take the
-    reset. The title's two styles take the theme's own, since a title stays hidden.
+    reset. The title's two take the theme's own, since a title stays hidden.
     """
-    bindings: dict[int, int] = {}
-    for descriptor in tst.TableStyleNetworkArchive.DESCRIPTOR.fields:
-        if descriptor.message_type is None:
-            continue
-        name = descriptor.name
-        if not template.body.HasField(name):
-            continue
-        if name == "table_style":
-            target = reset.tableStyle
-        elif name in ("table_name_style", "table_name_shape_style"):
-            target = getattr(styles.network, name).identifier
-        elif name.endswith("_text_style"):
-            target = reset.textStyle
-        else:
-            target = reset.cellStyle
-        source = getattr(template.body, name).identifier
-        if bindings.setdefault(source, target) != target:
-            raise WriteError(
-                f"The table template names style {source} in two slots the reset "
-                "fills differently."
-            )
-    return bindings
+    match slot:
+        case "table_style":
+            return reset.tableStyle
+        case "table_name_style" | "table_name_shape_style":
+            return int(getattr(styles.network, slot).identifier)
+        case _ if slot.endswith("_text_style"):
+            return reset.textStyle
+        case _:
+            return reset.cellStyle
 
 
 __all__ = [
     "DocumentStyles",
     "ResetStyles",
-    "bindStyles",
     "createResetStyles",
     "findDocumentStyles",
-    "templateDirectory",
+    "findSlotStyle",
 ]

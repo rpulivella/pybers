@@ -15,6 +15,7 @@ member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-11-02  A UUID's four words assigned here, for PYB-276.
 2026-10-28  `findRootIdentifier`, so a save can write the root, for PYB-272.
 2026-09-22  A random UUID is generated here, where both creators find it, for PYB-113.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
@@ -188,6 +189,14 @@ def assignUuid(message: tsp.UUID, value: int) -> None:
     """Set a UUID's two halves from a value."""
     message.lower = value & halfMask
     message.upper = value >> halfBits
+
+
+def assignUuidWords(message: tsp.CFUUIDArchive, value: int) -> None:
+    """Set a UUID's four words from a value, the lowest word first."""
+    message.uuid_w0 = value & wordMask
+    message.uuid_w1 = value >> wordBits & wordMask
+    message.uuid_w2 = value >> 2 * wordBits & wordMask
+    message.uuid_w3 = value >> 3 * wordBits & wordMask
 
 
 def generateUuid() -> tsp.UUID:

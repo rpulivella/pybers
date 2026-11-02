@@ -9,6 +9,9 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-02  A value or formula in a block of rows no tile stores gains its tile,
+            rather than being dropped or refused, and a first row over 255 columns
+            is written wide, for PYB-276.
 2026-10-29  Every list claimed and released through an `EntryPool`, for PYB-278.
 2026-10-22  A save compares a currency cell through its code, for PYB-220.
 2026-10-20  A value of any kind is written over any other, releasing the control
@@ -74,7 +77,6 @@ from .._persistence.metadata import PackageRegistry
 from .._persistence.pool import EntryPool
 from .._persistence.rows import StoredTiles, iterateTileRows
 from ..addressing.reference import CellAddress, originOffset
-from ..errors import WriteError
 from ..formula._write import (
     attachFormulaKey,
     buildFormulaRecord,
@@ -139,7 +141,7 @@ from .cells import Table
 def findRowsNeedingStorage(
     table: Table, firstRow: int, tileSize: int, present: frozenset[int]
 ) -> list[int]:
-    """Return the rows of this tile holding a formula the file stores no row for.
+    """Return the rows of this tile holding a value or formula it stores no row for.
 
     Numbers writes a `TileRowInfo` only for a row that holds something, so a table
     declaring ten rows can carry one. A formula written into any of the other nine
@@ -166,11 +168,13 @@ class TableEdits:
 
     **A formula swapped for another is `formulaAdded`**, since the register also
     carries what each formula reads, and the cell now reads something else.
+    `tilesCreated` says the model now names tiles it did not, so it has to be written.
     """
 
     written: list[tuple[int, int]]
     formulaAdded: list[tuple[int, int]]
     formulaRemoved: list[tuple[int, int]]
+    tilesCreated: bool
 
 
 def applyFormulaEdit(
@@ -369,29 +373,20 @@ def applyTableEdits(
         applyConditionChanges(index, registry, store, table)
         written.extend(sorted(copies.records))
 
-    # A row belongs to the tile covering its index, and a tile that holds nothing
-    # may be absent. No table in the 46 documents has such a gap, so this refuses
-    # rather than guessing what an absent tile should be built from, and refusing
-    # is what keeps the formula from being dropped in silence.
-    if pool is not None:
-        # Compared by tile rather than by row: a table at Numbers' million-row
-        # limit spans 3907 tiles, so naming every row covered would build a
-        # million-element set on every save to answer a question this answers in
-        # one division.
-        coveredTiles = frozenset(entry.tileid for entry in store.tiles.tiles)
-        uncovered = [
-            reference
-            for reference, held in table.cells.items()
-            if held.formula is not None
-            and (reference.row - originOffset) // tileSize not in coveredTiles
-        ]
-        if uncovered:
-            first = min(uncovered, key=lambda reference: (reference.row, reference.col))
-            raise WriteError(
-                f"Row {first.row} of {table.name!r} holds a formula and no tile "
-                f"covers it. The table declares {model.number_of_rows} rows and "
-                f"stores {len(store.tiles.tiles)} tile(s) of {tileSize}."
-            )
+    # Numbers creates a tile where a row lands, so a value or formula in a block of
+    # rows no tile stores gains its tile before the walk below, which only visits
+    # tiles. Measured from `27b` and the 100,000-row documents, findings-03.
+    absentTiles = {
+        (reference.row - originOffset) // tileSize
+        for reference, cell in table.cells.items()
+        if cell.formula is not None or cell.value is not None
+    } - {entry.tileid for entry in store.tiles.tiles}
+    tilesCreated = bool(absentTiles)
+    if tilesCreated:
+        tileRange = buildTileRange(index, registry, store)
+        for tileid in sorted(absentTiles):
+            tileRange.tileFor(tileid)
+        writeTileRange(registry, store, tileRange.tiles, set())
 
     for entry in store.tiles.tiles:
         tile = index.resolve(entry.tile, tst.Tile)
@@ -408,14 +403,9 @@ def applyTableEdits(
                 walked.row for walked in iterateTileRows(entry.tileid, tile, tileSize)
             )
             for missing in findRowsNeedingStorage(table, firstRow, tileSize, stored):
-                if not tile.rowInfos and table.colCount > narrowRowSlots:
-                    raise WriteError(
-                        f"Row {missing + originOffset} of {table.name!r} is the first "
-                        f"row of an empty tile in a table of {table.colCount} columns. "
-                        "Writing that row for more than 255 columns is not "
-                        "supported."
-                    )
-                createRowStorage(tile, missing - firstRow)
+                createRowStorage(
+                    tile, missing - firstRow, wide=table.colCount > narrowRowSlots
+                )
                 createdRows.add(missing)
                 touched = True
 
@@ -564,7 +554,7 @@ def applyTableEdits(
 
     if pool is not None and pool.touched:
         index.archiveWrite(store.formula_table.identifier, pool.dataList)
-    return TableEdits(written, formulaAdded, formulaRemoved)
+    return TableEdits(written, formulaAdded, formulaRemoved, tilesCreated)
 
 
 __all__ = [
