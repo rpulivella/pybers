@@ -18,6 +18,7 @@ with its charts, conditional formats and print settings quietly gone, rather tha
 as an error.
 
 UPDATES
+2026-11-02  A document created from nothing, for PYB-261.
 2026-10-28  A document's language and region, for PYB-272.
 2026-09-08  Made a package of its own for #58, gathering `model.sheet`, `reader`
             and `writer`, which is what was left once the features took theirs.
@@ -32,6 +33,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from pybers.document._create import create
 from pybers.document._read import open
 from pybers.document.references import ReferenceLocation
 from pybers.document.sheets import Document, SelectionError, Sheet
@@ -46,6 +48,7 @@ __all__ = [
     "ReferenceLocation",
     "SelectionError",
     "Sheet",
+    "create",
     "locales",
     "open",
 ]

@@ -6,6 +6,7 @@ Every golden rebuilt from its builder and compared, archive by archive, with its
 golden is made. Narrow it with `-k`.
 
 UPDATES
+2026-11-02  A golden starting from a fixture or measurement must state why, for PYB-261.
 2026-10-23  Every label beneath a cell pybers changed is checked against the cell,
             for PYB-255.
 2026-10-22  Written for PYB-255, replacing the comparison each golden's test held.
@@ -20,6 +21,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/22"
 
+import dataclasses
 import shutil
 from decimal import Decimal
 from pathlib import Path
@@ -65,8 +67,42 @@ def testEachGoldenIsWhatItsBuilderWrites(
     assert not differences, "\n  ".join(differences)
 
 
+def listUnexplainedGoldens(builders: tuple[GoldenBuilder, ...]) -> list[str]:
+    """Return each golden whose start and stated reason disagree.
+
+    One from a fixture or measurement names a ticket or a reason, and a created one
+    names neither.
+    """
+    return [
+        builder.name for builder in builders
+        if (builder.source is None) == bool(builder.sourceReason)
+    ]
+
+
+def testEveryGoldenFromANumbersDocumentStatesWhy() -> None:
+    assert listUnexplainedGoldens(goldens) == []
+
+
+def testAGoldenFromAMeasurementNamingNoReasonIsCaught() -> None:
+    unexplained = GoldenBuilder("99-unexplained", "00-baseline", lambda document: None)
+    explained = dataclasses.replace(
+        unexplained, name="99-explained", sourceReason="PYB-1"
+    )
+
+    assert listUnexplainedGoldens((unexplained, explained)) == ["99-unexplained"]
+
+
+def testACreatedGoldenNamingAReasonIsCaught() -> None:
+    created = GoldenBuilder(
+        "99-created", None, lambda document: None, sourceReason="PYB-1"
+    )
+
+    assert listUnexplainedGoldens((created,)) == ["99-created"]
+
+
 def listStaleLabels(builder: GoldenBuilder, golden: Path) -> list[str]:
     """Return each measured cell whose label no longer says what it holds."""
+    assert builder.source is not None, f"{builder.name} is labeled but has no source"
     sourceTable = findFirstTable(pybers.open(findDocumentPath(builder.source)))
     source = readMeasuredCells(sourceTable)
     built = readMeasuredCells(findFirstTable(pybers.open(golden)))

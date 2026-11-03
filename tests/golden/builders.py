@@ -2,12 +2,16 @@
 """\
 How every golden is built: its source document and the mutation pybers writes into it.
 
+A golden with no source starts from a document `pybers.create` made.
+
 The one place a golden's construction is written down. `test_goldens.py` rebuilds each
 from here and compares the whole archive, and `--golden-write` writes each from here,
 so no golden is made any other way. A test asserting what a golden holds reads its
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-02  A golden starting from a fixture or measurement names why, for PYB-261.
+2026-11-02  A golden can start from a created document, for PYB-261.
 2026-10-29  A golden for each measured region, for PYB-272.
 2026-10-22  Written for PYB-255, gathering the builders the tests held.
 """
@@ -45,19 +49,24 @@ relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
 named = FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 repeat = CellValueFill.REPEAT_SOURCE_VALUE
 series = CellValueFill.CONTINUE_SERIES
+# The region a golden starting from a created document is created in.
+createdLocale: str = "en_US"
 
 @dataclass(frozen=True, slots=True)
 class GoldenBuilder:
     """One golden: its name, the document it starts from, and what pybers writes.
 
-    `labeled` marks a source laid out as a measurement, whose label beneath each
-    cell the mutation changes is rewritten to say what pybers wrote.
+    A source of None starts from a document created in `createdLocale`, and a golden
+    starting from a fixture or measurement names in `sourceReason` the ticket enabling
+    pybers to create its source, or why it does not. `labeled` marks a source laid out
+    as a measurement, whose label beneath each cell the mutation changes is rewritten.
     """
 
     name: str
-    source: str
+    source: str | None
     mutate: Callable[[pybers.Document], None]
     labeled: bool = False
+    sourceReason: str = ""
 
 
 @contextmanager
@@ -120,9 +129,15 @@ def writeGoldenLabels(
 
 
 def buildGolden(builder: GoldenBuilder, into: Path) -> Path:
-    """Write a golden's mutation into a fresh copy of its source, and return it."""
-    working = copyDocument(builder.source, into)
+    """Write a golden's mutation into its source or a created document, return it."""
     with holdSeededIdentities(builder.name):
+        if builder.source is None:
+            working = into / f"{builder.name}.numbers"
+            document = pybers.create(createdLocale)
+            builder.mutate(document)
+            document.save(working)
+            return working
+        working = copyDocument(builder.source, into)
         document = pybers.open(working)
         table = findFirstTable(document)
         before = readMeasuredCells(table) if builder.labeled else {}
@@ -366,6 +381,18 @@ def addFormulaTables(document: pybers.Document) -> None:
     calc.cell("A3").formulaText = "=SUM(A1:B1)"
 
 
+def addCreatedFormulaTables(document: pybers.Document) -> None:
+    """Add two tables to a created document and formulas reading within and across."""
+    inputs = document.sheet("Sheet 1").tableAdd("Inputs", rows=2, cols=2)
+    inputs.cell("A1").value = Decimal("5")
+    calc = document.sheet("Sheet 1").tableAdd("Calc", rows=3, cols=3)
+    calc.cell("A1").value = Decimal("2")
+    calc.cell("B1").formulaText = "=A1*3"
+    calc.cell("C1").formulaText = "=Inputs::A1*2"
+    calc.cell("A2").formulaText = "=Inputs::A1+1"
+    calc.cell("A3").formulaText = "=SUM(A1:B1)"
+
+
 def addSheets(document: pybers.Document) -> None:
     """Insert a sheet second and append another."""
     document.sheetAdd("Inserted", position=2)
@@ -564,7 +591,25 @@ measuredLocales: tuple[str, ...] = (
     "de_DE", "en_GB", "ja_JP", "en_ZA", "pt_BR", "en_AU", "en_IN",
 )
 
-goldens: tuple[GoldenBuilder, ...] = (
+def writeNothing(document: pybers.Document) -> None:
+    """Write nothing, for a golden that is its starting document."""
+
+
+# The reason every golden confirmed before pybers could create a document gives.
+confirmedBeforeCreation: str = (
+    "Edits a document Numbers made, confirmed before pybers could create one."
+)
+
+createdGoldens: tuple[GoldenBuilder, ...] = (
+    GoldenBuilder("00-created-blank-by-pybers", None, writeNothing),
+    GoldenBuilder("00-created-sheets-added-by-pybers", None, addSheets),
+    GoldenBuilder("00-created-tables-added-by-pybers", None, addTables),
+    GoldenBuilder("00-created-formulas-in-tables-by-pybers", None,
+                  addCreatedFormulaTables),
+)
+
+# No golden joins this tuple, since one added from a measurement states its own reason.
+confirmedOnNumbersDocuments: tuple[GoldenBuilder, ...] = (
     *(GoldenBuilder(f"95-region-{identifier.lower().replace('_', '-')}-by-pybers",
                     "95-region-base", setLocale(identifier), labeled=True)
       for identifier in measuredLocales),
@@ -639,6 +684,12 @@ goldens: tuple[GoldenBuilder, ...] = (
       for direction in ("down", "left", "right", "up")),
     GoldenBuilder("67-series-filled-by-pybers", "67-series-rich-base", fillRichSeries),
     GoldenBuilder("68-series-filled-by-pybers", "68-series-kinds-base", fillKindSeries),
+)
+
+goldens: tuple[GoldenBuilder, ...] = (
+    *createdGoldens,
+    *(dataclasses.replace(builder, sourceReason=confirmedBeforeCreation)
+      for builder in confirmedOnNumbersDocuments),
 )
 
 

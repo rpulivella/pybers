@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-02  `create` re-exported, for PYB-261.
 2026-10-28  `LocaleChange`, `LocaleError` and `locales` re-exported, for PYB-272.
 2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
             for PYB-259.
@@ -85,6 +86,7 @@ lazy from pybers.document import (
     ReferenceLocation,
     SelectionError,
     Sheet,
+    create,
     locales,
     open,
 )
@@ -229,6 +231,7 @@ __all__ = [
     "TableReference",
     "toColumnLetter",
     "toColumnNumber",
+    "create",
     "open",
     "toCellRanges",
     "toCellReference",

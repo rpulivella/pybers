@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """\
-Create the archives of a sheet the model gained, and register them.
+Create a document from nothing, or the archives of a sheet the model gained.
+
+A created document holds a root, a theme offering one preset of each kind a person
+adds, composed by `_theme`, the sidebar and the package metadata, beside a document
+identifier, and one sheet created as every created sheet is. Numbers builds the rest
+on save. Measured 2026-11-02 in findings-10-creation.md. See docs/decisions.md.
 
 A created sheet is composed field by field in the pybers reset: printed 1:1 with
 autofit off, margins of 72 pt top and bottom and 54 pt left and right, and six empty
@@ -10,6 +15,7 @@ sheet without one. Numbers rebuilds its guides. See docs/decisions.md and
 findings-10-creation.md.
 
 UPDATES
+2026-11-02  A document created from nothing, for PYB-261.
 2026-11-02  Composed field by field rather than copied from a template, and the
             guides left for Numbers to rebuild, for PYB-276.
 2026-09-22  A random UUID comes from the index module, shared with table creation, for
@@ -28,20 +34,43 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/14"
 
+import datetime
+import itertools
+import uuid
 from dataclasses import dataclass
+
+from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSKArchives_pb2 as tsk
+from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSWPArchives_pb2 as tswp
+from .._persistence import IWAFile, NumbersPackage, StoredMember, composeMemberInfo
 from .._persistence.index import ArchiveIndex, findRoot, generateUuid
 from .._persistence.metadata import (
     PackageRegistry,
     composeArchive,
     documentComponentId,
+    findMemberName,
 )
 from .._persistence.types import findArchiveTypeId
 from ..errors import WriteError
+from ._locale import composeLocale
+from ._theme import composeTheme
+from .locale import findLocaleSymbols
 from .sheets import Document, Sheet
+
+# A created document's root and registry take the identifiers Numbers gives them.
+rootIdentifier: int = documentComponentId
+metadataIdentifier: int = 2
+# Numbers renumbered a theme at 4 and a stylesheet at 6, and kept them from 100.
+firstCreatedIdentifier: int = 100
+firstSheetName: str = "Sheet 1"
+stylesheetLocator: str = "DocumentStylesheet"
+documentLocator: str = "Document"
+identifierMember: str = "Metadata/DocumentIdentifier"
+# Numbers refuses a package missing it, measured 2026-11-02.
+packageReadVersion: tuple[int, ...] = (2, 0, 0)
 
 # The reset's page setup, see docs/decisions.md.
 marginTopBottom: float = 72.0
@@ -230,4 +259,120 @@ def createSheets(document: Document, registry: PackageRegistry) -> None:
     )
 
 
-__all__ = ["createSheets"]
+def composeDocumentRoot(
+    locale: str, stylesheet: int, theme: int, sidebar: int
+) -> tn.DocumentArchive:
+    """Return a document root in a region a person chose, its sheets not yet listed."""
+    root = tn.DocumentArchive()
+    root.stylesheet.identifier = stylesheet
+    root.sidebar_order.identifier = sidebar
+    root.theme.identifier = theme
+    composeLocale(root, locale)
+    root.super.super.creation_locale_identifier = locale
+    return root
+
+
+def composeMetadata(stylesheet: int, last: int) -> tspArchive.PackageMetadata:
+    """Return the registry of a created document's two components."""
+    metadata = tspArchive.PackageMetadata(last_object_identifier=last)
+    metadata.read_version.extend(packageReadVersion)
+    metadata.components.add(identifier=stylesheet, preferred_locator=stylesheetLocator)
+    metadata.components.add(
+        identifier=rootIdentifier, preferred_locator=documentLocator
+    )
+    return metadata
+
+
+def composePackage(locale: str, sheetName: str = firstSheetName) -> NumbersPackage:
+    """Return a new document's package: its theme, and one sheet in the pybers reset."""
+    identifiers = itertools.count(firstCreatedIdentifier)
+    theme = composeTheme(identifiers)
+    sidebar = next(identifiers)
+    root = composeDocumentRoot(locale, theme.stylesheet, theme.theme, sidebar)
+    metadata = composeMetadata(theme.stylesheet, next(identifiers) - 1)
+    stylesheetMember = findMemberName(stylesheetLocator)
+    members: dict[str, list[tuple[int, Message]]] = {
+        findMemberName(documentLocator): [
+            (rootIdentifier, root), *theme.document, (sidebar, tsk.TreeNode()),
+        ],
+        stylesheetMember: theme.styles,
+        findMemberName("Metadata"): [(metadataIdentifier, metadata)],
+    }
+    now = datetime.datetime.now()
+    moment = (now.year, now.month, now.day, now.hour, now.minute, now.second)
+    package = NumbersPackage()
+    for name, bodies in members.items():
+        package.iwaFiles.append(IWAFile(
+            name=name,
+            # A style's reference back to its stylesheet is weak, as Numbers writes it.
+            archives=[
+                composeArchive(identifier, body, weak={theme.stylesheet} - {identifier}
+                               if name == stylesheetMember else ())
+                for identifier, body in bodies
+            ],
+            modified=True,
+        ))
+        package.members.append(composeMemberInfo(name, moment))
+    # Numbers cannot read a package whose every member sits under `Index/`.
+    package.otherMembers.append(
+        StoredMember(identifierMember, str(uuid.uuid4()).upper().encode())
+    )
+    package.members.append(composeMemberInfo(identifierMember, moment))
+
+    index = ArchiveIndex(package)
+    registry = PackageRegistry(index)
+    styles = SheetStyles(
+        sheet=theme.sheetStyle, stylesheet=theme.stylesheet,
+        paragraph=theme.baseStyle, listStyle=theme.listStyle,
+    )
+    sheet = createSheet(registry, Sheet(name=sheetName), styles)
+    node = createSidebarNode(registry, sheet)
+    root.sheets.add(identifier=sheet)
+    rootReferences = [*registry.strongReferencesOf(rootIdentifier), sheet]
+    registry.archiveReplace(rootIdentifier, root, rootReferences)
+    sidebarNode = tsk.TreeNode()
+    sidebarNode.children.add(identifier=node)
+    registry.archiveReplace(sidebar, sidebarNode, [node])
+    registry.gained.update({rootIdentifier, theme.stylesheet})
+    registry.save()
+    return package
+
+
+def create(locale: str) -> Document:
+    """Create a document of one empty sheet, in a language and region, `en_US`.
+
+    It holds no table, since whatever works with it builds its own, and its archives
+    are composed on its first save, as every document built in memory is.
+    """
+    findLocaleSymbols(locale)
+    document = Document()
+    document.sheetAdd(firstSheetName)
+    document._localeAssign(locale)
+    return document
+
+
+def composeModelPackage(document: Document) -> NumbersPackage:
+    """Give a document built in memory a created package, its first sheet created.
+
+    Every other sheet and table is created by the save, as one a script adds is. A
+    document from the JSON form is one, and it saves as a created document would.
+    """
+    locale = document.localeIdentifier
+    if locale is None:
+        raise WriteError(
+            "This document names no language and region, so it cannot be created. "
+            "Set one with `localeSet`, such as `en_US`."
+        )
+    if not document.sheets:
+        raise WriteError(
+            "This document holds no sheet, and a document holds at least one. Add one "
+            "with `sheetAdd`."
+        )
+    findLocaleSymbols(locale)
+    first = document.sheets[0]
+    package = composePackage(locale, first.name)
+    first._identifier = findRoot(ArchiveIndex(package)).sheets[0].identifier
+    return package
+
+
+__all__ = ["composeModelPackage", "create", "createSheets"]

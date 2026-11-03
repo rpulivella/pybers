@@ -17,6 +17,9 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
   readable.
 - **`TSD.DrawableSelectionArchive` (3061) and `TST.SelectionArchive` (6030) are noise**,
   they reflect what was selected when the file was saved. Filter them.
+- **A refusal right after Numbers crashes is noise.** The first documents opened after a
+  crash were refused with no alert, and opened clean on a rerun, so a refusal counts only
+  once it repeats.
 - **File size is dominated by the preview JPEGs** Numbers regenerates on each save. Not a
   content signal.
 

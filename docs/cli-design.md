@@ -18,10 +18,10 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
 | `check FILE` | Whether pybers can read a document, safe to post publicly |
 | `show FILE [SELECTOR]` | A small part of a document, for reading |
-| `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o` |
+| `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
 | `set FILE ADDRESS VALUE` | One cell's value or formula |
 | `locale FILE [LOCALE]` | A document's language and region, or a change to it, and the regions offered |
-| `import FILE DATA` | Data brought into a document, at addresses or as a new one |
+| `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
 | `diff A B` | The cells that differ between two documents |
 | `visinum FILE [ADDRESS]` | The read-only terminal browser |
 
@@ -43,6 +43,8 @@ A command parses its arguments, calls the library once, formats what comes back,
 ## Writing
 
 - **A writing verb changes FILE itself**, since the verb is the act, as `sqlite-utils insert` and `git commit` are. `-o NEW` writes a new document beside it instead and refuses a file that already exists, any file, and `--preview` writes nothing. The two together are refused. `pybers.cli._common` owns the rule, both options and the report of what was written, so no command decides it.
+- **`import` changes FILE in place, writes the changed document to `-o`, or creates a new document when given no FILE.** A new document is made by `pybers.create` in the region `--locale` names, the data is written into it, and it is saved to `-o`, as every new document starts there. `import` never needs a document Numbers made.
+- **`export` never changes the document it reads.** It reads FILE and writes elsewhere, a new `.numbers` document included, so no `export` changes FILE.
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
 - **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
 - **`set --format SPEC`** sets how the cells show their value, SPEC being a format's text form, tagged by its family.

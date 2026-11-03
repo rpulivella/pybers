@@ -66,9 +66,12 @@ enum EditMenuItem: String, Codable {
     case paste
     case delete
     case autofillDown
+    case undo
 
     var path: [String] {
         switch self {
+        // Numbers titles it after the action, "Undo Insert Table", so it is matched by prefix.
+        case .undo: return ["Edit", "Undo"]
         case .copy: return ["Edit", "Copy"]
         case .paste: return ["Edit", "Paste"]
         case .delete: return ["Edit", "Delete"]
@@ -81,6 +84,15 @@ enum EditCellFormat: String, Codable {
     case checkbox
 }
 
+// Every drawable a step may add, each named by the AppleScript class Numbers makes.
+enum EditDrawable: String, Codable {
+    case textItem = "text item"
+    case shape
+    case line
+    case chart
+    case image
+}
+
 enum EditAction: String, Codable {
     case select
     case menuPress
@@ -89,6 +101,8 @@ enum EditAction: String, Codable {
     case dataFormatSet
     case tableExtend
     case tableAdd
+    case tableDelete
+    case drawableAdd
     case sheetAdd
     case customFormatEdit
 }
@@ -102,6 +116,7 @@ struct EditStep: Codable {
     var range: String?
     var menuItem: EditMenuItem?
     var format: EditCellFormat?
+    var drawable: EditDrawable?
     var value: String?
     var setting: String?
 }
@@ -1535,7 +1550,11 @@ func pressMenuItem(_ item: EditMenuItem, pid: pid_t) throws {
     var element = bar as! AXUIElement
     for title in item.path {
         let items = listMenuItems(element)
-        guard let found = items.first(where: { readText($0, kAXTitleAttribute) == title }) else {
+        let matches = { (each: AXUIElement) -> Bool in
+            let shown = readText(each, kAXTitleAttribute)
+            return shown == title || (title == "Undo" && shown.hasPrefix("Undo "))
+        }
+        guard let found = items.first(where: matches) else {
             let titles = items.map { readText($0, kAXTitleAttribute) }.filter { !$0.isEmpty }
             throw HelperFailure(problem: HelperProblem(
                 kind: "menu",
@@ -1650,6 +1669,37 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
             "tell \(target) to set t to make new table with properties {name:\(quoteAppleScript(table))}\n"
                 + "set header row count of t to 0\nset header column count of t to 0\nset footer row count of t to 0\n"
                 + "set row count of t to \(row)\nset column count of t to \(column)")
+    case .drawableAdd:
+        guard let sheet = step.sheet, let drawable = step.drawable else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a drawableAdd step needs a sheet and a drawable",
+                remedy: "name the sheet and one of text item, shape, line, chart or image"))
+        }
+        let target = "sheet \(quoteAppleScript(sheet)) of document id \(quoteAppleScript(documentId))"
+        guard drawable == .image else {
+            _ = try runAppleScript("tell \(target) to make new \(drawable.rawValue)")
+            return
+        }
+        // An image is made from a PNG or SVG the request staged in the temporary folder.
+        let temporary = resolvePath(NSTemporaryDirectory()) + "/"
+        guard let file = step.value, file.hasSuffix(".png") || file.hasSuffix(".svg"),
+              !file.contains("/../"),
+              (resolvePath((file as NSString).deletingLastPathComponent) + "/").hasPrefix(temporary)
+        else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "an image step needs a .png or .svg inside \(temporary) as its value",
+                remedy: "stage the image in the temporary folder"))
+        }
+        _ = try runAppleScript(
+            "tell \(target) to make new image with properties {file:(POSIX file \(quoteAppleScript(file)))}")
+    case .tableDelete:
+        guard let sheet = step.sheet, let table = step.table else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a tableDelete step needs a sheet and a table",
+                remedy: "name the sheet and the table to delete"))
+        }
+        let target = "sheet \(quoteAppleScript(sheet)) of document id \(quoteAppleScript(documentId))"
+        _ = try runAppleScript("tell \(target) to delete table \(quoteAppleScript(table))")
     case .menuPress:
         guard let item = step.menuItem else {
             throw HelperFailure(problem: HelperProblem(

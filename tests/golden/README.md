@@ -11,9 +11,16 @@ Only Numbers can say that a file this library wrote is a file Numbers considers 
 ## What is here
 
 Numbers makes fixtures and measurements, and pybers makes goldens, so nothing Numbers
-made lives here. A golden starts from a document Numbers made, a fixture or a measurement,
-because pybers opens a document rather than creating one. Whatever pybers writes is a
-golden and never a measurement, since a measurement is evidence of what Numbers does.
+made lives here. Whatever pybers writes is a golden and never a measurement, since a
+measurement is evidence of what Numbers does.
+
+**Every new golden starts from a document `pybers.create` made.** A feature creates what
+it edits within its own ticket, so its goldens can start from nothing Numbers wrote. A
+golden starting from a fixture or measurement names, in its builder's `sourceReason`,
+the ticket that enables pybers to create what it edits, or why it does not. Every golden
+confirmed before pybers could create a document gives that as its reason, and stays: it
+edits what Numbers wrote, which is the document a person brings. `test_goldens.py` fails
+when a golden starting from a fixture or measurement names neither.
 
 Every golden is built by its builder in [`builders.py`](builders.py), the one place its
 construction is written down: the document it starts from and the mutation pybers writes.
@@ -23,6 +30,10 @@ over what, and `test_goldens.py` fails when a label no longer says so.
 
 | File | Built from | Mutation | Confirmed |
 | --- | --- | --- | --- |
+| `00-created-sheets-added-by-pybers.numbers` | `pybers.create("en_US")` | the mutation `20-sheets-added` writes: `Inserted` added at position 2 and `Appended` last | 2026-11-03, Numbers 15.4: `/golden-confirm` passed every check, and the maintainer confirmed it in Numbers, the sheet white and its tables showing no gridlines, outline or banding |
+| `00-created-tables-added-by-pybers.numbers` | `pybers.create("en_US")` | the mutation `20-tables-added` writes: `Table 1` and `table 2` on `Sheet 1`, and `Output` on a new sheet `Fresh`, each with values. The first table in a created document creates its calculation engine | 2026-11-03, Numbers 15.4: `/golden-confirm` passed every check, and the maintainer confirmed it in Numbers, the sheet white and its tables showing no gridlines, outline or banding. Regenerated 2026-11-03 when a created document's archives moved to its first save, changing its identities alone; `/golden-confirm` passed every check |
+| `00-created-formulas-in-tables-by-pybers.numbers` | `pybers.create("en_US")` | two tables on `Sheet 1`: `Inputs` holding 5 at `A1`, and `Calc` holding 2 at `A1` and four formulas, `B1` reading `A1`, `C1` and `A2` reading `Inputs`, and `A3` summing `A1:B1` | 2026-11-03, Numbers 15.4: `/golden-confirm` passed every check, and the maintainer confirmed it in Numbers, the sheet white and its tables showing no gridlines, outline or banding, and Numbers recalculated `Calc` to 6, 10, 6 and 8. Regenerated 2026-11-03 when a created document's archives moved to its first save, changing its identities alone; `/golden-confirm` passed every check |
+| `00-created-blank-by-pybers.numbers` | `pybers.create("en_US")` | none: one sheet holding no table in the reset's page setup, and a theme of 30 color slots offering one preset of each kind a person adds, in the pybers reset. The first golden holding nothing Numbers wrote | 2026-11-02, Numbers 15.4: `/golden-confirm` passed every check, Quick Look shows the empty page, and the maintainer inserted every kind of object into a copy, each plain but not broken, with none of Apple's styles offered. Regenerated 2026-11-03, the sheet filled white and every root style stating what Numbers always states. Re-confirmed 2026-11-03, Numbers 15.4: `/golden-confirm` passed every check, and the maintainer confirmed it in Numbers |
 | `11-value-types-noformats-A1-edited.numbers` | `90f-number-for-an-edit` | `A1` set to `Decimal("98765.4321")` over the number 1234.5, each changed cell's label rewritten beneath it | 2026-10-23, Numbers 15.4: `/golden-confirm` passed every check, and a developer confirmed by eye `A1` reading 98765.4321 |
 | `20-formula-shapes-multisheet-edited.numbers` | `20-formula-shapes.numbers` | every typed number in rows 1 to 10 raised by 1000, across three tables on two sheets | 2026-09-02, re-confirmed the same day after PYB-25, Numbers 15.3.1 |
 | `22b-merged-by-pybers.numbers` | `22b-merge-2x2-unmerged.numbers` | five merges added across row 1 | 2026-09-02, Numbers 15.3.1 |

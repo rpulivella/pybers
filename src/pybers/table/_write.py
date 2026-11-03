@@ -14,6 +14,9 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
+2026-11-02  A document holding no table needs no engine, and its first table creates
+            one, for PYB-261.
 2026-11-02  The model is written when a write created a tile, for PYB-276.
 2026-10-28  `formulasMark`, every formula of a table marked for
             recalculation, for PYB-272.
@@ -47,7 +50,9 @@ from typing import TYPE_CHECKING
 from .._engine import (
     FormulaDependencies,
     TableOwner,
+    createCalculationEngine,
     findCalculationEngine,
+    findCalculationEngineHeld,
     findOwnerEntry,
     listRegisteredCells,
     moveOwnerCoordinates,
@@ -69,6 +74,7 @@ from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
 from ._read import updateCellStorage
+from ._records import refuseUncreatableCell
 from ._relocation import (
     applyBorderCopies,
     findBorderCopies,
@@ -135,6 +141,10 @@ class TableSave:
         modelIdentifier = tableInfo.tableModel.identifier
         model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
         entry = findOwnerEntry(self.entries, reference.identifier, table.name)
+        # A cell read from the file or copied keeps its record and all it holds.
+        for cell in table.cells.values():
+            if cell._origin is None and cell._copiedFrom is None:
+                refuseUncreatableCell(cell, table.name)
         self.saved.append((table, reference))
 
         # Before the merges are compared, since a merge the edit only moved must
@@ -216,10 +226,17 @@ class TableSave:
 def openTableSave(document: Document, registry: PackageRegistry) -> TableSave:
     """Create every table the model gained, then read the engine the save writes to.
 
-    Read after creation, since a created table registers owners of its own.
+    Read after creation, since a created table registers owners of its own. A
+    document holding no table may hold no engine, as a created one does.
     """
-    createTables(document, registry)
     index = registry.index
+    if findCalculationEngineHeld(index) is None:
+        if not any(sheet.tables for sheet in document.sheets):
+            return TableSave(
+                index=index, registry=registry, entries={}, ownerIds={}, extents={}
+            )
+        createCalculationEngine(registry)
+    createTables(document, registry)
     engine = findCalculationEngine(index)
     # A formula names the table it reads by identity, and the engine by internal
     # owner id, so declaring what a formula reads needs both halves in hand.

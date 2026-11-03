@@ -28,6 +28,7 @@ to a caller:
   that looks like a perfectly good number.
 
 UPDATES
+2026-11-02  A package pybers created becomes a document too, for PYB-261.
 2026-10-27  The document's locale identifier is read, for PYB-272.
 2026-10-24  The sheets and tables linked by `Document._ownersLink`, for PYB-259.
 2026-10-22  The locale's currency symbols and placement are read, for PYB-220.
@@ -72,7 +73,7 @@ from .sheets import Document, Sheet
 def readSheet(
     index: ArchiveIndex,
     identifier: int,
-    source: Path,
+    source: Path | None,
     identities: dict[int, str],
 ) -> Sheet:
     """Build one `Sheet`, taking its tables in the sheet's own drawable order.
@@ -113,8 +114,8 @@ def open(  # noqa: A001
     return document
 
 
-def readDocument(package: NumbersPackage, source: Path) -> Document:
-    """Build a `Document` from a package already read from `source`."""
+def readDocument(package: NumbersPackage, source: Path | None) -> Document:
+    """Build a `Document` from a package read from `source`, or created when None."""
     index = ArchiveIndex(package)
     root = findRoot(index)
 

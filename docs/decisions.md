@@ -437,6 +437,59 @@ what it does to one node.
 
 ---
 
+## A document created from nothing, decided 2026-11-02
+
+`pybers.create(locale)` composes a document from the least Numbers both opens and lets a
+person add to, which PYB-261 measured (findings-10-creation.md), rather than from a
+template Numbers made. A template would carry Numbers' bytes into every created document,
+and more than 500 archives a script never asked for. The less a created document holds, the less a
+future Numbers can find wrong with it, but a document Numbers opens and then crashes on
+the first inserted table is damaged, so the floor is set by what a person can add.
+
+**The region is the one decision a creation makes.** It is written as a person choosing
+it in Numbers writes it, `has_user_defined_locale` true, so the document keeps its region
+on a Mac set to another. The creation region is the same one.
+
+**One sheet holding no table is the floor, and pybers keeps it.** Numbers opened and
+saved a document holding no sheet, so the rule is pybers' own: a person deleting the last
+sheet in Numbers gets a new one, and whatever works with a created document builds its
+tables. The sheet is created as every created sheet is, in the reset's page setup with
+fit to page off, and the page size is left to Numbers.
+
+**The theme offers one preset of each kind a person adds, in the pybers reset.** Each
+root style states what Numbers states on every root style of its type, valued as the
+Blank theme states it and read into a generated table rather than copied, every text slot
+names `pybers-base`, and the table preset has no gridlines, outline or banding and does
+not wrap while every stroke choice stays offered. The rest stay as Numbers' Blank theme
+values them until a ticket gives them a reset value. A chart preset keeps
+Numbers' list lengths. When PYB-268 brings named paragraph and character styles, PYB-264
+color, and PYB-265 to PYB-267 cell and table styling, each builds these from its model's
+defaults in place of the constants `document/_theme.py` holds.
+
+**The theme offers 30 color slots of pybers' own.** Numbers reads the count, refusing
+fewer than 27, and not the colors, so the slots are a palette rather than Numbers'
+Blank theme: white, four grays and black, written grayscale, then red, orange, yellow,
+green, teal, blue, purple and pink, each light, as is and dark. Each hue sits a step
+from the saturated defaults of desktop and web palettes. Numbers saves a gray slot as
+sRGB with three equal components, and pybers writes it grayscale and converts nothing.
+
+**A document built in memory is created on its first save.** `pybers.create` returns
+one, and so does reading a JSON form, so the save gives it a created package in its own
+region, its first sheet the created one, and writes the rest as a script's additions.
+There is one creation path. The table writer refuses a cell whose new record would lose
+part of what it holds, naming it before anything is written: the format it keeps is the
+one its record builder writes for the value, so a format the builder learns to write is
+accepted without the check changing, and rich text and controls are refused until pybers
+creates them. A test saves all 188 fixtures and measurements through their JSON form, and
+each keeps every cell or is refused.
+
+**A `Metadata/DocumentIdentifier` holding a fresh UUID is the member outside `Index/`**
+that Numbers requires. Any member there satisfies it, and this one is the identity
+Numbers writes there, so two documents created alike differ only in it, in the UUIDs
+their objects are known by, and in their timestamps.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

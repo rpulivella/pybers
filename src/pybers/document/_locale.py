@@ -12,6 +12,7 @@ findings-12-language-and-region.md.
 Private. The locale's archive half, beside `locale`.
 
 UPDATES
+2026-11-02  A region's fields composed in one place, a creation's too, for PYB-261.
 2026-10-28  Written for PYB-272.
 """
 from __future__ import annotations
@@ -60,13 +61,21 @@ def writeLocale(document: Document, index: ArchiveIndex) -> bool:
         return False
     identifier = document.localeIdentifier
     assert identifier is not None
+    composeLocale(root, identifier)
+    index.archiveWrite(rootIdentifier, root)
+    return True
+
+
+def composeLocale(root: tn.DocumentArchive, identifier: str) -> None:
+    """Write a region into a document root as a person choosing it in Numbers does.
+
+    The one place a region's fields are decided, for a change and a creation alike.
+    """
     locale = root.super.super
     locale.locale_identifier = identifier
     locale.has_user_defined_locale = True
     locale.formatting_symbols.CopyFrom(buildFormattingSymbols(identifier))
     root.super.document_language = identifier.partition("_")[0]
-    index.archiveWrite(rootIdentifier, root)
-    return True
 
 
-__all__ = ["buildFormattingSymbols", "writeLocale"]
+__all__ = ["buildFormattingSymbols", "composeLocale", "writeLocale"]

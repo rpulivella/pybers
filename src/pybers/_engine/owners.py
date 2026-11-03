@@ -8,6 +8,7 @@ either means walking the tracker rather than reading the table, and reading the
 table the obvious way finds nothing at all.
 
 UPDATES
+2026-11-02  A document holding no table may hold no engine, for PYB-261.
 2026-09-22  Split out of the engine module for PYB-113, and the engine archive is
             found by its class.
 """
@@ -34,27 +35,41 @@ from ..errors import ReadError, WriteError
 tableOwnerKind: int = 1
 
 
-def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
-    """Return the document's one calculation engine, or refuse and say why.
+def findCalculationEngineHeld(
+    index: ArchiveIndex,
+) -> tsce.CalculationEngineArchive | None:
+    """Return the document's one calculation engine, or None when it holds none.
 
-    Exactly one archive in a document carries this type, the same way exactly one
-    carries `TN.DocumentArchive`. All 46 documents have one, so a document without
-    one is not what this library expects rather than a case to work around.
+    A document holding no table needs none, so a created one holds none and Numbers
+    creates it on save, measured 2026-11-02, findings-10-creation.md. Two are refused.
     """
     found = [
         archive for archive in index.byIdentifier.values()
         if readArchiveTypeId(archive)
         == findArchiveTypeId(tsce.CalculationEngineArchive)
     ]
-    if len(found) != 1:
+    if len(found) > 1:
         raise ReadError(
-            f"Expected exactly one TSCE.CalculationEngineArchive, found {len(found)}. "
-            "Without it a table has no identity, and neither a merge nor a "
-            "recalculation request can be written."
+            f"Expected at most one TSCE.CalculationEngineArchive, found {len(found)}, "
+            "so which one holds the tables' identities cannot be told."
         )
+    if not found:
+        return None
     return index.identifierResolve(
         found[0].identifier, tsce.CalculationEngineArchive
     )
+
+
+def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
+    """Return the document's one calculation engine, or refuse and say why."""
+    engine = findCalculationEngineHeld(index)
+    if engine is None:
+        raise ReadError(
+            "This document holds no TSCE.CalculationEngineArchive. Without it a "
+            "table has no identity, and neither a merge nor a recalculation request "
+            "can be written."
+        )
+    return engine
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,11 +128,12 @@ def readOwnerUuid(uid: tsp.UUID) -> str:
 
 def readTableIdentities(index: ArchiveIndex) -> dict[int, str]:
     """Return each table's formula identity, keyed by its `TST.TableInfoArchive`."""
+    engine = findCalculationEngineHeld(index)
+    if engine is None:
+        return {}
     return {
         identifier: readOwnerUuid(owner.dependencies.formula_owner_uid)
-        for identifier, owner in readTableOwnerEntries(
-            index, findCalculationEngine(index)
-        ).items()
+        for identifier, owner in readTableOwnerEntries(index, engine).items()
     }
 
 
@@ -150,6 +166,7 @@ def readTableOwnerIds(
 __all__ = [
     "TableOwner",
     "findCalculationEngine",
+    "findCalculationEngineHeld",
     "findOwnerEntry",
     "readOwnerUuid",
     "readTableIdentities",

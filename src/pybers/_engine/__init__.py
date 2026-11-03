@@ -34,6 +34,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from .creation import createCalculationEngine
 from .dependencies import (
     CellEdge,
     FormulaDependencies,
@@ -43,6 +44,7 @@ from .dependencies import (
 from .owners import (
     TableOwner,
     findCalculationEngine,
+    findCalculationEngineHeld,
     findOwnerEntry,
     readTableIdentities,
     readTableOwnerEntries,
@@ -68,7 +70,9 @@ __all__ = [
     "RangeEdge",
     "SpanEdge",
     "TableOwner",
+    "createCalculationEngine",
     "findCalculationEngine",
+    "findCalculationEngineHeld",
     "findOwnerEntry",
     "listRegisteredCells",
     "readTableIdentities",

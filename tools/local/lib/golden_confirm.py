@@ -157,8 +157,8 @@ recipeDefaultKeys: tuple[str, ...] = ("document", "sheet", "table")
 
 
 recipeStepKeys: frozenset[str] = frozenset({
-    "action", "document", "sheet", "table", "range", "menuItem", "format", "value",
-    "setting",
+    "action", "document", "sheet", "table", "range", "menuItem", "format", "drawable",
+    "value", "setting",
 })
 
 

@@ -84,6 +84,9 @@ mypy in one pass and reports all four.
   server, by naming a step its one caller would otherwise need a comment for, or by being
   the designated place one concern is decided, which its docstring says. A single-caller
   function that only forwards one call, and is none of these, is inlined.
+- **A feature creates, reads, updates and deletes what it adds, within its own ticket.**
+  pybers can then create everything it edits, so a script and a golden start from a
+  document pybers created rather than one Numbers made.
 - Place code with the feature that owns it. `_persistence` and `_engine` are
   infrastructure used by more than one feature, never a dumping ground.
 - **A feature's model types never import its archive halves at module scope.** A
@@ -210,10 +213,13 @@ functions over explanation.
 
 - **The base test**: read a real fixture and write it back unchanged, and the archives
   are identical.
-- **Every mutation earns a golden file**: a fixture or measurement in, one mutation,
-  built only by its builder in `tests/golden/builders.py`, confirmed once in real Numbers,
-  then locked in as a permanent regression check. Numbers makes fixtures and measurements,
-  and whatever pybers writes is a golden, never a measurement.
+- **Every mutation earns a golden file**: a starting document, one mutation, built only
+  by its builder in `tests/golden/builders.py`, confirmed once in real Numbers, then
+  locked in as a permanent regression check. Numbers makes fixtures and measurements, and
+  whatever pybers writes is a golden, never a measurement.
+- **Every new golden starts from a document `pybers.create` made.** A golden starting
+  from a fixture or measurement names the ticket that enables pybers to create what it
+  edits, or a stated reason, and a test fails when it names neither.
 - **Each feature earns a scenario test per consumer.** Write the few lines a script
   author would write, and the few a CLI or TUI would write, then test those. Both
   consumers exist from day one, so an API reading well from only one of them is
