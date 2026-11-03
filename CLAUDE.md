@@ -84,6 +84,9 @@ mypy in one pass and reports all four.
   server, by naming a step its one caller would otherwise need a comment for, or by being
   the designated place one concern is decided, which its docstring says. A single-caller
   function that only forwards one call, and is none of these, is inlined.
+- **A feature creates, reads, updates and deletes what it adds, within its own ticket.**
+  pybers can then create everything it edits, so a script and a golden start from a
+  document pybers created rather than one Numbers made.
 - Place code with the feature that owns it. `_persistence` and `_engine` are
   infrastructure used by more than one feature, never a dumping ground.
 - **A feature's model types never import its archive halves at module scope.** A
