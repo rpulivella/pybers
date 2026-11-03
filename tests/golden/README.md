@@ -11,9 +11,16 @@ Only Numbers can say that a file this library wrote is a file Numbers considers 
 ## What is here
 
 Numbers makes fixtures and measurements, and pybers makes goldens, so nothing Numbers
-made lives here. A golden starts from a document Numbers made, a fixture or a measurement,
-because pybers opens a document rather than creating one. Whatever pybers writes is a
-golden and never a measurement, since a measurement is evidence of what Numbers does.
+made lives here. Whatever pybers writes is a golden and never a measurement, since a
+measurement is evidence of what Numbers does.
+
+**Every new golden starts from a document `pybers.create` made.** A feature creates what
+it edits within its own ticket, so its goldens can start from nothing Numbers wrote. A
+golden starting from a fixture or measurement names, in its builder's `sourceReason`,
+the ticket that enables pybers to create what it edits, or why it does not. Every golden
+confirmed before pybers could create a document gives that as its reason, and stays: it
+edits what Numbers wrote, which is the document a person brings. `test_goldens.py` fails
+when a golden starting from a fixture or measurement names neither.
 
 Every golden is built by its builder in [`builders.py`](builders.py), the one place its
 construction is written down: the document it starts from and the mutation pybers writes.

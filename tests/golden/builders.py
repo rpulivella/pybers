@@ -10,6 +10,7 @@ so no golden is made any other way. A test asserting what a golden holds reads i
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-02  A golden starting from a fixture or measurement names why, for PYB-261.
 2026-11-02  A golden can start from a created document, for PYB-261.
 2026-10-29  A golden for each measured region, for PYB-272.
 2026-10-22  Written for PYB-255, gathering the builders the tests held.
@@ -55,15 +56,17 @@ createdLocale: str = "en_US"
 class GoldenBuilder:
     """One golden: its name, the document it starts from, and what pybers writes.
 
-    A source of None starts from a document created in `createdLocale`. `labeled`
-    marks a source laid out as a measurement, whose label beneath each cell the
-    mutation changes is rewritten to say what pybers wrote.
+    A source of None starts from a document created in `createdLocale`, and a golden
+    starting from a fixture or measurement names in `sourceReason` the ticket enabling
+    pybers to create its source, or why it does not. `labeled` marks a source laid out
+    as a measurement, whose label beneath each cell the mutation changes is rewritten.
     """
 
     name: str
     source: str | None
     mutate: Callable[[pybers.Document], None]
     labeled: bool = False
+    sourceReason: str = ""
 
 
 @contextmanager
@@ -580,8 +583,17 @@ def writeNothing(document: pybers.Document) -> None:
     """Write nothing, for a golden that is its starting document."""
 
 
-goldens: tuple[GoldenBuilder, ...] = (
+# The reason every golden confirmed before pybers could create a document gives.
+confirmedBeforeCreation: str = (
+    "Edits a document Numbers made, confirmed before pybers could create one."
+)
+
+createdGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("00-created-blank-by-pybers", None, writeNothing),
+)
+
+# No golden joins this tuple, since one added from a measurement states its own reason.
+confirmedOnNumbersDocuments: tuple[GoldenBuilder, ...] = (
     *(GoldenBuilder(f"95-region-{identifier.lower().replace('_', '-')}-by-pybers",
                     "95-region-base", setLocale(identifier), labeled=True)
       for identifier in measuredLocales),
@@ -656,6 +668,12 @@ goldens: tuple[GoldenBuilder, ...] = (
       for direction in ("down", "left", "right", "up")),
     GoldenBuilder("67-series-filled-by-pybers", "67-series-rich-base", fillRichSeries),
     GoldenBuilder("68-series-filled-by-pybers", "68-series-kinds-base", fillKindSeries),
+)
+
+goldens: tuple[GoldenBuilder, ...] = (
+    *createdGoldens,
+    *(dataclasses.replace(builder, sourceReason=confirmedBeforeCreation)
+      for builder in confirmedOnNumbersDocuments),
 )
 
 
