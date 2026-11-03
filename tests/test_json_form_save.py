@@ -26,6 +26,7 @@ from conftest import findDocumentPath
 from pybers.absence import UNDETERMINED
 from pybers.interchange import formatJsonForm, parseJsonForm
 from pybers.table._form import CellForm, buildCellForm
+from pybers.table._records import refuseUncreatableCell
 
 testsRoot: Path = Path(__file__).resolve().parent
 numbersDocuments: list[Path] = sorted(
@@ -146,6 +147,39 @@ def testADocumentHoldingAControlIsRefusedNamingTheCell(tmp_path: Path) -> None:
     assert not path.exists()
     assert document._package is None
     assert all(sheet._identifier is None for sheet in document.sheets)
+
+
+def findFixtureCell(stem: str, sheet: str, table: str, address: str) -> pybers.Cell:
+    """Return one cell of a fixture or measurement."""
+    return pybers.open(findDocumentPath(stem)).sheet(sheet).table(table).cell(address)
+
+
+def testACellHoldingRichTextIsRefused() -> None:
+    cell = findFixtureCell("22c-merge-overpaints", "Sheet 1", "Table 1", "A3")
+
+    with pytest.raises(pybers.WriteError, match="'T' A3 holds rich text"):
+        refuseUncreatableCell(cell, "T")
+
+
+def testACellHoldingAFormatAndNoValueIsRefused() -> None:
+    cell = findFixtureCell("22c-merge-overpaints", "Sheet 1", "Table 1", "I5")
+
+    with pytest.raises(pybers.WriteError, match="holds a number format and no value"):
+        refuseUncreatableCell(cell, "T")
+
+
+def testACellHoldingAFormatTheBuilderDoesNotWriteIsRefused() -> None:
+    cell = findFixtureCell("68-series-kinds-base", "Sheet1", "Table 1", "A2")
+
+    with pytest.raises(pybers.WriteError, match="holds a percent format"):
+        refuseUncreatableCell(cell, "T")
+
+
+def testACellHoldingTheFormatTheBuilderWritesIsAccepted(tmp_path: Path) -> None:
+    document = pybers.open(saveCreated(tmp_path))
+    cell = document.sheet(1).table(1).cell("A1")
+
+    refuseUncreatableCell(cell, "T")
 
 
 def testADocumentNamingNoRegionIsRefused(tmp_path: Path) -> None:
