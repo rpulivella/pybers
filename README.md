@@ -226,6 +226,22 @@ pybers needs the Python that `requires-python` in `pyproject.toml` specifies, an
 pip install -e .
 ```
 
+A new document starts with `pybers.create`, naming its language and region, and holds one sheet and no table until a script adds its own. Its archives are composed when it is first saved, so it holds nothing Numbers wrote:
+
+```python
+import pybers
+from decimal import Decimal
+
+document = pybers.create("en_US")
+budget = document.sheet("Sheet 1").tableAdd("Budget", rows=4, cols=2)
+budget.cell("A1").value = "Rent"
+budget.cell("B1").value = Decimal("1250.00")
+budget.cell("B4").formulaText = "=SUM(B1:B3)"
+document.save("budget.numbers")
+```
+
+An existing document opens with `pybers.open`, and every edit goes through it in the same way:
+
 ```python
 import datetime
 import pybers
@@ -263,12 +279,15 @@ form = json.loads(text, parse_float=Decimal, parse_int=Decimal)  # every number 
 assert pybers.parseJsonForm(text) == costs
 ```
 
+A whole document read from its JSON form saves as a created document holding what the form describes. A cell holding something pybers cannot yet create, rich text, a control or a format such as a percentage, is refused by name before anything is written.
+
 A table's `cells` maps each address to its cell and is read-only: a cell changes through the table, as `costs.cell("B4")` does above, so no edit can leave a table holding something that is not one of its cells.
 
 A cell takes a value of any kind, whatever it held, and reads it back as the same Python type: `Decimal` for a number, `str`, `bool`, `datetime` for a date and time, and `timedelta` for a duration. Numeric values are `Decimal`, never `float`, because Numbers stores them as decimal128 and a binary float would add rounding error the document never had. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one is written as the time it was in the document's zone, the one pybers is running in unless `pybers.open` specifies another.
 
 ## Capabilities
 
+- Creating a document from nothing, in any region, which Numbers opens and into which a person can add any kind of object
 - Opening a document and saving it back, with everything pybers does not change left exactly as it was
 - Reading every cell's value, its kind (number, currency, text, date, duration and more) and its display format
 - Writing numbers, text, dates and times, durations and booleans into any cell, and formulas as the text Numbers shows

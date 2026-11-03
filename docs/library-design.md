@@ -41,7 +41,7 @@ A reference is qualified only as far as its context needs, as a path is. Each ow
 
 ## One handle
 
-`pybers.open(path)` returns a `Document`, and every edit goes through it. Nothing reaches the disk until `Document.save`, which writes a complete package atomically, either over the file it came from or to a new path.
+Every document starts at one of two calls. `pybers.create(locale)` returns a new `Document` of one sheet holding no table, in the language and region specified, and `pybers.open(path)` returns one read from a file. Every edit goes through the document either returns. Nothing reaches the disk until `Document.save`, which writes a complete package atomically, either over the file it came from or to a new path. A document never read from a file, a created one or one read from its JSON form, has its archives composed on its first save, so it needs a path.
 
 ```python
 document = pybers.open("budget.numbers")
