@@ -245,9 +245,9 @@ def test_savingIsRepeatableAndLeavesTheDocumentUsable(tmp_path: Path) -> None:
 
 # ── Refusals: a save that cannot be correct raises rather than guessing ──────
 
-def test_savingADocumentThatWasNeverReadIsRefused() -> None:
-    """A hand-built Document has no archives, so there is nothing to write back."""
-    with pytest.raises(WriteError, match="carries no archives"):
+def test_savingADocumentBuiltInMemoryWithNoPathIsRefused() -> None:
+    """A document built in memory is created on save, which needs a path to land at."""
+    with pytest.raises(WriteError, match="nowhere to save"):
         Document().save()
 
 

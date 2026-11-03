@@ -473,6 +473,16 @@ green, teal, blue, purple and pink, each light, as is and dark. Each hue sits a 
 from the saturated defaults of desktop and web palettes. Numbers saves a gray slot as
 sRGB with three equal components, and pybers writes it grayscale and converts nothing.
 
+**A document built in memory is created on its first save.** `pybers.create` returns
+one, and so does reading a JSON form, so the save gives it a created package in its own
+region, its first sheet the created one, and writes the rest as a script's additions.
+There is one creation path. The table writer refuses a cell whose new record would lose
+part of what it holds, naming it before anything is written: the format it keeps is the
+one its record builder writes for the value, so a format the builder learns to write is
+accepted without the check changing, and rich text and controls are refused until pybers
+creates them. A test saves all 188 fixtures and measurements through their JSON form, and
+each keeps every cell or is refused.
+
 **A `Metadata/DocumentIdentifier` holding a fresh UUID is the member outside `Index/`**
 that Numbers requires. Any member there satisfies it, and this one is the identity
 Numbers writes there, so two documents created alike differ only in it, in the UUIDs

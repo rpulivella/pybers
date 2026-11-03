@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
 2026-11-02  A document holding no table needs no engine, and its first table creates
             one, for PYB-261.
 2026-11-02  The model is written when a write created a tile, for PYB-276.
@@ -73,6 +74,7 @@ from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
 from ._read import updateCellStorage
+from ._records import refuseUncreatableCell
 from ._relocation import (
     applyBorderCopies,
     findBorderCopies,
@@ -139,6 +141,10 @@ class TableSave:
         modelIdentifier = tableInfo.tableModel.identifier
         model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
         entry = findOwnerEntry(self.entries, reference.identifier, table.name)
+        # A cell read from the file or copied keeps its record and all it holds.
+        for cell in table.cells.values():
+            if cell._origin is None and cell._copiedFrom is None:
+                refuseUncreatableCell(cell, table.name)
         self.saved.append((table, reference))
 
         # Before the merges are compared, since a merge the edit only moved must

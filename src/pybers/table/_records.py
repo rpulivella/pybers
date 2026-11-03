@@ -14,6 +14,7 @@ a value typed into a fresh cell takes it, and drops the control the old value ha
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
 2026-10-29  A format keyed through the format pool, and a template found
             through `StoredTiles`, for PYB-278.
 2026-10-22  The chosen bit set or cleared is the one for the slot a record shows,
@@ -75,10 +76,17 @@ from .._persistence.decimal128 import Decimal128, encodedLength
 from .._persistence.index import ArchiveIndex
 from .._persistence.pool import EntryPool
 from .._persistence.rows import readStoredTiles
+from ..absence import UNDETERMINED
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
-from ._read import controlSlot, currencyFormatType, currencyTypeByte, storedKinds
+from ._read import (
+    controlSlot,
+    currencyFormatType,
+    currencyTypeByte,
+    formatFamilies,
+    storedKinds,
+)
 from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
@@ -201,6 +209,43 @@ def findAutomaticFormat(value: CellValue) -> tsk.FormatStructArchive:
     if isinstance(value, datetime.timedelta):
         return automaticDurationFormat
     return automaticNumberFormat
+
+
+def refuseUncreatableCell(cell: Cell, tableName: str) -> None:
+    """Refuse a cell whose record pybers would build without part of what it holds.
+
+    The one place a new record's presentation is decided: a format is kept only when
+    it is the family `findAutomaticFormat` writes for the value, so a family the
+    builder learns to write is accepted without this changing.
+    """
+    where = f"{tableName!r} {cell.address}"
+    if cell.kind is CellKind.RICH_TEXT:
+        raise WriteError(
+            f"{where} holds rich text, which pybers cannot yet create. Nothing was "
+            "written."
+        )
+    presentation = cell.presentation
+    if presentation.control is not None:
+        raise WriteError(
+            f"{where} holds a {presentation.control.controlType} control, which "
+            "pybers cannot yet create. Nothing was written."
+        )
+    asked = presentation.format
+    if asked is None or asked is UNDETERMINED:
+        return
+    if cell.value is None and cell.formula is None:
+        raise WriteError(
+            f"{where} holds a {asked} format and no value, which pybers cannot yet "
+            "create. Nothing was written."
+        )
+    written = formatFamilies.get(findAutomaticFormat(cell.value).format_type)
+    # A formula's format is its result's, which Numbers decides on calculating.
+    if asked != written and cell.formula is None:
+        raise WriteError(
+            f"{where} holds a {asked} format, and pybers writes its value in a "
+            f"{written} format, since it cannot yet create a {asked} one. Nothing was "
+            "written."
+        )
 
 
 def patchRichTextKey(raw: bytes, key: int) -> bytes:

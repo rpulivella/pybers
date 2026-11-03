@@ -56,7 +56,6 @@ from .._persistence.metadata import (
 from .._persistence.types import findArchiveTypeId
 from ..errors import WriteError
 from ._locale import composeLocale
-from ._read import readDocument
 from ._theme import composeTheme
 from .locale import findLocaleSymbols
 from .sheets import Document, Sheet
@@ -284,7 +283,7 @@ def composeMetadata(stylesheet: int, last: int) -> tspArchive.PackageMetadata:
     return metadata
 
 
-def composePackage(locale: str) -> NumbersPackage:
+def composePackage(locale: str, sheetName: str = firstSheetName) -> NumbersPackage:
     """Return a new document's package: its theme, and one sheet in the pybers reset."""
     identifiers = itertools.count(firstCreatedIdentifier)
     theme = composeTheme(identifiers)
@@ -326,7 +325,7 @@ def composePackage(locale: str) -> NumbersPackage:
         sheet=theme.sheetStyle, stylesheet=theme.stylesheet,
         paragraph=theme.baseStyle, listStyle=theme.listStyle,
     )
-    sheet = createSheet(registry, Sheet(name=firstSheetName), styles)
+    sheet = createSheet(registry, Sheet(name=sheetName), styles)
     node = createSidebarNode(registry, sheet)
     root.sheets.add(identifier=sheet)
     rootReferences = [*registry.strongReferencesOf(rootIdentifier), sheet]
@@ -342,10 +341,38 @@ def composePackage(locale: str) -> NumbersPackage:
 def create(locale: str) -> Document:
     """Create a document of one empty sheet, in a language and region, `en_US`.
 
-    It holds no table, since whatever works with it builds its own. Save it to a path.
+    It holds no table, since whatever works with it builds its own, and its archives
+    are composed on its first save, as every document built in memory is.
     """
     findLocaleSymbols(locale)
-    return readDocument(composePackage(locale), None)
+    document = Document()
+    document.sheetAdd(firstSheetName)
+    document._localeAssign(locale)
+    return document
 
 
-__all__ = ["create", "createSheets"]
+def composeModelPackage(document: Document) -> NumbersPackage:
+    """Give a document built in memory a created package, its first sheet created.
+
+    Every other sheet and table is created by the save, as one a script adds is. A
+    document from the JSON form is one, and it saves as a created document would.
+    """
+    locale = document.localeIdentifier
+    if locale is None:
+        raise WriteError(
+            "This document names no language and region, so it cannot be created. "
+            "Set one with `localeSet`, such as `en_US`."
+        )
+    if not document.sheets:
+        raise WriteError(
+            "This document holds no sheet, and a document holds at least one. Add one "
+            "with `sheetAdd`."
+        )
+    findLocaleSymbols(locale)
+    first = document.sheets[0]
+    package = composePackage(locale, first.name)
+    first._identifier = findRoot(ArchiveIndex(package)).sheets[0].identifier
+    return package
+
+
+__all__ = ["composeModelPackage", "create", "createSheets"]
