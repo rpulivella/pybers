@@ -66,9 +66,12 @@ enum EditMenuItem: String, Codable {
     case paste
     case delete
     case autofillDown
+    case undo
 
     var path: [String] {
         switch self {
+        // Numbers titles it after the action, "Undo Insert Table", so it is matched by prefix.
+        case .undo: return ["Edit", "Undo"]
         case .copy: return ["Edit", "Copy"]
         case .paste: return ["Edit", "Paste"]
         case .delete: return ["Edit", "Delete"]
@@ -1547,7 +1550,11 @@ func pressMenuItem(_ item: EditMenuItem, pid: pid_t) throws {
     var element = bar as! AXUIElement
     for title in item.path {
         let items = listMenuItems(element)
-        guard let found = items.first(where: { readText($0, kAXTitleAttribute) == title }) else {
+        let matches = { (each: AXUIElement) -> Bool in
+            let shown = readText(each, kAXTitleAttribute)
+            return shown == title || (title == "Undo" && shown.hasPrefix("Undo "))
+        }
+        guard let found = items.first(where: matches) else {
             let titles = items.map { readText($0, kAXTitleAttribute) }.filter { !$0.isEmpty }
             throw HelperFailure(problem: HelperProblem(
                 kind: "menu",

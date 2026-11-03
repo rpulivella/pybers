@@ -21,6 +21,10 @@ functions_extract.py derive the table of formula functions, each with its index,
                      src/pybers/_generated/functions.py
 locales_extract.py   read each region's formatting symbols from macOS's own ICU,
                      as Numbers reads them. Writes src/pybers/_generated/locales.py
+themestyles_extract.py
+                     read the properties Numbers states on every root style of each
+                     type a created theme holds, valued as 00-baseline's Blank theme
+                     states them. Writes src/pybers/_generated/themestyles.py
 locales_sweep.py     change a document to each region the locale table holds, open
                      it in Numbers through the golden-confirm helper, and check what
                      it shows. Writes workarea/locale-sweep/
@@ -83,7 +87,7 @@ reads back what it changed, so a control Numbers did not take stops the run.
 
 ```
 select           select the range
-menuPress        press menuItem: copy, paste, delete or autofillDown
+menuPress        press menuItem: copy, paste, delete, autofillDown or undo
 formatSet        set the range's format kind through AppleScript
 valueSet         type value into one cell, as a person would
 tableExtend      grow the table until it reaches the cell in range
