@@ -442,7 +442,7 @@ what it does to one node.
 `pybers.create(locale)` composes a document from the least Numbers both opens and lets a
 person add to, which PYB-261 measured (findings-10-creation.md), rather than from a
 template Numbers made. A template would carry Numbers' bytes into every created document,
-and 540 archives a script never asked for. The less a created document holds, the less a
+and more than 500 archives a script never asked for. The less a created document holds, the less a
 future Numbers can find wrong with it, but a document Numbers opens and then crashes on
 the first inserted table is damaged, so the floor is set by what a person can add.
 

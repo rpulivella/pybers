@@ -365,7 +365,7 @@ lengths, two value axes, one category axis, six series and 30 paragraph styles, 
 style shared along each. Cutting each list to one also passed, but a chart may reach an
 entry by position, and no insertion here turns on a title or adds a seventh series.
 
-**A theme offering one preset of each kind is 30 archives.** pybers composes it in
+**A created document offering one preset of each kind is 30 archives.** pybers composes it in
 `document/_theme.py`, the table preset carrying the reset and every text slot naming
 `pybers-base`, and Numbers inserted all seven objects into an `en_US` and a `de_DE`
 document created so.

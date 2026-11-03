@@ -50,8 +50,8 @@ from ..table._reset import (
 drawingLineStyle: str = "drawingline-0-drawinglineStyle"
 svgImportStyle: str = "svgimport-0-shapestyle"
 
-# The lengths of the chart preset's lists in Numbers' Blank theme, kept so a chart
-# reaching an entry by position finds one.
+# The lengths of the chart preset's lists in Numbers' Blank theme, kept in case a chart
+# reaches an entry by position.
 chartValueAxes: int = 2
 chartCategoryAxes: int = 1
 chartSeries: int = 6

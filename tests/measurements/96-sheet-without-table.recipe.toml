@@ -1,7 +1,7 @@
 # How Numbers makes 96-sheet-without-table: 00-baseline with its one table deleted, leaving
-# one sheet holding no table, the emptiest document Numbers keeps and the origin PYB-261
-# reduces to the smallest one Numbers opens. Made by `.venv/bin/python3 -m
-# tools.local.golden_confirm measure 96-sheet-without-table`.
+# one sheet holding no table, the emptiest document a person can make in Numbers and the
+# origin PYB-261 reduces to the smallest one Numbers opens. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 96-sheet-without-table`.
 
 base = "00-baseline"
 
