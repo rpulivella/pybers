@@ -37,6 +37,7 @@ from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSSArchives_pb2 as tss
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._generated import TSWPArchives_pb2 as tswp
+from pybers._generated.themestyles import themeStyles
 from pybers._persistence import NumbersPackage, readPackage
 from pybers._persistence.difference import readTypeName
 from pybers._persistence.types import archiveVersions, parseArchive
@@ -188,6 +189,38 @@ def testACreatedTablePresetCarriesTheReset(tmp_path: Path) -> None:
     assert text.super.name == "pybers-base"
 
 
+def testACreatedSheetIsFilledWhiteWithAnUncoloredTab(tmp_path: Path) -> None:
+    style = readBodies(readPackage(createSaved(tmp_path)))["TN.SheetStyleArchive"]
+
+    assert isinstance(style, tn.SheetStyleArchive)
+    fill = style.sheet_properties.fill.color
+    assert (fill.model, fill.w, fill.a) == (tsp.Color.white, 1.0, 1.0)
+    assert style.sheet_properties.HasField("tab_color")
+
+
+def testACreatedTablePresetOffersEveryStrokeWithNoneShown(tmp_path: Path) -> None:
+    style = readBodies(readPackage(createSaved(tmp_path)))["TST.TableStyleArchive"]
+
+    assert isinstance(style, tst.TableStyleArchive)
+    properties = style.table_properties
+    assert len(properties.ListFields()) == 62
+    assert properties.HasField("table_body_horizontal_border_stroke")
+    assert not properties.table_border_visible
+    assert not properties.h_strokes_visible
+    assert not properties.v_strokes_visible
+    assert not properties.banded_rows
+
+
+def testACreatedChartSeriesStyleStatesWhatNumbersAlwaysStates(
+    tmp_path: Path,
+) -> None:
+    bodies = readBodies(readPackage(createSaved(tmp_path)))
+    style = bodies["TSCH.ChartSeriesStyleArchive"]
+
+    stated = [field for field, _ in style.ListFields() if field.name != "super"]
+    assert len(stated) == len(themeStyles["series"])
+
+
 def testACreatedChartPresetKeepsNumbersListLengths(tmp_path: Path) -> None:
     preset = readBodies(readPackage(createSaved(tmp_path)))["TSCH.ChartStylePreset"]
 
@@ -272,16 +305,29 @@ def testCreateRefusesARegionPybersDoesNotOffer() -> None:
         pybers.create("xx_YY")
 
 
-def testACreatedDocumentRefusesATableUntilItHoldsAnEngine(tmp_path: Path) -> None:
+def testACreatedDocumentsFirstTableCreatesItsEngine(tmp_path: Path) -> None:
     document = pybers.create("en_US")
-    document.sheet(1).tableAdd("Table 1", 2, 2)
+    document.sheet(1).tableAdd("Table 1", 2, 2).cell("B1").formulaText = "=A1*3"
     path = tmp_path / "with-table.numbers"
 
-    with pytest.raises(pybers.WriteError, match="no calculation engine"):
-        document.save(path)
+    document.save(path)
 
-    assert not path.exists()
-    assert document.sheet(1).tables[0]._identifier is None
+    package = readPackage(path)
+    engines = [archive for member in package.iwaFiles for archive in member.archives
+               if readTypeName(archive) == "TSCE.CalculationEngineArchive"]
+    root = readBodies(package)["TN.DocumentArchive"]
+    assert isinstance(root, tn.DocumentArchive)
+    assert [engine.identifier for engine in engines] == [
+        root.super.calculation_engine.identifier
+    ]
+    assert pybers.open(path).sheet(1).table(1).cell("B1").formulaText == "=A1*3"
+
+
+def testACreatedDocumentHoldingNoTableHoldsNoEngine(tmp_path: Path) -> None:
+    root = readBodies(readPackage(createSaved(tmp_path)))["TN.DocumentArchive"]
+
+    assert isinstance(root, tn.DocumentArchive)
+    assert not root.super.HasField("calculation_engine")
 
 
 def testTheShowCommandReadsACreatedDocument(tmp_path: Path) -> None:

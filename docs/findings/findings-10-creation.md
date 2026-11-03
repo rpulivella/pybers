@@ -355,9 +355,9 @@ time from a floor holding all of them:
 Movie, caption, list, character, paragraph and drop cap presets passed when removed, but
 nothing the helper does exercises them, so a created theme keeps one of each.
 
-**One preset of each kind is enough**, against Numbers' six of most, and the styles a
-preset names need nothing but their references: every style stripped to its references,
-its identifier and its name gone too, passed every insertion. The table preset's 34 slots
+**One preset of each kind is enough**, against Numbers' six of most. Every style stripped
+to its references, its identifier and its name gone too, passed every insertion, but a
+person's later actions need more, below. The table preset's 34 slots
 may name one table, one cell and one paragraph style between them, Numbers itself sharing
 one paragraph style across three header and footer slots, and one paragraph style may
 serve every slot of every preset in the document. A chart preset keeps Numbers' list
@@ -370,9 +370,44 @@ entry by position, and no insertion here turns on a title or adds a seventh seri
 `pybers-base`, and Numbers inserted all seven objects into an `en_US` and a `de_DE`
 document created so.
 
+### What a person's later actions need
+
+**A root style states what Numbers states on every root style of its type.** Measured on
+3 November 2026 across every fixture and measurement:
+
+| style | properties every root style states |
+| --- | --- |
+| sheet | 2, its fill and tab color |
+| table | 62, the strokes and layout of every region |
+| chart series | 113 in its properties extension, and two flags |
+| chart | 22, and one flag |
+| list | 4 |
+| chart axis, legend and reference line | 3, 4 and 4 |
+| media | 1, its stroke |
+| paragraph | 59 on nearly every one, which `pybers-base` states |
+| shape, character, cell and drop cap | none |
+
+A created sheet stating no fill opened and took insertions, then drew dark under the dark
+appearance and crashed Numbers when a person changed its background and undid the change.
+Filled white, it did neither. A table style stating only the reset's three properties
+showed alternating rows ticked and an empty outline menu. Stating all 62, valued as the
+Blank theme states them, with the reset's visibility and banding off, it showed no
+banding, an outline of None and every outline choice.
+`tools/local/themestyles_extract.py` reads these from the documents into
+`src/pybers/_generated/themestyles.py`, and a test holds the two together.
+
 The table network is written as one message at version (2, 4, 0). Numbers writes a
 second message beside it, the first 11 slots at (2, 0, 0), and field infos marking the
 newer slots, and needs neither.
+
+**A created document's first table creates its calculation engine.** A document holding
+no table needs none, and Numbers builds one on save. pybers writes an engine holding an
+empty dependency tracker and an empty dirty list, in a component of its own named
+`CalculationEngine`, with the document root naming it, before registering the table's
+owner. Numbers opened a created document holding a table so made, kept the table's
+identity, and computed `=A1*3` as 6 and `=SUM(A1:B1)` as 8 from the 2 in `A1`,
+measured on 2 November 2026. Numbers itself names that member `CalculationEngine-<id>` in 16 of
+the 188 documents.
 
 **A created document's archives start at identifier 100.** Numbers-made documents use
 nothing between 3 and 999 but 71, the document metadata. A created theme at 4 and

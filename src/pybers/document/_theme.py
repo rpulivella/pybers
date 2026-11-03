@@ -3,15 +3,16 @@
 Compose a created document's theme and stylesheet: a preset of each kind a person adds.
 
 Numbers fails when a person inserts a table, chart, shape, line, text box or image into
-a document whose theme offers no preset for it, and reads nothing else from a preset
-but its references. Each preset is therefore a skeleton naming its styles, every text
-slot names `pybers-base`, and the table preset carries the reset. A chart preset keeps
-the lengths of Numbers' lists, one style shared along each. Measured 2026-11-02 in
-findings-10-creation.md. See docs/decisions.md.
+a document whose theme offers no preset for it, and a person's later actions fail on a
+root style missing what Numbers states on every one of its type. Each root style states
+those, from the generated `themestyles` table, every text slot names `pybers-base`, and
+the table preset carries the reset. A chart preset keeps the lengths of Numbers' lists,
+one style shared along each. Measured 2026-11-03 in findings-10-creation.md.
 
 Private. The document feature's archive half, reached by document creation.
 
 UPDATES
+2026-11-03  Root styles state what Numbers always states, for PYB-261.
 2026-11-02  Written for PYB-261.
 """
 from __future__ import annotations
@@ -24,8 +25,9 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/02"
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 from google.protobuf.message import Message
 
@@ -39,6 +41,7 @@ from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
+from .._generated.themestyles import themeStyles
 from ..table._reset import (
     applyResetCell,
     applyResetTable,
@@ -87,6 +90,51 @@ def composeStyle[StyleT: Message](styleClass: type[StyleT], stylesheet: int) -> 
     while holder.DESCRIPTOR.full_name != "TSS.StyleArchive":
         holder = holder.super  # type: ignore[attr-defined]
     holder.stylesheet.identifier = stylesheet  # type: ignore[attr-defined]
+    return style
+
+
+def applyStyleValues(message: Message, values: Mapping[str, object]) -> None:
+    """Set a message's fields from plain data, an extension named in brackets."""
+    for name, value in values.items():
+        extension = name.startswith("[")
+        field = (
+            message.DESCRIPTOR.file.pool.FindExtensionByName(name[1:-1]) if extension
+            else message.DESCRIPTOR.fields_by_name[name]
+        )
+        # Only a message with an extension range carries `Extensions` at all.
+        extensions: Any = message.Extensions if extension else None
+        if field.message_type is None and not field.is_repeated:
+            if extension:
+                extensions[field] = value
+            else:
+                setattr(message, name, value)
+            continue
+        target: Any = extensions[field] if extension else getattr(message, name)
+        if field.message_type is None:
+            target.extend(value)
+        elif field.is_repeated:
+            for item in cast(tuple[Mapping[str, object], ...], value):
+                applyStyleValues(target.add(), item)
+        else:
+            target.SetInParent()
+            applyStyleValues(target, cast(Mapping[str, object], value))
+
+
+def composeRootStyle[StyleT: Message](
+    styleClass: type[StyleT], stylesheet: int, role: str
+) -> StyleT:
+    """Return a root style stating what Numbers states on every one of its type."""
+    style = composeStyle(styleClass, stylesheet)
+    applyStyleValues(style, themeStyles[role])
+    return style
+
+
+def composeSheetStyle(stylesheet: int) -> tn.SheetStyleArchive:
+    """Return a sheet style filled white, its tab uncolored, as Numbers writes one."""
+    style = composeRootStyle(tn.SheetStyleArchive, stylesheet, "sheet")
+    style.sheet_properties.fill.color.CopyFrom(
+        tsp.Color(model=tsp.Color.white, w=1.0, a=1.0)
+    )
     return style
 
 
@@ -171,34 +219,36 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
         listStyle=0,
     )
     composed.listStyle = styleAdd(
-        "list", composeStyle(tswp.ListStyleArchive, stylesheet)
+        "list", composeRootStyle(tswp.ListStyleArchive, stylesheet, "list")
     )
     composed.baseStyle = styleAdd(
         "base",
         composeBaseStyle(namedStyleKey.format(0), stylesheet, composed.listStyle),
     )
-    composed.sheetStyle = styleAdd(
-        "sheet", composeStyle(tn.SheetStyleArchive, stylesheet)
-    )
+    composed.sheetStyle = styleAdd("sheet", composeSheetStyle(stylesheet))
     for name, styleClass in (
         ("character", tswp.CharacterStyleArchive),
         ("dropcap", tswp.DropCapStyleArchive),
-        ("image", tsd.MediaStyleArchive),
-        ("movie", tsd.MediaStyleArchive),
         ("line", tswp.ShapeStyleArchive),
         ("shape", tswp.ShapeStyleArchive),
         ("textbox", tswp.ShapeStyleArchive),
         ("tableName", tswp.ShapeStyleArchive),
         ("drawingLine", tswp.ShapeStyleArchive),
         ("svgImport", tswp.ShapeStyleArchive),
-        ("chart", tschStyles.ChartStyleArchive),
-        ("legend", tschStyles.LegendStyleArchive),
-        ("axis", tschStyles.ChartAxisStyleArchive),
-        ("series", tschStyles.ChartSeriesStyleArchive),
-        ("referenceLine", tschStyles.ReferenceLineStyleArchive),
     ):
         styleAdd(name, composeStyle(styleClass, stylesheet))
-    tableStyle = composeStyle(tst.TableStyleArchive, stylesheet)
+    rootStyles: tuple[tuple[str, type[Message], str], ...] = (
+        ("image", tsd.MediaStyleArchive, "media"),
+        ("movie", tsd.MediaStyleArchive, "media"),
+        ("chart", tschStyles.ChartStyleArchive, "chart"),
+        ("legend", tschStyles.LegendStyleArchive, "legend"),
+        ("axis", tschStyles.ChartAxisStyleArchive, "axis"),
+        ("series", tschStyles.ChartSeriesStyleArchive, "series"),
+        ("referenceLine", tschStyles.ReferenceLineStyleArchive, "referenceLine"),
+    )
+    for name, rootClass, role in rootStyles:
+        styleAdd(name, composeRootStyle(rootClass, stylesheet, role))
+    tableStyle = composeRootStyle(tst.TableStyleArchive, stylesheet, "table")
     applyResetTable(tableStyle)
     styleAdd("table", tableStyle)
     cellStyle = composeStyle(tst.CellStyleArchive, stylesheet)

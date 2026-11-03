@@ -153,6 +153,8 @@ archiveVersions: frozendict[type[Message], tuple[int, ...]] = frozendict({
     tsk.TreeNode: (1, 0, 5),
     tswp.StorageArchive: (1, 0, 5),
     tswp.ParagraphStyleArchive: (1, 0, 5),
+    tsce.CalculationEngineArchive: (1, 0, 5),
+    tsce.ReferencesToDirtyArchive: (1, 0, 5),
     tsce.FormulaOwnerDependenciesArchive: (3, 2, 10),
     tsce.CellRecordTileArchive: (1, 0, 5),
     tsce.RangePrecedentsTileArchive: (1, 0, 5),
