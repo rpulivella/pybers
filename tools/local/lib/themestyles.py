@@ -112,9 +112,7 @@ def surveyAlwaysStated(documents: Iterable[Path]) -> dict[int, frozenset[Path_]]
 
 def listSurveyDocuments() -> list[Path]:
     """Return every fixture and measurement Numbers made."""
-    return sorted(
-        path for folder in surveyFolders for path in folder.glob("*.numbers")
-    )
+    return sorted([*folder.glob("*.numbers") for folder in surveyFolders])
 
 
 def findRoleStyles(index: ArchiveIndex) -> dict[str, int]:
