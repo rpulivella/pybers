@@ -381,6 +381,18 @@ def addFormulaTables(document: pybers.Document) -> None:
     calc.cell("A3").formulaText = "=SUM(A1:B1)"
 
 
+def addCreatedFormulaTables(document: pybers.Document) -> None:
+    """Add two tables to a created document and formulas reading within and across."""
+    inputs = document.sheet("Sheet 1").tableAdd("Inputs", rows=2, cols=2)
+    inputs.cell("A1").value = Decimal("5")
+    calc = document.sheet("Sheet 1").tableAdd("Calc", rows=3, cols=3)
+    calc.cell("A1").value = Decimal("2")
+    calc.cell("B1").formulaText = "=A1*3"
+    calc.cell("C1").formulaText = "=Inputs::A1*2"
+    calc.cell("A2").formulaText = "=Inputs::A1+1"
+    calc.cell("A3").formulaText = "=SUM(A1:B1)"
+
+
 def addSheets(document: pybers.Document) -> None:
     """Insert a sheet second and append another."""
     document.sheetAdd("Inserted", position=2)
@@ -590,6 +602,10 @@ confirmedBeforeCreation: str = (
 
 createdGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("00-created-blank-by-pybers", None, writeNothing),
+    GoldenBuilder("00-created-sheets-added-by-pybers", None, addSheets),
+    GoldenBuilder("00-created-tables-added-by-pybers", None, addTables),
+    GoldenBuilder("00-created-formulas-in-tables-by-pybers", None,
+                  addCreatedFormulaTables),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.
