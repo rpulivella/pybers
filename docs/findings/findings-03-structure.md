@@ -204,9 +204,9 @@ for PYB-17. Each is one edit Numbers made to a document built for it.
 sat on left the merge one row shorter, still holding its value at the top of what
 remained. A merge left one cell is unmerged, and keeps its value.
 
-**Bands cover lines, not counts.** A line added inside the header grows it, one
-removed shrinks it, and a line added at the footer's own first line lands inside
-the footer rather than in the body.
+**Headers and footers cover lines, not counts.** A line added inside the header rows
+grows them, one removed shrinks them, and a line added at the footer's own first line
+lands inside the footer rather than in the body.
 
 **Borders are layers of runs.** Each row and each column owns one stroke layer,
 holding runs along the other axis. A run spanning an insertion grows, and a run
@@ -447,24 +447,26 @@ landed `D3`, which has no border, on `G9`, and `G9` lost its border in both `64d
 `B1`, `D1` and `E1` arrived under `B5`, `D5` and `E5`, with the borders drawn around each
 covered cell. Selecting `A1:G1` alone left Paste disabled, so the recipe copies two rows.
 
-## Styles exist per BAND, not per row or column
+## Styles exist per REGION, not per row or column
 
-`TST.TableModelArchive` carries a style reference for each band, and nothing else:
+The header rows, the header columns and the footer rows are each a region of the table,
+the three Numbers' Headers & Footer controls set. `TST.TableModelArchive` carries a style
+reference for the body and for each region, and nothing else:
 
 ```
 table_style          the whole table
 body_cell_style      the default for every body cell
 body_text_style      the default text for every body cell
-header_row_style     the header-rows band     (+ header_row_text_style)
-header_column_style  the header-columns band  (+ header_column_text_style)
-footer_row_style     the footer-rows band     (+ footer_row_text_style)
+header_row_style     the header rows     (+ header_row_text_style)
+header_column_style  the header columns  (+ header_column_text_style)
+footer_row_style     the footer rows     (+ footer_row_text_style)
 ```
 
 ### CORRECTED by `40-table-bands`: these are PARENT TEMPLATES, not applied styles
 
 The reading above was from the schema and it was wrong in both halves. Measured against `40`:
 
-**A band style is only a parent.** `header_row_style` is a root `CellStyleArchive`
+**A region's style is only a parent.** `header_row_style` is a root `CellStyleArchive`
 (`is_variation: False`, `override_count: 4`) that no cell references directly. Every styled
 cell (header, footer **and body**) carries its own reference to an anonymous *variation*
 whose `parent` is the appropriate template:
@@ -477,7 +479,7 @@ plain body    -> no style reference at all
 ```
 
 Formatting a header row and formatting a body row are **the same operation against
-different parents**. Neither is a single-property band write, and the earlier design
+different parents**. Neither is a single-property write to a region, and the earlier design
 consequence (that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar)
 does not hold. Both are N cell writes.
 
@@ -503,32 +505,41 @@ operation, and a reader must not depend on it being populated.
 **A plain body cell carries no style reference at all.** Default body appearance is the
 *absence* of a style, not a reference to a body style.
 
-## Band membership: precedence, overlaps, and what survives un-setting
+## Header and footer membership: precedence, overlaps, and what survives un-setting
 
 `40-table-bands` maxes every count, 5 header rows, 5 header columns, 5 footer rows on a
 19x11 table, and labels the two overlap regions, so the corners can be attributed.
 
 **Precedence is header row > header column > footer row.** Styling the header column left
 the top-left corner on the header-**row** style; styling the footer left the bottom-left
-corner on the header style. A corner belongs to the higher band, and styling a lower band
-stops at the boundary rather than painting over it.
+corner on the header style. A corner belongs to the higher region, and styling a lower
+region stops at the boundary rather than painting over it.
 
-**Five is the maximum** for each of the three counts, bands always sit at the top, left and
-bottom, and a band cannot be placed mid-table.
+**Five is the maximum** for each of the three counts. Header rows always sit at the top,
+header columns at the left and footer rows at the bottom, and none can be placed mid-table.
 
-**A band has TWO templates, not one:** `header_row_style` for cell appearance and
+**At least one row and one column stay outside the headers and footers.** Header rows and
+footer rows together never reach a table's row count, and header columns never reach its
+column count.
+Numbers disables every control and action that would break this: an eight-row table takes 3
+header rows beside 4 footer rows, or 2 beside 5, and a four-column table at most 3 header
+columns. Observed by the maintainer in Numbers 15.4 on 5 November 2026, on a copy of the
+golden `00-created-headers-set-by-pybers`, whose counts Numbers read as pybers set them.
+
+**Each region has TWO templates, not one:** `header_row_style` for cell appearance and
 `header_row_text_style` for text, each acting as a parent for its own kind of variation.
 
 **The four cell templates differ in exactly one property.** Body, header row, header column
 and footer row all carry identical `padding` (4 on every side), `text_wrap: True` and
 `vertical_alignment: 0`; only `cell_fill` differs, and the body and footer fills are empty.
-That is why removing a band changes less than expected.
+That is why removing header or footer rows changes less than expected.
 
-**Un-setting a band re-parents its cells and preserves their overrides.** Setting header rows
+**Un-setting a region re-parents its cells and preserves their overrides.** Setting header rows
 from 5 back to 0 leaves each cell's explicit fill intact but re-parents its style from
-`header_row_style` to the body style. The appearance the user chose survives; the band's own
-default fill, its text-style parent, and the band effects (frozen, repeat-on-print) do not.
-Band membership is **not** recoverable from cell styling after the fact.
+`header_row_style` to the body style. The appearance the user chose survives; the region's
+own default fill, its text-style parent, and its effects (frozen, repeat-on-print) do not.
+Whether a cell is a header or footer cell is **not** recoverable from its styling after the
+fact.
 
 ### Freezing and repeat-on-print are independent fields
 
@@ -893,7 +904,7 @@ repeating_header_columns_enabled = 32
 the Numbers UI presents both near each other, and conflating them would silently change print
 behavior while appearing to set a view preference.
 
-The presence of `HeaderStorageBucket-*.iwa` members in every fixture confirms header bands
+The presence of `HeaderStorageBucket-*.iwa` members in every fixture confirms headers
 have their own storage, not merely a count.
 
 ---

@@ -221,9 +221,10 @@ differ. That reading is also what keeps JSON export compact, since a column is d
 once and only its exceptions are listed.
 
 **Formats apply over a range**, `table.cellFormatApply(range, format)`, and a single cell's
-value, format and style are set together in one call, `document.cellSet(reference, ...)`,
+value, format and style are set together in one call, `document.cellSet(selector, ...)`,
 the style a named one or one written into the cell alone. The call sits on the document
-because its reference names the table, and it returns the change it made.
+because its selector names the tables, writes every cell the selector matches, and
+returns each change it made and each part it skipped, and why.
 
 **A custom number format is a structured value** holding its positive, negative and zero
 forms, the shape Numbers stores. A shorthand parser may later build one, and the structured
@@ -268,12 +269,13 @@ of one position are always one key.
 
 **A reference is qualified only as far as its context needs**, the model of a path or a
 URL. `B3`, `Q3::B3` and `Budget::Q3::B3` are one type, its table and that table's sheet
-given by `TableReference` and `SheetReference`, typed rather than bare strings. Each owner
-takes its part and hands the rest down: `document.cell` refuses a reference naming no table,
-`sheet.cell` refuses one naming another sheet, and `table.cell` takes `B3` alone or a
-qualifier naming that table. A qualified and an unqualified reference compare unequal, as
-two paths do. Merging position and qualification into one type was weighed and kept apart
-from the address, because a qualified key would have to be stripped before every lookup.
+given by `TableReference` and `SheetReference`, typed rather than bare strings. A
+reference's text is the cell it names, and finding that cell from a document is a
+selection, which reads text by its positions as the next decision records. `table.cell`
+takes `B3` alone or a qualifier naming that table. A qualified and an unqualified
+reference compare unequal, as two paths do. Merging position and qualification into one
+type was weighed and kept apart from the address, because a qualified key would have to
+be stripped before every lookup.
 
 **An offset is its own type**, because an address is counted from one and bounded, and an
 offset is signed and may be zero. An address plus an offset is an address, an address
@@ -298,12 +300,12 @@ Selecting cells borrows two models a developer already knows, one for naming a s
 cell and one for matching many.
 
 **A reference follows `pathlib.Path`.** It is qualified only as far as its context needs,
-the way a path is relative or absolute, and each owner resolves its part and hands the rest
-down, the way a path walks directories. `cell.address` and `cell.reference` are a path's
+the way a path is relative or absolute, and every lookup resolves through the one
+resolver, as a path resolves against its working directory. `cell.address` and `cell.reference` are a path's
 name and its resolved form, and an offset between two addresses is a relative path.
 
-**A selector follows CSS.** It matches a set of cells by pattern and returns their
-references. The `::` chain is the descendant combinator, `Budget::*, Notes::Table 1` is
+**A selector follows CSS.** It matches sheets, tables, ranges and cells by pattern and
+returns their references. The `::` chain is the descendant combinator, `Budget::*, Notes::Table 1` is
 grouping, and `Q*::*` is a partial match on names. CSS also offers what an agent asking for
 cells by meaning rather than by position needs: a condition on a cell's kind or format,
 in the manner of an attribute selector (`[kind=duration]`), a state, in the manner of a
@@ -312,9 +314,30 @@ pseudo-class (`:empty`, `:formula`, `:header`), a position by pattern, in the ma
 `:not()`. One string can then ask for every duration in every quarterly table that is not
 a header, and the table-structure read and JSON export answer to the same selectors.
 
+**A position always specifies the same part**, so no selector reads two ways, as
+`library-design.md` sets out under Addresses. Reading a name as the widest part it could name, a sheet before a table, was weighed and
+rejected, because a table sharing a sheet's name is then reachable only by accident, and an
+agent cannot tell from the text alone what it will select.
+
+**One resolver, written in its simplest form.** It walks the sheets, tables and cells a
+selector reaches and parses the text on each call. The typed lookups, `document.sheet`,
+`document.table`, `sheet.table` and `table.cell`, are one-group selections through it,
+and there is no other lookup by name or address. An index is added only where
+`findings-13-selection.md` measures the walk too slow, and every call changing what it
+holds then updates it.
+
+**Matching is apart from acting**, as in CSS, where a property that does not apply to an
+element is ignored. A selection returns references and changes nothing. An action states
+the selections it accepts: one acting on each cell, as `cellSet` does, applies to every
+cell it can and reports each it did not, and why, and one needing one block or one table,
+as a merge does, refuses any other shape before writing, listing what matched.
+
 pybers borrows from CSS elsewhere too: a created table starts from a reset in the sense of
 a CSS reset, and an item on a sheet is placed by the anchor names of `background-position`.
-The selector type is built in PYB-223.
+
+**A preview is a change left unsaved.** No call takes a `preview` argument: a script
+makes the change in memory and does not save, and every command's `--preview` does
+exactly that, so a preview reports what the change does because it is the change.
 
 ## The JSON form, decided 2026-10-24
 
@@ -326,6 +349,13 @@ record a save replaces, and the form carries what a cell shows rather than that 
 It is the only serializer pybers holds: `--format json` in every command, the golden
 confirmations and any script reach it, so no two of them can disagree.
 `src/pybers/interchange/schema.json` describes it, generated from the model.
+
+**What a command prints as JSON reads back.** A command's stdout under `--format json`
+is a JSON form `parseJsonForm` reads, never a report shaped for one command: `show` and
+`set` print the parts they reach, a selector's parts always as an array, and a part a
+write skipped is a diagnostic on stderr, as `Written:` is. A `Check` and the region
+`locale` prints are the exceptions: the first describes the file and the machine, and
+the second is the document's `localeIdentifier` under the key its form gives it.
 
 **A key is the model's own public name.** `Cell` writes `value`, `kind`, `formulaText`,
 `valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, in the order
