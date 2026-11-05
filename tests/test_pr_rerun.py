@@ -114,11 +114,11 @@ def testARunStillInProgressIsNotRestarted(monkeypatch: pytest.MonkeyPatch) -> No
     assert restarted == []
 
 
-def testADryRunNamesTheRunsAndRestartsNone(
+def testAPreviewNamesTheRunsAndRestartsNone(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     runs = [buildRun(1, "preflight", "cancelled", "2026-10-05T01:00:00Z")]
-    code, restarted = runRerunOf(monkeypatch, runs, "--dry-run")
+    code, restarted = runRerunOf(monkeypatch, runs, "--preview")
     assert (code, restarted) == (0, [])
     assert "would restart preflight" in readOutput(capsys)
 

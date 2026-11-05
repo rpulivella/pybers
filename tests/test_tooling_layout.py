@@ -5,6 +5,7 @@ The tooling's layout: commands in each folder, libraries in its `lib/`, and impo
 Read as source, so nothing here runs a command or reaches GitHub or Numbers.
 
 UPDATES
+2026-10-22  A message names a ticket by its key, never as an Issue, for PYB-255.
 2026-10-15  `pr`, `ticket` and `dashboard` import none of one another, and only
             `dashboard` reaches the dashboard library, for PYB-156.
 2026-10-13  Written for PYB-204.
@@ -140,3 +141,24 @@ def testOnlyTheDashboardCommandReachesTheDashboardLibrary(path: Path) -> None:
         return
     assert "tools.workflow.lib.dashboard" not in readImportedModules(path)
 
+
+
+def listMessageTexts(path: Path) -> list[str]:
+    """Return the literal text of every string and f-string a tooling file holds."""
+    texts = []
+    for node in ast.walk(readTree(path)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            texts.append(node.value)
+        elif isinstance(node, ast.JoinedStr):
+            texts.append("".join(
+                part.value if isinstance(part, ast.Constant) else "{}"
+                for part in node.values
+            ))
+    return texts
+
+
+@pytest.mark.parametrize("path", toolingFiles, ids=lambda path: path.name)
+def testAMessageNamesATicketByItsKeyNeverAsAnIssue(path: Path) -> None:
+    ticketAsIssue = re.compile(r"\bIssue \{\}|(?<!PR )(?<!Project )#\{\}")
+    named = [text for text in listMessageTexts(path) if ticketAsIssue.search(text)]
+    assert not named, f"{path.name} names a ticket as {named}"

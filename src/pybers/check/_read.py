@@ -17,6 +17,8 @@ message, because pybers's own read path names archives by identifier. Any other
 error keeps only its type and where pybers raised it.
 
 UPDATES
+2026-11-03  Every check carries the sheets and tables, their names withheld
+            unless asked for, for PYB-223.
 2026-10-13  Six archive types a Numbers 15.4 template holds count as tested, for
             PYB-139.
 2026-10-12  Each missing part of a check names why it is missing, for PYB-190.
@@ -42,16 +44,16 @@ from pathlib import Path
 
 from .._persistence import NumbersPackage, readPackage
 from .._persistence.types import readArchiveTypeId
-from ..absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
+from ..absence import UNDETERMINED, WITHHELD
 from ..document._read import readDocument
 from ..document.sheets import Document
 from ..errors import PybersError
+from ..table.cells import Table
 from .environment import readCheckEnvironment
 from .report import (
     Check,
     CheckCell,
     CheckFailure,
-    CheckNames,
     CheckSheet,
     CheckTable,
     NumbersVersion,
@@ -120,22 +122,25 @@ def countUntestedArchiveTypes(package: NumbersPackage) -> frozendict[int, int]:
     })
 
 
-def listUnrecognizedCells(document: Document) -> list[CheckCell]:
-    """Return each cell the reader kept a type for because it did not recognize it."""
-    return [
-        CheckCell(sheet.name, table.name, str(reference), unrecognized)
-        for sheet in document.sheets
-        for table in sheet.tables
-        for reference, cell in table.cells.items()
-        if (unrecognized := cell.description.unrecognizedTypeCode) is not None
-    ]
-
-
-def readCheckSheets(document: Document) -> tuple[CheckSheet, ...]:
-    """Return every sheet by name, with its tables and their sizes."""
+def listUnrecognizedCells(table: Table) -> tuple[CheckCell, ...]:
+    """Return each cell of a table the reader kept a type for, by row."""
     return tuple(
-        CheckSheet(sheet.name, tuple(
-            CheckTable(table.name, table.rowCount, table.colCount)
+        CheckCell(str(address), unrecognized)
+        for address, cell in sorted(
+            table.cells.items(), key=lambda each: each[0].asRowColumn()
+        )
+        if (unrecognized := cell.unrecognizedTypeCode) is not None
+    )
+
+
+def readCheckSheets(document: Document, names: bool) -> tuple[CheckSheet, ...]:
+    """Return every sheet, with its tables and their sizes, each name if asked for."""
+    return tuple(
+        CheckSheet(sheet.name if names else WITHHELD, tuple(
+            CheckTable(
+                table.name if names else WITHHELD, table.rowCount, table.colCount,
+                listUnrecognizedCells(table),
+            )
             for table in sheet.tables
         ))
         for sheet in document.sheets
@@ -189,19 +194,19 @@ def checkDocument(
     report("opening it…")
     opened = openForCheck(package, source)
     document = opened if isinstance(opened, Document) else None
-    cells = None if document is None else listUnrecognizedCells(document)
+    sheets = None if document is None else readCheckSheets(document, names)
     return Check(
         environment=readCheckEnvironment(),
         savedBy=readSavedVersion(package),
         failure=opened if isinstance(opened, CheckFailure) else None,
         untestedArchiveTypes=countUntestedArchiveTypes(package),
-        unrecognizedCellTypes=UNDETERMINED if cells is None else frozendict(
-            sorted(Counter(cell.typeCode for cell in cells).items())
-        ),
-        names=NOT_REQUESTED if not names else CheckNames(
-            UNDETERMINED if document is None else readCheckSheets(document),
-            UNDETERMINED if cells is None else tuple(cells),
-        ),
+        unrecognizedCellTypes=UNDETERMINED if sheets is None else frozendict(sorted(
+            Counter(
+                cell.typeCode for sheet in sheets for table in sheet.tables
+                for cell in table.unrecognizedCells
+            ).items()
+        )),
+        sheets=UNDETERMINED if sheets is None else sheets,
     )
 
 

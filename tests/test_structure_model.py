@@ -43,7 +43,7 @@ def testAnEditReachesTheModelNumbersReached(name: str) -> None:
 
 
 def testARangeGrowingPastTheInsertionMovesOnlyItsFarEnd() -> None:
-    """PYB-17 AC 2.i, the ticket's own example on a table built by hand."""
+    """PYB-17 AC 2.i, the ticket's own example on a table the test constructs."""
     table = pybers.Table("Ledger", rowCount=30, colCount=4)
     table.cell("D1").formulaText = "=SUM(C3:C25)"
     table.rowAdd(10)
@@ -91,7 +91,7 @@ def testRemovingAReferencedRowReportsTheCellItBroke() -> None:
     table = document.sheets[0].table("Table 1")
     lost = table._rowIdentities[1:3]
     broken = table.rowRemove(2, 2)
-    assert [str(cell.reference) for cell in broken] == ["B8"]
+    assert [str(cell.address) for cell in broken] == ["B8"]
     formula = table.cell("B8").formula
     assert formula is not None
     reference = formula.references[0]
@@ -105,7 +105,7 @@ def testRemovingAReferencedColumnBreaksAFormulaInAnotherTable() -> None:
     document = openBase()
     broken = document.sheets[0].table("Table 1").columnRemove("C", 5)
     found = {
-        (cell.table.name, str(cell.reference)) for cell in broken if cell.table
+        (cell.table.name, str(cell.address)) for cell in broken if cell.table
     }
     assert found == {("Table 1", "B12"), ("Table 2", "A3")}
 
@@ -164,4 +164,4 @@ def testACommandLineRemovesAColumnByLetterAndReportsWhatBroke() -> None:
     arguments = ["Table 1", "E"]
     document = pybers.open(baseFixture)
     broken = document.sheet(1).table(arguments[0]).columnRemove(arguments[1])
-    assert [f"{cell.reference}" for cell in broken] == ["B12"]
+    assert [f"{cell.address}" for cell in broken] == ["B12"]

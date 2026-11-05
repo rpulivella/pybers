@@ -40,7 +40,7 @@ monotonic and does not reset, so merge indices are never reused.
 ### Covered cells do not exist
 
 The cells a merge covers have **no record in the tile at all**, indistinguishable from empty.
-`spanCellType` is defined in `CellType` and is not used for this. So a reader cannot tell a
+`spanCellType` is defined in `CellType` and is not used for this. A reader cannot tell a
 covered cell from an empty one by looking at the tile; it has to consult the merge ranges.
 That makes merges essential to reading a table correctly, not an optional nicety.
 
@@ -68,7 +68,7 @@ text cell separated by tab characters**:
 
 `22d` completes the rule on the second axis, measured 2026-09-07. The join is **row-major,
 a tab between columns and a newline between rows**, so a two-by-two merge of cells naming
-themselves produces `'two by two, anchor\td2\nc3\td3'`. Every merge in the corpus was one
+themselves produces `'two by two, anchor\td2\nc3\td3'`. Every merge in the documents was one
 row tall until that fixture, which is why only the tab half was known.
 
 Numbers coerces to text, so merging two numeric cells destroys both numbers. `22b` proves the
@@ -82,7 +82,7 @@ In `22`, `=I1` reads the merge anchor and returns 391, while `=J1` points at a c
 and is a **type 8** error. In `22b` that same formula becomes an ordinary type 2 cell holding
 `0`, because J1 exists again.
 
-So merge state directly determines whether a formula resolves. The error is not recorded as a
+Merge state directly determines whether a formula resolves. The error is not recorded as a
 kind (consistent with the finding that error kinds are not stored) it simply becomes an
 error cell and un-becomes one.
 
@@ -107,7 +107,7 @@ notice on its own, for the same reason it does not notice an edited operand, see
                merges 10-14     at row 2     new, on an inserted row
 ```
 
-So **"absolute" means absolute with respect to dragging a formula, not immune to structural
+**"Absolute" means absolute with respect to dragging a formula, not immune to structural
 change.** The original five moved from row 0 to row 1 when a row was inserted above them, and
 row 1 still holds all of `22`'s content with the same covered-column gaps. Merges track edits
 correctly.
@@ -130,7 +130,7 @@ must not infer either from the other.
 ```
 
 Existing merges shifted to their new columns correctly, but **no new merges were created**,
-where inserting a row created ten. So an inserted **row** inherits the merge pattern of its
+where inserting a row created ten. An inserted **row** inherits the merge pattern of its
 neighbor and an inserted **column** does not.
 
 Had only one of the two been tested, the wrong rule would have been generalized to both. Any
@@ -188,7 +188,7 @@ wherever it moves. An added line takes a fresh UUID, and the sorted list stays s
 **Numbers maintains the counts it keeps by index**: each header bucket re-indexes and
 recounts `numberOfCells`, each tile row recounts `cell_count`, and the stroke sidecar
 takes the new size. The layout cache's `rows_fitting_entries` hold column indices and
-go stale; a created table carries that cache empty, which Numbers accepts.
+go stale; a created table carries no cache, which Numbers rebuilds.
 
 **The engine moves every coordinate**, in the table's registers, its merge owner and its
 `cell_errors`. A one-cell range such as `SUM(A2:A2)` is registered as a cell edge rather
@@ -204,9 +204,9 @@ for PYB-17. Each is one edit Numbers made to a document built for it.
 sat on left the merge one row shorter, still holding its value at the top of what
 remained. A merge left one cell is unmerged, and keeps its value.
 
-**Bands cover lines, not counts.** A line added inside the header grows it, one
-removed shrinks it, and a line added at the footer's own first line lands inside
-the footer rather than in the body.
+**Headers and footers cover lines, not counts.** A line added inside the header rows
+grows them, one removed shrinks them, and a line added at the footer's own first line
+lands inside the footer rather than in the body.
 
 **Borders are layers of runs.** Each row and each column owns one stroke layer,
 holding runs along the other axis. A run spanning an insertion grows, and a run
@@ -219,7 +219,15 @@ its neighbor's border.
 values scattered through it held tiles 0 to 7, then 15, 16, 24 and on. A tile is
 created where a row lands, and removed when it empties. `rowTileTree` lists only
 the tiles that exist, and `nextRowStripID` is the highest tile id plus one, not
-the tile count.
+the tile count. pybers creates the tile a written row needs the same way, since a
+row in a tile the file lacks was dropped in silence until PYB-276.
+
+**A wide row carries one offset slot per column through its last record.** With
+values typed at `A1` and `KJ1` of a created 300-column table on 2 November 2026,
+Numbers wrote 296 two-byte slots counting words, `has_wide_offsets` on the row and
+`should_use_wide_rows` on the tile, and filled both pre-BNC fields with the four bytes
+`f09fa4a0`, as every row of `45-columns-over-255` holds them. A narrow row keeps its
+fixed 255 slots, and pybers refuses a record past them rather than drop it.
 
 **Row headers are kept in buckets of 65,536 rows.** A table holds one bucket
 until its row count is SET past 65,536, when it holds sixteen, and it keeps
@@ -439,24 +447,26 @@ landed `D3`, which has no border, on `G9`, and `G9` lost its border in both `64d
 `B1`, `D1` and `E1` arrived under `B5`, `D5` and `E5`, with the borders drawn around each
 covered cell. Selecting `A1:G1` alone left Paste disabled, so the recipe copies two rows.
 
-## Styles exist per BAND, not per row or column
+## Styles exist per REGION, not per row or column
 
-`TST.TableModelArchive` carries a style reference for each band, and nothing else:
+The header rows, the header columns and the footer rows are each a region of the table,
+the three Numbers' Headers & Footer controls set. `TST.TableModelArchive` carries a style
+reference for the body and for each region, and nothing else:
 
 ```
 table_style          the whole table
 body_cell_style      the default for every body cell
 body_text_style      the default text for every body cell
-header_row_style     the header-rows band     (+ header_row_text_style)
-header_column_style  the header-columns band  (+ header_column_text_style)
-footer_row_style     the footer-rows band     (+ footer_row_text_style)
+header_row_style     the header rows     (+ header_row_text_style)
+header_column_style  the header columns  (+ header_column_text_style)
+footer_row_style     the footer rows     (+ footer_row_text_style)
 ```
 
 ### CORRECTED by `40-table-bands`: these are PARENT TEMPLATES, not applied styles
 
 The reading above was from the schema and it was wrong in both halves. Measured against `40`:
 
-**A band style is only a parent.** `header_row_style` is a root `CellStyleArchive`
+**A region's style is only a parent.** `header_row_style` is a root `CellStyleArchive`
 (`is_variation: False`, `override_count: 4`) that no cell references directly. Every styled
 cell (header, footer **and body**) carries its own reference to an anonymous *variation*
 whose `parent` is the appropriate template:
@@ -468,8 +478,8 @@ body cell     -> #928722  variation, parent = the BODY style,     overrides cell
 plain body    -> no style reference at all
 ```
 
-So formatting a header row and formatting a body row are **the same operation against
-different parents**. Neither is a single-property band write, and the earlier design
+Formatting a header row and formatting a body row are **the same operation against
+different parents**. Neither is a single-property write to a region, and the earlier design
 consequence (that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar)
 does not hold. Both are N cell writes.
 
@@ -488,39 +498,48 @@ message HeaderStorageBucket {
 }
 ```
 
-It is **unused** in the corpus: `40`'s deliberately-filled body row wrote per-cell styles and
-left `cell_style` unset on the row. So the slot exists, Numbers did not use it for that
+It is **unused** in the documents: `40`'s deliberately-filled body row wrote per-cell styles and
+left `cell_style` unset on the row. The slot exists, Numbers did not use it for that
 operation, and a reader must not depend on it being populated.
 
 **A plain body cell carries no style reference at all.** Default body appearance is the
 *absence* of a style, not a reference to a body style.
 
-## Band membership: precedence, overlaps, and what survives un-setting
+## Header and footer membership: precedence, overlaps, and what survives un-setting
 
 `40-table-bands` maxes every count, 5 header rows, 5 header columns, 5 footer rows on a
 19x11 table, and labels the two overlap regions, so the corners can be attributed.
 
 **Precedence is header row > header column > footer row.** Styling the header column left
 the top-left corner on the header-**row** style; styling the footer left the bottom-left
-corner on the header style. A corner belongs to the higher band, and styling a lower band
-stops at the boundary rather than painting over it.
+corner on the header style. A corner belongs to the higher region, and styling a lower
+region stops at the boundary rather than painting over it.
 
-**Five is the maximum** for each of the three counts, bands always sit at the top, left and
-bottom, and a band cannot be placed mid-table.
+**Five is the maximum** for each of the three counts. Header rows always sit at the top,
+header columns at the left and footer rows at the bottom, and none can be placed mid-table.
 
-**A band has TWO templates, not one:** `header_row_style` for cell appearance and
+**At least one row and one column stay outside the headers and footers.** Header rows and
+footer rows together never reach a table's row count, and header columns never reach its
+column count.
+Numbers disables every control and action that would break this: an eight-row table takes 3
+header rows beside 4 footer rows, or 2 beside 5, and a four-column table at most 3 header
+columns. Observed by the maintainer in Numbers 15.4 on 5 November 2026, on a copy of the
+golden `00-created-headers-set-by-pybers`, whose counts Numbers read as pybers set them.
+
+**Each region has TWO templates, not one:** `header_row_style` for cell appearance and
 `header_row_text_style` for text, each acting as a parent for its own kind of variation.
 
 **The four cell templates differ in exactly one property.** Body, header row, header column
 and footer row all carry identical `padding` (4 on every side), `text_wrap: True` and
 `vertical_alignment: 0`; only `cell_fill` differs, and the body and footer fills are empty.
-That is why removing a band changes less than expected.
+That is why removing header or footer rows changes less than expected.
 
-**Un-setting a band re-parents its cells and preserves their overrides.** Setting header rows
+**Un-setting a region re-parents its cells and preserves their overrides.** Setting header rows
 from 5 back to 0 leaves each cell's explicit fill intact but re-parents its style from
-`header_row_style` to the body style. The appearance the user chose survives; the band's own
-default fill, its text-style parent, and the band effects (frozen, repeat-on-print) do not.
-So band membership is **not** recoverable from cell styling after the fact.
+`header_row_style` to the body style. The appearance the user chose survives; the region's
+own default fill, its text-style parent, and its effects (frozen, repeat-on-print) do not.
+Whether a cell is a header or footer cell is **not** recoverable from its styling after the
+fact.
 
 ### Freezing and repeat-on-print are independent fields
 
@@ -532,7 +551,7 @@ BOTH        repeating_header_rows_enabled = True
 ```
 
 `repeating_*` is `True` on both tables, including the one where `header_rows_frozen` is not
-set at all. So the freeze control does not touch it, **repeat-on-print is print state**, set
+set at all. The freeze control does not touch it, **repeat-on-print is print state**, set
 elsewhere in the print layout UI, and a reader must not infer one from the other.
 
 Print settings generally, along with pagination and per-object page position, are **not
@@ -548,8 +567,8 @@ index          the row or column number
 size           its height or width  -- 0.00 means USE THE DEFAULT, not zero
 hidingState    0 when visible
 numberOfCells  how many cells that row or column holds
-cell_style     optional, unused in the corpus
-text_style     optional, unused in the corpus
+cell_style     optional, unused in the documents
+text_style     optional, unused in the documents
 ```
 
 **The two axes are reached differently.** `rowHeaders` is an inline `TST.HeaderStorage`
@@ -595,7 +614,7 @@ on each entry is what maps a tile to its row range.
 
 ## A table declares its size, and it is often larger than its cells reach
 
-From the whole corpus, measured 2026-09-01.
+From every document, measured 2026-09-01.
 
 **`TableModelArchive.number_of_rows` and `number_of_columns` are explicitly set on all 74
 tables**, and they are the table's real size. A Numbers table is a fixed grid rather than the
@@ -619,7 +638,7 @@ Every gap is ordinary: an empty trailing column, or a 10 by 5 table holding one 
 derived rectangle is a perfectly plausible one, which is the usual shape of a mistake in this
 format.
 
-**No cell record anywhere in the corpus falls outside its table's declared size**, so the
+**No cell record anywhere in the documents falls outside its table's declared size**, so the
 declaration and the tiles agree and the declaration can be read as authoritative rather than
 as a hint to be checked against the data.
 
@@ -644,7 +663,7 @@ headers and footers.
 ### Print and page setup: unexercised, and MUST NOT BE BROKEN
 
 No fixture tests any of this, and none is planned, Numbers' page-layout tools are a real
-differentiator and reproducing them is out of scope. But every sheet in every fixture already
+differentiator and reproducing them is out of scope. However, every sheet in every fixture already
 carries the state, so a writer that does not round-trip it damages documents it never
 intended to touch:
 
@@ -660,7 +679,7 @@ headers: [3 references]        footers: [3 references]
 
 **`headers` and `footers` are three references each** (left, center and right) and they
 point at real `TSWP.StorageArchive`s. Those are the six otherwise-unexplained storages that
-appear in every document in this corpus. They hold **editable text**, so a writer that
+appear in every document. They hold **editable text**, so a writer that
 regenerates storages rather than carrying them through can silently erase a document's page
 headers.
 
@@ -691,7 +710,7 @@ position (0.175, 68)     size 98 x 20.07
 position (165.175, 0)    size 102 x 60
 ```
 
-So placement is in **points**, the same unit as every other coordinate, `41-table-geometry`
+Placement is in **points**, the same unit as every other coordinate, `41-table-geometry`
 labels its tables and they read exactly: `(144, 144)` is "x2.0in y2.0in", `(-72, 360)` is
 "x-1.0in y5.0in". **A table may sit at a negative position**, off the left edge of the sheet.
 `angle` means a table can be rotated, and `locked` and `aspect_ratio_locked` are real state.
@@ -759,14 +778,14 @@ rule or it will produce a document Numbers itself would not have written.
 **Corrected 2026-09-01: the scope is the sheet, not the document.** This section read "unique
 within a document", generalized from `42`, whose eight tables all sit on one sheet.
 `20-formula-shapes` disproves that reading directly: it carries `Table 1` on Sheet 1 and
-another `Table 1` on Sheet 2, in one document, with `Table 2` alongside the first. So a name
+another `Table 1` on Sheet 2, in one document, with `Table 2` alongside the first. A name
 identifies a table within its own sheet and nowhere wider, and a lookup that takes a table
 name has to be reached through the sheet that holds it.
 
 `table_name_height` is `0.0` throughout, the same "use the default" convention as row heights.
 
 **The title sits in negative page space**, above the table's own origin, one fixture table
-is at `y = -28.0` with the title rendered above it. So a table's visible extent is larger
+is at `y = -28.0` with the title rendered above it. A table's visible extent is larger
 than its geometry when the name is shown.
 
 ### The title is a text container, styled like any other
@@ -798,7 +817,7 @@ CaptionInfoArchive {
 ```
 
 An uncaptioned drawable carries `TSD.StandinCaptionArchive` in that slot instead, the empty
-placeholder from `33`. So the slot is always occupied and only its *type* says whether a
+placeholder from `33`. The slot is always occupied and only its *type* says whether a
 caption exists.
 
 **Captions are NOT forced unique**, unlike table names; the fixture has three reading
@@ -818,13 +837,13 @@ custom inset      para 'Special Caption'   shape #914776   padding 1/1/1/1
 default inset     para 'Special Caption'   shape #904525   padding 4/4/4/4
 ```
 
-Same named paragraph style, different shape styles. So **an inset does not travel with a
+Same named paragraph style, different shape styles. **An inset does not travel with a
 named paragraph style**, applying that style elsewhere will not carry the inset with it, and
 a model that folds padding into the text style will get this wrong.
 
 `TSWP.ShapeStylePropertiesArchive` also carries `shrink_to_fit`, `vertical_alignment`, a
 `paragraph_style` reference for the container default, and **`columns`**, text containers
-support multiple text columns. Every instance in the corpus reads
+support multiple text columns. Every instance in the documents reads
 `equal_columns { count: 1 }`, so multi-column text is representable and **unexercised**.
 
 ## Hiding a row or column: by UUID, and not where the field name suggests
@@ -833,7 +852,7 @@ support multiple text columns. Every instance in the corpus reads
 guessable.
 
 **`HeaderStorageBucket.hidingState` is NOT user hiding.** It reads `0` on the hidden row and
-the hidden column alike, on every table in the corpus. Whatever it is for, it is not this.
+the hidden column alike, on every table in the documents. Whatever it is for, it is not this.
 
 **Hidden state lives on the table model, addressed by UUID:**
 
@@ -865,7 +884,7 @@ Reading the sorted list positionally reports the wrong column. **Sorted order is
 order** and the map has to be applied.
 
 `user_hidden` distinguishes manual hiding from filter hiding, which is the sibling
-`filter_set` mechanism (`is_enabled: False` throughout the corpus). A row can therefore be
+`filter_set` mechanism (`is_enabled: False` throughout the documents). A row can therefore be
 hidden two independent ways, and a hidden row **keeps its `size`**, hiding does not zero the
 height.
 
@@ -885,7 +904,7 @@ repeating_header_columns_enabled = 32
 the Numbers UI presents both near each other, and conflating them would silently change print
 behavior while appearing to set a view preference.
 
-The presence of `HeaderStorageBucket-*.iwa` members in every fixture confirms header bands
+The presence of `HeaderStorageBucket-*.iwa` members in every fixture confirms headers
 have their own storage, not merely a count.
 
 ---

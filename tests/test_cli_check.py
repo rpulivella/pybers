@@ -3,6 +3,10 @@
 `pybers check`, run the way a person reporting a bug runs it.
 
 UPDATES
+2026-11-03  Every check carries the sheets and tables, names withheld unless
+            asked for, for PYB-223.
+2026-10-27  A size of one row reads `1 row`, and `renderPlain` shared from
+            `conftest`, for PYB-260.
 2026-10-12  The JSON form and an uninstalled pybers's version, for PYB-187.
 2026-10-12  Each reason a part is missing prints as the design says, for PYB-190.
 2026-10-07  Written for PYB-169.
@@ -33,11 +37,10 @@ from rich.text import Text
 from typer.testing import CliRunner
 
 import pybers
-from conftest import findDocumentPath
+from conftest import findDocumentPath, renderPlain
 from pybers._persistence import readPackage, writePackage
 from pybers.cli import main
 from pybers.cli._app import HelpSection, app
-from pybers.cli._console import theme
 from pybers.cli.check import formatCheck
 
 baselinePath: Path = findDocumentPath("00-baseline")
@@ -74,7 +77,8 @@ def testCheckReportsEveryFactForADocumentPybersOpens() -> None:
     result = runner.invoke(app, ["check", str(baselinePath)])
     assert result.exit_code == 0
     lines = result.stdout.splitlines()
-    assert [line.split(": ")[0] + ": " for line in lines] == list(reportLabels)
+    labels = [line.split(": ")[0] + ": " for line in lines[:len(reportLabels)]]
+    assert labels == list(reportLabels)
     assert "Readable: yes" in lines
     assert "Saved with: Numbers 15.3.1 (build 7050.1.1-2)" in lines
 
@@ -116,14 +120,14 @@ def testJsonHoldsTheSameFactsAsTheLibraryReturns() -> None:
     assert printed["environment"]["pythonVersion"] == found.environment.pythonVersion
     assert printed["savedBy"] == {"version": "15.3.1", "build": "7050.1.1-2"}
     assert printed["failure"] is None
-    assert printed["names"]["sheets"][0]["tables"][0] == {
-        "name": "Table 1", "rowCount": 10, "colCount": 7
+    assert printed["sheets"][0]["tables"][0] == {
+        "name": "Table 1", "rowCount": 10, "colCount": 7, "unrecognizedCells": []
     }
 
 
 def testJsonNamesWhyAPartIsMissing() -> None:
     result = runner.invoke(app, ["check", "--format", "json", str(baselinePath)])
-    assert json.loads(result.stdout)["names"] == "NOT_REQUESTED"
+    assert json.loads(result.stdout)["sheets"][0]["name"] == "WITHHELD"
 
 
 @pytest.mark.parametrize("outputFormat", ["text", "json"])
@@ -241,12 +245,20 @@ def testHelpListsCheck() -> None:
     assert "check" in result.stdout
 
 
+def testEveryCheckShowsTheSheetsAndTablesByKindAndSize() -> None:
+    result = runner.invoke(app, ["check", str(recordsPath)])
+    lines = result.stdout.splitlines()
+    assert lines[lines.index("Sheets:") + 1:] == [
+        "Sheet", "└ Table: 10 rows × 7 columns"
+    ]
+
+
 def testNamesListTheDocumentsSheetsAndTables() -> None:
     result = runner.invoke(app, ["check", "--names", str(recordsPath)])
     assert result.exit_code == 0
     lines = result.stdout.splitlines()
     assert "Sheet1" in lines
-    assert "└ Table 1: 10 rows, 7 columns" in lines
+    assert "└ Table 1: 10 rows × 7 columns" in lines
 
 
 @pytest.mark.parametrize(
@@ -285,20 +297,13 @@ def testHelpAndUsageErrorsDrawNoBorders(arguments: list[str]) -> None:
     assert not set(output) & set("╭╮╰╯│─━┃┏┓┗┛")
 
 
-def renderPlain(renderable: object) -> str:
-    """Return what a renderable prints on a terminal without color."""
-    buffer = io.StringIO()
-    Console(file=buffer, width=100, no_color=True, theme=theme).print(renderable)
-    return buffer.getvalue()
-
-
 def testANameInBracketsPrintsAsWritten() -> None:
     found = pybers.checkDocument(baselinePath)
     table = pybers.CheckTable("[draft]", 1, 1)
-    names = pybers.CheckNames((pybers.CheckSheet("[bold]Q3", (table,)),), ())
-    printed = renderPlain(formatCheck(replace(found, names=names)))
+    sheets = (pybers.CheckSheet("[bold]Q3", (table,)),)
+    printed = renderPlain(formatCheck(replace(found, sheets=sheets)))
     assert "\n[bold]Q3\n" in printed
-    assert "└ [draft]: 1 rows, 1 columns" in printed
+    assert "└ [draft]: 1 row × 1 column" in printed
 
 
 @pytest.mark.parametrize(
@@ -315,11 +320,11 @@ def testAPartPybersCouldNotDetermineReadsUnknown() -> None:
     found = replace(
         pybers.checkDocument(baselinePath),
         unrecognizedCellTypes=pybers.UNDETERMINED,
-        names=pybers.CheckNames(pybers.UNDETERMINED, pybers.UNDETERMINED),
+        sheets=pybers.UNDETERMINED,
     )
     printed = renderPlain(formatCheck(found))
     assert "Unrecognized cell types: unknown\n" in printed
-    assert "Sheets: unknown\nUnrecognized cells: unknown\n" in printed
+    assert printed.endswith("Sheets: unknown\n")
 
 
 def testAWithheldMessageLeavesOnlyTheErrorType() -> None:
@@ -328,17 +333,15 @@ def testAWithheldMessageLeavesOnlyTheErrorType() -> None:
     assert "Readable: no, KeyError\n" in renderPlain(formatCheck(found))
 
 
-def testUnrecognizedCellsHangUnderTheirSheetAndTable() -> None:
+def testUnrecognizedCellsHangUnderTheirTableBadged() -> None:
     found = pybers.checkDocument(baselinePath)
-    cells = (
-        pybers.CheckCell("Sheet1", "Table 1", "B7", 4),
-        pybers.CheckCell("Sheet1", "Table 1", "C9", 4),
-    )
-    names = pybers.CheckNames((), cells)
-    printed = renderPlain(formatCheck(replace(found, names=names)))
+    cells = (pybers.CheckCell("B7", 4), pybers.CheckCell("C9", 4))
+    table = pybers.CheckTable(pybers.WITHHELD, 10, 5, cells)
+    sheets = (pybers.CheckSheet(pybers.WITHHELD, (table,)),)
+    printed = renderPlain(formatCheck(replace(found, sheets=sheets)))
     assert printed.endswith(
-        "Unrecognized cells:\nSheet1\n└ Table 1\n  ├ B7: cell type 4\n"
-        "  └ C9: cell type 4\n"
+        "Sheets:\nSheet\n└ Table: 10 rows × 5 columns\n"
+        "  ├ B7  UNRECOGNIZED  cell type 4\n  └ C9  UNRECOGNIZED  cell type 4\n"
     )
 
 
@@ -355,3 +358,13 @@ def testAHelpSectionRendersHoweverTyperCallsIt(section: HelpSection) -> None:
     buffer = io.StringIO()
     Console(width=40, file=buffer).print(section)
     assert "body" in buffer.getvalue()
+
+
+def testEveryBadgeLevelHasAStyleInTheTheme() -> None:
+    from pybers.cli._console import themeStyles
+    from pybers.cli._report import BadgeLevel, formatBadge
+
+    for level in BadgeLevel:
+        badge = formatBadge("noted", level)
+        assert (badge.plain, badge.style) == (" NOTED ", f"badge.{level}")
+        assert f"badge.{level}" in themeStyles

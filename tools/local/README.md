@@ -19,10 +19,27 @@ protos_extract.py    dump the iWork protobuf schemas pybers builds on, and diff 
 functions_extract.py derive the table of formula functions, each with its index,
                      name and the argument counts it accepts. Writes
                      src/pybers/_generated/functions.py
+locales_extract.py   read each region's formatting symbols from macOS's own ICU,
+                     as Numbers reads them. Writes src/pybers/_generated/locales.py
+themestyles_extract.py
+                     read the properties Numbers states on every root style of each
+                     type a created theme holds, valued as 00-baseline's Blank theme
+                     states them. Writes src/pybers/_generated/themestyles.py
+locales_sweep.py     change a document to each region the locale table holds, open
+                     it in Numbers through the golden-confirm helper, and check what
+                     it shows. Writes workarea/locale-sweep/
 golden_confirm.py    confirm a golden in running Numbers and write a report of what
                      Numbers shows, through a helper app that holds the permissions
-                     so Terminal holds none. Backs `/golden-confirm`, and nothing in
-                     the preflight, CI or the suite runs it
+                     so Terminal holds none. Backs `/golden-confirm`, and its
+                     `measure` backs `/fixture-create`. Nothing in the preflight, CI
+                     or the suite runs it
+selection_benchmark.py
+                     time the selector's one resolver on a simple, a typical and a
+                     far larger document built in memory. Never in CI. Its runs
+                     are recorded in docs/findings/findings-13-selection.md
+jsonform_schema.py   generate the JSON Schema of pybers' JSON form from the model.
+                     Writes src/pybers/interchange/schema.json, which a test holds
+                     to the model
 merge_readiness.py   gather a branch's facts, check a pull request, and post one
                      verdict as a comment. `collect` runs on the branch with no
                      write access, and `report` runs this repository's code over
@@ -31,9 +48,10 @@ merge_readiness.py   gather a branch's facts, check a pull request, and post one
 
 ## Reading a binary is not running one
 
-Both extractors open the application read-only and parse it as data. Nothing loads,
-links, executes or modifies any part of Numbers, which is the line CLAUDE.md draws when
-it rejects an approach that would execute an unsigned copy of the app.
+The function and schema extractors open the application read-only and parse it as
+data, and the locale extractor calls macOS's own ICU and Foundation for theirs. Nothing
+loads, links, executes or modifies any part of Numbers, which is the line CLAUDE.md
+draws when it rejects an approach that would execute an unsigned copy of the app.
 
 The technique of finding values in compiled code rather than in a published table comes
 from the numbers-parser project and from `protodump.py` by Peter Sobot, credited in each
@@ -49,3 +67,47 @@ even though nobody can run them without a local Numbers.
 Every extractor writes nothing unless `--write` is passed. The default run is a
 read-only report and the differential check at once, which is what makes regenerating on
 a newer Numbers reviewable rather than a silent replacement.
+
+## What a golden confirmation leaves behind
+
+`golden_confirm.py run <golden>` writes its report into `workarea/golden-confirm/<ticket>/<golden>/`,
+beside a copy of the golden that is safe to open and save. Its expected values are
+generated from the golden's JSON form by `lib/golden_expected.py` on every run, every
+filled cell of every table as pybers reads it back from that form, and written as
+`expectations.md`, to read beside the copy, and `expectations.json`, the JSON form itself.
+
+Every cell of every table is read through AppleScript for its value, formula and format,
+and a cell the expectations leave out must be empty. A currency or a control is read in
+the inspector too, since only the inspector shows its settings.
+
+## A measurement's recipe
+
+`golden_confirm.py measure <name>` makes `tests/measurements/<name>.numbers` in Numbers
+from `<name>.recipe.toml` beside it: a copy of `base` and any `documents`, then each
+`[[step]]` in order. Every step names its `document`, counted from 0, and the cell it
+acts on by `sheet`, `table` and `range`, which a recipe may name once at its top for every
+step. A `dataFormatSet` or `customFormatEdit` step
+reads back what it changed, so a control Numbers did not take stops the run.
+
+```
+select           select the range
+menuPress        press menuItem: copy, paste, delete, autofillDown or undo
+formatSet        set the range's format kind through AppleScript
+valueSet         type value into one cell, as a person would
+tableExtend      grow the table until it reaches the cell in range
+tableAdd         add the table named by table to sheet, reaching the cell in range
+tableDelete      delete the table named by table from sheet
+drawableAdd      add a drawable to sheet: text item, shape, line, chart, or an image
+                 from the PNG or SVG in value
+sheetAdd         add the sheet named by sheet, its table holding no header
+dataFormatSet    set one Data Format control, named by setting, to value
+customFormatEdit build a custom format, one part per step, named by setting
+```
+
+`dataFormatSet` names a control by the label Numbers shows beside it, such as
+`Decimals`, or by its caption, such as `Minimum`. A control with neither is
+`Unlabeled PopUpButton 1`, counted in screen order. A menu that titles two items alike
+takes ` #2` after the title for the second. `customFormatEdit` parts are `Open`, `Name`,
+`Type`, `Clear`, `Text`, `TextBefore`, `Token` for the last token's menu, `Rule`,
+`RuleValue` and `OK`, and any other setting drags the palette token it names into the
+newest format field.

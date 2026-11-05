@@ -7,6 +7,9 @@ conversion or a dropped locking marker both produce a real address that names th
 wrong cell. Parsing what each type emits and comparing is what catches that.
 
 UPDATES
+2026-11-03  A table selects its cells, `range` removed, for PYB-223.
+2026-10-27  A range names its table as a reference does, and a table refuses
+            a range naming another, for PYB-260.
 2026-09-13  The far end of both axes, found reviewing #67.
 2026-09-01  Written for #9.
 """
@@ -28,6 +31,7 @@ import pytest
 import pybers
 from conftest import allDocuments
 from pybers.addressing import (
+    CellAddress,
     CellRange,
     CellRangeList,
     CellReference,
@@ -57,8 +61,8 @@ def buildSampleTable() -> Table:
     fixed row and column count and touching a far cell does not extend it.
     """
     table = Table(name="Table 1", rowCount=3, colCount=3)
-    for reference in CellRange.parse("A1:C3"):
-        table.cell(reference).value = reference.asReference()
+    for address in CellRange.parse("A1:C3"):
+        table.cell(address).value = str(address)
     return table
 
 
@@ -89,16 +93,13 @@ def test_theBase26BoundaryIsWhereItIsClaimedToBe() -> None:
 
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
-def test_everyReferenceInEveryDocumentSurvivesTheRoundTrip(path: Path) -> None:
-    """Every cell in every document re-parses to the reference it came from."""
+def test_everyAddressInEveryDocumentSurvivesTheRoundTrip(path: Path) -> None:
+    """Every cell in every document re-parses to the address it came from."""
     document = pybers.open(path)
     for sheet in document.sheets:
         for table in sheet.tables:
             for cell in table.cells.values():
-                assert (
-                    CellReference.parse(cell.reference.asReference())
-                    == cell.reference
-                )
+                assert CellAddress.parse(str(cell.address)) == cell.address
 
 
 # AC 1.b
@@ -164,13 +165,29 @@ def test_aRangeReportsItsSpansAndWhatItCovers() -> None:
 
 # AC 3.b
 def test_arangeYieldsEveryCellItCoversInRowMajorOrder() -> None:
-    walked = [reference.asReference() for reference in CellRange.parse("A1:B2")]
+    walked = [str(address) for address in CellRange.parse("A1:B2")]
     assert walked == ["A1", "B1", "A2", "B2"]
 
 
 def test_aRangeRoundTripsThroughItsWrittenForm() -> None:
     for written in ("A1", "A1:C3", "$A$1:$C$3", "B2:D5"):
         assert CellRange.parse(written).asReference() == written
+
+
+@pytest.mark.parametrize(("written", "table"), [
+    ("Q3::B2:D5", "Q3"),
+    ("Budget::Q3::B", "Budget::Q3"),
+    ("B2:D5", None),
+])
+def test_aRangeNamesItsTableAsFarAsItsTextDoes(written: str, table: str | None) -> None:
+    found = CellRange.parse(written)
+    assert (None if found.table is None else str(found.table)) == table
+    assert str(found) == written
+    assert CellRange.parse(str(found)) == found
+
+
+def test_aRangeNamingATableDiffersFromOneNamingNone() -> None:
+    assert CellRange.parse("Q3::B2:D5") != CellRange.parse("B2:D5")
 
 
 # ── AC 4: unbounded on one axis, and distinguishable ─────────────────────────
@@ -201,7 +218,7 @@ def test_anUnboundedRangeCannotBeWalkedUntilItIsBounded() -> None:
     with pytest.raises(ReferenceError):
         list(CellRange.parse("A"))
     bounded = CellRange.parse("A").boundedBy(CellRange(1, 1, 3, 3))
-    assert [reference.asReference() for reference in bounded] == ["A1", "A2", "A3"]
+    assert [str(address) for address in bounded] == ["A1", "A2", "A3"]
 
 
 def test_aSpanOfWholeColumnsOrWholeRowsParsesAndReEmits() -> None:
@@ -250,46 +267,56 @@ def test_aTableAcceptsBothFormsOfAnAddress() -> None:
 
 
 # AC 6.a
-def test_aTableReturnsTheCellsARangeCovers() -> None:
+def test_aTableSelectsARangeAsOneRangeNamingIt() -> None:
     table = buildSampleTable()
-    covered = [cell.reference.asReference() for cell in table.range("A1:B2")]
+    assert table.select("A1:B2") == (
+        CellRange.parse("Table 1::A1:B2"),
+    )
+
+
+def test_aConditionSelectsEachCellARangeCovers() -> None:
+    table = buildSampleTable()
+    covered = [str(each.address) for each in table.select("A1:B2[kind]")]
     assert covered == ["A1", "B1", "A2", "B2"]
 
 
-def test_aTableReturnsTheCellsEveryRangeInAListCovers() -> None:
+def test_aSelectorGivenToATableNamesItsCellsAlone() -> None:
     table = buildSampleTable()
-    covered = [cell.reference.asReference() for cell in table.range("A1,C3")]
-    assert covered == ["A1", "C3"]
+    with pytest.raises(pybers.SelectorError, match="at most 1: cells"):
+        table.select("Table 1::A1:B1")
+
+
+def test_aTableSelectsEveryGroupOfAList() -> None:
+    table = buildSampleTable()
+    assert [str(each) for each in table.select("A1, C3")] == [
+        "Table 1::A1", "Table 1::C3"
+    ]
 
 
 def test_anUnboundedRangeIsBoundedByTheTablesOwnExtent() -> None:
     """A range knows nothing about the table it is used against, so the extent is
     the only thing that can answer what `A` covers."""
     table = buildSampleTable()
-    covered = [cell.reference.asReference() for cell in table.range("A")]
+    covered = [str(each.address) for each in table.select("A[kind]")]
     assert covered == ["A1", "A2", "A3"]
-    assert [cell.reference.asReference() for cell in table.range("1")] == [
+    assert [str(each.address) for each in table.select("1[kind]")] == [
         "A1", "B1", "C1"
     ]
 
 
 def test_aRangeReachingPastTheGridIsRefusedByItsOwnName() -> None:
-    """The refusal names the range the caller wrote. Letting the first cell past
-    the edge raise instead reports an interior address nobody asked for, which is
-    a worse answer to the same question."""
+    """The refusal names the range the caller wrote, rather than the first cell
+    past the edge, which is an interior address nobody asked for."""
     table = buildSampleTable()
-    with pytest.raises(ReferenceError) as raised:
-        table.range("A1:Z99")
-    assert "A1:Z99" in str(raised.value)
-    with pytest.raises(ReferenceError) as listed:
-        table.range("A1:B2,Z99")
-    assert "Z99" in str(listed.value)
+    with pytest.raises(pybers.ReferenceError) as raised:
+        table.select("A1:Z99")
+    assert str(raised.value).startswith("A1:Z99 reaches outside")
 
 
 def test_aTableWithNoDeclaredGridHasNoExtentAndHoldsNoCells() -> None:
     empty = Table(name="Table 1")
     assert empty.extent is None
-    assert empty.range("A") == []
+    assert len(empty.select("*")) == 0
     with pytest.raises(ReferenceError):
         empty.cell("A1")
 
@@ -301,7 +328,7 @@ def test_anExtentIsTheDeclaredGridAndNotWhatTheCellsReach() -> None:
     table = Table(name="Table 1", rowCount=10, colCount=5)
     table.cell("A1").value = "only this one"
     assert table.extent == CellRange(1, 1, 10, 5)
-    assert len(table.range("A")) == 10
+    assert len(table.select("A[kind]")) == 10
 
 
 # ── AC 7: a merge carries a range, and covering is unchanged ─────────────────
@@ -309,7 +336,7 @@ def test_anExtentIsTheDeclaredGridAndNotWhatTheCellsReach() -> None:
 def test_aMergeExpressesItsExtentAsARange() -> None:
     merge = MergeRange(CellRange.parse("A1:B1"))
     assert merge.extent == CellRange(1, 1, 1, 2)
-    assert merge.anchor == CellReference(1, 1)
+    assert merge.anchor == CellAddress(1, 1)
     assert merge.covers("B1") is True
     assert merge.covers("C1") is False
 
@@ -344,10 +371,11 @@ def test_aCellSwallowedByAMergeIsNotAddressable() -> None:
 def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
     """A merged region is one cell, so a range over it returns one cell."""
     table = buildMergedTable()
-    assert [cell.reference.asReference() for cell in table.range("A1:C1")] == [
+    assert [str(each.address) for each in table.select("A1:C1[kind]")] == [
         "A1", "C1"
     ]
-    assert table.range("B1") == []
+    with pytest.raises(pybers.ReferenceError, match="covered by the merge A1:B1"):
+        table.select("B1")
     assert table.addressable("A1") is True
     assert table.addressable("B1") is False
 

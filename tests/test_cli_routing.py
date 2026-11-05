@@ -3,6 +3,9 @@
 `pybers FILE` runs `check --names`, and every command is still reached by its name.
 
 UPDATES
+2026-11-03  Every check shows the tree, `--names` naming what is in it, for
+            PYB-223.
+2026-10-27  A size of one row reads `1 row`, for PYB-260.
 2026-10-12  Written for PYB-187.
 """
 from __future__ import annotations
@@ -32,7 +35,7 @@ def testAFileAloneRunsCheckWithNames() -> None:
     result = runner.invoke(app, [str(baselinePath)])
     assert result.exit_code == 0
     assert "Readable: yes" in result.stdout
-    assert "└ Table 1: 1 rows, 1 columns" in result.stdout
+    assert "└ Table 1: 1 row × 1 column" in result.stdout
 
 
 def testNoArgumentsPrintsTheHelp() -> None:
@@ -43,13 +46,14 @@ def testNoArgumentsPrintsTheHelp() -> None:
 def testCheckByNameReachesCheckWithoutNames() -> None:
     result = runner.invoke(app, ["check", str(baselinePath)])
     assert result.exit_code == 0
-    assert "Sheets:" not in result.stdout
+    assert "Sheet\n└ Table: 1 row × 1 column" in result.stdout
+    assert "Table 1" not in result.stdout
 
 
 def testARootOptionBeforeTheFileStillApplies() -> None:
     result = runner.invoke(app, ["--debug", str(baselinePath)])
     assert result.exit_code == 0
-    assert "Sheets:" in result.stdout
+    assert "└ Table 1: 1 row × 1 column" in result.stdout
 
 
 def testAFileNamedLikeACommandIsReachedThroughItsPath(

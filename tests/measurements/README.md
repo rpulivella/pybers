@@ -1,20 +1,29 @@
-# Measurements: one change from an origin
+# Measurements: what Numbers does, labeled
 
-A measurement is a document made from another document here by exactly one change, so that a
-diff against its origin shows where that change lives. Origins are in
+A measurement is a document Numbers made from a fixture, by hand or by the helper following
+a recipe beside it, whose cells label their own contents. It is evidence of what Numbers
+does, so nothing pybers wrote is a measurement: that is a golden, in
+[`tests/golden/`](../golden/README.md). Origins are in
 [`tests/fixtures/`](../fixtures/README.md). What each established is indexed in
-[FINDINGS.md](../../docs/findings/FINDINGS.md).
+[FINDINGS.md](../../docs/findings/FINDINGS.md), and a measurement made for one golden to
+edit names that golden below.
 
 ## Making one
 
-- **Save As from the origin, then make one change.** A new document renumbers every object
-  identifier, so it cannot be compared; a Save As copy kept 36 of 37 members named alike.
+- **By recipe where the helper can make it**:
+  `.venv/bin/python3 -m tools.local.golden_confirm measure <name>` makes `<name>.numbers`
+  from `<name>.recipe.toml`, so the document can be made again and its making is read in
+  one file.
+- **By hand, Save As from the origin, then make one change.** A new document renumbers
+  every object identifier, so it cannot be compared; a Save As copy kept 36 of 37 members
+  named alike.
 - **A star, not a chain.** Derive from the origin directly, never from the previous
   measurement, or isolating one change means unpicking the ones before it.
 - **Label what each cell displays**, in text beside it. What was typed cannot be recovered
   from the file, and `13-number-percent` showed the two can differ.
 - Preview images and selection archives change on every save and mean nothing.
-- Saved from **Numbers 15.3.1**, the version that supplied `src/pybers/protos/`.
+- Saved from the Numbers release `src/pybers/protos/README.md` records, or a later one pybers
+  reads, which the catalog row then names.
 
 ## Catalog
 
@@ -104,6 +113,48 @@ diff against its origin shows where that change lives. Origins are in
 | `61b-move-styles-cut-pasted`, `61c-move-styles-dragged` | `61-move-styles-base` | `B2:D5` moved to `F8`, by cut and paste and by dragging | [structure](../../docs/findings/findings-03-structure.md) |
 | `62-move-rules-base` | `00-baseline` | `A1`, `E2` and twelve numbers in `B2:D5`, built by a script, then highlighting on `C2` reading `A1` and on `E2` reading `C2` added by hand | [structure](../../docs/findings/findings-03-structure.md) |
 | `62b-move-rules-dragged` | `62-move-rules-base` | `B2:D5` dragged so its top-left lands on `F8` | [structure](../../docs/findings/findings-03-structure.md) |
+| `72b-date-time-zones-region` | `72-date-time-zones` | the document's language and region set to English (Italy), saved by Numbers 15.4 | [values](../../docs/findings/findings-01-values.md) |
+| `73-values-typed-over-controls` | `11-value-types-noformats` | a date, a duration and TRUE typed into plain cells, and a value outside each control typed into it, saved by Numbers 15.4 from its recipe | [values](../../docs/findings/findings-01-values.md) |
+| `74-number-negatives` | `00-baseline` | each negative style on a number, the thousands separator, and the red styles on a currency and a percentage, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `75-fraction-accuracy` | `00-baseline` | 1.3141 in every fraction accuracy, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `76-custom-number-scales` | `00-baseline` | a custom format for every scale, a suffix and a prefix, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `77-duration-units` | `00-baseline` | one duration in days only and in seconds only, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `78-custom-number-digits` | `00-baseline` | a custom format for each option of the Integer and Decimal tokens, and for every fraction accuracy, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `79-date-time-formats` | `00-baseline` | one moment under every Date item and every Time item, and two joined, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `80-numeral-systems` | `00-baseline` | bases from 2 to 36, places, and both ways of writing a negative, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `81-control-formats` | `00-baseline` | a slider and a stepper over custom ranges in each format they offer, a pop-up menu that starts blank, a star rating and a checkbox, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `82-currencies` | `00-baseline` | one amount in currencies whose customary decimals differ, a negative in accounting style and one in red parentheses, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `84-custom-date-tokens` | `00-baseline` | a custom Date & Time format for every style of each date token, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `85-custom-time-tokens` | `00-baseline` | a custom Date & Time format for every style of each time token, and one joining tokens with text, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `86-custom-text-and-currency` | `00-baseline` | custom Text formats with a suffix and a prefix, and custom number formats holding the Currency token, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `87-custom-number-rules` | `00-baseline` | a custom number format for every rule condition, and one with two rules, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `88-formula-currency-results` | `00-baseline` | a euro and a dollar amount, and formulas over them and the currency functions, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `89-currency-formats` | `00-baseline` | one amount under each currency format `12-number-currency` covers, labeled with what was typed and chosen, and an empty column, saved by Numbers 15.4 from its recipe | [formats](../../docs/findings/findings-11-formats.md) |
+| `90-values-for-booleans` | `00-baseline` | two numbers, a checked checkbox, a star rating and an empty cell, each labeled, for `11-booleans-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90b-values-for-dates` | `00-baseline` | two numbers, a date and an empty cell, each labeled, for `11-dates-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90c-values-for-durations` | `00-baseline` | a number, a duration and an empty cell, each labeled, for `11-durations-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90d-values-for-literal-text` | `00-baseline` | two numbers and an empty cell, each labeled, for `11-text-literal-written`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90e-values-for-text-and-retyping` | `00-baseline` | two numbers, a star rating, text and an empty cell, each labeled, for `11-text-written-and-retyped`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `90f-number-for-an-edit` | `00-baseline` | one labeled number, for `11-value-types-noformats-A1-edited`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `91-controls-for-values` | `00-baseline` | one cell under each control, each labeled, for `11-controls-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `92-values-for-currency` | `00-baseline` | a number, dollars, accounting-style dollars and an empty cell, each labeled, for `12-currency-written-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93-formulas-for-attaching` | `00-baseline` | a formula, text and a second formula, each labeled, for `18-formula-attached-and-detached`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93b-empty-for-a-formula` | `00-baseline` | one labeled empty cell, for `18-formula-created-in-empty-cell`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93c-formula-for-a-literal-change` | `00-baseline` | one labeled formula, for `18-formula-literals-A1-changed`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `93d-formulas-for-a-merge` | `00-baseline` | two labeled formulas side by side, for `18-merged-over-a-formula`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `94-values-for-a-named-fill` | `00-baseline` | a labeled sum over three numbers beside three labeled empty cells, for `20-cells-filled-named-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `94b-values-for-a-relative-fill` | `00-baseline` | the same, with numbers under each empty cell, for `20-cells-filled-relative-by-pybers`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `94c-references-for-a-retarget` | `00-baseline` | references into its own table, a second table and a second sheet, beside eight labeled empty cells and the numbers they read, for `20-formula-retargeted`, saved by Numbers 15.4 from its recipe | [goldens](../golden/README.md) |
+| `95-region-base` | `00-baseline` | a number, two currencies, a date, a percentage and six formulas whose text or result depends on the region, each labeled with what it was input as, under `en_US`, saved by Numbers Creator Studio 15.4 from its recipe | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95b-region-de-de` | `95-region-base` | Language & Region set to German, Germany, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95c-region-en-gb` | `95-region-base` | Language & Region set to System – English, United Kingdom, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95d-region-language-english` | `95-region-base` | Language & Region set to English, United States, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95e-region-ja-jp` | `95-region-base` | Language & Region set to Japanese, Japan, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95f-region-en-za` | `95-region-base` | Language & Region set to System – English, South Africa, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95g-region-pt-br` | `95-region-base` | Language & Region set to Portuguese, Brazil, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95h-region-en-au` | `95-region-base` | Language & Region set to System – English, Australia, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `95i-region-en-in` | `95-region-base` | Language & Region set to System – English, India, saved by Numbers Creator Studio 15.4 | [language and region](../../docs/findings/findings-12-language-and-region.md) |
+| `96-sheet-without-table` | `00-baseline` | its one table deleted, leaving one sheet holding no table, saved by Numbers Creator Studio 15.4 from its recipe | [creation](../../docs/findings/findings-10-creation.md) |
 
 `tile-pattern.png` and `orientation-test.png` are the source images, each generated by a
 script.

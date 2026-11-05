@@ -6,6 +6,7 @@ runs, and a body checked against the template.
 Shared by `pr.py` and the readiness check.
 
 UPDATES
+2026-10-23  `closePullRequest`, closing one without merging, for PYB-156.
 2026-10-14  A summary carries its author, and `readApprovers` and
             `confirmMergeApproved` gate a merge on approval, for PYB-156.
 2026-10-14  `findTicketPullRequest`, a ticket's open pull request by its branch,
@@ -669,6 +670,17 @@ def confirmChecksPassed(runs: list[CheckRun]) -> bool:
     ):
         return False
     return any(run.conclusion == "success" for run in runs)
+
+
+def closePullRequest(token: str, number: int) -> PullRequestSummary:
+    """Close an open pull request without merging it, and return what landed."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/"
+        f"{github.repositoryName}/pulls/{number}"
+    )
+    return summarizePullRequest(
+        github.requestJson(url, token, method="PATCH", payload={"state": "closed"})
+    )
 
 
 def editPullRequest(

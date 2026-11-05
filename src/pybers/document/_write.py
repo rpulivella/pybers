@@ -19,6 +19,10 @@ Numbers opens with its charts, conditional formats and print settings quietly
 gone, rather than as an error.
 
 UPDATES
+2026-11-03  A document built in memory is created on save, for PYB-261.
+2026-11-02  A created document saves, for PYB-261.
+2026-10-28  A changed region is written, marking every formula for
+            recalculation, for PYB-272.
 2026-09-01  Written for #2: the unchanged round trip.
 2026-09-01  Numeric edits reach the tile they came from, for #2.
 2026-09-02  Edited cells are marked for recalculation, for #25.
@@ -67,7 +71,8 @@ from .._persistence.types import findArchiveTypeId
 from ..errors import WriteError
 from ..table._write import TableSave, openTableSave
 from ..table.cells import Table
-from ._create import createSheets
+from ._create import composeModelPackage, createSheets
+from ._locale import writeLocale
 from .sheets import Document, Sheet
 
 
@@ -84,6 +89,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave
     tables = openTableSave(document, registry)
     root = findRoot(index)
     tableInfoTypeId = findArchiveTypeId(tst.TableInfoArchive)
+    written: list[tuple[Table, int]] = []
 
     # Strict, because `createSheets` has made the two lists one list, and a plain
     # `zip` would stop at the shorter side in silence if that ever stopped holding.
@@ -101,7 +107,11 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave
             )
         for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
             tables.tableWrite(table, tableReference)
+            written.append((table, tableReference.identifier))
 
+    if writeLocale(document, index):
+        for table, identifier in written:
+            tables.formulasMark(table, identifier)
     requestRecalculation(index, tables.written)
     registry.save()
     return tables
@@ -168,13 +178,13 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
     function exists separately so the model layer can stay free of any import of
     the persistence layer.
     """
+    target = resolveSaveTarget(document, path)
+    # A document built in memory, from its JSON form among others, is created on save.
+    created = document._package is None
+    if created:
+        document._package = composeModelPackage(document)
     package = document._package
-    if package is None:
-        raise WriteError(
-            "This document carries no archives, so there is nothing to write. Only "
-            "a document from `pybers.open` can be saved, and building one from "
-            "scratch is not supported."
-        )
+    assert package is not None
     # Created sheets and tables change both the package and the model's identifiers,
     # so a save that fails part way undoes both rather than leaving a retry to
     # create them twice.
@@ -182,7 +192,6 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
     identified = {
         id(item) for item in listIdentifiable(document) if item._identifier is not None
     }
-    target = resolveSaveTarget(document, path)
     try:
         tables = applyDocumentEdits(document, package)
         writeAtomically(package, target)
@@ -191,9 +200,12 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
         for item in listIdentifiable(document):
             if id(item) not in identified:
                 item._identifier = None
+        if created:
+            document._package = None
+            document.sheets[0]._identifier = None
         raise
     updateCellOrigins(document)
-    tables.descriptionsUpdate(target)
+    tables.storageUpdate(target)
 
 
 def updateCellOrigins(document: Document) -> None:
@@ -212,7 +224,7 @@ def updateCellOrigins(document: Document) -> None:
                     or cell.formula is not None
                     or copied is not None and copied._origin is not None
                 ):
-                    cell._origin = cell.reference
+                    cell._origin = cell.address
 
 
 # `Document.save` reaches `writeDocument` and nothing else, and no other module in

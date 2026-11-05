@@ -64,6 +64,9 @@ mypy in one pass and reports all four.
   add each feature on top of something that already works.
 - Make architectural decisions for the long term. Do not accept a stopgap.
 - Write no documentation unless asked.
+- Keep no memory outside the repository. A decision or a preference is written where
+  someone can see it: in this file, a doc or a ticket for everyone, or in the git-ignored
+  `CLAUDE.local.md` for one person's own rules. Otherwise it is not kept.
 
 ## Engineering approach
 
@@ -76,6 +79,14 @@ mypy in one pass and reports all four.
   with an explicit invalidation contract.
 - Reuse existing operations. Do not write a second implementation because the caller is
   the reader, the writer, a CLI, or a test.
+- **A function earns its place** by having two or more callers, by being an entry point a
+  caller outside the package uses, through `import pybers`, the command line or an MCP
+  server, by naming a step its one caller would otherwise need a comment for, or by being
+  the designated place one concern is decided, which its docstring says. A single-caller
+  function that only forwards one call, and is none of these, is inlined.
+- **A feature creates, reads, updates and deletes what it adds, within its own ticket.**
+  pybers can then create everything it edits, so a script and a golden start from a
+  document pybers created rather than one Numbers made.
 - Place code with the feature that owns it. `_persistence` and `_engine` are
   infrastructure used by more than one feature, never a dumping ground.
 - **A feature's model types never import its archive halves at module scope.** A
@@ -102,10 +113,23 @@ Seven facts that make the obvious approach wrong. Each is measured; see the find
   exactly, which is why earlier fixtures validated and proved nothing.
 - **Numbers shares style archives by reference.** Twelve styles back twenty-one shapes,
   so handing out a mutable decoded object turns one edit into a silent restyle of
-  seven. The frozen-`Style` contract holds on the READ path, not only when writing.
+  seven. The frozen-style contract holds on the READ path, not only when writing.
 
 **A wrong offset yields a wrong number, not an exception.** That is why every claim
 about the format is measured against a fixture that labels its own contents.
+
+## References
+
+Projects read for how others understood the format, and never a source of code. A claim from one
+is measured against a fixture here before pybers relies on it, as the findings record.
+
+- **numbers-parser** (https://github.com/masaccio/numbers-parser): the reverse
+  engineering pybers stands on, credited in `README.md` and `docs/decisions.md`. Its
+  class names were read for interpretation only.
+- **cupertino-files** (https://github.com/den-frie-vilje/cupertino-files): a TypeScript
+  library for all three iWork formats, MIT-licensed. Its `docs/FORMAT.md` is a second
+  reading of the same format, and its guide a model for a documentation site. Not a
+  source of pybers, so not credited in the README.
 
 ## Correctness
 
@@ -153,6 +177,10 @@ about the format is measured against a fixture that labels its own contents.
 pybers in a terminal. Read it before writing a command, and add a convention there
 before a second command needs it.
 
+**The Rust compiler's diagnostics are the standard every message is measured
+against**: a message that stands on its own, the place it points at, and a fix
+offered apart from the fault. Its guide is in the inspirations of `docs/cli-design.md`.
+
 ## Comments and docstrings
 
 Verbosity is this repository's standing failure. Prefer precise names and small
@@ -163,7 +191,7 @@ functions over explanation.
 - **Internal, twelve lines soft limit**, and only to record a measurement, an invariant,
   or a format trap that would otherwise be rediscovered the hard way.
 - **Longer than that belongs in `docs/findings/findings-*.md`** with a one-line pointer.
-  A docstring is the wrong container for a corpus survey.
+  A docstring is the wrong container for a survey across the documents.
 - **Comments are one line, and say why.** Never narrate code, restate a name, describe
   the current patch, leave removal breadcrumbs, or comment out code.
 - Module docstrings carry a dated `UPDATES` block. No contractions anywhere.
@@ -171,6 +199,9 @@ functions over explanation.
 - **An untrue statement is rewritten to the current fact**, in a doc, a finding or a
   comment, never left under a "Superseded" note. Only an addressed item, an AC or a
   checklist line, is struck through or marked NA, because references point at it.
+- **A statement names only the current design**, never what it replaced: no "formerly",
+  "renamed from" or "was". A breaking change that tells users what to do instead is the
+  one exception.
 - **A doc never states a version requirement**, a Python floor, a Numbers release or a
   tool version. It points at the file that owns it, such as `requires-python` in
   `pyproject.toml`, because a restated number goes stale.
@@ -182,8 +213,13 @@ functions over explanation.
 
 - **The base test**: read a real fixture and write it back unchanged, and the archives
   are identical.
-- **Every mutation earns a golden file**: real fixture in, one mutation, confirmed once
-  in real Numbers, then locked in as a permanent regression check.
+- **Every mutation earns a golden file**: a starting document, one mutation, built only
+  by its builder in `tests/golden/builders.py`, confirmed once in real Numbers, then
+  locked in as a permanent regression check. Numbers makes fixtures and measurements, and
+  whatever pybers writes is a golden, never a measurement.
+- **Every new golden starts from a document `pybers.create` made.** A golden starting
+  from a fixture or measurement names the ticket that enables pybers to create what it
+  edits, or a stated reason, and a test fails when it names neither.
 - **Each feature earns a scenario test per consumer.** Write the few lines a script
   author would write, and the few a CLI or TUI would write, then test those. Both
   consumers exist from day one, so an API reading well from only one of them is
@@ -213,6 +249,9 @@ functions over explanation.
 
 - Mutate the archives that were read rather than constructing new ones, so whatever the
   model does not yet represent survives untouched.
+- **Compose every field pybers writes from the model and the data it is measured
+  against, never by copying bytes or captured archives from another document.** A cell's
+  value, a formula and a locale are each built as Numbers builds them.
 - Stage a complete package outside the destination and install it atomically. Unique
   temporary paths, cleaned on success and on failure alike.
 - Never write into a `.numbers` file the user may have open.

@@ -11,6 +11,7 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-10-23  A golden the branch deleted is not counted as touched, for PYB-255.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-14  Reading a pull request, its preflight, its base and the declared
             packages moved here from `merge-readiness.py`, for PYB-204.
@@ -228,7 +229,10 @@ def collectBranchFacts(
         commitSubjects=runGit(["log", f"{base}..HEAD", "--format=%s"]).splitlines(),
     )
     confirmed = readGoldenConfirmations()
-    changed = runGit(["diff", f"{base}...HEAD", "--name-only"]).splitlines()
+    # A golden the branch deleted has nothing left to confirm.
+    changed = runGit(
+        ["diff", f"{base}...HEAD", "--name-only", "--diff-filter=d"]
+    ).splitlines()
     facts.goldensTouched = [
         Path(path).name for path in changed
         if path.startswith("tests/golden/") and path.endswith(".numbers")

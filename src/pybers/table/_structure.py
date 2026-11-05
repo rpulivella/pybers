@@ -3,16 +3,21 @@
 A table's rows and columns added or removed, carried into every archive indexed by one.
 
 The orchestration of one structural edit's archives, from the line maps `_lines`
-derives. Here: the UID map, the header buckets and their counts, the bands,
-hidden state, the declared counts and the layout cache. Borders move in
-`_strokes`, conditional highlighting in `_conditions`, the merge store in
-`_merges`, and tiles in the tile pass of `_edits`, where the lists a removed
-record releases are already open. The calculation engine is re-registered by the
-table save in `_write`, which knows what every formula reads.
+derives. Here: the UID map, the header buckets and their counts, hidden state, the
+declared counts and the layout cache. Borders move in `_strokes`, conditional
+highlighting in `_conditions`, the merge store in `_merges`, and tiles in the tile
+pass of `_edits`, where the lists a removed record releases are already open. The
+calculation engine is re-registered by the table save in `_write`, which knows what
+every formula reads.
 
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-11-03  Header and footer counts are the model's, moved by the edit and
+            written by the table's save, for PYB-223.
+2026-11-02  A table with no stroke sidecar or layout cache, as a created one is,
+            gains neither from a structural edit, for PYB-276.
+2026-10-29  One `countLineRecords`, mapped or not, for PYB-278.
 2026-09-22  The merge store moves in `_merges`, for PYB-113.
 2026-09-22  Nothing is imported from table creation: the UID map is written by `_lines`,
             for PYB-113.
@@ -33,94 +38,39 @@ __date__ = "2026/09/18"
 from collections import Counter
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRow
 from .._persistence.index import ArchiveIndex, readUuidValue
 from .._persistence.metadata import PackageRegistry
+from .._persistence.rows import readStoredTiles
 from ..addressing.reference import originOffset
 from ._conditions import ConditionalPlan, buildConditionalPlan
-from ._lines import (
-    GridMaps,
-    LineMap,
-    assignUids,
-    findDisplacedLine,
-    listAddedLines,
-)
+from ._lines import GridMaps, LineMap, assignUids
 from ._merges import remapMergeStore
 from ._read import readLineIdentities
 from ._strokes import applyStrokeLayers, listStrokeLayers
 from .cells import Table
 
 
-def countBands(lines: LineMap, leading: int, trailing: int) -> tuple[int, int]:
-    """Return what a leading and a trailing band hold after the edit.
-
-    A band covers a stretch of lines rather than a count, so a line added inside
-    one grows it and a line removed from one shrinks it. A line added at the
-    trailing band's own first line lands inside it, measured 2026-09-21 in
-    `57-bands-row-inserted-before-footer`, where a footer of one became two.
-    """
-    held = len(lines.lines)
-    removedLeading = sum(
-        1 for line in range(leading) if lines.lines[line] is None
-    )
-    removedTrailing = sum(
-        1 for line in range(held - trailing, held) if lines.lines[line] is None
-    )
-    addedLeading = addedTrailing = 0
-    for line in listAddedLines(lines):
-        displaced = findDisplacedLine(lines, line)
-        boundary = held if displaced is None else displaced
-        addedLeading += boundary < leading
-        addedTrailing += trailing > 0 and boundary >= held - trailing
-    return (
-        leading - removedLeading + addedLeading,
-        trailing - removedTrailing + addedTrailing,
-    )
-
-
-def applyBandCounts(model: tst.TableModelArchive, maps: GridMaps) -> None:
-    """Grow or shrink each band by the lines the edit added to or took from it.
-
-    A count is written only when it changed, because a field set to the zero it
-    already held is a byte a table without bands never carried.
-    """
-    headerRows, footerRows = countBands(
-        maps.rows, model.number_of_header_rows, model.number_of_footer_rows
-    )
-    headerColumns = countBands(
-        maps.columns, model.number_of_header_columns, 0
-    )[0]
-    for name, count in (
-        ("number_of_header_rows", headerRows),
-        ("number_of_footer_rows", footerRows),
-        ("number_of_header_columns", headerColumns),
-    ):
-        if getattr(model, name) != count:
-            setattr(model, name, count)
-
-
-def countSurvivingCells(
-    index: ArchiveIndex, store: tst.DataStore, maps: GridMaps
+def countLineRecords(
+    index: ArchiveIndex, store: tst.DataStore, maps: GridMaps | None = None
 ) -> tuple[Counter[int], Counter[int]]:
-    """Return how many records each new row and each new column will hold."""
-    tileSize = store.tiles.tile_size
+    """Return how many records each row and each column holds, through `maps` if given.
+
+    A record on a line the maps remove is not counted.
+    """
     rows: Counter[int] = Counter()
     columns: Counter[int] = Counter()
-    for entry in store.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        for rowInfo in tile.rowInfos:
-            row = maps.rows.lineMap(entry.tileid * tileSize + rowInfo.tile_row_index)
-            if row is None:
+    for stored in readStoredTiles(index, store):
+        row = stored.row if maps is None else maps.rows.lineMap(stored.row)
+        if row is None:
+            continue
+        for record in stored.records:
+            column = (
+                record.column if maps is None else maps.columns.lineMap(record.column)
+            )
+            if column is None:
                 continue
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                column = maps.columns.lineMap(record.column)
-                if column is None:
-                    continue
-                rows[row] += 1
-                columns[column] += 1
+            rows[row] += 1
+            columns[column] += 1
     return rows, columns
 
 
@@ -195,7 +145,7 @@ def applyGridStructure(
     archives it points at are written here.
     """
     store = model.base_data_store
-    rowCounts, columnCounts = countSurvivingCells(index, store, maps)
+    rowCounts, columnCounts = countLineRecords(index, store, maps)
     # Read before the UID map is rewritten, since a broken rule records the lines
     # as they were stored.
     storedRows, storedColumns = readLineIdentities(index, model)
@@ -220,26 +170,28 @@ def applyGridStructure(
     remapHeaders([columnBucket], maps.columns, columnCounts)
     index.archiveWrite(store.columnHeaders.identifier, columnBucket)
 
-    sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    applyStrokeLayers(index, registry, sidecar, maps)
-    sidecar.row_count = table.rowCount
-    sidecar.column_count = table.colCount
-    index.archiveWrite(
-        model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
-    )
+    # A created table has no sidecar until Numbers saves it, so no border to move.
+    if model.HasField("stroke_sidecar"):
+        sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
+        applyStrokeLayers(index, registry, sidecar, maps)
+        sidecar.row_count = table.rowCount
+        sidecar.column_count = table.colCount
+        index.archiveWrite(
+            model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
+        )
 
     model.number_of_rows = table.rowCount
     model.number_of_columns = table.colCount
-    applyBandCounts(model, maps)
     removeHiddenStates(model, table)
     remapMergeStore(model, maps)
 
     # A cache Numbers refills, measured holding column indices that an edit makes
-    # stale. A created table carries it empty, which Numbers already accepts.
-    cache = info.layout_engine.width_height_cache
-    del cache.rows_fitting_entries[:]
-    cache.columns_count = table.colCount
-    index.archiveWrite(infoIdentifier, info)
+    # stale. A created table carries none, which Numbers rebuilds.
+    if info.HasField("layout_engine"):
+        cache = info.layout_engine.width_height_cache
+        del cache.rows_fitting_entries[:]
+        cache.columns_count = table.colCount
+        index.archiveWrite(infoIdentifier, info)
     return plan
 
 

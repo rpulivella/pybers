@@ -121,7 +121,7 @@ def convertBodyForEditing(body: str) -> str:
     """Return a GitHub body as a file means it, with each break GitHub shows kept.
 
     A line already ending in a backslash or two spaces is a break in both, and is
-    left alone. So is every other byte, which is what keeps a body holding no
+    left alone, and so is every other byte, which is what keeps a body holding no
     break inside a paragraph exactly as `export-as-source` always printed it.
     """
     lines = body.splitlines(keepends=True)

@@ -1,0 +1,135 @@
+# How Numbers makes 77-duration-units: one duration shown in days only and in
+# seconds only, the two units no other document stores alone, to measure the unit
+# bits for PYB-219's AC 4. Made by `.venv/bin/python3 -m tools.local.golden_confirm
+# measure 77-duration-units`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '1d 2h 3m 4s'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Data Format'
+value = 'Duration'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Custom Units'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'sec'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'min'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'hr'
+value = '0'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as 1d 2h 3m 4s, Duration, custom units days only'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '1d 2h 3m 4s'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Data Format'
+value = 'Duration'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Custom Units'
+value = '1'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'day'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'hr'
+value = '0'
+
+[[step]]
+action = "dataFormatSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'min'
+value = '0'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as 1d 2h 3m 4s, Duration, custom units seconds only'

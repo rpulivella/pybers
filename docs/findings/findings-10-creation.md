@@ -120,7 +120,7 @@ both as weak external references.
 
 The engine's owner of kind 8 records its edge to the owner of kind 35 as an integer,
 `internal_owner_id_for_edge`, and each dependency tile names its owner the same way, so an
-internal owner id is renumbered inside archive bodies as well as in `owner_id_map`. Those
+internal owner id appears inside archive bodies as well as in `owner_id_map`. Those
 records are identical in every fixture whatever the table's size.
 
 `number_of_formulas` grows by four per table: 7 for one, 15 for three, 39 for nine.
@@ -188,7 +188,7 @@ that one cell compute.
 Measured for PYB-86 by bisection: a created table holding no formula is repaired the same
 way, a formula pybers writes into a table Numbers made evaluates correctly, and the repair
 is indifferent to the pybers reset styles, to row height and column width, and to the
-table title. Everything else about a created table already matched a Numbers-inserted one,
+table title. Everything else about the table under test matched a Numbers-inserted one,
 archive for archive.
 
 Two consequences follow. A table identity is a **version 4 UUID in file byte order**,
@@ -199,3 +199,227 @@ slot Numbers writes does. Neither was the cause, and both are now what pybers wr
 The same save raises `number_of_formulas` from 7 to 8 and drops `owner_id_map` entry 34,
 which no owner archive names. `49` and `50` drop it too, so it is a leftover Numbers culls
 on any save rather than part of the edit.
+
+## The least a created table and sheet hold
+
+Found for PYB-276 on 2 November 2026 in Numbers 15.4, by removing one group at a time from
+what pybers wrote and confirming each removal before the next. Every rung was
+`20-formula-shapes` with two created tables holding cross-table formulas and two created
+sheets. Numbers opened each rung, one value was typed, and the document was saved, then
+the saved file was compared with what was sent: each created table's `table_id` and owner
+family, the formulas' values before and after the edit, and every field of every created
+archive.
+
+**A field Numbers restores as it would write it is derivable, and pybers omits it. A field
+Numbers leaves absent, or restores with another value, is state, and pybers writes it.**
+Numbers raises no warning either way, so only the comparison tells them apart.
+
+### What a created table holds
+
+| archive or field | why it is written |
+| --- | --- |
+| `TableInfoArchive.super` and `tableModel` | required by the schema |
+| `geometry.flags` 3 and `exterior_text_wrap` | restored at 0, and with a margin of 0 rather than 12 |
+| the model's required fields, `table_name`, sizes and `table_id` | required, and `table_id` names the owner family |
+| `header_rows_frozen`, `header_columns_frozen` and both `repeating_header_*_enabled` | left absent, so a header row added later would neither freeze nor repeat |
+| every style slot the theme's preset fills | the category, label and pivot slots were left absent |
+| `base_column_row_uids` and its map | pybers keys every line's identity on it |
+| `table_style_preset`, weak | names the preset the reset styles vary |
+| two header buckets and the first tile | required by the data store |
+| the string, style, formula and pre-BNC format lists | required by the data store |
+| the control-spec list | without it Numbers opened clean and dropped every formula in the table |
+| the BNC format list | pybers names a value's Automatic format in it |
+| the owner of kind 1: uid, internal id, kind and `formula_owner` | the identity `table_id` names |
+| the three reset styles, whole | each property is the reset, and `pybers-base` without `tabs` was recounted to 56 overrides |
+
+### What a created table leaves to Numbers
+
+Each group was absent from the rung named, and Numbers rebuilt it on save on the table's
+own owner base, adding no owner and changing no field pybers sent.
+
+| rung | group |
+| --- | --- |
+| 1 | `field_infos` on every created archive |
+| 2 | every optional nested message left empty |
+| 3 | every optional scalar at its schema default, but those the table above holds and every coordinate's `row`, `column` and `owner_index` |
+| 4 | the summary model and its 17 archives, rebuilt identical on the owner at base + 9 |
+| 5 | the category order and its UID map |
+| 6 | the category owner, group-by and group node, rebuilt as base + 8 onto the owner of kind 8 |
+| 7 | the hidden states at base + 4 and base + 11, their formula owners and filter sets |
+| 8 | the sort rule tracker and `sort_order` |
+| 9 to 11 | the ten owners besides kind 1, their tiles, and every model field naming them |
+| 12 | the rich-text, comment, conditional-style, formula-error, import-warning and multiple-choice lists |
+| 13 | the title and caption standins, the title still hidden |
+| 14 | the layout cache |
+| 15 | the stroke sidecar |
+| 16 | the ranges and empty dependency sets of the owner of kind 1 |
+| 17 | the header name manager's slot |
+| 18 | the table's sidebar node |
+| 21 | `storage_version_pre_bnc`, restored as 4 |
+
+**An absent default is not the schema's default to Numbers.** With `row: 0` and `column:
+0` absent from the group-by's coordinates, Numbers rebuilt the whole registration onto
+other coordinates, so a coordinate is always written.
+
+**A merge pybers writes into a created table states the merge owner.** The model carries
+no `merge_owner` until a table holds a merge, and `merge_owner.owner_id` is required, so
+the merge writer states it at base + 5 with the first merge. Numbers kept it and the merge
+with no owner of kind 5 registered.
+
+### What a created sheet holds
+
+The name, the style, the reset's page setup and six empty header and footer storages.
+`is_autofit_on` and `show_page_numbers` are written although false, since Numbers read
+either absent as true and printed the sheet scaled with page numbers. The storages are
+written because Numbers rebuilding them put a page number in the center footer. The
+guides (rung 19), and `page_order`, `layout_direction`, `uses_single_header_footer` and
+`should_print_comments` at their defaults (rung 3), are left to Numbers.
+
+**A created archive takes the version Numbers writes its type at**, one per type across
+all 187 documents, measured on 2 November 2026, with two exceptions. A BNC data list, the
+control-spec and format lists, carries (3, 2, 10) where the others carry (1, 0, 5). The
+model carries (10, 0, 3) in the six documents built from `45-columns-over-255`, 300
+columns, and `58-buckets-base`, 100,000 rows, and (3, 2, 10) everywhere else. pybers
+writes (3, 2, 10) for every created model. Numbers opened a created table of 300 columns
+and one of 100,000 rows written so, computed the formulas typed into each, kept both
+identities, and saved both models at (10, 0, 3) itself, measured on 2 November 2026.
+
+`tests/test_creation_floor.py` compares a created table with `48-table-inserted` and a
+created sheet with `49-sheet-inserted`, field for field, and pins every omission above.
+
+## The least a document holds
+
+Found for PYB-261 on 2 November 2026 in Numbers 15.4, from `96-sheet-without-table`, one
+sheet and no table in 13 members and 548 archives. A candidate holding the fewest that
+might suffice was built first, then each item left in it was removed alone. Every
+reference to a removed archive was stripped from the bodies holding it, the archives
+nothing reached were collected, and the package metadata was rebuilt to match. A refusal
+is an alert that the document cannot be opened right now because Numbers could not read
+it.
+
+**Opening a document is not using it.** The least document Numbers opens, below, crashed
+Numbers the moment a person inserted a table or a text box. The floor a created
+document holds is therefore the one in which a table, a text box, a shape, a line, a chart, a PNG
+image and an SVG can each be inserted through the helper's `drawableAdd` and `tableAdd`
+steps and the document saved, with no alert and no crash.
+
+### What opening needs
+
+**A document of 8 archives in 4 members opens, 2,485 bytes.**
+
+| member, archive or field | why it is kept |
+| --- | --- |
+| `TN.DocumentArchive` and its four references | required by the schema |
+| `TN.SheetArchive`, its name alone | pybers' floor of one sheet holding no table, since Numbers opened and saved a document holding none |
+| `TN.ThemeArchive` and 27 `color_presets` | refused with 26 or fewer, and opened with 27 all black, so the count is read and the colors are not |
+| one empty `TSK.TreeNode` | `sidebar_order` is required by the schema |
+| `TSS.StylesheetArchive` and `is_locked` | Numbers crashed when `is_locked` was absent |
+| two empty `TSWP.ShapeStyleArchive`s, `drawingline-0-drawinglineStyle` and `svgimport-0-shapestyle` | refused when either is absent, or absent from `identifier_to_style_map`, so Numbers looks each up by that name |
+| `TSP.PackageMetadata`: `last_object_identifier`, two components and `read_version` | refused when `read_version` is absent |
+| one member outside `Index/` | refused when every member is under `Index/` |
+
+The member outside `Index/` can be anything. Numbers opened `DocumentIdentifier` holding a
+fresh UUID, the same file empty, an empty `Metadata/Placeholder` and an empty `Placeholder`
+at the root, first in the zip or last, and refused an empty `Index/Placeholder`.
+
+Numbers opened each of these absent: the previews, `Properties.plist`,
+`BuildVersionHistory.plist`, the view state, annotation author storage, document metadata
+and calculation engine components, the custom format list, the function browser state,
+every theme preset and every style nothing references, the sheet's guides, headers and
+footers, every print setting on the document and the sheet, the document's flags,
+`template_identifier` and `document_language`, the theme's identifier, the stylesheet's
+other flags, every field of both shape styles, and the metadata's `write_version`,
+revision, file format version, save tokens and UUID maps. Three locale fields,
+`locale_identifier`, `creation_locale_identifier` and `formatting_symbols`, each opened
+absent too, and are kept because a creation states its region.
+
+On save Numbers rebuilt 79 archives in 13 members, and chose US Letter, 72 pt margins,
+automatic scaling and page numbers for a sheet holding no print setting. pybers writes
+the reset's page setup instead, with fit to page off, and leaves the page size to
+Numbers.
+
+### What inserting needs
+
+Each insertion draws on the theme's presets. With none, inserting a table, text box,
+shape or line crashed Numbers, and a chart was refused. Removing one kind of preset at a
+time from a floor holding all of them:
+
+| preset kind | without it |
+| --- | --- |
+| table style | inserting a table crashed Numbers |
+| chart | inserting a chart was refused, `AppleEvent handler failed` |
+| shape, line and text box style | inserting that object crashed Numbers |
+| image style | inserting an image was refused, `Unsupported item` |
+| SVG import style | an SVG was inserted and saved, so it is not kept |
+
+Movie, caption, list, character, paragraph and drop cap presets passed when removed, but
+nothing the helper does exercises them, so a created theme keeps one of each.
+
+**One preset of each kind is enough**, against Numbers' six of most. Every style stripped
+to its references, its identifier and its name gone too, passed every insertion, but a
+person's later actions need more, below. The table preset's 34 slots
+may name one table, one cell and one paragraph style between them, Numbers itself sharing
+one paragraph style across three header and footer slots, and one paragraph style may
+serve every slot of every preset in the document. A chart preset keeps Numbers' list
+lengths, two value axes, one category axis, six series and 30 paragraph styles, one
+style shared along each. Cutting each list to one also passed, but a chart may reach an
+entry by position, and no insertion here turns on a title or adds a seventh series.
+
+**A created document offering one preset of each kind is 30 archives.** pybers composes it in
+`document/_theme.py`, the table preset carrying the reset and every text slot naming
+`pybers-base`, and Numbers inserted all seven objects into an `en_US` and a `de_DE`
+document created so.
+
+### What a person's later actions need
+
+**A root style states what Numbers states on every root style of its type.** Measured on
+3 November 2026 across every fixture and measurement:
+
+| style | properties every root style states |
+| --- | --- |
+| sheet | 2, its fill and tab color |
+| table | 62, the strokes and layout of every region |
+| chart series | 113 in its properties extension, and two flags |
+| chart | 22, and one flag |
+| list | 4 |
+| chart axis, legend and reference line | 3, 4 and 4 |
+| media | 1, its stroke |
+| paragraph | 59 on nearly every one, which `pybers-base` states |
+| shape, character, cell and drop cap | none |
+
+A created sheet stating no fill opened and took insertions, then drew dark under the dark
+appearance and crashed Numbers when a person changed its background and undid the change.
+Filled white, it did neither. A table style stating only the reset's three properties
+showed alternating rows ticked and an empty outline menu. Stating all 62, valued as the
+Blank theme states them, with the reset's visibility and banding off, it showed no
+banding, an outline of None and every outline choice.
+`tools/local/themestyles_extract.py` reads these from the documents into
+`src/pybers/_generated/themestyles.py`, and a test holds the two together.
+
+The table network is written as one message at version (2, 4, 0). Numbers writes a
+second message beside it, the first 11 slots at (2, 0, 0), and field infos marking the
+newer slots, and needs neither.
+
+**A created document's first table creates its calculation engine.** A document holding
+no table needs none, and Numbers builds one on save. pybers writes an engine holding an
+empty dependency tracker and an empty dirty list, in a component of its own named
+`CalculationEngine`, with the document root naming it, before registering the table's
+owner. Numbers opened a created document holding a table so made, kept the table's
+identity, and computed `=A1*3` as 6 and `=SUM(A1:B1)` as 8 from the 2 in `A1`,
+measured on 2 November 2026. Numbers itself names that member `CalculationEngine-<id>` in 16 of
+the 188 documents.
+
+**A created document's archives start at identifier 100.** Numbers-made documents use
+nothing between 3 and 999 but 71, the document metadata. A created theme at 4 and
+stylesheet at 6 opened, and Numbers saved them renumbered from 100, the stylesheet's
+component becoming `DocumentStylesheet-102`. Numbered from 100 they were kept, and only
+the empty sidebar root was replaced, as Numbers rebuilds the sidebar.
+
+**Removing every optional member at once is refused even though each opens alone.** It is
+the one member outside `Index/` that was missing, since keeping any of the three
+`Metadata` files restored it.
+
+**The stylesheet lists styles it does not declare.** Its `styles` held five character
+styles that only the theme's presets declare in `object_references`, so dropping the
+presets left those entries naming nothing. Numbers opened that without complaint, which is
+why only the comparison of every body reference found it.

@@ -1,0 +1,31 @@
+# How Numbers makes 93d-formulas-for-a-merge: a formula beside a second formula, for a merge to cover the second, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 93d-formulas-for-a-merge`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "B2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "=1+1"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "formula =1+1"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "=2*3"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "formula =2*3"

@@ -4,7 +4,7 @@ Base-128 varints, checked as an exact inverse pair and against real archive stre
 
 The synthetic cases sit on the boundaries where the encoding grows a byte, which is
 where an off-by-one in the shift arithmetic would show. The sweep across every document
-is the one that matters most: every archive in every document is reached by reading a
+is the most important: every archive in every document is reached by reading a
 varint, so a bad decode desynchronizes the whole stream rather than raising.
 
 UPDATES

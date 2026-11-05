@@ -5,10 +5,10 @@ round-trip tests (read a document .numbers file, write it back unchanged, assert
 byte-for-byte equality) land once pybers._persistence exists, see CLAUDE.md.
 
 UPDATES
+2026-10-24  The cell's unread style no longer printed or tested, for PYB-259.
 2026-08-12  Initial scaffold.
 """
 
-import dataclasses
 import importlib
 import pkgutil
 from decimal import Decimal
@@ -35,15 +35,6 @@ def testPackageExposesVersion() -> None:
     """The package's __version__ matches pyproject.toml, so releases cannot
     drift apart."""
     assert pybers.__version__ == "0.1.0"
-
-
-def testStyleIsFrozenAndHashable() -> None:
-    """Style must be immutable, the fix for the old fork's shared-mutable-Style bug,
-    where two cells could hold the exact same Style object by reference."""
-    style = pybers.Style(bold=True)
-    assert hash(style) is not None
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        style.bold = False  # type: ignore[misc]
 
 
 def testCellCreatesAndReusesCells() -> None:

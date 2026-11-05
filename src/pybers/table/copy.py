@@ -27,8 +27,11 @@ __date__ = "2026/09/29"
 
 from typing import TYPE_CHECKING
 
-from pybers.addressing.ranges import CellRange, RangeAddress
-from pybers.addressing.reference import CellAddress, ReferenceError, toCellReference
+from pybers.addressing.ranges import CellRange, CellRangeLike
+from pybers.addressing.reference import (
+    CellReferenceLike,
+    ReferenceError,
+)
 from pybers.formula.relocation import FormulaReferenceRelocation, clampFormulaRanges
 from pybers.table.bounds import refuseRangeOutside
 from pybers.table.fill import copyCellContent
@@ -47,17 +50,17 @@ if TYPE_CHECKING:
 
 def copyCells(
     table: Table,
-    source: RangeAddress,
-    anchor: CellAddress,
+    source: CellRangeLike,
+    anchor: CellReferenceLike,
     references: FormulaReferenceRelocation,
 ) -> CellRange:
     """Copy a block so its top-left lands on `anchor`, and return where it landed."""
-    from pybers.table.cells import Cell
+    from pybers.table.cell import Cell
 
     rule = toRelocationRule(references)
     named = rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
     extent = table.rangeSingle(source, "copy")
-    landing = toCellReference(anchor).asUnlocked()
+    landing = table._addressResolve(anchor)
     startRow, startCol, _, _ = findBlockCorners(extent)
     copy = CellsMove(extent, landing.row - startRow, landing.col - startCol)
     destination = copy.destination
@@ -79,16 +82,16 @@ def copyCells(
     for reference in destination:
         table._cells.pop(reference, None)
     for cell in copied:
-        target = Cell(reference=copy.cellMap(cell.reference), table=table)
+        target = Cell(address=copy.cellMap(cell.address), table=table)
         copyCellContent(target, cell, named, borders=True)
         if target.formula is not None and not named:
             target.formula = clampFormulaRanges(
-                target.formula, target.reference, table.rowCount, table.colCount
+                target.formula, target.address, table.rowCount, table.colCount
             )
-        table._cells[target.reference] = target
+        table._cells[target.address] = target
     table.mergeRanges.extend(
         MergeRange(CellRange.fromReferences(
-            copy.cellMap(merge.anchor), copy.cellMap(merge.extent.end or merge.anchor)
+            copy.cellMap(merge.anchor), copy.cellMap(merge.corner)
         ))
         for merge in list(table.mergeRanges) if extent.covers(merge.anchor)
     )

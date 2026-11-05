@@ -1,0 +1,68 @@
+# How Numbers makes 90-values-for-booleans: two numbers, a checked checkbox, a star rating and an empty cell, for booleans to be written over, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 90-values-for-booleans`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "E2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "1234.5"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "number 1234.5"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "42"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "number 42"
+
+[[step]]
+action = "dataFormatSet"
+range = "C1"
+setting = "Data Format"
+value = "Checkbox"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "TRUE"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "checkbox, checked"
+
+[[step]]
+action = "dataFormatSet"
+range = "D1"
+setting = "Data Format"
+value = "Star Rating"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "3"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "star rating of 3"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "nothing"

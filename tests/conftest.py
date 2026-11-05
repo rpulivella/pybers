@@ -7,6 +7,12 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-11-03  `readRangeValues`, the values a range covers, and `listShownFields`,
+            the fields a command folds onto its lines, for PYB-223.
+2026-10-29  `readPlainText`, a command's output without color or wrapping, for
+            PYB-272.
+2026-10-27  `renderPlain`, a command's output without color, for PYB-260.
+2026-10-22  `--golden-write`, which writes each golden from its builder, for PYB-255.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-16  `allDocuments` and `findDocumentPath` gathered here for PYB-90, so a
             test finds a document without knowing whether it is an origin.
@@ -25,8 +31,12 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/07"
 
+import shutil
 from pathlib import Path
 
+import pytest
+
+import pybers
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import NumbersPackage, readPackage
 from pybers._persistence.cells import chooseOffsetUnit, decodeRow
@@ -56,6 +66,52 @@ def findDocumentPath(stem: str) -> Path:
     ]
     assert len(found) == 1, f"{stem}.numbers is in {len(found)} document directories"
     return found[0]
+
+
+def readPlainText(text: str) -> str:
+    """Return a command's output without terminal codes, its words joined by one space.
+
+    Typer colors and wraps a usage error to the terminal, which differs on CI, and Rich
+    decodes every code it may write.
+    """
+    # Imported here, so a suite run without the `cli` extra still collects.
+    from rich.text import Text
+
+    return " ".join(Text.from_ansi(text).plain.split())
+
+
+def renderPlain(renderable: object) -> str:
+    """Return what a renderable prints on a terminal without color."""
+    # Imported here, so a suite run without the `cli` extra still collects.
+    import io
+
+    from rich.console import Console
+
+    from pybers.cli._console import theme
+
+    buffer = io.StringIO()
+    Console(file=buffer, width=100, no_color=True, theme=theme).print(renderable)
+    return buffer.getvalue()
+
+
+def listShownFields(text: str) -> list[tuple[str, str]]:
+    """Return each `Label: value` field a command printed, in order, folded or not."""
+    return [
+        (label, value)
+        for line in text.splitlines()
+        for field in line.strip().split("   ") if ": " in field
+        for label, value in [field.split(": ", 1)]
+    ]
+
+
+def readRangeValues(table: pybers.Table, text: str) -> list[object]:
+    """Return the value of each cell a bounded range covers, row by row."""
+    return [table.cell(address).value for address in pybers.CellRange.parse(text)]
+
+
+def copyDocument(stem: str, into: Path) -> Path:
+    """Return a writable copy of a document, so a save never touches the original."""
+    return Path(shutil.copy(findDocumentPath(stem), into / f"{stem}.numbers"))
 
 
 tableModelType: int = next(
@@ -121,3 +177,11 @@ def readRecordedColumns(path: Path, row: int) -> set[int]:
     if row not in recorded:
         raise AssertionError(f"No table in {path.name} holds row {row}.")
     return recorded[row]
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add `--golden-write`, which writes each golden from its builder."""
+    parser.addoption(
+        "--golden-write", action="store_true",
+        help="write each selected golden from tests/golden/builders.py",
+    )

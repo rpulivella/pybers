@@ -13,6 +13,10 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-11-03  `SelectionMatch`, one thing a selector matches, for PYB-223.
+2026-10-27  A range names its table when its context needs one, as a reference
+            does, for PYB-260.
+2026-10-19  `CellRangeLike`, what a call accepts for a range, for PYB-217.
 2026-10-13  A range in the file marks an unbounded axis with a sentinel, for PYB-139.
 2026-09-13  A range endpoint past the last row is refused, for #67.
 2026-09-08  Moved into `pybers.addressing` for #58, unchanged.
@@ -30,12 +34,15 @@ __date__ = "2026/09/01"
 
 import re
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from pybers.addressing.reference import (
     CellAddress,
     CellReference,
+    CellReferenceLike,
     ReferenceError,
+    SheetReference,
+    TableReference,
     absoluteMarker,
     cellPattern,
     chooseMarker,
@@ -43,6 +50,8 @@ from pybers.addressing.reference import (
     firstRow,
     lastColumn,
     lastRow,
+    splitTableName,
+    tableNameSeparator,
     toCellReference,
     toColumnLetter,
     toColumnNumber,
@@ -156,6 +165,7 @@ class CellRange:
     startColAbsolute: bool = field(default=False, kw_only=True)
     endRowAbsolute: bool = field(default=False, kw_only=True)
     endColAbsolute: bool = field(default=False, kw_only=True)
+    table: TableReference | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
         """Reject a rectangle half-unbounded, inverted, or off either end.
@@ -269,8 +279,11 @@ class CellRange:
         )
 
     @classmethod
-    def fromReferences(cls, start: CellReference, end: CellReference) -> CellRange:
+    def fromReferences(
+        cls, start: CellReference | CellAddress, end: CellReference | CellAddress
+    ) -> CellRange:
         """Return the rectangle two cells bound, given in either order."""
+        start, end = toCellReference(start), toCellReference(end)
         return cls.fromAxes(
             ((start.row, start.rowAbsolute), (end.row, end.rowAbsolute)),
             ((start.col, start.colAbsolute), (end.col, end.colAbsolute)),
@@ -281,11 +294,12 @@ class CellRange:
         """Return the rectangle a written range addresses.
 
         Accepts one cell (`B2`), a rectangle (`A1:C3`), a whole column (`A`), a
-        whole row (`1`), and a span of either (`A:C`, `1:3`). Both endpoints of a
-        span have to be the same kind, since `A1:C` names no rectangle.
+        whole row (`1`), and a span of either (`A:C`, `1:3`), each named by its
+        table as far as the text names it, `Q3::B2:D5`. Both endpoints of a span
+        have to be the same kind, since `A1:C` names no rectangle.
         """
-        text = reference.strip()
-        parts = text.split(rangeSeparator)
+        table, text = splitTableName(reference)
+        parts = text.strip().split(rangeSeparator)
         if len(parts) > 2:
             raise ReferenceError(f"{reference!r} names more than two endpoints.")
         first = parseEndpoint(parts[0], reference)
@@ -297,12 +311,13 @@ class CellRange:
                 f"{reference!r} bounds one endpoint on an axis that the other "
                 "leaves unbounded."
             )
-        return cls.fromAxes(
+        found = cls.fromAxes(
             ((first.row, first.rowAbsolute), (last.row, last.rowAbsolute)),
             ((first.col, first.colAbsolute), (last.col, last.colAbsolute)),
         )
+        return found if table is None else replace(found, table=table)
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether a cell falls inside this range, its edges included."""
         reference = toCellReference(address)
         withinRows = self.startRow is None or (
@@ -333,6 +348,7 @@ class CellRange:
             startColAbsolute=self.startColAbsolute,
             endRowAbsolute=self.endRowAbsolute,
             endColAbsolute=self.endColAbsolute,
+            table=self.table,
         )
 
     def asReference(self) -> str:
@@ -358,7 +374,7 @@ class CellRange:
             return first
         return f"{first}{rangeSeparator}{last}"
 
-    def __iter__(self) -> Iterator[CellReference]:
+    def __iter__(self) -> Iterator[CellAddress]:
         """Yield every cell this range covers, row by row and left to right.
 
         An unbounded range cannot be walked, and refusing is better than inventing
@@ -370,11 +386,13 @@ class CellRange:
             raise ReferenceError(f"{self} spans every column and cannot be walked.")
         for row in range(self.startRow, self.endRow + 1):
             for col in range(self.startCol, self.endCol + 1):
-                yield CellReference(row, col)
+                yield CellAddress(row, col)
 
     def __str__(self) -> str:
-        """Return the written form, so an error message reads as a range."""
-        return self.asReference()
+        """Return the written form, qualified by its table when it names one."""
+        if self.table is None:
+            return self.asReference()
+        return f"{self.table}{tableNameSeparator}{self.asReference()}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,7 +422,7 @@ class CellRangeList:
         """Return the list as it would be written, in its own order."""
         return listSeparator.join(item.asReference() for item in self.ranges)
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether any range in the list covers a cell."""
         return any(item.covers(address) for item in self.ranges)
 
@@ -421,12 +439,15 @@ class CellRangeList:
         return self.asReference()
 
 
+# One thing a selector matches, qualified by its sheet and table.
+type SelectionMatch = SheetReference | TableReference | CellReference | CellRange
+
 # What a caller may hand to anything that addresses more than one cell. A plain
 # string covers both a single range and a comma-separated list of them.
-RangeAddress = CellRange | CellRangeList | str
+CellRangeLike = CellRange | CellRangeList | str
 
 
-def toCellRanges(address: RangeAddress) -> tuple[CellRange, ...]:
+def toCellRanges(address: CellRangeLike) -> tuple[CellRange, ...]:
     """Return the ranges an address names, as a tuple even when there is one.
 
     One range and a list of them are treated the same way everywhere downstream, so

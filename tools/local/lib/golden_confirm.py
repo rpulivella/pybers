@@ -7,6 +7,18 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-10-29  A formula is compared as Numbers saved it, its shown text in the
+            document's language left for a person, for PYB-272.
+2026-10-24  The expectations' machine form is the golden's JSON form, for PYB-259.
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
+2026-10-22  Every cell of every table is checked against what pybers reads from the
+            golden, and the inspector only where a setting needs it, for PYB-255.
+2026-10-22  A golden's expected values are generated from the golden, for PYB-220.
+2026-10-22  A run's folder holds a copy of the golden to open and its expectations
+            as headed Markdown, for PYB-220.
+2026-10-21  The helper names each Data Format control, and a recipe step sets one,
+            for PYB-219.
 2026-10-14  A missing or stale helper states the miss and stops, as house rule 11
             asks, for PYB-204.
 2026-10-14  The confirmation's logic moved here from `golden_confirm.py`, for
@@ -33,14 +45,29 @@ import subprocess
 import tempfile
 import tomllib
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, assert_never
 
-from pybers import CellRange, CellReference, MergeRange, PybersError
+import pybers
+from pybers import (
+    CellControl,
+    CellControlCheckbox,
+    CellControlPopUpMenu,
+    CellControlSlider,
+    CellControlStarRating,
+    CellControlStepper,
+    CellControlUnknown,
+    CellFormat,
+    CellRange,
+    CellReference,
+    CurrencyAmount,
+    PybersError,
+)
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
 from pybers.formula.syntax import (
@@ -48,6 +75,15 @@ from pybers.formula.syntax import (
     formulaMarker,
     percentSymbol,
     tokenize,
+)
+from tools.local.lib.golden_expected import (
+    ExpectedCell,
+    ExpectedTable,
+    ExpectedValues,
+    buildExpectedValues,
+    formatValue,
+    writeExpectations,
+    writeExpectationsJson,
 )
 from tools.workflow.lib.shared import readTicketNumber, repositoryRoot
 
@@ -117,25 +153,16 @@ measurementDirectory: Path = repositoryRoot / "tests" / "measurements"
 recipeSuffix: str = ".recipe.toml"
 
 
+recipeDefaultKeys: tuple[str, ...] = ("document", "sheet", "table")
+
+
 recipeStepKeys: frozenset[str] = frozenset({
-    "action", "document", "sheet", "table", "range", "menuItem", "format", "value",
+    "action", "document", "sheet", "table", "range", "menuItem", "format", "drawable",
+    "value", "setting",
 })
 
 
 reportRoot: Path = repositoryRoot / "workarea" / "golden-confirm"
-
-
-expectedSuffix: str = ".expected.toml"
-
-
-expectedKeys: frozenset[str] = frozenset({
-    "sheet", "table", "cell", "value", "empty", "formula", "format", "dataFormat", "qa",
-})
-
-
-expectedTableKeys: frozenset[str] = frozenset({
-    "sheet", "table", "rows", "columns", "merges",
-})
 
 
 # A run launches a closed Numbers itself, so its permissions check does not refuse one.
@@ -152,6 +179,10 @@ numbersOperators: dict[int, str] = str.maketrans({"×": "*", "÷": "/", "−": "
 
 
 inspectDeadlineSeconds: float = 300.0
+
+
+# What reading one more grid cell adds to a run's deadline, AppleScript asking per cell.
+gridSecondsPerCell: float = 0.1
 
 
 # Slack beyond the helper's own deadline, for `open` to start it and write the result.
@@ -172,40 +203,6 @@ class HelperProblem:
     kind: str
     detail: str
     remedy: str
-
-
-@dataclass(frozen=True)
-class ExpectedCell:
-    """One cell an expected-values file names, and what Numbers should show for it."""
-
-    sheet: str
-    table: str
-    cell: str
-    value: object
-    empty: bool
-    formula: str | None
-    formatKind: str | None
-    dataFormat: dict[str, str]
-    qa: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class ExpectedTable:
-    """One table an expected-values file names, with its size and merged ranges."""
-
-    sheet: str
-    table: str
-    rows: int | None
-    columns: int | None
-    merges: frozenset[str] | None
-
-
-@dataclass(frozen=True)
-class ExpectedValues:
-    """Everything an expected-values file says Numbers should show."""
-
-    cells: list[ExpectedCell]
-    tables: list[ExpectedTable]
 
 
 @dataclass(frozen=True)
@@ -243,7 +240,7 @@ class MeasurementRecipe:
 
 @dataclass(frozen=True)
 class HelperBuild:
-    """What `helper-build` produced, or would produce under `--dry-run`."""
+    """What `helper-build` produced, or would produce under `--preview`."""
 
     identity: str
     sourceHash: str
@@ -309,10 +306,10 @@ def findSigningIdentity(requested: str | None) -> str:
     return development[0][0]
 
 
-def buildHelper(identity: str, dryRun: bool) -> HelperBuild:
+def buildHelper(identity: str, preview: bool) -> HelperBuild:
     """Compile, sign and install the helper, replacing any installed build."""
     sourceHash = readHelperSourceHash()
-    if dryRun:
+    if preview:
         return HelperBuild(identity, sourceHash, helperBundle, installed=False)
     helperInstallDirectory.mkdir(parents=True, exist_ok=True)
     # Staged beside the install so the final move is a rename on one volume.
@@ -473,7 +470,9 @@ def readMeasurementRecipe(name: str) -> MeasurementRecipe:
         raise GoldenConfirmError(f"{path.relative_to(repositoryRoot)} does not exist")
     with path.open("rb") as handle:
         recipe = tomllib.load(handle)
-    steps = recipe.get("step", [])
+    # A recipe may name its document, sheet and table once, for every step.
+    defaults = {key: recipe[key] for key in recipeDefaultKeys if key in recipe}
+    steps = [defaults | step for step in recipe.get("step", [])]
     for position, step in enumerate(steps, start=1):
         unknown = set(step) - recipeStepKeys
         if unknown:
@@ -498,129 +497,21 @@ def readTicketKey() -> str:
     return f"{prefix}-{number}"
 
 
-def readExpectedValues(golden: Path) -> ExpectedValues:
-    """Read the cells and tables to check and what each should show, from the golden."""
-    path = golden.with_name(f"{golden.stem}{expectedSuffix}")
-    if not path.is_file():
-        raise GoldenConfirmError(f"{path.name} does not exist beside {golden.name}")
-    try:
-        with path.open("rb") as handle:
-            document = tomllib.load(handle)
-    except tomllib.TOMLDecodeError as exc:
-        raise GoldenConfirmError(f"{path.name} is not valid TOML: {exc}") from exc
-    cells = [readExpectedCell(path, position, entry)
-             for position, entry in enumerate(document.get("cell", []), start=1)]
-    tables = [readExpectedTable(path, position, entry)
-              for position, entry in enumerate(document.get("table", []), start=1)]
-    if not cells and not tables:
-        raise GoldenConfirmError(f"{path.name} names no [[cell]] or [[table]] to check")
-    addresses = [(cell.sheet, cell.table, cell.cell) for cell in cells]
-    if len(set(addresses)) != len(addresses):
-        raise GoldenConfirmError(f"{path.name} names the same cell twice")
-    named = [(table.sheet, table.table) for table in tables]
-    if len(set(named)) != len(named):
-        raise GoldenConfirmError(f"{path.name} names the same table twice")
-    return ExpectedValues(cells, tables)
-
-
-def checkEntryKeys(
-    path: Path, label: str, entry: dict[str, Any], allowed: frozenset[str],
-    required: set[str],
-) -> None:
-    """Refuse an entry holding a key the tool does not read or missing one it needs."""
-    unknown = set(entry) - allowed
-    missing = required - set(entry)
-    if unknown or missing:
-        raise GoldenConfirmError(
-            f"{path.name} {label}: unknown keys {sorted(unknown)}, "
-            f"missing keys {sorted(missing)}"
-        )
-
-
-def readExpectedCell(path: Path, position: int, entry: dict[str, Any]) -> ExpectedCell:
-    """Read one [[cell]] entry, refusing an emptiness that contradicts its value."""
-    label = f"cell {position}"
-    checkEntryKeys(path, label, entry, expectedKeys, {"sheet", "table", "cell"})
-    empty = entry.get("empty", False)
-    # Only true, since "not empty" would pass a cell the helper never read.
-    if "empty" in entry and empty is not True:
-        raise GoldenConfirmError(f"{path.name} {label}: empty {empty!r} is not true")
-    if empty and "value" in entry:
-        raise GoldenConfirmError(f"{path.name} {label}: states both empty and a value")
-    return ExpectedCell(
-        sheet=entry["sheet"], table=entry["table"], cell=entry["cell"],
-        value=entry.get("value"), empty=empty, formula=entry.get("formula"),
-        formatKind=entry.get("format"),
-        dataFormat={str(key): str(value) for key, value in
-                    entry.get("dataFormat", {}).items()},
-        qa=tuple(entry.get("qa", ())),
-    )
-
-
-def readExpectedTable(
-    path: Path, position: int, entry: dict[str, Any]
-) -> ExpectedTable:
-    """Read one [[table]] entry, its merges spelled as pybers spells a merge."""
-    label = f"table {position}"
-    checkEntryKeys(path, label, entry, expectedTableKeys, {"sheet", "table"})
-    if not {"rows", "columns", "merges"} & set(entry):
-        raise GoldenConfirmError(
-            f"{path.name} {label}: states none of rows, columns and merges")
-    for key in ("rows", "columns"):
-        count = entry.get(key)
-        if count is not None and (type(count) is not int or count < 1):
-            raise GoldenConfirmError(
-                f"{path.name} {label}: {key} {count!r} is not a positive whole number")
-    merges: frozenset[str] | None = None
-    if "merges" in entry:
-        try:
-            extents = [MergeRange(CellRange.parse(text)).extent
-                       for text in entry["merges"]]
-        except (PybersError, TypeError) as exc:
-            raise GoldenConfirmError(f"{path.name} {label}: {exc}") from exc
-        merges = frozenset(str(extent) for extent in extents)
-        if len(merges) != len(extents):
-            raise GoldenConfirmError(f"{path.name} {label}: names a merge twice")
-    return ExpectedTable(
-        sheet=entry["sheet"], table=entry["table"], rows=entry.get("rows"),
-        columns=entry.get("columns"), merges=merges,
-    )
-
-
 def readFileHash(path: Path) -> str:
     """Return a file's SHA-256, the proof a golden left a run unchanged (AC 2)."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def readDataFormatSettings(elements: list[dict[str, str]]) -> dict[str, str]:
-    """Name each Data Format control by the label Numbers shows beside it."""
+    """Return each Data Format control's value under the name the helper gave it."""
     settings: dict[str, str] = {}
     items: list[str] = []
-    pendingLabel: str | None = None
-    unlabeled = 0
-    for position, element in enumerate(elements):
-        role, value = element["role"], element["value"]
-        following = elements[position + 1] if position + 1 < len(elements) else None
-        if role == "AXStaticText":
-            if value.endswith(":"):
-                pendingLabel = value[:-1]
-            continue
-        if role == "AXPopUpButton" and "Data Format" not in settings:
-            settings["Data Format"] = value
-        elif role == "AXCheckBox":
-            settings[(element["title"] or element["label"]).strip()] = value
-        elif pendingLabel is not None:
-            settings[pendingLabel] = value
-        elif (role == "AXTextField" and following is not None
-              and following["role"] == "AXStaticText"
-              and not following["value"].endswith(":") and following["value"] != "–"):
-            settings[following["value"]] = value
-        elif role == "AXTextField":
+    for element in elements:
+        name, value = element["setting"], element["value"]
+        if name == "Items":
             items.append(value)
-        else:
-            unlabeled += 1
-            settings[f"Unlabeled {role[2:]} {unlabeled}"] = value
-        pendingLabel = None
+        elif name:
+            settings[name] = value
     if items:
         settings["Items"] = ", ".join(items)
     return settings
@@ -630,62 +521,6 @@ def readFormulaText(shown: str) -> str:
     """Spell a formula as pybers does, from the typographic operators Numbers shows."""
     # Numbers ends some formulas it saved itself with a newline outside the formula.
     return shown.translate(numbersOperators).rstrip()
-
-
-def checkValue(expected: object, reading: dict[str, str]) -> bool:
-    """Compare an expected TOML value with what Numbers reads, region-free (AC 4)."""
-    kind, text = reading["kind"], reading["text"]
-    if isinstance(expected, bool):
-        return kind == "boolean" and text == str(expected).lower()
-    if isinstance(expected, int | float):
-        return kind == "number" and float(text) == float(expected)
-    if isinstance(expected, datetime):
-        return kind == "date" and text == expected.strftime("%Y-%m-%dT%H:%M:%S")
-    if expected == "":
-        return kind in ("empty", "text") and text == ""
-    return kind == "text" and text == expected
-
-
-def checkCell(expected: ExpectedCell, reading: dict[str, Any]) -> list[Check]:
-    """Compare everything expected of one cell with what Numbers read (AC 4, AC 8)."""
-    subject = f"{expected.sheet} / {expected.table} / {expected.cell}"
-    evidence = Path(reading.get("inspectorCapture") or "").name
-    checks: list[Check] = []
-
-    def record(name: str, passed: bool, wanted: object, found: object) -> None:
-        """Add one comparison, showing both sides when it fails."""
-        detail = f"{name} {found}"
-        if not passed:
-            detail += f", expected {wanted}"
-        status = "passed" if passed else "failed"
-        checks.append(Check(status, subject, detail, evidence))
-
-    value = reading.get("value") or {"kind": "missing", "text": ""}
-    # The formatted value follows region settings, so it is shown, never compared.
-    shown = (f"{value['kind']} {formatCodeSpan(value['text'])}, shown as "
-             f"{formatCodeSpan(reading.get('formattedValue'))}")
-    if expected.value is not None:
-        record("value", checkValue(expected.value, value),
-               formatCodeSpan(expected.value), shown)
-    if expected.empty:
-        record("value", value["kind"] == "empty", "empty", shown)
-    if expected.formula is not None:
-        found = readFormulaText(reading.get("formula") or "")
-        record("formula", found == expected.formula,
-               formatCodeSpan(formatSpacedFormula(expected.formula)),
-               formatCodeSpan(formatSpacedFormula(found)))
-    if expected.formatKind is not None:
-        found = reading.get("formatKind") or ""
-        record("format", found == expected.formatKind,
-               formatCodeSpan(expected.formatKind), formatCodeSpan(found))
-    settings = readDataFormatSettings(reading.get("dataFormat", []))
-    for label, wanted in expected.dataFormat.items():
-        name = label if label == "Data Format" else f"Data Format {label}"
-        record(name, settings.get(label) == wanted, formatCodeSpan(wanted),
-               formatCodeSpan(settings.get(label)))
-    for question in expected.qa:
-        checks.append(Check("qa", subject, question, evidence))
-    return checks
 
 
 def readMerges(subject: str, cellNames: list[list[str]]) -> list[str]:
@@ -713,32 +548,237 @@ def readMergeOrder(merge: str) -> tuple[int | None, ...]:
     return (extent.startRow, extent.startCol, extent.endRow, extent.endCol)
 
 
-def checkTable(expected: ExpectedTable, reading: dict[str, Any]) -> list[Check]:
-    """Compare a table's size and merges with what Numbers read, one check per merge."""
+# A format as AppleScript's `format of cell` names it, once a person chose it.
+numbersFormatNames: dict[CellFormat, str] = {
+    CellFormat.NUMBER: "number", CellFormat.CURRENCY: "currency",
+    CellFormat.PERCENT: "percent", CellFormat.SCIENTIFIC: "scientific",
+    CellFormat.FRACTION: "fraction", CellFormat.NUMERAL_SYSTEM: "numeral system",
+    CellFormat.TEXT: "text", CellFormat.DATE_TIME: "date and time",
+    CellFormat.DURATION: "duration", CellFormat.CHECKBOX: "checkbox",
+    CellFormat.STAR_RATING: "rating",
+}
+
+
+# A format as the inspector's Data Format menu titles it.
+dataFormatTitles: dict[CellFormat, str] = {
+    CellFormat.NUMBER: "Number", CellFormat.CURRENCY: "Currency",
+    CellFormat.PERCENT: "Percentage", CellFormat.SCIENTIFIC: "Scientific",
+    CellFormat.FRACTION: "Fraction", CellFormat.NUMERAL_SYSTEM: "Numeral System",
+    CellFormat.TEXT: "Text", CellFormat.DATE_TIME: "Date & Time",
+    CellFormat.DURATION: "Duration", CellFormat.CHECKBOX: "Checkbox",
+    CellFormat.STAR_RATING: "Star Rating",
+}
+
+
+def findControlNames(control: CellControl) -> tuple[str, str] | None:
+    """Return a control's AppleScript format name and its Data Format menu title."""
+    match control:
+        case CellControlCheckbox():
+            return ("checkbox", "Checkbox")
+        case CellControlStarRating():
+            return ("rating", "Star Rating")
+        case CellControlSlider():
+            return ("slider", "Slider")
+        case CellControlStepper():
+            return ("stepper", "Stepper")
+        case CellControlPopUpMenu():
+            return ("pop up menu", "Pop-Up Menu")
+        case CellControlUnknown():
+            return None
+        case _:
+            assert_never(control)
+
+
+def findNumbersFormat(cell: ExpectedCell) -> tuple[str, str] | None:
+    """Return the format Numbers names for a cell, or None when no name is measured."""
+    if cell.control is not None:
+        return findControlNames(cell.control)
+    if not cell.formatChosen or cell.format is None:
+        return ("automatic", "Automatic")
+    if cell.format not in numbersFormatNames:
+        return None
+    return (numbersFormatNames[cell.format], dataFormatTitles[cell.format])
+
+
+def listInspectorSettings(cell: ExpectedCell) -> dict[str, str]:
+    """Return the Data Format settings the inspector shows, by the helper's names."""
+    settings: dict[str, str] = {}
+    names = findNumbersFormat(cell)
+    if names is not None:
+        settings["Data Format"] = names[1]
+    if cell.currencyMenu is not None:
+        settings["Currency"] = cell.currencyMenu
+    match cell.control:
+        case CellControlSlider(minimum, maximum, increment) | CellControlStepper(
+            minimum, maximum, increment
+        ):
+            settings |= {"Minimum": str(minimum), "Maximum": str(maximum),
+                         "Increment": str(increment)}
+        case CellControlPopUpMenu(items, _):
+            settings["Items"] = ", ".join(items)
+    return settings
+
+
+def checkNeedsInspector(cell: ExpectedCell) -> bool:
+    """Report whether a cell holds a setting only the inspector shows."""
+    return cell.control is not None or cell.currencyMenu is not None
+
+
+def checkValue(expected: pybers.CellValue, reading: dict[str, str]) -> bool:
+    """Compare a value pybers read with what Numbers read, region-free."""
+    kind, text = reading["kind"], reading["text"]
+    match expected:
+        case None:
+            return kind == "empty" or (kind == "text" and text == "")
+        case bool():
+            return kind == "boolean" and text == str(expected).lower()
+        case CurrencyAmount():
+            return kind == "number" and Decimal(text) == expected.amount
+        case Decimal():
+            return kind == "number" and float(text) == float(expected)
+        case datetime():
+            return kind == "date" and text == expected.strftime("%Y-%m-%dT%H:%M:%S")
+        case timedelta():
+            return kind == "number" and float(text) == expected.total_seconds()
+        case str():
+            return kind == "text" and text == expected
+        case _:
+            return False
+
+
+def formatReadingValue(reading: dict[str, str]) -> str:
+    """Return what Numbers read for a value, its kind first."""
+    return f"{reading['kind']} {formatCodeSpan(reading['text'])}"
+
+
+def listCoveredCells(merges: tuple[str, ...]) -> frozenset[str]:
+    """Return every cell a merge covers, its anchor excepted."""
+    covered = set()
+    for merge in merges:
+        extent = CellRange.parse(merge)
+        for row in range(extent.startRow or 1, (extent.endRow or 1) + 1):
+            for column in range(extent.startCol or 1, (extent.endCol or 1) + 1):
+                covered.add(CellReference(row, column).asReference())
+        covered.discard(CellReference(extent.startRow or 1, extent.startCol or 1)
+                        .asReference())
+    return frozenset(covered)
+
+
+def checkTableGrid(
+    expected: ExpectedTable, reading: dict[str, Any],
+    savedFormulas: Mapping[str, str] | None,
+) -> list[Check]:
+    """Compare every cell of a table with what pybers read, a check per difference.
+
+    A formula is compared as Numbers saved it, read back through pybers, since the text
+    Numbers shows follows the document's language and region. None for `savedFormulas`
+    means Numbers saved no copy to read it from.
+    """
     subject = f"{expected.sheet} / {expected.table}"
     checks: list[Check] = []
-    for axis, wanted, found in (
+    filled = {cell.cell: cell for cell in expected.cells}
+    covered = listCoveredCells(expected.merges)
+    for row, facts in enumerate(reading["cellFacts"], start=1):
+        for column, fact in enumerate(facts, start=1):
+            name = CellReference(row, column).asReference()
+            # AppleScript answers for a covered cell with its anchor's value.
+            if name in covered:
+                continue
+            cell = filled.get(name)
+            value = None if cell is None else cell.value
+            matched = checkValue(value, fact["value"])
+            # pybers stores the result Numbers last cached and evaluates nothing, so a
+            # formula's recalculated value is a person's to judge.
+            if cell is not None and cell.formula is not None and not matched:
+                stored = ("nothing" if value is None
+                          else formatCodeSpan(formatValue(value)))
+                found = formatReadingValue(fact["value"])
+                checks.append(Check("qa", f"{subject} / {name}",
+                                    f"Numbers recalculated it to {found}, where "
+                                    f"pybers stored {stored}"))
+            elif not matched:
+                wanted = "empty" if cell is None else formatCodeSpan(formatValue(value))
+                checks.append(Check("failed", f"{subject} / {name}",
+                                    f"value {formatReadingValue(fact['value'])}, "
+                                    f"expected {wanted}"))
+            shown = readFormulaText(fact.get("formula") or "") or None
+            wantedFormula = None if cell is None else cell.formula
+            if savedFormulas is None:
+                if wantedFormula is not None:
+                    checks.append(Check(
+                        "failed", f"{subject} / {name}",
+                        "Numbers saved no copy to read its formula from",
+                    ))
+            elif (saved := savedFormulas.get(name)) != wantedFormula:
+                checks.append(Check("failed", f"{subject} / {name}",
+                                    f"formula {formatCodeSpan(saved)} as Numbers saved "
+                                    f"it, expected {formatCodeSpan(wantedFormula)}"))
+            elif shown != wantedFormula:
+                checks.append(Check(
+                    "qa", f"{subject} / {name}",
+                    f"Numbers shows the formula as {formatCodeSpan(shown)}, in the "
+                    "document's language and region",
+                ))
+            names = None if cell is None else findNumbersFormat(cell)
+            found = fact.get("formatKind") or ""
+            if names is not None and found != names[0]:
+                checks.append(Check("failed", f"{subject} / {name}",
+                                    f"format {formatCodeSpan(found)}, expected "
+                                    f"{formatCodeSpan(names[0])}"))
+    if not any(check.status == "failed" for check in checks):
+        checks.append(Check("passed", subject,
+                            f"every cell holds the value, formula and format pybers "
+                            f"read, {len(filled)} of them filled"))
+    for axis, declared, counted in (
         ("row", expected.rows, reading["rowCount"]),
         ("column", expected.columns, reading["columnCount"]),
     ):
-        if wanted is None:
-            continue
-        passed = found == wanted
-        detail = f"{found} {axis}{'' if found == 1 else 's'}"
-        detail += "" if passed else f", expected {wanted}"
-        checks.append(Check("passed" if passed else "failed", subject, detail))
-    if expected.merges is not None:
-        found = readMerges(subject, reading["cellNames"])
-        unexpected = [merge for merge in found if merge not in expected.merges]
-        for merge in [*sorted(expected.merges, key=readMergeOrder), *unexpected]:
-            if merge not in found:
-                checks.append(Check("failed", subject, f"{merge} is not merged"))
-            elif merge not in expected.merges:
-                checks.append(
-                    Check("failed", subject, f"{merge} is merged, unexpectedly"))
-            else:
-                checks.append(Check("passed", subject, f"{merge} is merged"))
+        detail = f"{counted} {axis}{'' if counted == 1 else 's'}"
+        passed = counted == declared
+        checks.append(Check("passed" if passed else "failed", subject,
+                            detail if passed else f"{detail}, expected {declared}"))
+    merged = readMerges(subject, reading["cellNames"])
+    for merge in sorted({*expected.merges, *merged}, key=readMergeOrder):
+        if merge not in merged:
+            checks.append(Check("failed", subject, f"{merge} is not merged"))
+        elif merge not in expected.merges:
+            checks.append(Check("failed", subject, f"{merge} is merged, unexpectedly"))
+        else:
+            checks.append(Check("passed", subject, f"{merge} is merged"))
     return checks
+
+
+def checkCellInspector(
+    expected: ExpectedTable, cell: ExpectedCell, reading: dict[str, Any]
+) -> list[Check]:
+    """Compare the inspector's Data Format settings with what pybers read."""
+    subject = f"{expected.sheet} / {expected.table} / {cell.cell}"
+    evidence = Path(reading.get("inspectorCapture") or "").name
+    settings = readDataFormatSettings(reading.get("dataFormat", []))
+    checks = []
+    for name, wanted in listInspectorSettings(cell).items():
+        found = settings.get(name)
+        label = name if name == "Data Format" else f"Data Format {name}"
+        detail = f"{label} {formatCodeSpan(found)}"
+        passed = found == wanted
+        checks.append(Check("passed" if passed else "failed", subject,
+                            detail if passed else
+                            f"{detail}, expected {formatCodeSpan(wanted)}", evidence))
+    if isinstance(cell.control, CellControlPopUpMenu):
+        start = "its first item" if cell.control.startsWithFirstItem else "blank"
+        checks.append(Check("qa", subject, f"the pop-up menu starts with {start}",
+                            evidence))
+    return checks
+
+
+def listLabelChecks(expected: ExpectedTable) -> list[Check]:
+    """Return a person's check of each measured cell against the label beneath it."""
+    byName = {cell.cell: cell for cell in expected.cells}
+    return [
+        Check("qa", f"{expected.sheet} / {expected.table} / {cell.cell}",
+              f"matches {cell.label}: {byName[cell.label].value}")
+        for cell in expected.cells if cell.label is not None
+    ]
 
 
 def renderQuickLook(golden: Path, outputDirectory: Path) -> list[tuple[str, Path]]:
@@ -783,14 +823,44 @@ def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
     return [str(difference) for difference in listPackageDifferences(before, after)]
 
 
+def readSavedFormulas(saved: Path) -> dict[tuple[str, str], dict[str, str]]:
+    """Return each formula of the copy Numbers saved, by table and cell."""
+    return {
+        (sheet.name, table.name): {
+            str(address): cell.formulaText for address, cell in table.cells.items()
+            if cell.formulaText is not None
+        }
+        for sheet in pybers.open(saved).sheets for table in sheet.tables
+    }
+
+
+def listInspectedCells(
+    expected: ExpectedValues,
+) -> list[tuple[ExpectedTable, ExpectedCell]]:
+    """Return every cell whose settings only the inspector shows, with its table."""
+    return [(table, cell) for table in expected.tables for cell in table.cells
+            if checkNeedsInspector(cell)]
+
+
+def findInspectDeadline(expected: ExpectedValues) -> float:
+    """Return how long a run may take, longer for a table with more cells to read."""
+    gridCells = sum(table.rows * table.columns for table in expected.tables)
+    return inspectDeadlineSeconds + gridSecondsPerCell * gridCells
+
+
 def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
     """Drive the helper over one golden, with the display held awake around it."""
-    expected = readExpectedValues(golden)
+    expected = buildExpectedValues(golden)
+    inspected = listInspectedCells(expected)
     outputDirectory = run.outputDirectory
     checkHelperCanRun()
     if outputDirectory.exists():
         shutil.rmtree(outputDirectory)
     outputDirectory.mkdir(parents=True)
+    # A copy to open by hand, since Numbers rewrites a document it saves.
+    shutil.copyfile(golden, outputDirectory / golden.name)
+    writeExpectations(expected, outputDirectory)
+    writeExpectationsJson(expected, outputDirectory)
     goldenHash = readFileHash(golden)
     with tempfile.TemporaryDirectory(prefix="pybers-golden-copy-") as work:
         copy = Path(work) / golden.name
@@ -801,11 +871,11 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
             "documentPath": str(copy),
             "savedCopyPath": str(saved),
             "captureDirectory": str(outputDirectory),
-            "cells": [{"sheet": c.sheet, "table": c.table, "cell": c.cell}
-                      for c in expected.cells],
+            "cells": [{"sheet": t.sheet, "table": t.table, "cell": c.cell}
+                      for t, c in inspected],
             "tables": [{"sheet": t.sheet, "table": t.table} for t in expected.tables],
             "maxCaptures": maxCaptures,
-        }, deadlineSeconds=inspectDeadlineSeconds,
+        }, deadlineSeconds=findInspectDeadline(expected),
             logPath=outputDirectory / "helper.log")
         run.numbersVersion = result.get("numbersVersion")
         run.problems.extend(readProblems(result))
@@ -821,19 +891,10 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
                 "passed" if opened == "opened" else "failed", "document",
                 f"Numbers {opened} the copy" + (f": {alert}" if alert else ""),
             ))
-        readings = {
-            (r["address"]["sheet"], r["address"]["table"], r["address"]["cell"]): r
-            for r in result.get("cells", [])
-        }
-        for cell in expected.cells:
-            reading = readings.get((cell.sheet, cell.table, cell.cell))
-            if reading is None:
-                if opened == "opened":
-                    subject = f"{cell.sheet} / {cell.table} / {cell.cell}"
-                    run.checks.append(Check(
-                        "failed", subject, "the helper returned no reading for it"))
-                continue
-            run.checks.extend(checkCell(cell, reading))
+        savedFormulas = (
+            readSavedFormulas(saved) if result.get("savedCopy") and saved.is_file()
+            else None
+        )
         tableReadings = {
             (r["address"]["sheet"], r["address"]["table"]): r
             for r in result.get("tables", [])
@@ -846,7 +907,25 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
                         "failed", f"{table.sheet} / {table.table}",
                         "the helper returned no reading for it"))
                 continue
-            run.checks.extend(checkTable(table, tableReading))
+            run.checks.extend(checkTableGrid(
+                table, tableReading,
+                None if savedFormulas is None
+                else savedFormulas.get((table.sheet, table.table), {}),
+            ))
+            run.checks.extend(listLabelChecks(table))
+        readings = {
+            (r["address"]["sheet"], r["address"]["table"], r["address"]["cell"]): r
+            for r in result.get("cells", [])
+        }
+        for table, cell in inspected:
+            reading = readings.get((table.sheet, table.table, cell.cell))
+            if reading is None:
+                if opened == "opened":
+                    run.checks.append(Check(
+                        "failed", f"{table.sheet} / {table.table} / {cell.cell}",
+                        "the helper returned no inspector reading for it"))
+                continue
+            run.checks.extend(checkCellInspector(table, cell, reading))
         for capture in result.get("sheetCaptures", []):
             run.checks.append(Check(
                 "qa", capture["sheet"], "the sheet as Numbers displays it",
@@ -889,6 +968,9 @@ def writeReport(run: GoldenRun) -> Path:
         "",
         f"{run.ticket}, {datetime.now().strftime('%Y-%m-%d %H:%M')}, "
         f"Numbers {run.numbersVersion or 'unknown'}",
+        "",
+        f"Open [{run.golden.name}]({run.golden.name}), a copy safe to open and save, "
+        "beside [what it should show](expectations.md).",
         "",
     ]
     for problem in run.problems:

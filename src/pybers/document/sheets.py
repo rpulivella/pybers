@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""A sheet holds tables (row/column grids) and graphical objects (things that float on
-the sheet at an absolute position, text boxes, images, shapes) side by side, since
-Numbers places both on the same sheet independently. A document is a list of sheets.
+"""A sheet holds tables, and a document is a list of sheets.
 
 `Document` is the only handle a caller ever holds. It is what `pybers.open` returns,
 what every edit reaches through, and what `save` writes back. See CLAUDE.md, "Document
@@ -18,11 +16,33 @@ learn by being wrong:
 - **A table name is unique within its sheet and nowhere wider.** Numbers enforces it
   per sheet, case-insensitively, appending `-1` and `-2` to force it, so `Sheet.table`
   by name is unambiguous. It does not extend to the document: `20-formula-shapes`
-  carries a `Table 1` on each of two sheets, which is why there is no document-wide
-  table lookup by name. Sheet names carry no such enforcement at all, so a duplicate
+  carries a `Table 1` on each of two sheets, which is why `Document.table` refuses a
+  name two sheets share. Sheet names carry no such enforcement at all, so a duplicate
   is handled rather than assumed away.
 
 UPDATES
+2026-11-03  `select` on a document and a sheet, and every lookup by name a typed
+            call into the one resolver, replacing `partSelect`, `Document.cell`
+            and `Sheet.cell`, and `cellSet` writing every cell a selector
+            matches, for PYB-223.
+2026-10-28  `localeSet`, a change of language and region, for PYB-272.
+2026-10-27  `localeIdentifier`, the language and region a document shows its
+            values in, for PYB-272.
+2026-10-27  `partSelect`, the sheet, table, range or cell a selector names, and
+            every refusal listing names quoting each, for PYB-260.
+2026-10-24  The unread `graphicalObjects` scaffold removed, and the table naming
+            rule a function the JSON form shares, and `_ownersLink` the one
+            linking the reader and the JSON form share, for PYB-259.
+2026-10-22  `Sheet.tableIdentities`, the names a formula on one sheet uses,
+            replacing `Document.tableIdentities`, for PYB-255.
+2026-10-22  A document reads its locale's currency symbols and placement, for
+            PYB-220.
+2026-10-20  A document carries the time zone an aware `datetime` is written in, for
+            PYB-144.
+2026-10-20  `cellSet` writes one cell by its reference, growing the table when asked
+            and reporting the change, for PYB-217.
+2026-10-20  A document and a sheet each reach a cell by a reference naming its
+            table, walking down the owners, for PYB-217.
 2026-10-11  Table identities are returned as a frozendict, for PYB-189.
 2026-09-14  A sheet or a table is added, and each knows the archive it was read
             from, for PYB-63.
@@ -47,22 +67,32 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/02"
 
+import datetime
 from collections import Counter
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from pybers.addressing.reference import lastColumn, lastRow, tableNameSeparator
-from pybers.drawable import GraphicalObject
+from pybers.addressing.reference import (
+    TableReference,
+    lastColumn,
+    lastRow,
+    tableNameSeparator,
+)
 from pybers.errors import PybersError
 from pybers.geometry import Position
-from pybers.table.cells import Cell, Table, generateOwnerIdentity
+from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, toCellValue
+from pybers.table.cells import Table, generateOwnerIdentity
+from pybers.timezone import TimeZoneLike, machineTimeZone, toTimeZone
 
 if TYPE_CHECKING:
     # Guarded so that importing the model never drags in the persistence layer.
     from pybers._persistence import NumbersPackage
+    from pybers.document.locale import LocaleChange
     from pybers.document.references import ReferenceLocation
+    from pybers.selection.matching import SelectionMatch
+    from pybers.selection.selector import SelectorLike
 
 # Sheets and tables both count from one, matching the rest of the model and matching
 # what Numbers shows. The file counts from zero and the two meet only in the reader.
@@ -84,42 +114,11 @@ class Named(Protocol):
     name: str
 
 
-def listNames(items: Sequence[Named]) -> str:
-    """Return the names present, for an error message that says what to ask for."""
-    if not items:
-        return "nothing"
-    return ", ".join(repr(item.name) for item in items)
-
-
-def selectByName[NamedT: Named](
-    items: Sequence[NamedT], name: str, kind: str, within: str, foldCase: bool
-) -> NamedT:
-    """Return the one item carrying a name, raising when none or several do.
-
-    Case folding is a per-kind fact rather than a convenience. Numbers treats two
-    table names differing only in case as one name and will not create both, so
-    matching a table caselessly can never merge two things a document distinguishes.
-    Nothing shows it enforcing anything about sheet names, so folding them would be
-    this library inventing a collision the file does not have.
-    """
-    wanted = name.casefold() if foldCase else name
-    matched = [
-        (position, item)
-        for position, item in enumerate(items, start=firstPosition)
-        if (item.name.casefold() if foldCase else item.name) == wanted
-    ]
-    if not matched:
-        raise SelectionError(
-            f"No {kind} in {within} is named {name!r}. "
-            f"Present: {listNames(items)}."
-        )
-    if len(matched) > 1:
-        positions = ", ".join(str(position) for position, _ in matched)
-        raise SelectionError(
-            f"{len(matched)} {kind}s in {within} are named {name!r}, at positions "
-            f"{positions}. Reach one by position instead."
-        )
-    return matched[0][1]
+def listPresent(kind: str, names: Sequence[str]) -> str:
+    """Return the sentence ending a refusal with the names present, to ask for one."""
+    if not names:
+        return f"It holds no {kind}s."
+    return f"The {kind}s are {', '.join(repr(name) for name in names)}."
 
 
 def selectByPosition[NamedT: Named](
@@ -134,37 +133,47 @@ def selectByPosition[NamedT: Named](
     return items[position - firstPosition]
 
 
-def selectItem[NamedT: Named](
-    items: Sequence[NamedT],
-    nameOrPosition: str | int,
-    kind: str,
-    within: str,
-    foldCase: bool,
-) -> NamedT:
-    """Return the one item a name or a one-based position names, or raise saying why.
-
-    Shared by sheets and tables so that the two cannot drift into disagreeing about
-    what a position counts from or about what a repeated name does.
-    """
-    if isinstance(nameOrPosition, str):
-        return selectByName(items, nameOrPosition, kind, within, foldCase)
+def refuseUnnamed(nameOrPosition: object, kind: str) -> None:
+    """Refuse what is neither a name nor a position, a `bool` and `""` included."""
+    if nameOrPosition is None or (isinstance(nameOrPosition, str) and nameOrPosition):
+        return
     if isinstance(nameOrPosition, int) and not isinstance(nameOrPosition, bool):
-        return selectByPosition(items, nameOrPosition, kind, within)
-    # `True` reaching this as position 1 is the reason bool is excluded above: it is
-    # an int in Python and it is never a position anyone meant to write.
+        return
     raise SelectionError(
         f"A {kind} is reached by its name or by its position, and "
         f"{nameOrPosition!r} is neither."
     )
 
 
+def findTableIdentities(
+    sheets: Sequence[Sheet], local: Sheet
+) -> frozendict[str, str]:
+    """Return each table's identity under every name a formula on `local` uses.
+
+    One owner for the naming rule, shared by `Sheet.tableIdentities` and by the JSON
+    form, which must know the names a reader of only part of a document will have.
+    """
+    seen: Counter[str] = Counter(
+        table.name for sheet in sheets for table in sheet.tables
+    )
+    names: dict[str, str] = {}
+    for sheet in sheets:
+        for table in sheet.tables:
+            if not table.identifier:
+                continue
+            names[f"{sheet.name}{tableNameSeparator}{table.name}"] = table.identifier
+            if seen[table.name] == 1:
+                names[table.name] = table.identifier
+    names |= {table.name: table.identifier for table in local.tables
+              if table.identifier}
+    return frozendict(names)
+
 @dataclass(slots=True)
 class Sheet:
-    """One sheet (tab) in a document: its tables and its floating graphical objects."""
+    """One sheet (tab) in a document, and its tables."""
 
     name: str
     tables: list[Table] = field(default_factory=list)
-    graphicalObjects: list[GraphicalObject] = field(default_factory=list)
     # The archive this sheet was read from or saved as, and None until it has one.
     # Excluded from equality and `repr` for the reason `Document._package` is.
     _identifier: int | None = field(default=None, repr=False, compare=False)
@@ -173,16 +182,37 @@ class Sheet:
         default=None, repr=False, compare=False, kw_only=True
     )
 
-    def table(self, nameOrPosition: str | int) -> Table:
-        """Return one of this sheet's tables by its name or by its position.
+    def table(self, nameOrPosition: str | int | None = None) -> Table:
+        """Return one of this sheet's tables by its name or position, or its only one.
 
-        `tables` remains, so an ordinary loop still works and nothing here replaces
-        it. Position is the table's place in the sheet's drawable list, which says
+        Position is the table's place in the sheet's drawable list, which says
         nothing about where the table sits on the page.
         """
-        return selectItem(
-            self.tables, nameOrPosition, "table", repr(self.name), foldCase=True
-        )
+        refuseUnnamed(nameOrPosition, "table")
+        if isinstance(nameOrPosition, int):
+            return selectByPosition(
+                self.tables, nameOrPosition, "table", repr(self.name)
+            )
+        from pybers.selection.matching import findTable
+
+        return findTable(self, nameOrPosition)
+
+    def select(self, selector: SelectorLike) -> tuple[SelectionMatch, ...]:
+        """Return what a selector matches on this sheet, read from its tables."""
+        from pybers.selection.matching import selectWithin
+
+        return selectWithin(self, selector)
+
+    @property
+    def tableIdentities(self) -> frozendict[str, str]:
+        """Return every table's identity under each name a formula on this sheet uses.
+
+        Every table answers to `Sheet 2::Table 1`. A bare name reaches this sheet's
+        table of that name, otherwise the document's only table of that name, which is
+        how Numbers shows `Table 1::A1` on Sheet 1 when Sheet 2 holds one too.
+        """
+        sheets = [self] if self.document is None else self.document.sheets
+        return findTableIdentities(sheets, self)
 
     def tableAdd(
         self, name: str, rows: int, cols: int, position: Position | None = None
@@ -241,40 +271,109 @@ class Document:
     sheets: list[Sheet] = field(default_factory=list)
     _package: NumbersPackage | None = field(default=None, repr=False, compare=False)
     _sourcePath: Path | None = field(default=None, repr=False, compare=False)
-
-    def sheet(self, nameOrPosition: str | int) -> Sheet:
-        """Return one of this document's sheets by its name or by its position.
-
-        `sheets` remains, so an ordinary loop still works. Position is the sheet's
-        place in the document's own list, which is the tab order a person sees.
-        """
-        return selectItem(
-            self.sheets, nameOrPosition, "sheet", "this document", foldCase=False
-        )
+    # Lives for the session alone, since the file has nowhere to keep a zone.
+    _timeZone: datetime.tzinfo = field(
+        default=machineTimeZone, repr=False, compare=False
+    )
+    # The document's own locale, which a currency's symbol and placement follow.
+    _currencySymbols: frozendict[str, str] = field(
+        default_factory=frozendict, repr=False, compare=False
+    )
+    _currencyPattern: str = field(default="", repr=False, compare=False)
+    _localeIdentifier: str | None = field(default=None, repr=False, compare=False)
 
     @property
-    def tableIdentities(self) -> frozendict[str, str]:
-        """Return the identity of every table, under each name that names it alone.
+    def localeIdentifier(self) -> str | None:
+        """Return the language and region this document shows its values in, `en_IT`.
 
-        A formula naming another table writes `Table 2::A1`, and qualifies it as
-        `Sheet 2::Table 1::A1` when a bare name would be ambiguous. Both spellings
-        appear here for a table whose name is unique, and only the qualified one for
-        a name two tables share, which `20-formula-shapes` is the example of.
+        None for a document built in memory, which has none until it is saved.
         """
-        qualified: dict[str, str] = {}
-        seen: Counter[str] = Counter(
-            table.name for sheet in self.sheets for table in sheet.tables
-        )
-        for sheet in self.sheets:
-            for table in sheet.tables:
-                if not table.identifier:
-                    continue
-                qualified[f"{sheet.name}{tableNameSeparator}{table.name}"] = (
-                    table.identifier
-                )
-                if seen[table.name] == 1:
-                    qualified[table.name] = table.identifier
-        return frozendict(qualified)
+        return self._localeIdentifier
+
+    def localeSet(self, identifier: str) -> LocaleChange:
+        """Change the language and region this document shows its values in, `de_DE`.
+
+        The save writes the region as Numbers writes it and marks every formula, so
+        Numbers recalculates a result such as `DOLLAR` that depends on it.
+        """
+        from pybers.document.locale import LocaleChange, findLocaleSymbols
+
+        findLocaleSymbols(identifier)
+        change = LocaleChange(self._localeIdentifier, identifier)
+        if change.changed:
+            self._localeAssign(identifier)
+        return change
+
+    def _localeAssign(self, identifier: str | None) -> None:
+        """Hold a region, with the currency symbols and placement pybers has for it.
+
+        A region the table does not hold, read from a file or a JSON form, keeps the
+        identifier alone, since only its own document knows its symbols.
+        """
+        from pybers.document.locale import findLocaleSymbols, locales
+
+        self._localeIdentifier = identifier
+        if identifier not in locales:
+            return
+        symbols = findLocaleSymbols(identifier)
+        currencySymbols = symbols["currency_symbols"]
+        assert isinstance(currencySymbols, tuple)
+        self._currencySymbols = frozendict(currencySymbols)
+        self._currencyPattern = str(symbols["currency_pattern"])
+
+    @property
+    def currencyPattern(self) -> str:
+        """Return where this document's locale places a symbol, `¤` marking it."""
+        return self._currencyPattern
+
+    def currencySymbolFind(self, code: str) -> str | None:
+        """Return the symbol this document's locale writes a currency with, if any."""
+        return self._currencySymbols.get(code)
+
+    @property
+    def timeZone(self) -> datetime.tzinfo:
+        """Return the zone an aware `datetime` written here is converted to."""
+        return self._timeZone
+
+    @timeZone.setter
+    def timeZone(self, zone: TimeZoneLike) -> None:
+        """Set that zone, as a `tzinfo` or a name `zoneinfo.ZoneInfo` knows."""
+        self._timeZone = toTimeZone(zone)
+
+    def sheet(self, nameOrPosition: str | int | None = None) -> Sheet:
+        """Return a sheet by its name or position, or this document's only sheet.
+
+        Position is the sheet's place in the document's own list, the tab order a
+        person sees.
+        """
+        refuseUnnamed(nameOrPosition, "sheet")
+        if isinstance(nameOrPosition, int):
+            return selectByPosition(
+                self.sheets, nameOrPosition, "sheet", "this document"
+            )
+        from pybers.selection.matching import findSheet
+
+        return findSheet(self, nameOrPosition)
+
+    def table(self, name: str | TableReference | None = None) -> Table:
+        """Return the one table of a name on any sheet, or the document's only table.
+
+        A name two sheets share is refused, listing both. A `TableReference` naming
+        its sheet reaches it.
+        """
+        from pybers.selection.matching import findTable
+
+        return findTable(self, name)
+
+    def select(self, selector: SelectorLike) -> tuple[SelectionMatch, ...]:
+        """Return what a selector matches in this document, as qualified references.
+
+        `Budget::Q*[kind=number]` is every number in the tables on Budget whose
+        names start with Q. Nothing is created or changed.
+        """
+        from pybers.selection.matching import selectWithin
+
+        return selectWithin(self, selector)
 
     def sheetAdd(self, name: str, position: int | None = None) -> Sheet:
         """Add an empty sheet, last or at a position counted from one, and return it.
@@ -302,10 +401,45 @@ class Document:
         self.sheets.insert(position - firstPosition, sheet)
         return sheet
 
+    def cellSet(
+        self, selector: SelectorLike, value: object, *, extend: bool = False
+    ) -> CellChanges:
+        """Set the value of every cell a selector matches, and return each change.
+
+        A part that is no cell, or a cell a formula backs, is skipped and reported.
+        `extend` grows a table to hold one cell past its end, `Budget::Q3::B30`.
+        """
+        from pybers.selection.matching import findCellTargets, findExtendTarget
+
+        targets, skipped = (
+            ([findExtendTarget(self, selector)], []) if extend
+            else findCellTargets(self, selector)
+        )
+        if targets:
+            toCellValue(value, targets[0][1], self.timeZone)
+        changes: list[CellChange] = []
+        for table, address in targets:
+            rowsAdded = max(0, address.row - table.rowCount)
+            colsAdded = max(0, address.col - table.colCount)
+            cell = table.cells.get(address)
+            if cell is not None and cell.formula is not None:
+                skipped.append(CellSkip(
+                    cell.reference, f"{cell.reference} is backed by a formula, which "
+                    "a value would discard.",
+                ))
+                continue
+            if rowsAdded:
+                table.rowAdd(table.rowCount + 1, rowsAdded)
+            if colsAdded:
+                table.columnAdd(table.colCount + 1, colsAdded)
+            change = table.cell(address)._valueChange(value)
+            changes.append(replace(change, rowsAdded=rowsAdded, colsAdded=colsAdded))
+        return CellChanges(tuple(changes), tuple(skipped))
+
     def tableFor(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.
 
-        The reverse of `tableIdentities`, and the reason renaming a table cannot
+        The reverse of `Sheet.tableIdentities`, and the reason renaming a table cannot
         break a formula pointing into it: the archive stores this, never the name.
         """
         # Imported inside for the reason `save` is: `references` builds on this
@@ -318,6 +452,17 @@ class Document:
                 f"No table in this document carries the identity {identity!r}."
             )
         return table
+
+    def _ownersLink(self) -> None:
+        """Point every sheet and table at this document, once all of them are in.
+
+        Linked only then, so a cell can name another table without the caller
+        passing the names, and so `Table.document` is never half a document.
+        """
+        for sheet in self.sheets:
+            sheet.document = self
+            for table in sheet.tables:
+                table.document = self
 
     def cellsIterate(self) -> Iterator[tuple[Sheet, Table, Cell]]:
         """Yield every STORED cell with the sheet and table holding it.

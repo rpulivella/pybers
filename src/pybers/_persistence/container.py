@@ -10,8 +10,8 @@ Every member's storage method is recorded and replayed rather than assumed. In
 every file examined so far each member is STORED, because the IWA payload is
 already Snappy-compressed and deflating it again buys nothing. That is an
 observation about the files seen, though, not a guarantee about the format, and
-re-deflating a member Apple chose to store would change bytes for no reason. So
-the method travels with the member.
+re-deflating a member Apple chose to store would change bytes for no reason.
+The method travels with the member.
 
 This is the deliberate opposite of how the IWA frame flag is handled one layer
 down. There, an unknown value raises, because handling it would mean shipping an
@@ -20,6 +20,7 @@ support, and a reader that carries it survives a file this developer has not
 seen yet. Record what varies; refuse what cannot be verified.
 
 UPDATES
+2026-11-02  A member's zip header composed as Numbers writes one, for PYB-261.
 2026-10-07  A directory, an unreadable file and a zip holding no IWA member are
             refused by name, for PYB-169.
 2026-09-14  A package can gain an IWA member, and be restored after a failed
@@ -165,6 +166,32 @@ class NumbersPackage:
         created = IWAFile(name=name, modified=True)
         self.iwaFiles.append(created)
         return created
+
+
+# The zip header fields Numbers writes on every member, measured 2026-11-02 in
+# `96-sheet-without-table`: stored uncompressed, by MS-DOS, at zip versions 6.2 and 2.0.
+storedCompressType: int = 0
+numbersCreateSystem: int = 0
+numbersCreateVersion: int = 62
+numbersExtractVersion: int = 20
+
+
+def composeMemberInfo(
+    name: str, moment: tuple[int, int, int, int, int, int]
+) -> MemberInfo:
+    """Return the zip header Numbers writes for a member saved at a moment."""
+    return MemberInfo(
+        name=name,
+        compressType=storedCompressType,
+        dateTime=moment,
+        createSystem=numbersCreateSystem,
+        createVersion=numbersCreateVersion,
+        extractVersion=numbersExtractVersion,
+        flagBits=0,
+        internalAttr=0,
+        externalAttr=0,
+        extra=b"",
+    )
 
 
 def isDocumentMember(name: str) -> bool:

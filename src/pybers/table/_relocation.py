@@ -18,6 +18,10 @@ count is refused rather than guessed.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-02  A table with no stroke sidecar, as a created one is, moves and copies
+            no border, for PYB-276.
+2026-10-29  Lines counted by the one `countLineRecords`, and records walked
+            through `StoredTiles`, for PYB-278.
 2026-10-01  The format slots are read from `_persistence.cells`, for PYB-141.
 2026-09-29  A copy carries every position of a merge it copies, as a move does,
             so what an import stores under covered cells goes with it, for PYB-136.
@@ -43,7 +47,6 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import chooseOffsetUnit, decodeRow
 from .._persistence.cells import (
     CellRecord,
     carriesFormula,
@@ -60,24 +63,24 @@ from .._persistence.cells import (
 )
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
-from ..addressing import CellReference
-from ..addressing.reference import originOffset
+from .._persistence.rows import readStoredTiles
+from ..addressing.reference import CellAddress, originOffset
 from ..errors import WriteError
 from ..formula._read import readFormula
 from ._conditions import readConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
-from ._records import controlSlot
+from ._read import controlSlot
 from ._refcounts import countedStyleSlots
 from ._strokes import copyStrokeEdges, listStrokeLayers, moveStrokeEdges
-from ._structure import rowsPerBucket
+from ._structure import countLineRecords, rowsPerBucket
 from ._tiles import (
     TileRange,
     buildTileRange,
-    createRowStorage,
     rewriteRow,
     writeTileRange,
 )
-from .cells import Cell, Table
+from .cell import Cell
+from .cells import Table
 
 # A stored (row, column), counted from zero, mapped to where its cell now sits.
 type CellMoves = dict[tuple[int, int], tuple[int, int]]
@@ -107,7 +110,7 @@ copyableSlots: frozenset[tuple[int, int]] = frozenset({
 })
 
 # Claims every entry a duplicated record names, returning the record to place.
-type RecordClaim = Callable[[CellRecord, CellReference], bytes]
+type RecordClaim = Callable[[CellRecord, CellAddress], bytes]
 
 
 def findCellMoves(table: Table, maps: GridMaps) -> CellMoves:
@@ -148,7 +151,7 @@ def listCoveredOffsets(cell: Cell) -> list[tuple[int, int]]:
     if merge is None:
         return []
     return [
-        (covered.row - cell.reference.row, covered.col - cell.reference.col)
+        (covered.row - cell.address.row, covered.col - cell.address.col)
         for covered in merge.extent if covered != merge.anchor
     ]
 
@@ -166,12 +169,12 @@ def findCellCopies(table: Table) -> CellCopies:
         if copy is None:
             continue
         source = copy.source
-        if table.cells.get(source.reference) is not source:
+        if table.cells.get(source.address) is not source:
             raise WriteError(
                 f"{reference} was copied from a cell no longer in {table.name!r}, "
                 "so there is no record to copy."
             )
-        stored = source.reference
+        stored = source.address
         row, column = reference.row - originOffset, reference.col - originOffset
         top, left = stored.row - originOffset, stored.col - originOffset
         records[(row, column)] = None if source._origin is None else (top, left)
@@ -192,7 +195,7 @@ def findBorderCopies(table: Table) -> CellMoves:
         copy = cell._copiedFrom
         if copy is None or not copy.borders:
             continue
-        source = copy.source.reference
+        source = copy.source.address
         row, column = reference.row - originOffset, reference.col - originOffset
         top, left = source.row - originOffset, source.col - originOffset
         copies[(row, column)] = (top, left)
@@ -221,15 +224,9 @@ def placeRecords(
     tileSize = store.tiles.tile_size
     created = False
     for row in sorted(set(removals) | set(placements)):
-        tileid = row // tileSize
-        created |= tileid not in tileRange.tiles
-        tile = tileRange.tileFor(tileid)
-        if not any(held.tile_row_index == row % tileSize for held in tile.rowInfos):
-            createRowStorage(tile, row % tileSize)
-        # Found after creation, because a repeated field stores a copy of its input.
-        rowInfo = next(
-            held for held in tile.rowInfos if held.tile_row_index == row % tileSize
-        )
+        created |= row // tileSize not in tileRange.tiles
+        target = tileRange.rowFor(row)
+        tile, rowInfo = target.tile, target.info
         placed = placements.get(row, {})
         slots = len(rowInfo.cell_offsets) // offsetWidth
         beyond = [column for column in placed if column >= slots]
@@ -238,14 +235,11 @@ def placeRecords(
                 f"A record would land in column {min(beyond) + originOffset}, past "
                 f"the {slots} offset slots row {row + originOffset} carries."
             )
-        unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
         rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
-            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit, placed,
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer, target.unit, placed,
             frozenset(removals.get(row, set()) - placed.keys()),
         )
-        rowInfo.cell_count = len(
-            decodeRow(rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit)
-        )
+        rowInfo.cell_count = len(target.records)
         if not rowInfo.cell_count:
             tile.rowInfos.remove(rowInfo)
         tile.numrows = len(tile.rowInfos)
@@ -269,18 +263,12 @@ def moveCellRecords(
     Lifted before any is placed, so a block overlapping where it was never
     overwrites a record it has yet to move.
     """
-    tileSize = store.tiles.tile_size
     tileRange = buildTileRange(index, registry, store)
     lifted: dict[tuple[int, int], CellRecord] = {}
-    for tileid, tile in tileRange.tiles.items():
-        for rowInfo in tile.rowInfos:
-            row = tileid * tileSize + rowInfo.tile_row_index
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                if (row, record.column) in moves:
-                    lifted[(row, record.column)] = record
+    for stored in tileRange.rows:
+        for record in stored.records:
+            if (stored.row, record.column) in moves:
+                lifted[(stored.row, record.column)] = record
 
     removals: dict[int, set[int]] = {}
     placements: dict[int, dict[int, bytes]] = {}
@@ -311,7 +299,7 @@ class RecordCopies:
     displaced: dict[tuple[int, int], CellRecord]
 
 
-def refuseUncopyableRecord(record: CellRecord, where: CellReference) -> None:
+def refuseUncopyableRecord(record: CellRecord, where: CellAddress) -> None:
     """Refuse a record whose duplicate would name an entry nobody counted."""
     for at, bit in listReferenceSlots(record.raw):
         if (at, bit) not in copyableSlots:
@@ -333,22 +321,16 @@ def copyCellRecords(
     Every record is read before any is placed, so a source that is also filled is
     copied as it stood.
     """
-    tileSize = store.tiles.tile_size
     tileRange = buildTileRange(index, registry, store)
     records = copies.records
     wanted = set(records) | {
         stored for stored in records.values() if stored is not None
     }
     found: dict[tuple[int, int], CellRecord] = {}
-    for tileid, tile in tileRange.tiles.items():
-        for rowInfo in tile.rowInfos:
-            row = tileid * tileSize + rowInfo.tile_row_index
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                if (row, record.column) in wanted:
-                    found[(row, record.column)] = record
+    for stored in tileRange.rows:
+        for record in stored.records:
+            if (stored.row, record.column) in wanted:
+                found[(stored.row, record.column)] = record
 
     missing = [
         stored for landed, stored in records.items()
@@ -358,7 +340,7 @@ def copyCellRecords(
         row, column = min(missing)
         raise WriteError(
             f"A copy names the record at "
-            f"{CellReference(row + originOffset, column + originOffset)}, and the file "
+            f"{CellAddress(row + originOffset, column + originOffset)}, and the file "
             "holds none there."
         )
     placed = {
@@ -367,7 +349,7 @@ def copyCellRecords(
     }
     for (row, column), record in placed.items():
         refuseUncopyableRecord(
-            record, CellReference(row + originOffset, column + originOffset)
+            record, CellAddress(row + originOffset, column + originOffset)
         )
     displaced = {landed: found[landed] for landed in records if landed in found}
     removals: dict[int, set[int]] = {}
@@ -375,7 +357,7 @@ def copyCellRecords(
     for row, column in displaced:
         removals.setdefault(row, set()).add(column)
     for (row, column), record in placed.items():
-        where = CellReference(row + originOffset, column + originOffset)
+        where = CellAddress(row + originOffset, column + originOffset)
         placements.setdefault(row, {})[column] = claim(record, where)
     placeRecords(registry, store, tileRange, removals, placements)
     return RecordCopies(placed, displaced)
@@ -396,62 +378,36 @@ def applyConditionChanges(
     plan = readConditionalPlan(index, registry, store)
     if plan is None or not plan.rules:
         return
-    tileSize = store.tiles.tile_size
-    tiles = []
+    tiles = readStoredTiles(index, store)
     changed = False
-    for entry in store.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        tiles.append(tile)
-        for rowInfo in tile.rowInfos:
-            row = entry.tileid * tileSize + rowInfo.tile_row_index
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            replacements = {}
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                key = findSlotValue(record, conditionalSlot)
-                cell = table.cells.get(
-                    CellReference(row + originOffset, record.column + originOffset)
-                )
-                if key is None or key not in plan.rules or cell is None:
-                    continue
-                stored = tuple(
-                    readFormula(rule.predicate.formula)
-                    for rule in plan.rules[key].rules.rule
-                )
-                if not cell._conditions or cell._conditions == stored:
-                    continue
-                moved = plan.keyForConditions(key, cell._conditions)
-                replacements[record.column] = patchSlotValue(
-                    record.raw, conditionalSlot, moved
-                )
-            if replacements:
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
-                    rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit,
-                    replacements,
-                )
-                changed = True
+    for walked in tiles:
+        replacements = {}
+        for record in walked.records:
+            key = findSlotValue(record, conditionalSlot)
+            cell = table.cells.get(
+                CellAddress(walked.row + originOffset, record.column + originOffset)
+            )
+            if key is None or key not in plan.rules or cell is None:
+                continue
+            stored = tuple(
+                readFormula(rule.predicate.formula)
+                for rule in plan.rules[key].rules.rule
+            )
+            if not cell._conditions or cell._conditions == stored:
+                continue
+            moved = plan.keyForConditions(key, cell._conditions)
+            replacements[record.column] = patchSlotValue(
+                record.raw, conditionalSlot, moved
+            )
+        if replacements:
+            rowInfo = walked.info
+            rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
+                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, walked.unit,
+                replacements,
+            )
+            changed = True
     if changed:
         writeConditionalCounts(plan, tiles)
-
-
-def countLineRecords(
-    index: ArchiveIndex, store: tst.DataStore
-) -> tuple[Counter[int], Counter[int]]:
-    """Return how many records each row and each column holds."""
-    tileSize = store.tiles.tile_size
-    rows: Counter[int] = Counter()
-    columns: Counter[int] = Counter()
-    for entry in store.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        for rowInfo in tile.rowInfos:
-            unit = chooseOffsetUnit(rowInfo.has_wide_offsets, tile.should_use_wide_rows)
-            for record in decodeRow(
-                rowInfo.cell_offsets, rowInfo.cell_storage_buffer, unit
-            ):
-                rows[entry.tileid * tileSize + rowInfo.tile_row_index] += 1
-                columns[record.column] += 1
-    return rows, columns
 
 
 def carriesOnlyCount(header: tst.HeaderStorageBucket.Header) -> bool:
@@ -519,10 +475,7 @@ def applyCellCopies(
     )
     plan = readConditionalPlan(index, registry, store)
     if plan is not None and plan.rules:
-        writeConditionalCounts(
-            plan,
-            [index.resolve(entry.tile, tst.Tile) for entry in store.tiles.tiles],
-        )
+        writeConditionalCounts(plan, readStoredTiles(index, store))
     return copied
 
 
@@ -533,6 +486,9 @@ def applyBorderCopies(
     copies: CellMoves,
 ) -> None:
     """Give every copied cell exactly its source's borders, as a paste did in `64f`."""
+    # A created table has no sidecar until Numbers saves it, so no border to copy.
+    if not model.HasField("stroke_sidecar"):
+        return
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
     copyStrokeEdges(index, registry, sidecar, copies)
     index.archiveWrite(
@@ -551,11 +507,13 @@ def applyCellMoves(
     moved = moveCellRecords(index, registry, store, moves)
     recountLineHeaders(index, store, moved.rows, moved.columns)
 
-    sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    moveStrokeEdges(index, registry, sidecar, moves)
-    index.archiveWrite(
-        model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
-    )
+    # A created table has no sidecar until Numbers saves it, so no border to move.
+    if model.HasField("stroke_sidecar"):
+        sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
+        moveStrokeEdges(index, registry, sidecar, moves)
+        index.archiveWrite(
+            model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
+        )
     return moved
 
 

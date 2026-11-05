@@ -15,6 +15,7 @@ stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.
 
 UPDATES
+2026-11-02  A created archive is composed from its body alone, for PYB-276.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-09-22  Built on the save's one index, which every change passes through, and
@@ -34,6 +35,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/14"
 
+from collections.abc import Collection
+
 from google.protobuf.message import Message
 
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
@@ -42,7 +45,7 @@ from ..errors import PybersError
 from .container import indexPrefix, iwaSuffix
 from .index import ArchiveIndex
 from .iwa import Archive, IWAFile, createArchive
-from .types import findArchiveTypeId, readArchiveTypeId
+from .types import archiveVersions, findArchiveTypeId, readArchiveTypeId
 
 # The component every document roots at, whose version and save token a created
 # component copies.
@@ -305,6 +308,27 @@ class PackageRegistry:
         self.index.archiveWrite(self.metadataIdentifier, self.metadata)
 
 
+def composeArchive(
+    identifier: int,
+    body: Message,
+    weak: Collection[int] = (),
+    version: tuple[int, ...] | None = None,
+) -> Archive:
+    """Return an archive composed from its body, every reference strong but `weak`.
+
+    It carries no `field_infos`: they describe Apple's schema rather than the
+    archive, and Numbers needs none on a created one, measured 2026-11-02 for
+    PYB-276. See findings-10-creation.md.
+    """
+    info = tspArchive.ArchiveInfo(identifier=identifier)
+    message = info.message_infos.add(type=findArchiveTypeId(type(body)), length=0)
+    message.version.extend(version or archiveVersions[type(body)])
+    message.object_references.extend(
+        target for target in listMessageReferences(body) if target not in weak
+    )
+    return createArchive(info, [body.SerializeToString()])
+
+
 def createSiblingArchive(
     registry: PackageRegistry, sibling: int, body: Message
 ) -> int:
@@ -345,6 +369,7 @@ def listMessageReferences(message: Message) -> list[int]:
 __all__ = [
     "MetadataError",
     "PackageRegistry",
+    "composeArchive",
     "createSiblingArchive",
     "findMemberName",
     "listMessageReferences",

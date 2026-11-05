@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""\
+`pybers set`: the value of every cell a selector matches, its kind inferred or named.
+
+The command reads the text into a value, makes one `cellSet` call, and saves only
+when a cell changed and the call was not a preview. Each cell written prints as
+`pybers show` prints it, in text and JSON alike, and each part skipped prints why on
+stderr.
+
+UPDATES
+2026-11-03  SELECTOR sets every cell it matches, reporting each skipped, for
+            PYB-223. Each cell written prints as `pybers show` prints it.
+2026-10-28  Where a write goes shared with `locale`, FILE itself unless `-o`
+            names a new one, for PYB-272.
+2026-10-27  Report lines shared with `show`, growth by one row reading `1 row`,
+            for PYB-260.
+2026-10-20  A date, a duration and a boolean, inferred or named, and the zone an
+            aware date is written in, for PYB-144.
+2026-10-20  Written for PYB-217.
+"""
+from __future__ import annotations
+
+__author__ = "Richard P Ulivella"
+__copyright__ = "Copyright 2026 Richard P Ulivella"
+__license__ = "Apache-2.0"
+__version__ = "0.1.0"
+__email__ = "pybers@richardulivella.com"
+__status__ = "Development"
+__date__ = "2026/10/20"
+
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+import pybers
+from pybers.cli._common import (
+    OutputOption,
+    PreviewOption,
+    findSaveTarget,
+    reportPybersErrors,
+    reportWrite,
+)
+from pybers.cli._console import statusConsole
+from pybers.cli._formats import FormatOption, OutputFormat, printResult
+from pybers.cli._report import formatLine
+from pybers.cli.show import ShownPart, formatShownParts
+
+
+def runSet(
+    context: typer.Context,
+    documentPath: Annotated[
+        Path,
+        typer.Argument(
+            metavar="FILE", help="The .numbers document.", show_default=False
+        ),
+    ],
+    selector: Annotated[
+        str,
+        typer.Argument(
+            metavar="SELECTOR",
+            # A backslash keeps Rich from reading a condition as markup.
+            help=(
+                "The cells to set: `Budget::Q3::B4`, `::Q3::B4` for B4 of every table "
+                "named Q3, or `Budget::Q*::B2:B9\\[kind=number]`."
+            ),
+            show_default=False,
+        ),
+    ],
+    value: Annotated[
+        str,
+        typer.Argument(
+            metavar="VALUE",
+            help=(
+                "The value as text: 42, 42 EUR, TRUE, 2026-10-20 09:00, 1h 30m, or any "
+                "text."
+            ),
+            show_default=False,
+        ),
+    ],
+    kind: Annotated[
+        str | None,
+        typer.Option(
+            "--as",
+            metavar="KIND",
+            help=(
+                "Read VALUE as this kind rather than inferring it. One of: number, "
+                "currency, boolean, date, duration, text."
+            ),
+        ),
+    ] = None,
+    timeZone: Annotated[
+        str | None,
+        typer.Option(
+            "--time-zone",
+            metavar="ZONE",
+            help=(
+                "Write a date carrying an offset as the wall-clock time in ZONE, "
+                "such as America/New_York, rather than the zone pybers is running in."
+            ),
+        ),
+    ] = None,
+    output: OutputOption = None,
+    preview: PreviewOption = False,
+    extend: Annotated[
+        bool,
+        typer.Option(
+            "--extend",
+            help="Grow the table when SELECTOR names one cell lying outside it.",
+        ),
+    ] = False,
+    outputFormat: FormatOption = OutputFormat.TEXT,
+) -> None:
+    """Set every cell SELECTOR matches, the kind inferred from VALUE unless --as."""
+    target = findSaveTarget(documentPath, output, preview)
+    with reportPybersErrors(context):
+        document = (
+            pybers.open(documentPath) if timeZone is None
+            else pybers.open(documentPath, timeZone=timeZone)
+        )
+        changes = document.cellSet(
+            selector, pybers.parseCellValue(value, kind), extend=extend
+        )
+        cells: list[ShownPart] = [
+            document.table(each.reference.table).cell(each.reference)
+            for each in changes.changes if each.reference.table is not None
+        ]
+        if target is not None and changes.changed:
+            document.save(target)
+    printResult(cells, outputFormat, formatShownParts)
+    for skip in changes.skipped:
+        statusConsole.print(formatLine("Skipped", skip.reason))
+    reportWrite(changes.changed, target, "no cell it matched changes.")
+
+
+__all__ = ["runSet"]

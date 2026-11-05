@@ -42,7 +42,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from pybers.addressing.ranges import CellRange
-from pybers.addressing.reference import CellReference, tableNameSeparator
+from pybers.addressing.reference import CellAddress, tableNameSeparator
 from pybers.formula.nodes import (
     Coordinate,
     FormulaError,
@@ -462,7 +462,7 @@ def buildSpan(
 
 
 def buildReference(
-    extent: CellRange, host: CellReference, tableId: str | None
+    extent: CellRange, host: CellAddress, tableId: str | None
 ) -> FormulaReference:
     """Return the single-cell reference an address names, from the cell holding it.
 
@@ -481,7 +481,7 @@ def buildReference(
 
 
 def buildRange(
-    extent: CellRange, host: CellReference, tableId: str | None, text: str,
+    extent: CellRange, host: CellAddress, tableId: str | None, text: str,
     position: int,
 ) -> FormulaRange:
     """Return the range an address names, refusing one locked at a single end.

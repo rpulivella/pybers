@@ -24,6 +24,8 @@ Runs on the repository's venv, though the posting workflow installs rich alone, 
 needs a GitHub token for `check` and `report`, resolved by tools/workflow/lib/github.py.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-14  Moved here from `scripts/merge-readiness.py`, and run as a module,
             for PYB-204.
@@ -135,7 +137,7 @@ def runReport(arguments: argparse.Namespace) -> int:
     """
     stored = json.loads(Path(arguments.results).read_text())
     number, body = posting.renderStoredReport(stored, arguments.head_sha)
-    if arguments.dry_run:
+    if arguments.preview:
         console.print(body, markup=False, highlight=False)
         return 0
     token = github.resolveToken()
@@ -174,7 +176,7 @@ def buildParser() -> argparse.ArgumentParser:
     report.add_argument(
         "--head-sha", required=True, help="the head commit the checking run checked"
     )
-    report.add_argument("--dry-run", action="store_true", help="print, post nothing")
+    report.add_argument("--preview", action="store_true", help="print, post nothing")
     report.set_defaults(handler=runReport)
 
     check = commands.add_parser(

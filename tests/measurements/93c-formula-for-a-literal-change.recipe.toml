@@ -1,0 +1,21 @@
+# How Numbers makes 93c-formula-for-a-literal-change: one formula, for its literal to be changed, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 93c-formula-for-a-literal-change`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "A2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "=1+1"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "formula =1+1"

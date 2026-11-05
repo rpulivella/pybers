@@ -21,6 +21,11 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-11-02  Every style and preset a created theme holds, and the version of each
+            type a created document holds, for PYB-261.
+2026-11-02  The version Numbers writes each created type at, for PYB-276.
+2026-10-22  Type 222, the custom format list, for PYB-220.
+2026-10-20  A pop-up menu's items, for PYB-144.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-09-22  An identifier is asked for by its class, and nowhere else spells one,
             for PYB-113.
@@ -46,6 +51,8 @@ from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSCEArchives_pb2 as tsce
+from .._generated import TSCHArchives_Common_pb2 as tschStyles
+from .._generated import TSCHArchives_pb2 as tsch
 from .._generated import TSDArchives_pb2 as tsd
 from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
@@ -66,9 +73,14 @@ archiveTypes: frozendict[int, type[Message]] = frozendict({
     1: tn.DocumentArchive,          # the root: holds the ordered sheet list
     2: tn.SheetArchive,             # a tab: its name and its ordered drawables
     205: tsk.TreeNode,              # one entry in the sidebar's sheet and table tree
+    222: tsk.CustomFormatListArchive,  # the document's custom formats, by UUID
     401: tss.StylesheetArchive,     # the shared style registry
     2001: tswp.StorageArchive,      # rich text, and a sheet's headers and footers
+    2021: tswp.CharacterStyleArchive,  # a named character style
     2022: tswp.ParagraphStyleArchive,  # a named text style, or a variation of one
+    2023: tswp.ListStyleArchive,   # a list's bullets and numbering
+    2025: tswp.ShapeStyleArchive,  # a shape's, line's or text box's style
+    3016: tsd.MediaStyleArchive,    # an image's or movie's style
     3047: tsd.GuideStorageArchive,  # a sheet's user-defined alignment guides
     3097: tsd.StandinCaptionArchive,  # the empty title or caption slot of a drawable
     4000: tsce.CalculationEngineArchive,     # the dependency graph and dirty set
@@ -77,6 +89,12 @@ archiveTypes: frozendict[int, type[Message]] = frozendict({
     4009: tsce.CellRecordTileArchive,       # which cells of a tile hold formulas
     4010: tsce.RangePrecedentsTileArchive,  # the ranges those cells read
     4011: tsce.ReferencesToDirtyArchive,     # cells to recalculate on next open
+    5020: tsch.ChartStylePreset,    # one chart style in the theme
+    5022: tschStyles.ChartStyleArchive,
+    5024: tschStyles.LegendStyleArchive,
+    5026: tschStyles.ChartAxisStyleArchive,
+    5028: tschStyles.ChartSeriesStyleArchive,
+    5030: tschStyles.ReferenceLineStyleArchive,
     6000: tst.TableInfoArchive,     # the drawable that wraps a table
     6001: tst.TableModelArchive,    # the table proper: geometry, stores, merges
     6002: tst.Tile,                 # one block of rows and their cell records
@@ -87,6 +105,7 @@ archiveTypes: frozendict[int, type[Message]] = frozendict({
     6010: tst.ConditionalStyleSetArchive,  # one cell's conditional highlighting rules
     6008: tstStyles.TableStylePresetArchive,  # one table style in the theme
     6204: tst.HiddenStateFormulaOwnerArchive,  # the formula owner of hidden rows
+    6206: tst.PopUpMenuModel,     # a pop-up menu's items
     6218: tst.RichTextPayloadArchive,
     6220: tst.FilterSetArchive,     # the filters a table's rows can be hidden by
     6247: tst.TableStyleNetworkArchive,  # the styles a table style preset names
@@ -100,9 +119,55 @@ archiveTypes: frozendict[int, type[Message]] = frozendict({
     6373: tst.GroupByArchive,       # how a table's rows are grouped into categories
     6366: tst.HeaderNameMgrArchive,  # each table's slot for natural-language names
     6383: tst.GroupByArchive.GroupNodeArchive,
+    10024: tswp.DropCapStyleArchive,  # a paragraph's drop cap
     12009: tn.ThemeArchive,         # the theme and its style presets
+    12050: tn.SheetStyleArchive,    # a sheet's background
     11006: tspArchive.PackageMetadata,  # every component and its external references
 })
+
+
+# The version Numbers writes each type pybers creates at, measured across all 187
+# documents on 2026-11-02, and across 243 for the types a created document holds.
+# `TST.TableDataList`'s BNC lists carry `bncDataListVersion`, and two very large
+# tables carry their model at (10, 0, 3). See findings-10-creation.md.
+archiveVersions: frozendict[type[Message], tuple[int, ...]] = frozendict({
+    tn.DocumentArchive: (1, 0, 5),
+    tn.SheetArchive: (1, 0, 5),
+    tn.ThemeArchive: (1, 0, 5),
+    tss.StylesheetArchive: (1, 0, 5),
+    tswp.ShapeStyleArchive: (1, 0, 5),
+    tswp.CharacterStyleArchive: (1, 0, 5),
+    tswp.ListStyleArchive: (1, 0, 5),
+    tswp.DropCapStyleArchive: (1, 0, 5),
+    tsd.MediaStyleArchive: (1, 0, 5),
+    tn.SheetStyleArchive: (1, 0, 5),
+    tsch.ChartStylePreset: (1, 0, 5),
+    tschStyles.ChartStyleArchive: (1, 0, 5),
+    tschStyles.LegendStyleArchive: (1, 0, 5),
+    tschStyles.ChartAxisStyleArchive: (1, 0, 5),
+    tschStyles.ChartSeriesStyleArchive: (1, 0, 5),
+    tschStyles.ReferenceLineStyleArchive: (1, 0, 5),
+    tstStyles.TableStylePresetArchive: (1, 0, 5),
+    tst.TableStyleNetworkArchive: (2, 4, 0),
+    tspArchive.PackageMetadata: (1, 0, 5),
+    tsk.TreeNode: (1, 0, 5),
+    tswp.StorageArchive: (1, 0, 5),
+    tswp.ParagraphStyleArchive: (1, 0, 5),
+    tsce.CalculationEngineArchive: (1, 0, 5),
+    tsce.ReferencesToDirtyArchive: (1, 0, 5),
+    tsce.FormulaOwnerDependenciesArchive: (3, 2, 10),
+    tsce.CellRecordTileArchive: (1, 0, 5),
+    tsce.RangePrecedentsTileArchive: (1, 0, 5),
+    tst.TableInfoArchive: (1, 0, 5),
+    tst.TableModelArchive: (3, 2, 10),
+    tst.Tile: (1, 0, 5),
+    tst.TableStyleArchive: (1, 0, 5),
+    tst.CellStyleArchive: (1, 0, 5),
+    tst.TableDataList: (1, 0, 5),
+    tst.HeaderStorageBucket: (1, 0, 5),
+    tst.ColumnRowUIDMapArchive: (1, 0, 5),
+})
+bncDataListVersion: tuple[int, ...] = (3, 2, 10)
 
 
 class ArchiveTypeError(PybersError, RuntimeError):

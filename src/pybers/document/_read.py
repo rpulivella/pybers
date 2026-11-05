@@ -28,6 +28,10 @@ to a caller:
   that looks like a perfectly good number.
 
 UPDATES
+2026-11-02  A package pybers created becomes a document too, for PYB-261.
+2026-10-27  The document's locale identifier is read, for PYB-272.
+2026-10-24  The sheets and tables linked by `Document._ownersLink`, for PYB-259.
+2026-10-22  The locale's currency symbols and placement are read, for PYB-220.
 2026-08-31  Written for #1: document, sheets, tables and cell values.
 2026-09-01  The package read here travels with the document, for #2.
 2026-09-03  Formulas, for #41. The key slot and the sticky-bits rule were
@@ -39,6 +43,7 @@ UPDATES
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
 2026-10-07  A package already read becomes a document through `readDocument`,
             for PYB-169.
+2026-10-20  `open` takes the time zone an aware date is written in, for PYB-144.
 """
 from __future__ import annotations
 
@@ -61,13 +66,14 @@ from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import ReadError
 from ..table._read import readTable
+from ..timezone import TimeZoneLike, machineTimeZone, toTimeZone
 from .sheets import Document, Sheet
 
 
 def readSheet(
     index: ArchiveIndex,
     identifier: int,
-    source: Path,
+    source: Path | None,
     identities: dict[int, str],
 ) -> Sheet:
     """Build one `Sheet`, taking its tables in the sheet's own drawable order.
@@ -92,35 +98,45 @@ def readSheet(
     return sheet
 
 
-def open(path: Path | str) -> Document:  # noqa: A001
-    """Read a `.numbers` file into a `Document`.
+def open(  # noqa: A001
+    path: Path | str, *, timeZone: TimeZoneLike = machineTimeZone
+) -> Document:
+    """Read a `.numbers` file into a `Document`, writing aware dates in `timeZone`.
 
-    Shadows the builtin deliberately: `pybers.open(path)` is the entry point the
-    library is meant to be used through, and it reads as it should at the call
-    site. The builtin is still reachable here as `builtins.open`.
+    Shadows the builtin deliberately, so the entry point reads as it should. The
+    zone defaults to the one pybers is running in, and naming one makes a script's
+    result the same wherever it runs.
     """
+    zone = toTimeZone(timeZone)
     source = Path(path)
-    return readDocument(readPackage(source), source)
+    document = readDocument(readPackage(source), source)
+    document.timeZone = zone
+    return document
 
 
-def readDocument(package: NumbersPackage, source: Path) -> Document:
-    """Build a `Document` from a package already read from `source`."""
+def readDocument(package: NumbersPackage, source: Path | None) -> Document:
+    """Build a `Document` from a package read from `source`, or created when None."""
     index = ArchiveIndex(package)
     root = findRoot(index)
 
     # The package travels with the document because `Document.save` writes it back.
-    document = Document(_package=package, _sourcePath=source)
+    locale = root.super.super
+    symbols = locale.formatting_symbols
+    document = Document(
+        _package=package,
+        _sourcePath=source,
+        _currencySymbols=frozendict(
+            (each.code, each.symbol) for each in symbols.currency_symbols
+        ),
+        _currencyPattern=symbols.currency_pattern,
+        _localeIdentifier=locale.locale_identifier,
+    )
     identities = readTableIdentities(index)
     for reference in root.sheets:
         document.sheets.append(
             readSheet(index, reference.identifier, source, identities)
         )
-    # Linked after the sheets are in, so a cell can name another table without the
-    # caller passing the names, and so `Table.document` is never half a document.
-    for sheet in document.sheets:
-        sheet.document = document
-        for table in sheet.tables:
-            table.document = document
+    document._ownersLink()
     return document
 
 

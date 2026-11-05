@@ -1,0 +1,82 @@
+# How Numbers makes 92-values-for-currency: a number, dollars, accounting-style dollars and an empty cell, for currency amounts to be written over, each labeled beneath with what it
+# holds. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 92-values-for-currency`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "D2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "1234.5"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "number 1234.5"
+
+[[step]]
+action = "dataFormatSet"
+range = "B1"
+setting = "Data Format"
+value = "Currency"
+
+[[step]]
+action = "dataFormatSet"
+range = "B1"
+setting = "Currency"
+value = "US Dollar ($)"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "1234.5"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "dollars 1234.5, nothing else chosen"
+
+[[step]]
+action = "dataFormatSet"
+range = "C1"
+setting = "Data Format"
+value = "Currency"
+
+[[step]]
+action = "dataFormatSet"
+range = "C1"
+setting = "Currency"
+value = "US Dollar ($)"
+
+[[step]]
+action = "dataFormatSet"
+range = "C1"
+setting = "Thousands Separator"
+value = "1"
+
+[[step]]
+action = "dataFormatSet"
+range = "C1"
+setting = "Accounting Style"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "1234.5"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "dollars 1234.5, separator, accounting style"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "nothing"

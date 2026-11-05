@@ -328,7 +328,7 @@ def testNoValidFormulaInAnyDocumentContradictsTheTable() -> None:
         for sheet in document.sheets:
             for table in sheet.tables:
                 for cell in table.cells.values():
-                    errored = cell.description.kind is pybers.CellKind.ERROR
+                    errored = cell.kind is pybers.CellKind.ERROR
                     if cell.formula is None or errored:
                         continue
                     for node in cell.formula:
@@ -352,7 +352,7 @@ def testTheTableAgreesWithNumbersAboutAnErroredCall() -> None:
     errored = [
         node.content
         for cell in table.cells.values()
-        if cell.formula is not None and cell.description.kind is pybers.CellKind.ERROR
+        if cell.formula is not None and cell.kind is pybers.CellKind.ERROR
         for node in cell.formula
         if isinstance(node.content, FormulaFunctionCall)
     ]

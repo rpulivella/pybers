@@ -4,6 +4,8 @@ The engine's cell-keyed records a structural edit or a moved block carries, whic
 registration rewrites.
 
 UPDATES
+2026-11-02  An owner carrying no extent, as a created table's does, keeps none,
+            for PYB-276.
 2026-09-23  Every record follows a mapping of cells, so a moved block reuses what a
             structural edit does, for PYB-18.
 2026-09-22  Split out of the engine module for PYB-113.
@@ -191,15 +193,25 @@ def remapOwnerCoordinates(
         )
 
     remapOwnerCells(dependencies, cellMap, spillCut, name)
-    for spanning in (
-        dependencies.spanning_column_dependencies,
-        dependencies.spanning_row_dependencies,
-    ):
-        for extent in (spanning.total_range_for_table, spanning.body_range_for_table):
-            if not extent.ByteSize():
-                continue
-            extent.bottom_right_row += rows.growth
-            extent.bottom_right_column += columns.growth
+    # A created table's owner carries no extent until Numbers saves it.
+    extents = [
+        extent
+        for spanning in (
+            dependencies.spanning_column_dependencies,
+            dependencies.spanning_row_dependencies,
+        )
+        for extent, held in (
+            (
+                spanning.total_range_for_table,
+                spanning.HasField("total_range_for_table"),
+            ),
+            (spanning.body_range_for_table, spanning.HasField("body_range_for_table")),
+        )
+        if held and extent.ByteSize()
+    ]
+    for extent in extents:
+        extent.bottom_right_row += rows.growth
+        extent.bottom_right_column += columns.growth
 
 
 def moveOwnerCoordinates(

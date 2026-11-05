@@ -55,7 +55,8 @@ Record layout, as far as it is needed to read a value:
 ```
 byte  0      storage version (5 in every file seen)
 byte  1      value TYPE (below)
-bytes 6-7    flags: which format layers exist, and at byte 6 0x80 a chosen format
+bytes 6-7    flags: one bit per kind whose format was chosen, and currency at byte
+             7 0x08. See findings-11-formats.md
 bytes 8-10   byte 8's low nibble names the value's width; byte 8's 0xE0 and every
              bit of bytes 9 and 10 each add one trailing reference (below)
 bytes 12+    the value, then the trailing references
@@ -69,7 +70,7 @@ that look settled. `12-number-currency` disproved it: **every currency cell carr
 `10`, and 10 is outside the `CellType` enum entirely**, that enum stops at 9, and
 `CellValueType` puts currency at 9, not 10.
 
-So the storage byte is its own numbering that happens to agree with `CellType` over the
+The storage byte is its own numbering that happens to agree with `CellType` over the
 common types. Treat the enum as a useful guide and **not** as an exhaustive list, and expect
 further values that neither enum names. Anything reading this byte must handle an unknown
 value by preserving it rather than rejecting the cell.
@@ -84,7 +85,7 @@ attached where they exist. Type 9 holds rich text, whatever `automaticCellType` 
 | 2 | `numberCellType` | 49,701 | IEEE-754 decimal128, little-endian, 16 bytes | `NUMBER` |
 | 3 | `textCellType` | 20,960 | uint32 key into the `STRING` `TableDataList` | `TEXT` |
 | 4 | `formulaCellType` | 0 | not seen | |
-| 5 | `dateCellType` | 370 | float64 seconds since 2001-01-01 UTC | `DATE_TIME` |
+| 5 | `dateCellType` | 370 | float64 wall-clock seconds since 2001-01-01, in no zone | `DATE_TIME` |
 | 6 | `boolCellType` | 12 | float64, zero is false | `BOOLEAN` |
 | 7 | `durationCellType` | 27 | float64 seconds | `DURATION` |
 | 8 | `formulaErrorCellType` | 42 | no value: a formula that failed, or one not yet calculated | `ERROR` |
@@ -96,7 +97,7 @@ unchanged.
 
 ## How many trailing references a record carries, and what byte 8 says about its value
 
-Measured for PYB-61 across every record in the corpus, 11,760 of them spanning all nine
+Measured for PYB-61 across every record in the documents, 11,760 of them spanning all nine
 cell types. Writing text over a number moves every trailing reference, because a
 decimal128 value is sixteen bytes and a pooled string key is four, so the count and the
 placement both have to be right before a type can change.
@@ -137,7 +138,7 @@ why the `0xE0` mask `findings-09` uses for the formula key slot is correct here 
 
 ### Which list each reference-bearing bit points into
 
-Measured for PYB-61 across the corpus. A bit is named by the `format_type` its key
+Measured for PYB-61 across the documents. A bit is named by the `format_type` its key
 resolves to, since a format entry states its own kind and a small key is otherwise a
 plausible entry in several lists at once.
 
@@ -224,10 +225,10 @@ leaves it clear here.
 
 Setting it is a deliberate act with one purpose: forcing a number to render as text, or
 stopping a formula from evaluating so its own text shows. `Cell.textLiteralSet` does it,
-and every read cell reports the bit as `cell.description.formatChosen`, whatever its
-type. One record pairs it with a formula, `A2` of the golden
-`18-formula-attached-and-detached`, which Numbers accepted, so the writer carries the bit
-on a formula record rather than refusing one.
+and a cell showing text reports it as `cell.presentation.formatChosen`, which for any
+other cell reports its own slot's bit, as findings-11-formats.md records. None of the
+897 formula records in the documents carries it, so a formula given to a cell drops a
+chosen Text format.
 
 **Pressing return does not interpret stored text, even under Automatic.** Measured
 2026-09-17 on the golden `11-text-literal-written` and on a new document made in Numbers:
@@ -244,12 +245,22 @@ as a star rating.
 
 ### What this settles for writing
 
-A record whose type changes keeps its references and therefore keeps the count, so bytes
-9 and 10 are never rewritten and the slots keep their meanings. What that leaves is a
-text cell naming the format its number had, which Numbers accepts: confirmed in Numbers
-15.3.1 on 2026-09-14, where a cell converted from a number displays as text with a Data
-Format of Automatic, and one converted from a star-rating control displays as plain text
-with no control.
+A value of the kind a record already holds replaces the value bytes alone, so the record
+keeps its format, its style and any control. A value of another kind retypes the record:
+byte 1 and byte 8's value bits change, the old kind's format slot and any control go, the
+new kind's slot names that kind's Automatic format, the displayed kind names that slot,
+and bytes 6 and 7 clear, since a value typed into a fresh cell stores no flags there. Every
+other reference keeps its slot and its value, which carries the style across. Numbers
+accepted the number and text retypes in Numbers 15.3.1 on 2026-09-14, where a cell
+converted from a star-rating control displays as plain text with no control.
+
+The Automatic format of each kind is taken from what Numbers stored: `256` with 253
+decimal places for a number, a bare `260` for text, `268` with automatic units for the
+duration in `11-value-types-noformats` `D1`, and a bare format type `1` for the boolean a
+formula returned in `69-functions-added-in-15-4` and a typed TRUE in
+`73-values-typed-over-controls`. A date has no Automatic, since Numbers names a pattern for every date: pybers
+writes ISO 8601 order, `yyyy-MM-dd` for one at midnight, as `66-series-horizontal-base`
+holds, and `yyyy-MM-dd HH:mm` for one with a time.
 
 ### What a format's refcount counts
 
@@ -273,7 +284,7 @@ Under this rule neither does. That audit read fewer slots than Numbers counts.
 What pybers does with it: a written record moves counts by the difference between the
 format slots it held and those it holds now, so an entry no written record names keeps
 the count Numbers wrote, even one that disagrees with its cells. A shape borrowed from a
-sibling holds no claim before the write, and it keeps only its own kind's format slot.
+sibling holds no claim before the write, and it keeps none of the sibling's format slots.
 
 ### What Numbers does with a format nothing names
 
@@ -321,7 +332,7 @@ Measured across `12-number-currency`, which carries nine currency variants besid
 sits at the same offset in the same decimal128 encoding in both, signs included, the three
 negative variants decode to `-1234.5` correctly from decimal128's sign bit.
 
-So currency is a **type marker plus a format reference over an ordinary number**. It needs no
+Currency is a **type marker plus a format reference over an ordinary number**. It needs no
 new value type in the model: `Decimal` already covers it. What it needs is somewhere to carry
 the currency code and the presentation, because those are not in the value.
 
@@ -363,7 +374,7 @@ consistent with what is on disk.
 
 This does **not** affect pybers, which stores and returns the underlying value and does not
 emulate how Numbers interprets typing. It affects *fixtures*: when a file is built by typing
-into Numbers, what ends up stored may not be what was typed. So a fixture label should record
+into Numbers, what ends up stored may not be what was typed. A fixture label should record
 **what is displayed**, which is checkable against a screenshot, rather than what was entered,
 which is not recoverable from the file.
 
@@ -376,13 +387,31 @@ like percent and unlike currency, formatting never changes the type.
 the same float64 as `11:00:00` past midnight; cells with no time hold exactly `00:00:00`.
 There is nowhere else for a time to live.
 
-Flags record which format layers exist:
+Byte 6 sets `0x08` when the date format was chosen rather than inferred, and `0x0b`
+when the number and currency formats were chosen as well. See
+[formats](findings-11-formats.md).
 
-```
-0x0000   no format applied
-0x0008   a date format
-0x000b   a date format and a time format
-```
+### A date has no time zone: it is floating wall-clock time
+
+Measured 2026-10-20 for PYB-218 against `72-date-time-zones` and `72b-date-time-zones-region`,
+saved by Numbers 15.4. `2026-10-20 09:00` typed on a Mac set to America/New_York and again on
+one set to America/Los_Angeles stores the same value, 814,179,600 seconds, where two moments
+would differ by 10,800. Reopened in Los Angeles, the New York cell still shows 09:00.
+
+**The stored seconds count the wall-clock time as if it were UTC**, from 2001-01-01 00:00,
+and nothing in the record or the document names a zone. Changing the document's language and
+region to English (Italy) leaves both values as they were. Text typed with a zone,
+`2026-10-20 09:00 PST`, stays text, and a date-time format applied afterward does not
+convert it. Apple Community reports that a zone typed in a longer form, such as
+`Jan 30, 2023 6:23:04 AM PST`, is converted on entry, which no fixture here measures.
+
+None of the 389 functions Numbers offers names or converts a zone. `NOW()` and `TODAY()` read
+the clock of the Mac that recalculates, so their cached value is that Mac's wall-clock time,
+which is inferred rather than measured.
+
+**What this settles for pybers:** a date read is naive wall-clock time, and a time zone
+matters only when a caller writes a `datetime` that carries one. How pybers converts it is
+in `docs/decisions.md`.
 
 ### The trailing references do NOT start at a fixed offset
 
@@ -403,7 +432,7 @@ expected content is known independently.
 ## Durations, and what finally settles the type-versus-format question
 
 From `15-duration-formats`. Every duration cell is **type 7** regardless of format, automatic
-units, weeks only, milliseconds abbreviated, no unit shown. So durations behave like percent
+units, weeks only, milliseconds abbreviated, no unit shown. Durations behave like percent
 and date.
 
 **Currency is therefore the only type in the entire set that changes its type byte for a
@@ -450,15 +479,12 @@ For pybers this is a case to be careful about rather than to replicate: a caller
 number to a duration through this library should not silently lose the type the way the
 application does.
 
-**That warning indicator is not stored in the file.** Measured: no archive type appears in
-`15` that is absent from `16`, the `IMPORT_WARNING` and `COMMENT_STORAGE` data lists are both
-empty, and the flagged cell carries no flag bit its unflagged neighbor lacks, the neighbor
-has an extra bit, not one fewer. Numbers recomputes the indicator when it recalculates,
-knowing the operand was a duration and the result is not.
-
-So a round trip cannot drop it, which is one less thing to preserve. It also means pybers
-cannot surface it without performing the same inference, and that requires evaluating
-formulas, which is Numbers' job, not this library's.
+**That warning indicator is one bit in the record, byte 5 `0x02`.** No archive type
+appears in `15` that is absent from `16`, and the `IMPORT_WARNING` and `COMMENT_STORAGE`
+data lists are both empty. The flagged cell is the only record in the documents that sets
+byte 5 `0x02`, and its unflagged neighbor `K1` leaves it clear. One record does not settle
+the bit, so pybers carries it through and never sets it. See
+[formats](findings-11-formats.md).
 
 ### Three duration behaviors worth knowing
 
@@ -536,7 +562,7 @@ DURATION(,,,K1,,)   ->  6,174,000.01 s      K1 read as MINUTES
 DURATION(,,K1,,,)   ->  370,440,000.6 s     K1 read as HOURS
 ```
 
-So the signature is `DURATION(weeks, days, hours, minutes, seconds, milliseconds)`, derived
+The signature is `DURATION(weeks, days, hours, minutes, seconds, milliseconds)`, derived
 from two measurements rather than from documentation. It also corroborates the hours finding
 above independently.
 
@@ -562,26 +588,15 @@ value -1234.5   tail=[1, 4, 2]
 value  0        tail=[1, 4, 2]
 ```
 
-So a custom format with distinct presentations for positive, negative and zero is a **single**
-format archive containing all three, not three formats selected by sign. Anything modeling
-number formats needs that shape: one object, several conditional presentations.
+A custom format with distinct presentations for positive, negative and zero is a **single**
+format archive containing all three, not three formats selected by sign. Its forms are
+decoded in [formats](findings-11-formats.md).
 
-### Format is carried by reference, gated by a bitmask
+### Format is carried by reference
 
-Bytes 6-7 are a flags bitmask that decides which trailing `uint32` references are present:
-
-```
-type  2, flags 0x0000 -> tail [1, 1]
-type 10, flags 0x0802 -> tail [2, K]        the common currency case
-type 10, flags 0x0803 -> tail [2, 1, K]     bit 0 adds one field
-type 10, flags 0x0882 -> tail [2, 11, 5]    bit 7 adds a different one
-```
-
-The last element varies with the format variant, so it reads as a key into the `FORMAT`
-`TableDataList`. **The individual flag bits are not decoded**, which bit implies which
-field is unknown, and guessing would be worse than saying so. A writer must not synthesize
-this bitmask until each bit is understood; round-tripping the original bytes is safe, and
-inventing them is not.
+Bytes 8 to 10 decide which trailing references are present, as recorded above, and the
+format references are keys into the `FORMAT` `TableDataList`. Bytes 6 and 7 do not add a
+reference: they mark which kinds' formats were chosen, and currency.
 
 ### There are TWO cell type enums and they do not agree
 
@@ -618,7 +633,30 @@ model rather than leaving it to taste.
 
 A checkbox, star rating, slider, stepper and popup menu all store a **normal value**, bool,
 number, or string, and reference a `CONTROL_CELL_SPEC` separately. The control is how the
-value is edited, not what it is. So they need no new value type, only a reference to carry.
+value is edited, not what it is. They need no new value type, only a reference to carry.
+
+**A value the control cannot show is clamped or loses the control.** Measured 2026-10-20 for
+PYB-144 in `73-values-typed-over-controls`, typed into `11-value-types-noformats` by Numbers
+15.4. A number outside a range control is clamped to it, and the control stays: 7 in the star
+rating of 0 to 5 stores 5, and 150 in the slider and 500 in the stepper, each of 1 to 100,
+store 100. Text that is none of a pop-up menu's items stays text, and the cell loses its
+control, whose entry Numbers then removes. A pop-up menu's items are in a
+`TST.PopUpMenuModel`, type 6206, which the control's `chooser_control_popup_model` specifies.
+
+pybers never clamps, since a value must read back as written, so a value a control cannot
+show resets the cell to its kind's Automatic format and drops the control, as Numbers does
+for a pop-up menu. **A star rating is a format as well as a control**, `267` in the number
+slot, so dropping the control alone is not enough: `11-controls-written-by-pybers`, written
+that way, opened with 7 drawn as five stars, and Numbers' scripting failed on the cell.
+Reset to Automatic, the same cell shows 7, confirmed by `/golden-confirm` on 2026-10-20 in
+Numbers 15.4. A pop-up menu whose items include a kind other than text or the blank choice
+is not measured, so pybers keeps its control.
+
+The same document measures what a value typed into a plain cell stores. TRUE stores format
+type `1` in the checkbox slot, as a formula's boolean result does. A date and a duration
+each store a format Numbers chose from the text typed, `yyyy-M-d H:mm` for
+`2026-10-20 09:30` and automatic units for `1h 30m`. All three store no flags in bytes 6
+and 7, and Numbers' inspector reads each as Automatic.
 
 ### Two storage strategies by type
 

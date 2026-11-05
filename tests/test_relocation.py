@@ -6,6 +6,7 @@ The archives a save writes for a move, the refusals that leave a table as it was
 and the few lines a script or a command line writes to move a block.
 
 UPDATES
+2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-23  Written for PYB-18.
 """
 from __future__ import annotations
@@ -26,7 +27,7 @@ import pytest
 from structurefacts import readConditionalRules, readTableFacts
 
 import pybers
-from conftest import findDocumentPath
+from conftest import findDocumentPath, readRangeValues
 from pybers import FormulaReferenceRelocation
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
@@ -64,7 +65,7 @@ def readTableState(table: pybers.Table) -> tuple[object, ...]:
     """Return what a refused move must leave alone: every cell and every merge."""
     return (
         {
-            reference: (cell.formulaText or cell.value, cell.reference)
+            reference: (cell.formulaText or cell.value, cell.address)
             for reference, cell in table.cells.items()
         },
         list(table.mergeRanges),
@@ -152,7 +153,7 @@ def testAConditionFollowsARowAddedAboveIt() -> None:
     table.rowAdd(1)
     (condition,) = table.cell("C3")._conditions
     (reference,) = condition.references
-    assert reference.resolve(table.cell("C3").reference) == pybers.CellReference(2, 1)
+    assert reference.resolve(table.cell("C3").address) == pybers.CellReference(2, 1)
 
 
 def readRuleConditions(path: Path) -> dict[tuple[int, int], object]:
@@ -232,7 +233,7 @@ def testVacatedCellsReadEmptyAfterASave(tmp_path: Path) -> None:
     target = tmp_path / "moved.numbers"
     moveAndSave("61-move-styles-base", target)
     table = pybers.open(target).sheet(1).table("Table 1")
-    assert [cell.value for cell in table.range("B2:D5")] == [None] * 12
+    assert readRangeValues(table, "B2:D5") == [None] * 12
     assert table.cell("F8").value == Decimal("21")
     assert table.cell("H11").value == Decimal("53")
 
@@ -244,8 +245,8 @@ def testAMoveOverlappingItselfLandsEveryCell(tmp_path: Path) -> None:
     target = tmp_path / "overlap.numbers"
     document.save(target)
     reopened = pybers.open(target).sheet(1).table("Table 1")
-    assert [cell.value for cell in reopened.range("B2:D2")] == [None] * 3
-    assert [cell.value for cell in reopened.range("B3:D3")] == [
+    assert readRangeValues(reopened, "B2:D2") == [None] * 3
+    assert readRangeValues(reopened, "B3:D3") == [
         Decimal("21"), Decimal("22"), Decimal("23"),
     ]
     assert reopened.cell("D6").value == Decimal("53")
@@ -261,14 +262,14 @@ def testABlockMovedAcrossTilesBesideAnInsertionKeepsItsValues(
     """
     document = pybers.open(findDocumentPath("27-big-table"))
     table = document.sheets[0].tables[0]
-    before = [cell.value for cell in table.range("A1:B2")]
+    before = readRangeValues(table, "A1:B2")
     table.columnAdd("E", 2)
     table.cellsMove("A1:B2", "E600", references=relative)
     target = tmp_path / "tiles.numbers"
     document.save(target)
     reopened = pybers.open(target).sheets[0].tables[0]
-    assert [cell.value for cell in reopened.range("E600:F601")] == before
-    assert [cell.value for cell in reopened.range("A1:B2")] == [None] * 4
+    assert readRangeValues(reopened, "E600:F601") == before
+    assert readRangeValues(reopened, "A1:B2") == [None] * 4
 
 
 @pytest.mark.parametrize("rule", list(FormulaReferenceRelocation))
@@ -380,7 +381,7 @@ def testAMoveReturnsEveryFormulaReadingAVacatedCell(
     """PYB-18 AC 8: a partial range under either rule, the old address under one."""
     _, table = openTable("60-move-base")
     stranded = table.cellsMove("B2:D5", anchor, references=rule)
-    assert [str(cell.reference) for cell in stranded] == expected
+    assert [str(cell.address) for cell in stranded] == expected
 
 
 def testAMovedImportedMergeCarriesTheRecordsItCovers(tmp_path: Path) -> None:
@@ -395,28 +396,6 @@ def testAMovedImportedMergeCarriesTheRecordsItCovers(tmp_path: Path) -> None:
     assert {(4, 0), (4, 1)} <= records.keys()
     assert not {(0, 0), (0, 1)} & records.keys()
 
-
-goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
-
-
-@pytest.mark.parametrize(
-    ("name", "rule"),
-    [("60-move-cut-pasted-by-pybers", relative), ("60-move-dragged-by-pybers", named)],
-)
-def testTheMoveGoldensMatchWhatThisLibraryProduces(
-    name: str, rule: FormulaReferenceRelocation, tmp_path: Path
-) -> None:
-    """PYB-18 AC 7: each move again, against the file Numbers confirmed."""
-    document, table = openTable("60-move-base")
-    table.cellsMove("B2:D5", "F8", references=rule)
-    target = tmp_path / f"{name}.numbers"
-    document.save(target)
-    differences = listPackageDifferences(
-        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
-    )
-    assert [
-        difference for difference in differences if difference.identifier is not None
-    ] == []
 
 
 def testAScriptAuthorMovesABlockAndSaves(tmp_path: Path) -> None:
@@ -447,7 +426,7 @@ def testACommandLineMovesABlockWithTheRuleAsTyped() -> None:
     stranded = table.cellsMove(arguments[1], arguments[2], references=arguments[3])  # type: ignore[arg-type]
     assert table.cell("H8").formulaText == "=F8+G8"
     assert [
-        f"{cell.table.name}::{cell.reference}" for cell in stranded if cell.table
+        f"{cell.table.name}::{cell.address}" for cell in stranded if cell.table
     ] == [
         "Table 1::E2", "Table 1::E3", "Table 1::E4", "Table 1::E5", "Table 1::E8",
         "Table 1::E9", "Table 2::A2", "Table 2::A3",

@@ -14,6 +14,13 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-03  A table's header and footer counts, for PYB-223.
+2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
+2026-11-02  A document holding no table needs no engine, and its first table creates
+            one, for PYB-261.
+2026-11-02  The model is written when a write created a tile, for PYB-276.
+2026-10-28  `formulasMark`, every formula of a table marked for
+            recalculation, for PYB-272.
 2026-10-01  A save describes each cell it wrote once the package is on disk, for
             PYB-141.
 2026-09-29  A copied cell's borders are drawn after every edit, for PYB-136.
@@ -44,7 +51,9 @@ from typing import TYPE_CHECKING
 from .._engine import (
     FormulaDependencies,
     TableOwner,
+    createCalculationEngine,
     findCalculationEngine,
+    findCalculationEngineHeld,
     findOwnerEntry,
     listRegisteredCells,
     moveOwnerCoordinates,
@@ -65,7 +74,8 @@ from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
 from ._merges import applyMerges, listSwallowedPositions
-from ._read import updateCellDescriptions
+from ._read import updateCellStorage
+from ._records import refuseUncreatableCell
 from ._relocation import (
     applyBorderCopies,
     findBorderCopies,
@@ -78,6 +88,24 @@ from .cells import Table
 if TYPE_CHECKING:
     # Guarded because the document feature imports this one to save its tables.
     from ..document.sheets import Document
+
+
+def applyHeaders(table: Table, model: tst.TableModelArchive) -> bool:
+    """Write each header and footer count the model changed, and report a change.
+
+    A count is written only when it changed, since a zero set on a field that held
+    none is a byte a table without headers never carried.
+    """
+    changed = False
+    for name, count in (
+        ("number_of_header_rows", table.headers.headerRows),
+        ("number_of_header_columns", table.headers.headerColumns),
+        ("number_of_footer_rows", table.headers.footerRows),
+    ):
+        if getattr(model, name) != count:
+            setattr(model, name, count)
+            changed = True
+    return changed
 
 
 def collectFormulaDependencies(
@@ -98,7 +126,7 @@ def collectFormulaDependencies(
                 f"column {column + originOffset} that the model does not hold."
             )
         dependencies[(row, column)] = resolveFormulaDependencies(
-            cell.formula, cell.reference, hostOwner, ownerIds, table.name, extents
+            cell.formula, cell.address, hostOwner, ownerIds, table.name, extents
         )
     return dependencies
 
@@ -119,11 +147,11 @@ class TableSave:
     written: dict[int, list[tuple[int, int]]] = field(default_factory=dict)
     saved: list[tuple[Table, tsp.Reference]] = field(default_factory=list)
 
-    def descriptionsUpdate(self, source: Path) -> None:
+    def storageUpdate(self, source: Path) -> None:
         """Describe every saved cell by its record, once the package is on disk."""
         for table, reference in self.saved:
             tableInfo = self.index.resolve(reference, tst.TableInfoArchive)
-            updateCellDescriptions(self.index, tableInfo, table, source)
+            updateCellStorage(self.index, tableInfo, table, source)
 
     def tableWrite(self, table: Table, reference: tsp.Reference) -> None:
         """Write one table back into its archives and tell the engine what moved."""
@@ -132,6 +160,10 @@ class TableSave:
         modelIdentifier = tableInfo.tableModel.identifier
         model = index.resolve(tableInfo.tableModel, tst.TableModelArchive)
         entry = findOwnerEntry(self.entries, reference.identifier, table.name)
+        # A cell read from the file or copied keeps its record and all it holds.
+        for cell in table.cells.values():
+            if cell._origin is None and cell._copiedFrom is None:
+                refuseUncreatableCell(cell, table.name)
         self.saved.append((table, reference))
 
         # Before the merges are compared, since a merge the edit only moved must
@@ -167,13 +199,15 @@ class TableSave:
         if borderCopies:
             applyBorderCopies(index, self.registry, model, borderCopies)
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
-        if moved or swallowed or maps.changed or moves or copies:
-            # A structural edit or a moved block can create and remove tiles and
+        headed = applyHeaders(table, model)
+        reshaped = maps.changed or moves or copies or edits.tilesCreated
+        if moved or swallowed or reshaped or headed:
+            # A structural edit, a moved block or a created tile changes the tiles and
             # buckets, which the model has to declare as it points at them.
             index.archiveWrite(
                 modelIdentifier, model,
                 self.registry.referencesReconcile(modelIdentifier, model)
-                if maps.changed or moves or copies else None,
+                if reshaped else None,
             )
         # The engine's register of formula-bearing cells, which is a separate
         # fact from a cell having moved and is what makes a newly attached
@@ -200,14 +234,29 @@ class TableSave:
                 edits.written + sorted(moved) + recalculated
             )
 
+    def formulasMark(self, table: Table, identifier: int) -> None:
+        """Mark every formula of a table for recalculation, as a region change needs."""
+        formulas = listModelFormulas(table)
+        if formulas:
+            self.written[identifier] = sorted(
+                {*self.written.get(identifier, []), *formulas}
+            )
+
 
 def openTableSave(document: Document, registry: PackageRegistry) -> TableSave:
     """Create every table the model gained, then read the engine the save writes to.
 
-    Read after creation, since a created table registers owners of its own.
+    Read after creation, since a created table registers owners of its own. A
+    document holding no table may hold no engine, as a created one does.
     """
-    createTables(document, registry)
     index = registry.index
+    if findCalculationEngineHeld(index) is None:
+        if not any(sheet.tables for sheet in document.sheets):
+            return TableSave(
+                index=index, registry=registry, entries={}, ownerIds={}, extents={}
+            )
+        createCalculationEngine(registry)
+    createTables(document, registry)
     engine = findCalculationEngine(index)
     # A formula names the table it reads by identity, and the engine by internal
     # owner id, so declaring what a formula reads needs both halves in hand.

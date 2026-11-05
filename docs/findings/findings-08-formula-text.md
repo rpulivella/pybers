@@ -22,10 +22,10 @@ carrying nothing but that type:
  6  CONCATENATION     12  NOT_EQUAL_TO
 ```
 
-`findings-02` records "7 comparison" from the corpus, which is the one comparison the
-fixtures happen to use. The enum has six, and reading the corpus rather than the enum would
+`findings-02` records "7 comparison" from the documents, which is the one comparison the
+fixtures happen to use. The enum has six, and reading the documents rather than the enum would
 have produced a table missing five of them. **Derive from the declaration, corroborate with
-the corpus, never the reverse.** numbers-parser took openpyxl's Excel tokenizer instead and
+the documents, never the reverse.** numbers-parser took openpyxl's Excel tokenizer instead and
 its precedence table carried no comparison at all, so `1<2` worked and `A+B<=10` raised.
 
 Precedence follows Excel, which is what Numbers implements: a prefix sign binds tighter than
@@ -44,7 +44,7 @@ the power beneath it, so `-2^2` is four rather than negative four.
 
 The condition is bare and each branch is bracketed, which is lazy evaluation expressed in
 the node array. Nobody types a thunk, so a parser has to put them back, and which functions
-get them is not derivable from the corpus: `IF` is the only one in it.
+get them is not derivable from the documents: `IF` is the only one in them.
 
 **Numbers answers this directly.** `+[TSCEFunctionSpec functionIndexUsesThunks:]` in
 Numbers 15.3.1 is fourteen instructions long and compares its argument against exactly four
@@ -79,18 +79,18 @@ for the target table, low half first, matched across `20-formula-shapes` on 2026
 in 15 of 16 bytes and differs in the low byte (`0x37` against `0x14` for `Table 2`). Reading
 it instead names no table at all, which is a plausible wrong answer rather than an error.
 
-So `Table.identifier` is read the long way round, from the engine, exactly as
+`Table.identifier` is read the long way round, from the engine, exactly as
 `internal_formula_owner_id` already was.
 
 ## A table name cannot be found by a rule over characters
 
-Every fixture names its tables `Table 1` and `Table 2`, so nothing in the corpus says what
+Every fixture names its tables `Table 1` and `Table 2`, so nothing in the documents says what
 a real one looks like. Numbers permits a bracket, a comma, a quote, a colon and a name of
 digits alone, and `Sales (EU)::A1` is a formula it accepts. No character class can say
 where such a name ends: the comma of `Sales, net::A1` is also the comma that separates
 arguments.
 
-So a qualifier is matched against the names the document carries, longest first, and the
+A qualifier is matched against the names the document carries, longest first, and the
 pattern is only the fallback for a caller that supplied none. That reads `2026::A1`, whose
 first token is otherwise a number, and `SUM::A1`, whose first token is otherwise a
 function.
@@ -138,7 +138,7 @@ Numbers 15.3.1 on 2026-09-11.
 needs a bracket that no node records. Its stored result is 1233.33 for F22 of 18500 and
 C22 of 15000, which is the bracketed reading. The left-associative reading gives
 0.001233.
-So a renderer taking brackets only from the nodes writes a different number, and one
+A renderer taking brackets only from the nodes writes a different number, and one
 taking them only from the tree drops 193 formulas' brackets. **Both sources are needed.**
 
 That exception is one formula dragged into three cells, which is one authoring event and
@@ -167,7 +167,7 @@ Numbers did not store. Nothing is lost and nothing changes meaning.
 
 ## Round tripping is exact for what a person can type, and not otherwise
 
-Every formula in the corpus, 77 across the fixtures, renders to text and parses back. **74
+Every formula in the documents, 77 across the fixtures, renders to text and parses back. **74
 of the 77 return the identical node array.** All three exceptions are node type 23, and all
 77 return identical TEXT, which is the property a caller can rely on. The bracket node
 above is the fourth kind, measured outside the fixtures because none of them carries one.
@@ -203,16 +203,16 @@ days 11 hours, which is `L1` exactly. The same number read as hours is 4287 days
 
 The rule choosing between 22 and 23 is not established. Type 23 is therefore rendered as
 the omitted argument it behaves as, and typing that text back produces type 22, which is
-the only one of the two whose placement the corpus establishes: the leading commas of both
+the only one of the two whose placement the documents establish: the leading commas of both
 formulas are 22. Those three formulas round trip through the text and not through the node
-type, and nothing else in the corpus does.
+type, and nothing else in the documents does.
 
 ## What a reserved function does, and why an argument count is not checked
 
 Numbers stores a function it will not resolve as node type 31 with its spelling intact, and
 that includes four it declares an index for and then refuses by name: `LATITUDE`,
 `LONGITUDE`, `BEARING` and `ALTITUDE`, 281 to 284. `46-formula-rare-functions` holds all
-four as type 31 beside `TEXT` and `RANGE`, which Numbers does not declare at all. So a name
+four as type 31 beside `TEXT` and `RANGE`, which Numbers does not declare at all. A name
 becomes an indexed call only when the table carries an index for it and does not mark it
 reserved, and `SPILL`, which is internal rather than offered, stays an indexed call because
 that is how Numbers itself writes it.

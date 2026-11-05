@@ -34,7 +34,7 @@ resolved to a column at or before zero.
 
 ## How the rule was validated
 
-A pooled formula carries a `refcount` recording how many cells name it. So for each table,
+A pooled formula carries a `refcount` recording how many cells name it. For each table,
 take the key each record names under a candidate rule, count them, and compare the histogram
 against the pool's own refcounts. A wrong rule almost never reproduces one by accident.
 
@@ -46,8 +46,8 @@ popcount(byte8 & 0xE0) + (byte9 & 0x01)         22 / 22
 ```
 
 Twenty-two tables, roughly 1,700 formula records, eleven distinct flag shapes, across the
-46-fixture corpus and one real document. The rule that shipped before this was fitted to a
-corpus where exactly one fixture set `0x40`, so a constant slot read every other file
+46 fixtures and one real document. The rule that shipped before this was fitted to a
+set of fixtures where exactly one set `0x40`, so a constant slot read every other file
 correctly.
 
 ## What each bit is

@@ -22,7 +22,7 @@ import pytest
 
 import pybers
 from conftest import findDocumentPath
-from pybers.addressing import CellReference
+from pybers.addressing import CellAddress, CellReference
 
 sourceRoot: Path = Path(__file__).resolve().parent.parent / "src"
 mutatingMethods: tuple[str, ...] = ("clear", "pop", "popitem", "setdefault", "update")
@@ -36,7 +36,7 @@ def openTable() -> pybers.Table:
 
 def testTheCellsReadAsAMapping() -> None:
     table = openTable()
-    first = CellReference.parse("A1")
+    first = CellAddress.parse("A1")
     assert table.cells[first] is table.cell("A1")
     assert first in table.cells
     assert len(table.cells) == len(list(table.cells)) > 0
@@ -65,7 +65,7 @@ def testTheTableStillChangesItsOwnCells() -> None:
         reference
         for row in range(1, table.rowCount + 1)
         for col in range(1, table.colCount + 1)
-        if (reference := CellReference(row, col)) not in table.cells
+        if (reference := CellAddress(row, col)) not in table.cells
     )
     table.cell(empty)
     assert empty in table.cells

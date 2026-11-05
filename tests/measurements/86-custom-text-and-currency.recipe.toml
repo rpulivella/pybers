@@ -1,0 +1,403 @@
+# How Numbers makes 86-custom-text-and-currency: custom Text formats with a suffix and a
+# prefix, and custom number formats carrying the Currency token, to measure both for
+# PYB-219's AC 1. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure
+# 86-custom-text-and-currency`.
+
+base = "00-baseline"
+
+[[step]]
+action = "tableExtend"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = 'hello'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Name'
+value = 'text plain'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'Type'
+value = 'Text'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A2"
+value = 'input as hello, custom format named text plain: Type Text'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = 'hello'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Name'
+value = 'text suffix'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Type'
+value = 'Text'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'Text'
+value = ' (note)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B2"
+value = 'input as hello, custom format named text suffix: Type Text, then Text  (note)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+value = 'hello'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Name'
+value = 'text prefix'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'Type'
+value = 'Text'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'TextBefore'
+value = 'Note: '
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "C2"
+value = 'input as hello, custom format named text prefix: Type Text, then TextBefore Note:'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+value = '1234.5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Name'
+value = 'currency euro'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Currency'
+value = 'Euro (€)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'Decimal'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "D2"
+value = 'input as 1234.5, custom format named currency euro: Clear, then Currency Euro (€), then Integer, then Decimal'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+value = '1234.5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Name'
+value = 'currency yen after'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Space'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'Currency'
+value = 'Japanese Yen (¥)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "E2"
+value = 'input as 1234.5, custom format named currency yen after: Clear, then Integer, then Space, then Currency Japanese Yen (¥)'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '-1234.5'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Open'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Name'
+value = 'currency pound negative'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Clear'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Currency'
+value = 'British Pound (£)'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Integer'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'Decimal'
+
+[[step]]
+action = "customFormatEdit"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+setting = 'OK'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F2"
+value = 'input as -1234.5, custom format named currency pound negative: Clear, then Currency British Pound (£), then Integer, then Decimal'

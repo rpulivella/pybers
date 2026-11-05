@@ -1,0 +1,65 @@
+# How Numbers makes 73-values-typed-over-controls: `11-value-types-noformats`, with a
+# date typed over the number at A1, a duration over the number at B1, and TRUE into J1,
+# which has no record, to measure the format Numbers gives each. Then a value outside
+# each control: 7 into the star rating at F1, 150 into the slider at G1, 500 into the
+# stepper at H1, and Banana, which is not one of its items, into the pop-up menu at I1,
+# for PYB-144's AC 14. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure
+# 73-values-typed-over-controls`.
+
+base = "11-value-types-noformats"
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "A1"
+value = '2026-10-20 09:30'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "B1"
+value = '1h 30m'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "J1"
+value = 'TRUE'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "F1"
+value = '7'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "G1"
+value = '150'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "H1"
+value = '500'
+
+[[step]]
+action = "valueSet"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+range = "I1"
+value = 'Banana'

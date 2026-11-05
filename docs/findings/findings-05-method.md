@@ -17,6 +17,9 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
   readable.
 - **`TSD.DrawableSelectionArchive` (3061) and `TST.SelectionArchive` (6030) are noise**,
   they reflect what was selected when the file was saved. Filter them.
+- **A refusal right after Numbers crashes is noise.** The first documents opened after a
+  crash were refused with no alert, and opened clean on a rerun, so a refusal counts only
+  once it repeats.
 - **File size is dominated by the preview JPEGs** Numbers regenerates on each save. Not a
   content signal.
 
@@ -40,7 +43,7 @@ be checked against a fixture where the tables hold visibly different text.
 briefly recorded as a deliberate character-spacing setting. It is a built-in template style's
 default, and the baseline proves it: nothing had been done to that file.
 
-**Check the baseline before attributing any value to a fixture's author.** The corpus is a
+**Check the baseline before attributing any value to a fixture's author.** The fixtures form a
 star around `00-baseline`, so anything the baseline also carries is Apple's, not ours. The
 same reasoning already retired the selection archives as noise; this is the general form of
 it.

@@ -3,11 +3,14 @@
 What a check of a document found, holding nothing the document contains unless asked.
 
 A report is meant to be posted publicly when the document cannot be, so every
-field of `Check` is a version, a type identifier, a count, or a location in
-pybers's own source. `CheckNames` is the one exception, present only when a
-caller asks for names, and never meant for posting.
+field of `Check` is a version, a type identifier, a count, a size, or a location in
+pybers's own source. Every sheet, table and cell name is WITHHELD unless a caller
+asks for names, which are never meant for posting.
 
 UPDATES
+2026-11-03  Every check carries the sheets and tables, each table its unrecognized
+            cells, names withheld unless asked for, replacing `CheckNames`, for
+            PYB-223.
 2026-10-12  A missing part names why it is missing, for PYB-190.
 2026-10-11  Both type tables are frozendict, so a Check cannot change, for PYB-189.
 2026-10-07  Written for PYB-169.
@@ -24,7 +27,7 @@ __date__ = "2026/10/07"
 
 from dataclasses import dataclass, field
 
-from ..absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
+from ..absence import UNDETERMINED, WITHHELD
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,51 +64,39 @@ class CheckFailure:
 
 
 @dataclass(frozen=True, slots=True)
-class CheckTable:
-    """One table by name, with its size."""
-
-    name: str
-    rowCount: int
-    colCount: int
-
-
-@dataclass(frozen=True, slots=True)
-class CheckSheet:
-    """One sheet by name, with its tables in the sheet's own order."""
-
-    name: str
-    tables: tuple[CheckTable, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class CheckCell:
-    """Where a cell of an unrecognized type sits."""
+    """A cell of a type pybers does not recognize, by its address in its table."""
 
-    sheetName: str
-    tableName: str
     address: str
     typeCode: int
 
 
 @dataclass(frozen=True, slots=True)
-class CheckNames:
-    """The document's own names, for the person holding it. Never for posting.
+class CheckTable:
+    """One table, its name WITHHELD unless asked for, its size, unrecognized cells."""
 
-    Both parts are UNDETERMINED when the document could not be opened.
-    """
+    name: str | WITHHELD
+    rowCount: int
+    colCount: int
+    unrecognizedCells: tuple[CheckCell, ...] = ()
 
-    sheets: tuple[CheckSheet, ...] | UNDETERMINED
-    unrecognizedCells: tuple[CheckCell, ...] | UNDETERMINED
+
+@dataclass(frozen=True, slots=True)
+class CheckSheet:
+    """One sheet, its name WITHHELD unless asked for, its tables in its own order."""
+
+    name: str | WITHHELD
+    tables: tuple[CheckTable, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class Check:
     """Whether pybers can read a document, and what a bug report about it needs.
 
-    Both type tables count archives or cells by type identifier. Cell types are
-    UNDETERMINED when the document could not be opened, and `names` is
-    NOT_REQUESTED unless asked for. `savedBy` is None when the document records no
-    Numbers, and UNDETERMINED when its record cannot be read.
+    Both type tables count archives or cells by type identifier. Cell types and
+    `sheets` are UNDETERMINED when the document could not be opened.
+    `savedBy` is None when the document records no Numbers, and UNDETERMINED when its
+    record cannot be read.
     """
 
     environment: CheckEnvironment
@@ -113,7 +104,7 @@ class Check:
     failure: CheckFailure | None
     untestedArchiveTypes: frozendict[int, int]
     unrecognizedCellTypes: frozendict[int, int] | UNDETERMINED
-    names: CheckNames | NOT_REQUESTED
+    sheets: tuple[CheckSheet, ...] | UNDETERMINED
 
 
 __all__ = [
@@ -121,7 +112,6 @@ __all__ = [
     "CheckCell",
     "CheckEnvironment",
     "CheckFailure",
-    "CheckNames",
     "CheckSheet",
     "CheckTable",
     "NumbersVersion",

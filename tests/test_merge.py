@@ -48,7 +48,7 @@ def test_aMergeIsReportedForEveryPositionItCovers() -> None:
     merge = table.mergeAdd("A1:B1")
 
     assert isinstance(merge, MergeRange)
-    assert merge.anchor == pybers.toCellReference("A1")
+    assert merge.anchor == pybers.CellAddress(1, 1)
     assert table.mergeCovering("A1") is merge
     assert table.mergeCovering("B1") is merge
     assert table.mergeCovering("C1") is None

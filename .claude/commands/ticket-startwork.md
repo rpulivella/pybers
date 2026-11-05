@@ -76,7 +76,7 @@ permission.
 .venv/bin/python3 -m tools.workflow.ticket close <N> --reason not-planned   # abandoned; Status -> Done, closed unplanned
 ```
 
-`--dry-run` is accepted here and everywhere else the tool is used.
+`--preview` is accepted here and everywhere else the tool is used.
 
 **`Code Review` is not set from this skill**, which has exited long before a pull request
 exists. `/pr-review-code` owns it and sets it when a review starts.

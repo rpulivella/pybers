@@ -8,6 +8,9 @@ table Numbers inserted, whose owner held no dependency tile either, so replaying
 edit on `48` compares the tile pybers creates with the one Numbers created.
 
 UPDATES
+2026-11-02  A formula past row 128 or column 32 is registered in its block's tile,
+            for PYB-276.
+2026-10-22  The golden's tables are added by its builder, for PYB-255.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-15  Written for PYB-86.
 """
@@ -27,6 +30,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import addFormulaTables
 from google.protobuf import text_format
 
 import pybers
@@ -39,7 +43,6 @@ from pybers._persistence import PackageRegistry, readPackage
 from pybers._persistence.difference import listPackageDifferences
 from pybers._persistence.index import ArchiveIndex
 from pybers.document import Document
-from pybers.errors import WriteError
 from pybers.formula.nodes import FormulaReference
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
@@ -52,14 +55,7 @@ def openShapes() -> Document:
 
 def addFormulas(document: Document) -> Document:
     """Add the golden's two tables and their formulas, and return the document."""
-    inputs = document.sheet("Sheet 1").tableAdd("Inputs", rows=2, cols=2)
-    inputs.cell("A1").value = Decimal("5")
-    calc = document.sheet("Sheet 1").tableAdd("Calc", rows=3, cols=3)
-    calc.cell("A1").value = Decimal("2")
-    calc.cell("B1").formulaText = "=A1*3"
-    calc.cell("C1").formulaText = "=Table 2::A1"
-    calc.cell("A2").formulaText = "=Inputs::A1+1"
-    calc.cell("A3").formulaText = "=SUM(A1:B1)"
+    addFormulaTables(document)
     return document
 
 
@@ -468,26 +464,58 @@ def testSavingAgainWithNoEditWritesEveryArchiveUnchanged(tmp_path: Path) -> None
 # ── Refusals ────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("references", [["AN1"], ["B1", "AN1"]])
-def testAFormulaPastTheFirstTileIsRefusedAndWritesNothing(
-    tmp_path: Path, references: list[str]
+@pytest.mark.parametrize(
+    ("references", "origins"),
+    [
+        (["AN1"], {(0, 32)}),
+        (["B1", "AN1"], {(0, 0), (0, 32)}),
+        (["D129"], {(128, 0)}),
+        (["D2", "D200", "D256"], {(0, 0), (128, 0)}),
+        (["D200", "AN1", "B1"], {(0, 0), (0, 32), (128, 0)}),
+    ],
+)
+def testAFormulaIsRegisteredInTheTileOfItsBlock(
+    tmp_path: Path, references: list[str], origins: set[tuple[int, int]]
 ) -> None:
-    """Only the tile at column 0 was measured, so no tile is guessed beyond it."""
+    """Tiles hold 128 rows by 32 columns, as Numbers created them typed at row 129."""
     document = openShapes()
-    package = document._package
-    assert package is not None
-    before = readArchiveBodies(package)
-    added = document.sheet(1).tableAdd("Wide", rows=1, cols=40)
+    added = document.sheet(1).tableAdd("Wide", rows=300, cols=40)
     added.cell("A1").value = Decimal("1")
     for reference in references:
         added.cell(reference).formulaText = "=A1*2"
+    document.save(tmp_path / "tiled.numbers")
 
-    with pytest.raises(WriteError, match="No dependency tile covers"):
-        document.save(tmp_path / "refused.numbers")
+    owner, tiles = readOwnerTiles(tmp_path / "tiled.numbers", "Sheet 1", "Wide")
 
-    assert readArchiveBodies(package) == before
-    assert added._identifier is None
-    assert not (tmp_path / "refused.numbers").exists()
+    assert [(tile.tile_row_begin, tile.tile_column_begin) for tile in tiles] == sorted(
+        origins
+    )
+    for tile in tiles:
+        for record in tile.cell_records:
+            assert record.row - record.row % 128 == tile.tile_row_begin
+            assert record.column - record.column % 32 == tile.tile_column_begin
+    assert readRegisteredPairs(owner.cell_dependencies.cell_record) == {
+        pair for tile in tiles for pair in readRegisteredPairs(tile.cell_records)
+    }
+
+
+def testTilesAddedByALaterSaveStillListByRowThenColumn(tmp_path: Path) -> None:
+    """Numbers lists an owner's tiles by row, then column, whatever order made them."""
+    document = openShapes()
+    added = document.sheet(1).tableAdd("Wide", rows=300, cols=40)
+    added.cell("A1").value = Decimal("1")
+    added.cell("D200").formulaText = "=A1*2"
+    document.save(tmp_path / "first.numbers")
+    later = pybers.open(tmp_path / "first.numbers")
+    for reference in ("AN1", "B1"):
+        later.sheet(1).table("Wide").cell(reference).formulaText = "=A1*2"
+    later.save(tmp_path / "second.numbers")
+
+    _, tiles = readOwnerTiles(tmp_path / "second.numbers", "Sheet 1", "Wide")
+
+    assert [(tile.tile_row_begin, tile.tile_column_begin) for tile in tiles] == [
+        (0, 0), (0, 32), (128, 0)
+    ]
 
 
 # ── The golden ──────────────────────────────────────────────────────────────
@@ -570,6 +598,6 @@ def testACliWritesAFormulaIntoANewTableAndPrintsIt(tmp_path: Path) -> None:
     document.save(tmp_path / "cli.numbers")
 
     printed = f"{table.name}::{arguments[2]} {cell.formulaText}"
-    assert printed == "Scratch::B2 =Sheet 2::Table 1::A1*2"
+    assert printed == "Scratch::B2 =Table 1::A1*2"
     reopened = pybers.open(tmp_path / "cli.numbers").sheet("Sheet 2").table("Scratch")
-    assert reopened.cell("B2").formulaText == "=Sheet 2::Table 1::A1*2"
+    assert reopened.cell("B2").formulaText == "=Table 1::A1*2"

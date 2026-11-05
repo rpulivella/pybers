@@ -16,15 +16,16 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | Command | What it does |
 | ------- | ------------ |
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
-| `check FILE` | Whether pybers can read a document, safe to post publicly |
-| `show FILE [SELECTOR]` | A small part of a document, for reading |
-| `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o` |
-| `set FILE ADDRESS VALUE` | One cell's value or formula |
-| `import FILE DATA` | Data brought into a document, at addresses or as a new one |
+| `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` naming each |
+| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
+| `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
+| `set FILE SELECTOR VALUE` | The value of every cell a selector matches |
+| `locale FILE [LOCALE]` | A document's language and region, or a change to it |
+| `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
 | `diff A B` | The cells that differ between two documents |
 | `visinum FILE [ADDRESS]` | The read-only terminal browser |
 
-`check` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
+`check`, `show`, `set`, `locale` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
 
 - **The default action** comes from a `TyperGroup` subclass that routes a first argument naming no command to `check --names`. A file named like a command is reached as `./check`.
 - **`python -m pybers`** runs the same command.
@@ -33,17 +34,23 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 
 A command parses its arguments, calls the library once, formats what comes back, and chooses the exit status. Nothing else, so a script and a command never disagree.
 
-- **Selectors and addresses** are positional, quoted in the shell, and parsed by the library. Tab completion offers the sheet and table names of the file being typed.
+- **Selectors** are positional, quoted in the shell, and parsed by the library, the one syntax `library-design.md` sets out under Addresses. Tab completion offers the sheet and table names of the file being typed.
+- **A command prints every part a selector matches, each as it prints alone.** `show` prints each part, and `set` each cell it wrote, exactly as `show` prints that part, so a part reads the same whatever reached it. A selector's JSON is always an array of those parts' forms, which `parseJsonForm` reads back.
+- **JSON on stdout reads back, and a diagnostic goes to stderr.** A part a write skipped prints `Skipped:` and its reason on stderr, as `Written:` does, so `--format json` never mixes a report into the data.
 - **Each command has one default format** that does not change when its output is piped. A terminal only turns color on. `--format` chooses another, and `-o FILE` infers it from the extension.
-- **Every command offers `--format text`, its default, and `--format json`**, so an agent or a pipeline never parses a report. Both come from `pybers.cli._formats`, and a command never builds JSON itself. JSON keys are the library's own field names, `None` is `null`, and a value missing for a reason is the name of its sentinel, such as `"UNDETERMINED"`.
+- **Every command offers `--format text`, its default, and `--format json`**, so an agent or a pipeline never parses a report. `pybers.cli._formats` chooses between them, and every JSON comes from `pybers.formatJsonForm`, the library's one serializer, so a command never builds JSON itself. Its keys are the library's own field names, a number is a JSON number with its exact digits, `None` is `null`, and a value missing for a reason is the name of its sentinel, such as `"UNDETERMINED"`. The rule each value follows is in `decisions.md`, under the JSON form.
 - **`-` is stdin or stdout** for text formats. A `.numbers` document is never written to stdout.
 - **Nothing prompts.** A command that would need an answer refuses instead.
 
 ## Writing
 
-- **A write names its target**: `--in-place` changes the file given, and `-o NEW` writes a new document beside it. A command that writes requires one of the two.
-- **`--dry-run`** shows the change and writes nothing, and a change that alters nothing writes nothing.
-- **A cell outside its table** is refused, naming the table's size, unless `--extend` grows the table to hold it.
+- **A writing verb changes FILE itself**, since the verb is the act, as `sqlite-utils insert` and `git commit` are. `-o NEW` writes a new document beside it instead and refuses a file that already exists, any file, and `--preview` writes nothing. The two together are refused. `pybers.cli._common` owns the rule, both options and the report of what was written, so no command decides it.
+- **`import` changes FILE in place, writes the changed document to `-o`, or creates a new document when given no FILE.** A new document is made by `pybers.create` in the region `--locale` names, the data is written into it, and it is saved to `-o`, as every new document starts there. `import` never needs a document Numbers made.
+- **`export` never changes the document it reads.** It reads FILE and writes elsewhere, a new `.numbers` document included, so no `export` changes FILE.
+- **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
+- **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
+- **`set --format SPEC`** sets how the cells show their value, SPEC being a format's text form, tagged by its family.
+- **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
 ## Formulas
 
@@ -54,6 +61,11 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **Each line opens with the shortest label that names its value**, then `: ` and the value: `Readable: yes`, `OS: macOS-26.6.1`.
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
+- **A count names its noun in the number it agrees with**: `1 row`, `10 rows`, through `formatCount` in `pybers.cli._report`, which holds every line more than one command prints.
+- **A flag reads `yes` or `no`.**
+- **Several parts print one after another, a blank line between each**, and each opens with a line naming it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
+- **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is left out. A size reads `5 rows × 3 columns`, in a tree as on a line.
+- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its unrecognized type code. A format or a control prints its family, then each setting in parentheses: `slider (minimum 0, maximum 100, increment 1)`, and `tests/test_cli_show.py` fails for one whose settings it does not print.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
   ```
@@ -87,7 +99,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 
 ## Color
 
-Named styles in one Rich `Theme`, so a command names a meaning and never a color.
+Named styles in one Rich `Theme`, so a command specifies a meaning and never a color.
 
 | Style | Rich style | Meaning | Example |
 | ----- | ---------- | ------- | ------- |
@@ -98,6 +110,12 @@ Named styles in one Rich `Theme`, so a command names a meaning and never a color
 | `warning` | `yellow` | Something to look at, such as a nonzero count of untested types | `3008 (x2)` |
 | `detail` | `dim` | Secondary lines under a value | `  at document/_read.py:103` |
 | `identifier` | `bold cyan` | A type identifier, a cell address | `B7` |
+| `badge.info` | `bold black on cyan` | A badge for a fact worth noticing | |
+| `badge.success` | `bold black on green` | A badge for a good outcome | |
+| `badge.warning` | `bold black on yellow` | A badge for something to look at | ` UNRECOGNIZED ` |
+| `badge.failure` | `bold white on red` | A badge for a fault | |
+
+**A badge sets one word apart** that the reader must not miss, such as a cell pybers does not recognize. Every command writes one through `formatBadge(word, BadgeLevel.WARNING)` in `pybers.cli._report`, which writes the word upper case and padded, so it stands out in a pasted report too, and styles it by its level: info, success, warning or failure.
 
 Bold rather than bright white, which nearly vanishes on a light terminal.
 
@@ -134,13 +152,13 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 
 | Project | What pybers took |
 | ------- | ---------------- |
-| [sqlite-utils](https://sqlite-utils.datasette.io/en/stable/cli.html) | Each command mirrors one library call, and output formats are flags |
+| [sqlite-utils](https://sqlite-utils.datasette.io/en/stable/cli.html) | Each command mirrors one library call, output formats are flags, and a writing command changes the file it names |
 | [uv](https://docs.astral.sh/uv/reference/cli/) | Workflows as top-level verbs, nouns only for resources |
 | [pandoc](https://pandoc.org/MANUAL.html) | The output format inferred from `-o`, and binary output kept off stdout |
-| [Miller](https://miller.readthedocs.io/en/latest/file-formats/) | Writing in place only when asked |
 | [csvkit](https://csvkit.readthedocs.io/en/latest/scripts/in2csv.html) | stdin and stdout so commands compose, and one verb rather than a binary per job |
 | [numbers-parser](https://github.com/masaccio/numbers-parser) | Formulas or values as a CSV choice |
 | [openpyxl](https://openpyxl.readthedocs.io/en/stable/tutorial.html), [pandas](https://pandas.pydata.org/docs/reference/api/pandas.read_excel.html), [polars](https://docs.pola.rs/api/python/stable/reference/api/polars.read_excel.html) | Names rather than indices, whose bases they disagree on, and no silent overwrite |
 | [jq and yq](https://jqlang.org/manual/) | A path syntax, and a lossless round trip, which yq's in-place mode lacks |
 | [VisiData](https://www.visidata.org/docs/api/) | A browser over the same engine, opening at a given cell |
 | [ruff](https://docs.astral.sh/ruff/linter/), [git diff](https://git-scm.com/docs/git-diff) | Exit status 1 for a finding, 2 for a usage error |
+| [The Rust compiler](https://rustc-dev-guide.rust-lang.org/diagnostics.html) | The standard for every message: one that stands on its own, the place it points at, and a fix offered apart from the fault |

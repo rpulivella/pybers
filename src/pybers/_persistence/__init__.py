@@ -49,6 +49,7 @@ from .container import (
     MemberInfo,
     NumbersPackage,
     StoredMember,
+    composeMemberInfo,
     isDocumentMember,
     readPackage,
     toZipInfo,
@@ -70,12 +71,14 @@ from .iwa import (
     writeArchives,
     writeIWAFile,
 )
-from .metadata import MetadataError, PackageRegistry, findMemberName
+from .metadata import MetadataError, PackageRegistry, composeArchive, findMemberName
 from .varint import VarintError, readVarint, writeVarint
 
 __all__ = [
     "carriesFormula",
     "Archive",
+    "composeArchive",
+    "composeMemberInfo",
     "createArchive",
     "MetadataError",
     "PackageRegistry",

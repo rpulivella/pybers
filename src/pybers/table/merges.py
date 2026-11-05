@@ -20,7 +20,11 @@ __date__ = "2026/09/29"
 from dataclasses import dataclass
 
 from pybers.addressing.ranges import CellRange
-from pybers.addressing.reference import CellAddress, CellReference, ReferenceError
+from pybers.addressing.reference import (
+    CellAddress,
+    CellReferenceLike,
+    ReferenceError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +44,7 @@ class MergeRange:
             raise ReferenceError(
                 f"A merge covers a fixed block of cells, and {extent} is unbounded."
             )
-        # A marked anchor never equals the unlocked key `Table.cell` files a cell under.
+        # A merge is a block of positions, and a position carries no lock.
         object.__setattr__(
             self,
             "extent",
@@ -48,12 +52,18 @@ class MergeRange:
         )
 
     @property
-    def anchor(self) -> CellReference:
+    def corner(self) -> CellAddress:
+        """Return the bottom-right cell, the anchor itself for a merge one cell wide."""
+        end = self.extent.end
+        return self.anchor if end is None else end.address
+
+    @property
+    def anchor(self) -> CellAddress:
         """Return the top-left cell, the one that holds the merged region's value."""
         anchor = self.extent.start
         if anchor is None:
             raise ReferenceError(f"{self.extent} has no anchor cell.")
-        return anchor
+        return anchor.address
 
     @property
     def bounds(self) -> tuple[int, int, int, int]:
@@ -69,7 +79,7 @@ class MergeRange:
             raise ReferenceError(f"{self.extent} is unbounded and bounds no merge.")
         return (startRow, startCol, endRow, endCol)
 
-    def covers(self, address: CellAddress) -> bool:
+    def covers(self, address: CellReferenceLike) -> bool:
         """Report whether this merge occupies a cell, its anchor included."""
         return self.extent.covers(address)
 

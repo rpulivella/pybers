@@ -3,6 +3,7 @@
 The engine's register of the rectangles and whole lines each formula reads.
 
 UPDATES
+2026-11-02  A created tile is composed from its body, for PYB-276.
 2026-09-22  Split out of the engine module for PYB-113, the tile's type identifier
             asked of the registry.
 """
@@ -19,17 +20,10 @@ __date__ = "2026/09/22"
 from collections.abc import Mapping
 
 from .._generated import TSCEArchives_pb2 as tsce
-from .._generated import TSPArchiveMessages_pb2 as tspArchive
-from .._persistence import PackageRegistry, createArchive
+from .._persistence import PackageRegistry, composeArchive
 from .._persistence.index import ArchiveIndex
-from .._persistence.types import findArchiveTypeId
 from .dependencies import FormulaDependencies, RangeEdge
 from .owners import TableOwner
-
-# The version of the tile mirroring the range half of the register, as
-# `20-formula-shapes` holds it.
-rangePrecedentsTileVersion: tuple[int, ...] = (1, 0, 5)
-
 
 # A rectangle's size counts from one, and Numbers omits an axis of one line.
 singleLine: int = 1
@@ -164,14 +158,7 @@ def rewriteRangeTiles(
             if extent.right - extent.left + 1 != singleLine:
                 entry.refers_to_rect.size.num_columns = extent.right - extent.left + 1
         if identifier in created:
-            info = tspArchive.ArchiveInfo(identifier=identifier)
-            message = info.message_infos.add(
-                type=findArchiveTypeId(tsce.RangePrecedentsTileArchive), length=0
-            )
-            message.version.extend(rangePrecedentsTileVersion)
-            registry.archiveAdd(
-                componentId, createArchive(info, [tile.SerializeToString()]), tile
-            )
+            registry.archiveAdd(componentId, composeArchive(identifier, tile), tile)
             continue
         index.archiveWrite(identifier, tile)
     return sorted(created)

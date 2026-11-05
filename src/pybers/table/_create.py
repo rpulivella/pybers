@@ -2,15 +2,17 @@
 """\
 Create the archives of a table the model gained, in the pybers reset, and register them.
 
-A created table is the template under `_templates/table`, taken from
-`48-table-inserted`: the 49 archives Numbers writes for an inserted table, its 11
-calculation-engine owners and their two dependency tiles. Every name in it is renewed,
-and each owner keeps its offset from the table's base UUID, as Numbers writes it. See
-findings-10-creation.md.
+A created table holds only what Numbers needs, each field composed as Numbers writes
+it: the info, the model, its data store, the row and column UIDs, and one engine owner
+of kind 1 carrying its identity alone. Numbers rebuilds everything else on its next
+save, the other ten owners, the summary model, the category order and the hidden
+states among them. Found one group at a time, 2026-11-02, findings-10-creation.md.
 
 Its styles are the reset in docs/decisions.md, created by `_reset`.
 
 UPDATES
+2026-11-02  Composed field by field to the least Numbers needs, rather than copied
+            from a template, for PYB-276.
 2026-09-22  The reset's styles moved to `_reset`, for PYB-113.
 2026-09-22  A random UUID comes from the index module, shared with sheet creation, for
             PYB-113.
@@ -31,46 +33,30 @@ __status__ = "Development"
 __date__ = "2026/09/14"
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
-
-from google.protobuf.message import Message
 
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSCEArchives_pb2 as tsce
-from .._generated import TSKArchives_pb2 as tsk
-from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
-from .._persistence import createArchive
 from .._persistence.index import (
     ArchiveIndex,
     assignUuid,
-    findRoot,
+    assignUuidWords,
     generateUuid,
-    readUuidValue,
-    wordBits,
-    wordMask,
 )
-from .._persistence.metadata import PackageRegistry
-from .._persistence.template import (
-    ArchiveCopy,
-    ArchiveTemplate,
-    TemplateCopies,
-    copyTemplates,
-    readTemplates,
-)
-from .._persistence.types import findArchiveTypeId
+from .._persistence.metadata import PackageRegistry, composeArchive
+from .._persistence.types import bncDataListVersion, findArchiveTypeId
 from ..errors import WriteError
 from ..geometry import Position
 from ._lines import assignUids
 from ._reset import (
     DocumentStyles,
     ResetStyles,
-    bindStyles,
     createResetStyles,
     findDocumentStyles,
-    templateDirectory,
+    findSlotStyle,
 )
 from .cells import Table, generateOwnerIdentity
 
@@ -79,52 +65,44 @@ if TYPE_CHECKING:
     from ..document.sheets import Document, Sheet
 
 
-# The objects the templates name that belong to the document rather than to the
-# table, as `48-table-inserted` numbered them.
-templateSheet: int = 904532
-templatePreset: int = 904099
-
-# The table template's base owner UUID, which its owner of kind 1 carries. Every other
-# owner UUID in the template is this plus the owner's kind, and kinds reach 35.
-templateOwnerBase: int = (2965606220279224969 << 64) | 8665371034051433512
-ownerKindLimit: int = 0x100
-
-# A UUID this small is a fixed value such as a root group, never an identity.
-fixedUuidLimit: int = 1 << 32
-
-treeNodeVersion: tuple[int, ...] = (1, 0, 5)
-
 resetRowHeight: float = 24.0
 resetColumnWidth: float = 72.0
 tableGap: float = resetRowHeight
 # Numbers' own convention for a created table's stored frame: the content plus 4 pt.
 geometryFrame: float = 4.0
 
-headerNameOwnerKind: int = 200
+# The drawable flags and text wrap Numbers states on an inserted table, neither of
+# which it restores as written when absent.
+geometryFlags: int = 3
+wrapType: int = 4
+wrapDirection: int = 2
+wrapFitType: int = 1
+wrapMargin: float = 12.0
+wrapAlphaThreshold: float = 0.5
+
+tileSize: int = 256
+tileStorageVersion: int = 5
+bucketHashFunction: int = 1
+firstStripId: int = 1
+
 # Measured across the documents holding one, three and nine tables: each adds four.
 formulasPerTable: int = 4
 
-ownerIdFields: frozenset[str] = frozenset(
-    {"internal_formula_owner_id", "internal_owner_id_for_edge", "internal_owner_id"}
+type ListKind = tst.TableDataList.ListType.ValueType
+
+# The six lists a created data store names: four the schema requires, the control
+# specs without which Numbers drops every formula, and the format list pybers names
+# a value's Automatic format in. The last two are the BNC lists.
+storeLists: tuple[tuple[str, ListKind, bool], ...] = (
+    ("stringTable", tst.TableDataList.STRING, False),
+    ("styleTable", tst.TableDataList.STYLE, False),
+    ("formula_table", tst.TableDataList.FORMULA, False),
+    ("format_table_pre_bnc", tst.TableDataList.FORMAT, False),
+    ("control_cell_spec_table", tst.TableDataList.CONTROL_CELL_SPEC, True),
+    ("format_table", tst.TableDataList.FORMAT, True),
 )
 
-
-def readWordsValue(message: tsp.CFUUIDArchive) -> int:
-    """Return a UUID's value from its four words."""
-    return (
-        message.uuid_w0
-        | message.uuid_w1 << wordBits
-        | message.uuid_w2 << 2 * wordBits
-        | message.uuid_w3 << 3 * wordBits
-    )
-
-
-def assignWords(message: tsp.CFUUIDArchive, value: int) -> None:
-    """Set a UUID's four words from a value."""
-    message.uuid_w0 = value & wordMask
-    message.uuid_w1 = value >> wordBits & wordMask
-    message.uuid_w2 = value >> 2 * wordBits & wordMask
-    message.uuid_w3 = value >> 3 * wordBits & wordMask
+modelFields: frozenset[str] = frozenset(tst.TableModelArchive.DESCRIPTOR.fields_by_name)
 
 
 def readIdentityValue(identity: str) -> int:
@@ -146,115 +124,22 @@ def renderIdentityText(identity: str) -> str:
 
 
 @dataclass(slots=True)
-class UuidRenewal:
-    """Renews every UUID in a template set: owner UUIDs from a base, others fresh."""
-
-    base: int
-    fresh: dict[int, int] = field(default_factory=dict)
-
-    def renewed(self, value: int) -> int:
-        """Return what one template UUID becomes."""
-        offset = value - templateOwnerBase
-        if 0 <= offset < ownerKindLimit:
-            return self.base + offset
-        if value < fixedUuidLimit:
-            return value
-        return self.fresh.setdefault(value, uuid.uuid4().int)
-
-    def apply(self, message: Message) -> None:
-        """Renew every UUID a message holds, in place."""
-        if isinstance(message, tsp.UUID):
-            assignUuid(message, self.renewed(readUuidValue(message)))
-            return
-        if isinstance(message, tsp.CFUUIDArchive):
-            if message.HasField("uuid_w0"):
-                assignWords(message, self.renewed(readWordsValue(message)))
-            return
-        for descriptor, value in message.ListFields():
-            if descriptor.message_type is None:
-                continue
-            items = list(value) if descriptor.is_repeated else [value]
-            for item in items:
-                self.apply(item)
-
-
-def remapOwnerIds(message: Message, mapping: dict[int, int]) -> None:
-    """Rewrite every internal owner id a message holds as an integer, in place."""
-    for descriptor, value in message.ListFields():
-        if descriptor.message_type is None:
-            if descriptor.name not in ownerIdFields:
-                continue
-            if descriptor.is_repeated:
-                value[:] = [mapping.get(item, item) for item in value]
-            elif value in mapping:
-                setattr(message, descriptor.name, mapping[value])
-            continue
-        items = list(value) if descriptor.is_repeated else [value]
-        for item in items:
-            remapOwnerIds(item, mapping)
-
-
-@dataclass(slots=True)
 class EngineState:
-    """The calculation engine and the archives creating a table rewrites in it."""
+    """The calculation engine a created table's owner registers in."""
 
     identifier: int
     engine: tsce.CalculationEngineArchive
-    headerNames: tst.HeaderNameMgrArchive
-    headerOwner: tsce.FormulaOwnerDependenciesArchive
-    headerOwnerId: int
-    headerTile: tsce.CellRecordTileArchive
-    headerTileId: int
 
 
 def findEngineState(index: ArchiveIndex, registry: PackageRegistry) -> EngineState:
-    """Find the engine, its header name manager, and that manager's owner."""
+    """Find the calculation engine and its archive identifier."""
     engineId = registry.componentNamed("CalculationEngine")
-    engine = index.resolve(
-        tsp.Reference(identifier=engineId), tsce.CalculationEngineArchive
+    return EngineState(
+        identifier=engineId,
+        engine=index.resolve(
+            tsp.Reference(identifier=engineId), tsce.CalculationEngineArchive
+        ),
     )
-    headerNames = index.resolve(engine.header_name_manager, tst.HeaderNameMgrArchive)
-    for reference in engine.dependency_tracker.formula_owner_dependencies:
-        owner = index.resolve(reference, tsce.FormulaOwnerDependenciesArchive)
-        if owner.owner_kind != headerNameOwnerKind:
-            continue
-        tiles = owner.tiled_cell_dependencies.cell_record_tiles
-        if len(tiles) != 1:
-            raise WriteError(
-                f"The header name owner holds {len(tiles)} dependency tiles, and "
-                "every document measured holds one."
-            )
-        return EngineState(
-            identifier=engineId,
-            engine=engine,
-            headerNames=headerNames,
-            headerOwner=owner,
-            headerOwnerId=reference.identifier,
-            headerTile=index.resolve(tiles[0], tsce.CellRecordTileArchive),
-            headerTileId=tiles[0].identifier,
-        )
-    raise WriteError("The calculation engine registers no header name owner.")
-
-
-def addHeaderSlot(state: EngineState, base: int) -> None:
-    """Give a table the next header name slot, and register it as a dependency."""
-    slot = 1 + max(
-        (entry.per_table_precedent.column for entry in state.headerNames.per_tables),
-        default=0,
-    )
-    entry = state.headerNames.per_tables.add()
-    assignUuid(entry.table_uid, base)
-    entry.per_table_precedent.column = slot
-    entry.per_table_precedent.row = 1
-    for records in (
-        state.headerOwner.cell_dependencies.cell_record,
-        state.headerTile.cell_records,
-    ):
-        record = records.add(column=slot, row=1)
-        # Every slot Numbers writes depends on the owner's own first cell, and a
-        # slot without that edge is a table Numbers re-identifies on open.
-        record.expanded_edges.edge_without_owner_rows.append(0)
-        record.expanded_edges.edge_without_owner_columns.append(0)
 
 
 def measureTableBottom(index: ArchiveIndex, info: tst.TableInfoArchive) -> float:
@@ -275,9 +160,94 @@ def measureTableBottom(index: ArchiveIndex, info: tst.TableInfoArchive) -> float
     return float(info.super.geometry.position.y) + height
 
 
+def composeInfo(
+    table: Table, sheetId: int, modelId: int, origin: Position
+) -> tst.TableInfoArchive:
+    """Return the drawable a table sits on its sheet as, at its place and size."""
+    info = tst.TableInfoArchive()
+    drawable = info.super
+    drawable.geometry.position.x = origin.x
+    drawable.geometry.position.y = origin.y
+    drawable.geometry.size.width = table.colCount * resetColumnWidth + geometryFrame
+    drawable.geometry.size.height = table.rowCount * resetRowHeight + geometryFrame
+    drawable.geometry.flags = geometryFlags
+    drawable.parent.identifier = sheetId
+    wrap = drawable.exterior_text_wrap
+    wrap.type = wrapType
+    wrap.direction = wrapDirection
+    wrap.fit_type = wrapFitType
+    wrap.margin = wrapMargin
+    wrap.alpha_threshold = wrapAlphaThreshold
+    info.tableModel.identifier = modelId
+    return info
+
+
+def composeModel(
+    table: Table,
+    styles: DocumentStyles,
+    reset: ResetStyles,
+    parts: dict[str, int],
+) -> tst.TableModelArchive:
+    """Return a table's model: its size, name, reset styles, and the parts it names.
+
+    Every style slot the theme's preset fills is filled, since Numbers leaves an
+    absent one absent rather than restoring it.
+    """
+    model = tst.TableModelArchive(
+        table_id=renderIdentityText(table.identifier),
+        number_of_rows=table.rowCount,
+        number_of_columns=table.colCount,
+        table_name=table.name,
+        header_rows_frozen=True,
+        header_columns_frozen=True,
+        repeating_header_rows_enabled=True,
+        repeating_header_columns_enabled=True,
+        default_row_height=resetRowHeight,
+        default_column_width=resetColumnWidth,
+    )
+    store = model.base_data_store
+    store.rowHeaders.bucketHashFunction = bucketHashFunction
+    store.rowHeaders.buckets.add(identifier=parts["rowHeaders"])
+    store.columnHeaders.identifier = parts["columnHeaders"]
+    store.tiles.tiles.add(tileid=0).tile.identifier = parts["tile"]
+    store.tiles.tile_size = tileSize
+    for field, _, _ in storeLists:
+        getattr(store, field).identifier = parts[field]
+    store.nextRowStripID = firstStripId
+    store.nextColumnStripID = 0
+    store.rowTileTree.nodes.add(key=0, value=0)
+    store.columnTileTree.SetInParent()
+    for descriptor, _ in styles.network.ListFields():
+        if descriptor.message_type is not None and descriptor.name in modelFields:
+            slot = getattr(model, descriptor.name)
+            slot.identifier = findSlotStyle(descriptor.name, styles, reset)
+    model.base_column_row_uids.identifier = parts["uids"]
+    model.table_style_preset.identifier = styles.preset
+    return model
+
+
+def composeOwner(
+    base: int, internalId: int, infoId: int
+) -> tsce.FormulaOwnerDependenciesArchive:
+    """Return a table's owner of kind 1, carrying its identity and nothing else."""
+    owner = tsce.FormulaOwnerDependenciesArchive(
+        internal_formula_owner_id=internalId, owner_kind=1
+    )
+    assignUuid(owner.formula_owner_uid, base)
+    owner.formula_owner.identifier = infoId
+    return owner
+
+
+def composeTile() -> tst.Tile:
+    """Return the empty first tile a table's rows are written into."""
+    return tst.Tile(
+        maxColumn=0, maxRow=0, numCells=0, numrows=0,
+        storage_version=tileStorageVersion, last_saved_in_BNC=True,
+    )
+
+
 def createTable(
     registry: PackageRegistry,
-    templates: list[ArchiveTemplate],
     table: Table,
     sheetId: int,
     origin: Position,
@@ -285,141 +255,67 @@ def createTable(
     reset: ResetStyles,
     state: EngineState,
 ) -> int:
-    """Create one table's archives and engine entries, and return its info archive."""
-    modelTemplate = next(template for template in templates if template.role == "model")
-    bindings = {templateSheet: sheetId, templatePreset: styles.preset}
-    bindings.update(bindStyles(modelTemplate, styles, reset))
+    """Create one table's archives and its engine owner, and return its info archive."""
     if not table.identifier:
         table.identifier = generateOwnerIdentity()
-    copies = copyTemplates(registry, templates, bindings)
-
     base = readIdentityValue(table.identifier)
-    renewal = UuidRenewal(base=base)
-    owners = [
-        copy for copy in copies.copies.values()
-        if copy.template.info.message_infos[0].type
-        == findArchiveTypeId(tsce.FormulaOwnerDependenciesArchive)
-    ]
-    registered = [
-        entry.internal_owner_id
-        for entry in state.engine.dependency_tracker.owner_id_map.map_entry
-    ]
-    nextOwnerId = 1 + max(registered, default=0)
-    ownerIds: dict[int, int] = {}
-    for copy in owners:
-        body = readOwnerBody(copy)
-        ownerIds[body.internal_formula_owner_id] = nextOwnerId
-        nextOwnerId += 1
-    for copy in copies.copies.values():
-        renewal.apply(copy.body)
-        remapOwnerIds(copy.body, ownerIds)
-
-    shapeTable(copies, table, origin)
-    copies.place(registry, {"CalculationEngine": state.identifier})
-    for role in ("table-info", "caption", "title", "model"):
-        registry.objectUuidAdd(
-            state.identifier, copies[role].identifier, generateUuid()
+    infoId, modelId, ownerId = (registry.identifierAllocate() for _ in range(3))
+    parts = {
+        name: registry.identifierAllocate()
+        for name in (
+            "tile", "rowHeaders", "columnHeaders", "uids",
+            *(field for field, _, _ in storeLists),
         )
+    }
+
+    tile = composeTile()
+    registry.componentAdd(composeArchive(parts["tile"], tile), "Tables/Tile", tile)
+    for name in ("rowHeaders", "columnHeaders"):
+        bucket = tst.HeaderStorageBucket(bucketHashFunction=bucketHashFunction)
+        registry.componentAdd(
+            composeArchive(parts[name], bucket), "Tables/HeaderStorageBucket", bucket
+        )
+    for field, listType, bnc in storeLists:
+        dataList = tst.TableDataList(listType=listType, nextListID=1)
+        if bnc:
+            dataList.is_new_for_bnc = True
+        registry.componentAdd(
+            composeArchive(
+                parts[field], dataList, version=bncDataListVersion if bnc else None
+            ),
+            "Tables/DataList",
+            dataList,
+        )
+
+    uids = tst.ColumnRowUIDMapArchive()
+    assignUids(uids, table)
+    model = composeModel(table, styles, reset, parts)
+    info = composeInfo(table, sheetId, modelId, origin)
+    tracker = state.engine.dependency_tracker
+    internalId = 1 + max(
+        (entry.internal_owner_id for entry in tracker.owner_id_map.map_entry),
+        default=0,
+    )
+    owner = composeOwner(base, internalId, infoId)
+    for identifier, body, weak in (
+        (parts["uids"], uids, ()),
+        (modelId, model, (styles.preset,)),
+        (infoId, info, (sheetId,)),
+        (ownerId, owner, (infoId,)),
+    ):
+        registry.archiveAdd(
+            state.identifier, composeArchive(identifier, body, weak=weak), body
+        )
+    for identifier in (infoId, modelId):
+        registry.objectUuidAdd(state.identifier, identifier, generateUuid())
     registry.weakReferenceAdd(state.identifier, sheetId)
     registry.weakReferenceAdd(state.identifier, styles.preset)
 
-    tracker = state.engine.dependency_tracker
-    for copy in owners:
-        body = readOwnerBody(copy)
-        tracker.formula_owner_dependencies.add(identifier=copy.identifier)
-        entry = tracker.owner_id_map.map_entry.add(
-            internal_owner_id=body.internal_formula_owner_id
-        )
-        assignWords(entry.owner_id, readUuidValue(body.formula_owner_uid))
+    tracker.formula_owner_dependencies.add(identifier=ownerId)
+    entry = tracker.owner_id_map.map_entry.add(internal_owner_id=internalId)
+    assignUuidWords(entry.owner_id, base)
     tracker.number_of_formulas += formulasPerTable
-    addHeaderSlot(state, base)
-    return copies["table-info"].identifier
-
-
-def readOwnerBody(copy: ArchiveCopy) -> tsce.FormulaOwnerDependenciesArchive:
-    """Return an owner template's message, refusing a template of another type."""
-    if not isinstance(copy.body, tsce.FormulaOwnerDependenciesArchive):
-        raise WriteError(
-            f"The {copy.template.role!r} template is not a formula owner."
-        )
-    return copy.body
-
-
-def shapeTable(copies: TemplateCopies, table: Table, origin: Position) -> None:
-    """Set a copied table's name, size and place, and every count its size decides."""
-    model = copies["model"].body
-    info = copies["table-info"].body
-    sidecar = copies["model-stroke-sidecar"].body
-    uids = copies["model-column-row-uids"].body
-    owner = copies["owner-kind-1"].body
-    if not (
-        isinstance(model, tst.TableModelArchive)
-        and isinstance(info, tst.TableInfoArchive)
-        and isinstance(sidecar, tst.StrokeSidecarArchive)
-        and isinstance(uids, tst.ColumnRowUIDMapArchive)
-        and isinstance(owner, tsce.FormulaOwnerDependenciesArchive)
-    ):
-        raise WriteError("A table template holds an archive of an unexpected type.")
-    model.table_name = table.name
-    model.number_of_rows = table.rowCount
-    model.number_of_columns = table.colCount
-    model.default_row_height = resetRowHeight
-    model.default_column_width = resetColumnWidth
-    model.table_id = renderIdentityText(table.identifier)
-    sidecar.row_count = table.rowCount
-    sidecar.column_count = table.colCount
-    assignUids(uids, table)
-    cache = info.layout_engine.width_height_cache
-    del cache.rows_fitting_entries[:]
-    cache.columns_count = table.colCount
-    geometry = info.super.geometry
-    geometry.position.x = origin.x
-    geometry.position.y = origin.y
-    geometry.size.width = table.colCount * resetColumnWidth + geometryFrame
-    geometry.size.height = table.rowCount * resetRowHeight + geometryFrame
-    spans = (owner.spanning_column_dependencies, owner.spanning_row_dependencies)
-    for dependencies in spans:
-        extents = (
-            dependencies.total_range_for_table, dependencies.body_range_for_table
-        )
-        for extent in extents:
-            extent.bottom_right_column = table.colCount - 1
-            extent.bottom_right_row = table.rowCount - 1
-
-
-def addSidebarNodes(
-    index: ArchiveIndex, registry: PackageRegistry, sheetId: int, tableIds: list[int]
-) -> None:
-    """List a sheet's created tables under it in the sidebar tree, in one rewrite."""
-    root = findRoot(index)
-    sidebar = index.resolve(root.sidebar_order, tsk.TreeNode)
-    for reference in sidebar.children:
-        node = index.resolve(reference, tsk.TreeNode)
-        if node.object.identifier != sheetId:
-            continue
-        references = registry.strongReferencesOf(reference.identifier)
-        for tableId in tableIds:
-            identifier = registry.identifierAllocate()
-            info = tspArchive.ArchiveInfo(identifier=identifier)
-            message = info.message_infos.add(
-                type=findArchiveTypeId(tsk.TreeNode), length=0
-            )
-            message.version.extend(treeNodeVersion)
-            message.object_references.append(tableId)
-            child = tsk.TreeNode()
-            child.object.identifier = tableId
-            registry.archiveAdd(
-                registry.componentRequire(reference.identifier),
-                createArchive(info, [child.SerializeToString()]),
-                child,
-            )
-            node.children.add(identifier=identifier)
-            references.append(identifier)
-        registry.archiveReplace(
-            reference.identifier, node, references
-        )
-        return
-    raise WriteError(f"The sidebar lists no sheet {sheetId} to place a table under.")
+    return infoId
 
 
 def findPendingTables(
@@ -477,7 +373,6 @@ def createTables(document: Document, registry: PackageRegistry) -> None:
     styles = findDocumentStyles(index)
     reset = createResetStyles(index, registry, styles)
     state = findEngineState(index, registry)
-    templates = readTemplates(templateDirectory / "table")
     for sheet, sheetArchive, created in pending:
         sheetId = readSheetIdentifier(sheet)
         top = max(
@@ -498,12 +393,11 @@ def createTables(document: Document, registry: PackageRegistry) -> None:
                 origin = Position(0.0, top)
                 top += table.rowCount * resetRowHeight + tableGap
             identifier = createTable(
-                registry, templates, table, sheetId, origin, styles, reset, state
+                registry, table, sheetId, origin, styles, reset, state
             )
             table._identifier = identifier
             tableIds.append(identifier)
             sheetArchive.drawable_infos.add(identifier=identifier)
-        addSidebarNodes(index, registry, sheetId, tableIds)
         references = registry.strongReferencesOf(sheetId)
         references.extend(tableIds)
         registry.archiveReplace(sheetId, sheetArchive, references)
@@ -514,15 +408,7 @@ def createTables(document: Document, registry: PackageRegistry) -> None:
         reference.identifier for reference in tracker.formula_owner_dependencies
         if reference.identifier not in engineReferences
     )
-    registry.archiveReplace(
-        state.identifier, state.engine, engineReferences
-    )
-    for identifier, message in (
-        (state.engine.header_name_manager.identifier, state.headerNames),
-        (state.headerOwnerId, state.headerOwner),
-        (state.headerTileId, state.headerTile),
-    ):
-        registry.archiveReplace(identifier, message)
+    registry.archiveReplace(state.identifier, state.engine, engineReferences)
 
 
 def readSheetIdentifier(sheet: Sheet) -> int:

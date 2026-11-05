@@ -7,6 +7,12 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-10-24  `kindValueTypes`, the type each kind's value holds, for PYB-259.
+2026-10-22  `CellPresentation`, a cell's format and its control, replacing the
+            description, whose kind is the cell's own, for PYB-255.
+2026-10-22  A `CurrencyAmount` is the currency kind, for PYB-220.
+2026-10-20  The boolean family, Numbers' Automatic format for TRUE and FALSE, for
+            PYB-144.
 2026-10-12  A format the save will choose is UNDETERMINED, not None, for PYB-190.
 2026-10-07  An unknown kind keeps the record's own type, for PYB-169.
 2026-10-01  Written for PYB-141, replacing `Cell.errored`, its chosen-format flag
@@ -29,9 +35,11 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
+from pybers.currency import CurrencyAmount
+from pybers.table.controls import CellControl
 
 if TYPE_CHECKING:
-    from pybers.table.cells import CellValue
+    from pybers.table.cell import CellValue
 
 
 class CellKind(StrEnum):
@@ -53,6 +61,7 @@ class CellFormat(StrEnum):
     """The family of the format a cell displays its value with."""
 
     NUMBER = "number"
+    BOOLEAN = "boolean"
     CURRENCY = "currency"
     PERCENT = "percent"
     SCIENTIFIC = "scientific"
@@ -68,22 +77,33 @@ class CellFormat(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class CellDescription:
-    """A cell's stored kind, its format, and whether a person chose that format.
+class CellPresentation:
+    """How a cell shows its value: its format, whether a person chose it, its control.
 
     `format` is None when the record names none, and UNDETERMINED once an edit
-    changed the kind, since the save then chooses it. A failed formula is the
-    `ERROR` kind, and an `UNKNOWN` kind keeps the record's own type in
-    `unrecognizedTypeCode`.
+    changed the kind or dropped the control, since the save then chooses it. A
+    control is kept only while it can show the cell's value, as the save keeps it.
+    """
+
+    format: CellFormat | UNDETERMINED | None
+    formatChosen: bool
+    control: CellControl | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CellStorage:
+    """What a cell's record stores beside its value, as read, copied or saved.
+
+    A failed formula is the `ERROR` kind, and an `UNKNOWN` kind keeps the record's
+    own type in `unrecognizedTypeCode`.
     """
 
     kind: CellKind
-    format: CellFormat | UNDETERMINED | None
-    formatChosen: bool
+    presentation: CellPresentation
     unrecognizedTypeCode: int | None = None
 
 
-emptyDescription: CellDescription = CellDescription(CellKind.EMPTY, None, False)
+emptyStorage: CellStorage = CellStorage(CellKind.EMPTY, CellPresentation(None, False))
 
 
 def findCellKind(
@@ -104,6 +124,8 @@ def findCellKind(
         return CellKind.EMPTY
     if isinstance(value, bool):
         return CellKind.BOOLEAN
+    if isinstance(value, CurrencyAmount):
+        return CellKind.CURRENCY
     if isinstance(value, Decimal):
         return CellKind.CURRENCY if stored is CellKind.CURRENCY else CellKind.NUMBER
     if isinstance(value, str):
@@ -115,10 +137,29 @@ def findCellKind(
     return CellKind.UNKNOWN
 
 
+# The type a value of each kind holds, the inverse of `findCellKind`. Measured across
+# every document in the tests on 2026-10-24: an error, an empty and an unknown cell
+# hold None, and each other kind one type.
+kindValueTypes: frozendict[CellKind, type] = frozendict({
+    CellKind.EMPTY: type(None),
+    CellKind.NUMBER: Decimal,
+    CellKind.CURRENCY: CurrencyAmount,
+    CellKind.TEXT: str,
+    CellKind.RICH_TEXT: str,
+    CellKind.DATE_TIME: datetime.datetime,
+    CellKind.DURATION: datetime.timedelta,
+    CellKind.BOOLEAN: bool,
+    CellKind.ERROR: type(None),
+    CellKind.UNKNOWN: type(None),
+})
+
+
 __all__ = [
-    "CellDescription",
     "CellFormat",
     "CellKind",
-    "emptyDescription",
+    "CellPresentation",
+    "CellStorage",
+    "emptyStorage",
     "findCellKind",
+    "kindValueTypes",
 ]

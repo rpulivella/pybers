@@ -109,6 +109,8 @@ make. Report what you find; do not rewrite unasked.
 7. **Claims that cannot be dated or checked.** "Recently" is not a date.
 8. **Hedging over an unverified claim.** "Appears to" is honest when something was not
    verified and dishonest when it softens a claim nobody checked. Say which.
+9. **A date in the wrong form.** Prose writes 24 September 2026, and a technical
+   context, a filename included, writes 2026-09-24, most significant first.
 
 **The rubric is the authority, and it is short on purpose.** If a check becomes
 mechanical, move it into the script and delete it from here. This list should only

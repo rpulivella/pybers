@@ -16,6 +16,7 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-10-29  The formula pool is the shared `EntryPool`, for PYB-278.
 2026-10-13  Every range tract holds `preserve_rectangular`, for PYB-200.
 2026-10-13  A node's content is written by matching it, checked exhaustive by
             mypy, for PYB-139.
@@ -39,7 +40,6 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 import struct
-from dataclasses import dataclass
 from decimal import Decimal
 from typing import assert_never, cast
 
@@ -57,6 +57,7 @@ from .._persistence.cells import (
 )
 from .._persistence.decimal128 import Decimal128
 from .._persistence.index import ArchiveIndex, assignUuid
+from .._persistence.pool import EntryPool
 from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ._read import ColonTractAxis, decimalHalfFormat, readFormulaTable
@@ -348,102 +349,6 @@ def encodeFormula(formula: Formula) -> tsce.FormulaArchive:
     return archive
 
 
-@dataclass(slots=True)
-class FormulaPool:
-    """A table's pooled formulas, and the one place a changed one is written.
-
-    Numbers shares one stored archive between every cell a formula was dragged
-    into, so overwriting an entry that more than one cell names would edit all of
-    them at once. That is the same aliasing hazard the frozen model closes on the
-    read side, and it has to be closed again here: a shared entry is split rather
-    than overwritten, leaving the cells that did not change pointing at what they
-    always pointed at.
-    """
-
-    dataList: tst.TableDataList
-    stored: dict[int, Formula]
-    touched: bool = False
-
-    def formulaFor(self, key: int) -> Formula | None:
-        """Return the formula a key names, or None when the table has no such entry."""
-        return self.stored.get(key)
-
-    def entryFor(self, key: int) -> tst.TableDataList.ListEntry | None:
-        """Return one pooled entry by key, or None when the table has no such key."""
-        for entry in self.dataList.entries:
-            if entry.key == key:
-                return entry
-        return None
-
-    def keyFor(self, formula: Formula, previous: int | None = None) -> int:
-        """Return the key a cell should name, sharing an entry when one matches.
-
-        **Sharing is the only path, and that is what makes filling a column correct.**
-        Numbers points every cell a formula was dragged into at ONE archive, so a
-        relative reference resolves against whichever cell holds it and anchoring
-        needs no special cases. Writing an entry per cell passes a naive test and
-        diverges the moment an axis is locked.
-
-        `previous` is the key the cell names now, released when it stops naming it.
-        A shared entry is split rather than overwritten, so the cells that did not
-        change keep what they had.
-        """
-        self.touched = True
-        for key, stored in self.stored.items():
-            entry = self.entryFor(key)
-            if stored != formula or entry is None:
-                continue
-            if key == previous:
-                return key
-            entry.refcount += 1
-            if previous is not None:
-                self.release(previous)
-            return key
-
-        # Nothing identical is stored. An entry only this cell names may be
-        # rewritten in place; a shared one must not be.
-        existing = self.entryFor(previous) if previous is not None else None
-        if existing is not None and existing.refcount <= 1:
-            existing.formula.CopyFrom(encodeFormula(formula))
-            self.stored[existing.key] = formula
-            return existing.key
-        if previous is not None:
-            self.release(previous)
-        fresh = self.dataList.entries.add()
-        fresh.key = self.dataList.nextListID
-        fresh.refcount = 1
-        fresh.formula.CopyFrom(encodeFormula(formula))
-        self.dataList.nextListID += 1
-        self.stored[fresh.key] = formula
-        return fresh.key
-
-    def claim(self, key: int) -> None:
-        """Add one cell's claim on a stored formula, as a copied record makes."""
-        entry = self.entryFor(key)
-        if entry is None:
-            raise WriteError(
-                f"A copied record names formula {key}, which is not stored."
-            )
-        self.touched = True
-        entry.refcount += 1
-
-    def release(self, key: int) -> None:
-        """Give up one cell's claim on a stored formula.
-
-        The entry stays when others still name it, and is emptied rather than deleted
-        when none do: `nextListID` never reuses a key, so a spent entry costs a few
-        bytes and removing one would invite a reader to assume keys are dense.
-        """
-        entry = self.entryFor(key)
-        if entry is None:
-            return
-        self.touched = True
-        entry.refcount = max(0, entry.refcount - 1)
-        if entry.refcount == 0:
-            entry.ClearField("formula")
-            self.stored.pop(key, None)
-
-
 def findFormulaKeyOffset(record: CellRecord) -> int:
     """Return where a record keeps its formula key.
 
@@ -536,23 +441,28 @@ def patchFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
 
 def readFormulaPool(
     index: ArchiveIndex, store: tst.DataStore
-) -> FormulaPool | None:
+) -> EntryPool[Formula] | None:
     """Return the table's formula pool, or None when it declares no formulas.
 
     A table that has never held one carries no list to write into, which is a
     distinct state from a table whose list is empty and is why this returns None
-    rather than an empty pool.
+    rather than an empty pool. A spent entry is emptied rather than deleted:
+    `nextListID` never reuses a key, and removing one would invite a reader to
+    assume keys are dense.
     """
     if not store.formula_table.identifier:
         return None
-    return FormulaPool(
+    return EntryPool(
         dataList=index.resolve(store.formula_table, tst.TableDataList),
+        noun="formula",
+        write=lambda entry, formula: entry.formula.CopyFrom(encodeFormula(formula)),
         stored=readFormulaTable(index, store),
+        spend=lambda entry: entry.ClearField("formula"),
     )
 
 
 def classifyFormulaEdit(
-    formula: Formula | None, record: CellRecord, pool: FormulaPool | None
+    formula: Formula | None, record: CellRecord, pool: EntryPool[Formula] | None
 ) -> str:
     """Return which of the four things happened to this cell's formula.
 
@@ -575,9 +485,9 @@ def classifyFormulaEdit(
     if formula is None and stored:
         return "detach"
     if formula is not None and stored:
-        previous = pool.formulaFor(record.references[slot])
+        previous = pool.stored.get(record.references[slot])
         return "replace" if formula != previous else "none"
     return "none"
 
 
-__all__ = ["FormulaPool", "encodeFormula", "classifyFormulaEdit", "readFormulaPool"]
+__all__ = ["encodeFormula", "classifyFormulaEdit", "readFormulaPool"]

@@ -3,6 +3,8 @@
 Numbers 15.4: its added functions, and the stylesheet slot it added.
 
 UPDATES
+2026-10-22  The golden's writes and comparison moved to the golden builders, for
+            PYB-255.
 2026-10-13  Written for PYB-139.
 """
 from __future__ import annotations
@@ -19,8 +21,10 @@ import shutil
 from decimal import Decimal
 from pathlib import Path
 
+from golden.builders import addedFunctionFormulas
+
 import pybers
-from conftest import findDocumentPath, readDataListBytes
+from conftest import findDocumentPath
 from pybers._generated import TSSArchives_pb2 as tss
 from pybers._persistence import NumbersPackage, readPackage, writePackage
 from pybers._persistence.types import archiveTypeIds
@@ -28,38 +32,6 @@ from pybers._persistence.types import archiveTypeIds
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 goldenName: str = "20-functions-added-in-15-4-by-pybers.numbers"
 measurementStem: str = "69-functions-added-in-15-4"
-
-# One call to each function Numbers 15.4 added, `TRUE()` written as the function
-# Numbers stores, and the two paired statistics reading `Table 1`'s first ten rows.
-addedFunctionFormulas: tuple[tuple[str, str], ...] = (
-    ("B1", "=ACOT(1)"), ("B2", "=ACOTH(2)"), ("B3", "=COT(1)"), ("B4", "=COTH(1)"),
-    ("B5", "=CSC(1)"), ("B6", "=CSCH(1)"), ("B7", "=SEC(1)"), ("B8", "=SECH(1)"),
-    ("B9", "=XOR(TRUE(),FALSE())"),
-    ("C1", "=COMBINA(4,3)"), ("C2", "=GAMMA(5)"), ("C3", "=PHI(0)"),
-    ("C4", "=FISHER(0.5)"), ("C5", "=FISHERINV(0.5)"), ("C6", "=PERMUTATIONA(3,2)"),
-    ("C7", "=DAYS(DATE(2026,10,13),DATE(2026,1,1))"),
-    ("C8", "=PEARSON(Sheet 1::Table 1::A1:A5,Sheet 1::Table 1::A6:A10)"),
-    ("C9", "=RSQ(Sheet 1::Table 1::A1:A5,Sheet 1::Table 1::A6:A10)"),
-)
-
-
-def authorAddedFunctions(working: Path) -> None:
-    """Write one call to each added function into `Sheet 1 / Table 2` of a copy."""
-    document = pybers.open(working)
-    table = document.sheet("Sheet 1").table("Table 2")
-    for address, text in addedFunctionFormulas:
-        table.cell(address).formulaText = text
-    document.save()
-
-
-def testAddedFunctionsAuthoredByNameMatchTheirGoldenFile(tmp_path: Path) -> None:
-    golden = goldenDirectory / goldenName
-    working = Path(
-        shutil.copy(findDocumentPath("20-formula-shapes"), tmp_path / "20.numbers")
-    )
-    authorAddedFunctions(working)
-    assert readDataListBytes(golden) == readDataListBytes(working)
-
 
 def testTheAddedFunctionsGoldenHoldsEveryCall() -> None:
     table = pybers.open(goldenDirectory / goldenName).sheet("Sheet 1").table("Table 2")

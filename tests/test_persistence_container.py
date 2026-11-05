@@ -108,7 +108,7 @@ def testRoundTripEnvelopeDiffersOnlyByLocalExtraFields(
     no warning and no repair prompt. `numbers-parser` reaches the same conclusion
     by using `zipfile` and not attempting byte-identity either.
 
-    So the real contract is the test below this one: every member identical. This
+    The real contract is the test below this one: every member identical. This
     test exists to keep the divergence bounded and named, so that a *different*
     difference appearing later is a failure rather than a shrug.
     """

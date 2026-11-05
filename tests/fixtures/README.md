@@ -1,9 +1,10 @@
 # Fixtures: the origins
 
 A fixture is a document no other document here was made from: the control every measurement
-starts from, or a document that came from outside, by import or from real use. A document made
-from one of these by a single change is a measurement, in
-[`tests/measurements/`](../measurements/README.md). What each established is indexed in
+starts from, or a document that came from outside, by import or from real use. A document
+Numbers made from one of these is a measurement, in
+[`tests/measurements/`](../measurements/README.md), and a document pybers wrote from one is a
+golden, in [`tests/golden/`](../golden/README.md). What each established is indexed in
 [FINDINGS.md](../../docs/findings/FINDINGS.md).
 
 Tests name a document by its stem through `findDocumentPath` in `tests/conftest.py`, so a test
@@ -11,7 +12,8 @@ never depends on which directory holds it.
 
 ## Adding one
 
-- Saved from **Numbers 15.3.1**, the version that supplied `src/pybers/protos/`.
+- Saved from the Numbers release `src/pybers/protos/README.md` records, or a later one pybers
+  reads, which the catalog row then names.
 - Label what each cell **displays**, in text beside it, so a decode can be checked rather
   than believed. What was typed cannot be recovered from the file.
 - Keep what made it (a `.csv`, a generator script) beside it under the same stem.
@@ -30,3 +32,4 @@ never depends on which directory holds it.
 | `48-table-inserted` | a new document | the origin of the table and sheet creation measurements ([creation](../../docs/findings/findings-10-creation.md)) |
 | `52-table-reset-styled` | a new document | the pybers reset applied through the interface ([creation](../../docs/findings/findings-10-creation.md)) |
 | `53-paragraph-style-named` | a new document | the reset's text style saved as the named style `pybers-base` ([creation](../../docs/findings/findings-10-creation.md)) |
+| `72-date-time-zones` | a new document, saved by Numbers 15.4 | `2026-10-20 09:00` typed on a Mac in New York and again in Los Angeles, and the same time typed with `PST`, each labeled ([values](../../docs/findings/findings-01-values.md)) |

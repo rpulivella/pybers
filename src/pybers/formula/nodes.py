@@ -11,7 +11,7 @@ Numbers could not resolve.
 
 Two consequences shape everything here. A formula cannot be modeled as a string
 without inventing a language to parse, losing the per-axis locking flags on the
-way through. And a walk over nodes is all that a reader or a rewriter needs,
+way through. A walk over nodes is all that a reader or a rewriter needs,
 which is why no parser appears in this library.
 
 **A reference is a distance, not a position.** An unlocked reference stores a
@@ -34,6 +34,8 @@ row of `None` means the whole column rather than row zero. The same rule
 as a sentinel line, read here as `None`.
 
 UPDATES
+2026-10-29  `mapFormulaNodes`, the one walk a rewrite makes, for PYB-278.
+2026-10-24  A node's raw bytes kept in the JSON form, for PYB-259.
 2026-10-13  A boolean literal and a range reaching every row or column, for PYB-139.
 2026-09-18  A broken reference names the rows and columns it lost, for PYB-17.
 2026-09-11  Apple's list node is a bracket the author typed, for #67. It
@@ -59,12 +61,12 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/03"
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal
 
 from pybers.addressing.ranges import CellRange
-from pybers.addressing.reference import CellReference
+from pybers.addressing.reference import CellAddress, CellReference
 from pybers.errors import PybersError
 from pybers.formula.functions import (
     ArgumentCountError,
@@ -74,6 +76,7 @@ from pybers.formula.functions import (
     findFunctionName,
     findFunctionNamed,
 )
+from pybers.interchange._tree import jsonFormKept
 
 # The node types this model gives meaning to. Every other type is carried through
 # untouched: the node message has 45 fields and the documents use 16, so a model
@@ -294,7 +297,7 @@ class FormulaReference:
         """Report whether this reference points into a different table."""
         return self.tableId is not None
 
-    def resolve(self, host: CellReference) -> CellReference:
+    def resolve(self, host: CellAddress) -> CellReference:
         """Return the cell this reference names, for a formula living at `host`.
 
         Refuses rather than guessing on the two cases that have no single cell to
@@ -352,7 +355,7 @@ class FormulaRange:
         """Report whether this range points into a different table."""
         return self.tableId is not None
 
-    def resolve(self, host: CellReference) -> CellRange:
+    def resolve(self, host: CellAddress) -> CellRange:
         """Return the rectangle this range covers, for a formula living at `host`.
 
         The counterpart of `FormulaReference.resolve`, where a formula's vocabulary
@@ -520,12 +523,14 @@ class FormulaNode:
 
     `raw` is the node's archive bytes as read, kept so a node this model does not
     interpret survives a rewrite exactly. Excluded from equality, being provenance
-    rather than content.
+    rather than content, and kept in the JSON form, which carries it through too.
     """
 
     nodeType: int
     content: NodeContent = None
-    raw: bytes = field(default=b"", compare=False, repr=False)
+    raw: bytes = field(
+        default=b"", compare=False, repr=False, metadata={jsonFormKept: True}
+    )
 
     @property
     def recognized(self) -> bool:
@@ -537,7 +542,7 @@ class FormulaNode:
 class Formula:
     """One cell's formula, as the postfix node array the file stores.
 
-    Frozen for the same reason `Style` is: Numbers shares one archive between every
+    Frozen because Numbers shares one archive between every
     cell a formula was dragged into, so a mutable one would turn a single edit into
     a silent edit of all of them. Replace it on the cell to change it.
     """
@@ -581,3 +586,16 @@ class Formula:
             for node in self.nodes
         )
 
+
+def mapFormulaNodes(
+    formula: Formula, rewrite: Callable[[FormulaNode], FormulaNode]
+) -> Formula:
+    """Return a formula with each node rewritten, or the same one when none changed.
+
+    The designated place a rewrite walks a formula's nodes, returning the very formula
+    it was given when every node comes back as itself, so a caller tests `is`.
+    """
+    nodes = tuple(rewrite(node) for node in formula.nodes)
+    if all(new is old for new, old in zip(nodes, formula.nodes, strict=True)):
+        return formula
+    return Formula(nodes)

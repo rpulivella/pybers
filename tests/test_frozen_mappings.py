@@ -43,8 +43,8 @@ def readCheckMappings() -> tuple[Mapping[Any, Any], Mapping[Any, Any]]:
 
 
 def readTableIdentities() -> Mapping[Any, Any]:
-    """Return the table identities of a document whose formulas name other tables."""
-    return pybers.open(findDocumentPath("20-formula-shapes")).tableIdentities
+    """Return the table names a sheet's formulas use, in a document naming others."""
+    return pybers.open(findDocumentPath("20-formula-shapes")).sheets[0].tableIdentities
 
 
 def readCellTableNames() -> Mapping[Any, Any]:
@@ -68,7 +68,7 @@ mappingReaders: dict[str, Callable[[], Mapping[Any, Any]]] = {
     "functionsByName": lambda: functionsByName,
     "functionsByIndex": lambda: functionsByIndex,
     "themeStyles": lambda: themeStyles,
-    "Document.tableIdentities": readTableIdentities,
+    "Sheet.tableIdentities": readTableIdentities,
     "Cell.tableNames": readCellTableNames,
 }
 

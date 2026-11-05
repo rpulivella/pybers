@@ -11,7 +11,7 @@ bodies that were deliberately changed.
 
 The rest guards the two ways this can fail quietly. A member whose archives were
 edited must not be written from `originalBytes`, which would discard the edit and
-pass every round-trip test. And a rewritten archive must keep the `ArchiveInfo`
+pass every round-trip test. A rewritten archive must keep the `ArchiveInfo`
 fields this library does not model, which 40.2% of messages carry.
 
 UPDATES

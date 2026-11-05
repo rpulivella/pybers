@@ -11,6 +11,20 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-03  The selector, its matches, `TableHeaders`, `CellChanges` and `CellSkip`
+            re-exported, for PYB-223.
+2026-11-02  `create` re-exported, for PYB-261.
+2026-10-28  `LocaleChange`, `LocaleError` and `locales` re-exported, for PYB-272.
+2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
+            for PYB-259.
+2026-10-24  `CellControlType` and the JSON form's names re-exported, for PYB-259.
+2026-10-22  The cell controls and CellPresentation re-exported, replacing
+            CellDescription, for PYB-255.
+2026-10-22  The currency names re-exported, for PYB-220.
+2026-10-20  MachineTimeZone, TimeZoneError, TimeZoneLike and formatCellValue
+            re-exported, for PYB-144.
+2026-10-20  `parseCellValue` re-exported, for PYB-217.
+2026-10-20  `CellChange` re-exported, for PYB-217.
 2026-10-12  NOT_REQUESTED, UNDETERMINED and WITHHELD re-exported, for PYB-190.
 2026-10-09  Re-exports made lazy, so the command line skips protobuf, for PYB-181.
 2026-10-07  checkDocument and what it reports re-exported, for PYB-169.
@@ -32,14 +46,18 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
-lazy from pybers.absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
+lazy from pybers.absence import UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
     CellAddress,
+    CellOffset,
     CellRange,
+    CellRangeLike,
     CellRangeList,
     CellReference,
-    RangeAddress,
+    CellReferenceLike,
     ReferenceError,
+    SheetReference,
+    TableReference,
     toCellRanges,
     toCellReference,
     toColumnLetter,
@@ -50,20 +68,29 @@ lazy from pybers.check import (
     CheckCell,
     CheckEnvironment,
     CheckFailure,
-    CheckNames,
     CheckSheet,
     CheckTable,
     NumbersVersion,
     checkDocument,
 )
+lazy from pybers.currency import (
+    Currency,
+    CurrencyAmount,
+    CurrencyError,
+    currencies,
+    findCurrency,
+)
 lazy from pybers.document import (
     Document,
+    LocaleChange,
+    LocaleError,
     ReferenceLocation,
     SelectionError,
     Sheet,
+    create,
+    locales,
     open,
 )
-lazy from pybers.drawable import GraphicalObject, Image, Shape, TextBox
 lazy from pybers.errors import PybersError, ReadError, WriteError
 lazy from pybers.formula import (
     ArgumentCountError,
@@ -92,24 +119,50 @@ lazy from pybers.formula import (
     parseFormula,
     renderFormula,
 )
-lazy from pybers.geometry import Position, Size
-lazy from pybers.style import Style
+lazy from pybers.geometry import Position
+lazy from pybers.interchange import (
+    JsonFormError,
+    formatJsonForm,
+    jsonFormVersion,
+    parseJsonForm,
+)
+lazy from pybers.selection import (
+    SelectionMatch,
+    Selector,
+    SelectorError,
+    SelectorLike,
+    quoteSelectorName,
+)
 lazy from pybers.table import (
     Cell,
-    CellDescription,
+    CellChange,
+    CellChanges,
+    CellControl,
+    CellControlBase,
+    CellControlCheckbox,
+    CellControlPopUpMenu,
+    CellControlSlider,
+    CellControlStarRating,
+    CellControlStepper,
+    CellControlType,
+    CellControlUnknown,
     CellFormat,
     CellKind,
+    CellPresentation,
+    CellSkip,
     CellValue,
     CellValueFill,
     MergeRange,
     Table,
+    TableHeaders,
     TableRow,
     TableRows,
+    formatCellValue,
+    parseCellValue,
 )
-lazy from pybers.text import Paragraph, RichText, TextRun
+lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
 __all__ = [
-    "NOT_REQUESTED",
     "UNDETERMINED",
     "WITHHELD",
     "ArgumentCountError",
@@ -137,6 +190,17 @@ __all__ = [
     "FormulaVariable",
     "FormulaLambda",
     "Formula",
+    "formatCellValue",
+    "formatJsonForm",
+    "JsonFormError",
+    "jsonFormVersion",
+    "parseJsonForm",
+    "parseCellValue",
+    "Currency",
+    "CurrencyAmount",
+    "CurrencyError",
+    "currencies",
+    "findCurrency",
     "parseFormula",
     "renderFormula",
     "Coordinate",
@@ -144,44 +208,63 @@ __all__ = [
     "CheckCell",
     "CheckEnvironment",
     "CheckFailure",
-    "CheckNames",
     "CheckSheet",
     "CheckTable",
     "NumbersVersion",
     "checkDocument",
     "Cell",
-    "CellAddress",
-    "CellDescription",
+    "CellChange",
+    "CellChanges",
+    "CellSkip",
+    "CellControl",
+    "CellControlBase",
+    "CellControlCheckbox",
+    "CellControlPopUpMenu",
+    "CellControlSlider",
+    "CellControlStarRating",
+    "CellControlStepper",
+    "CellControlType",
+    "CellControlUnknown",
+    "CellReferenceLike",
+    "CellPresentation",
     "CellFormat",
     "CellKind",
     "CellRange",
     "CellRangeList",
+    "CellAddress",
+    "CellOffset",
     "CellReference",
     "CellValue",
     "CellValueFill",
-    "RangeAddress",
+    "CellRangeLike",
     "ReferenceError",
+    "SheetReference",
+    "TableReference",
     "toColumnLetter",
     "toColumnNumber",
+    "create",
     "open",
     "toCellRanges",
     "toCellReference",
-    "GraphicalObject",
-    "Image",
     "MergeRange",
-    "Paragraph",
     "Position",
-    "RichText",
     "SelectionError",
-    "Shape",
+    "SelectionMatch",
+    "Selector",
+    "SelectorError",
+    "SelectorLike",
+    "quoteSelectorName",
+    "TableHeaders",
     "Sheet",
-    "Size",
-    "Style",
     "Table",
     "TableRow",
     "TableRows",
-    "TextBox",
-    "TextRun",
     "Document",
+    "LocaleChange",
+    "LocaleError",
+    "locales",
     "ReferenceLocation",
+    "MachineTimeZone",
+    "TimeZoneError",
+    "TimeZoneLike",
 ]

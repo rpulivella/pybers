@@ -6,6 +6,8 @@ Each unfamiliar document is made by retyping one archive or one cell record of a
 real fixture, so a test names exactly what pybers has not met.
 
 UPDATES
+2026-11-03  Every check carries the sheets and tables, names withheld unless
+            asked for, for PYB-223.
 2026-10-12  Missing parts are asserted by the sentinel naming why, for PYB-190.
 2026-10-07  Written for PYB-169.
 """
@@ -134,7 +136,7 @@ def testAScriptChecksADocumentThroughImportPybers() -> None:
     assert check.savedBy == pybers.NumbersVersion("15.3.1", "7050.1.1-2")
     assert check.untestedArchiveTypes == {}
     assert check.unrecognizedCellTypes == {}
-    assert check.names is pybers.NOT_REQUESTED
+    assert check.unrecognizedCellTypes == {}
 
 
 def testTheEnvironmentReportsWhatPybersRunsOn() -> None:
@@ -176,13 +178,13 @@ def testTheReaderKeepsTheTypeOfARecordItDoesNotRecognize(tmp_path: Path) -> None
     rewriteFirstRow(package, lambda rowInfo: retypeEmptyRecord(rowInfo, 4))
     document = pybers.open(writePackageCopy(package, tmp_path))
     found = [
-        cell.description
+        cell.unrecognizedTypeCode
         for sheet in document.sheets
         for table in sheet.tables
         for cell in table.cells.values()
-        if cell.description.kind is pybers.CellKind.UNKNOWN
+        if cell.kind is pybers.CellKind.UNKNOWN
     ]
-    assert [description.unrecognizedTypeCode for description in found] == [4]
+    assert found == [4]
 
 
 def testAFailureKeepsItsErrorToRaise(tmp_path: Path) -> None:
@@ -197,18 +199,24 @@ def testAFailureKeepsItsErrorToRaise(tmp_path: Path) -> None:
 def testNamesLocateEachUnrecognizedCell(tmp_path: Path) -> None:
     package = readPackage(emptyCellsPath)
     rewriteFirstRow(package, lambda rowInfo: retypeEmptyRecord(rowInfo, 4))
-    names = pybers.checkDocument(writePackageCopy(package, tmp_path), names=True).names
-    assert names is not pybers.NOT_REQUESTED
-    assert names.unrecognizedCells is not pybers.UNDETERMINED
-    [cell] = names.unrecognizedCells
-    assert (cell.sheetName, cell.tableName, cell.typeCode) == ("Sheet 1", "Table 1", 4)
+    path = writePackageCopy(package, tmp_path)
+    sheets = pybers.checkDocument(path, names=True).sheets
+    assert sheets is not pybers.UNDETERMINED
+    [table] = [each for each in sheets[0].tables if each.unrecognizedCells]
+    assert (table.name, table.unrecognizedCells[0].typeCode) == ("Table 1", 4)
+
+
+def testEveryCheckListsEachSheetAndTableWithItsSizeNamesWithheld() -> None:
+    sheets = pybers.checkDocument(recordsPath).sheets
+    assert sheets == (pybers.CheckSheet(
+        pybers.WITHHELD, (pybers.CheckTable(pybers.WITHHELD, 10, 7),)
+    ),)
 
 
 def testNamesListEachSheetAndTableWithItsSize() -> None:
     document = pybers.open(recordsPath)
-    names = pybers.checkDocument(recordsPath, names=True).names
-    assert names is not pybers.NOT_REQUESTED
-    assert names.sheets == tuple(
+    sheets = pybers.checkDocument(recordsPath, names=True).sheets
+    assert sheets == tuple(
         pybers.CheckSheet(sheet.name, tuple(
             pybers.CheckTable(table.name, table.rowCount, table.colCount)
             for table in sheet.tables
@@ -222,7 +230,7 @@ def testNamesAreUnknownWhenTheDocumentCannotBeOpened(tmp_path: Path) -> None:
     retypeArchive(package, 6005, untestedType)
     check = pybers.checkDocument(writePackageCopy(package, tmp_path), names=True)
     assert check.failure is not None
-    assert check.names == pybers.CheckNames(pybers.UNDETERMINED, pybers.UNDETERMINED)
+    assert check.sheets is pybers.UNDETERMINED
     assert check.unrecognizedCellTypes is pybers.UNDETERMINED
 
 

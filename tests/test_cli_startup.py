@@ -3,6 +3,8 @@
 What the command line loads before it does any work, checked in a fresh interpreter.
 
 UPDATES
+2026-10-20  The cell model, the value parser and the time zone load no protobuf,
+            for PYB-144.
 2026-10-09  Written for PYB-181.
 """
 from __future__ import annotations
@@ -46,10 +48,26 @@ def listLoadedProtobufModules(*arguments: str) -> list[str]:
     return result.stdout.splitlines()[-1].split()
 
 
-@pytest.mark.parametrize("arguments", [("--help",), ("check", "--help")])
+@pytest.mark.parametrize(
+    "arguments", [("--help",), ("check", "--help"), ("set", "--help")]
+)
 def testHelpLoadsNoProtobuf(arguments: tuple[str, ...]) -> None:
     assert listLoadedProtobufModules(*arguments) == []
 
 
 def testProbeSeesProtobufOnceADocumentIsRead() -> None:
     assert "google.protobuf" in listLoadedProtobufModules("check", "missing.numbers")
+
+
+@pytest.mark.parametrize(
+    "module", ["pybers.table.cell", "pybers.table.inference", "pybers.timezone"]
+)
+def testTheValueModelLoadsNoPersistence(module: str) -> None:
+    probe = (
+        f"import sys, {module}; print(*sorted(name for name in sys.modules "
+        "if name.startswith(('google.protobuf', 'pybers._persistence'))))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=True
+    )
+    assert result.stdout.split() == []

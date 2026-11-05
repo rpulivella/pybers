@@ -20,6 +20,14 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-11-03  `TableHeaders`, a table's header rows, header columns and footer rows,
+            for PYB-223.
+2026-10-24  `CellControlType`, the type a control names itself by, for PYB-259.
+2026-10-22  The controls a cell presents its value through, and
+            `CellPresentation` replacing `CellDescription`, for PYB-255.
+2026-10-20  `formatCellValue`, the text a value reads back from, for PYB-144.
+2026-10-20  `parseCellValue`, a cell value read from text, for PYB-217.
+2026-10-20  `CellChange`, what a write did to one cell, for PYB-217.
 2026-10-14  The cell store is the feature's own, read through `cells`, for PYB-193.
 2026-10-01  `CellKind`, `CellFormat` and `CellDescription`, for PYB-141.
 2026-09-30  A fill under `CONTINUE_SERIES` continues a series, for PYB-137.
@@ -38,21 +46,50 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from pybers.table.cells import Cell, CellValue, Table
+from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
+from pybers.table.cells import Table
+from pybers.table.controls import (
+    CellControl,
+    CellControlBase,
+    CellControlCheckbox,
+    CellControlPopUpMenu,
+    CellControlSlider,
+    CellControlStarRating,
+    CellControlStepper,
+    CellControlType,
+    CellControlUnknown,
+)
 from pybers.table.fill import CellValueFill
-from pybers.table.kinds import CellDescription, CellFormat, CellKind
+from pybers.table.headers import TableHeaders
+from pybers.table.inference import formatCellValue, parseCellValue
+from pybers.table.kinds import CellFormat, CellKind, CellPresentation
 from pybers.table.merges import MergeRange
 from pybers.table.rows import TableRow, TableRows
 
 __all__ = [
     "Cell",
-    "CellDescription",
+    "CellPresentation",
     "CellFormat",
     "CellKind",
+    "CellChange",
+    "CellChanges",
+    "CellSkip",
+    "CellControl",
+    "CellControlBase",
+    "CellControlCheckbox",
+    "CellControlPopUpMenu",
+    "CellControlSlider",
+    "CellControlStarRating",
+    "CellControlStepper",
+    "CellControlType",
+    "CellControlUnknown",
     "CellValue",
     "CellValueFill",
     "MergeRange",
     "Table",
+    "TableHeaders",
     "TableRow",
     "TableRows",
+    "formatCellValue",
+    "parseCellValue",
 ]

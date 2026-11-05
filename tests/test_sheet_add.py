@@ -8,6 +8,8 @@ its second, so a sheet inserted between them is exactly what would break a refer
 resolved by position. The golden was made from it the same way.
 
 UPDATES
+2026-11-02  A created sheet leaves its guides for Numbers to rebuild, for PYB-276.
+2026-10-22  The golden's sheets are added by its builder, for PYB-255.
 2026-09-14  Written for PYB-63.
 """
 from __future__ import annotations
@@ -23,6 +25,7 @@ __date__ = "2026/09/14"
 from pathlib import Path
 
 import pytest
+from golden.builders import addSheets
 
 import pybers
 from conftest import findDocumentPath, readArchiveBodies
@@ -48,8 +51,7 @@ def openShapes() -> Document:
 def saveWithSheets(tmp_path: Path) -> Path:
     """Save the golden's two insertions, and return where they were written."""
     document = openShapes()
-    document.sheetAdd("Inserted", position=2)
-    document.sheetAdd("Appended")
+    addSheets(document)
     destination = tmp_path / "sheets-added.numbers"
     document.save(destination)
     return destination
@@ -203,9 +205,10 @@ def testAnAddedSheetFollowsTheRegistryRules(tmp_path: Path) -> None:
         entry.identifier
         for entry in registry.components[1].object_uuid_map_entries
     }
-    assert {added.userDefinedGuideStorage.identifier, *[
+    assert not added.HasField("userDefinedGuideStorage")
+    assert {
         reference.identifier for reference in [*added.headers, *added.footers]
-    ]} <= uuids
+    } <= uuids
     for identifier, component in registry.components.items():
         stored = {
             (reference.component_identifier, reference.object_identifier)

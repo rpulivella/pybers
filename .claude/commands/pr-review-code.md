@@ -85,6 +85,10 @@ repeating its checks or assuming nobody made them.
      dataclass or other new type.
 
    One agent that fits beats four that overlap. Report the token cost of the ones you ran.
+   **Then sweep the docs.** For every public name, command, option or file the diff adds,
+   renames or removes, search every tracked doc (`git ls-files '*.md'`), the docstrings and
+   the command-line help, one layer at a time from the front door to the docstrings, and
+   report each match as current or stale. A stale match is a finding.
 6. **Read CI and report it, without gating on it:** `.venv/bin/python3 -m tools.workflow.pr checks <N>`.
    A review runs before promotion, so `checks-not-passed` is the ordinary answer here
    and is never a finding. `/pr-merge` is where it becomes a refusal.

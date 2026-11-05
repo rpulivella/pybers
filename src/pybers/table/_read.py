@@ -19,6 +19,13 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-11-03  A table's header rows, header columns and footer rows, for PYB-223.
+2026-11-02  A table of a document never saved names none, for PYB-261.
+2026-10-29  A table's records walked through `StoredTiles`, for PYB-278.
+2026-10-22  Each cell's control read into its presentation, for PYB-255.
+2026-10-22  A currency record reads as a `CurrencyAmount` carrying its format's
+            code, for PYB-220.
+2026-10-20  Format type 1 is the boolean family, for PYB-144.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
 2026-10-07  A row that fails to decode names its table by identifier, and a record
             of a type pybers does not recognize keeps that type, for PYB-169.
@@ -42,40 +49,51 @@ __status__ = "Development"
 __date__ = "2026/09/08"
 
 from collections.abc import Iterator
+from decimal import Decimal
 from pathlib import Path
 from typing import cast
 
+from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence import CellDecodeError, chooseOffsetUnit, decodeRow
+from .._persistence import CellDecodeError
 from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
     conditionalSlot,
     countedFormatSlots,
+    currencyFormatSlot,
     displayedKindSlot,
     findSlotValue,
 )
 from .._persistence.index import (
     ArchiveIndex,
+    findRoot,
     readDataList,
     readUuidValue,
     richTextListType,
     stringListType,
 )
-from ..addressing import CellRange, CellReference
-from ..addressing.reference import originOffset
+from .._persistence.rows import readStoredTiles
+from ..addressing import CellRange
+from ..addressing.reference import CellAddress, originOffset
+from ..currency import CurrencyAmount
 from ..errors import ReadError
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
-from .cells import Cell, CellValue, Table
-from .kinds import CellDescription, CellFormat, CellKind, emptyDescription
+from ._controls import readControls
+from .cell import Cell, CellValue
+from .cells import Table
+from .controls import CellControl
+from .headers import TableHeaders
+from .kinds import CellFormat, CellKind, CellPresentation, CellStorage, emptyStorage
 from .merges import MergeRange
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
 # rather than the value itself. See `pybers._persistence.cells`.
 stringKeyType: int = 3
 richTextKeyType: int = 9
+currencyTypeByte: int = 10
 
 # The kind each measured type byte stores. Type 8 is a failed formula, which holds no
 # value, so its formula key sits where a result would. See findings-01-values.md.
@@ -93,6 +111,7 @@ storedKinds: frozendict[int, CellKind] = frozendict({
 
 # The family each measured `format_type` belongs to, every one the documents carry.
 formatFamilies: frozendict[int, CellFormat] = frozendict({
+    1: CellFormat.BOOLEAN,
     256: CellFormat.NUMBER,
     257: CellFormat.CURRENCY,
     258: CellFormat.PERCENT,
@@ -147,6 +166,68 @@ def readFormatTypes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, 
     }
 
 
+# The custom format type a Currency token gives; its code is in the document's list.
+customCurrencyFormatType: int = 274
+currencyFormatType: int = 257
+
+
+def readCustomCurrencyCodes(index: ArchiveIndex) -> dict[tuple[int, int], str]:
+    """Return each custom format's currency code, keyed by its UUID's two halves."""
+    reference = findRoot(index).super.custom_format_list
+    if not reference.identifier:
+        return {}
+    formats = index.resolve(reference, tsk.CustomFormatListArchive)
+    return {
+        (uuid.lower, uuid.upper): custom.default_format.currency_code
+        for uuid, custom in zip(formats.uuids, formats.custom_formats, strict=True)
+        if custom.default_format.currency_code
+    }
+
+
+def readCurrencyCodes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, str]:
+    """Return the currency code of each format entry that names one, by its key.
+
+    A Currency format holds its code itself, and a custom format holding a Currency
+    token holds it in the document's custom format list, as findings-11 records.
+    """
+    if not dataStore.format_table.identifier:
+        return {}
+    dataList = index.resolve(dataStore.format_table, tst.TableDataList)
+    codes: dict[int, str] = {}
+    custom: dict[tuple[int, int], str] | None = None
+    for entry in dataList.entries:
+        found = entry.format
+        if found.format_type == currencyFormatType and found.currency_code:
+            codes[int(entry.key)] = found.currency_code
+        elif found.format_type == customCurrencyFormatType:
+            if custom is None:
+                custom = readCustomCurrencyCodes(index)
+            code = custom.get((found.custom_uid.lower, found.custom_uid.upper))
+            if code:
+                codes[int(entry.key)] = code
+    return codes
+
+
+def readCellValue(
+    record: CellRecord,
+    strings: dict[int, str],
+    richText: dict[int, str],
+    currencyCodes: dict[int, str],
+) -> CellValue:
+    """Return a cell's value, a currency amount carrying the code its format holds.
+
+    A currency record whose format names no code it can follow keeps its `Decimal`,
+    carried through rather than given a currency it may not have.
+    """
+    value = resolveValue(record, strings, richText)
+    if record.typeByte == currencyTypeByte and isinstance(value, Decimal):
+        key = findSlotValue(record, currencyFormatSlot)
+        code = None if key is None else currencyCodes.get(key)
+        if code is not None:
+            return CurrencyAmount(value, code)
+    return value
+
+
 def findDisplayedFormat(
     record: CellRecord, formatTypes: dict[int, int]
 ) -> CellFormat | None:
@@ -167,17 +248,34 @@ def findDisplayedFormat(
     return formatFamilies.get(formatType, CellFormat.UNKNOWN)
 
 
-def readRecordDescription(
-    record: CellRecord, formatTypes: dict[int, int]
-) -> CellDescription:
+# The control a cell presents as, a `control_cell_spec_table` key. Measured against
+# 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
+# the table lists them and whose plain cells carry no such slot. A control describes
+# the value it was built for, so it does not survive that value being replaced: a
+# star rating left on a cell that became text makes Numbers present text as stars.
+controlSlot: tuple[int, int] = (9, 0x04)
+
+
+def findRecordControl(
+    record: CellRecord, controls: dict[int, CellControl]
+) -> CellControl | None:
+    """Return the control a record names, or None when it names none."""
+    key = findSlotValue(record, controlSlot)
+    return None if key is None else controls.get(key)
+
+
+def readRecordStorage(
+    record: CellRecord, formatTypes: dict[int, int], controls: dict[int, CellControl]
+) -> CellStorage:
     """Return what a record stores beyond its value."""
     kind = storedKinds.get(record.typeByte, CellKind.UNKNOWN)
-    return CellDescription(
-        kind=kind,
+    presentation = CellPresentation(
         format=findDisplayedFormat(record, formatTypes),
         formatChosen=carriesChosenFormat(record),
-        unrecognizedTypeCode=record.typeByte if kind is CellKind.UNKNOWN else None,
+        control=findRecordControl(record, controls),
     )
+    unrecognized = record.typeByte if kind is CellKind.UNKNOWN else None
+    return CellStorage(kind, presentation, unrecognized)
 
 
 def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
@@ -265,7 +363,7 @@ def readConditionFormulas(
 def readTable(
     index: ArchiveIndex,
     tableInfo: tst.TableInfoArchive,
-    source: Path,
+    source: Path | None,
     identifier: str = "",
 ) -> Table:
     """Build one `Table` from its `TST.TableInfoArchive`."""
@@ -288,8 +386,15 @@ def readTable(
         identifier=identifier,
         _rowIdentities=rowIdentities,
         _columnIdentities=columnIdentities,
+        _headers=TableHeaders(
+            model.number_of_header_rows,
+            model.number_of_header_columns,
+            model.number_of_footer_rows,
+        ),
     )
     formatTypes = readFormatTypes(index, dataStore)
+    currencyCodes = readCurrencyCodes(index, dataStore)
+    controls = readControls(index, dataStore)
     for reference, record in iterateCellRecords(index, model, source):
         # A merge imported from Excel keeps a style-only record at every covered
         # position, and the model has no cell there to hold one. The archive
@@ -297,9 +402,9 @@ def readTable(
         if not table.addressable(reference):
             continue
         cell = table.cell(reference)
-        value = resolveValue(record, strings, richText)
-        setCellDescription(cell, record, value, formatTypes)
-        cell.value = value
+        value = readCellValue(record, strings, richText, currencyCodes)
+        setCellStorage(cell, record, value, formatTypes, controls)
+        cell._value = value
         # Each cell is given its own Formula even where the archive is shared, so
         # an edit to one cannot reach another. Frozen, so sharing would be safe
         # anyway; built per cell so that neither guarantee depends on the other.
@@ -312,51 +417,35 @@ def readTable(
 
 
 def iterateCellRecords(
-    index: ArchiveIndex, model: tst.TableModelArchive, source: Path
-) -> Iterator[tuple[CellReference, CellRecord]]:
+    index: ArchiveIndex, model: tst.TableModelArchive, source: Path | None
+) -> Iterator[tuple[CellAddress, CellRecord]]:
     """Yield every record a table stores, with the cell it belongs to."""
-    dataStore = model.base_data_store
-    tileSize = dataStore.tiles.tile_size
-    # The tile LIST is authoritative. Its `tileid` gives the row range, and the
-    # archive identifiers are not in row order, so nothing here may iterate
-    # archives as found. See findings-03-structure.md.
-    for entry in dataStore.tiles.tiles:
-        tile = index.resolve(entry.tile, tst.Tile)
-        firstRow = entry.tileid * tileSize
-        for rowInfo in tile.rowInfos:
-            # `tile_row_index` is LOCAL to its tile, so a document row is the
-            # tile's own id times the tile size plus the local index. Reading it
-            # as a document row gives eight different rows on an eight-tile table
-            # and raises nothing. See findings-03-structure.md.
-            row = firstRow + rowInfo.tile_row_index
-            try:
-                records = decodeRow(
-                    rowInfo.cell_offsets,
-                    rowInfo.cell_storage_buffer,
-                    chooseOffsetUnit(
-                        rowInfo.has_wide_offsets, tile.should_use_wide_rows
-                    ),
-                )
-            except CellDecodeError as exc:
-                raise ReadError(
-                    # By identifier, never by name, so a check report stays publishable.
-                    f"{source}, table {model.table_id}, row "
-                    f"{row + originOffset}: {exc}"
-                ) from exc
-            for record in records:
-                column = record.column + originOffset
-                yield CellReference(row + originOffset, column), record
+    for stored in readStoredTiles(index, model.base_data_store):
+        try:
+            records = stored.records
+        except CellDecodeError as exc:
+            raise ReadError(
+                # By identifier, never by name, so a check report stays publishable.
+                f"{source or 'An unsaved document'}, table {model.table_id}, row "
+                f"{stored.row + originOffset}: {exc}"
+            ) from exc
+        for record in records:
+            yield (
+                CellAddress(stored.row + originOffset, record.column + originOffset),
+                record,
+            )
 
 
-def setCellDescription(
-    cell: Cell, record: CellRecord, value: CellValue, formatTypes: dict[int, int]
+def setCellStorage(
+    cell: Cell, record: CellRecord, value: CellValue, formatTypes: dict[int, int],
+    controls: dict[int, CellControl],
 ) -> None:
-    """Give a cell the description of its record and the value that record holds."""
-    cell._stored = readRecordDescription(record, formatTypes)
+    """Give a cell what its record stores and the value that record holds."""
+    cell._stored = readRecordStorage(record, formatTypes, controls)
     cell._storedValue = value
 
 
-def updateCellDescriptions(
+def updateCellStorage(
     index: ArchiveIndex, tableInfo: tst.TableInfoArchive, table: Table, source: Path
 ) -> None:
     """Describe every cell of a saved table by the record the save left it.
@@ -368,17 +457,19 @@ def updateCellDescriptions(
     strings = readStringTable(index, dataStore)
     richText = readRichTextTable(index, dataStore)
     formatTypes = readFormatTypes(index, dataStore)
-    described: set[CellReference] = set()
+    currencyCodes = readCurrencyCodes(index, dataStore)
+    controls = readControls(index, dataStore)
+    described: set[CellAddress] = set()
     for reference, record in iterateCellRecords(index, model, source):
         cell = table.cells.get(reference)
         if cell is None:
             continue
-        value = resolveValue(record, strings, richText)
-        setCellDescription(cell, record, value, formatTypes)
+        value = readCellValue(record, strings, richText, currencyCodes)
+        setCellStorage(cell, record, value, formatTypes, controls)
         described.add(reference)
     for reference, cell in table.cells.items():
         if reference not in described:
-            cell._stored, cell._storedValue = emptyDescription, None
+            cell._stored, cell._storedValue = emptyStorage, None
 
 
 def resolveValue(

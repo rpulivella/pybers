@@ -7,6 +7,8 @@ is the whole mechanism and a model that agreed with itself would prove nothing a
 what Numbers reads. See findings-01-values.md.
 
 UPDATES
+2026-10-22  The golden's writes and its comparison moved to the golden builders,
+            for PYB-255.
 2026-09-16  Written for PYB-83.
 """
 from __future__ import annotations
@@ -23,6 +25,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from golden.builders import buildGolden, findBuilder, literalCells, plainCell
 from test_format_refcounts import readDisplayedKind
 from test_writer import copyDocument, listArchiveDifferences, readRecordAt
 
@@ -36,13 +39,6 @@ from pybers._persistence.cells import (
 )
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
-
-# The golden: a literal retyping a number and one borrowing a shape, beside plain text.
-literalCells: tuple[tuple[str, str], ...] = (
-    ("A1", "=SUM(B1:C1)"),
-    ("J1", "=A1+1"),
-)
-plainCell: tuple[str, str] = ("B1", "=1+1")
 
 
 def assertLiteralRecord(path: Path, address: str) -> None:
@@ -59,16 +55,9 @@ def openFirstTableCell(stem: str, address: str) -> pybers.Cell:
     return pybers.open(findDocumentPath(stem)).sheets[0].tables[0].cell(address)
 
 
-def writeLiteralGolden(tmp_path: Path) -> Path:
-    """Write the golden's mutation into a fresh copy of its fixture, and return it."""
-    working = copyDocument("11-value-types-noformats", tmp_path)
-    document = pybers.open(working)
-    table = document.sheets[0].tables[0]
-    for address, text in literalCells:
-        table.cell(address).textLiteralSet(text)
-    table.cell(plainCell[0]).value = plainCell[1]
-    document.save()
-    return working
+def writeLiteralGolden(into: Path) -> Path:
+    """Build the literal golden into a directory, and return the file written."""
+    return buildGolden(findBuilder("11-text-literal-written"), into)
 
 
 def testTheMeasuredLiteralReadsAsTextWithAChosenFormat() -> None:
@@ -79,14 +68,14 @@ def testTheMeasuredLiteralReadsAsTextWithAChosenFormat() -> None:
 
     assert cell.value == "=SUM(A1:A5)"
     assert cell.formula is None
-    assert cell.description.formatChosen
+    assert cell.presentation.formatChosen
 
 
 def testAnOrdinaryStringReadsAsAutomatic() -> None:
     cell = openFirstTableCell("01-text-plain", "A1")
 
     assert isinstance(cell.value, str)
-    assert not cell.description.formatChosen
+    assert not cell.presentation.formatChosen
 
 
 @pytest.mark.parametrize("address", ["A1", "J1"])
@@ -128,7 +117,7 @@ def testAnOrdinaryStringIsStillWrittenAsAutomatic(address: str, tmp_path: Path) 
 
     assert not carriesChosenFormat(readRecordAt(working, address))
     reopened = pybers.open(working).sheets[0].tables[0].cell(address)
-    assert not reopened.description.formatChosen
+    assert not reopened.presentation.formatChosen
 
 
 def testLiteralTextReadsBackAsTheTextItWasGiven(tmp_path: Path) -> None:
@@ -139,7 +128,7 @@ def testLiteralTextReadsBackAsTheTextItWasGiven(tmp_path: Path) -> None:
     for address, text in literalCells:
         cell = table.cell(address)
         assert (cell.value, cell.formula) == (text, None)
-        assert cell.description.formatChosen
+        assert cell.presentation.formatChosen
 
 
 def testSavingLiteralTextAgainChangesNothing(tmp_path: Path) -> None:
@@ -168,11 +157,11 @@ def testNewTextInALiteralCellStaysLiteral(tmp_path: Path) -> None:
 def testLiteralTextOverAFormulaIsRefusedAndLeavesTheCellAlone() -> None:
     """AC 5. The formula is what would be lost."""
     cell = openFirstTableCell("18-formula-literals", "A1")
-    before = (cell.value, cell.formula, cell.description.formatChosen)
+    before = (cell.value, cell.formula, cell.presentation.formatChosen)
 
     with pytest.raises(pybers.WriteError, match="A1 is backed by a formula"):
         cell.textLiteralSet("=1+1")
-    assert (cell.value, cell.formula, cell.description.formatChosen) == before
+    assert (cell.value, cell.formula, cell.presentation.formatChosen) == before
 
 
 def testLiteralTextThatIsNotTextIsRefused() -> None:
@@ -180,23 +169,10 @@ def testLiteralTextThatIsNotTextIsRefused() -> None:
 
     with pytest.raises(pybers.WriteError, match="was given Decimal"):
         cell.textLiteralSet(Decimal("1"))  # type: ignore[arg-type]
-    assert not cell.description.formatChosen
+    assert not cell.presentation.formatChosen
 
 
 # ── The golden file ─────────────────────────────────────────────────────────
-
-
-def testLiteralTextMatchesTheGoldenFile(tmp_path: Path) -> None:
-    golden = goldenDirectory / "11-text-literal-written.numbers"
-    assert golden.is_file(), f"{golden.name} is missing; see the golden README"
-
-    differences = listArchiveDifferences(
-        readPackage(golden), readPackage(writeLiteralGolden(tmp_path))
-    )
-    assert not differences, (
-        "the writer no longer produces the confirmed output:\n  "
-        + "\n  ".join(differences)
-    )
 
 
 def testTheLiteralGoldenHoldsWhatItClaimsTo() -> None:
@@ -226,7 +202,7 @@ def testAScriptWritesLabelsThatReadLikeFormulas(tmp_path: Path) -> None:
         "=total", "-net", "+gross"
     ]
     assert all(
-        reopened.cell(row=row, col=2).description.formatChosen for row in (1, 2, 3)
+        reopened.cell(row=row, col=2).presentation.formatChosen for row in (1, 2, 3)
     )
 
 
@@ -239,7 +215,7 @@ def testACliWritesLiteralTextAndPrintsItsFormat(tmp_path: Path) -> None:
     cell.textLiteralSet(arguments[3])
     document.save()
 
-    shown = "Text" if cell.description.formatChosen else "Automatic"
+    shown = "Text" if cell.presentation.formatChosen else "Automatic"
     printed = f"{arguments[2]} {cell.value} ({shown})"
     assert printed == "C1 =SUM(A1:A5) (Text)"
 
@@ -256,4 +232,4 @@ def testACliRefusingAFormulaCellPrintsWhy() -> None:
 def testEveryNameThisTicketAddsIsReachableFromPybersAlone() -> None:
     """Neither consumer imports anything deeper than `pybers`."""
     assert hasattr(pybers.Cell, "textLiteralSet")
-    assert hasattr(pybers.Cell, "description")
+    assert hasattr(pybers.Cell, "presentation")

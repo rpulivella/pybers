@@ -7,6 +7,7 @@ leave a table as it was, and the few lines a script or a command line writes to
 copy a block.
 
 UPDATES
+2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-29  Written for PYB-136.
 """
 from __future__ import annotations
@@ -27,7 +28,7 @@ import pytest
 from structurefacts import readTableFacts
 
 import pybers
-from conftest import findDocumentPath
+from conftest import findDocumentPath, readRangeValues
 from pybers import CellValueFill, FormulaReferenceRelocation
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
@@ -165,12 +166,8 @@ def testASavedCopyLeavesTheSourceAsItWas(tmp_path: Path) -> None:
         "Table 1"
     )
     copied = pybers.open(target).sheet(1).table("Table 1")
-    assert [cell.value for cell in copied.range("B2:D5")] == [
-        cell.value for cell in source.range("B2:D5")
-    ]
-    assert [cell.value for cell in copied.range("F8:H11")] == [
-        cell.value for cell in source.range("B2:D5")
-    ]
+    assert readRangeValues(copied, "B2:D5") == readRangeValues(source, "B2:D5")
+    assert readRangeValues(copied, "F8:H11") == readRangeValues(source, "B2:D5")
 
 
 def testACopiedBlockCarriesItsMergeAndKeepsTheSource(tmp_path: Path) -> None:
@@ -338,25 +335,6 @@ def testCopyTakesTheArgumentsMoveTakes() -> None:
     assert listParameters(pybers.Table.cellsCopy) == listParameters(
         pybers.Table.cellsMove
     )
-
-
-@pytest.mark.parametrize(
-    ("name", "rule"),
-    [("64-cells-copied-relative-by-pybers", relative),
-     ("64-cells-copied-named-by-pybers", named)],
-)
-def testTheCopyGoldensMatchWhatThisLibraryProduces(
-    name: str, rule: FormulaReferenceRelocation, tmp_path: Path
-) -> None:
-    """PYB-136 AC 8: each copy again, against the file Numbers confirmed."""
-    target = tmp_path / f"{name}.numbers"
-    copyAndSave("60-move-base", rule, target)
-    differences = listPackageDifferences(
-        readPackage(goldenDirectory / f"{name}.numbers"), readPackage(target)
-    )
-    assert [
-        difference for difference in differences if difference.identifier is not None
-    ] == []
 
 
 def testTheCopyGoldensHoldWhatTheyClaimTo() -> None:

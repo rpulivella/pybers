@@ -2,9 +2,9 @@
 """\
 pybers golden confirmation tool
 
-Opens a temporary copy of a golden in running Numbers, checks the cells and tables a
-golden's expected-values file names, and writes a report a developer reads in place of a
-manual session in Numbers. Backs the /golden-confirm skill (PYB-94).
+Opens a temporary copy of a golden in running Numbers, checks every cell of every
+table against what pybers reads from the golden, and writes a report a developer reads
+in place of a manual session in Numbers. Backs the /golden-confirm skill (PYB-94).
 
 Everything that needs Accessibility, Screen Recording or control of Numbers happens in
 pybersdev-golden-confirm.app, built from tools/local/lib/golden-confirm-helper/ by the
@@ -16,11 +16,11 @@ house rules allow: no Python library signs an app or starts one under its own gr
 Usage:
     .venv/bin/python3 -m tools.local.golden_confirm run 20-sheets-added.numbers
     .venv/bin/python3 -m tools.local.golden_confirm run 20-sheets-added.numbers \
-        --dry-run
+        --preview
     .venv/bin/python3 -m tools.local.golden_confirm damage-check
     .venv/bin/python3 -m tools.local.golden_confirm helper-build
     .venv/bin/python3 -m tools.local.golden_confirm helper-build --identity <hash> \
-        --dry-run
+        --preview
     .venv/bin/python3 -m tools.local.golden_confirm permissions
     .venv/bin/python3 -m tools.local.golden_confirm measure 63b-fill-dragged-down
 
@@ -34,6 +34,11 @@ Runs on the repository's venv, which holds rich and pybers, and needs the Xcode
 command line tools for `helper-build`.
 
 UPDATES
+2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
+            for PYB-156.
+2026-10-22  A golden's expected values are generated from it on every run, for
+            PYB-255.
+2026-10-21  A measurement's deadline grows with its steps, for PYB-219.
 2026-10-14  Moved here from `scripts/golden-confirm.py`, and run as a module,
             for PYB-204.
 2026-10-13  The repository root, a branch's ticket number and the help formatter
@@ -71,7 +76,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.markup import escape
 
-# Internal on purpose: pybers exposes no archives, and round-trip tests share this.
 from tools.local.lib.golden_confirm import (
     GoldenConfirmError,
     GoldenRun,
@@ -85,15 +89,18 @@ from tools.local.lib.golden_confirm import (
     findGolden,
     findSigningIdentity,
     holdDisplayAwake,
+    listInspectedCells,
     maxCaptures,
     measurementDirectory,
-    readExpectedValues,
     readMeasurementRecipe,
     readProblems,
     readTicketKey,
     reportRoot,
     requestHelper,
 )
+
+# Internal on purpose: pybers exposes no archives, and round-trip tests share this.
+from tools.local.lib.golden_expected import buildExpectedValues
 from tools.workflow.lib.shared import (
     RichHelpFormatter,
     repositoryRoot,
@@ -103,22 +110,24 @@ console: Console = Console()
 
 damageCheckGolden: str = "11-text-written-and-retyped.numbers"
 editDeadlineSeconds: float = 300.0
+# A custom format step drags and opens menus, and takes up to five seconds.
+editStepSeconds: float = 5.0
 
 
-def runGoldenConfirm(golden: Path, dryRun: bool) -> GoldenRun:
+def runGoldenConfirm(golden: Path, preview: bool) -> GoldenRun:
     """Confirm one golden in running Numbers and return every check it made."""
     ticket = readTicketKey()
-    expectedCells = readExpectedValues(golden).cells
-    sheets = list(dict.fromkeys(cell.sheet for cell in expectedCells))
-    captureCount = len(sheets) + len(expectedCells)
+    expected = buildExpectedValues(golden)
+    sheets = list(dict.fromkeys(table.sheet for table in expected.tables))
+    captureCount = len(sheets) + len(listInspectedCells(expected))
     if captureCount > maxCaptures:
         raise GoldenConfirmError(
             f"checking these cells takes {captureCount} screenshots, over the limit of "
-            f"{maxCaptures}; split the expected-values file"
+            f"{maxCaptures}, since each currency or control is read in the inspector"
         )
     outputDirectory = reportRoot / ticket / golden.stem
     run = GoldenRun(golden, ticket, outputDirectory, captureCount, [])
-    if dryRun:
+    if preview:
         return run
 
     with holdDisplayAwake():
@@ -133,9 +142,9 @@ def reportProblems(problems: list[HelperProblem]) -> None:
 
 
 def runHelperBuild(arguments: argparse.Namespace) -> int:
-    """Build, sign and install the helper, or preview that under --dry-run."""
+    """Build, sign and install the helper, or preview that under --preview."""
     identity = findSigningIdentity(arguments.identity)
-    build = buildHelper(identity, arguments.dry_run)
+    build = buildHelper(identity, arguments.preview)
     verb = "installed" if build.installed else "would install"
     console.print(f"[green]{verb}[/] {escape(str(build.bundle))}")
     console.print(f"  signed by {escape(build.identity)}")
@@ -160,7 +169,7 @@ def runMeasure(arguments: argparse.Namespace) -> int:
     if target.exists():
         raise GoldenConfirmError(f"{target.relative_to(repositoryRoot)} already exists")
     sources = [findDocument(stem) for stem in [recipe.base, *recipe.documents]]
-    if arguments.dry_run:
+    if arguments.preview:
         console.print(f"would make {escape(str(target.relative_to(repositoryRoot)))}")
         for position, source in enumerate(sources):
             console.print(f"  document {position}: {escape(source.name)}")
@@ -182,7 +191,8 @@ def runMeasure(arguments: argparse.Namespace) -> int:
             "documentPaths": copies,
             "savedCopyPath": str(saved),
             "steps": recipe.steps,
-        }, deadlineSeconds=editDeadlineSeconds, logPath=Path(work) / "helper.log")
+        }, deadlineSeconds=editDeadlineSeconds + editStepSeconds * len(recipe.steps),
+            logPath=Path(work) / "helper.log")
         problems = readProblems(result)
         if problems or not saved.is_file():
             console.print(
@@ -210,8 +220,8 @@ def runDamageCheck(arguments: argparse.Namespace) -> int:
 def runRun(arguments: argparse.Namespace) -> int:
     """Confirm a golden in running Numbers and summarize the report it wrote."""
     golden = findGolden(arguments.golden)
-    run = runGoldenConfirm(golden, arguments.dry_run)
-    if arguments.dry_run:
+    run = runGoldenConfirm(golden, arguments.preview)
+    if arguments.preview:
         console.print(f"[green]would confirm[/] {escape(golden.name)} for {run.ticket}")
         console.print(f"  {run.captureCount} screenshots into "
                       f"{escape(str(run.outputDirectory))}")
@@ -245,7 +255,7 @@ def buildParser() -> argparse.ArgumentParser:
         formatter_class=RichHelpFormatter,
     )
     build.add_argument("--identity", help="signing identity fingerprint or name")
-    build.add_argument("--dry-run", action="store_true", help="resolve and report only")
+    build.add_argument("--preview", action="store_true", help="resolve and report only")
     build.set_defaults(handler=runHelperBuild)
 
     permissions = commands.add_parser(
@@ -259,7 +269,7 @@ def buildParser() -> argparse.ArgumentParser:
         formatter_class=RichHelpFormatter,
     )
     confirm.add_argument("golden", help="a .numbers file in tests/golden/")
-    confirm.add_argument("--dry-run", action="store_true",
+    confirm.add_argument("--preview", action="store_true",
                          help="check the golden and its expected values, open nothing")
     confirm.set_defaults(handler=runRun)
 
@@ -268,7 +278,7 @@ def buildParser() -> argparse.ArgumentParser:
         formatter_class=RichHelpFormatter,
     )
     measure.add_argument("name", help="a measurement's name, without an extension")
-    measure.add_argument("--dry-run", action="store_true",
+    measure.add_argument("--preview", action="store_true",
                          help="read the recipe and its documents, open nothing")
     measure.set_defaults(handler=runMeasure)
 
