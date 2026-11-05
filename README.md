@@ -14,7 +14,9 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document and what it is running on, in a form safe to paste into a public bug report, and `--names` adds the document's sheets, tables and unrecognized cells for its owner. `pybers set FILE CELL VALUE` sets one cell, whatever it held, reading the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
+`pybers check FILE` says whether pybers can read a document, what it is running on, and the tree of its sheets and tables, each shown by its kind and size, in a form safe to paste into a public bug report. `--names` names each sheet, table and unrecognized cell, for the person holding the document.
+
+`pybers set FILE SELECTOR VALUE` sets every cell a [selector](#selectors) matches, skipping a cell a formula backs, reading the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B4" 1250.00
@@ -23,6 +25,7 @@ pybers set budget.numbers "Summary::Costs::C4" "2026-10-20 09:30"
 pybers set budget.numbers "Summary::Costs::D4" "1h 30m"
 pybers set budget.numbers "Summary::Costs::E4" TRUE
 pybers set budget.numbers "Summary::Costs::F4" 1:30 --as duration
+pybers set budget.numbers "Summary::Q*::B2" 0 --preview   # B2 of every quarter
 ```
 
 A date is stored as wall-clock time, as Numbers stores it. One given with an offset, such as `2026-10-20T16:00Z`, is written as the time it was in the zone pybers is running in, or in the zone `--time-zone America/New_York` specifies.
@@ -36,182 +39,189 @@ A date is stored as wall-clock time, as Numbers stores it. One given with an off
 - `duration`: Numbers' own units, `1h 30m` or `2d 4h`, or a clock, `1:30`
 - `text`: anything, kept exactly as given
 
-`pybers show FILE` prints a document's language and region and each sheet with its tables and their sizes, and `pybers show FILE SELECTOR` prints what a selector names: a sheet, a table, a range or one cell, addressed as `pybers set` addresses a cell. A name is read as the widest part it names, a sheet before a table and a table before a cell, so a table sharing its sheet's name is reached as `Summary::Summary`. `pybers show` never writes to the document.
+`pybers show FILE` prints a whole document, and `pybers show FILE SELECTOR` prints every part a [selector](#selectors) matches, each in full and one after another. Each part opens with a line naming it and folding what describes it, its children indented beneath it, and a count of zero is left out. `pybers show` never writes to the document.
 
 ```console
 $ pybers show shapes.numbers
 Locale: en_US
-Sheets:
-Sheet 1
-├ Table 1: 12 rows, 8 columns
-└ Table 2: 10 rows, 5 columns
-Sheet 2
-└ Table 1: 10 rows, 5 columns
+
+Sheet: Sheet 1  2 tables
+
+  Table: Sheet 1::Table 1  12 rows × 8 columns  26 cells
+
+    Cell: Sheet 1::Table 1::A1
+      Value: 1   Kind: number   Formula text: none   Value cached: no
+      Format: number   Format chosen: no   Control: none
+      Unrecognized type code: none
+…
 ```
 
-A cell prints one line for each field of its JSON form, in that form's order:
+A cell folds the fields of its JSON form, in that form's order, onto three lines:
 
 ```console
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11"
 Cell: Sheet 1::Table 1::A11
-Value: 55
-Kind: number
-Formula text: =SUM(A1:A10)
-Value cached: yes
-Format: number
-Format chosen: no
-Control: none
-Unrecognized type code: none
+  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
+  Format: number   Format chosen: no   Control: none
+  Unrecognized type code: none
 ```
 
-A table prints its size and merges, then each cell it holds, and a range prints the cells within it:
+Several matches print each part exactly as it prints alone:
 
 ```console
-$ pybers show shapes.numbers "Table 2"
-Table: Sheet 1::Table 2
-Size: 10 rows, 5 columns
-Merges: none
-Cells: 1 cell
+$ pybers show shapes.numbers "::A11, *::Table 2[kind=number]"
+Cell: Sheet 1::Table 1::A11
+  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
+  Format: number   Format chosen: no   Control: none
+  Unrecognized type code: none
 
 Cell: Sheet 1::Table 2::A1
-Value: 42
-Kind: number
-Formula text: none
-Value cached: no
-Format: number
-Format chosen: no
-Control: none
-Unrecognized type code: none
+  Value: 42   Kind: number   Formula text: none   Value cached: no
+  Format: number   Format chosen: no   Control: none
+  Unrecognized type code: none
 ```
 
-`--format json` prints the JSON form of what is selected, exactly as `pybers.formatJsonForm` writes it for a script, a range as its table narrowed to it, so a script and the command never disagree.
+`--format json` prints the JSON form of what is selected, exactly as `pybers.formatJsonForm` writes it for a script, a selector's parts always as an array and a range as its table narrowed to it, and `pybers.parseJsonForm` reads it back, so a script and the command never disagree.
 
 <details>
 <summary>The JSON of the cell and of the table above</summary>
 
 ```console
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
-{
-  "jsonFormVersion": 2,
-  "sheetName": "Sheet 1",
-  "cell": "A11",
-  "table": {
-    "name": "Table 1",
-    "identifier": "f3617f67f94a592f36e14fa6cc9846f8",
-    "rowCount": 12,
-    "colCount": 8,
-    "mergeRanges": [],
-    "cells": [
-      {
-        "address": "A11",
-        "value": 55,
-        "kind": "number",
-        "formulaText": "=SUM(A1:A10)",
-        "valueCached": true,
-        "presentation": {
-          "format": "number",
-          "formatChosen": false,
-          "control": null
-        },
-        "unrecognizedTypeCode": null,
-        "formula": "WITHHELD"
-      }
-    ]
-  },
-  "documentTables": [
-    {
-      "sheetPosition": 1,
-      "sheetName": "Sheet 1",
+[
+  {
+    "jsonFormVersion": 3,
+    "sheetName": "Sheet 1",
+    "cell": "A11",
+    "table": {
       "name": "Table 1",
       "identifier": "f3617f67f94a592f36e14fa6cc9846f8",
       "rowCount": 12,
-      "colCount": 8
+      "colCount": 8,
+      "headers": {
+        "headerRows": 0,
+        "headerColumns": 0,
+        "footerRows": 0
+      },
+      "mergeRanges": [],
+      "cells": [
+        {
+          "address": "A11",
+          "value": 55,
+          "kind": "number",
+          "formulaText": "=SUM(A1:A10)",
+          "valueCached": true,
+          "presentation": {
+            "format": "number",
+            "formatChosen": false,
+            "control": null
+          },
+          "unrecognizedTypeCode": null,
+          "formula": "WITHHELD"
+        }
+      ]
     },
-    {
-      "sheetPosition": 1,
-      "sheetName": "Sheet 1",
-      "name": "Table 2",
-      "identifier": "7fc8ce14cf4a692b380f869beca4f9ce",
-      "rowCount": 10,
-      "colCount": 5
-    },
-    {
-      "sheetPosition": 2,
-      "sheetName": "Sheet 2",
-      "name": "Table 1",
-      "identifier": "25e772dc0a40af2e3961d79e7e3be9ad",
-      "rowCount": 10,
-      "colCount": 5
-    }
-  ]
-}
+    "documentTables": [
+      {
+        "sheetPosition": 1,
+        "sheetName": "Sheet 1",
+        "name": "Table 1",
+        "identifier": "f3617f67f94a592f36e14fa6cc9846f8",
+        "rowCount": 12,
+        "colCount": 8
+      },
+      {
+        "sheetPosition": 1,
+        "sheetName": "Sheet 1",
+        "name": "Table 2",
+        "identifier": "7fc8ce14cf4a692b380f869beca4f9ce",
+        "rowCount": 10,
+        "colCount": 5
+      },
+      {
+        "sheetPosition": 2,
+        "sheetName": "Sheet 2",
+        "name": "Table 1",
+        "identifier": "25e772dc0a40af2e3961d79e7e3be9ad",
+        "rowCount": 10,
+        "colCount": 5
+      }
+    ]
+  }
+]
 ```
 
 ```console
-$ pybers show shapes.numbers "Table 2" --format json
-{
-  "jsonFormVersion": 2,
-  "sheetName": "Sheet 1",
-  "table": {
-    "name": "Table 2",
-    "identifier": "7fc8ce14cf4a692b380f869beca4f9ce",
-    "rowCount": 10,
-    "colCount": 5,
-    "mergeRanges": [],
-    "cells": [
-      {
-        "address": "A1",
-        "value": 42,
-        "kind": "number",
-        "formulaText": null,
-        "valueCached": false,
-        "presentation": {
-          "format": "number",
-          "formatChosen": false,
-          "control": null
-        },
-        "unrecognizedTypeCode": null,
-        "formula": null
-      }
-    ]
-  },
-  "documentTables": [
-    {
-      "sheetPosition": 1,
-      "sheetName": "Sheet 1",
-      "name": "Table 1",
-      "identifier": "f3617f67f94a592f36e14fa6cc9846f8",
-      "rowCount": 12,
-      "colCount": 8
-    },
-    {
-      "sheetPosition": 1,
-      "sheetName": "Sheet 1",
+$ pybers show shapes.numbers "*::Table 2" --format json
+[
+  {
+    "jsonFormVersion": 3,
+    "sheetName": "Sheet 1",
+    "table": {
       "name": "Table 2",
       "identifier": "7fc8ce14cf4a692b380f869beca4f9ce",
       "rowCount": 10,
-      "colCount": 5
+      "colCount": 5,
+      "headers": {
+        "headerRows": 0,
+        "headerColumns": 0,
+        "footerRows": 0
+      },
+      "mergeRanges": [],
+      "cells": [
+        {
+          "address": "A1",
+          "value": 42,
+          "kind": "number",
+          "formulaText": null,
+          "valueCached": false,
+          "presentation": {
+            "format": "number",
+            "formatChosen": false,
+            "control": null
+          },
+          "unrecognizedTypeCode": null,
+          "formula": null
+        }
+      ]
     },
-    {
-      "sheetPosition": 2,
-      "sheetName": "Sheet 2",
-      "name": "Table 1",
-      "identifier": "25e772dc0a40af2e3961d79e7e3be9ad",
-      "rowCount": 10,
-      "colCount": 5
-    }
-  ]
-}
+    "documentTables": [
+      {
+        "sheetPosition": 1,
+        "sheetName": "Sheet 1",
+        "name": "Table 1",
+        "identifier": "f3617f67f94a592f36e14fa6cc9846f8",
+        "rowCount": 12,
+        "colCount": 8
+      },
+      {
+        "sheetPosition": 1,
+        "sheetName": "Sheet 1",
+        "name": "Table 2",
+        "identifier": "7fc8ce14cf4a692b380f869beca4f9ce",
+        "rowCount": 10,
+        "colCount": 5
+      },
+      {
+        "sheetPosition": 2,
+        "sheetName": "Sheet 2",
+        "name": "Table 1",
+        "identifier": "25e772dc0a40af2e3961d79e7e3be9ad",
+        "rowCount": 10,
+        "colCount": 5
+      }
+    ]
+  }
+]
 ```
 
 </details>
 
-`pybers locale FILE` prints a document's language and region and the regions pybers offers, by language, and `pybers locale FILE LOCALE` changes it as Numbers' Language & Region does, writing as `pybers set` writes:
+`pybers locale FILE` prints a document's language and region as `pybers show` prints it, and `pybers locale FILE LOCALE` changes it as Numbers' Language & Region does, printing the region it holds afterward and writing as `pybers set` writes:
 
 ```console
 $ pybers locale budget.numbers de_DE
-Before: en_US
-After: de_DE
+Locale: de_DE
 ```
 
 The document then shows its numbers, dates and currencies as Germany writes them, `1.234,50 €`, and Numbers recalculates every formula when it opens it, since a result such as `DOLLAR` follows the region. pybers builds each locale field from macOS's own locale data, read into pybers before a release, so it writes a region exactly as Numbers would, on any system pybers runs on.
@@ -234,6 +244,7 @@ from decimal import Decimal
 
 document = pybers.create("en_US")
 budget = document.sheet("Sheet 1").tableAdd("Budget", rows=4, cols=2)
+budget.headersSet(headerRows=1)  # a header row, styled by Numbers
 budget.cell("A1").value = "Rent"
 budget.cell("B1").value = Decimal("1250.00")
 budget.cell("B4").formulaText = "=SUM(B1:B3)"
@@ -266,13 +277,10 @@ document.localeSet("de_DE")  # Numbers' Language & Region, one of pybers.locales
 document.save()
 ```
 
-Any document, sheet, table, range or cell has one JSON form, and reads back from it. `document.partSelect` reaches any of them by the selector `pybers show` takes:
+Any document, sheet, table, range or cell has one JSON form, and reads back from it:
 
 ```python
 import json
-
-totals = document.partSelect("Summary::Costs::B2:B6")  # a range naming its table
-print([cell.value for cell in costs.range(totals)])
 
 text = pybers.formatJsonForm(costs)
 form = json.loads(text, parse_float=Decimal, parse_int=Decimal)  # every number exact
@@ -280,6 +288,35 @@ assert pybers.parseJsonForm(text) == costs
 ```
 
 A whole document read from its JSON form saves as a created document holding what the form describes. A cell holding something pybers cannot yet create, rich text, a control or a format such as a percentage, is refused by name before anything is written.
+
+### Selectors
+
+One selector syntax reaches any sheet, table, range or cell, in the library, at the command line and for an agent alike, in the manner of CSS. It has three positions, sheet, table and cells, joined by `::`, and an empty position means any:
+
+| Selector | Matches |
+| -------- | ------- |
+| `Budget` | The sheet `Budget` |
+| `Budget::Q3` | The table `Q3` on `Budget` |
+| `Budget::Q3::B2:D9` | A range of that table, and in the same place a cell `B3`, a column `B` or a row `3` |
+| `*::Q3` | Every table named `Q3`, on any sheet |
+| `::Q3::B4` | Cell `B4` of every table named `Q3`, filled from the right after a leading `::` |
+| `::B3` | Cell `B3` of every table |
+| `[kind=number]` | Every number in the document |
+| `Budget::Q*[kind=number]` | Every number in the tables on `Budget` whose names start with `Q` |
+| `Budget::Q*:not(Q4)::B:nth-row(2n):not(:empty)` | Every second row of column `B` holding something, in each quarter but the fourth |
+| `Budget::*, Notes::Table 1` | Several selectors at once |
+
+A condition reads what pybers models, `[kind=duration]`, `[format=currency]`, `[control=slider]` or `[conditional]`, and a pseudo-class a cell's state or place: `:empty`, `:formula`, `:merged`, `:header`, `:footer`, `:nth-row(2n+1)` and `:nth-column(3n)`. A backslash takes a character literally, so a sheet named `Q3, draft` is `Q3\, draft`. `document.select`, `sheet.select` and `table.select` read a selector relative to their owner, as a path is read, and return a tuple of references, changing nothing:
+
+```python
+for found in document.select("Summary::Costs[kind=number]"):
+    print(found)  # Summary::Costs::B4, one reference per cell
+
+print(document.sheet("Summary").select("Costs::B2:B6"))  # a tuple holding one CellRange
+print(len(costs.select(":header")), "header cells")
+```
+
+An exact name matching nothing is refused, listing what the document holds, while a pattern or a condition matching nothing returns nothing. The full rules are in [`docs/library-design.md`](docs/library-design.md), under Addresses.
 
 A table's `cells` maps each address to its cell and is read-only: a cell changes through the table, as `costs.cell("B4")` does above, so no edit can leave a table holding something that is not one of its cells.
 
@@ -294,6 +331,8 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Adding and deleting rows and columns, with every formula and merge following
 - Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does
 - Merging and unmerging cells, and creating sheets and tables
+- Selecting any sheet, table, range or cell by one selector syntax, in the manner of CSS, by name, wildcard, a cell's kind, format or state, position pattern and negation
+- Reading and setting a table's header rows, header columns and footer rows
 - Showing any sheet, table, range or cell at the command line, as text or as its JSON form
 - Changing a document's language and region as Numbers does, in any of 335 regions
 - Writing a document or any part of one as JSON, and reading it back exactly

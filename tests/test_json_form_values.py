@@ -137,7 +137,7 @@ def testWhatJsonPrintsForADurationIsTextSetReadsAsThatDuration() -> None:
 
 
 @pytest.mark.parametrize(
-    "found", [pybers.NOT_REQUESTED, pybers.UNDETERMINED, pybers.WITHHELD]
+    "found", [pybers.UNDETERMINED, pybers.WITHHELD]
 )
 def testASentinelIsWrittenAsItsName(found: object) -> None:
     assert readTree(pybers.formatJsonForm(found)) == repr(found)
@@ -222,11 +222,11 @@ def testAValueOfTheWrongKindIsRefusedNamingWhatItMustBe() -> None:
     ('{"jsonFormVersion": 1, "jsonFormVersion": 1}', "appears twice"),
     ('{"jsonFormVersion": NaN}', "no number NaN"),
     ('{"jsonFormVersion": 99, "document": {"sheets": []}}', "jsonFormVersion being 99"),
-    ('{"jsonFormVersion": 2, "document": {"localeIdentifier": null, "sheets": [], '
+    ('{"jsonFormVersion": 3, "document": {"localeIdentifier": null, "sheets": [], '
      '"extra": 1}}', "no key 'extra'"),
-    ('{"jsonFormVersion": 2, "document": {"localeIdentifier": null}}',
+    ('{"jsonFormVersion": 3, "document": {"localeIdentifier": null}}',
      "sheets is missing"),
-    ('{"jsonFormVersion": 2, "document": {"sheets": []}}',
+    ('{"jsonFormVersion": 3, "document": {"sheets": []}}',
      "localeIdentifier is missing"),
 ])
 def testTextThatIsNotTheFormIsRefusedSayingWhy(text: str, refusal: str) -> None:

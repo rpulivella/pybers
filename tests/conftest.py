@@ -7,6 +7,8 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-11-03  `readRangeValues`, the values a range covers, and `listShownFields`,
+            the fields a command folds onto its lines, for PYB-223.
 2026-10-29  `readPlainText`, a command's output without color or wrapping, for
             PYB-272.
 2026-10-27  `renderPlain`, a command's output without color, for PYB-260.
@@ -34,6 +36,7 @@ from pathlib import Path
 
 import pytest
 
+import pybers
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import NumbersPackage, readPackage
 from pybers._persistence.cells import chooseOffsetUnit, decodeRow
@@ -89,6 +92,21 @@ def renderPlain(renderable: object) -> str:
     buffer = io.StringIO()
     Console(file=buffer, width=100, no_color=True, theme=theme).print(renderable)
     return buffer.getvalue()
+
+
+def listShownFields(text: str) -> list[tuple[str, str]]:
+    """Return each `Label: value` field a command printed, in order, folded or not."""
+    return [
+        (label, value)
+        for line in text.splitlines()
+        for field in line.strip().split("   ") if ": " in field
+        for label, value in [field.split(": ", 1)]
+    ]
+
+
+def readRangeValues(table: pybers.Table, text: str) -> list[object]:
+    """Return the value of each cell a bounded range covers, row by row."""
+    return [table.cell(address).value for address in pybers.CellRange.parse(text)]
 
 
 def copyDocument(stem: str, into: Path) -> Path:

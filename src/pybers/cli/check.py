@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """\
-`pybers check FILE`: whether pybers can read a document, and what it runs on.
+`pybers check FILE`: whether pybers can read a document, what it runs on, and its tree.
 
-The output is meant to be pasted into a public bug report, so it holds nothing
-from the document, not even its file name. `--names` adds the document's own
-names for the person holding it. Exit status 0 means
-pybers opened the document, and 1 means it could not, or that the file could not
+The output is meant to be pasted into a public bug report, so it holds nothing from
+the document, not even its file name: its sheets and tables show as their kind and
+size. `--names` adds the document's own names for the person holding it. Exit status 0
+means pybers opened the document, and 1 means it could not, or that the file could not
 be checked.
 
 UPDATES
+2026-11-03  Every check shows the sheets and tables as one tree, each unrecognized
+            cell badged under its table, `--names` naming them, for PYB-223.
 2026-10-27  Report lines and the sheet outline shared with `show`, a size of one
             row reading `1 row`, for PYB-260.
 2026-10-12  `--format json` prints the same facts, and an uninstalled pybers reads
@@ -38,7 +40,7 @@ import pybers
 from pybers.cli._common import findCommandSettings, reportPybersErrors
 from pybers.cli._console import TreeCompact, statusConsole
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
-from pybers.cli._report import formatLine, formatSheetTree
+from pybers.cli._report import BadgeLevel, formatBadge, formatCount, formatLine
 
 
 def formatPybersVersion(found: str | pybers.UNDETERMINED) -> str:
@@ -81,6 +83,32 @@ def formatReadable(failure: pybers.CheckFailure | None) -> list[Text]:
     ]
 
 
+def chooseName(name: str | pybers.WITHHELD, kind: str) -> str:
+    """Return a name, or the kind of thing it names when it is withheld."""
+    return name if isinstance(name, str) else kind
+
+
+def formatSheetTree(sheet: pybers.CheckSheet) -> TreeCompact:
+    """Return a sheet as a tree of its tables and sizes, unrecognized cells badged."""
+    root = Text(chooseName(sheet.name, "Sheet"), "value")
+    tree = TreeCompact(root, guide_style="label")
+    for table in sheet.tables:
+        size = (
+            f"{formatCount(table.rowCount, 'row')} × "
+            f"{formatCount(table.colCount, 'column')}"
+        )
+        branch = tree.add(Text.assemble(
+            (chooseName(table.name, "Table"), "value"), (": ", "label"), (size, "value")
+        ))
+        for cell in table.unrecognizedCells:
+            branch.add(Text.assemble(
+                (cell.address, "identifier"), " ",
+                formatBadge("unrecognized", BadgeLevel.WARNING),
+                (f" cell type {cell.typeCode}", "detail"),
+            ))
+    return tree
+
+
 def formatSheets(
     sheets: tuple[pybers.CheckSheet, ...] | pybers.UNDETERMINED,
 ) -> list[RenderableType]:
@@ -88,33 +116,6 @@ def formatSheets(
     if sheets is pybers.UNDETERMINED:
         return [formatLine("Sheets", "unknown")]
     return [Text("Sheets:", "label"), *(formatSheetTree(sheet) for sheet in sheets)]
-
-
-def formatUnrecognizedCells(
-    cells: tuple[pybers.CheckCell, ...] | pybers.UNDETERMINED,
-) -> list[RenderableType]:
-    """Return the unrecognized cells heading, then a tree per sheet down to each."""
-    if cells is pybers.UNDETERMINED:
-        return [formatLine("Unrecognized cells", "unknown")]
-    if not cells:
-        return [formatLine("Unrecognized cells", "none")]
-    grouped: dict[str, dict[str, list[pybers.CheckCell]]] = {}
-    for cell in cells:
-        byTable = grouped.setdefault(cell.sheetName, {})
-        byTable.setdefault(cell.tableName, []).append(cell)
-    shown: list[RenderableType] = [Text("Unrecognized cells:", "label")]
-    for sheetName, tables in grouped.items():
-        tree = TreeCompact(Text(sheetName, "value"), guide_style="label")
-        for tableName, tableCells in tables.items():
-            branch = tree.add(Text(tableName, "value"))
-            for cell in tableCells:
-                branch.add(Text.assemble(
-                    (cell.address, "identifier"),
-                    (": ", "label"),
-                    (f"cell type {cell.typeCode}", "warning"),
-                ))
-        shown.append(tree)
-    return shown
 
 
 def formatCheck(check: pybers.Check) -> Group:
@@ -134,9 +135,7 @@ def formatCheck(check: pybers.Check) -> Group:
             "Unrecognized cell types", formatTypeCounts(check.unrecognizedCellTypes)
         ),
     ]
-    if check.names is not pybers.NOT_REQUESTED:
-        shown += formatSheets(check.names.sheets)
-        shown += formatUnrecognizedCells(check.names.unrecognizedCells)
+    shown += formatSheets(check.sheets)
     return Group(*shown)
 
 
@@ -156,8 +155,8 @@ def runCheck(
         bool,
         typer.Option(
             "--names",
-            help="Add sheet and table names and where each unrecognized cell sits. "
-            "Not for posting publicly.",
+            help="Name each sheet and table, and say where each unrecognized cell "
+            "sits. Not for posting publicly.",
         ),
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,

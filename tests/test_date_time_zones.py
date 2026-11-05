@@ -32,23 +32,24 @@ typedSeconds: float = 814_179_600.0
 appleEpoch: datetime.datetime = datetime.datetime(2001, 1, 1)
 
 
-def readStoredSeconds(stem: str, reference: str) -> float:
-    """Return the seconds a date cell stores, read as the wall-clock time it is."""
-    value = pybers.open(findDocumentPath(stem)).cell(reference).value
+def readStoredSeconds(stem: str, address: str) -> float:
+    """Return the seconds a date cell of `Table 1` stores, as its wall-clock time."""
+    value = pybers.open(findDocumentPath(stem)).table("Table 1").cell(address).value
     assert isinstance(value, datetime.datetime)
     assert value.tzinfo is None
     return (value - appleEpoch).total_seconds()
 
 
 @pytest.mark.parametrize("stem", ["72-date-time-zones", "72b-date-time-zones-region"])
-@pytest.mark.parametrize("reference", ["Table 1::A1", "Table 1::B1"])
+@pytest.mark.parametrize("address", ["A1", "B1"])
 def testOneTypedTimeStoresOneValueInEveryZoneAndRegion(
-    stem: str, reference: str
+    stem: str, address: str
 ) -> None:
-    assert readStoredSeconds(stem, reference) == typedSeconds
+    assert readStoredSeconds(stem, address) == typedSeconds
 
 
 def testATypedZoneLeavesTheTimeAsText() -> None:
-    cell = pybers.open(findDocumentPath("72-date-time-zones")).cell("Table 1::C1")
+    document = pybers.open(findDocumentPath("72-date-time-zones"))
+    cell = document.table("Table 1").cell("C1")
     assert cell.value == "2026-10-20 09:00 PST"
     assert cell.kind is pybers.CellKind.TEXT

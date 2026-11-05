@@ -8,6 +8,7 @@ kind a person adds, into which Numbers 15.4 inserted a table, text box, shape, l
 chart, image and SVG on 2 November 2026, and one sheet in the pybers reset.
 
 UPDATES
+2026-11-03  `pybers show` prints a created document in full, for PYB-223.
 2026-11-02  Written for PYB-261.
 """
 from __future__ import annotations
@@ -334,5 +335,6 @@ def testTheShowCommandReadsACreatedDocument(tmp_path: Path) -> None:
     result = CliRunner().invoke(app, ["show", str(createSaved(tmp_path))])
 
     assert result.exit_code == 0, result.output
-    assert "Sheet 1" in result.stdout
-    assert "Table" not in result.stdout
+    assert result.stdout.splitlines() == [
+        "Locale: en_US", "", "Sheet: Sheet 1",
+    ]

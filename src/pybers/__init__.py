@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-03  The selector, its matches, `TableHeaders`, `CellChanges` and `CellSkip`
+            re-exported, for PYB-223.
 2026-11-02  `create` re-exported, for PYB-261.
 2026-10-28  `LocaleChange`, `LocaleError` and `locales` re-exported, for PYB-272.
 2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
@@ -44,7 +46,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
-lazy from pybers.absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
+lazy from pybers.absence import UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
     CellAddress,
     CellOffset,
@@ -66,7 +68,6 @@ lazy from pybers.check import (
     CheckCell,
     CheckEnvironment,
     CheckFailure,
-    CheckNames,
     CheckSheet,
     CheckTable,
     NumbersVersion,
@@ -125,9 +126,17 @@ lazy from pybers.interchange import (
     jsonFormVersion,
     parseJsonForm,
 )
+lazy from pybers.selection import (
+    SelectionMatch,
+    Selector,
+    SelectorError,
+    SelectorLike,
+    quoteSelectorName,
+)
 lazy from pybers.table import (
     Cell,
     CellChange,
+    CellChanges,
     CellControl,
     CellControlBase,
     CellControlCheckbox,
@@ -140,10 +149,12 @@ lazy from pybers.table import (
     CellFormat,
     CellKind,
     CellPresentation,
+    CellSkip,
     CellValue,
     CellValueFill,
     MergeRange,
     Table,
+    TableHeaders,
     TableRow,
     TableRows,
     formatCellValue,
@@ -152,7 +163,6 @@ lazy from pybers.table import (
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
 __all__ = [
-    "NOT_REQUESTED",
     "UNDETERMINED",
     "WITHHELD",
     "ArgumentCountError",
@@ -198,13 +208,14 @@ __all__ = [
     "CheckCell",
     "CheckEnvironment",
     "CheckFailure",
-    "CheckNames",
     "CheckSheet",
     "CheckTable",
     "NumbersVersion",
     "checkDocument",
     "Cell",
     "CellChange",
+    "CellChanges",
+    "CellSkip",
     "CellControl",
     "CellControlBase",
     "CellControlCheckbox",
@@ -238,6 +249,12 @@ __all__ = [
     "MergeRange",
     "Position",
     "SelectionError",
+    "SelectionMatch",
+    "Selector",
+    "SelectorError",
+    "SelectorLike",
+    "quoteSelectorName",
+    "TableHeaders",
     "Sheet",
     "Table",
     "TableRow",

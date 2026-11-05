@@ -37,7 +37,7 @@ class LocaleError(PybersError, ValueError):
 
 @dataclass(frozen=True, slots=True)
 class LocaleChange:
-    """What a region change did to a document, or would do in a preview."""
+    """What a region change did to a document."""
 
     localeBefore: str | None
     localeAfter: str

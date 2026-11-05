@@ -10,6 +10,7 @@ so no golden is made any other way. A test asserting what a golden holds reads i
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-03  A golden setting a created table's headers, for PYB-223.
 2026-11-02  A golden starting from a fixture or measurement names why, for PYB-261.
 2026-11-02  A golden can start from a created document, for PYB-261.
 2026-10-29  A golden for each measured region, for PYB-272.
@@ -411,6 +412,20 @@ def addTables(document: pybers.Document) -> None:
     output.cell("B5").value = "last cell"
 
 
+def setHeaders(document: pybers.Document) -> None:
+    """Set every header and footer count of one table, and grow another's header."""
+    sheet = document.sheet()
+    headers = sheet.tableAdd("Headers", rows=8, cols=4)
+    headers.headersSet(headerRows=2, headerColumns=1, footerRows=1)
+    for row, label in ((1, "header"), (3, "body"), (8, "footer")):
+        headers.cell(f"B{row}").value = label
+    headers.cell("A5").value = "side"
+    grown = sheet.tableAdd("Grown", rows=4, cols=2)
+    grown.headersSet(headerRows=1)
+    grown.rowAdd(1)
+    grown.cell("A1").value = "header"
+
+
 def fillAcross(rule: FormulaReferenceRelocation) -> Callable[[pybers.Document], None]:
     """Return a mutation filling `A1` across `A1:D1` under a reference rule."""
 
@@ -606,6 +621,7 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("00-created-tables-added-by-pybers", None, addTables),
     GoldenBuilder("00-created-formulas-in-tables-by-pybers", None,
                   addCreatedFormulaTables),
+    GoldenBuilder("00-created-headers-set-by-pybers", None, setHeaders),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.

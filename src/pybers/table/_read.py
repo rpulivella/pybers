@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-11-03  A table's header rows, header columns and footer rows, for PYB-223.
 2026-11-02  A table of a document never saved names none, for PYB-261.
 2026-10-29  A table's records walked through `StoredTiles`, for PYB-278.
 2026-10-22  Each cell's control read into its presentation, for PYB-255.
@@ -84,6 +85,7 @@ from ._controls import readControls
 from .cell import Cell, CellValue
 from .cells import Table
 from .controls import CellControl
+from .headers import TableHeaders
 from .kinds import CellFormat, CellKind, CellPresentation, CellStorage, emptyStorage
 from .merges import MergeRange
 
@@ -384,6 +386,11 @@ def readTable(
         identifier=identifier,
         _rowIdentities=rowIdentities,
         _columnIdentities=columnIdentities,
+        _headers=TableHeaders(
+            model.number_of_header_rows,
+            model.number_of_header_columns,
+            model.number_of_footer_rows,
+        ),
     )
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)

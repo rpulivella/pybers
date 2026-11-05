@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """\
-A cell reached by a reference, each owner taking its part and handing the rest down.
+A sheet, a table and a cell reached by the typed lookups through the one resolver.
 
 `20-formula-shapes` names two tables `Table 1`, one on each sheet, and one table
 `Table 2`, so it holds a table name that is unique and one that is shared.
 
 UPDATES
+2026-11-03  The typed lookups, `document.cell` and `sheet.cell` removed, for
+            PYB-223.
 2026-10-27  Each listed table name quoted, for PYB-260.
 2026-10-20  Written for PYB-217.
 """
@@ -51,30 +53,36 @@ def testAReferenceRefusesAnEmptyTableName() -> None:
         CellReference.parse("::B3")
 
 
-def testATypedReferenceWalksSheetThenTableThenCell(document: pybers.Document) -> None:
-    reference = CellReference(
-        1, 1, table=TableReference(sheet=SheetReference("Sheet 2"), name="Table 1")
-    )
-    assert document.cell(reference) is (
-        document.sheet("Sheet 2").table("Table 1").cell("A1")
-    )
+def testATableReferenceNamingItsSheetReachesThatTable(
+    document: pybers.Document,
+) -> None:
+    reference = TableReference(sheet=SheetReference("Sheet 2"), name="Table 1")
+    assert document.table(reference) is document.sheet("Sheet 2").table("Table 1")
 
 
 def testAUniqueTableNameNeedsNoSheet(document: pybers.Document) -> None:
-    assert document.cell("Table 2::B3") is (
-        document.sheet("Sheet 1").table("Table 2").cell("B3")
-    )
+    assert document.table("Table 2") is document.sheet("Sheet 1").table("Table 2")
 
 
 def testATableNameMatchesWhateverItsCase(document: pybers.Document) -> None:
-    assert document.cell("table 2::B3") is document.cell("Table 2::B3")
+    assert document.table("table 2") is document.table("Table 2")
+
+
+def testASheetNameMatchesOnlyItsOwnCase(document: pybers.Document) -> None:
+    with pytest.raises(pybers.SelectionError, match="'sheet 1'"):
+        document.sheet("sheet 1")
+
+
+def testANameIsTakenLiterallyNeverAsAPattern(document: pybers.Document) -> None:
+    with pytest.raises(pybers.SelectionError, match="'Table \\*'"):
+        document.table("Table *")
 
 
 def testASharedTableNameIsRefusedWithTheNamesThatMatch(
     document: pybers.Document,
 ) -> None:
     with pytest.raises(pybers.SelectionError) as raised:
-        document.cell("Table 1::B3")
+        document.table("Table 1")
     assert "'Sheet 1::Table 1', 'Sheet 2::Table 1'" in str(raised.value)
 
 
@@ -82,29 +90,54 @@ def testAnUnknownTableIsRefusedWithTheTablesThatExist(
     document: pybers.Document,
 ) -> None:
     with pytest.raises(pybers.SelectionError) as raised:
-        document.cell("Ledger::B3")
-    assert "'Ledger'" in str(raised.value)
+        document.table("Ledger")
+    assert str(raised.value).startswith("No table in this document is named 'Ledger'.")
     assert "'Sheet 1::Table 2'" in str(raised.value)
 
 
-def testADocumentRefusesAReferenceNamingNoTable(document: pybers.Document) -> None:
-    with pytest.raises(pybers.SelectionError, match="names no table"):
-        document.cell("B3")
+def testNoSheetNamedIsRefusedWhenThereAreSeveral(document: pybers.Document) -> None:
+    with pytest.raises(pybers.SelectionError) as raised:
+        document.sheet()
+    assert str(raised.value) == (
+        "No sheet was named, and this document holds 2. Name one. The sheets are "
+        "'Sheet 1', 'Sheet 2'."
+    )
+
+
+def testNoTableNamedIsRefusedListingEveryTable(document: pybers.Document) -> None:
+    with pytest.raises(pybers.SelectionError, match="'Sheet 2::Table 1'"):
+        document.table()
+
+
+def testNoNameReachesTheOnlySheetAndTheOnlyTable() -> None:
+    document = pybers.create("en_US")
+    table = document.sheet().tableAdd("Ledger", 3, 3)
+    assert document.sheet() is document.sheets[0]
+    assert document.table() is table
+    assert document.sheet().table() is table
+
+
+def testASheetWithNoTableRefusesNoNameSayingSo() -> None:
+    with pytest.raises(pybers.SelectionError, match="holds none"):
+        pybers.create("en_US").sheet().table()
 
 
 def testASheetReachesItsOwnTable(document: pybers.Document) -> None:
-    sheet = document.sheet("Sheet 1")
-    assert sheet.cell("Table 1::C2") is sheet.table("Table 1").cell("C2")
+    sheet = document.sheet("Sheet 2")
+    assert sheet.table("table 1") is sheet.tables[0]
 
 
-def testASheetRefusesAReferenceNamingAnotherSheet(document: pybers.Document) -> None:
-    with pytest.raises(pybers.SelectionError, match="names the sheet 'Sheet 2'"):
-        document.sheet("Sheet 1").cell("Sheet 2::Table 1::A1")
+def testASheetRefusesATableItDoesNotHold(document: pybers.Document) -> None:
+    with pytest.raises(pybers.SelectionError) as raised:
+        document.sheet("Sheet 2").table("Table 2")
+    assert str(raised.value) == (
+        "No table in 'Sheet 2' is named 'Table 2'. The tables are 'Table 1'."
+    )
 
 
-def testASheetRefusesAReferenceNamingNoTable(document: pybers.Document) -> None:
-    with pytest.raises(pybers.SelectionError, match="names no table"):
-        document.sheet("Sheet 1").cell("B3")
+def testABoolIsNeitherANameNorAPosition(document: pybers.Document) -> None:
+    with pytest.raises(pybers.SelectionError, match="neither"):
+        document.sheet(True)
 
 
 def testATableTakesItsOwnQualifiedReference(document: pybers.Document) -> None:
@@ -121,9 +154,9 @@ def testAReferenceOutsideItsTableNamesTheTablesSize(
     document: pybers.Document,
 ) -> None:
     with pytest.raises(pybers.ReferenceError, match="10 rows by 5 columns"):
-        document.cell("Table 2::Z99")
+        document.table("Table 2").cell("Z99")
 
 
-def testACellsOwnReferenceLeadsBackToIt(document: pybers.Document) -> None:
+def testACellsOwnReferenceSelectsIt(document: pybers.Document) -> None:
     cell = document.sheet("Sheet 2").table("Table 1").cell("C4")
-    assert document.cell(cell.reference) is cell
+    assert document.select(str(cell.reference)) == (cell.reference,)

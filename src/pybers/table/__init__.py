@@ -20,6 +20,8 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-11-03  `TableHeaders`, a table's header rows, header columns and footer rows,
+            for PYB-223.
 2026-10-24  `CellControlType`, the type a control names itself by, for PYB-259.
 2026-10-22  The controls a cell presents its value through, and
             `CellPresentation` replacing `CellDescription`, for PYB-255.
@@ -44,7 +46,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from pybers.table.cell import Cell, CellChange, CellValue
+from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
 from pybers.table.cells import Table
 from pybers.table.controls import (
     CellControl,
@@ -58,6 +60,7 @@ from pybers.table.controls import (
     CellControlUnknown,
 )
 from pybers.table.fill import CellValueFill
+from pybers.table.headers import TableHeaders
 from pybers.table.inference import formatCellValue, parseCellValue
 from pybers.table.kinds import CellFormat, CellKind, CellPresentation
 from pybers.table.merges import MergeRange
@@ -69,6 +72,8 @@ __all__ = [
     "CellFormat",
     "CellKind",
     "CellChange",
+    "CellChanges",
+    "CellSkip",
     "CellControl",
     "CellControlBase",
     "CellControlCheckbox",
@@ -82,6 +87,7 @@ __all__ = [
     "CellValueFill",
     "MergeRange",
     "Table",
+    "TableHeaders",
     "TableRow",
     "TableRows",
     "formatCellValue",

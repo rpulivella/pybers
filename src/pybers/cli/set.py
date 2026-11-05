@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """\
-`pybers set`: one cell's value, its kind inferred from the text or named with `--as`.
+`pybers set`: the value of every cell a selector matches, its kind inferred or named.
 
 The command reads the text into a value, makes one `cellSet` call, and saves only
-when the cell changed and the call was not a preview.
+when a cell changed and the call was not a preview. Each cell written prints as
+`pybers show` prints it, in text and JSON alike, and each part skipped prints why on
+stderr.
 
 UPDATES
+2026-11-03  SELECTOR sets every cell it matches, reporting each skipped, for
+            PYB-223. Each cell written prints as `pybers show` prints it.
 2026-10-28  Where a write goes shared with `locale`, FILE itself unless `-o`
             names a new one, for PYB-272.
 2026-10-27  Report lines shared with `show`, growth by one row reading `1 row`,
@@ -28,8 +32,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Group
-from rich.text import Text
 
 import pybers
 from pybers.cli._common import (
@@ -39,30 +41,10 @@ from pybers.cli._common import (
     reportPybersErrors,
     reportWrite,
 )
+from pybers.cli._console import statusConsole
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
-from pybers.cli._report import formatCount, formatLine
-
-
-def formatValue(value: pybers.CellValue, kind: pybers.CellKind) -> Text:
-    """Return a value and its kind as one report value, `none` for an empty cell."""
-    shown = pybers.formatCellValue(value)
-    return Text.assemble((shown, "value"), (f" ({kind.value})", "detail"))
-
-
-def formatChange(change: pybers.CellChange) -> Group:
-    """Return the report lines of one cell's change."""
-    lines = [
-        formatLine("Cell", (str(change.reference), "identifier")),
-        formatLine("Before") + formatValue(change.valueBefore, change.kindBefore),
-        formatLine("After") + formatValue(change.valueAfter, change.kindAfter),
-    ]
-    if change.rowsAdded or change.colsAdded:
-        lines.append(formatLine(
-            "Grown",
-            f"{formatCount(change.rowsAdded, 'row')}, "
-            f"{formatCount(change.colsAdded, 'column')}",
-        ))
-    return Group(*lines)
+from pybers.cli._report import formatLine
+from pybers.cli.show import ShownPart, formatShownParts
 
 
 def runSet(
@@ -73,11 +55,15 @@ def runSet(
             metavar="FILE", help="The .numbers document.", show_default=False
         ),
     ],
-    reference: Annotated[
+    selector: Annotated[
         str,
         typer.Argument(
-            metavar="CELL",
-            help="The cell, its table named: `Q3::B4` or `Budget::Q3::B4`.",
+            metavar="SELECTOR",
+            # A backslash keeps Rich from reading a condition as markup.
+            help=(
+                "The cells to set: `Budget::Q3::B4`, `::Q3::B4` for B4 of every table "
+                "named Q3, or `Budget::Q*::B2:B9\\[kind=number]`."
+            ),
             show_default=False,
         ),
     ],
@@ -118,27 +104,33 @@ def runSet(
     preview: PreviewOption = False,
     extend: Annotated[
         bool,
-        typer.Option("--extend", help="Grow the table when CELL lies outside it."),
+        typer.Option(
+            "--extend",
+            help="Grow the table when SELECTOR names one cell lying outside it.",
+        ),
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
-    """Set one cell's value, its kind inferred from VALUE unless --as names one."""
+    """Set every cell SELECTOR matches, the kind inferred from VALUE unless --as."""
     target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
         document = (
             pybers.open(documentPath) if timeZone is None
             else pybers.open(documentPath, timeZone=timeZone)
         )
-        change = document.cellSet(
-            reference,
-            pybers.parseCellValue(value, kind),
-            extend=extend,
-            preview=preview,
+        changes = document.cellSet(
+            selector, pybers.parseCellValue(value, kind), extend=extend
         )
-        if target is not None and change.changed:
+        cells: list[ShownPart] = [
+            document.table(each.reference.table).cell(each.reference)
+            for each in changes.changes if each.reference.table is not None
+        ]
+        if target is not None and changes.changed:
             document.save(target)
-    printResult(change, outputFormat, formatChange)
-    reportWrite(change.changed, target, "the cell already holds that.")
+    printResult(cells, outputFormat, formatShownParts)
+    for skip in changes.skipped:
+        statusConsole.print(formatLine("Skipped", skip.reason))
+    reportWrite(changes.changed, target, "no cell it matched changes.")
 
 
 __all__ = ["runSet"]

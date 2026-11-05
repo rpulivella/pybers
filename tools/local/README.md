@@ -33,6 +33,10 @@ golden_confirm.py    confirm a golden in running Numbers and write a report of w
                      so Terminal holds none. Backs `/golden-confirm`, and its
                      `measure` backs `/fixture-create`. Nothing in the preflight, CI
                      or the suite runs it
+selection_benchmark.py
+                     time the selector's one resolver on a simple, a typical and a
+                     far larger document built in memory. Never in CI. Its runs
+                     are recorded in docs/findings/findings-13-selection.md
 jsonform_schema.py   generate the JSON Schema of pybers' JSON form from the model.
                      Writes src/pybers/interchange/schema.json, which a test holds
                      to the model

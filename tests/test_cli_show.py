@@ -7,6 +7,8 @@ first alone, and its `A11` holds `=SUM(A1:A10)`. `81-control-formats` holds a ce
 for each control, a slider in `A1` and a pop-up menu in `I1`.
 
 UPDATES
+2026-11-03  A selector read by its positions, each match printed as it prints
+            alone, a document in full, and a table's headers, for PYB-223.
 2026-10-28  A document's outline opens with its locale, for PYB-272.
 2026-10-27  Written for PYB-260.
 """
@@ -23,15 +25,22 @@ __date__ = "2026/10/27"
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner, Result
 
 import pybers
-from conftest import copyDocument, findDocumentPath, renderPlain
+from conftest import copyDocument, findDocumentPath, listShownFields, renderPlain
 from pybers.cli._app import app
-from pybers.cli.show import formatCell, formatControl, formatFormat, formatSheet
+from pybers.cli.show import (
+    formatCell,
+    formatControl,
+    formatFormat,
+    formatSheet,
+    formatTable,
+)
 
 runner: CliRunner = CliRunner()
 
@@ -45,9 +54,9 @@ def runShowCommand(*arguments: str | Path) -> Result:
 
 
 def findLines(result: Result, label: str) -> list[str]:
-    """Return every line of a result opening with a label."""
-    return [line for line in result.stdout.splitlines()
-            if line.startswith(f"{label}: ")]
+    """Return every field of a result under a label, as `Label: value`."""
+    return [f"{each}: {value}" for each, value in listShownFields(result.stdout)
+            if each == label]
 
 
 def readFingerprint(path: Path) -> tuple[tuple[str, str, int], ...]:
@@ -60,46 +69,43 @@ def readFingerprint(path: Path) -> tuple[tuple[str, str, int], ...]:
     )
 
 
-def testADocumentShowsEachSheetWithItsTablesAndSizes() -> None:
+def testADocumentShowsItsLocaleThenEachSheetInFull() -> None:
     result = runShowCommand(shapesPath)
     assert result.exit_code == 0
-    assert result.stdout.splitlines() == [
-        "Locale: en_US",
-        "Sheets:",
-        "Sheet 1",
-        "├ Table 1: 12 rows, 8 columns",
-        "└ Table 2: 10 rows, 5 columns",
-        "Sheet 2",
-        "└ Table 1: 10 rows, 5 columns",
+    assert result.stdout.splitlines()[:5] == [
+        "Locale: en_US", "", "Sheet: Sheet 1  2 tables", "",
+        "  Table: Sheet 1::Table 1  12 rows × 8 columns  26 cells",
     ]
+    assert findLines(result, "Sheet") == [
+        "Sheet: Sheet 1  2 tables", "Sheet: Sheet 2  1 table",
+    ]
+    assert len(findLines(result, "Cell")) == sum(
+        len(table.cells) for sheet in pybers.open(shapesPath).sheets
+        for table in sheet.tables
+    )
 
 
-def testACellShowsOneLabeledLinePerFact() -> None:
+def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
     result = runShowCommand(shapesPath, "Sheet 1::Table 1::A11")
     assert result.exit_code == 0
     assert result.stdout.splitlines() == [
         "Cell: Sheet 1::Table 1::A11",
-        "Value: 55",
-        "Kind: number",
-        "Formula text: =SUM(A1:A10)",
-        "Value cached: yes",
-        "Format: number",
-        "Format chosen: no",
-        "Control: none",
-        "Unrecognized type code: none",
+        "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
+        "  Format: number   Format chosen: no   Control: none",
+        "  Unrecognized type code: none",
     ]
 
 
-def testACellsLinesFollowTheNamesAndOrderOfItsJsonForm() -> None:
+def testACellsFieldsFollowTheNamesAndOrderOfItsJsonForm() -> None:
     form = json.loads(pybers.formatJsonForm(
-        pybers.open(shapesPath).cell("Sheet 1::Table 1::A11")
+        pybers.open(shapesPath).sheet("Sheet 1").table("Table 1").cell("A11")
     ))["table"]["cells"][0]
     keys = [key for key in form if key not in ("address", "formula")]
     index = keys.index("presentation")
     keys[index:index + 1] = list(form["presentation"])
     expected = [re.sub(r"(?<!^)(?=[A-Z])", " ", key).capitalize() for key in keys]
-    lines = runShowCommand(shapesPath, "Sheet 1::Table 1::A11").stdout.splitlines()
-    assert [line.split(": ")[0] for line in lines[1:]] == expected
+    fields = listShownFields(runShowCommand(shapesPath, "Sheet 1::Table 1::A11").stdout)
+    assert [label for label, _ in fields[1:]] == expected
 
 
 @pytest.mark.parametrize(("address", "control"), [
@@ -109,14 +115,14 @@ def testACellsLinesFollowTheNamesAndOrderOfItsJsonForm() -> None:
     ("J1", "star-rating"),
 ])
 def testAControlShowsEverySettingItHolds(address: str, control: str) -> None:
-    result = runShowCommand(controlsPath, f"Table 1::{address}")
+    result = runShowCommand(controlsPath, f"::Table 1::{address}")
     assert findLines(result, "Control") == [f"Control: {control}"]
 
 
 def testAControlsSettingsAreNamedAndOrderedAsItsJsonForm() -> None:
-    control = pybers.open(controlsPath).cell("Table 1::I1").presentation.control
+    control = pybers.open(controlsPath).table("Table 1").cell("I1").presentation.control
     family, *keys = json.loads(pybers.formatJsonForm(control))
-    line = findLines(runShowCommand(controlsPath, "Table 1::I1"), "Control")[0]
+    line = findLines(runShowCommand(controlsPath, "::Table 1::I1"), "Control")[0]
     assert family == "controlType"
     found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', ' ', key).lower()} ")
              for key in keys]
@@ -155,50 +161,58 @@ def testEveryFormatAndControlShowsEachSettingOfItsJsonForm() -> None:
         assert found == sorted(found) and len(found) == len(settings), (stem, line)
 
 
-def testATableShowsItsSizeMergesAndEachCell() -> None:
-    result = runShowCommand(shapesPath, "Table 2")
-    assert result.stdout.splitlines()[:5] == [
-        "Table: Sheet 1::Table 2",
-        "Size: 10 rows, 5 columns",
-        "Merges: none",
-        "Cells: 1 cell",
+def testATableShowsItsSizeAndCellCountOnOneLineThenEachCell() -> None:
+    result = runShowCommand(shapesPath, "*::Table 2")
+    assert result.stdout.splitlines()[:3] == [
+        "Table: Sheet 1::Table 2  10 rows × 5 columns  1 cell",
         "",
+        "  Cell: Sheet 1::Table 2::A1",
     ]
-    assert findLines(result, "Cell") == ["Cell: Sheet 1::Table 2::A1"]
+
+
+def testATablesBandsShowWhenItHasThem() -> None:
+    table = pybers.create("en_US").sheet().tableAdd("Headers", 4, 3)
+    table.headersSet(headerRows=1, footerRows=2)
+    assert renderPlain(formatTable(table)).splitlines() == [
+        "Table: Sheet 1::Headers  4 rows × 3 columns  1 header row, 2 footer rows",
+    ]
 
 
 def testATableListsEachOfItsMerges() -> None:
-    result = runShowCommand(findDocumentPath("22-merge-2x2"), "Table 1")
-    assert findLines(result, "Merges") == [
-        "Merges: A1:B1, C1:D1, E1:F1, G1:H1, I1:J1",
-    ]
+    result = runShowCommand(findDocumentPath("22-merge-2x2"), "*::Table 1")
+    assert result.stdout.splitlines()[0] == (
+        "Table: Sheet 1::Table 1  2 rows × 13 columns  "
+        "merges A1:B1, C1:D1, E1:F1, G1:H1, I1:J1  18 cells"
+    )
 
 
-def testASheetHoldingNoTablesSaysSo() -> None:
+def testASheetHoldingNoTablesShowsItsNameAlone() -> None:
     printed = renderPlain(formatSheet(pybers.Sheet(name="Empty")))
-    assert printed.splitlines() == ["Sheet: Empty", "Tables: none"]
+    assert printed.splitlines() == ["Sheet: Empty"]
 
 
 def testAFormatASaveHasNotChosenReadsUnknown() -> None:
-    cell = pybers.open(shapesPath).cell("Sheet 1::Table 1::A1")
+    cell = pybers.open(shapesPath).sheet("Sheet 1").table("Table 1").cell("A1")
     cell.value = "text"
     assert cell.presentation.format is pybers.UNDETERMINED
-    assert "Format: unknown" in renderPlain(formatCell(cell)).splitlines()
+    assert ("Format", "unknown") in listShownFields(renderPlain(formatCell(cell)))
 
 
-def testASheetShowsEachOfItsTables() -> None:
+def testASheetShowsEachOfItsTablesIndentedUnderIt() -> None:
     result = runShowCommand(shapesPath, "Sheet 1")
-    assert result.stdout.splitlines()[:2] == ["Sheet: Sheet 1", "Tables: 2 tables"]
-    assert findLines(result, "Table") == [
+    assert result.stdout.splitlines()[:3] == [
+        "Sheet: Sheet 1  2 tables", "",
+        "  Table: Sheet 1::Table 1  12 rows × 8 columns  26 cells",
+    ]
+    assert [line.split("  ")[1] for line in result.stdout.splitlines()
+            if line.startswith("  Table: ")] == [
         "Table: Sheet 1::Table 1", "Table: Sheet 1::Table 2",
     ]
 
 
 def testARangeShowsOnlyTheCellsWithinIt() -> None:
     result = runShowCommand(shapesPath, "Sheet 1::Table 1::A1:C3")
-    assert result.stdout.splitlines()[:2] == [
-        "Range: Sheet 1::Table 1::A1:C3", "Cells: 3 cells",
-    ]
+    assert result.stdout.splitlines()[0] == "Range: Sheet 1::Table 1::A1:C3  3 cells"
     assert findLines(result, "Cell") == [
         "Cell: Sheet 1::Table 1::A1",
         "Cell: Sheet 1::Table 1::A2",
@@ -206,27 +220,52 @@ def testARangeShowsOnlyTheCellsWithinIt() -> None:
     ]
 
 
-def testARangeHoldingNothingSaysSo() -> None:
-    result = runShowCommand(shapesPath, "Table 2::B2:C4")
-    assert result.stdout.splitlines() == [
-        "Range: Sheet 1::Table 2::B2:C4", "Cells: none",
-    ]
+def testARangeHoldingNothingShowsItsNameAlone() -> None:
+    result = runShowCommand(shapesPath, "::Table 2::B2:C4")
+    assert result.stdout.splitlines() == ["Range: Sheet 1::Table 2::B2:C4"]
 
 
-@pytest.mark.parametrize("selector", [
-    None, "Sheet 1", "Table 2", "Sheet 1::Table 1::A1:C3", "Sheet 1::Table 1::A11",
+@pytest.mark.parametrize(("selector", "part"), [
+    (None, lambda document: document),
+    ("Sheet 1", lambda document: [document.sheet("Sheet 1")]),
+    ("*::Table 2", lambda document: [document.table("Table 2")]),
+    ("Sheet 1::Table 1::A11", lambda document: [
+        document.sheet("Sheet 1").table("Table 1").cell("A11")
+    ]),
+    ("Sheet 1::Table 1::A1:C3, Sheet 2", lambda document: [
+        (document.sheet("Sheet 1").table("Table 1"), pybers.CellRange.parse("A1:C3")),
+        document.sheet("Sheet 2"),
+    ]),
+    ("Q*", lambda document: []),
 ])
-def testJsonIsTheFormTheLibraryWritesForWhatIsSelected(selector: str | None) -> None:
-    document = pybers.open(shapesPath)
-    part = document if selector is None else document.partSelect(selector)
-    expected = (
-        pybers.formatJsonForm(document.sheet("Sheet 1").table("Table 1"), part)
-        if isinstance(part, pybers.CellRange) else pybers.formatJsonForm(part)
-    )
+def testJsonIsTheFormTheLibraryWritesForWhatIsSelected(
+    selector: str | None, part: Callable[[pybers.Document], object]
+) -> None:
+    expected = pybers.formatJsonForm(part(pybers.open(shapesPath)))
     arguments = [shapesPath] if selector is None else [shapesPath, selector]
     result = runShowCommand(*arguments, "--format", "json")
     assert result.exit_code == 0
     assert result.stdout == expected + "\n"
+
+
+def testJsonOfSeveralPartsReadsBackAsEachPart() -> None:
+    result = runShowCommand(shapesPath, "::A1, Sheet 2", "--format", "json")
+    parts = pybers.parseJsonForm(result.stdout)
+    assert isinstance(parts, list)
+    assert [type(each).__name__ for each in parts] == ["Cell", "Cell", "Cell", "Sheet"]
+
+
+def testSeveralMatchesEachPrintAsTheyPrintAlone() -> None:
+    together = runShowCommand(shapesPath, "*::Table 2, ::A11").stdout
+    alone = [runShowCommand(shapesPath, each).stdout
+             for each in ("*::Table 2", "::A11")]
+    assert together == "\n".join(alone)
+
+
+def testAPatternMatchingNothingPrintsNothing() -> None:
+    result = runShowCommand(shapesPath, "Q*")
+    assert result.exit_code == 0
+    assert result.stdout == ""
 
 
 def testASelectorNamingNothingIsRefusedWithWhatTheDocumentHolds() -> None:
@@ -234,14 +273,22 @@ def testASelectorNamingNothingIsRefusedWithWhatTheDocumentHolds() -> None:
     assert result.exit_code == 1
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
-        "pybers show: No sheet or table in this document is named 'Ledger'. The "
-        "sheets are 'Sheet 1', 'Sheet 2'. The tables are 'Sheet 1::Table 1', "
-        "'Sheet 1::Table 2', 'Sheet 2::Table 1'.",
+        "pybers show: No sheet in this document is named 'Ledger'. The sheets are "
+        "'Sheet 1', 'Sheet 2'.",
     ]
 
 
+def testAMalformedSelectorIsRefusedAtTheColumnItGoesWrong() -> None:
+    result = runShowCommand(shapesPath, "Sheet 1::Table 1[kind=nmber]")
+    assert result.exit_code == 1
+    assert result.stderr.startswith(
+        "pybers show: `Sheet 1::Table 1[kind=nmber]`, column 17: `nmber` is no "
+        "value of `[kind]`. It takes empty, number,"
+    )
+
+
 def testACellOutsideItsTableIsRefusedWithTheTablesSize() -> None:
-    result = runShowCommand(shapesPath, "Table 2::F1")
+    result = runShowCommand(shapesPath, "::Table 2::F1")
     assert result.exit_code == 1
     assert result.stderr.splitlines() == [
         "pybers show: F1 is outside 'Table 2', which is 10 rows by 5 columns.",
@@ -256,7 +303,7 @@ def testAMissingDocumentIsRefused(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("selector", [
-    "Sheet 1", "Table 2", "Table 2::B2:C4", "Table 2::B3", "Ledger",
+    "Sheet 1", "*::Table 2", "::Table 2::B2:C4", "::Table 2::B3", "Ledger", "::A1",
 ])
 def testShowNeverWritesTheDocument(tmp_path: Path, selector: str) -> None:
     working = copyDocument("20-formula-shapes", tmp_path)
@@ -265,3 +312,8 @@ def testShowNeverWritesTheDocument(tmp_path: Path, selector: str) -> None:
     runShowCommand(working, selector, "--format", "json")
     assert readFingerprint(working) == before
     assert sorted(tmp_path.iterdir()) == [working]
+
+
+def testTheHelpShowsAConditionInItsExampleSelector() -> None:
+    result = runner.invoke(app, ["show", "--help"], terminal_width=200)
+    assert "[kind=number]" in result.stdout
