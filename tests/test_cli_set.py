@@ -254,3 +254,8 @@ def testGrowingATableTakesOneCellAndIsRefusedBeforeWriting(working: Path) -> Non
         "cell grows one: `Sheet 1::Table 1`, `Sheet 2::Table 1`.",
     ]
     assert working.read_bytes() == before
+
+
+def testTheHelpShowsAConditionInItsExampleSelector() -> None:
+    result = runner.invoke(app, ["set", "--help"], terminal_width=200)
+    assert "[kind=number]" in result.stdout

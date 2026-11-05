@@ -272,9 +272,10 @@ def runShow(
         str | None,
         typer.Argument(
             metavar="SELECTOR",
+            # A backslash keeps Rich from reading a condition as markup.
             help=(
                 "What to show: `Budget`, `Budget::Q3`, `::Q3::B2:D5`, `::B4` or "
-                "`Budget::Q*[kind=number]`, each match as it shows alone."
+                "`Budget::Q*\\[kind=number]`, each match as it shows alone."
             ),
             show_default=False,
         ),

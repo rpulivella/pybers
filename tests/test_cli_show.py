@@ -312,3 +312,8 @@ def testShowNeverWritesTheDocument(tmp_path: Path, selector: str) -> None:
     runShowCommand(working, selector, "--format", "json")
     assert readFingerprint(working) == before
     assert sorted(tmp_path.iterdir()) == [working]
+
+
+def testTheHelpShowsAConditionInItsExampleSelector() -> None:
+    result = runner.invoke(app, ["show", "--help"], terminal_width=200)
+    assert "[kind=number]" in result.stdout

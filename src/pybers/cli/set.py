@@ -59,9 +59,10 @@ def runSet(
         str,
         typer.Argument(
             metavar="SELECTOR",
+            # A backslash keeps Rich from reading a condition as markup.
             help=(
                 "The cells to set: `Budget::Q3::B4`, `::Q3::B4` for B4 of every table "
-                "named Q3, or `Budget::Q*::B2:B9[kind=number]`."
+                "named Q3, or `Budget::Q*::B2:B9\\[kind=number]`."
             ),
             show_default=False,
         ),
