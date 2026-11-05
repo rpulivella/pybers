@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-11-03  `CellChanges` and `CellSkip`, what a write to every matched cell did, for
+            PYB-223.
 2026-10-29  `reference` builds its own reference, for PYB-278.
 2026-10-24  The unread `style` scaffold removed, for PYB-259.
 2026-10-24  `valueCached`, whether a formula's value is the cached one, for PYB-259.
@@ -40,11 +42,8 @@ from decimal import Context, Decimal
 from typing import TYPE_CHECKING, NoReturn
 
 from pybers.absence import UNDETERMINED
-from pybers.addressing.ranges import CellRange
-from pybers.addressing.reference import (
-    CellAddress,
-    CellReference,
-)
+from pybers.addressing.ranges import CellRange, SelectionMatch
+from pybers.addressing.reference import CellAddress, CellReference
 from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
 from pybers.errors import WriteError
 from pybers.formula.nodes import Formula
@@ -177,7 +176,7 @@ def refuseValueOverFormula(address: CellAddress) -> NoReturn:
 
 @dataclass(frozen=True, slots=True)
 class CellChange:
-    """What a write did to one cell, or would do in a preview, and how far it grew."""
+    """What a write did to one cell, and how far its table grew."""
 
     reference: CellReference
     valueBefore: CellValue
@@ -195,6 +194,27 @@ class CellChange:
             or self.kindBefore is not self.kindAfter
             or not isSameValue(self.valueBefore, self.valueAfter)
         )
+
+
+@dataclass(frozen=True, slots=True)
+class CellSkip:
+    """A part a write matched and did not write, and why, in a sentence naming it."""
+
+    reference: SelectionMatch
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class CellChanges:
+    """What a write did to each cell a selector matched, and each part it skipped."""
+
+    changes: tuple[CellChange, ...]
+    skipped: tuple[CellSkip, ...] = ()
+
+    @property
+    def changed(self) -> bool:
+        """Report whether any cell changed."""
+        return any(each.changed for each in self.changes)
 
 
 @dataclass(slots=True)
@@ -312,8 +332,8 @@ class Cell:
         document = None if self.table is None else self.table.document
         return machineTimeZone if document is None else document.timeZone
 
-    def _valueChange(self, value: object, preview: bool = False) -> CellChange:
-        """Set this cell's value and return the change, or only report it in preview.
+    def _valueChange(self, value: object) -> CellChange:
+        """Set this cell's value and return the change.
 
         A value of another kind takes that kind's Automatic format when saved, so
         a format chosen for the old kind goes with it, as it does with a control that
@@ -328,7 +348,7 @@ class Cell:
         before = self.kind
         after = findCellKind(written, self._stored.kind, self._storedValue, False)
         change = CellChange(self.reference, self._value, written, before, after)
-        if not preview and change.changed:
+        if change.changed:
             self._value = written
             control = self._stored.presentation.control
             dropped = control is not None and not self._controlKept()
@@ -435,6 +455,7 @@ class Cell:
 
 
 __all__ = [
-    "Cell", "CellChange", "CellCopy", "CellValue", "decimal128Context",
+    "Cell", "CellChange", "CellChanges", "CellCopy", "CellSkip", "CellValue",
+    "decimal128Context",
     "refuseValueOverFormula", "toCellValue",
 ]

@@ -6,6 +6,8 @@ Each test changes a copy of `95-region-base`, a document under `en_US`, and the
 measurements derived from it record what Numbers writes for each region.
 
 UPDATES
+2026-11-03  The region prints as `show` prints it, read or changed, and the
+            regions offered are no longer listed, for PYB-223.
 2026-10-28  Written for PYB-272.
 """
 from __future__ import annotations
@@ -45,7 +47,7 @@ def runLocaleCommand(*arguments: str | Path) -> Result:
 def testACommandChangesTheDocumentItNames(working: Path) -> None:
     result = runLocaleCommand(working, "de_DE")
     assert result.exit_code == 0
-    assert result.stdout.splitlines() == ["Before: en_US", "After: de_DE"]
+    assert result.stdout.splitlines() == ["Locale: de_DE"]
     assert f"Written: {working}" in result.stderr
     assert pybers.open(working).localeIdentifier == "de_DE"
 
@@ -96,27 +98,21 @@ def testANewFileThatExistsIsRefusedLeavingIt(working: Path, tmp_path: Path) -> N
     assert existing.read_bytes() == before
 
 
-def testWithNoRegionTheCommandListsEveryRegionOffered(working: Path) -> None:
+def testWithNoRegionTheCommandShowsTheDocumentsRegionAsShowDoes(
+    working: Path,
+) -> None:
     result = runLocaleCommand(working)
-    lines = result.stdout.splitlines()
     assert result.exit_code == 0
-    assert lines[:2] == [
-        "Locale: en_US", f"Regions offered: {len(pybers.locales)} regions",
-    ]
-    assert any(line.endswith("de: " + ", ".join(
-        each for each in pybers.locales if each.startswith("de_")
-    )) for line in lines)
+    assert result.stdout.splitlines() == ["Locale: en_US"]
+    shown = runner.invoke(app, ["show", str(working)]).stdout.splitlines()
+    assert shown[0] == "Locale: en_US"
 
 
-def testTheListingAsJsonNamesTheRegionAndEveryOneOffered(working: Path) -> None:
-    result = runLocaleCommand(working, "--format", "json")
-    assert json.loads(result.stdout) == {
-        "localeIdentifier": "en_US", "locales": list(pybers.locales),
-    }
-
-
-def testAChangeAsJsonIsTheLibrarysChange(working: Path) -> None:
-    result = runLocaleCommand(working, "de_DE", "--preview", "--format", "json")
-    assert result.stdout == pybers.formatJsonForm(
-        pybers.LocaleChange("en_US", "de_DE")
-    ) + "\n"
+@pytest.mark.parametrize(("arguments", "region"), [
+    ((), "en_US"), (("de_DE", "--preview"), "de_DE"),
+])
+def testJsonIsTheRegionUnderItsJsonFormKey(
+    working: Path, arguments: tuple[str, ...], region: str
+) -> None:
+    result = runLocaleCommand(working, *arguments, "--format", "json")
+    assert json.loads(result.stdout) == {"localeIdentifier": region}

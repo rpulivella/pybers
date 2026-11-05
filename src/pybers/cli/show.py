@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """\
-`pybers show`: a document's sheets and tables, or the cells a selector names.
+`pybers show`: a whole document, or every part a selector matches, in full.
 
-The command opens the document, makes one `partSelect` call, and never saves. A
-range prints as its table narrowed to it, as `formatJsonForm` writes one. A cell
-prints one line per field of its JSON form, in that form's order and under its names,
-and a control prints every setting its form holds. `tests/test_cli_show.py` fails
-when the form gains a field this command does not print.
+The command opens the document, makes at most one `select` call, and never saves.
+Each match prints in full, one after another with a blank line between: a range as its
+table narrowed to it, as `formatJsonForm` writes one, and a cell the fields of its JSON
+form, in that form's order and under its names, folded onto three lines. A selector's
+JSON is always an array of those forms, which `parseJsonForm` reads back.
+`tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-03  What a selector matches, read by the one resolver, each match as it
+            prints alone, a document in full as its JSON is, and a table's
+            headers, for PYB-223.
 2026-10-28  A document's outline opens with its locale, for PYB-272.
 2026-10-27  Written for PYB-260.
 """
@@ -24,6 +28,7 @@ __date__ = "2026/10/27"
 
 import dataclasses
 import re
+from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
@@ -35,9 +40,14 @@ from rich.text import Text
 import pybers
 from pybers.cli._common import reportPybersErrors
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
-from pybers.cli._report import formatCount, formatLine, formatSheetTree, formatTableSize
+from pybers.cli._report import formatCount, formatLine
 
 type DocumentPart = pybers.Document | pybers.Sheet | pybers.Table | pybers.Cell
+
+# How far a part's children sit under it, and what separates what one line holds.
+childIndent: int = 2
+segmentGap: str = "  "
+fieldGap: str = "   "
 
 # Where a JSON key's next word starts, so `formulaText` reads `formula text`.
 wordStart: re.Pattern[str] = re.compile(r"(?<!^)(?=[A-Z])")
@@ -93,21 +103,62 @@ def formatFormat(cellFormat: pybers.CellFormat | pybers.UNDETERMINED | None) -> 
     return cellFormat.value
 
 
-def formatCell(cell: pybers.Cell) -> Group:
-    """Return a cell as one line per field of its JSON form, in the form's order."""
+def formatSegments(indent: int, label: str, name: str, *segments: str) -> Text:
+    """Return a part's line: its label and name, then each segment holding something.
+
+    An empty segment is left out, so a count of zero or an empty list never prints.
+    """
+    # A part's own label is full weight, as the tree in `check` draws one.
+    shown = Text.assemble(" " * indent, (f"{label}: ", "value"), (name, "identifier"))
+    for segment in segments:
+        if segment:
+            shown.append(segmentGap).append(segment, "value")
+    return shown
+
+
+def formatFields(indent: int, *fields: tuple[str, str]) -> Text:
+    """Return several labeled fields folded onto one line."""
+    shown = Text(" " * indent)
+    for index, (label, value) in enumerate(fields):
+        if index:
+            shown.append(fieldGap)
+        shown.append_text(formatLine(label, value))
+    return shown
+
+
+def formatCountShown(count: int, noun: str) -> str:
+    """Return a count with its noun, or nothing when the count is zero."""
+    return formatCount(count, noun) if count else ""
+
+
+def listChildren(children: Sequence[RenderableType]) -> list[RenderableType]:
+    """Return each child of a part, a blank line before each."""
+    return [shown for child in children for shown in (Text(""), child)]
+
+
+def formatCell(cell: pybers.Cell, indent: int = 0) -> Group:
+    """Return a cell's fields of its JSON form, in its order, folded onto lines."""
     presentation = cell.presentation
     text, typeCode = cell.formulaText, cell.unrecognizedTypeCode
+    inner = indent + childIndent
     return Group(
-        formatLine("Cell", (str(cell.reference), "identifier")),
-        formatLine("Value", pybers.formatCellValue(cell.value)),
-        formatLine("Kind", cell.kind.value),
-        formatLine("Formula text", "none" if text is None else text),
-        formatLine("Value cached", formatYesNo(cell.valueCached)),
-        formatLine("Format", formatFormat(presentation.format)),
-        formatLine("Format chosen", formatYesNo(presentation.formatChosen)),
-        formatLine("Control", formatControl(presentation.control)),
-        formatLine(
-            "Unrecognized type code", "none" if typeCode is None else str(typeCode)
+        formatSegments(indent, "Cell", str(cell.reference)),
+        formatFields(
+            inner,
+            ("Value", pybers.formatCellValue(cell.value)),
+            ("Kind", cell.kind.value),
+            ("Formula text", "none" if text is None else text),
+            ("Value cached", formatYesNo(cell.valueCached)),
+        ),
+        formatFields(
+            inner,
+            ("Format", formatFormat(presentation.format)),
+            ("Format chosen", formatYesNo(presentation.formatChosen)),
+            ("Control", formatControl(presentation.control)),
+        ),
+        formatFields(
+            inner,
+            ("Unrecognized type code", "none" if typeCode is None else str(typeCode)),
         ),
     )
 
@@ -123,57 +174,53 @@ def listCells(
     ]
 
 
-def formatCells(cells: list[pybers.Cell]) -> list[RenderableType]:
-    """Return a count of cells, then each cell after a blank line."""
-    shown: list[RenderableType] = [
-        formatLine("Cells", formatCount(len(cells), "cell") if cells else "none")
-    ]
-    for cell in cells:
-        shown += [Text(""), formatCell(cell)]
-    return shown
-
-
-def formatTable(table: pybers.Table) -> Group:
-    """Return a table's name, size and merges, then each cell it holds."""
+def formatTable(table: pybers.Table, indent: int = 0) -> Group:
+    """Return a table's size, headers, merges and cell count, then each of its cells."""
+    headers = table.headers
+    cells = listCells(table)
     merges = ", ".join(str(merge.extent) for merge in table.mergeRanges)
     return Group(
-        formatLine("Table", (str(table.reference), "identifier")),
-        formatLine("Size", formatTableSize(table)),
-        formatLine("Merges", merges or "none"),
-        *formatCells(listCells(table)),
+        formatSegments(
+            indent, "Table", str(table.reference),
+            f"{formatCount(table.rowCount, 'row')} × "
+            f"{formatCount(table.colCount, 'column')}",
+            ", ".join(each for each in (
+                formatCountShown(headers.headerRows, "header row"),
+                formatCountShown(headers.headerColumns, "header column"),
+                formatCountShown(headers.footerRows, "footer row"),
+            ) if each),
+            f"merges {merges}" if merges else "",
+            formatCountShown(len(cells), "cell"),
+        ),
+        *listChildren([formatCell(cell, indent + childIndent) for cell in cells]),
     )
 
 
 def formatRange(table: pybers.Table, extent: pybers.CellRange) -> Group:
     """Return a range, qualified by its table, then each cell stored within it."""
+    cells = listCells(table, extent)
     return Group(
-        formatLine("Range", (str(extent), "identifier")),
-        *formatCells(listCells(table, extent)),
+        formatSegments(0, "Range", str(extent), formatCountShown(len(cells), "cell")),
+        *listChildren([formatCell(cell, childIndent) for cell in cells]),
     )
 
 
 def formatSheet(sheet: pybers.Sheet) -> Group:
-    """Return a sheet's name, then each of its tables after a blank line."""
-    tables = sheet.tables
-    shown: list[RenderableType] = [
-        formatLine("Sheet", (sheet.name, "identifier")),
-        formatLine("Tables", formatCount(len(tables), "table") if tables else "none"),
-    ]
-    for table in sheet.tables:
-        shown += [Text(""), formatTable(table)]
-    return Group(*shown)
+    """Return a sheet's name and table count, then each of its tables."""
+    count = formatCountShown(len(sheet.tables), "table")
+    return Group(
+        formatSegments(0, "Sheet", sheet.name, count),
+        *listChildren([formatTable(table, childIndent) for table in sheet.tables]),
+    )
 
 
 def formatPart(part: DocumentPart) -> RenderableType:
-    """Return what a selector named as the lines a person reads."""
+    """Return a document, sheet, table or cell as the lines a person reads."""
     match part:
         case pybers.Document():
             locale = part.localeIdentifier
-            trees = [formatSheetTree(each) for each in part.sheets]
-            return Group(
-                formatLine("Locale", (locale, "identifier") if locale else "none"),
-                Text("Sheets:", "label"), *trees,
-            )
+            sheets = [formatSheet(each) for each in part.sheets]
+            return Group(formatLine("Locale", locale or "none"), *listChildren(sheets))
         case pybers.Sheet():
             return formatSheet(part)
         case pybers.Table():
@@ -181,20 +228,36 @@ def formatPart(part: DocumentPart) -> RenderableType:
     return formatCell(part)
 
 
-def findRangeTable(document: pybers.Document, extent: pybers.CellRange) -> pybers.Table:
-    """Return a selected range's table, which `partSelect` names with its sheet."""
-    table = document.partSelect(str(extent.table))
-    assert isinstance(table, pybers.Table)
-    return table
+type ShownPart = DocumentPart | tuple[pybers.Table, pybers.CellRange]
 
 
-def printRange(
-    table: pybers.Table, extent: pybers.CellRange, outputFormat: OutputFormat
-) -> None:
-    """Print a range as its table narrowed to it, the form `formatJsonForm` writes."""
-    printResult(
-        table, outputFormat, lambda each: formatRange(each, extent), extent=extent
-    )
+def findPart(document: pybers.Document, match: pybers.SelectionMatch) -> ShownPart:
+    """Return the part a match points at, a range as its table and that range."""
+    match match:
+        case pybers.SheetReference():
+            return document.sheet(match.name)
+        case pybers.TableReference():
+            return document.table(match)
+        case pybers.CellReference(table=table) if table is not None:
+            return document.table(table).cell(match)
+        case pybers.CellRange(table=table) if table is not None:
+            return (document.table(table), match)
+    raise AssertionError(f"A selection returned {match!r}, which names no table.")
+
+
+def formatShownPart(part: ShownPart) -> RenderableType:
+    """Return one part as `show` prints it alone, a range as its narrowed table."""
+    if isinstance(part, tuple):
+        return formatRange(*part)
+    return formatPart(part)
+
+
+def formatShownParts(parts: list[ShownPart]) -> Group:
+    """Return each part as it prints alone, a blank line between each."""
+    shown: list[RenderableType] = []
+    for part in parts:
+        shown += [Text(""), formatShownPart(part)] if shown else [formatShownPart(part)]
+    return Group(*shown)
 
 
 def runShow(
@@ -210,22 +273,21 @@ def runShow(
         typer.Argument(
             metavar="SELECTOR",
             help=(
-                "The sheet, table, range or cell: `Budget`, `Q3`, `Q3::B2:D5` or "
-                "`Budget::Q3::B4`."
+                "What to show: `Budget`, `Budget::Q3`, `::Q3::B2:D5`, `::B4` or "
+                "`Budget::Q*[kind=number]`, each match as it shows alone."
             ),
             show_default=False,
         ),
     ] = None,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
-    """Show a document's sheets and tables, or the cells SELECTOR names."""
+    """Show a whole document, or every part SELECTOR matches."""
     with reportPybersErrors(context):
         document = pybers.open(documentPath)
-        part = document if selector is None else document.partSelect(selector)
-        if isinstance(part, pybers.CellRange):
-            printRange(findRangeTable(document, part), part, outputFormat)
+        if selector is None:
+            printResult(document, outputFormat, formatPart)
             return
-    printResult(part, outputFormat, formatPart)
-
+        parts = [findPart(document, each) for each in document.select(selector)]
+    printResult(parts, outputFormat, formatShownParts)
 
 __all__ = ["runShow"]

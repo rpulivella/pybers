@@ -28,7 +28,7 @@ import pytest
 from structurefacts import readTableFacts
 
 import pybers
-from conftest import findDocumentPath
+from conftest import findDocumentPath, readRangeValues
 from pybers import CellValueFill, FormulaReferenceRelocation
 from pybers._persistence import readPackage
 from pybers._persistence.difference import listPackageDifferences
@@ -166,12 +166,8 @@ def testASavedCopyLeavesTheSourceAsItWas(tmp_path: Path) -> None:
         "Table 1"
     )
     copied = pybers.open(target).sheet(1).table("Table 1")
-    assert [cell.value for cell in copied.range("B2:D5")] == [
-        cell.value for cell in source.range("B2:D5")
-    ]
-    assert [cell.value for cell in copied.range("F8:H11")] == [
-        cell.value for cell in source.range("B2:D5")
-    ]
+    assert readRangeValues(copied, "B2:D5") == readRangeValues(source, "B2:D5")
+    assert readRangeValues(copied, "F8:H11") == readRangeValues(source, "B2:D5")
 
 
 def testACopiedBlockCarriesItsMergeAndKeepsTheSource(tmp_path: Path) -> None:

@@ -48,12 +48,13 @@ def testAScriptSavesAWholeDocumentAsJsonAndReadsItBack(tmp_path: Path) -> None:
 def testACommandsJsonIsTheLibrarysJsonForm(tmp_path: Path) -> None:
     working = copyDocument("20-formula-shapes", tmp_path)
     result = runner.invoke(app, [
-        "set", str(working), "Table 2::B2", "1234567890123456789012345678901234",
+        "set", str(working), "::Table 2::B2", "1234567890123456789012345678901234",
         "--preview", "--format", "json",
     ])
     printed = json.loads(result.stdout, parse_float=Decimal, parse_int=Decimal)
-    assert printed["valueAfter"] == Decimal("1234567890123456789012345678901234")
-    change = pybers.open(working).cellSet(
-        "Table 2::B2", Decimal("1234567890123456789012345678901234"), preview=True
-    )
-    assert result.stdout.rstrip("\n") == pybers.formatJsonForm(change)
+    exact = Decimal("1234567890123456789012345678901234")
+    assert printed[0]["table"]["cells"][0]["value"] == exact
+    document = pybers.open(working)
+    document.cellSet("::Table 2::B2", exact)
+    cell = document.table("Table 2").cell("B2")
+    assert result.stdout.rstrip("\n") == pybers.formatJsonForm([cell])

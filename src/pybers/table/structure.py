@@ -20,6 +20,10 @@ single selected cell does, which is what `56f` and `56g` were made from.
 is unmerged rather than kept, both measured in `57-anchors-*` and `57-collapse-*`.
 
 UPDATES
+2026-11-05  An edit leaving a header or footer count past five, or no line
+            outside them, is refused, for PYB-223.
+2026-11-03  An edit moves the table's header and footer counts in the model, for
+            PYB-223.
 2026-10-14  Writes the table's own store, `cells` being read-only, for PYB-193.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-24  A cell's highlighting conditions follow the edit too, for PYB-18.
@@ -49,11 +53,12 @@ from pybers.addressing.reference import (
 )
 from pybers.formula.nodes import Formula
 from pybers.formula.restructure import FormulaRestructure, mapFormula
+from pybers.table.headers import mapHeaders, refuseHeadersUnfit
+from pybers.table.merges import MergeRange
 
 if TYPE_CHECKING:
     from pybers.table.cell import Cell
     from pybers.table.cells import Table
-    from pybers.table.merges import MergeRange
 
 
 def generateLineIdentities(count: int) -> list[int]:
@@ -111,7 +116,17 @@ def buildGridEdit(
                 f"{table.name!r} would hold {held + count} {axis}, past the {limit} a "
                 "Numbers table can hold."
             )
-    return GridEdit(rows=rows, at=at, count=count, removing=removing)
+    edit = GridEdit(rows=rows, at=at, count=count, removing=removing)
+    after = held - count if removing else held + count
+    lines = axis[:-1] if count == 1 else axis
+    refuseHeadersUnfit(
+        mapHeaders(table.headers, edit, held),
+        after if rows else table.rowCount,
+        table.colCount if rows else after,
+        f"{'Removing' if removing else 'Adding'} {count} {lines} at {at} "
+        f"{'from' if removing else 'to'} {table.name!r}",
+    )
+    return edit
 
 
 def mapCell(reference: CellAddress, edit: GridEdit) -> CellAddress | None:
@@ -255,6 +270,7 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
         cell.address = reference
     table._cells = cells
     table.mergeRanges = merges
+    table._headers = mapHeaders(table._headers, edit, held)
     start = edit.at - 1
     if edit.removing:
         del identities[start:start + edit.count]

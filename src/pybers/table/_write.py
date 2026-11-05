@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-03  A table's header and footer counts, for PYB-223.
 2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
 2026-11-02  A document holding no table needs no engine, and its first table creates
             one, for PYB-261.
@@ -87,6 +88,24 @@ from .cells import Table
 if TYPE_CHECKING:
     # Guarded because the document feature imports this one to save its tables.
     from ..document.sheets import Document
+
+
+def applyHeaders(table: Table, model: tst.TableModelArchive) -> bool:
+    """Write each header and footer count the model changed, and report a change.
+
+    A count is written only when it changed, since a zero set on a field that held
+    none is a byte a table without headers never carried.
+    """
+    changed = False
+    for name, count in (
+        ("number_of_header_rows", table.headers.headerRows),
+        ("number_of_header_columns", table.headers.headerColumns),
+        ("number_of_footer_rows", table.headers.footerRows),
+    ):
+        if getattr(model, name) != count:
+            setattr(model, name, count)
+            changed = True
+    return changed
 
 
 def collectFormulaDependencies(
@@ -180,8 +199,9 @@ class TableSave:
         if borderCopies:
             applyBorderCopies(index, self.registry, model, borderCopies)
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
+        headed = applyHeaders(table, model)
         reshaped = maps.changed or moves or copies or edits.tilesCreated
-        if moved or swallowed or reshaped:
+        if moved or swallowed or reshaped or headed:
             # A structural edit, a moved block or a created tile changes the tiles and
             # buckets, which the model has to declare as it points at them.
             index.archiveWrite(

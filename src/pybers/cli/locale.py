@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """\
-`pybers locale`: a document's language and region, and the regions pybers offers.
+`pybers locale`: a document's language and region, or a change to it.
 
-With no identifier the command reports the document's region and every region
-offered, by language. With one it makes one `localeSet` call, and saves only when the
-region changed and the call was not a preview.
+With no identifier the command prints the document's region as `pybers show` prints
+it. With one it makes one `localeSet` call, prints the region the same way, and saves
+only when the region changed and the call was not a preview.
 
 UPDATES
+2026-11-03  The region prints as `show` prints it, before and after a change
+            alike, and the regions offered are left to the library, for PYB-223.
 2026-10-28  Written for PYB-272.
 """
 from __future__ import annotations
@@ -24,7 +26,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Group
 from rich.text import Text
 
 import pybers
@@ -35,48 +36,21 @@ from pybers.cli._common import (
     reportPybersErrors,
     reportWrite,
 )
-from pybers.cli._console import TreeCompact
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
-from pybers.cli._report import formatCount, formatLine
+from pybers.cli._report import formatLine
 
 
 @dataclass(frozen=True, slots=True)
-class LocaleListing:
-    """A document's region beside every region pybers offers."""
+class DocumentLocale:
+    """A document's language and region, under the key its JSON form gives it."""
 
     localeIdentifier: str | None
-    locales: tuple[str, ...]
 
 
-def formatListing(listing: LocaleListing) -> Group:
-    """Return the document's region, then the regions offered, by language."""
-    byLanguage: dict[str, list[str]] = {}
-    for identifier in listing.locales:
-        byLanguage.setdefault(identifier.partition("_")[0], []).append(identifier)
-    tree = TreeCompact(
-        Text.assemble(
-            ("Regions offered: ", "label"),
-            (formatCount(len(listing.locales), "region"), "value"),
-        ),
-        guide_style="label",
-    )
-    for language, identifiers in byLanguage.items():
-        tree.add(Text.assemble(
-            (language, "identifier"), (": ", "label"), (", ".join(identifiers), "value")
-        ))
-    current = listing.localeIdentifier
-    return Group(
-        formatLine("Locale", (current, "identifier") if current else "none"), tree
-    )
-
-
-def formatChange(change: pybers.LocaleChange) -> Group:
-    """Return the report lines of a region change."""
-    before = change.localeBefore
-    return Group(
-        formatLine("Before", (before, "identifier") if before else "none"),
-        formatLine("After", (change.localeAfter, "identifier")),
-    )
+def formatLocale(locale: DocumentLocale) -> Text:
+    """Return a document's region as `pybers show` prints it."""
+    current = locale.localeIdentifier
+    return formatLine("Locale", (current, "identifier") if current else "none")
 
 
 def runLocale(
@@ -100,20 +74,17 @@ def runLocale(
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
     """Show a document's language and region, or change it to LOCALE."""
-    if identifier is None:
-        with reportPybersErrors(context):
-            document = pybers.open(documentPath)
-        listing = LocaleListing(document.localeIdentifier, pybers.locales)
-        printResult(listing, outputFormat, formatListing)
-        return
-    target = findSaveTarget(documentPath, output, preview)
+    target = None if identifier is None else findSaveTarget(
+        documentPath, output, preview
+    )
     with reportPybersErrors(context):
         document = pybers.open(documentPath)
-        change = document.localeSet(identifier, preview=preview)
-        if target is not None and change.changed:
+        changed = identifier is not None and document.localeSet(identifier).changed
+        if target is not None and changed:
             document.save(target)
-    printResult(change, outputFormat, formatChange)
-    reportWrite(change.changed, target, "the document already uses that region.")
+    printResult(DocumentLocale(document.localeIdentifier), outputFormat, formatLocale)
+    if identifier is not None:
+        reportWrite(changed, target, "the document already uses that region.")
 
 
 __all__ = ["runLocale"]

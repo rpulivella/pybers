@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-03  A table's header and footer headers, read and set, `select`, and
+            `range` removed in its favor, for PYB-223.
 2026-10-29  A cell builds its own reference, for PYB-278.
 2026-10-27  `reference`, how to point at the table, and a range naming another
             table refused, for PYB-260.
@@ -84,10 +86,11 @@ from pybers.addressing.reference import (
 )
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
-from pybers.table.bounds import listRangePositions, refuseRangeOutside
+from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
+from pybers.table.headers import TableHeaders, checkHeadersFit
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
@@ -101,6 +104,8 @@ if TYPE_CHECKING:
     # Guarded because `sheet` imports this module, and the link back is a type
     # reference rather than anything this module calls.
     from pybers.document.sheets import Document, Sheet
+    from pybers.selection.matching import SelectionMatch
+    from pybers.selection.selector import SelectorLike
 
 # A new table's owner identity leaves its low byte clear, because Numbers derives each
 # of a table's owners by adding the owner's kind to it, and the kinds reach 35.
@@ -156,6 +161,7 @@ class Table:
     _columnIdentities: list[int] = field(
         default_factory=list, repr=False, compare=False, kw_only=True
     )
+    _headers: TableHeaders = field(default_factory=TableHeaders, kw_only=True)
 
     def __post_init__(self) -> None:
         """Identify every line of a table that arrived without identities."""
@@ -163,6 +169,33 @@ class Table:
             self._rowIdentities = generateLineIdentities(self.rowCount)
         if not self._columnIdentities:
             self._columnIdentities = generateLineIdentities(self.colCount)
+
+    @property
+    def headers(self) -> TableHeaders:
+        """Return how many header rows, header columns and footer rows this holds."""
+        return self._headers
+
+    def headersSet(
+        self,
+        *,
+        headerRows: int | None = None,
+        headerColumns: int | None = None,
+        footerRows: int | None = None,
+    ) -> TableHeaders:
+        """Set any of this table's header and footer counts, and return all three.
+
+        Numbers styles headers and footers itself. A change moving a cell read from a
+        file into or out of them is refused, since Numbers would re-parent its style.
+        """
+        held = self._headers
+        headers = TableHeaders(
+            held.headerRows if headerRows is None else headerRows,
+            held.headerColumns if headerColumns is None else headerColumns,
+            held.footerRows if footerRows is None else footerRows,
+        )
+        checkHeadersFit(self, headers)
+        self._headers = headers
+        return headers
 
     def rowAdd(self, row: int, count: int = 1) -> None:
         """Insert empty rows so the first is row `row`, moving the rest down.
@@ -244,21 +277,11 @@ class Table:
         grid, and one swallowed by a merge, reached through its anchor.
         """
         key = self._addressResolve(toCellReferenceNamed(address, row, col))
-        extent = self.extent
-        if extent is None or not extent.covers(key):
-            raise ReferenceError(
-                f"{key} is outside {self.name!r}, which is {self.rowCount} rows "
-                f"by {self.colCount} columns."
-            )
-        merge = self.mergeCovering(key)
-        if merge is not None and merge.anchor != key:
-            # Creating one here is what produces a phantom record: a covered cell
-            # has NO record in the tile, so a table read and then written back
-            # would gain one Numbers never writes. See findings-03-structure.md.
-            raise ReferenceError(
-                f"{key} is covered by the merge {merge.extent}, whose anchor is "
-                f"{merge.anchor}."
-            )
+        miss = findCellsMiss(self, key)
+        if miss is not None:
+            # A covered position has NO record in the tile, so creating one is what
+            # produces a phantom record. See findings-03-structure.md.
+            raise ReferenceError(miss)
         if key not in self._cells:
             self._cells[key] = Cell(address=key, table=self)
         return self._cells[key]
@@ -281,14 +304,11 @@ class Table:
         for row in self.rows:
             yield from row
 
-    def range(self, address: CellRangeLike) -> list[Cell]:
-        """Return the cells one or more ranges cover, in the order they name them.
+    def select(self, selector: SelectorLike) -> tuple[SelectionMatch, ...]:
+        """Return what a selector matches in this table, read as its cells: `B2:D9`."""
+        from pybers.selection.matching import selectWithin
 
-        An unbounded range is bounded by this table's extent, and an empty table has
-        none, so an unbounded range over one covers nothing. Positions swallowed by a
-        merge are skipped, so a merged block yields its anchor once.
-        """
-        return [self.cell(reference) for reference in listRangePositions(self, address)]
+        return selectWithin(self, selector)
 
     @property
     def reference(self) -> TableReference:

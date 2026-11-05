@@ -32,7 +32,7 @@ from test_cli_set import runSetCommand
 from test_writer import readRecordAt
 
 import pybers
-from conftest import copyDocument, findDocumentPath
+from conftest import copyDocument, findDocumentPath, listShownFields
 from pybers import CurrencyAmount, CurrencyError, currencies, findCurrency
 from pybers.table.series import findSeriesContinuation
 
@@ -213,10 +213,10 @@ def testAScriptTotalsACurrencyColumn() -> None:
 
 def testTheCommandLineWritesAndReportsACurrencyAmount(tmp_path: Path) -> None:
     working = copyDocument("20-formula-shapes", tmp_path)
-    result = runSetCommand(str(working), "Table 2::B2", "1234.5 EUR")
+    result = runSetCommand(str(working), "::Table 2::B2", "1234.5 EUR")
     assert result.exit_code == 0
-    assert "After: 1234.5 EUR (currency)" in result.stdout
-    cell = pybers.open(working).cell("Table 2::B2")
+    assert ("Value", "1234.5 EUR") in listShownFields(result.stdout)
+    cell = pybers.open(working).table("Table 2").cell("B2")
     assert cell.value == CurrencyAmount(Decimal("1234.5"), "EUR")
 
 

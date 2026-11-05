@@ -13,6 +13,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-11-03  `SelectionMatch`, one thing a selector matches, for PYB-223.
 2026-10-27  A range names its table when its context needs one, as a reference
             does, for PYB-260.
 2026-10-19  `CellRangeLike`, what a call accepts for a range, for PYB-217.
@@ -40,6 +41,7 @@ from pybers.addressing.reference import (
     CellReference,
     CellReferenceLike,
     ReferenceError,
+    SheetReference,
     TableReference,
     absoluteMarker,
     cellPattern,
@@ -436,6 +438,9 @@ class CellRangeList:
         """Return the written form, so an error message reads as a list."""
         return self.asReference()
 
+
+# One thing a selector matches, qualified by its sheet and table.
+type SelectionMatch = SheetReference | TableReference | CellReference | CellRange
 
 # What a caller may hand to anything that addresses more than one cell. A plain
 # string covers both a single range and a comma-separated list of them.

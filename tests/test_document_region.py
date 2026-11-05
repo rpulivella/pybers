@@ -6,6 +6,8 @@ Each `95` measurement is the base with only Language & Region changed in Numbers
 `72b-date-time-zones-region` is the earlier English (Italy) document.
 
 UPDATES
+2026-11-03  A preview is a change left unsaved, so `localeSet` takes none, for
+            PYB-223.
 2026-10-28  A region changed, written as Numbers writes it, for PYB-272.
 2026-10-27  Written for PYB-272.
 """
@@ -133,13 +135,6 @@ def testTheRegionADocumentHoldsIsNoChange(tmp_path: Path) -> None:
         readLocaleArchive(findDocumentPath("95-region-base")).super.super
         .formatting_symbols
     )
-
-
-def testAPreviewChangesNothing() -> None:
-    document = pybers.open(findDocumentPath("95-region-base"))
-    change = document.localeSet("de_DE", preview=True)
-    assert change.changed
-    assert document.localeIdentifier == "en_US"
 
 
 @pytest.mark.parametrize("identifier", ["de_XX", "", "en-GB", 5])

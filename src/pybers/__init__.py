@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-03  The selector, its matches, `TableHeaders`, `CellChanges` and `CellSkip`
+            re-exported, for PYB-223.
 2026-11-02  `create` re-exported, for PYB-261.
 2026-10-28  `LocaleChange`, `LocaleError` and `locales` re-exported, for PYB-272.
 2026-10-24  The unread style, rich text and drawable scaffold and `Size` removed,
@@ -125,9 +127,17 @@ lazy from pybers.interchange import (
     jsonFormVersion,
     parseJsonForm,
 )
+lazy from pybers.selection import (
+    SelectionMatch,
+    Selector,
+    SelectorError,
+    SelectorLike,
+    quoteSelectorName,
+)
 lazy from pybers.table import (
     Cell,
     CellChange,
+    CellChanges,
     CellControl,
     CellControlBase,
     CellControlCheckbox,
@@ -140,10 +150,12 @@ lazy from pybers.table import (
     CellFormat,
     CellKind,
     CellPresentation,
+    CellSkip,
     CellValue,
     CellValueFill,
     MergeRange,
     Table,
+    TableHeaders,
     TableRow,
     TableRows,
     formatCellValue,
@@ -205,6 +217,8 @@ __all__ = [
     "checkDocument",
     "Cell",
     "CellChange",
+    "CellChanges",
+    "CellSkip",
     "CellControl",
     "CellControlBase",
     "CellControlCheckbox",
@@ -238,6 +252,12 @@ __all__ = [
     "MergeRange",
     "Position",
     "SelectionError",
+    "SelectionMatch",
+    "Selector",
+    "SelectorError",
+    "SelectorLike",
+    "quoteSelectorName",
+    "TableHeaders",
     "Sheet",
     "Table",
     "TableRow",

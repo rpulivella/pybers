@@ -27,7 +27,7 @@ import pytest
 from structurefacts import readConditionalRules, readTableFacts
 
 import pybers
-from conftest import findDocumentPath
+from conftest import findDocumentPath, readRangeValues
 from pybers import FormulaReferenceRelocation
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
@@ -233,7 +233,7 @@ def testVacatedCellsReadEmptyAfterASave(tmp_path: Path) -> None:
     target = tmp_path / "moved.numbers"
     moveAndSave("61-move-styles-base", target)
     table = pybers.open(target).sheet(1).table("Table 1")
-    assert [cell.value for cell in table.range("B2:D5")] == [None] * 12
+    assert readRangeValues(table, "B2:D5") == [None] * 12
     assert table.cell("F8").value == Decimal("21")
     assert table.cell("H11").value == Decimal("53")
 
@@ -245,8 +245,8 @@ def testAMoveOverlappingItselfLandsEveryCell(tmp_path: Path) -> None:
     target = tmp_path / "overlap.numbers"
     document.save(target)
     reopened = pybers.open(target).sheet(1).table("Table 1")
-    assert [cell.value for cell in reopened.range("B2:D2")] == [None] * 3
-    assert [cell.value for cell in reopened.range("B3:D3")] == [
+    assert readRangeValues(reopened, "B2:D2") == [None] * 3
+    assert readRangeValues(reopened, "B3:D3") == [
         Decimal("21"), Decimal("22"), Decimal("23"),
     ]
     assert reopened.cell("D6").value == Decimal("53")
@@ -262,14 +262,14 @@ def testABlockMovedAcrossTilesBesideAnInsertionKeepsItsValues(
     """
     document = pybers.open(findDocumentPath("27-big-table"))
     table = document.sheets[0].tables[0]
-    before = [cell.value for cell in table.range("A1:B2")]
+    before = readRangeValues(table, "A1:B2")
     table.columnAdd("E", 2)
     table.cellsMove("A1:B2", "E600", references=relative)
     target = tmp_path / "tiles.numbers"
     document.save(target)
     reopened = pybers.open(target).sheets[0].tables[0]
-    assert [cell.value for cell in reopened.range("E600:F601")] == before
-    assert [cell.value for cell in reopened.range("A1:B2")] == [None] * 4
+    assert readRangeValues(reopened, "E600:F601") == before
+    assert readRangeValues(reopened, "A1:B2") == [None] * 4
 
 
 @pytest.mark.parametrize("rule", list(FormulaReferenceRelocation))

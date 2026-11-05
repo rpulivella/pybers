@@ -12,6 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
+2026-11-03  A table's headers, for PYB-223.
 2026-10-27  The order `pybers show` prints, now that it is built, for PYB-260.
 2026-10-24  Written for PYB-259.
 """
@@ -39,6 +40,7 @@ from pybers.interchange._leaves import JsonFormError
 from pybers.interchange._tree import jsonFormReadOnly
 from pybers.table.cell import Cell, CellValue
 from pybers.table.cells import Table
+from pybers.table.headers import TableHeaders
 from pybers.table.kinds import (
     CellKind,
     CellPresentation,
@@ -81,6 +83,7 @@ class TableForm:
     identifier: str
     rowCount: int
     colCount: int
+    headers: TableHeaders
     mergeRanges: tuple[MergeRange, ...]
     cells: tuple[CellForm, ...]
 
@@ -90,7 +93,8 @@ def buildTableForm(table: Table, extent: CellRange | None = None) -> TableForm:
     cells = sorted(table.cells.items(), key=lambda each: each[0].asRowColumn())
     return TableForm(
         name=table.name, identifier=table.identifier, rowCount=table.rowCount,
-        colCount=table.colCount, mergeRanges=tuple(table.mergeRanges),
+        colCount=table.colCount, headers=table.headers,
+        mergeRanges=tuple(table.mergeRanges),
         cells=tuple(
             buildCellForm(cell) for address, cell in cells
             if extent is None or extent.covers(address)
@@ -128,6 +132,7 @@ def buildTable(form: TableForm, path: str) -> Table:
     table = Table(
         name=form.name, rowCount=form.rowCount, colCount=form.colCount,
         mergeRanges=list(form.mergeRanges), identifier=form.identifier,
+        _headers=form.headers,
     )
     for index, cellForm in enumerate(form.cells):
         addCell(table, cellForm, f"{path}.cells[{index}]")
