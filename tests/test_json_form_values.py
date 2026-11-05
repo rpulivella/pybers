@@ -137,7 +137,7 @@ def testWhatJsonPrintsForADurationIsTextSetReadsAsThatDuration() -> None:
 
 
 @pytest.mark.parametrize(
-    "found", [pybers.NOT_REQUESTED, pybers.UNDETERMINED, pybers.WITHHELD]
+    "found", [pybers.UNDETERMINED, pybers.WITHHELD]
 )
 def testASentinelIsWrittenAsItsName(found: object) -> None:
     assert readTree(pybers.formatJsonForm(found)) == repr(found)

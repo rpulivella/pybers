@@ -3,6 +3,7 @@
 The three reasons a value can be missing, each its own value and its own type.
 
 UPDATES
+2026-11-03  NOT_REQUESTED removed, for PYB-223.
 2026-10-12  Written for PYB-190.
 """
 from __future__ import annotations
@@ -25,13 +26,13 @@ import pytest
 import pybers
 from pybers import absence
 
-sentinelNames: tuple[str, ...] = ("NOT_REQUESTED", "UNDETERMINED", "WITHHELD")
+sentinelNames: tuple[str, ...] = ("UNDETERMINED", "WITHHELD")
 
 mixedUpSentinels: str = """\
 import pybers
 
 
-def readNames(names: tuple[str, ...] | pybers.NOT_REQUESTED) -> None:
+def readNames(names: tuple[str, ...] | pybers.WITHHELD) -> None:
     pass
 
 

@@ -46,7 +46,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
-lazy from pybers.absence import NOT_REQUESTED, UNDETERMINED, WITHHELD
+lazy from pybers.absence import UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
     CellAddress,
     CellOffset,
@@ -68,7 +68,6 @@ lazy from pybers.check import (
     CheckCell,
     CheckEnvironment,
     CheckFailure,
-    CheckNames,
     CheckSheet,
     CheckTable,
     NumbersVersion,
@@ -164,7 +163,6 @@ lazy from pybers.table import (
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
 __all__ = [
-    "NOT_REQUESTED",
     "UNDETERMINED",
     "WITHHELD",
     "ArgumentCountError",
@@ -210,7 +208,6 @@ __all__ = [
     "CheckCell",
     "CheckEnvironment",
     "CheckFailure",
-    "CheckNames",
     "CheckSheet",
     "CheckTable",
     "NumbersVersion",

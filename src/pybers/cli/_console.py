@@ -8,6 +8,7 @@ Lines are soft-wrapped, so a pasted report keeps each fact on one line, and a tr
 draws two-column guides rather than Rich's four. See `docs/cli-design.md`.
 
 UPDATES
+2026-11-03  The badge styles, for PYB-223.
 2026-10-11  The theme's styles are a frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
 """
@@ -33,6 +34,10 @@ themeStyles: frozendict[str, str] = frozendict({
     "warning": "yellow",
     "detail": "dim",
     "identifier": "bold cyan",
+    "badge.info": "bold black on cyan",
+    "badge.success": "bold black on green",
+    "badge.warning": "bold black on yellow",
+    "badge.failure": "bold white on red",
 })
 theme: Theme = Theme(themeStyles)
 
