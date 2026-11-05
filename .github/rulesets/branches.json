@@ -4,10 +4,10 @@
   "enforcement": "active",
   "conditions": {
     "ref_name": {
+      "exclude": [],
       "include": [
         "~ALL"
-      ],
-      "exclude": []
+      ]
     }
   },
   "bypass_actors": [
