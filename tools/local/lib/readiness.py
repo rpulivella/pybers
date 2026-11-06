@@ -12,7 +12,7 @@ without a token, a network or a pull request.
 
 UPDATES
 2026-11-05  Reports the coverage the preflight measured against the figure on
-            `develop`, for PYB-277.
+            `develop`, and counts one golden in the singular, for PYB-277.
 2026-10-23  A golden the branch deleted is not counted as touched, for PYB-255.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-14  Reading a pull request, its preflight, its base and the declared
@@ -360,6 +360,11 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     )
 
 
+def formatGoldenCount(count: int) -> str:
+    """Count goldens in the wording their sentence needs."""
+    return "1 golden," if count == 1 else f"{count} goldens, each"
+
+
 def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
     """Report whether every golden this change touches carries a confirmation date."""
     if not facts.goldensTouched:
@@ -372,7 +377,7 @@ def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
         )
     return CheckResult(
         "Goldens", passed,
-        f"This change touches {len(set(facts.goldensTouched))} goldens, each "
+        f"This change touches {formatGoldenCount(len(set(facts.goldensTouched)))} "
         "confirmed in Numbers",
     )
 

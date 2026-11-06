@@ -7,6 +7,7 @@ or a pull request. What needs GitHub is the half that gathers the facts, and it 
 the workflows that prove that.
 
 UPDATES
+2026-11-05  One golden is counted in the singular, for PYB-277.
 2026-10-23  A deleted golden is not counted as touched, for PYB-255.
 2026-09-17  Written for PYB-76.
 """
@@ -196,6 +197,19 @@ def testTheWorstStatusDecidesTheVerdict() -> None:
     assert checks.readVerdict(green) == checks.passed
     assert checks.readVerdict(yellow) == checks.attention
     assert checks.readVerdict(red) == checks.failed
+
+
+@pytest.mark.parametrize(
+    ("touched", "sentence"),
+    [
+        (["a.numbers"], "This change touches 1 golden, confirmed in Numbers"),
+        (["a.numbers", "b.numbers"],
+         "This change touches 2 goldens, each confirmed in Numbers"),
+    ],
+)
+def testAGoldenCountReadsAsASentence(touched: list[str], sentence: str) -> None:
+    facts = buildFacts(goldensTouched=touched, goldensConfirmed=touched)
+    assert checks.checkGoldenConfirmations(facts).detail == sentence
 
 
 def testTheCommentOpensWithItsMarkerSoALaterRunFindsIt() -> None:
