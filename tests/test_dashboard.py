@@ -20,6 +20,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from tools.workflow.dashboard import buildParser
 from tools.workflow.lib import dashboard as dashboardModule
 from tools.workflow.lib.dashboard import (
     Dashboard,
@@ -231,3 +232,10 @@ def testClearingTheFocusReadsNone(monkeypatch: pytest.MonkeyPatch) -> None:
     board = parseBoard(dashboard)
     updateDashboard("token", board, "")
     assert board.status == "None"
+
+
+@pytest.mark.parametrize("value", ["PR #55", "#55", "55"])
+def testMergedReadsEveryPullRequestForm(value: str) -> None:
+    """A merge is recorded from the form the pull request tools print."""
+    arguments = buildParser().parse_args(["merged", "PYB-14", value])
+    assert arguments.pullRequest == 55

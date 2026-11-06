@@ -15,6 +15,7 @@ Usage:
     .venv/bin/python3 -m tools.workflow.dashboard merged PYB-193 210
 
 UPDATES
+2026-11-05  `merged` reads every form the pull request tools print.
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
 2026-10-15  The only writer of the dashboard, run explicitly, for PYB-156.
@@ -47,6 +48,7 @@ from tools.workflow.lib.dashboard import (
     updateDashboard,
     writeDashboard,
 )
+from tools.workflow.lib.pull_request import parsePullRequestNumber
 from tools.workflow.lib.shared import RichHelpFormatter, errorExitCode
 
 console = Console()
@@ -113,7 +115,10 @@ def buildParser() -> argparse.ArgumentParser:
     focus.set_defaults(handler=runFocus)
     merged = subparsers.add_parser("merged", help="record a ticket that merged")
     merged.add_argument("key", type=parseTicketKey, help="the ticket, such as PYB-193")
-    merged.add_argument("pullRequest", type=int, help="its pull request's number")
+    merged.add_argument(
+        "pullRequest", type=parsePullRequestNumber,
+        help="its pull request, such as PR #38, #38, 38 or the URL",
+    )
     merged.set_defaults(handler=runMerged)
     for command in (sync, focus, merged):
         command.add_argument("--preview", dest="preview", action="store_true")
