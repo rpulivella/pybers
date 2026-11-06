@@ -47,6 +47,8 @@ cli = ["typer>=0.27.3"]
 dev = [
     "pybers[cli]",
     "pytest>=9.1.1",
+    "pytest-xdist>=3.8.0",
+    "pytest-cov>=7.1.0",
     "rich>=15.0.0",
     "rich_argparse>=1.8.0",
     # Bodies posted to GitHub by tools/ are formatted and checked by these, never pybers.
@@ -77,6 +79,22 @@ ticketPrefix = "PYB"
 testpaths = ["tests"]
 # The root, so a test imports the tooling as `tools.workflow`, the name a command runs by.
 pythonpath = ["."]
+# The worker count is `pytest_xdist_auto_num_workers` in tests/conftest.py.
+addopts = "-n auto"
+
+[tool.coverage.run]
+branch = true
+source = ["src/pybers"]
+omit = ["src/pybers/_generated/*"]
+# Inside a directory git and Dropbox already ignore, so a run leaves nothing to guard.
+data_file = ".pytest_cache/coverage"
+
+[tool.coverage.report]
+# One place, so the table agrees with the badge, and a small drop shows.
+precision = 1
+
+[tool.coverage.html]
+directory = ".pytest_cache/htmlcov"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pybers"]

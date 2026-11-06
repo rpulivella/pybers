@@ -27,6 +27,8 @@ no base to diff against. Needing neither is why this runs unchanged in CI on a
 default shallow checkout.
 
 UPDATES
+2026-11-05  The pytest gate measures coverage, and every gate reports its seconds, for
+            PYB-277.
 2026-10-14  Moved here from `scripts/pr-preflight-check.py`, and run as a module,
             for PYB-204.
 2026-10-13  Imports every gate's tool and the standards checks at the top, and
@@ -50,8 +52,9 @@ import argparse
 import contextlib
 import io
 import subprocess
+import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import mypy.api
@@ -79,6 +82,7 @@ class GateResult:
     passed: bool
     summary: str
     output: str
+    seconds: float = 0.0
 
 
 class PreflightError(RuntimeError):
@@ -89,7 +93,7 @@ def runTests() -> GateResult:
     """Run the whole pytest suite in this process and report what it found."""
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
-        code = pytest.main(["-q", "tests"])
+        code = pytest.main(["-q", "tests", "--cov", "--cov-report="])
     output = buffer.getvalue().strip()
     lastLine = output.splitlines()[-1] if output else "pytest printed nothing"
     return GateResult("pytest", int(code) == 0, lastLine, output)
@@ -172,10 +176,12 @@ def runGates(names: list[str]) -> list[GateResult]:
     """
     results: list[GateResult] = []
     for name in names:
+        started = time.perf_counter()
         try:
-            results.append(gates[name]())
+            result = gates[name]()
         except PreflightError as exc:
-            results.append(GateResult(name, False, "could not run", str(exc)))
+            result = GateResult(name, False, "could not run", str(exc))
+        results.append(replace(result, seconds=time.perf_counter() - started))
     return results
 
 
@@ -189,6 +195,7 @@ def report(results: list[GateResult]) -> int:
         mark = "[green]PASS[/]" if result.passed else "[red]FAIL[/]"
         console.print(
             f"{mark} [bold]{escape(result.name)}[/]  {escape(result.summary)}"
+            f" ({result.seconds:.1f} s)"
         )
 
     failed = [result for result in results if not result.passed]
