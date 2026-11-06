@@ -1,7 +1,7 @@
-# The four gates on a runner, shared by `preflight` before a merge and `health`
+# The four gates and the coverage they measure on a runner, shared by `preflight` before a merge and `health`
 # after one, so the two workflows differ only in when they run.
 name: gates
-description: Install the project and run pytest, the prose gate, ruff and mypy.
+description: Install the project, run pytest, the prose gate, ruff and mypy, and report coverage.
 
 inputs:
   title:

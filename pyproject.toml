@@ -86,7 +86,7 @@ addopts = "-n auto"
 branch = true
 source = ["src/pybers"]
 omit = ["src/pybers/_generated/*"]
-# Inside a directory git and Dropbox already ignore, so a run leaves nothing to guard.
+# Inside a directory every tool already ignores, so a run leaves nothing behind.
 data_file = ".pytest_cache/coverage"
 
 [tool.coverage.report]
