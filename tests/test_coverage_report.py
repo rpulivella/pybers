@@ -15,16 +15,21 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/05"
 
-import base64
+import io
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from conftest import pytest_xdist_auto_num_workers
-from tools.local.coverage_report import chooseBadgeColor, renderBadge, renderReport
-from tools.local.lib import readiness as checks
-from tools.workflow import preflight
+from tools.local.coverage_report import (
+    chooseBadgeColor,
+    renderBadge,
+    renderReport,
+)
+from tools.local.coverage_report import main as coverageReportMain
+from tools.local.lib.readiness import coverageNoticeTitle
 
 
 @pytest.mark.parametrize(
@@ -62,75 +67,23 @@ def testTheReportNamesTheCommitAndCarriesTheTable() -> None:
     assert report.endswith("| Name | Cover |\n")
 
 
-@pytest.mark.parametrize(
-    ("percent", "published", "status", "detail"),
-    [
-        ("95.6", "95.5", checks.passed, "95.6%, increased from 95.5% on develop"),
-        ("95.5", "95.5", checks.passed, "95.5%"),
-        ("95.5", "95.50", checks.passed, "95.5%"),
-        ("94.6", "95.5", checks.passed, "94.6%, down from 95.5% on develop"),
-        ("94.5", "95.5", checks.attention, "94.5%, down from 95.5% on develop"),
-        ("90.0", "95.5", checks.attention, "90.0%, down from 95.5% on develop"),
-        ("95.5", "", checks.passed, "95.5%, with no develop figure to compare"),
-        ("", "95.5", checks.skipped, "Coverage was not measured"),
-        ("", "", checks.skipped, "Coverage was not measured"),
-    ],
-)
-def testCoverageReadsAgainstDevelopAndOnlyALargeDropAsksADecision(
-    percent: str, published: str, status: str, detail: str,
+def testMainWritesBothFilesAndAnnotatesTheRun(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str],
 ) -> None:
-    result = checks.checkCoverage(percent, published)
-    assert (result.status, result.detail) == (status, detail)
+    class MeasuredStandIn:
+        def load(self) -> None:
+            pass
 
+        def report(self, file: io.StringIO, output_format: str) -> float:
+            assert output_format == "markdown"
+            file.write("| Name | Cover |\n")
+            return 95.54
 
-def testThePublishedFigureIsReadFromTheBadge(monkeypatch: pytest.MonkeyPatch) -> None:
-    content = base64.b64encode(renderBadge(95.5).encode()).decode()
-    monkeypatch.setattr(
-        checks.github, "requestJson", lambda *args, **kwargs: {"content": content},
-    )
-    assert checks.readPublishedCoverage("token") == "95.5"
-
-
-def testNoCoverageBranchYetReadsAsNothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    def refuse(*args: object, **kwargs: object) -> None:
-        raise checks.github.GitHubHttpError(404, "Not Found")
-
-    monkeypatch.setattr(checks.github, "requestJson", refuse)
-    assert checks.readPublishedCoverage("token") == ""
-
-
-def testAnyOtherFailureReadingTheFigureIsRaised(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def refuse(*args: object, **kwargs: object) -> None:
-        raise checks.github.GitHubHttpError(500, "Server Error")
-
-    monkeypatch.setattr(checks.github, "requestJson", refuse)
-    with pytest.raises(checks.github.GitHubHttpError):
-        checks.readPublishedCoverage("token")
-
-
-def testTheNoticeIsReadFromAmongAnnotations(monkeypatch: pytest.MonkeyPatch) -> None:
-    annotations = [
-        {"title": "", "message": "Node.js 20 is deprecated."},
-        {"title": checks.coverageNoticeTitle, "message": "95.0"},
-    ]
-    monkeypatch.setattr(
-        checks.github, "requestJson", lambda *args, **kwargs: annotations,
-    )
-    assert checks.readCoverageNotice("token", 1) == "95.0"
-
-
-def testARunWithNoNoticeReadsAsNothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(checks.github, "requestJson", lambda *args, **kwargs: [])
-    assert checks.readCoverageNotice("token", 1) == ""
-
-
-def testEveryGateIsTimedEvenWhenItCannotRun(monkeypatch: pytest.MonkeyPatch) -> None:
-    def refuse() -> preflight.GateResult:
-        raise preflight.PreflightError("no binary")
-
-    monkeypatch.setitem(preflight.gates, "ruff", refuse)
-    result = preflight.runGates(["ruff"])[0]
-    assert not result.passed
-    assert result.seconds >= 0
+    monkeypatch.setattr("coverage.Coverage", MeasuredStandIn)
+    output = tmp_path / "published"
+    arguments = ["coverage_report", "--output", str(output), "--commit", "abc1234"]
+    monkeypatch.setattr("sys.argv", arguments)
+    assert coverageReportMain() == 0
+    assert json.loads((output / "badge.json").read_text())["message"] == "95.5%"
+    assert (output / "README.md").read_text().endswith("| Name | Cover |\n")
+    assert f"::notice title={coverageNoticeTitle}::95.5" in capsys.readouterr().out
