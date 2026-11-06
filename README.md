@@ -290,6 +290,21 @@ assert pybers.parseJsonForm(text) == costs
 
 A whole document read from its JSON form saves as a created document holding what the form describes. A cell holding something pybers cannot yet create, rich text, a control or a format such as a percentage, is refused by name before anything is written.
 
+### Colors
+
+A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert. Build one through `import pybers` or read one from its text:
+
+| System | Through `import pybers` | As text |
+| --- | --- | --- |
+| sRGB | `pybers.Color(pybers.ColorSpace.SRGB, (1, 0.5, 0), 1)` | `#ff8000ff` or `color(srgb 1 0.5 0 / 1)` |
+| Display P3 | `pybers.Color(pybers.ColorSpace.DISPLAY_P3, (1, 0.5, 0), 1)` | `color(display-p3 1 0.5 0 / 1)` |
+| CMYK | `pybers.Color(pybers.ColorSpace.DEVICE_CMYK, (0, 0, 0, 1), 1)` | `device-cmyk(0 0 0 1 / 1)` |
+| grayscale | `pybers.Color.gray(0.5, 1)` | `device-gray(0.5 / 1)` |
+| `black` token | `pybers.Color.black` | `black` |
+| `white` token | `pybers.Color.white` | `white` |
+
+`pybers.Color.parse(text)` reads each form and `str(color)` prints it. Text leaving out its alpha is refused, naming the form that carries it, and so is a model Numbers does not store, such as HSL or OKLCH. Components run from 0.0 to 1.0. Numbers stores every color as RGB, so a gray is three equal sRGB components, and `device-gray(0.5 / 1)` prints back as `color(srgb 0.5 0.5 0.5 / 1)`, what will be stored. A document pybers creates holds RGB alone, and a CMYK color is one a caller holds or a document already contains.
+
 ### Selectors
 
 One selector syntax reaches any sheet, table, range or cell, in the library, at the command line and for an agent alike, in the manner of CSS. It has three positions, sheet, table and cells, joined by `::`, and an empty position means any:
@@ -337,6 +352,7 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Showing any sheet, table, range or cell at the command line, as text or as its JSON form
 - Changing a document's language and region as Numbers does, in any of 335 regions
 - Writing a document or any part of one as JSON, and reading it back exactly
+- Stating a color exactly as Numbers stores it, with its color space and alpha, in CSS syntax or as its fields
 
 ### Planned
 
