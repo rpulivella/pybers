@@ -360,11 +360,6 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     )
 
 
-def formatGoldenCount(count: int) -> str:
-    """Count goldens in the wording their sentence needs."""
-    return "1 golden," if count == 1 else f"{count} goldens, each"
-
-
 def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
     """Report whether every golden this change touches carries a confirmation date."""
     if not facts.goldensTouched:
@@ -375,10 +370,10 @@ def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
             "Goldens", failed,
             f"{formatList(missing)} carries no confirmation date",
         )
+    count = len(set(facts.goldensTouched))
+    touched = "1 golden," if count == 1 else f"{count} goldens, each"
     return CheckResult(
-        "Goldens", passed,
-        f"This change touches {formatGoldenCount(len(set(facts.goldensTouched)))} "
-        "confirmed in Numbers",
+        "Goldens", passed, f"This change touches {touched} confirmed in Numbers",
     )
 
 
