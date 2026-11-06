@@ -201,6 +201,47 @@ non-RGB spaces this fixture has not exercised.
 Anything in pybers representing a color must carry the space, and must not convert between
 spaces silently. Converting is a decision a caller makes, not a side effect of reading a file.
 
+## Numbers stores RGB, whichever slider chose the color
+
+`TSP.Color` defines three models, `rgb`, `cmyk` and `white`, and Numbers writes only the
+first. `97b-color-panel-sliders` holds one fill per slider of the color panel, chosen by
+hand in Numbers 15.4, and each row 1 cell stores:
+
+| Cell | Chosen with | Stored model and space | Stored r, g, b | Alpha |
+|---|---|---|---|---|
+| `A1` | Gray Scale, Brightness 0% | `rgb`, `srgb` | 0, 0, 0 | 1 |
+| `B1` | Gray Scale, Brightness 50% | `rgb`, `srgb` | 0.5, 0.5, 0.5 | 1 |
+| `C1` | Gray Scale, Brightness 50%, Opacity 50% | `rgb`, `srgb` | 0.5, 0.5, 0.5 | 0.5 |
+| `D1` | RGB, sRGB IEC61966-2.1, 0 0 0 | `rgb`, `srgb` | 0, 0, 0 | 1 |
+| `E1` | RGB, sRGB IEC61966-2.1, 255 128 0 | `rgb`, `srgb` | 1, 0.501960814, 0 | 1 |
+| `F1` | RGB, Display P3, 255 128 0 | `rgb`, `p3` | 1, 0.501960814, 0 | 1 |
+| `G1` | RGB, Generic RGB, 255 128 0 | `rgb`, `srgb` | 1, 0.501960814, 0 | 1 |
+| `H1` | CMYK, Generic CMYK, 0 0 0 100 | `rgb`, `srgb` | 0.103640832, 0.0991537645, 0.0975294784 | 1 |
+| `I1` | CMYK, Generic CMYK, 100 0 0 0 | `rgb`, `srgb` | 0, 0.640511453, 0.855992138 | 1 |
+| `J1` | HSB, 30 100 100 | `rgb`, `srgb` | 1, 0.5, 0 | 1 |
+
+Five things follow:
+
+- **A gray has no model of its own.** The Gray Scale sliders store three equal components,
+  so `A1` and `D1` are the same color, and a gray in the file cannot be told from an RGB
+  color with equal components.
+- **A CMYK color is converted when it is chosen.** Its ink values are gone from the file,
+  so `H1` is a dark gray rather than black, and it stays a different color from `A1`
+  because their RGB values differ, never because their models do.
+- **Display P3 is the only profile that survives as a space.** `F1` keeps its numbers and
+  names `p3`. `G1`, labeled Generic RGB, holds the same bytes as `E1`.
+- **Numbers converts a `cmyk` or `white` color when it opens one.** On 2026-11-06 a copy of
+  `97b` had five fills rewritten by a script to those models, then was exported to PDF and
+  saved from Numbers 15.4. The PDF names only ICC profiles of three components and no
+  `DeviceGray` or `DeviceCMYK`, drawing `cmyk` `0 0 0 1` as `0.1036408 0.09915376 0.09752948`
+  and `white` `0.5` as `0.5 0.5 0.5`, the values the sliders store, and the save stores
+  those RGB values. A Display P3 fill reaches the PDF with its own profile and numbers. The
+  rewritten copy is pybers' work and so no measurement, and is not kept.
+- **Every color in the archives pybers parses across the test documents is `rgb`**, in
+  `srgb` or `p3`, with a headroom of 1, and every component and alpha lies from 0 to 1.
+  Theme slots agree, which is why a created document's palette and sheet fill are stored
+  the same way.
+
 ## Gradients
 
 ```
