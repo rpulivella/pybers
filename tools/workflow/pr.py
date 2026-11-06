@@ -42,6 +42,7 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-11-05  `checks` prints how long each check took, for PYB-277.
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
 2026-10-23  `close`, a pull request closed without merging, for PYB-156.
@@ -361,7 +362,8 @@ def runChecks(arguments: argparse.Namespace) -> int:
         else:
             mark = "[red]FAIL[/]"
         state = run.conclusion or run.status
-        console.print(f"{mark} [bold]{escape(run.name)}[/]  {escape(state)}")
+        line = f"{mark} [bold]{escape(run.name)}[/]  {escape(state)}"
+        console.print(f"{line}  {run.duration}" if run.duration else line)
 
     if confirmChecksPassed(runs):
         console.print(f"[green]{checksPassedMarker}[/] on {commit}")

@@ -8,6 +8,7 @@
 Read and write Apple Numbers documents from Python, with the aim that an edit made by script is as reliable as one made in Numbers by hand.
 
 [![health](https://github.com/rpulivella/pybers/actions/workflows/health.yml/badge.svg?branch=develop)](https://github.com/rpulivella/pybers/actions/workflows/health.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/rpulivella/pybers/coverage/badge.json)](https://github.com/rpulivella/pybers/blob/coverage/README.md)
 [![License](https://img.shields.io/github/license/rpulivella/pybers)](LICENSE)
 
 > **Status, 28 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has four commands, `pybers check`, `pybers show`, `pybers set` and `pybers locale`, and nothing is on PyPI yet.

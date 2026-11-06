@@ -7,6 +7,7 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-11-05  The worker count the parallel suite runs with, for PYB-277.
 2026-11-03  `readRangeValues`, the values a range covers, and `listShownFields`,
             the fields a command folds onto its lines, for PYB-223.
 2026-10-29  `readPlainText`, a command's output without color or wrapping, for
@@ -31,6 +32,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/07"
 
+import os
 import shutil
 from pathlib import Path
 
@@ -177,6 +179,12 @@ def readRecordedColumns(path: Path, row: int) -> set[int]:
     if row not in recorded:
         raise AssertionError(f"No table in {path.name} holds row {row}.")
     return recorded[row]
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_xdist_auto_num_workers(config: pytest.Config) -> int:
+    """Leave one core free. `tryfirst` outranks the count xdist computes itself."""
+    return max(2, (os.process_cpu_count() or 1) - 1)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

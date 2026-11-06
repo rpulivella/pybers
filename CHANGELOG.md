@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-277] Measure test coverage and show it on the README
 - [PYB-223] Select anything in a document one way, in the manner of CSS
 - [PYB-261] Create a Numbers document from nothing
 - [PYB-276] Compose a created sheet and table instead of copying one

@@ -25,6 +25,8 @@ themestyles_extract.py
                      read the properties Numbers states on every root style of each
                      type a created theme holds, valued as 00-baseline's Blank theme
                      states them. Writes src/pybers/_generated/themestyles.py
+coverage_report.py   write the coverage badge and report the `health` workflow publishes
+                     on the `coverage` branch. Runs in CI
 locales_sweep.py     change a document to each region the locale table holds, open
                      it in Numbers through the golden-confirm helper, and check what
                      it shows. Writes workarea/locale-sweep/

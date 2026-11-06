@@ -7,6 +7,7 @@ run, and both can start in the same second. GitHub is stood in for at the API
 boundary, with the runs PR #174 carried on 7057e55.
 
 UPDATES
+2026-11-05  How long a check took, for PYB-277.
 2026-10-13  Pull request summaries and check runs are dataclasses, for PYB-204.
 2026-10-06  Written for PYB-175.
 """
@@ -131,3 +132,18 @@ def testAMergeRefusesAFailureTiedWithASkippedRun(
     )
     assert pr.runMerge(arguments) == pr.errorExitCode
     assert merged == []
+
+
+@pytest.mark.parametrize(
+    ("completed", "duration"),
+    [
+        ("2026-11-06T01:15:48Z", "6m 17s"),
+        ("2026-11-06T01:09:40Z", "9s"),
+        ("2026-11-06T01:09:31Z", "0s"),
+        (None, ""),
+    ],
+)
+def testACheckRunSpellsHowLongItTook(completed: str | None, duration: str) -> None:
+    run = {"started_at": "2026-11-06T01:09:31Z", "completed_at": completed}
+    assert pullRequest.formatRunDuration(run) == duration
+

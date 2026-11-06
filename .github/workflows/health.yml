@@ -1,7 +1,7 @@
 # Checks develop after something lands on it: a pull request the preflight saw
 # only against an older develop, or an administrator's direct push it never saw.
-# It posts nothing and gates nothing; its verdict is the commit's mark and the
-# README's badge.
+# It gates nothing; its verdict is the commit's mark and the README's badge, and its
+# coverage job is the only part that writes.
 name: health
 
 on:
@@ -32,3 +32,35 @@ jobs:
       - uses: ./.github/actions/gates
         with:
           title: Health
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: coverage
+          path: ${{ runner.temp }}/coverage
+          retention-days: 1
+
+  # Its own job, so the suite never runs beside a token that can write.
+  coverage:
+    needs: health
+    # A manual run on another branch must not replace the number for `develop`.
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: coverage
+
+      - name: Replace the coverage branch
+        # One commit, force-pushed, so the branch never grows a history.
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -b coverage
+          git add .
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "chore: coverage of $GITHUB_SHA"
+          git push --force "https://x-access-token:$TOKEN@github.com/$GITHUB_REPOSITORY.git" coverage

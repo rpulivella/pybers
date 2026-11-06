@@ -1,7 +1,7 @@
-# The four gates on a runner, shared by `preflight` before a merge and `health`
+# The four gates and the coverage they measure on a runner, shared by `preflight` before a merge and `health`
 # after one, so the two workflows differ only in when they run.
 name: gates
-description: Install the project and run pytest, the prose gate, ruff and mypy.
+description: Install the project, run pytest, the prose gate, ruff and mypy, and report coverage.
 
 inputs:
   title:
@@ -28,6 +28,11 @@ runs:
     - name: pytest
       shell: bash -o pipefail -e {0}
       run: python -m tools.workflow.preflight --gate pytest 2>&1 | tee -a "$RUNNER_TEMP/preflight.log"
+
+    # Only after a passing suite, so a failed run publishes and reports no number.
+    - name: coverage
+      shell: bash
+      run: python -m tools.local.coverage_report --output "$RUNNER_TEMP/coverage" --commit "$GITHUB_SHA"
 
     - name: standards
       if: always()

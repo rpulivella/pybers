@@ -11,6 +11,8 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-11-05  Reports the coverage the preflight measured against `develop`,
+            and counts one golden in the singular, for PYB-277.
 2026-10-23  A golden the branch deleted is not counted as touched, for PYB-255.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-14  Reading a pull request, its preflight, its base and the declared
@@ -33,6 +35,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/17"
 
+import base64
 import json
 import re
 import subprocess
@@ -43,6 +46,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field, fields
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +71,11 @@ templateCheckName: str = "PR Template"
 changelogCheckName: str = "Changelog"
 ticketCheckName: str = "Ticket Identifier"
 baseCheckName: str = "Base Branch"
+coverageCheckName: str = "Coverage"
+# The annotation title that carries the preflight's number across workflows.
+coverageNoticeTitle: str = "coverage"
+# A smaller drop is the wiggle any change makes, and a decision on it would be noise.
+coverageDropLimit: Decimal = Decimal("1.0")
 
 passed: str = "passed"
 failed: str = "failed"
@@ -269,6 +278,23 @@ def checkPreflight(conclusion: str) -> CheckResult:
     return CheckResult("Preflight", failed, f"The preflight ended as {conclusion}")
 
 
+def checkCoverage(percent: str, published: str) -> CheckResult:
+    """Report coverage against `develop`, informing and never failing."""
+    if not percent:
+        return CheckResult(coverageCheckName, skipped, "Coverage was not measured")
+    if not published:
+        return CheckResult(
+            coverageCheckName, passed, f"{percent}% (develop not yet measured)"
+        )
+    change = Decimal(percent) - Decimal(published)
+    if not change:
+        return CheckResult(coverageCheckName, passed, f"{percent}%")
+    direction = "increased" if change > 0 else "down"
+    status = attention if -change >= coverageDropLimit else passed
+    detail = f"{percent}%, {direction} from {published}% on develop"
+    return CheckResult(coverageCheckName, status, detail)
+
+
 def readChangelogException(body: str) -> str:
     """Return the reason a body records for carrying no CHANGELOG entry, if any."""
     found = re.search(r"^_No CHANGELOG entry[,:]? (.+?)_\s*$", body, re.MULTILINE)
@@ -344,10 +370,10 @@ def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
             "Goldens", failed,
             f"{formatList(missing)} carries no confirmation date",
         )
+    count = len(set(facts.goldensTouched))
+    touched = "1 golden," if count == 1 else f"{count} goldens, each"
     return CheckResult(
-        "Goldens", passed,
-        f"This change touches {len(set(facts.goldensTouched))} goldens, each "
-        "confirmed in Numbers",
+        "Goldens", passed, f"This change touches {touched} confirmed in Numbers",
     )
 
 
@@ -508,8 +534,8 @@ def readResolvedPackages() -> list[list[str]]:
     return [[entry["name"], entry["version"]] for entry in json.loads(listed.stdout)]
 
 
-def waitForPreflight(token: str, sha: str) -> str:
-    """Return the preflight check's conclusion for a commit, waiting for it to finish.
+def waitForPreflight(token: str, sha: str) -> dict[str, Any] | None:
+    """Return the preflight's check run for a commit, waiting for it to finish.
 
     Read from GitHub rather than handed over, because the preflight is its own
     workflow and its own check. Waiting is what AC 3 asks for, and a preflight
@@ -531,10 +557,38 @@ def waitForPreflight(token: str, sha: str) -> str:
         ]
         if decided:
             newest = max(decided, key=lambda run: str(run["started_at"]))
-            return str(newest["conclusion"])
+            return dict(newest)
         if attempt < preflightAttempts - 1:
             time.sleep(preflightPauseSeconds)
+    return None
+
+
+def readCoverageNotice(token: str, checkRunId: int) -> str:
+    """Return the percent the preflight's run annotated, or nothing if it did not."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
+        f"/check-runs/{checkRunId}/annotations"
+    )
+    for annotation in github.requestJson(url, token, apiVersion="2022-11-28"):
+        if annotation["title"] == coverageNoticeTitle:
+            return str(annotation["message"])
     return ""
+
+
+def readPublishedCoverage(token: str) -> str:
+    """Return the percent on the `coverage` branch, or nothing before its first run."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
+        "/contents/badge.json?ref=coverage"
+    )
+    try:
+        stored = github.requestJson(url, token)
+    except github.GitHubHttpError as exc:
+        if exc.statusCode == 404:
+            return ""
+        raise
+    badge = json.loads(base64.b64decode(stored["content"]))
+    return str(badge["message"]).removesuffix("%")
 
 
 def readCommitsBehind(token: str, base: str, head: str) -> int:
@@ -553,8 +607,13 @@ def checkPullRequest(facts: BranchFacts, token: str) -> list[CheckResult]:
     # The branch's template when it carried one, since the body was written against it.
     template = facts.template or readTemplate()
     findings = findBodyFindings(pullRequest["body"], template)
+    preflight = waitForPreflight(token, facts.headSha)
     return [
-        checkPreflight(waitForPreflight(token, facts.headSha)),
+        checkPreflight(str(preflight["conclusion"]) if preflight else ""),
+        checkCoverage(
+            readCoverageNotice(token, preflight["id"]) if preflight else "",
+            readPublishedCoverage(token),
+        ),
         checkTemplate(findings),
         checkChecklist(pullRequest["body"]),
         checkChangelog(facts, pullRequest["body"]),
