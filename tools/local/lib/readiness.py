@@ -11,6 +11,7 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-11-05  Reports the coverage the preflight measured, for PYB-277.
 2026-10-23  A golden the branch deleted is not counted as touched, for PYB-255.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-14  Reading a pull request, its preflight, its base and the declared
@@ -67,6 +68,9 @@ templateCheckName: str = "PR Template"
 changelogCheckName: str = "Changelog"
 ticketCheckName: str = "Ticket Identifier"
 baseCheckName: str = "Base Branch"
+coverageCheckName: str = "Coverage"
+# The annotation title that carries the preflight's number across workflows.
+coverageNoticeTitle: str = "coverage"
 
 passed: str = "passed"
 failed: str = "failed"
@@ -267,6 +271,14 @@ def checkPreflight(conclusion: str) -> CheckResult:
     if conclusion == "failure":
         return CheckResult("Preflight", failed, "The preflight failed")
     return CheckResult("Preflight", failed, f"The preflight ended as {conclusion}")
+
+
+def checkCoverage(percent: str) -> CheckResult:
+    """Report the coverage the preflight measured, which informs and never gates."""
+    if not percent:
+        return CheckResult(coverageCheckName, skipped, "Coverage was not measured")
+    detail = f"{percent}% of lines and branches, omitting generated code"
+    return CheckResult(coverageCheckName, passed, detail)
 
 
 def readChangelogException(body: str) -> str:
@@ -508,8 +520,8 @@ def readResolvedPackages() -> list[list[str]]:
     return [[entry["name"], entry["version"]] for entry in json.loads(listed.stdout)]
 
 
-def waitForPreflight(token: str, sha: str) -> str:
-    """Return the preflight check's conclusion for a commit, waiting for it to finish.
+def waitForPreflight(token: str, sha: str) -> dict[str, Any] | None:
+    """Return the preflight's check run for a commit, waiting for it to finish.
 
     Read from GitHub rather than handed over, because the preflight is its own
     workflow and its own check. Waiting is what AC 3 asks for, and a preflight
@@ -531,9 +543,21 @@ def waitForPreflight(token: str, sha: str) -> str:
         ]
         if decided:
             newest = max(decided, key=lambda run: str(run["started_at"]))
-            return str(newest["conclusion"])
+            return dict(newest)
         if attempt < preflightAttempts - 1:
             time.sleep(preflightPauseSeconds)
+    return None
+
+
+def readCoverageNotice(token: str, checkRunId: int) -> str:
+    """Return the percent the preflight's run annotated, or nothing if it did not."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
+        f"/check-runs/{checkRunId}/annotations"
+    )
+    for annotation in github.requestJson(url, token, apiVersion="2022-11-28"):
+        if annotation["title"] == coverageNoticeTitle:
+            return str(annotation["message"])
     return ""
 
 
@@ -553,8 +577,10 @@ def checkPullRequest(facts: BranchFacts, token: str) -> list[CheckResult]:
     # The branch's template when it carried one, since the body was written against it.
     template = facts.template or readTemplate()
     findings = findBodyFindings(pullRequest["body"], template)
+    preflight = waitForPreflight(token, facts.headSha)
     return [
-        checkPreflight(waitForPreflight(token, facts.headSha)),
+        checkPreflight(str(preflight["conclusion"]) if preflight else ""),
+        checkCoverage(readCoverageNotice(token, preflight["id"]) if preflight else ""),
         checkTemplate(findings),
         checkChecklist(pullRequest["body"]),
         checkChangelog(facts, pullRequest["body"]),
