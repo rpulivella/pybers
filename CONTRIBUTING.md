@@ -16,10 +16,17 @@ A first-time contributor keeps at most one pull request open, and work that show
 - **A classic personal access token** with the `repo` and `project` scopes, in a git-ignored `.dev.vars` as `GITHUB_TOKEN=`. The ticket and pull request tools refuse to run without it, as [their README](tools/workflow/README.md#github-authentication) explains.
 - **Claude Code, optionally.** Each step below names the skill in `.claude/commands/` that carries it out. A skill is a written procedure, so it can be followed by hand as well.
 
-One command runs every local gate, and it is the only one this guide shows:
+One command runs every local gate:
 
 ```bash
 .venv/bin/python3 -m tools.workflow.preflight
+```
+
+The suite picks its own worker count, one fewer than the machine has cores and never fewer than two, and `-n 0` runs it in one process. To see which lines and branches it covers, with `htmlcov` under `.pytest_cache/`:
+
+```bash
+.venv/bin/python3 -m pytest --cov --cov-report=term-missing
+.venv/bin/python3 -m pytest --cov --cov-report=html
 ```
 
 ## Getting Started
