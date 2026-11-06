@@ -222,11 +222,11 @@ def testAValueOfTheWrongKindIsRefusedNamingWhatItMustBe() -> None:
     ('{"jsonFormVersion": 1, "jsonFormVersion": 1}', "appears twice"),
     ('{"jsonFormVersion": NaN}', "no number NaN"),
     ('{"jsonFormVersion": 99, "document": {"sheets": []}}', "jsonFormVersion being 99"),
-    ('{"jsonFormVersion": 3, "document": {"localeIdentifier": null, "sheets": [], '
+    ('{"jsonFormVersion": 4, "document": {"localeIdentifier": null, "sheets": [], '
      '"extra": 1}}', "no key 'extra'"),
-    ('{"jsonFormVersion": 3, "document": {"localeIdentifier": null}}',
+    ('{"jsonFormVersion": 4, "document": {"localeIdentifier": null}}',
      "sheets is missing"),
-    ('{"jsonFormVersion": 3, "document": {"sheets": []}}',
+    ('{"jsonFormVersion": 4, "document": {"sheets": []}}',
      "localeIdentifier is missing"),
 ])
 def testTextThatIsNotTheFormIsRefusedSayingWhy(text: str, refusal: str) -> None:

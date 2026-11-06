@@ -29,12 +29,13 @@ from typing import Final
 
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress
+from pybers.color.colors import Color
 from pybers.document._form import DocumentForm, SheetForm, TableEntry
 from pybers.interchange._tree import jsonFormConst
 from pybers.table._form import TableForm
 
 # Any change to the form's shape is a new version, recorded in `docs/decisions.md`.
-jsonFormVersion: Final[int] = 3
+jsonFormVersion: Final[int] = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,12 +87,22 @@ class CellJsonForm:
     documentTables: tuple[TableEntry, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ColorJsonForm:
+    """One color, its fields rather than its text."""
+
+    jsonFormVersion: int = field(metadata={jsonFormConst: jsonFormVersion})
+    color: Color
+
+
 type JsonForm = (
     DocumentJsonForm | SheetJsonForm | TableJsonForm | RangeJsonForm | CellJsonForm
+    | ColorJsonForm
 )
 
 __all__ = [
     "CellJsonForm",
+    "ColorJsonForm",
     "DocumentJsonForm",
     "JsonForm",
     "RangeJsonForm",

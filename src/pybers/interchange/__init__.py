@@ -14,6 +14,7 @@ and this package owns only the mechanism, so a feature adding a field adds no co
 here.
 
 UPDATES
+2026-11-06  A color writes its form and reads back, for PYB-264.
 2026-11-03  A list of parts writes an array of their forms, and an array reads
             back as each part, for PYB-223.
 2026-10-27  A range narrowing a table may name it, and one naming another is
@@ -32,6 +33,7 @@ __date__ = "2026/10/24"
 
 # Lazy, because `formula.nodes` reaches `_tree` while the model is still loading.
 lazy from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
+lazy from pybers.color.colors import Color
 lazy from pybers.document._form import (
     buildDocument,
     buildDocumentForm,
@@ -43,6 +45,7 @@ lazy from pybers.document._form import (
 lazy from pybers.document.sheets import Document, Sheet
 lazy from pybers.interchange._envelope import (
     CellJsonForm,
+    ColorJsonForm,
     DocumentJsonForm,
     JsonForm,
     RangeJsonForm,
@@ -67,11 +70,11 @@ def formatJsonForm(subject: object, extent: CellRangeLike | None = None) -> str:
     return writeJsonText(encodeTree(buildJsonForm(subject, extent)))
 
 
-type JsonFormPart = Document | Sheet | Table | tuple[Cell, ...] | Cell
+type JsonFormPart = Document | Sheet | Table | tuple[Cell, ...] | Cell | Color
 
 
 def parseJsonForm(text: str) -> JsonFormPart | list[JsonFormPart]:
-    """Return the document, sheet, table, cells or cell a JSON form describes.
+    """Return the document, sheet, table, cells, cell or color a JSON form describes.
 
     An array returns each of its forms, as `pybers show` writes several parts.
     """
@@ -115,6 +118,8 @@ def buildFormPart(tree: Tree, path: str) -> JsonFormPart:
                     f"{path}.table must hold the cell {cell} and no other."
                 )
             return buildPart(table, sheetName, entries, f"{path}.table").cells[cell]
+        case ColorJsonForm(color=color):
+            return color
     raise JsonFormError("The text holds no part of a document.")
 
 
@@ -123,6 +128,8 @@ def buildJsonForm(subject: object, extent: CellRangeLike | None) -> object:
     if extent is not None and not isinstance(subject, Table):
         raise JsonFormError("Only a table is narrowed to a range of its cells.")
     match subject:
+        case Color():
+            return ColorJsonForm(jsonFormVersion, subject)
         case list():
             return [
                 buildJsonForm(*each) if isinstance(each, tuple)
