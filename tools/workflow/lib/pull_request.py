@@ -6,6 +6,7 @@ runs, and a body checked against the template.
 Shared by `pr.py` and the readiness check.
 
 UPDATES
+2026-11-05  A check run carries how long it took, for PYB-277.
 2026-10-23  `closePullRequest`, closing one without merging, for PYB-156.
 2026-10-14  A summary carries its author, and `readApprovers` and
             `confirmMergeApproved` gate a merge on approval, for PYB-156.
@@ -33,6 +34,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime
 from email.message import Message
 from pathlib import Path
 from typing import IO, Any
@@ -246,6 +248,7 @@ class CheckRun:
     name: str
     status: str
     conclusion: str
+    duration: str = ""
 
 
 @dataclass(frozen=True)
@@ -505,8 +508,19 @@ def chooseLatestRuns(runs: list[dict[str, Any]]) -> list[CheckRun]:
             status=run["status"],
             # Null until a run completes, and "" reports better than "None".
             conclusion=run.get("conclusion") or "",
+            duration=formatRunDuration(run),
         )
     return list(latest.values())
+
+
+def formatRunDuration(run: dict[str, Any]) -> str:
+    """Spell how long a finished run took, and nothing for one still running."""
+    started, completed = run.get("started_at"), run.get("completed_at")
+    if not started or not completed:
+        return ""
+    elapsed = datetime.fromisoformat(completed) - datetime.fromisoformat(started)
+    minutes, seconds = divmod(round(elapsed.total_seconds()), 60)
+    return f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
 
 
 def readWorkflowRuns(token: str, sha: str) -> list[WorkflowRun]:
