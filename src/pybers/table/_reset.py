@@ -39,6 +39,8 @@ from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence.index import ArchiveIndex, findRoot, generateUuid
 from .._persistence.metadata import PackageRegistry, composeArchive
 from .._persistence.types import findArchiveTypeId, readArchiveTypeId
+from ..color._archive import composeColor
+from ..color.colors import Color
 from ..errors import WriteError
 
 baseStyleName: str = "pybers-base"
@@ -144,14 +146,6 @@ def composeCellStyle(parent: int, stylesheet: int) -> tst.CellStyleArchive:
     return style
 
 
-def composeBlack(color: tsp.Color) -> None:
-    """Make a color opaque black in sRGB, as `53-paragraph-style-named` states it."""
-    color.model = tsp.Color.rgb
-    color.r, color.g, color.b, color.a = 0.0, 0.0, 0.0, 1.0
-    color.rgbspace = tsp.Color.srgb
-    color.headroom = 1.0
-
-
 def composeBaseStyle(
     key: str, stylesheet: int, listStyle: int
 ) -> tswp.ParagraphStyleArchive:
@@ -169,7 +163,7 @@ def composeBaseStyle(
     chars.italic = False
     chars.font_size = 11.0
     chars.font_name = "AvenirNext-Regular"
-    composeBlack(chars.font_color)
+    chars.font_color.CopyFrom(composeColor(Color.black))
     chars.language_null = True
     chars.superscript = character.kNoScript
     chars.underline = character.kNoUnderline
@@ -194,7 +188,7 @@ def composeBaseStyle(
     chars.is_named_point_size = False
     chars.capitalization_uses_linguistics = False
     chars.tsd_stroke_null = True
-    composeBlack(chars.tsd_fill.color)
+    chars.tsd_fill.color.CopyFrom(composeColor(Color.black))
     chars.tsd_fill_should_fill_text_container = False
     paras = style.para_properties
     paras.alignment = paragraph.TATvalue4

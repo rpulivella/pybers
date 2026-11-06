@@ -135,12 +135,12 @@ def testACreatedThemeOffersThirtySlotsOpeningWithSixGrays(tmp_path: Path) -> Non
     assert isinstance(theme, tn.ThemeArchive)
     slots = theme.super.color_presets
     assert len(slots) == 30
-    assert [(slot.model, round(slot.w, 6)) for slot in slots[:6]] == [
-        (tsp.Color.white, level) for level in (1.0, 0.9, 0.7, 0.5, 0.3, 0.0)
-    ]
+    assert [
+        (round(slot.r, 6), round(slot.g, 6), round(slot.b, 6)) for slot in slots[:6]
+    ] == [(level, level, level) for level in (1.0, 0.9, 0.7, 0.5, 0.3, 0.0)]
     assert all(
         slot.model == tsp.Color.rgb and slot.rgbspace == tsp.Color.srgb
-        for slot in slots[6:]
+        for slot in slots
     )
     assert len({(slot.r, slot.g, slot.b) for slot in slots[6:]}) == 24
 
@@ -195,7 +195,8 @@ def testACreatedSheetIsFilledWhiteWithAnUncoloredTab(tmp_path: Path) -> None:
 
     assert isinstance(style, tn.SheetStyleArchive)
     fill = style.sheet_properties.fill.color
-    assert (fill.model, fill.w, fill.a) == (tsp.Color.white, 1.0, 1.0)
+    assert (fill.model, fill.rgbspace) == (tsp.Color.rgb, tsp.Color.srgb)
+    assert (fill.r, fill.g, fill.b, fill.a) == (1.0, 1.0, 1.0, 1.0)
     assert style.sheet_properties.HasField("tab_color")
 
 
