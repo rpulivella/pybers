@@ -15,6 +15,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/05"
 
+import base64
 import json
 from types import SimpleNamespace
 
@@ -61,14 +62,52 @@ def testTheReportNamesTheCommitAndCarriesTheTable() -> None:
     assert report.endswith("| Name | Cover |\n")
 
 
-def testMeasuredCoverageIsReportedAndNeverGates() -> None:
-    result = checks.checkCoverage("95.0")
-    assert result.status == checks.passed
-    assert "95.0%" in result.detail
+@pytest.mark.parametrize(
+    ("percent", "published", "status", "detail"),
+    [
+        ("95.6", "95.5", checks.passed, "95.6%, increased from 95.5% on develop"),
+        ("95.5", "95.5", checks.passed, "95.5%"),
+        ("95.5", "95.50", checks.passed, "95.5%"),
+        ("94.6", "95.5", checks.passed, "94.6%, down from 95.5% on develop"),
+        ("94.5", "95.5", checks.attention, "94.5%, down from 95.5% on develop"),
+        ("90.0", "95.5", checks.attention, "90.0%, down from 95.5% on develop"),
+        ("95.5", "", checks.passed, "95.5%, with no develop figure to compare"),
+        ("", "95.5", checks.skipped, "Coverage was not measured"),
+        ("", "", checks.skipped, "Coverage was not measured"),
+    ],
+)
+def testCoverageReadsAgainstDevelopAndOnlyALargeDropAsksADecision(
+    percent: str, published: str, status: str, detail: str,
+) -> None:
+    result = checks.checkCoverage(percent, published)
+    assert (result.status, result.detail) == (status, detail)
 
 
-def testCoverageTheRunNeverMeasuredIsSkipped() -> None:
-    assert checks.checkCoverage("").status == checks.skipped
+def testThePublishedFigureIsReadFromTheBadge(monkeypatch: pytest.MonkeyPatch) -> None:
+    content = base64.b64encode(renderBadge(95.5).encode()).decode()
+    monkeypatch.setattr(
+        checks.github, "requestJson", lambda *args, **kwargs: {"content": content},
+    )
+    assert checks.readPublishedCoverage("token") == "95.5"
+
+
+def testNoCoverageBranchYetReadsAsNothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise checks.github.GitHubHttpError(404, "Not Found")
+
+    monkeypatch.setattr(checks.github, "requestJson", refuse)
+    assert checks.readPublishedCoverage("token") == ""
+
+
+def testAnyOtherFailureReadingTheFigureIsRaised(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise checks.github.GitHubHttpError(500, "Server Error")
+
+    monkeypatch.setattr(checks.github, "requestJson", refuse)
+    with pytest.raises(checks.github.GitHubHttpError):
+        checks.readPublishedCoverage("token")
 
 
 def testTheNoticeIsReadFromAmongAnnotations(monkeypatch: pytest.MonkeyPatch) -> None:

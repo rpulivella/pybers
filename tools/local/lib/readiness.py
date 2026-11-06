@@ -11,7 +11,8 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
-2026-11-05  Reports the coverage the preflight measured, for PYB-277.
+2026-11-05  Reports the coverage the preflight measured against the figure on
+            `develop`, for PYB-277.
 2026-10-23  A golden the branch deleted is not counted as touched, for PYB-255.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-14  Reading a pull request, its preflight, its base and the declared
@@ -34,6 +35,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/17"
 
+import base64
 import json
 import re
 import subprocess
@@ -44,6 +46,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field, fields
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +74,8 @@ baseCheckName: str = "Base Branch"
 coverageCheckName: str = "Coverage"
 # The annotation title that carries the preflight's number across workflows.
 coverageNoticeTitle: str = "coverage"
+# A smaller drop is the wiggle any change makes, and a decision on it would be noise.
+coverageDropLimit: Decimal = Decimal("1.0")
 
 passed: str = "passed"
 failed: str = "failed"
@@ -273,12 +278,21 @@ def checkPreflight(conclusion: str) -> CheckResult:
     return CheckResult("Preflight", failed, f"The preflight ended as {conclusion}")
 
 
-def checkCoverage(percent: str) -> CheckResult:
-    """Report the coverage the preflight measured, which informs and never gates."""
+def checkCoverage(percent: str, published: str) -> CheckResult:
+    """Report coverage against the figure on `develop`, informing and never failing."""
     if not percent:
         return CheckResult(coverageCheckName, skipped, "Coverage was not measured")
-    detail = f"{percent}% of lines and branches, omitting generated code"
-    return CheckResult(coverageCheckName, passed, detail)
+    if not published:
+        return CheckResult(
+            coverageCheckName, passed, f"{percent}%, with no develop figure to compare"
+        )
+    change = Decimal(percent) - Decimal(published)
+    if not change:
+        return CheckResult(coverageCheckName, passed, f"{percent}%")
+    direction = "increased" if change > 0 else "down"
+    status = attention if -change >= coverageDropLimit else passed
+    detail = f"{percent}%, {direction} from {published}% on develop"
+    return CheckResult(coverageCheckName, status, detail)
 
 
 def readChangelogException(body: str) -> str:
@@ -561,6 +575,22 @@ def readCoverageNotice(token: str, checkRunId: int) -> str:
     return ""
 
 
+def readPublishedCoverage(token: str) -> str:
+    """Return the percent on the `coverage` branch, or nothing before its first run."""
+    url = (
+        f"{github.restRoot}/repos/{github.repositoryOwner}/{github.repositoryName}"
+        "/contents/badge.json?ref=coverage"
+    )
+    try:
+        stored = github.requestJson(url, token)
+    except github.GitHubHttpError as exc:
+        if exc.statusCode == 404:
+            return ""
+        raise
+    badge = json.loads(base64.b64decode(stored["content"]))
+    return str(badge["message"]).removesuffix("%")
+
+
 def readCommitsBehind(token: str, base: str, head: str) -> int:
     """Return how many commits the base holds that this head does not."""
     url = (
@@ -580,7 +610,10 @@ def checkPullRequest(facts: BranchFacts, token: str) -> list[CheckResult]:
     preflight = waitForPreflight(token, facts.headSha)
     return [
         checkPreflight(str(preflight["conclusion"]) if preflight else ""),
-        checkCoverage(readCoverageNotice(token, preflight["id"]) if preflight else ""),
+        checkCoverage(
+            readCoverageNotice(token, preflight["id"]) if preflight else "",
+            readPublishedCoverage(token),
+        ),
         checkTemplate(findings),
         checkChecklist(pullRequest["body"]),
         checkChangelog(facts, pullRequest["body"]),
