@@ -34,7 +34,6 @@ from pybers.errors import PybersError
 
 # The fewest significant digits that always read back to the same float32.
 float32Digits: int = 9
-hexChannelCount: int = 4
 hexChannelMaximum: int = 255
 
 numberPattern: str = r"[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?"
