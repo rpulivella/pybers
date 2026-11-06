@@ -11,8 +11,8 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
-2026-11-05  Reports the coverage the preflight measured against the figure on
-            `develop`, and counts one golden in the singular, for PYB-277.
+2026-11-05  Reports the coverage the preflight measured against `develop`,
+            and counts one golden in the singular, for PYB-277.
 2026-10-23  A golden the branch deleted is not counted as touched, for PYB-255.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
 2026-10-14  Reading a pull request, its preflight, its base and the declared
@@ -279,12 +279,12 @@ def checkPreflight(conclusion: str) -> CheckResult:
 
 
 def checkCoverage(percent: str, published: str) -> CheckResult:
-    """Report coverage against the figure on `develop`, informing and never failing."""
+    """Report coverage against `develop`, informing and never failing."""
     if not percent:
         return CheckResult(coverageCheckName, skipped, "Coverage was not measured")
     if not published:
         return CheckResult(
-            coverageCheckName, passed, f"{percent}%, with no develop figure to compare"
+            coverageCheckName, passed, f"{percent}% (develop not yet measured)"
         )
     change = Decimal(percent) - Decimal(published)
     if not change:

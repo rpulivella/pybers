@@ -223,7 +223,7 @@ def testAGoldenCountReadsAsASentence(touched: list[str], sentence: str) -> None:
         ("94.6", "95.5", checks.passed, "94.6%, down from 95.5% on develop"),
         ("94.5", "95.5", checks.attention, "94.5%, down from 95.5% on develop"),
         ("90.0", "95.5", checks.attention, "90.0%, down from 95.5% on develop"),
-        ("95.5", "", checks.passed, "95.5%, with no develop figure to compare"),
+        ("95.5", "", checks.passed, "95.5% (develop not yet measured)"),
         ("", "95.5", checks.skipped, "Coverage was not measured"),
         ("", "", checks.skipped, "Coverage was not measured"),
     ],
@@ -235,7 +235,7 @@ def testCoverageReadsAgainstDevelopAndOnlyALargeDropAsksADecision(
     assert (result.status, result.detail) == (status, detail)
 
 
-def testThePublishedFigureIsReadFromTheBadge(monkeypatch: pytest.MonkeyPatch) -> None:
+def testThePublishedPercentIsReadFromTheBadge(monkeypatch: pytest.MonkeyPatch) -> None:
     content = base64.b64encode(json.dumps({"message": "95.5%"}).encode()).decode()
     monkeypatch.setattr(
         checks.github, "requestJson", lambda *args, **kwargs: {"content": content},
@@ -251,7 +251,7 @@ def testNoCoverageBranchYetReadsAsNothing(monkeypatch: pytest.MonkeyPatch) -> No
     assert checks.readPublishedCoverage("token") == ""
 
 
-def testAnyOtherFailureReadingTheFigureIsRaised(
+def testAnyOtherFailureReadingThePercentIsRaised(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def refuse(*args: object, **kwargs: object) -> None:
