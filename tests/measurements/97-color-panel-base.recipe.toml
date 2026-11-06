@@ -1,0 +1,66 @@
+# How Numbers makes 97-color-panel-base: ten labeled columns, each awaiting one color chosen by hand with one slider of the color panel. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 97-color-panel-base`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "K2"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "fill set with Gray Scale sliders, Brightness 0%"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "fill set with Gray Scale sliders, Brightness 50%"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "fill set with Gray Scale sliders, Brightness 50%, Opacity 50%"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "fill set with RGB sliders, sRGB IEC61966-2.1, 0 0 0"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "fill set with RGB sliders, sRGB IEC61966-2.1, 255 128 0"
+
+[[step]]
+action = "valueSet"
+range = "F2"
+value = "fill set with RGB sliders, Display P3, 255 128 0"
+
+[[step]]
+action = "valueSet"
+range = "G2"
+value = "fill set with RGB sliders, Generic RGB, 255 128 0"
+
+[[step]]
+action = "valueSet"
+range = "H2"
+value = "fill set with CMYK sliders, Generic CMYK, 0 0 0 100"
+
+[[step]]
+action = "valueSet"
+range = "I2"
+value = "fill set with CMYK sliders, Generic CMYK, 100 0 0 0"
+
+[[step]]
+action = "valueSet"
+range = "J2"
+value = "fill set with HSB sliders, 30 100 100"
+
+[[step]]
+action = "valueSet"
+range = "K2"
+value = "empty"
