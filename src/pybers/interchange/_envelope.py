@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """\
-The top of the JSON form: its version, and which part of a document it holds.
+The top of the JSON form: its version, and which part or color it holds.
 
-Five shapes, each writing keys no other writes, so a reader knows which it holds
+Six shapes, each writing keys no other writes, so a reader knows which it holds
 from its keys alone. A table, a range and a cell carry the name of their sheet, or
 null for a table on none, and every part carries the directory of its document's
 tables, against which its formulas' text is read.
@@ -10,6 +10,7 @@ tables, against which its formulas' text is read.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-06  Version 4, a color carrying its fields, for PYB-264.
 2026-11-03  Version 3, a table carrying its headers, for PYB-223.
 2026-10-28  Version 2, a document carrying its locale identifier, for PYB-272.
 2026-10-24  Written for PYB-259.

@@ -10,6 +10,7 @@ per document and found again by name. See docs/decisions.md.
 Private. Part of the table feature's archive half, reached by table creation.
 
 UPDATES
+2026-11-06  Black comes from `Color`, for PYB-264.
 2026-11-02  The reset's table and cell properties applied in one place each, which a
             created theme's table preset shares, for PYB-261.
 2026-11-02  Each style is composed field by field rather than copied from a

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "pybers JSON form",
-  "description": "A Numbers document, or a sheet, table, range or cell of one, as pybers writes and reads it. See docs/decisions.md for the rule each value follows.",
+  "description": "A Numbers document, a sheet, table, range or cell of one, or a color, as pybers writes and reads it. See docs/decisions.md for the rule each value follows.",
   "anyOf": [
     {
       "$ref": "#/$defs/DocumentJsonForm"

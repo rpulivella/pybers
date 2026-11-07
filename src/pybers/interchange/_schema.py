@@ -13,6 +13,7 @@ output, committed, and a test fails when the two differ.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-06  The form's description names a color, for PYB-264.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -59,8 +60,8 @@ def buildJsonFormSchema() -> dict[str, Any]:
         "$schema": schemaDialect,
         "title": "pybers JSON form",
         "description": (
-            "A Numbers document, or a sheet, table, range or cell of one, as pybers "
-            "writes and reads it. See docs/decisions.md for the rule each value "
+            "A Numbers document, a sheet, table, range or cell of one, or a color, as "
+            "pybers writes and reads it. See docs/decisions.md for the rule each value "
             "follows."
         ),
         **root,

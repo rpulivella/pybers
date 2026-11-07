@@ -3,6 +3,7 @@
 The rule each value follows in the JSON form, and what reading one refuses.
 
 UPDATES
+2026-11-06  Version 4, for PYB-264.
 2026-10-28  Version 2, whose document names its locale, for PYB-272.
 2026-10-27  A range narrowing a table may name it, and not another, for
             PYB-260.

@@ -8,6 +8,7 @@ kind a person adds, into which Numbers 15.4 inserted a table, text box, shape, l
 chart, image and SVG on 2 November 2026, and one sheet in the pybers reset.
 
 UPDATES
+2026-11-06  Created grays and the sheet's fill are sRGB, for PYB-264.
 2026-11-03  `pybers show` prints a created document in full, for PYB-223.
 2026-11-02  Written for PYB-261.
 """
