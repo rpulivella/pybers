@@ -12,6 +12,8 @@ one style shared along each. Measured 2026-11-03 in findings-10-creation.md.
 Private. The document feature's archive half, reached by document creation.
 
 UPDATES
+2026-11-06  The palette and the sheet's fill are `Color` values in sRGB, as Numbers
+            stores them, for PYB-264.
 2026-11-03  Root styles state what Numbers always states, for PYB-261.
 2026-11-02  Written for PYB-261.
 """
@@ -42,6 +44,8 @@ from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
 from .._generated.themestyles import themeStyles
+from ..color._archive import composeColor
+from ..color.colors import Color, ColorSpace
 from ..table._reset import (
     applyResetCell,
     applyResetTable,
@@ -132,35 +136,30 @@ def composeRootStyle[StyleT: Message](
 def composeSheetStyle(stylesheet: int) -> tn.SheetStyleArchive:
     """Return a sheet style filled white, its tab uncolored, as Numbers writes one."""
     style = composeRootStyle(tn.SheetStyleArchive, stylesheet, "sheet")
-    style.sheet_properties.fill.color.CopyFrom(
-        tsp.Color(model=tsp.Color.white, w=1.0, a=1.0)
-    )
+    style.sheet_properties.fill.color.CopyFrom(composeColor(Color.white))
     return style
 
 
-def composeThemeColor(hue: str, toward: float, amount: float) -> tsp.Color:
+def composeThemeColor(hue: str, toward: float, amount: float) -> Color:
     """Return an sRGB color mixed from a hex hue toward white (1) or black (0)."""
-    red, green, blue = (
-        int(hue[start:start + 2], 16) / 255 for start in range(0, 6, 2)
-    )
-    return tsp.Color(
-        model=tsp.Color.rgb,
-        r=red + (toward - red) * amount,
-        g=green + (toward - green) * amount,
-        b=blue + (toward - blue) * amount,
-        a=1.0,
-        rgbspace=tsp.Color.srgb,
-    )
+    channels = (int(hue[start:start + 2], 16) / 255 for start in range(0, 6, 2))
+    mixed = tuple(each + (toward - each) * amount for each in channels)
+    return Color(ColorSpace.SRGB, mixed, 1.0)
+
+
+def listThemeColors() -> list[Color]:
+    """Return the pybers palette: six grays, then each hue light, as is and dark."""
+    grays = [Color.gray(level, 1.0) for level in themeGrays]
+    tones = ((1.0, themeTintToWhite), (0.0, 0.0), (0.0, themeShadeToBlack))
+    return grays + [
+        composeThemeColor(hue, toward, amount)
+        for toward, amount in tones for hue in themeHues
+    ]
 
 
 def composeColorSlots(theme: tn.ThemeArchive) -> None:
     """Fill a theme's 30 color slots with the pybers palette."""
-    slots = theme.super.color_presets
-    for level in themeGrays:
-        slots.add(model=tsp.Color.white, w=level, a=1.0)
-    tones = ((1.0, themeTintToWhite), (0.0, 0.0), (0.0, themeShadeToBlack))
-    for toward, amount in tones:
-        slots.extend(composeThemeColor(hue, toward, amount) for hue in themeHues)
+    theme.super.color_presets.extend(composeColor(each) for each in listThemeColors())
 
 
 def composeTableNetwork(

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "pybers JSON form",
-  "description": "A Numbers document, or a sheet, table, range or cell of one, as pybers writes and reads it. See docs/decisions.md for the rule each value follows.",
+  "description": "A Numbers document, a sheet, table, range or cell of one, or a color, as pybers writes and reads it. See docs/decisions.md for the rule each value follows.",
   "anyOf": [
     {
       "$ref": "#/$defs/DocumentJsonForm"
@@ -17,6 +17,9 @@
     },
     {
       "$ref": "#/$defs/CellJsonForm"
+    },
+    {
+      "$ref": "#/$defs/ColorJsonForm"
     }
   ],
   "$defs": {
@@ -464,7 +467,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 3
+          "const": 4
         },
         "sheetName": {
           "anyOf": [
@@ -567,6 +570,59 @@
       ],
       "additionalProperties": false
     },
+    "Color": {
+      "type": "object",
+      "description": "A color in Numbers' own terms, never converted, and unequal across spaces.",
+      "properties": {
+        "colorSpace": {
+          "$ref": "#/$defs/ColorSpace"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "alpha": {
+          "type": "number"
+        },
+        "headroom": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "colorSpace",
+        "components",
+        "alpha"
+      ],
+      "additionalProperties": false
+    },
+    "ColorJsonForm": {
+      "type": "object",
+      "description": "One color, its fields rather than its text.",
+      "properties": {
+        "jsonFormVersion": {
+          "type": "integer",
+          "const": 4
+        },
+        "color": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "required": [
+        "jsonFormVersion",
+        "color"
+      ],
+      "additionalProperties": false
+    },
+    "ColorSpace": {
+      "enum": [
+        "srgb",
+        "display-p3",
+        "device-cmyk",
+        "device-gray"
+      ]
+    },
     "Coordinate": {
       "type": "object",
       "description": "One axis of a reference, and the only thing that knows what its number is.",
@@ -633,7 +689,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 3
+          "const": 4
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -951,7 +1007,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 3
+          "const": 4
         },
         "sheetName": {
           "anyOf": [
@@ -1014,7 +1070,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 3
+          "const": 4
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1158,7 +1214,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 3
+          "const": 4
         },
         "sheetName": {
           "anyOf": [
