@@ -220,20 +220,22 @@ hand in Numbers 15.4, and each row 1 cell stores:
 | `I1` | CMYK, Generic CMYK, 100 0 0 0 | `rgb`, `srgb` | 0, 0.640511453, 0.855992138 | 1 |
 | `J1` | HSB, 30 100 100 | `rgb`, `srgb` | 1, 0.5, 0 | 1 |
 
-Five things follow:
+The table and two further checks establish:
 
 - **A gray has no model of its own.** The Gray Scale sliders store three equal components,
   so `A1` and `D1` are the same color, and a gray in the file cannot be told from an RGB
   color with equal components.
-- **A CMYK color is converted when it is chosen.** Its ink values are gone from the file,
+- **A CMYK color is stored converted.** Its ink values are gone from the file,
   so `H1` is a dark gray rather than black, and it stays a different color from `A1`
   because their RGB values differ, never because their models do.
-- **Display P3 is the only profile that survives as a space.** `F1` keeps its numbers and
-  names `p3`. `G1`, labeled Generic RGB, holds the same bytes as `E1`.
-- **Numbers converts a `cmyk` or `white` color when it opens one.** On 2026-11-06 a copy of
-  `97b` had five fills rewritten by a script to those models, then was exported to PDF and
-  saved from Numbers 15.4. The PDF names only ICC profiles of three components and no
-  `DeviceGray` or `DeviceCMYK`, drawing `cmyk` `0 0 0 1` as `0.1036408 0.09915376 0.09752948`
+- **Of the three RGB profiles measured, sRGB and Display P3 are kept.** `F1` keeps its
+  numbers and specifies `p3`. `G1`, labeled Generic RGB, holds the same bytes as `E1`.
+- **Numbers holds a `cmyk` or `white` color as RGB by the time it exports or saves one.** On
+  6 November 2026 a copy of `97b` had five fills rewritten by a script, `B1` to `white`
+  `0.5`, `C1` to `white` `0.5` at alpha 0.5, `H1` to `cmyk` `0 0 0 1`, `I1` to `cmyk`
+  `1 0 0 0` and `J1` to `white` `0`, then was exported to PDF and saved from Numbers 15.4.
+  The PDF specifies only ICC profiles of three components and no `DeviceGray` or
+  `DeviceCMYK`, drawing `cmyk` `0 0 0 1` as `0.1036408 0.09915376 0.09752948`
   and `white` `0.5` as `0.5 0.5 0.5`, the values the sliders store, and the save stores
   those RGB values. A Display P3 fill reaches the PDF with its own profile and numbers. The
   rewritten copy is pybers' work and so no measurement, and is not kept.

@@ -91,7 +91,7 @@ Cell: Sheet 1::Table 2::A1
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 [
   {
-    "jsonFormVersion": 3,
+    "jsonFormVersion": 4,
     "sheetName": "Sheet 1",
     "cell": "A11",
     "table": {
@@ -156,7 +156,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 $ pybers show shapes.numbers "*::Table 2" --format json
 [
   {
-    "jsonFormVersion": 3,
+    "jsonFormVersion": 4,
     "sheetName": "Sheet 1",
     "table": {
       "name": "Table 2",
@@ -292,7 +292,7 @@ A whole document read from its JSON form saves as a created document holding wha
 
 ### Colors
 
-A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert. Build one through `import pybers` or read one from its text:
+A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert it to another space. No call applies a color to a document yet, and [PYB-265](https://github.com/rpulivella/pybers/issues/265) adds the first. Build one through `import pybers` or read one from its text:
 
 | System | Through `import pybers` | As text |
 | --- | --- | --- |
@@ -303,7 +303,7 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 | `black` token | `pybers.Color.black` | `black` |
 | `white` token | `pybers.Color.white` | `white` |
 
-`pybers.Color.parse(text)` reads each form and `str(color)` prints it. Text leaving out its alpha is refused, naming the form that carries it, and so is a model Numbers does not store, such as HSL or OKLCH. Components run from 0.0 to 1.0. Numbers stores every color as RGB, so a gray is three equal sRGB components, and `device-gray(0.5 / 1)` prints back as `color(srgb 0.5 0.5 0.5 / 1)`, what will be stored. A document pybers creates holds RGB alone, and a CMYK color is one a caller holds or a document already contains.
+`pybers.Color.parse(text)` reads each form and `str(color)` prints it. Text leaving out its alpha is refused, naming the form that carries it, and so is a model Numbers does not store, such as HSL or OKLCH. Components run from 0.0 to 1.0. Numbers stores every color as RGB, so a gray is three equal sRGB components, and `device-gray(0.5 / 1)` prints back as `color(srgb 0.5 0.5 0.5 / 1)`, which is what pybers stores. A document pybers creates holds RGB alone, and pybers reads and prints a CMYK color but creates none. `pybers.formatJsonForm(color)` writes a color's fields, and `pybers.parseJsonForm` reads them back equal.
 
 ### Selectors
 

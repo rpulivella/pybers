@@ -115,7 +115,7 @@ The reasoning is in `decisions.md`, under writing values and formats.
 
 ## Colors
 
-A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert. `pybers.Color.parse(text)` reads its one text form and `str(color)` prints it, as the [README](../README.md#colors) shows for each color system.
+A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert it to another space. `pybers.Color.parse(text)` reads its one text form and `str(color)` prints it, as the [README](../README.md#colors) shows for each color system.
 
 ## What is stored
 

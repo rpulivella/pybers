@@ -493,9 +493,9 @@ Blank theme states it and read into a generated table rather than copied, every 
 names `pybers-base`, and the table preset has no gridlines, outline or banding and does
 not wrap while every stroke choice stays offered. The rest stay as Numbers' Blank theme
 values them until a ticket gives them a reset value. A chart preset keeps
-Numbers' list lengths. When PYB-268 brings named paragraph and character styles, and PYB-265 to
-PYB-267 cell and table styling, each builds these from its model's defaults in place of
-the constants `document/_theme.py` holds.
+Numbers' list lengths. When PYB-268 brings named paragraph and character styles, and
+PYB-265 to PYB-267 cell and table styling, each builds these from its model's defaults in
+place of the constants `document/_theme.py` holds.
 
 **The theme offers 30 color slots of pybers' own.** Numbers reads the count, refusing
 fewer than 27, and not the colors, so the slots are a palette rather than Numbers'
@@ -533,35 +533,37 @@ unequal. pybers converts no color, whether reading, writing or comparing, since 
 conversion would write a value the document never held.
 
 **A color carries its alpha, and no call assumes one.** `TSP.Color` defaults alpha to 1
-when a writer omits it, so an omission reads as a choice nobody made. `Color` therefore
+when a writer omits it, so a reader cannot tell an omission from a choice. `Color` therefore
 takes alpha as a required argument, the text form always states it, and the archive half
 always writes it. A drawable's opacity is a separate value from its color's alpha.
 
-**A component is the float32 the file stores, from 0 to the color's headroom.** With the
-headroom of 1 every measured color holds, that is 0.0 to 1.0. `Color` rounds what it is
-given to a float32 and keeps it in a Python float, which represents it exactly, so equality
-compares stored values rather than the decimals a person typed. This is the one float in the
-model, and a cell's number stays decimal128, each as Numbers stores it.
+**A component is the float32 the file stores, held as a `Decimal`, from 0 to the color's
+headroom.** With the headroom of 1 every measured color holds, that is 0.0 to 1.0. `Color`
+rounds what it is given to a float32 and keeps the shortest `Decimal` that reads back to
+it, one for each float32, so `0.1` prints as `0.1`, and equality compares stored values
+rather than the decimals a person typed. A `float` is accepted, unlike a
+cell's value, since it loses nothing that the float32 keeps.
 
 **Text is CSS syntax, and the JSON form carries fields.** `str` prints the one form a
-color has and `Color.parse` reads it back equal. A headroom other than 1 has no CSS
-syntax, so such a color is refused a text form and keeps its JSON form.
+color has and `Color.parse` reads it back equal. `device-gray` is pybers' own, modeled on
+CSS Color 5's `device-cmyk`, since CSS has no grayscale syntax. A headroom other than 1 has
+no CSS syntax, so such a color is refused a text form and keeps its JSON form.
 
 **A color holds one `colorSpace`, and no separate model.** `srgb`, `display-p3`,
 `device-cmyk` and `device-gray` each decide how many components a color has, so an RGB
 color with no space cannot exist. The JSON form follows the Design Tokens Color Module's
 `colorSpace`, `components` and `alpha`, adding `headroom`, and it requires the alpha that
-module lets a writer omit. JSON has no color type, so a color is an object wherever a part
+module permits a writer to omit. JSON has no color type, so a color is an object wherever a part
 holds one.
 
 **pybers creates only what Numbers stores, which is RGB.** Every slider of the color panel
-stores RGB, in sRGB or Display P3, and Numbers converts a `cmyk` or `white` color when it
-opens one, so a PDF it exports holds neither ink nor gray. A stored CMYK or grayscale color
+stores RGB, in sRGB or Display P3, and Numbers holds a `cmyk` or `white` color as RGB by
+the time it exports or saves one, so a PDF it exports holds neither ink nor gray. A stored CMYK or grayscale color
 is still read, survives a round trip, appears in the JSON form and prints as `device-cmyk`
 or `device-gray`, and a document pybers creates holds neither. The `black` and `white`
 tokens are therefore opaque sRGB, and the print path decides what ink they become.
 
-**`Color.gray` is the convenience for the color people ask for most.** One level is easier
+**`Color.gray` is a convenience for a common case.** One level is easier
 to state than three equal components, and the Gray Scale sliders store exactly those, so
 no color math is involved. Text `device-gray(0.5 / 1)` reads the same way and prints what
 will be stored, `color(srgb 0.5 0.5 0.5 / 1)`. Only a gray stored in a file prints as
