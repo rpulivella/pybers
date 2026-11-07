@@ -12,7 +12,6 @@ written here holds for writing, reading and validating alike.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
-2026-11-06  A float32 is the shortest number reading back to it, for PYB-264.
 2026-10-29  The duration leaf named for ISO 8601, for PYB-278.
 2026-10-24  Written for PYB-259.
 """
@@ -37,7 +36,6 @@ from typing import Any
 
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress, CellReference
-from pybers.color.colors import formatFloat32
 from pybers.errors import PybersError
 
 # What the JSON text holds once read: numbers arrive as Decimal, never float.
@@ -156,11 +154,6 @@ def parseDecimal(tree: Tree, path: str) -> Decimal:
     return Decimal(tree)
 
 
-def parseFloat32(tree: Tree, path: str) -> float:
-    """Return a JSON number read as the float its owner rounds to a float32."""
-    return float(parseDecimal(tree, path))
-
-
 def parseBytes(tree: Tree, path: str) -> bytes:
     """Return the bytes a base64 text holds."""
     text = readString(tree, path, "base64 text")
@@ -186,11 +179,6 @@ def buildAddressRule(
 
 leafRules: tuple[LeafRule, ...] = (
     LeafRule(Decimal, lambda value: value, parseDecimal, {"type": "number"}),
-    # The model's only float is a stored float32, which a color's components hold.
-    LeafRule(
-        float, lambda value: Decimal(formatFloat32(value)), parseFloat32,
-        {"type": "number"},
-    ),
     LeafRule(
         datetime.datetime, lambda value: value.isoformat(), parseDateTime,
         {"type": "string", "pattern": dateTimePattern},

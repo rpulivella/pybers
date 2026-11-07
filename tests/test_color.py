@@ -17,6 +17,7 @@ __date__ = "2026/11/06"
 
 import json
 from collections.abc import Iterator
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -83,8 +84,17 @@ def testAColorHoldsNoAssumedAlpha() -> None:
 def testAComponentIsHeldAsItsFloat32() -> None:
     color = Color(ColorSpace.SRGB, (0.1, 0, 0), 1)
 
-    assert color.components[0] == tsp.Color(model=tsp.Color.rgb, r=0.1).r
-    assert color.components[0] != 0.1
+    assert color.components[0] == Decimal("0.1")
+    assert float(color.components[0]) != tsp.Color(model=tsp.Color.rgb, r=0.1).r
+    assert composeColor(color).r == tsp.Color(model=tsp.Color.rgb, r=0.1).r
+
+
+@pytest.mark.parametrize("number", [0.1, Decimal("0.1"), Decimal("0.10000000001")])
+def testEveryNumberSpecifyingOneFloat32HoldsOneDecimal(number: float) -> None:
+    color = Color(ColorSpace.DEVICE_GRAY, (number,), 1)
+
+    assert color == Color(ColorSpace.DEVICE_GRAY, (Decimal("0.1"),), 1)
+    assert isinstance(color.components[0], Decimal)
 
 
 @pytest.mark.parametrize(("space", "components"), [
@@ -103,7 +113,8 @@ def testAMalformedColorIsRefused(
 
 
 @pytest.mark.parametrize("number", [
-    float("nan"), float("inf"), 1e40, True, "1",
+    float("nan"), float("inf"), 1e40, True, "1", Decimal("NaN"), Decimal("sNaN"),
+    Decimal("Infinity"), Decimal("1e400"),
 ])
 def testAComponentThatIsNoFiniteFloat32IsRefused(number: float) -> None:
     with pytest.raises(ColorError):
@@ -237,7 +248,8 @@ def testAComponentReadsBackToTheSameFloat32WhateverItsDigits() -> None:
     stored = tsp.Color(model=tsp.Color.white, w=0.123456789).w
     color = Color(ColorSpace.DEVICE_GRAY, (stored,), 1)
 
-    assert Color.parse(str(color)).components[0] == stored
+    assert readColor(composeColor(color)) == color
+    assert composeColor(color).w == stored
 
 
 @pytest.mark.parametrize(("text", "named"), [

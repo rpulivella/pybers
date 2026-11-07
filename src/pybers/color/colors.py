@@ -2,11 +2,11 @@
 """\
 A color as Numbers stores it: its color space, its components, alpha and headroom.
 
-Nothing here converts a color. A component is the float32 the file holds, kept in a
-Python float that represents it exactly, and the text form is CSS syntax that names the
-same numbers. Numbers stores RGB alone, whichever slider chose the color, so a stored
-CMYK or grayscale color reads and survives but pybers creates none in a document. See
-findings-06-styles.md and `docs/decisions.md`.
+Nothing here converts a color. A component is the float32 the file holds, kept as the
+shortest Decimal that reads back to it, so `0.1` stays `0.1`, and the text form is CSS
+syntax that specifies the same numbers. Numbers stores RGB alone, whichever slider
+chose the color, so a stored CMYK or grayscale color reads and survives but pybers
+creates none in a document. See findings-06-styles.md and `docs/decisions.md`.
 
 UPDATES
 2026-11-06  Written for PYB-264.
@@ -24,6 +24,7 @@ __date__ = "2026/11/06"
 import math
 import re
 import struct
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -44,7 +45,7 @@ carryingForms: str = (
     "#rrggbbaa, color(srgb r g b / a), color(display-p3 r g b / a), "
     "device-cmyk(c m y k / a) or device-gray(w / a)"
 )
-# Every CSS function or `color()` space naming a model or space Numbers stores none of.
+# Each CSS function or `color()` space specifying what Numbers does not store.
 unstoredModels: frozendict[str, str] = frozendict({
     "hsl": "HSL", "hsla": "HSL", "hwb": "HWB", "lab": "Lab", "lch": "LCH",
     "oklab": "OKLab", "oklch": "OKLCH", "xyz": "XYZ", "xyz-d50": "XYZ",
@@ -53,6 +54,10 @@ unstoredModels: frozendict[str, str] = frozendict({
 unstoredSpaces: frozenset[str] = frozenset({
     "srgb-linear", "display-p3-linear", "a98-rgb", "prophoto-rgb", "rec2020",
 })
+
+
+# A float loses nothing here, since a component is rounded to a float32 either way.
+type ColorNumber = Decimal | float | int
 
 
 class ColorError(PybersError, ValueError):
@@ -89,34 +94,36 @@ def findNearestFloat32(number: float) -> float:
     return rounded
 
 
-def formatFloat32(number: float) -> str:
-    """Return the shortest decimal that reads back to a float32, `0.1` for 0.1f."""
+def findShortestDecimal(number: float) -> Decimal:
+    """Return the shortest Decimal reading back to a float32, `0.1` for 0.1f."""
     for digits in range(1, float32Digits + 1):
         shown = f"{number:.{digits}g}"
         if findNearestFloat32(float(shown)) == number:
             break
-    return format(Decimal(shown), "f")
+    return Decimal(format(Decimal(shown), "f"))
 
 
 @cache
-def findHexChannels() -> frozendict[float, int]:
+def findHexChannels() -> frozendict[Decimal, int]:
     """Return each float32 a whole number of 255ths rounds to, and that whole number."""
     return frozendict({
-        findNearestFloat32(whole / hexChannelMaximum): whole
+        readChannel("component", whole / hexChannelMaximum): whole
         for whole in range(hexChannelMaximum + 1)
     })
 
 
-def readChannel(name: str, number: object) -> float:
-    """Return one number as a float32, refusing what is not a finite real number."""
-    if isinstance(number, bool) or not isinstance(number, int | float):
+def readChannel(name: str, number: object) -> Decimal:
+    """Return one number as the Decimal specifying its float32, or refuse it."""
+    if isinstance(number, bool) or not isinstance(number, int | float | Decimal):
         raise ColorError(f"A color's {name} is a number, and this one is {number!r}.")
+    if isinstance(number, Decimal) and not number.is_finite():
+        raise ColorError(f"A color's {name} is finite, and this one is {number}.")
     if not math.isfinite(number):
         raise ColorError(f"A color's {name} is finite, and this one is {number}.")
-    return findNearestFloat32(number)
+    return findShortestDecimal(findNearestFloat32(float(number)))
 
 
-def parseNumbers(text: str, count: int, form: str) -> tuple[float, ...]:
+def parseNumbers(text: str, count: int, form: str) -> tuple[Decimal, ...]:
     """Return the numbers a space-separated list holds, exactly `count` of them."""
     words = text.split()
     plain = all(re.fullmatch(numberPattern, each) for each in words)
@@ -125,10 +132,12 @@ def parseNumbers(text: str, count: int, form: str) -> tuple[float, ...]:
             f"{form} takes {count} plain {'number' if count == 1 else 'numbers'} "
             f"here, and is given {text.strip()!r}."
         )
-    return tuple(float(each) for each in words)
+    return tuple(Decimal(each) for each in words)
 
 
-def parseAlphaBody(body: str, count: int, form: str) -> tuple[tuple[float, ...], float]:
+def parseAlphaBody(
+    body: str, count: int, form: str
+) -> tuple[tuple[Decimal, ...], Decimal]:
     """Return a function's components and alpha, refusing a body omitting the alpha."""
     before, slash, after = body.partition("/")
     if not slash:
@@ -140,7 +149,7 @@ def parseAlphaBody(body: str, count: int, form: str) -> tuple[tuple[float, ...],
 
 
 def parseHexColor(text: str) -> Color:
-    """Return the sRGB color `#rrggbbaa` names, refusing every shorter hex form."""
+    """Return the sRGB color `#rrggbbaa` specifies, refusing every shorter hex form."""
     if hexPattern.fullmatch(text) is None or len(text) != 9:
         if hexPattern.fullmatch(text) is not None and len(text) in (4, 7):
             raise ColorError(
@@ -155,7 +164,7 @@ def parseHexColor(text: str) -> Color:
 
 
 def parseFunctionColor(name: str, body: str, text: str) -> Color:
-    """Return the color a CSS function names, refusing a model Numbers lacks."""
+    """Return the color a CSS function specifies, refusing a model Numbers lacks."""
     match name:
         case "color":
             return parseColorFunction(body)
@@ -176,7 +185,7 @@ def parseFunctionColor(name: str, body: str, text: str) -> Color:
 
 
 def composeUnstoredModelRefusal(model: str) -> ColorError:
-    """Return the refusal of a model Numbers stores none of."""
+    """Return the refusal of a model Numbers does not store."""
     return ColorError(
         f"Numbers stores no {model} color, and pybers converts no color. Numbers "
         "stores RGB, in sRGB or Display P3."
@@ -184,7 +193,7 @@ def composeUnstoredModelRefusal(model: str) -> ColorError:
 
 
 def parseColorFunction(body: str) -> Color:
-    """Return the RGB color `color(space r g b / a)` names, in a space Numbers has."""
+    """Return the RGB color `color(space r g b / a)` specifies, its space Numbers'."""
     spaceName, _, rest = body.strip().partition(" ")
     if spaceName in unstoredModels:
         raise composeUnstoredModelRefusal(unstoredModels[spaceName])
@@ -203,7 +212,7 @@ def parseColorFunction(body: str) -> Color:
     return Color(rgbSpaces[spaceName], components, alpha)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class Color:
     """A color in Numbers' own terms, never converted, and unequal across spaces.
 
@@ -215,48 +224,49 @@ class Color:
     """
 
     colorSpace: ColorSpace
-    components: tuple[float, ...]
-    alpha: float
-    headroom: float = 1.0
+    components: tuple[Decimal, ...]
+    alpha: Decimal
+    headroom: Decimal = Decimal(1)
 
     black: ClassVar[Color]
     white: ClassVar[Color]
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.colorSpace, ColorSpace):
+    def __init__(
+        self, colorSpace: ColorSpace, components: Sequence[ColorNumber],
+        alpha: ColorNumber, headroom: ColorNumber = 1,
+    ) -> None:
+        if not isinstance(colorSpace, ColorSpace):
+            raise ColorError(f"A color's space is a ColorSpace, and is {colorSpace!r}.")
+        count = componentCounts[colorSpace]
+        if len(components) != count:
             raise ColorError(
-                f"A color's space is a ColorSpace, and is {self.colorSpace!r}."
+                f"A {colorSpace} color holds {count} components, and this one holds "
+                f"{len(components)}."
             )
-        count = componentCounts[self.colorSpace]
-        if len(self.components) != count:
-            raise ColorError(
-                f"A {self.colorSpace} color holds {count} components, and this one "
-                f"holds {len(self.components)}."
-            )
-        alpha = readChannel("alpha", self.alpha)
+        alpha = readChannel("alpha", alpha)
         if not 0 <= alpha <= 1:
             raise ColorError(
                 f"A color's alpha is from 0 to 1, and this one is {alpha}."
             )
-        headroom = readChannel("headroom", self.headroom)
+        headroom = readChannel("headroom", headroom)
         if headroom <= 0:
             raise ColorError(
                 f"A color's headroom is above 0, and this one is {headroom}."
             )
-        components = tuple(
-            readChannel("component", each) for each in self.components
-        )
-        if not all(0 <= each <= headroom for each in components):
+        held = tuple(readChannel("component", each) for each in components)
+        if not all(0 <= each <= headroom for each in held):
+            shown = ", ".join(map(str, held))
             raise ColorError(
-                f"A color's components are from 0 to its headroom of "
-                f"{formatFloat32(headroom)}, and this one holds {components}."
+                f"A color's components are from 0 to its headroom of {headroom}, and "
+                f"this one holds {shown}."
             )
-        object.__setattr__(self, "components", components)
+        object.__setattr__(self, "colorSpace", colorSpace)
+        object.__setattr__(self, "components", held)
         object.__setattr__(self, "alpha", alpha)
         object.__setattr__(self, "headroom", headroom)
 
     @classmethod
-    def gray(cls, level: float, alpha: float) -> Color:
+    def gray(cls, level: ColorNumber, alpha: ColorNumber) -> Color:
         """Return a gray from one level, as the Gray Scale sliders store it.
 
         Numbers stores three equal sRGB components, so this is what the color holds.
@@ -265,7 +275,7 @@ class Color:
 
     @classmethod
     def parse(cls, text: str) -> Color:
-        """Return the color CSS text names, which always states its alpha.
+        """Return the color CSS text specifies, which always states its alpha.
 
         `#ff8000ff`, sRGB. `color(display-p3 1 0.5 0 / 1)`, Display P3.
         `device-cmyk(0 0 0 1 / 1)`, CMYK. `device-gray(0.5 / 1)`, grayscale, read as
@@ -290,26 +300,25 @@ class Color:
     def __str__(self) -> str:
         if self.headroom != 1:
             raise ColorError(
-                f"This color has a headroom of {formatFloat32(self.headroom)}, and CSS "
+                f"This color has a headroom of {self.headroom}, and CSS "
                 "has no syntax for one, so it has no text form. Its JSON form carries "
                 "it."
             )
-        alpha = formatFloat32(self.alpha)
-        numbers = " ".join(formatFloat32(each) for each in self.components)
+        numbers = " ".join(map(str, self.components))
         match self.colorSpace:
             case ColorSpace.DEVICE_CMYK | ColorSpace.DEVICE_GRAY:
-                return f"{self.colorSpace}({numbers} / {alpha})"
+                return f"{self.colorSpace}({numbers} / {self.alpha})"
         if self.colorSpace is ColorSpace.SRGB:
             channels = findHexChannels()
             wholes = [channels.get(each) for each in (*self.components, self.alpha)]
             if None not in wholes:
                 return "#" + "".join(f"{each:02x}" for each in wholes)
-        return f"color({self.colorSpace} {numbers} / {alpha})"
+        return f"color({self.colorSpace} {numbers} / {self.alpha})"
 
 
 # Numbers stores black and white chosen with any slider but CMYK as these.
-Color.black = Color.gray(0.0, 1.0)
-Color.white = Color.gray(1.0, 1.0)
+Color.black = Color.gray(0, 1)
+Color.white = Color.gray(1, 1)
 
 
-__all__ = ["Color", "ColorError", "ColorSpace", "formatFloat32"]
+__all__ = ["Color", "ColorError", "ColorNumber", "ColorSpace"]

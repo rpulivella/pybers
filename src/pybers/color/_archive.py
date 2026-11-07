@@ -45,22 +45,22 @@ def composeColor(color: Color) -> tsp.Color:
     """Return the archive a color is stored as, its alpha and headroom always stated."""
     match color.colorSpace:
         case ColorSpace.DEVICE_CMYK:
-            cyan, magenta, yellow, black = color.components
+            cyan, magenta, yellow, black = map(float, color.components)
             return tsp.Color(
                 model=tsp.Color.cmyk, c=cyan, m=magenta, y=yellow, k=black,
-                a=color.alpha, headroom=color.headroom,
+                a=float(color.alpha), headroom=float(color.headroom),
             )
         case ColorSpace.DEVICE_GRAY:
             return tsp.Color(
-                model=tsp.Color.white, w=color.components[0],
-                a=color.alpha, headroom=color.headroom,
+                model=tsp.Color.white, w=float(color.components[0]),
+                a=float(color.alpha), headroom=float(color.headroom),
             )
-    red, green, blue = color.components
+    red, green, blue = map(float, color.components)
     wide = color.colorSpace is ColorSpace.DISPLAY_P3
     space = tsp.Color.p3 if wide else tsp.Color.srgb
     return tsp.Color(
-        model=tsp.Color.rgb, r=red, g=green, b=blue, a=color.alpha,
-        rgbspace=space, headroom=color.headroom,
+        model=tsp.Color.rgb, r=red, g=green, b=blue, a=float(color.alpha),
+        rgbspace=space, headroom=float(color.headroom),
     )
 
 

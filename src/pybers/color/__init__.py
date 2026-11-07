@@ -15,6 +15,6 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/06"
 
-from pybers.color.colors import Color, ColorError, ColorSpace
+from pybers.color.colors import Color, ColorError, ColorNumber, ColorSpace
 
-__all__ = ["Color", "ColorError", "ColorSpace"]
+__all__ = ["Color", "ColorError", "ColorNumber", "ColorSpace"]
