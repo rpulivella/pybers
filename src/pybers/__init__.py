@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-06  `Color`, `ColorError` and `ColorSpace` re-exported, for PYB-264.
 2026-11-03  The selector, its matches, `TableHeaders`, `CellChanges` and `CellSkip`
             re-exported, for PYB-223.
 2026-11-02  `create` re-exported, for PYB-261.
@@ -73,6 +74,7 @@ lazy from pybers.check import (
     NumbersVersion,
     checkDocument,
 )
+lazy from pybers.color import Color, ColorError, ColorSpace
 lazy from pybers.currency import (
     Currency,
     CurrencyAmount,
@@ -196,6 +198,9 @@ __all__ = [
     "jsonFormVersion",
     "parseJsonForm",
     "parseCellValue",
+    "Color",
+    "ColorError",
+    "ColorSpace",
     "Currency",
     "CurrencyAmount",
     "CurrencyError",

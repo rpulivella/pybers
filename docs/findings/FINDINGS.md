@@ -12,7 +12,7 @@ Split by topic, this file is the index.
 | [findings-02-formulas.md](findings-02-formulas.md) | The postfix AST, why references survive being moved, cross-table links, and what a failed formula stores. |
 | [findings-03-structure.md](findings-03-structure.md) | Merges, what structural edits do to them, tiles, and how tables and sheets sit on a document. |
 | [findings-04-text.md](findings-04-text.md) | Text storage, style runs, OpenType features, and the typography traps. |
-| [findings-06-styles.md](findings-06-styles.md) | Fills, gradients, and why a color is not three floats. |
+| [findings-06-styles.md](findings-06-styles.md) | Fills, gradients, why a color is not three floats, and how Numbers stores every slider of its color panel as RGB. |
 | [findings-07-drawables.md](findings-07-drawables.md) | Text boxes, shapes and images, everything floating on a sheet rather than inside a table. |
 | [findings-08-formula-text.md](findings-08-formula-text.md) | The operator table, which functions bracket their arguments, and the three node kinds where text and nodes are not inverses. |
 | [findings-09-cell-records.md](findings-09-cell-records.md) | Where a cell record keeps its formula key, which moves as the cell gains a fill, an alignment or conditional highlighting. |

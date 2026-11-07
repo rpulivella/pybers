@@ -42,6 +42,7 @@ Usage:
 Runs on the repository's venv.
 
 UPDATES
+2026-11-07  `ready` waits on both sides of a promotion, for PYB-264.
 2026-11-05  `checks` prints how long each check took, for PYB-277.
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
@@ -132,6 +133,7 @@ from tools.workflow.lib.pull_request import (
     assertBranchIsPushed,
     checkHeadIsOurs,
     closePullRequest,
+    confirmCheckRunAppears,
     confirmChecksPassed,
     confirmMergeApproved,
     createDraftPullRequest,
@@ -507,6 +509,7 @@ def runReady(arguments: argparse.Namespace) -> int:
         )
         return 0
 
+    confirmCheckRunAppears(token, summary.headSha, real=False)
     if not markReadyForReview(token, summary.nodeId):
         console.print(
             f"[red]{formatPullRequestRef(summary.number)} is still a draft "
@@ -519,6 +522,12 @@ def runReady(arguments: argparse.Namespace) -> int:
         f"[bold cyan]{formatPullRequestRef(summary.number)}[/]"
     )
     console.print(summary.url)
+    if not confirmCheckRunAppears(token, summary.headSha, real=True):
+        console.print(
+            f"[red]No check started on {summary.headSha[:12]} after the promotion.[/] "
+            "Convert the pull request to a draft and mark it ready again."
+        )
+        return errorExitCode
     return 0
 
 

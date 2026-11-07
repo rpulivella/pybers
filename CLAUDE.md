@@ -25,6 +25,7 @@ pybers/
   __main__.py     python -m pybers, the same command as pybers
   addressing/     a cell's address and a rectangle of them, used by every feature
   check/          whether pybers can read a document, for a bug report
+  color/          one color carrying its space, and both archive halves
   cli/            the pybers command, one module per command, a front end
   document/       Document and Sheet, the walk that reads one and the one that saves it
   formula/        the node model, the function table, the text, and both archive halves

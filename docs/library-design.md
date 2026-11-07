@@ -28,6 +28,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `LocaleChange` | What a region change did to a document: its locale before and after | Frozen |
 | `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
+| `Color` | A color in Numbers' own terms: its color space, its components, its alpha and its headroom, never converted | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
 | `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |
@@ -111,6 +112,10 @@ The reasoning is in `decisions.md`, under writing values and formats.
 ## The JSON form
 
 `pybers.formatJsonForm(subject)` returns a document, a sheet, a table, a table narrowed to one range, or a cell as JSON text, and a list of them as an array, a `(table, range)` pair being that table narrowed. `pybers.parseJsonForm(text)` reads either back into an equal model. It is the one serializer, so a command's `--format json` and a script's output are the same text, and any other value a call returns, a `Check` or a `CellChange`, is written by the same rules. Every number is a JSON number with its exact digits, read back exactly with `json.loads(text, parse_float=Decimal, parse_int=Decimal)`. The rule each value follows is in `decisions.md`, and `pybers/interchange/schema.json` describes the form.
+
+## Colors
+
+A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert it to another space. `pybers.Color.parse(text)` reads its one text form and `str(color)` prints it, as the [README](../README.md#colors) shows for each color system.
 
 ## What is stored
 
