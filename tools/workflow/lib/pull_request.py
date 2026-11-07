@@ -6,6 +6,7 @@ runs, and a body checked against the template.
 Shared by `pr.py` and the readiness check.
 
 UPDATES
+2026-11-07  `confirmCheckRunAppears`, and no negative duration, for PYB-264.
 2026-11-05  A check run carries how long it took, for PYB-277.
 2026-10-23  `closePullRequest`, closing one without merging, for PYB-156.
 2026-10-14  A summary carries its author, and `readApprovers` and
@@ -190,6 +191,9 @@ ticketCloseAttempts: int = 10
 
 
 ticketClosePauseSeconds: float = 3.0
+# How long to watch for a check run, which GitHub starts seconds after its event.
+checkRunAttempts: int = 20
+checkRunPauseSeconds: float = 3.0
 
 
 errorLogMarker: str = "##[error]"
@@ -488,6 +492,21 @@ def readCheckRuns(token: str, sha: str) -> list[CheckRun]:
     return chooseLatestRuns(payload.get("check_runs", []))
 
 
+def confirmCheckRunAppears(token: str, sha: str, real: bool) -> bool:
+    """Report whether a commit gains a check run, or a real one, within the wait.
+
+    `pr ready` waits on both sides of a promotion. PR #286 promoted one second after
+    its push, and GitHub then started no run from the promotion.
+    """
+    for attempt in range(checkRunAttempts):
+        runs = readCheckRuns(token, sha)
+        if any(run.conclusion != "skipped" for run in runs) if real else runs:
+            return True
+        if attempt < checkRunAttempts - 1:
+            time.sleep(checkRunPauseSeconds)
+    return False
+
+
 def chooseLatestRuns(runs: list[dict[str, Any]]) -> list[CheckRun]:
     """Return the newest run per name, since GitHub keeps every run a commit had.
 
@@ -519,6 +538,9 @@ def formatRunDuration(run: dict[str, Any]) -> str:
     if not started or not completed:
         return ""
     elapsed = datetime.fromisoformat(completed) - datetime.fromisoformat(started)
+    # GitHub stamps a skipped run as completing before it started.
+    if elapsed.total_seconds() < 0:
+        return ""
     minutes, seconds = divmod(round(elapsed.total_seconds()), 60)
     return f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
 

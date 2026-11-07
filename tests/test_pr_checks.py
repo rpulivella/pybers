@@ -7,6 +7,7 @@ run, and both can start in the same second. GitHub is stood in for at the API
 boundary, with the runs PR #174 carried on 7057e55.
 
 UPDATES
+2026-11-07  `ready` confirms a real run follows a promotion, for PYB-264.
 2026-11-05  How long a check took, for PYB-277.
 2026-10-13  Pull request summaries and check runs are dataclasses, for PYB-204.
 2026-10-06  Written for PYB-175.
@@ -140,6 +141,7 @@ def testAMergeRefusesAFailureTiedWithASkippedRun(
         ("2026-11-06T01:15:48Z", "6m 17s"),
         ("2026-11-06T01:09:40Z", "9s"),
         ("2026-11-06T01:09:31Z", "0s"),
+        ("2026-11-06T01:07:32Z", ""),
         (None, ""),
     ],
 )
@@ -147,3 +149,60 @@ def testACheckRunSpellsHowLongItTook(completed: str | None, duration: str) -> No
     run = {"started_at": "2026-11-06T01:09:31Z", "completed_at": completed}
     assert pullRequest.formatRunDuration(run) == duration
 
+
+def runReadyAgainst(
+    monkeypatch: pytest.MonkeyPatch, reads: list[list[dict[str, Any]]],
+) -> tuple[int, list[str]]:
+    """Return `pr ready`'s exit code and the order it read runs and promoted."""
+    pr = loadPrScript()
+    payload = {
+        "number": 286, "title": "[PYB-264] A change", "html_url": "https://x/286",
+        "state": "open", "draft": True, "node_id": "PR_1",
+        "head": {"ref": "feature/264-a-change", "sha": "a" * 40,
+                 "repo": {"full_name": "rpulivella/pybers"}},
+        "base": {"ref": "develop"},
+    }
+    steps: list[str] = []
+
+    def readRuns(token: str, sha: str) -> list[pullRequest.CheckRun]:
+        steps.append("read")
+        current = reads.pop(0) if len(reads) > 1 else reads[0]
+        return pullRequest.chooseLatestRuns(current)
+
+    def markReady(token: str, nodeId: str) -> bool:
+        steps.append("promote")
+        return True
+
+    monkeypatch.setattr(pr.github, "resolveToken", lambda: "token")
+    monkeypatch.setattr(
+        pr, "readPullRequest",
+        lambda token, number: pullRequest.summarizePullRequest(payload),
+    )
+    monkeypatch.setattr(pullRequest, "readCheckRuns", readRuns)
+    monkeypatch.setattr(pullRequest, "checkRunPauseSeconds", 0.0)
+    monkeypatch.setattr(pr, "markReadyForReview", markReady)
+    arguments = pr.buildParser().parse_args(["ready", "286"])
+    return pr.runReady(arguments), steps
+
+
+def testAPromotionWaitsForThePushToRegisterARun(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skipped = [buildRun("preflight", "skipped")]
+    real = [buildRun("preflight", None)]
+
+    code, steps = runReadyAgainst(monkeypatch, [[], [], skipped, real])
+
+    assert code == 0
+    assert steps == ["read", "read", "read", "promote", "read"]
+
+
+def testAPromotionThatStartsNoRealRunFailsLoudly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    code, steps = runReadyAgainst(
+        monkeypatch, [[buildRun("preflight", "skipped")]]
+    )
+
+    assert code == loadPrScript().errorExitCode
+    assert "promote" in steps
