@@ -41,12 +41,13 @@ Pass `--status Concept` when filing; `Todo` is the default.
 5. **Show the draft to the user and wait for explicit approval before filing.** This is
    the spec-in touchpoint.
 6. Decide the starting Status. See [Concept or Todo](#concept-or-todo--the-spec-in-decision).
+   State where the ticket falls in the order of work, and ask when it is unknown.
 7. On approval, file it:
    ```
    .venv/bin/python3 -m tools.workflow.ticket create --label <label> --title "<title>" --body-file <draft>
    .venv/bin/python3 -m tools.workflow.ticket create --label <label> --title "<title>" --body-file <draft> --status Concept
    ```
-8. Report the issue URL the tool prints.
+8. Record that position, and report the issue URL the tool prints.
 
 ## Title format
 
@@ -120,5 +121,6 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
 - Sections run opener, ACs, Design, Constraints, and no other.
 - No "Definition of Done" section, the ACs are that.
 - One label per issue.
+- Never file a ticket without recording its position in the order of work.
 
 $ARGUMENTS
