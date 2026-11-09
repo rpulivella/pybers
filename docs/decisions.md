@@ -188,19 +188,37 @@ and lives only for the session, since the file has nowhere to keep it. Refusing 
 it puts on every caller.
 
 **A cell that changes kind takes Numbers' Automatic format for its new kind**, as a value
-typed into a fresh cell does. A boolean therefore shows TRUE or FALSE; a checkbox is a
-format, chosen through formats like any other.
+typed into a fresh cell does. A boolean therefore shows TRUE or FALSE, and a checkbox is
+chosen as a format and a control together.
 
-**A format is a value of one union, `CellFormat`**, with one frozen dataclass per family:
-`CellFormatNumber`, `CellFormatNumberCustom`, `CellFormatDuration`, `CellFormatCurrency`
-and the rest. `CellFormatAutomatic` and `CellFormatUnknown` are members too, so a format
-nobody chose and a format pybers cannot decode are explicit values rather than `None`, and
-a `match` over a cell's format is exhaustive. The names lead with `CellFormat` so the family
-sorts together and never collides with text or table formatting, and `CellFormatFamily`
-names the families. A small `Protocol` carries what every format shares.
+**A format is a member of one closed family, `CellFormat`**, with one frozen dataclass per
+family: `CellFormatNumber`, `CellFormatNumberCustom`, `CellFormatDuration`,
+`CellFormatCurrency` and the rest. `CellFormatAutomatic` and `CellFormatUnknown` are
+members too, so a format nobody chose and a format pybers cannot decode are explicit values
+rather than `None`, and a `match` over a cell's format is exhaustive. The names lead with
+`CellFormat` so the family sorts together and never collides with text or table
+formatting. An abstract base gives every member what it shares, its discriminator
+`formatFamily` among it, a `CellFormatFamily` naming the families, and `CellFormat` is the
+union a `match` uses.
 Typed objects were chosen over the alternatives other libraries take, a format string as in
 openpyxl or keyword options as in numbers-parser, because Numbers has no format syntax to
 borrow and a misspelled keyword fails late or not at all.
+
+**A control is a closed family of its own beside the format.** A slider, a stepper and a
+pop-up menu show their value through an ordinary format, so none of them is a format. A
+checkbox and a star rating are a format and a control both, since Numbers stores a format
+entry for each as well as the control that edits it. `CellControl` is the union of
+`CellControlCheckbox`, `CellControlStarRating`, `CellControlSlider` and
+`CellControlStepper` with the minimum, maximum and increment each specifies,
+`CellControlPopUpMenu` with its items, and `CellControlUnknown`. A control answers itself
+whether it can show a value, and a value write consults it to decide whether a cell keeps
+the control.
+
+**Each family refuses a malformed member at import.** `pybers/_family.py` holds both to
+one shape. A member extending another raises when its class is created, and a
+member that is not a frozen, slotted dataclass, that the union omits, or whose
+discriminator is missing or repeated stops the import. Each member is `@final`, so mypy
+holds the same line, and the structure holds by construction rather than by review.
 
 **A format belongs to no document.** One read from a cell in one document applies to a
 cell in another, and the writer finds or adds the matching entry in that table's format
