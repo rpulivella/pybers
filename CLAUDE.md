@@ -132,6 +132,17 @@ is measured against a fixture here before pybers relies on it, as the findings r
   reading of the same format, and its guide a model for a documentation site. Not a
   source of pybers, so not credited in the README.
 
+Standards read for how a public name and structure should feel to a developer, never a
+source of code. The archive decides what pybers can store, and these decide what it is
+called. A name is approved by the maintainer before a ticket relies on it.
+
+- **CSS** (https://www.w3.org/TR/CSS/): the model for styles. A named style is a class,
+  a variation an inline style, a resolved property the computed value, and its property
+  names and declaration syntax are where a style's names start.
+- **ECMA-402 `Intl`** (https://tc39.es/ecma402/): the model for formats.
+  `Intl.NumberFormat`, `Intl.DateTimeFormat` and `Intl.DurationFormat` name the same
+  choices Numbers offers, such as `currencySign` and `minimumFractionDigits`.
+
 ## Correctness
 
 - Working on the happy path is not sufficient. Enumerate the boundary, lifecycle and
