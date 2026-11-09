@@ -33,7 +33,7 @@ import pybers
 from pybers import (
     UNDETERMINED,
     CellControl,
-    CellFormat,
+    CellFormatFamily,
     CellKind,
     CurrencyAmount,
 )
@@ -51,7 +51,7 @@ class ExpectedCell:
     kind: CellKind
     value: pybers.CellValue
     formula: str | None
-    format: CellFormat | None
+    format: CellFormatFamily | None
     formatChosen: bool
     control: CellControl | None
     currencyMenu: str | None

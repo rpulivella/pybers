@@ -94,7 +94,9 @@ def formatControl(control: pybers.CellControl | None) -> str:
     return f"{family} ({settings})" if settings else family
 
 
-def formatFormat(cellFormat: pybers.CellFormat | pybers.UNDETERMINED | None) -> str:
+def formatFormat(
+    cellFormat: pybers.CellFormatFamily | pybers.UNDETERMINED | None,
+) -> str:
     """Return a format as its family, `unknown` until a save chooses one."""
     if cellFormat is None:
         return "none"

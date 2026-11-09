@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-09  `CellFormatFamily` re-exported in place of the enum `CellFormat`, for
+            PYB-145.
 2026-11-06  `Color`, `ColorError` and `ColorSpace` re-exported, for PYB-264.
 2026-11-03  The selector, its matches, `TableHeaders`, `CellChanges` and `CellSkip`
             re-exported, for PYB-223.
@@ -148,7 +150,7 @@ lazy from pybers.table import (
     CellControlStepper,
     CellControlType,
     CellControlUnknown,
-    CellFormat,
+    CellFormatFamily,
     CellKind,
     CellPresentation,
     CellSkip,
@@ -232,7 +234,7 @@ __all__ = [
     "CellControlUnknown",
     "CellReferenceLike",
     "CellPresentation",
-    "CellFormat",
+    "CellFormatFamily",
     "CellKind",
     "CellRange",
     "CellRangeList",

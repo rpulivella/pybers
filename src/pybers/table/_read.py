@@ -86,7 +86,13 @@ from .cell import Cell, CellValue
 from .cells import Table
 from .controls import CellControl
 from .headers import TableHeaders
-from .kinds import CellFormat, CellKind, CellPresentation, CellStorage, emptyStorage
+from .kinds import (
+    CellFormatFamily,
+    CellKind,
+    CellPresentation,
+    CellStorage,
+    emptyStorage,
+)
 from .merges import MergeRange
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
@@ -110,20 +116,20 @@ storedKinds: frozendict[int, CellKind] = frozendict({
 })
 
 # The family each measured `format_type` belongs to, every one the documents carry.
-formatFamilies: frozendict[int, CellFormat] = frozendict({
-    1: CellFormat.BOOLEAN,
-    256: CellFormat.NUMBER,
-    257: CellFormat.CURRENCY,
-    258: CellFormat.PERCENT,
-    259: CellFormat.SCIENTIFIC,
-    260: CellFormat.TEXT,
-    261: CellFormat.DATE_TIME,
-    262: CellFormat.FRACTION,
-    263: CellFormat.CHECKBOX,
-    267: CellFormat.STAR_RATING,
-    268: CellFormat.DURATION,
-    269: CellFormat.NUMERAL_SYSTEM,
-    270: CellFormat.CUSTOM_NUMBER,
+formatFamilies: frozendict[int, CellFormatFamily] = frozendict({
+    1: CellFormatFamily.BOOLEAN,
+    256: CellFormatFamily.NUMBER,
+    257: CellFormatFamily.CURRENCY,
+    258: CellFormatFamily.PERCENT,
+    259: CellFormatFamily.SCIENTIFIC,
+    260: CellFormatFamily.TEXT,
+    261: CellFormatFamily.DATE_TIME,
+    262: CellFormatFamily.FRACTION,
+    263: CellFormatFamily.CHECKBOX,
+    267: CellFormatFamily.STAR_RATING,
+    268: CellFormatFamily.DURATION,
+    269: CellFormatFamily.NUMERAL_SYSTEM,
+    270: CellFormatFamily.CUSTOM_NUMBER,
 })
 
 
@@ -230,7 +236,7 @@ def readCellValue(
 
 def findDisplayedFormat(
     record: CellRecord, formatTypes: dict[int, int]
-) -> CellFormat | None:
+) -> CellFormatFamily | None:
     """Return the family of the format a record displays with, or None for none.
 
     The displayed slot holds a kind, 1 to 6, naming the per-kind slot whose key is
@@ -240,12 +246,12 @@ def findDisplayedFormat(
     if displayed is None:
         return None
     if not 1 <= displayed <= len(countedFormatSlots):
-        return CellFormat.UNKNOWN
+        return CellFormatFamily.UNKNOWN
     key = findSlotValue(record, countedFormatSlots[displayed - 1])
     formatType = None if key is None else formatTypes.get(key)
     if formatType is None:
-        return CellFormat.UNKNOWN
-    return formatFamilies.get(formatType, CellFormat.UNKNOWN)
+        return CellFormatFamily.UNKNOWN
+    return formatFamilies.get(formatType, CellFormatFamily.UNKNOWN)
 
 
 # The control a cell presents as, a `control_cell_spec_table` key. Measured against

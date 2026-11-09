@@ -143,7 +143,7 @@ def testTheCellReportsItsNewKindOnceSaved(tmp_path: Path) -> None:
     assert cell.presentation.format is pybers.UNDETERMINED
     document.save()
     assert cell.kind is CellKind.BOOLEAN
-    assert cell.presentation.format is pybers.CellFormat.BOOLEAN
+    assert cell.presentation.format is pybers.CellFormatFamily.BOOLEAN
 
 
 # ── AC 3: exact read back ───────────────────────────────────────────────────
@@ -417,7 +417,7 @@ def testAValueTheControlCannotShowDropsTheControlAndKeepsTheValue(
     cell = writeAndReopen(working, address, value)
     assert cell.value == value
     assert findSlotValue(readRecordAt(working, address), controlSlot) is None
-    shown = (pybers.CellFormat.NUMBER, pybers.CellFormat.TEXT)
+    shown = (pybers.CellFormatFamily.NUMBER, pybers.CellFormatFamily.TEXT)
     assert cell.presentation.format in shown
 
 

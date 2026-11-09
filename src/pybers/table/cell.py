@@ -50,7 +50,7 @@ from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.table.kinds import (
-    CellFormat,
+    CellFormatFamily,
     CellKind,
     CellPresentation,
     CellStorage,
@@ -388,7 +388,7 @@ class Cell:
         if self.kind is not self._stored.kind:
             presentation = replace(presentation, format=UNDETERMINED)
         # None of the 897 formula records in the documents keeps a chosen Text format.
-        if self.formula is not None and presentation.format is CellFormat.TEXT:
+        if self.formula is not None and presentation.format is CellFormatFamily.TEXT:
             presentation = replace(presentation, formatChosen=False)
         return presentation
 

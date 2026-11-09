@@ -7,6 +7,8 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-11-09  `CellFormatFamily`, the families' enum, so `CellFormat` can name the
+            union of formats, for PYB-145.
 2026-10-24  `kindValueTypes`, the type each kind's value holds, for PYB-259.
 2026-10-22  `CellPresentation`, a cell's format and its control, replacing the
             description, whose kind is the cell's own, for PYB-255.
@@ -57,7 +59,7 @@ class CellKind(StrEnum):
     UNKNOWN = "unknown"
 
 
-class CellFormat(StrEnum):
+class CellFormatFamily(StrEnum):
     """The family of the format a cell displays its value with."""
 
     NUMBER = "number"
@@ -85,7 +87,7 @@ class CellPresentation:
     control is kept only while it can show the cell's value, as the save keeps it.
     """
 
-    format: CellFormat | UNDETERMINED | None
+    format: CellFormatFamily | UNDETERMINED | None
     formatChosen: bool
     control: CellControl | None = None
 
@@ -155,7 +157,7 @@ kindValueTypes: frozendict[CellKind, type] = frozendict({
 
 
 __all__ = [
-    "CellFormat",
+    "CellFormatFamily",
     "CellKind",
     "CellPresentation",
     "CellStorage",

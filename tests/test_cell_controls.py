@@ -38,7 +38,7 @@ from pybers import (
     CellControlStarRating,
     CellControlStepper,
     CellControlUnknown,
-    CellFormat,
+    CellFormatFamily,
     CurrencyAmount,
 )
 from pybers._family import FamilyMember, checkFamily
@@ -52,20 +52,21 @@ def readPresentation(stem: str, reference: str) -> pybers.CellPresentation:
 
 
 @pytest.mark.parametrize(("reference", "control", "shownAs"), [
-    ("A1", CellControlSlider(Decimal(0), Decimal(200), Decimal(5)), CellFormat.NUMBER),
+    ("A1", CellControlSlider(Decimal(0), Decimal(200), Decimal(5)),
+     CellFormatFamily.NUMBER),
     ("B1", CellControlStepper(Decimal(-10), Decimal(10), Decimal("0.5")),
-     CellFormat.NUMBER),
+     CellFormatFamily.NUMBER),
     ("C1", CellControlSlider(Decimal(0), Decimal(100), Decimal(1)),
-     CellFormat.CURRENCY),
+     CellFormatFamily.CURRENCY),
     ("D1", CellControlSlider(Decimal(0), Decimal(1), Decimal("0.05")),
-     CellFormat.PERCENT),
+     CellFormatFamily.PERCENT),
     ("I1", CellControlPopUpMenu(("Item 1", "Item 2", "Item 3"), False),
-     CellFormat.TEXT),
-    ("J1", CellControlStarRating(), CellFormat.STAR_RATING),
-    ("K1", CellControlCheckbox(), CellFormat.CHECKBOX),
+     CellFormatFamily.TEXT),
+    ("J1", CellControlStarRating(), CellFormatFamily.STAR_RATING),
+    ("K1", CellControlCheckbox(), CellFormatFamily.CHECKBOX),
 ])
 def testEachControlReadsAsItsLabelSaysOverTheFormatShowingIt(
-    reference: str, control: pybers.CellControl, shownAs: CellFormat
+    reference: str, control: pybers.CellControl, shownAs: CellFormatFamily
 ) -> None:
     presentation = readPresentation("81-control-formats", reference)
     assert (presentation.control, presentation.format) == (control, shownAs)

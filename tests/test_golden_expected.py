@@ -27,7 +27,7 @@ from typing import Any
 
 import pybers
 from conftest import findDocumentPath
-from pybers import CellControlSlider, CellFormat, CellKind
+from pybers import CellControlSlider, CellFormatFamily, CellKind
 from tools.local.lib import golden_confirm as report
 from tools.local.lib.golden_expected import (
     ExpectedCell,
@@ -55,7 +55,7 @@ def buildCell(**fields: Any) -> ExpectedCell:
     """Return an expected cell, an automatic number unless a field says otherwise."""
     defaults: dict[str, Any] = {
         "cell": "A1", "kind": CellKind.NUMBER, "value": Decimal(1), "formula": None,
-        "format": CellFormat.NUMBER, "formatChosen": False, "control": None,
+        "format": CellFormatFamily.NUMBER, "formatChosen": False, "control": None,
         "currencyMenu": None, "label": None,
     }
     return ExpectedCell(**(defaults | fields))
@@ -141,7 +141,7 @@ def testAControlDecidesTheFormatNumbersNames() -> None:
 
 def testAFormatNobodyChoseIsAutomatic() -> None:
     assert report.findNumbersFormat(buildCell()) == ("automatic", "Automatic")
-    chosen = buildCell(format=CellFormat.PERCENT, formatChosen=True)
+    chosen = buildCell(format=CellFormatFamily.PERCENT, formatChosen=True)
     assert report.findNumbersFormat(chosen) == ("percent", "Percentage")
 
 

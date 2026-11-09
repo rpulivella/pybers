@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING
 from pybers.absence import UNDETERMINED
 from pybers.addressing.reference import CellAddress
 from pybers.table.controls import CellControlType
-from pybers.table.kinds import CellFormat, CellKind
+from pybers.table.kinds import CellFormatFamily, CellKind
 
 if TYPE_CHECKING:
     from pybers.table.cell import Cell
@@ -72,7 +72,7 @@ def readConditional(cell: Cell | None) -> object:
 selectorAttributes: frozendict[str, SelectorAttributeField] = frozendict(
     kind=SelectorAttributeField(readKind, tuple(each.value for each in CellKind)),
     format=SelectorAttributeField(
-        readFormat, tuple(each.value for each in CellFormat)
+        readFormat, tuple(each.value for each in CellFormatFamily)
     ),
     control=SelectorAttributeField(
         readControl, tuple(each.value for each in CellControlType)

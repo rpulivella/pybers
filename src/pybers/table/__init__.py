@@ -62,14 +62,14 @@ from pybers.table.controls import (
 from pybers.table.fill import CellValueFill
 from pybers.table.headers import TableHeaders
 from pybers.table.inference import formatCellValue, parseCellValue
-from pybers.table.kinds import CellFormat, CellKind, CellPresentation
+from pybers.table.kinds import CellFormatFamily, CellKind, CellPresentation
 from pybers.table.merges import MergeRange
 from pybers.table.rows import TableRow, TableRows
 
 __all__ = [
     "Cell",
     "CellPresentation",
-    "CellFormat",
+    "CellFormatFamily",
     "CellKind",
     "CellChange",
     "CellChanges",

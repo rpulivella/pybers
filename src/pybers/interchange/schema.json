@@ -443,7 +443,7 @@
         }
       ]
     },
-    "CellFormat": {
+    "CellFormatFamily": {
       "enum": [
         "number",
         "boolean",
@@ -525,7 +525,7 @@
         "format": {
           "anyOf": [
             {
-              "$ref": "#/$defs/CellFormat"
+              "$ref": "#/$defs/CellFormatFamily"
             },
             {
               "const": "UNDETERMINED"
