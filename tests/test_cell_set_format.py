@@ -136,7 +136,7 @@ def testAnEmptyCellIsRefusedAFormat(working: Path) -> None:
 
 
 def testACallGivenNeitherPartIsRefused(working: Path) -> None:
-    with pytest.raises(pybers.WriteError, match="neither a value nor a format"):
+    with pytest.raises(pybers.WriteError, match="no value, format or control"):
         pybers.open(working).cellSet("::Table 1::A1")
 
 
@@ -163,7 +163,7 @@ def testACommandRefusesAFormatNamingNoFamily(working: Path) -> None:
 def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1")
     assert result.exit_code == 2
-    assert "Give a VALUE, a --cell-format, or both." in result.output
+    assert "Give a VALUE, a --cell-format or a --cell-control." in result.output
 
 
 @pytest.mark.parametrize(("stem", "address"), [

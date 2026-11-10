@@ -77,6 +77,7 @@ from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
 from .._persistence.pool import EntryPool
 from .._persistence.rows import StoredTiles, iterateTileRows
+from ..absence import UNCHANGED
 from ..addressing.reference import CellAddress, originOffset
 from ..format._controls import readControls
 from ..format._write import checkAskedFormatShown
@@ -106,6 +107,7 @@ from ._records import (
     findWrittenTypeByte,
     patchRichTextKey,
     plainNumberRecord,
+    removeSlots,
 )
 from ._refcounts import (
     copyRichText,
@@ -434,7 +436,9 @@ def applyTableEdits(
                 chosenChanged = (
                     cell._formatChosenCheck() != carriesChosenFormat(record)
                 )
-                asked = cell._formatAsked is not None
+                asked = (
+                    cell._formatAsked is not None or cell._controlAsked is not UNCHANGED
+                )
                 if not (valueChanged or asked or chosenChanged) and edit == "none":
                     continue
                 patched = record.raw
@@ -457,6 +461,10 @@ def applyTableEdits(
                         formulaAdded.append((row, record.column))
                     elif edit == "detach":
                         formulaRemoved.append((row, record.column))
+                if cell._controlAsked is None:
+                    removed = removeSlots(patched, {controlSlot})
+                    releaseReplaced(decodeRecord(record.column, patched), removed)
+                    patched = removed
                 if cell._formatAsked is not None and not checkAskedFormatShown(
                     patched, cell._formatAsked, cell.value, formatOf
                 ):

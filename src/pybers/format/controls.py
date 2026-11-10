@@ -9,6 +9,8 @@ outside a range control, measured in `73-values-typed-over-controls`, while pybe
 clamps, so a control that cannot show a value is dropped by the save.
 
 UPDATES
+2026-11-10  `controlFormatFamilies`, the formats each control shows through, for
+            PYB-145.
 2026-11-09  Moved into the format feature from `pybers.table`, for PYB-145.
 2026-10-24  Each control names its type, `controlType`, for PYB-259.
 2026-10-22  Written for PYB-255.
@@ -31,6 +33,7 @@ from typing import TYPE_CHECKING, ClassVar, final
 
 from pybers._family import FamilyMember, checkFamily
 from pybers.currency import CurrencyAmount
+from pybers.format.formats import CellFormatFamily
 
 if TYPE_CHECKING:
     from pybers.table.cell import CellValue
@@ -162,6 +165,24 @@ type CellControl = (
 
 checkFamily(CellControlBase, CellControl, "controlType")
 
+# The format families each control shows its value through, measured across the 190
+# documents in the tests on 2026-11-10, a slider's and a stepper's together. See
+# findings-11-formats.md, "Which formats each control shows through".
+rangeFormatFamilies: frozenset[CellFormatFamily] = frozenset({
+    CellFormatFamily.NUMBER, CellFormatFamily.CURRENCY, CellFormatFamily.PERCENT,
+    CellFormatFamily.FRACTION, CellFormatFamily.SCIENTIFIC,
+    CellFormatFamily.NUMERAL_SYSTEM,
+})
+controlFormatFamilies: frozendict[CellControlType, frozenset[CellFormatFamily]] = (
+    frozendict({
+        CellControlType.CHECKBOX: frozenset({CellFormatFamily.CHECKBOX}),
+        CellControlType.STAR_RATING: frozenset({CellFormatFamily.STAR_RATING}),
+        CellControlType.SLIDER: rangeFormatFamilies,
+        CellControlType.STEPPER: rangeFormatFamilies,
+        CellControlType.POP_UP_MENU: frozenset({CellFormatFamily.TEXT}),
+    })
+)
+
 
 __all__ = [
     "CellControl",
@@ -173,4 +194,5 @@ __all__ = [
     "CellControlStepper",
     "CellControlType",
     "CellControlUnknown",
+    "controlFormatFamilies",
 ]

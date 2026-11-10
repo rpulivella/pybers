@@ -201,7 +201,9 @@ type CellFormat = CellFormatShown | CellFormatAutomatic
 checkFamily(CellFormatBase, CellFormat, "formatFamily")
 
 
-def findFormatShown(cellFormat: CellFormat) -> CellFormatShown | UNDETERMINED:
+def findFormatShown(
+    cellFormat: CellFormat | UNDETERMINED,
+) -> CellFormatShown | UNDETERMINED:
     """Return the format a cell is shown with, the one Automatic chose included."""
     if isinstance(cellFormat, CellFormatAutomatic):
         return cellFormat.shown

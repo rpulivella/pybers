@@ -86,6 +86,12 @@ from pybers.addressing.reference import (
     tableNameSeparator,
 )
 from pybers.errors import PybersError, WriteError
+from pybers.format._check import (
+    findControlRefusal,
+    findFormatMisfit,
+    findFormatRefusal,
+)
+from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
 from pybers.geometry import Position
 from pybers.table.cell import (
@@ -93,10 +99,7 @@ from pybers.table.cell import (
     CellChange,
     CellChanges,
     CellSkip,
-    findFormatMisfit,
-    findFormatRefusal,
     findWrittenValue,
-    toCellValue,
 )
 from pybers.table.cells import Table, generateOwnerIdentity
 from pybers.timezone import TimeZoneLike, machineTimeZone, toTimeZone
@@ -422,19 +425,21 @@ class Document:
         value: object = UNCHANGED,
         *,
         format: CellFormat | UNCHANGED = UNCHANGED,
+        control: CellControl | None | UNCHANGED = UNCHANGED,
         conflict: CellFormatConflict = CellFormatConflict.REFUSE,
         extend: bool = False,
     ) -> CellChanges:
-        """Set the value, the format or both of every cell a selector matches.
+        """Set the value, the format, the control or any of them on every matched cell.
 
-        A part not given stays as it was, and a cell a formula backs is skipped and
-        reported. A format that cannot show a cell's value is refused before any cell
-        changes, unless `conflict` falls back to Automatic for that cell and says so.
+        A part not given stays as it was, a control of None removes one, and a cell a
+        formula backs is skipped and reported. A format that cannot show a cell's
+        value is refused before any cell changes, unless `conflict` falls back to
+        Automatic for that cell and says so.
         """
         from pybers.selection.matching import findCellTargets, findExtendTarget
 
-        if value is UNCHANGED and format is UNCHANGED:
-            raise WriteError("cellSet was given neither a value nor a format to set.")
+        if value is UNCHANGED and format is UNCHANGED and control is UNCHANGED:
+            raise WriteError("cellSet was given no value, format or control to set.")
         targets, skipped = (
             ([findExtendTarget(self, selector)], []) if extend
             else findCellTargets(self, selector)
@@ -449,23 +454,30 @@ class Document:
                 ))
                 continue
             asked = format
-            if asked is not UNCHANGED:
-                current = None if cell is None else cell.value
-                after = current if value is UNCHANGED else findWrittenValue(
-                    value, address, self.timeZone, current
+            current = None if cell is None else cell.value
+            after = current if value is UNCHANGED else findWrittenValue(
+                value, address, self.timeZone, current
+            )
+            where = CellReference(address.row, address.col, table=table.reference)
+            if control is not UNCHANGED and control is not None:
+                raise WriteError(
+                    f"{findControlRefusal(cell, where, control, asked, after)} Nothing "
+                    "was written."
                 )
-                where = CellReference(address.row, address.col, table=table.reference)
+            controlAfter = (
+                (None if cell is None else cell.presentation.control)
+                if control is UNCHANGED else control
+            )
+            if asked is not UNCHANGED:
                 misfit = findFormatMisfit(cell, where, asked, after)
                 if misfit is not None and conflict is CellFormatConflict.REFUSE:
                     raise WriteError(f"{misfit} Nothing was written.")
                 if misfit is not None:
                     asked = CellFormatAutomatic()
                     skipped.append(CellSkip(where, f"{misfit} It takes Automatic."))
-                refusal = findFormatRefusal(cell, where, asked, after)
+                refusal = findFormatRefusal(cell, where, asked, after, controlAfter)
                 if refusal is not None:
                     raise WriteError(f"{refusal} Nothing was written.")
-            elif value is not UNCHANGED:
-                toCellValue(value, address, self.timeZone)
             writing.append((table, address, asked))
         changes: list[CellChange] = []
         for table, address, asked in writing:
@@ -481,12 +493,16 @@ class Document:
                 else CellChange(
                     cell.reference, cell.value, cell.value, cell.kind, cell.kind,
                     cell.presentation.format, cell.presentation.format,
+                    cell.presentation.control, cell.presentation.control,
                 )
             )
+            if control is not UNCHANGED:
+                cell._controlRequest(control)
             if asked is not UNCHANGED:
                 cell._formatRequest(asked)
             changes.append(replace(
                 change, formatAfter=cell.presentation.format,
+                controlAfter=cell.presentation.control,
                 rowsAdded=rowsAdded, colsAdded=colsAdded,
             ))
         return CellChanges(tuple(changes), tuple(skipped))

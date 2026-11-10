@@ -10,6 +10,7 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-10  A control prints as its text form, as a format does, for PYB-145.
 2026-11-10  A format prints as its text form, `(automatic)` after one Automatic chose,
             for PYB-145.
 2026-11-09  A format prints its family and settings, Automatic the format it chose,
@@ -30,10 +31,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/27"
 
-import dataclasses
-import re
 from collections.abc import Sequence
-from enum import Enum
 from pathlib import Path
 from typing import Annotated
 
@@ -53,49 +51,15 @@ childIndent: int = 2
 segmentGap: str = "  "
 fieldGap: str = "   "
 
-# Where a JSON key's next word starts, so `formulaText` reads `formula text`.
-wordStart: re.Pattern[str] = re.compile(r"(?<!^)(?=[A-Z])")
-
-
-def formatWords(key: str) -> str:
-    """Return a JSON key as the lowercase words it joins, `starts with first item`."""
-    return wordStart.sub(" ", key).lower()
-
 
 def formatYesNo(flag: bool) -> str:
     """Return a flag as `yes` or `no`."""
     return "yes" if flag else "no"
 
 
-def formatSettingValue(value: object) -> str:
-    """Return one setting of a control as a report value."""
-    if value is None:
-        return "none"
-    if isinstance(value, bool):
-        return formatYesNo(value)
-    if isinstance(value, Enum):
-        return str(value.value)
-    if isinstance(value, str):
-        return repr(value)
-    if isinstance(value, tuple | list):
-        return f"[{', '.join(formatSettingValue(each) for each in value)}]"
-    return str(value)
-
-
 def formatControl(control: pybers.CellControl | None) -> str:
-    """Return a control as its type, then each setting under its JSON form's name.
-
-    The settings are the fields taking part in equality, which are what the form writes.
-    """
-    if control is None:
-        return "none"
-    settings = ", ".join(
-        f"{formatWords(each.name)} {formatSettingValue(getattr(control, each.name))}"
-        for each in dataclasses.fields(control)
-        if each.compare and not each.name.startswith("_")
-    )
-    family = control.controlType.value
-    return f"{family} ({settings})" if settings else family
+    """Return a control as its text form, which `pybers set --cell-control` reads."""
+    return "none" if control is None else pybers.formatCellControl(control)
 
 
 def formatFormat(cellFormat: pybers.CellFormat | pybers.UNDETERMINED | None) -> str:

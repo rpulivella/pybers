@@ -239,10 +239,11 @@ a write touches the cells it names, and a caller reads any pattern across them f
 cells themselves.
 
 **One call sets every part of a cell, and each part alone.**
-`document.cellSet(selector, value, format=...)` sets a value, a format or both on every
-cell the selector matches, a part not given `UNCHANGED`, and the style tickets add a
-cell's styles to the same call.
-Setting only a format is that call given no value, so no second call does it. The call
+`document.cellSet(selector, value, format=..., control=...)` sets any of a cell's value,
+format and control on every cell the selector matches, a part not given `UNCHANGED` and
+a control of `None` removing one, and the style tickets add a cell's styles to the same
+call. A control is its own part rather than a format, as a control family beside the
+format records, and each of PYB-240 to PYB-244 teaches the writer one. Setting only a format is that call given no value, so no second call does it. The call
 sits on the document because its selector names the tables, writes every cell the
 selector matches, and returns each change it made and each part it skipped, and why.
 

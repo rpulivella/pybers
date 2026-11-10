@@ -13,6 +13,8 @@ the full origin story and design contract.
 UPDATES
 2026-11-10  UNCHANGED re-exported, a part of `cellSet` left as it was, for PYB-145.
 2026-11-10  `CellFormatConflict` re-exported, for PYB-145.
+2026-11-10  `formatCellControl`, `parseCellControl` and `CellControlError`, a
+            control's text form, for PYB-145.
 2026-11-10  `formatCellFormat`, `parseCellFormat` and `CellFormatError`, a format's
             text form, for PYB-145.
 2026-11-09  The format family re-exported from `pybers.format`, `CellFormat` the
@@ -105,6 +107,7 @@ lazy from pybers.format import (
     CellControl,
     CellControlBase,
     CellControlCheckbox,
+    CellControlError,
     CellControlPopUpMenu,
     CellControlSlider,
     CellControlStarRating,
@@ -132,7 +135,9 @@ lazy from pybers.format import (
     CellFormatStarRating,
     CellFormatText,
     CellFormatUnknown,
+    formatCellControl,
     formatCellFormat,
+    parseCellControl,
     parseCellFormat,
 )
 lazy from pybers.formula import (
@@ -256,6 +261,7 @@ __all__ = [
     "CellControl",
     "CellControlBase",
     "CellControlCheckbox",
+    "CellControlError",
     "CellControlPopUpMenu",
     "CellControlSlider",
     "CellControlStarRating",
@@ -285,7 +291,9 @@ __all__ = [
     "CellFormatStarRating",
     "CellFormatText",
     "CellFormatUnknown",
+    "formatCellControl",
     "formatCellFormat",
+    "parseCellControl",
     "parseCellFormat",
     "CellKind",
     "CellRange",

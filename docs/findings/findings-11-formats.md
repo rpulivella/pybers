@@ -389,6 +389,23 @@ An empty cell keeps a chosen number, text or date format, 172 times in `65b-seri
 and `19-formula-dragged`, so an empty cell takes any format. A custom format over text, a
 date or currency reads as unknown until PYB-245 to PYB-247 decode it, so it is not listed.
 
+### Which formats each control shows through
+
+Measured 2026-11-10 for PYB-145 across the same 190 documents, pairing each control with
+the family of the format beneath it. `controlFormatFamilies` in `pybers.format.controls`
+is this table, and a control beside any other format is refused.
+
+| control | families | named by |
+| --- | --- | --- |
+| checkbox | checkbox | `11-value-types-noformats` `E1`, `63-fill-base` `D3` |
+| star rating | star rating | `11-value-types-noformats` `F1`, `54-format-star-rating` `A1` |
+| slider, stepper | number, currency, percent, fraction, scientific, numeral system | `81-control-formats` `A1` to `H1`, `70-retirement-template-15-4` `B4` |
+| pop-up menu | text | `11-value-types-noformats` `I1`, `81-control-formats` `I1` |
+
+The slider and the stepper are read as one row: between them the documents hold every
+family PYB-242 and PYB-243 name, a slider over fraction and scientific and a stepper
+over numeral system, though no single fixture holds each under both.
+
 ### Controls are a format plus a cell spec
 
 **A control never changes how its value is formatted.** Measured in `81-control-formats`:

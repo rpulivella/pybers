@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-`pybers set`: the value, the format or both of every cell a selector matches.
+`pybers set`: the value, the format and the control of every cell a selector matches.
 
 The command reads the text into a value and a format, makes one `cellSet` call, and
 saves only
@@ -9,6 +9,8 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-10  `--cell-control` sets a control by its text form, `none` removing one,
+            for PYB-145.
 2026-11-10  `--cell-format` sets a format by its text form, VALUE now optional, and
             `--conflict` falls back to Automatic for a format that does not fit,
             for PYB-145.
@@ -115,6 +117,17 @@ def runSet(
             ),
         ),
     ] = None,
+    cellControl: Annotated[
+        str | None,
+        typer.Option(
+            "--cell-control",
+            metavar="CONTROL",
+            help=(
+                "The control each cell presents its value through, as `pybers show` "
+                "prints one, or none to remove it."
+            ),
+        ),
+    ] = None,
     conflict: Annotated[
         pybers.CellFormatConflict,
         typer.Option(
@@ -136,9 +149,9 @@ def runSet(
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
-    """Set every cell SELECTOR matches to VALUE, --cell-format, or both."""
-    if value is None and cellFormat is None:
-        raise typer.BadParameter("Give a VALUE, a --cell-format, or both.")
+    """Set every cell SELECTOR matches to VALUE, --cell-format and --cell-control."""
+    if value is None and cellFormat is None and cellControl is None:
+        raise typer.BadParameter("Give a VALUE, a --cell-format or a --cell-control.")
     target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
         document = (
@@ -151,6 +164,10 @@ def runSet(
             format=(
                 pybers.UNCHANGED if cellFormat is None
                 else pybers.parseCellFormat(cellFormat)
+            ),
+            control=(
+                pybers.UNCHANGED if cellControl is None
+                else pybers.parseCellControl(cellControl)
             ),
             conflict=conflict,
             extend=extend,

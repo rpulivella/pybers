@@ -72,6 +72,7 @@ from .._persistence.index import (
     stringListType,
 )
 from .._persistence.rows import readStoredTiles
+from ..absence import UNCHANGED
 from ..addressing import CellRange
 from ..addressing.reference import CellAddress, originOffset
 from ..currency import CurrencyAmount
@@ -386,7 +387,7 @@ def setCellStorage(
     """Give a cell what its record stores and the value that record holds."""
     cell._stored = readRecordStorage(record, formatTypes, controls)
     cell._storedValue = value
-    cell._formatAsked = None
+    cell._formatAsked, cell._controlAsked = None, UNCHANGED
 
 
 def updateCellStorage(
@@ -414,7 +415,7 @@ def updateCellStorage(
     for reference, cell in table.cells.items():
         if reference not in described:
             cell._stored, cell._storedValue = emptyStorage, None
-            cell._formatAsked = None
+            cell._formatAsked, cell._controlAsked = None, UNCHANGED
 
 
 def resolveValue(

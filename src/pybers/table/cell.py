@@ -43,15 +43,18 @@ from dataclasses import dataclass, field, fields, replace
 from decimal import Context, Decimal
 from typing import TYPE_CHECKING, NoReturn
 
-from pybers.absence import UNDETERMINED
+from pybers.absence import UNCHANGED, UNDETERMINED
 from pybers.addressing.ranges import CellRange, SelectionMatch
 from pybers.addressing.reference import CellAddress, CellReference
 from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
 from pybers.errors import WriteError
+from pybers.format.controls import CellControl
 from pybers.format.formats import (
     CellFormat,
     CellFormatAutomatic,
+    CellFormatCheckbox,
     CellFormatCurrency,
+    CellFormatStarRating,
     CellFormatText,
     findFormatShown,
 )
@@ -64,7 +67,6 @@ from pybers.table.kinds import (
     CellStorage,
     emptyStorage,
     findCellKind,
-    kindFormatFamilies,
 )
 from pybers.table.merges import MergeRange
 from pybers.timezone import machineTimeZone, toWallClockTime
@@ -180,66 +182,6 @@ def findWrittenValue(
     return written
 
 
-def findFormatMisfit(
-    cell: Cell | None, where: CellReference, cellFormat: CellFormat, value: CellValue
-) -> str | None:
-    """Return why a format cannot show the value a cell would hold, or None if it can.
-
-    An empty cell takes any format, as Numbers keeps one on a cell it emptied.
-    """
-    shown = findFormatShown(cellFormat)
-    if shown is UNDETERMINED or value is None:
-        return None
-    unchanged = cell is not None and isSameValue(cell.value, value)
-    kind = (
-        cell.kind if cell is not None and unchanged
-        else findCellKind(value, CellKind.EMPTY, None, False)
-    )
-    if shown.formatFamily in kindFormatFamilies.get(kind, frozenset()):
-        return None
-    holds = "holds" if unchanged else "would hold"
-    return (
-        f"{where} {holds} a {kind} value, which a {shown.formatFamily} format cannot "
-        "show."
-    )
-
-
-def findFormatRefusal(
-    cell: Cell | None, where: CellReference, cellFormat: CellFormat, value: CellValue
-) -> str | None:
-    """Return why pybers cannot yet give a cell a format over a value, or None.
-
-    A chosen family is written over the entry Numbers' Automatic picks for the value,
-    so only that family can be chosen until its own ticket teaches the writer more.
-    """
-    # Local, so the model never loads its archive halves on import.
-    from pybers.format._read import findFormatOfType
-    from pybers.format._write import findAutomaticFormat
-
-    if cell is not None and cell.formula is not None:
-        return f"{where} is backed by a formula, whose format pybers cannot yet set."
-    if cell is not None and cell.presentation.control is not None:
-        return (
-            f"{where} shows its value through a control, and pybers cannot yet set "
-            "the format beneath one."
-        )
-    if value is None:
-        return f"{where} holds no value, and pybers cannot yet format an empty cell."
-    shown = None if cell is None else cell.presentation.format
-    unchanged = cell is not None and isSameValue(cell.value, value)
-    if isinstance(cellFormat, CellFormatAutomatic) or (
-        unchanged and cellFormat == shown
-    ):
-        return None
-    written = findFormatOfType(findAutomaticFormat(value).format_type)
-    if cellFormat == written:
-        return None
-    return (
-        f"pybers cannot yet write a {cellFormat.formatFamily} format, so {where} "
-        f"can take {written.formatFamily} or automatic."
-    )
-
-
 def isSameValue(before: CellValue, after: CellValue) -> bool:
     """Report whether two values are one stored value, a Decimal down to its digits."""
     if type(before) is not type(after):
@@ -268,6 +210,8 @@ class CellChange:
     kindAfter: CellKind
     formatBefore: CellFormat | UNDETERMINED | None
     formatAfter: CellFormat | UNDETERMINED | None
+    controlBefore: CellControl | None
+    controlAfter: CellControl | None
     rowsAdded: int = 0
     colsAdded: int = 0
 
@@ -278,6 +222,7 @@ class CellChange:
             self.rowsAdded or self.colsAdded
             or self.kindBefore is not self.kindAfter
             or self.formatBefore != self.formatAfter
+            or self.controlBefore != self.controlAfter
             or not isSameValue(self.valueBefore, self.valueAfter)
         )
 
@@ -320,6 +265,10 @@ class Cell:
     # The format an edit asked the next save to write, None when none did.
     _formatAsked: CellFormat | None = field(
         default=None, repr=False, compare=False, kw_only=True
+    )
+    # The control an edit asked the next save to give, None to remove the one it has.
+    _controlAsked: CellControl | None | UNCHANGED = field(
+        default=UNCHANGED, repr=False, compare=False, kw_only=True
     )
     # The value that record holds, so an edit since is told from it.
     _storedValue: CellValue = field(
@@ -433,7 +382,8 @@ class Cell:
         if self.formula is not None:
             refuseValueOverFormula(self.address)
         valueBefore, before = self._value, self.kind
-        formatBefore = self.presentation.format
+        shownBefore = self.presentation
+        formatBefore, controlBefore = shownBefore.format, shownBefore.control
         after = findCellKind(written, self._stored.kind, self._storedValue, False)
         if not (after is before and isSameValue(valueBefore, written)):
             self._value = written
@@ -446,7 +396,7 @@ class Cell:
                 )
         return CellChange(
             self.reference, valueBefore, written, before, after, formatBefore,
-            self.presentation.format,
+            self.presentation.format, controlBefore, self.presentation.control,
         )
 
     def _formatRequest(self, cellFormat: CellFormat) -> None:
@@ -466,6 +416,19 @@ class Cell:
         if isSameValue(self.value, self._storedValue):
             return True
         return self.kind is self._stored.kind and control.showsValue(self.value)
+
+    def _controlRequest(self, control: CellControl | None) -> None:
+        """Ask the next save to give this cell a control, or none, unless it has it."""
+        shown = self.presentation
+        if control == shown.control:
+            return
+        self._controlAsked = control
+        family = None if shown.format is None else findFormatShown(shown.format)
+        # A checkbox or a star rating is a format too, so removing one leaves Automatic.
+        if control is None and self._formatAsked is None and family in (
+            CellFormatCheckbox(), CellFormatStarRating()
+        ):
+            self._formatAsked = CellFormatAutomatic()
 
     def _formatChosenCheck(self) -> bool:
         """Report whether a person chose the format this cell's save writes.
@@ -504,6 +467,8 @@ class Cell:
             presentation = replace(presentation, format=pending)
         if self._formatAsked is not None:
             presentation = replace(presentation, format=self._formatAsked)
+        if self._controlAsked is not UNCHANGED:
+            presentation = replace(presentation, control=self._controlAsked)
         # None of the 897 formula records in the documents keeps a chosen Text format.
         if self.formula is not None and presentation.format == CellFormatText():
             presentation = replace(
@@ -576,6 +541,6 @@ class Cell:
 __all__ = [
     "Cell", "CellChange", "CellChanges", "CellCopy", "CellSkip", "CellValue",
     "decimal128Context",
-    "findFormatMisfit", "findFormatRefusal", "findWrittenValue",
+    "findWrittenValue",
     "refuseValueOverFormula", "toCellValue",
 ]

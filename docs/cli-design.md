@@ -19,7 +19,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` naming each |
 | `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
-| `set FILE SELECTOR [VALUE] [--cell-format FORMAT]` | The value, the format or both of every cell a selector matches |
+| `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL]` | The value, the format and the control of every cell a selector matches, each optional |
 | `locale FILE [LOCALE]` | A document's language and region, or a change to it |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
 | `diff A B` | The cells that differ between two documents |
@@ -65,7 +65,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **A flag reads `yes` or `no`.**
 - **Several parts print one after another, a blank line between each**, and each opens with a line naming it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
 - **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is left out. A size reads `5 rows × 3 columns`, in a tree as on a line.
-- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints its type, then each setting in parentheses: `slider (minimum 0, maximum 100, increment 1)`. `tests/test_cli_show.py` fails for a format that does not read back from its line, and for a control whose settings it does not print.
+- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
   ```

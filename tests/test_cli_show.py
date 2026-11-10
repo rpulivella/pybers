@@ -109,9 +109,9 @@ def testACellsFieldsFollowTheNamesAndOrderOfItsJsonForm() -> None:
 
 
 @pytest.mark.parametrize(("address", "control"), [
-    ("A1", "slider (minimum 0, maximum 200, increment 5)"),
-    ("I1", "pop-up-menu (items ['Item 1', 'Item 2', 'Item 3'], "
-           "starts with first item no)"),
+    ("A1", "slider; minimum: 0; maximum: 200; increment: 5"),
+    ("I1", 'pop-up-menu; items: "Item 1", "Item 2", "Item 3"; '
+           "starts-with-first-item: no"),
     ("J1", "star-rating"),
 ])
 def testAControlShowsEverySettingItHolds(address: str, control: str) -> None:
@@ -124,7 +124,7 @@ def testAControlsSettingsAreNamedAndOrderedAsItsJsonForm() -> None:
     family, *keys = json.loads(pybers.formatJsonForm(control))
     line = findLines(runShowCommand(controlsPath, "::Table 1::I1"), "Control")[0]
     assert family == "controlType"
-    found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', ' ', key).lower()} ")
+    found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', '-', key).lower()}: ")
              for key in keys]
     assert found == sorted(found)
 
@@ -155,18 +155,14 @@ def testEveryFormatShowsAsTheTextFormItReadsBackFrom() -> None:
             assert pybers.parseCellFormat(line) == shown, line
 
 
-def testEveryControlShowsEachSettingOfItsJsonForm() -> None:
+def testEveryControlShowsAsTheTextFormItReadsBackFrom() -> None:
     for presentation in listPresentations():
-        subject, line = presentation.control, formatControl(presentation.control)
-        tree = json.loads(pybers.formatJsonForm(subject))
-        if not isinstance(tree, dict):
-            assert line == ("none" if tree is None else str(tree)), line
-            continue
-        family, *settings = tree.values()
-        assert line.startswith(str(family)), line
-        found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', ' ', key).lower()} ")
-                 for key in list(tree)[1:]]
-        assert found == sorted(found) and len(found) == len(settings), line
+        control = presentation.control
+        line = formatControl(control)
+        if isinstance(control, pybers.CellControlUnknown):
+            assert line.startswith("unknown; interaction-type: ")
+        else:
+            assert pybers.parseCellControl(line) == control, line
 
 
 def testATableShowsItsSizeAndCellCountOnOneLineThenEachCell() -> None:
