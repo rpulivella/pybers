@@ -10,6 +10,8 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-10  A format prints as its text form, `(automatic)` after one Automatic chose,
+            for PYB-145.
 2026-11-09  A format prints its family and settings, Automatic the format it chose,
             replacing the chosen flag, for PYB-145.
 2026-11-03  What a selector matches, read by the one resolver, each match as it
@@ -66,7 +68,7 @@ def formatYesNo(flag: bool) -> str:
 
 
 def formatSettingValue(value: object) -> str:
-    """Return one setting of a control or a format as a report value."""
+    """Return one setting of a control as a report value."""
     if value is None:
         return "none"
     if isinstance(value, bool):
@@ -77,41 +79,28 @@ def formatSettingValue(value: object) -> str:
         return repr(value)
     if isinstance(value, tuple | list):
         return f"[{', '.join(formatSettingValue(each) for each in value)}]"
-    if isinstance(value, pybers.CellFormatBase) or value is pybers.UNDETERMINED:
-        return formatFormat(value)
     return str(value)
 
 
-def formatMember(member: object, family: str) -> str:
-    """Return a family member as its family, then each setting under its JSON name.
+def formatControl(control: pybers.CellControl | None) -> str:
+    """Return a control as its type, then each setting under its JSON form's name.
 
     The settings are the fields taking part in equality, which are what the form writes.
     """
-    assert dataclasses.is_dataclass(member) and not isinstance(member, type)
+    if control is None:
+        return "none"
     settings = ", ".join(
-        f"{formatWords(each.name)} {formatSettingValue(getattr(member, each.name))}"
-        for each in dataclasses.fields(member)
+        f"{formatWords(each.name)} {formatSettingValue(getattr(control, each.name))}"
+        for each in dataclasses.fields(control)
         if each.compare and not each.name.startswith("_")
     )
+    family = control.controlType.value
     return f"{family} ({settings})" if settings else family
 
 
-def formatControl(control: pybers.CellControl | None) -> str:
-    """Return a control as its type, then each setting."""
-    if control is None:
-        return "none"
-    return formatMember(control, control.controlType.value)
-
-
-def formatFormat(
-    cellFormat: pybers.CellFormatBase | pybers.UNDETERMINED | None,
-) -> str:
-    """Return a format as its family, then each setting, `unknown` before a save."""
-    if cellFormat is None:
-        return "none"
-    if cellFormat is pybers.UNDETERMINED:
-        return "unknown"
-    return formatMember(cellFormat, cellFormat.formatFamily.value)
+def formatFormat(cellFormat: pybers.CellFormat | pybers.UNDETERMINED | None) -> str:
+    """Return a format as its text form, which `pybers set --cell-format` reads."""
+    return "none" if cellFormat is None else pybers.formatCellFormat(cellFormat)
 
 
 def formatSegments(indent: int, label: str, name: str, *segments: str) -> Text:

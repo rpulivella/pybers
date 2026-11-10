@@ -6,6 +6,7 @@ The format a cell shows its value with, a closed family whose Automatic holds it
 percentages a person chose.
 
 UPDATES
+2026-11-10  A format's text form, read back as the format it names, for PYB-145.
 2026-11-09  Written for PYB-145.
 """
 from __future__ import annotations
@@ -18,6 +19,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/09"
 
+import re
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -152,4 +154,35 @@ def testACommandLinePrintsAChosenFormatAndAnAutomaticOne() -> None:
     result = runShowCommand(percentPath, "*::Table 1::A1:B1")
     formats = [value for label, value in listShownFields(result.stdout)
                if label == "Format"]
-    assert formats == ["automatic (shown number)", "percent"]
+    assert formats == ["number (automatic)", "percent"]
+
+
+@pytest.mark.parametrize("cellFormat", [
+    CellFormatPercent(), CellFormatAutomatic(CellFormatNumber()), CellFormatAutomatic(),
+])
+def testAFormatReadsBackFromItsTextForm(cellFormat: CellFormat) -> None:
+    assert pybers.parseCellFormat(pybers.formatCellFormat(cellFormat)) == cellFormat
+
+
+def testAutomaticAloneNamesAFormatTheSaveChooses() -> None:
+    assert pybers.parseCellFormat("automatic") == CellFormatAutomatic()
+
+
+@pytest.mark.parametrize(("text", "refusal"), [
+    ("percentage", "'percentage' is no format family. Use one of: automatic, number"),
+    ("unknown", "'unknown' is no format family"),
+    ("percent; fraction-digits: 1",
+     "percent has no setting 'fraction-digits'; it takes no settings"),
+])
+def testATextFormNamingNoFamilyOrSettingIsRefusedSayingWhich(
+    text: str, refusal: str
+) -> None:
+    with pytest.raises(pybers.CellFormatError, match=re.escape(refusal)):
+        pybers.parseCellFormat(text)
+
+
+def testAScriptCopiesAFormatFromOneCellToAnotherAsText() -> None:
+    cellFormat = readPercentCell("B1").presentation.format
+    assert cellFormat is not None
+    shown = pybers.formatCellFormat(cellFormat)
+    assert pybers.parseCellFormat(shown) == CellFormatPercent()

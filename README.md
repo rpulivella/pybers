@@ -52,7 +52,7 @@ Sheet: Sheet 1  2 tables
 
     Cell: Sheet 1::Table 1::A1
       Value: 1   Kind: number   Formula text: none   Value cached: no
-      Format: automatic (shown number)   Control: none
+      Format: number (automatic)   Control: none
       Unrecognized type code: none
 …
 ```
@@ -63,7 +63,7 @@ A cell folds the fields of its JSON form, in that form's order, onto three lines
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11"
 Cell: Sheet 1::Table 1::A11
   Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
-  Format: automatic (shown number)   Control: none
+  Format: number (automatic)   Control: none
   Unrecognized type code: none
 ```
 
@@ -73,12 +73,12 @@ Several matches print each part exactly as it prints alone:
 $ pybers show shapes.numbers "::A11, *::Table 2[kind=number]"
 Cell: Sheet 1::Table 1::A11
   Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
-  Format: automatic (shown number)   Control: none
+  Format: number (automatic)   Control: none
   Unrecognized type code: none
 
 Cell: Sheet 1::Table 2::A1
   Value: 42   Kind: number   Formula text: none   Value cached: no
-  Format: automatic (shown number)   Control: none
+  Format: number (automatic)   Control: none
   Unrecognized type code: none
 ```
 

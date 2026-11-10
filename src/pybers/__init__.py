@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-10  `formatCellFormat`, `parseCellFormat` and `CellFormatError`, a format's
+            text form, for PYB-145.
 2026-11-09  The format family re-exported from `pybers.format`, `CellFormat` the
             union of its members and `CellFormatFamily` their enum, beside the
             control family moved there, for PYB-145.
@@ -115,6 +117,7 @@ lazy from pybers.format import (
     CellFormatCurrency,
     CellFormatDateTime,
     CellFormatDuration,
+    CellFormatError,
     CellFormatFamily,
     CellFormatFraction,
     CellFormatNumber,
@@ -126,6 +129,8 @@ lazy from pybers.format import (
     CellFormatStarRating,
     CellFormatText,
     CellFormatUnknown,
+    formatCellFormat,
+    parseCellFormat,
 )
 lazy from pybers.formula import (
     ArgumentCountError,
@@ -263,6 +268,7 @@ __all__ = [
     "CellFormatCurrency",
     "CellFormatDateTime",
     "CellFormatDuration",
+    "CellFormatError",
     "CellFormatFamily",
     "CellFormatFraction",
     "CellFormatNumber",
@@ -274,6 +280,8 @@ __all__ = [
     "CellFormatStarRating",
     "CellFormatText",
     "CellFormatUnknown",
+    "formatCellFormat",
+    "parseCellFormat",
     "CellKind",
     "CellRange",
     "CellRangeList",

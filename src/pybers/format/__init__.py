@@ -4,6 +4,8 @@ The format feature: the format a cell shows its value with, its control, and bot
 archive halves.
 
 UPDATES
+2026-11-10  A format's text form, `formatCellFormat` and `parseCellFormat`, for
+            PYB-145.
 2026-11-09  Written for PYB-145, taking in the control family from `pybers.table`.
 """
 from __future__ import annotations
@@ -48,6 +50,7 @@ from pybers.format.formats import (
     CellFormatText,
     CellFormatUnknown,
 )
+from pybers.format.text import CellFormatError, formatCellFormat, parseCellFormat
 
 __all__ = [
     "CellControl",
@@ -67,6 +70,7 @@ __all__ = [
     "CellFormatCurrency",
     "CellFormatDateTime",
     "CellFormatDuration",
+    "CellFormatError",
     "CellFormatFamily",
     "CellFormatFraction",
     "CellFormatNumber",
@@ -78,4 +82,6 @@ __all__ = [
     "CellFormatStarRating",
     "CellFormatText",
     "CellFormatUnknown",
+    "formatCellFormat",
+    "parseCellFormat",
 ]

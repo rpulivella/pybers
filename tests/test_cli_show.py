@@ -91,7 +91,7 @@ def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
     assert result.stdout.splitlines() == [
         "Cell: Sheet 1::Table 1::A11",
         "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
-        "  Format: automatic (shown number)   Control: none",
+        "  Format: number (automatic)   Control: none",
         "  Unrecognized type code: none",
     ]
 
@@ -137,28 +137,36 @@ formatStems: tuple[str, ...] = (
 )
 
 
-def listPresentations() -> list[tuple[str, object, str]]:
-    """Return each format and control the format documents hold, with its line."""
-    found = []
-    for stem in formatStems:
-        for _, _, cell in pybers.open(findDocumentPath(stem)).cellsIterate():
-            shown = cell.presentation
-            found.append((stem, shown.format, formatFormat(shown.format)))
-            found.append((stem, shown.control, formatControl(shown.control)))
-    return found
+def listPresentations() -> list[pybers.CellPresentation]:
+    """Return how each cell of the format documents shows its value."""
+    return [cell.presentation for stem in formatStems
+            for _, _, cell in pybers.open(findDocumentPath(stem)).cellsIterate()]
 
 
-def testEveryFormatAndControlShowsEachSettingOfItsJsonForm() -> None:
-    for stem, subject, line in listPresentations():
+def testEveryFormatShowsAsTheTextFormItReadsBackFrom() -> None:
+    for presentation in listPresentations():
+        shown = presentation.format
+        line = formatFormat(shown)
+        if shown is None:
+            assert line == "none"
+        elif isinstance(shown, pybers.CellFormatUnknown):
+            assert line.startswith("unknown; format-type: ")
+        else:
+            assert pybers.parseCellFormat(line) == shown, line
+
+
+def testEveryControlShowsEachSettingOfItsJsonForm() -> None:
+    for presentation in listPresentations():
+        subject, line = presentation.control, formatControl(presentation.control)
         tree = json.loads(pybers.formatJsonForm(subject))
         if not isinstance(tree, dict):
-            assert line == ("none" if tree is None else str(tree)), stem
+            assert line == ("none" if tree is None else str(tree)), line
             continue
         family, *settings = tree.values()
-        assert line.startswith(str(family)), (stem, line)
+        assert line.startswith(str(family)), line
         found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', ' ', key).lower()} ")
                  for key in list(tree)[1:]]
-        assert found == sorted(found) and len(found) == len(settings), (stem, line)
+        assert found == sorted(found) and len(found) == len(settings), line
 
 
 def testATableShowsItsSizeAndCellCountOnOneLineThenEachCell() -> None:
@@ -196,7 +204,7 @@ def testAFormatASaveHasNotChosenReadsUnknown() -> None:
     cell.value = "text"
     assert cell.presentation.format == pybers.CellFormatAutomatic()
     shown = listShownFields(renderPlain(formatCell(cell)))
-    assert ("Format", "automatic (shown unknown)") in shown
+    assert ("Format", "unknown (automatic)") in shown
 
 
 def testASheetShowsEachOfItsTablesIndentedUnderIt() -> None:

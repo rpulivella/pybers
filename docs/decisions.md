@@ -223,8 +223,9 @@ holds the same line, and the structure holds by construction rather than by revi
 
 **A format belongs to no document.** One read from a cell in one document applies to a
 cell in another, and the writer finds or adds the matching entry in that table's format
-list. Every format has one text form tagged by its family, which the command line, JSON
-export and import, and an agent all use.
+list. Every format has one text form tagged by its family, which `pybers set
+--cell-format` reads and `pybers show` prints, and the JSON form carries the same setting
+names as an object, so a machine reads one grammar and a person another.
 
 **A cell's kind and format always agree.** A write that would leave a format on a value it
 cannot show, such as a duration format on text, is refused, naming both, unless the caller
