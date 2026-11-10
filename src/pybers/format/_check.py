@@ -96,6 +96,21 @@ def findControlRefusal(
     return f"pybers cannot yet write a {control.controlType} control at {where}."
 
 
+def findFormatSkip(
+    cell: Cell | None, where: CellReference, value: CellValue
+) -> str | None:
+    """Return why a cell in a range is left without the format asked, or None.
+
+    A range commonly holds an empty cell and a formula, so each is skipped and reported
+    rather than refusing the cells pybers can format.
+    """
+    if cell is not None and cell.formula is not None:
+        return f"{where} is backed by a formula, whose format pybers cannot yet set."
+    if value is None:
+        return f"{where} holds no value, which pybers cannot yet format."
+    return None
+
+
 def findFormatRefusal(
     cell: Cell | None,
     where: CellReference,
@@ -108,15 +123,11 @@ def findFormatRefusal(
     A chosen family is written over the entry Numbers' Automatic picks for the value,
     so only that family can be chosen until its own ticket teaches the writer more.
     """
-    if cell is not None and cell.formula is not None:
-        return f"{where} is backed by a formula, whose format pybers cannot yet set."
     if control is not None:
         return (
             f"{where} shows its value through a control, and pybers cannot yet set "
             "the format beneath one."
         )
-    if value is None:
-        return f"{where} holds no value, and pybers cannot yet format an empty cell."
     shown = None if cell is None else cell.presentation.format
     unchanged = cell is not None and isSameValue(cell.value, value)
     if isinstance(cellFormat, CellFormatAutomatic) or (
@@ -137,4 +148,6 @@ def findFormatRefusal(
     )
 
 
-__all__ = ["findControlRefusal", "findFormatMisfit", "findFormatRefusal"]
+__all__ = [
+    "findControlRefusal", "findFormatMisfit", "findFormatRefusal", "findFormatSkip",
+]

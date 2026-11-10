@@ -132,9 +132,25 @@ def testAFormatPybersCannotYetWriteIsRefusedAndNothingChanges(working: Path) -> 
     )
 
 
-def testAnEmptyCellIsRefusedAFormat(working: Path) -> None:
-    with pytest.raises(pybers.WriteError, match="holds no value"):
-        pybers.open(working).cellSet("::Table 1::H1", format=CellFormatNumber())
+def testARangeSkipsItsEmptyAndFormulaCellsAndFormatsTheRest(tmp_path: Path) -> None:
+    document = pybers.create("en_US")
+    table = document.sheet().tableAdd("Range", rows=1, cols=3)
+    table.cell("A1").value = Decimal(5)
+    table.cell("C1").formulaText = "=A1*2"
+    working = tmp_path / "range.numbers"
+    document.save(working)
+    reopened = pybers.open(working)
+    changes = reopened.cellSet("::Range::A1:C1", format=CellFormatNumber())
+    assert [(str(skip.reference), skip.reason) for skip in changes.skipped] == [
+        ("Sheet 1::Range::B1",
+         "Sheet 1::Range::B1 holds no value, which pybers cannot yet format."),
+        ("Sheet 1::Range::C1", "Sheet 1::Range::C1 is backed by a formula, whose "
+         "format pybers cannot yet set."),
+    ]
+    reopened.save()
+    assert pybers.open(working).table("Range").cell("A1").presentation.format == (
+        CellFormatNumber()
+    )
 
 
 def testACallGivenNeitherPartIsRefused(working: Path) -> None:
