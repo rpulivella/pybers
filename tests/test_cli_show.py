@@ -91,7 +91,7 @@ def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
     assert result.stdout.splitlines() == [
         "Cell: Sheet 1::Table 1::A11",
         "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
-        "  Format: number   Format chosen: no   Control: none",
+        "  Format: automatic (shown number)   Control: none",
         "  Unrecognized type code: none",
     ]
 
@@ -194,8 +194,9 @@ def testASheetHoldingNoTablesShowsItsNameAlone() -> None:
 def testAFormatASaveHasNotChosenReadsUnknown() -> None:
     cell = pybers.open(shapesPath).sheet("Sheet 1").table("Table 1").cell("A1")
     cell.value = "text"
-    assert cell.presentation.format is pybers.UNDETERMINED
-    assert ("Format", "unknown") in listShownFields(renderPlain(formatCell(cell)))
+    assert cell.presentation.format == pybers.CellFormatAutomatic()
+    shown = listShownFields(renderPlain(formatCell(cell)))
+    assert ("Format", "automatic (shown unknown)") in shown
 
 
 def testASheetShowsEachOfItsTablesIndentedUnderIt() -> None:

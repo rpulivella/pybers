@@ -28,6 +28,7 @@ pybers/
   color/          one color carrying its space, and both archive halves
   cli/            the pybers command, one module per command, a front end
   document/       Document and Sheet, the walk that reads one and the one that saves it
+  format/         a cell's format and its control, one closed family each, both halves
   formula/        the node model, the function table, the text, and both archive halves
   table/          Cell, Table and merges, and both archive halves
   drawable.py     things that float on a sheet   style.py  text.py  geometry.py

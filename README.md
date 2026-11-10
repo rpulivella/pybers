@@ -52,7 +52,7 @@ Sheet: Sheet 1  2 tables
 
     Cell: Sheet 1::Table 1::A1
       Value: 1   Kind: number   Formula text: none   Value cached: no
-      Format: number   Format chosen: no   Control: none
+      Format: automatic (shown number)   Control: none
       Unrecognized type code: none
 …
 ```
@@ -63,7 +63,7 @@ A cell folds the fields of its JSON form, in that form's order, onto three lines
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11"
 Cell: Sheet 1::Table 1::A11
   Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
-  Format: number   Format chosen: no   Control: none
+  Format: automatic (shown number)   Control: none
   Unrecognized type code: none
 ```
 
@@ -73,12 +73,12 @@ Several matches print each part exactly as it prints alone:
 $ pybers show shapes.numbers "::A11, *::Table 2[kind=number]"
 Cell: Sheet 1::Table 1::A11
   Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
-  Format: number   Format chosen: no   Control: none
+  Format: automatic (shown number)   Control: none
   Unrecognized type code: none
 
 Cell: Sheet 1::Table 2::A1
   Value: 42   Kind: number   Formula text: none   Value cached: no
-  Format: number   Format chosen: no   Control: none
+  Format: automatic (shown number)   Control: none
   Unrecognized type code: none
 ```
 
@@ -91,7 +91,7 @@ Cell: Sheet 1::Table 2::A1
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 [
   {
-    "jsonFormVersion": 4,
+    "jsonFormVersion": 5,
     "sheetName": "Sheet 1",
     "cell": "A11",
     "table": {
@@ -113,8 +113,12 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
           "formulaText": "=SUM(A1:A10)",
           "valueCached": true,
           "presentation": {
-            "format": "number",
-            "formatChosen": false,
+            "format": {
+              "formatFamily": "automatic",
+              "shown": {
+                "formatFamily": "number"
+              }
+            },
             "control": null
           },
           "unrecognizedTypeCode": null,
@@ -156,7 +160,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 $ pybers show shapes.numbers "*::Table 2" --format json
 [
   {
-    "jsonFormVersion": 4,
+    "jsonFormVersion": 5,
     "sheetName": "Sheet 1",
     "table": {
       "name": "Table 2",
@@ -177,8 +181,12 @@ $ pybers show shapes.numbers "*::Table 2" --format json
           "formulaText": null,
           "valueCached": false,
           "presentation": {
-            "format": "number",
-            "formatChosen": false,
+            "format": {
+              "formatFamily": "automatic",
+              "shown": {
+                "formatFamily": "number"
+              }
+            },
             "control": null
           },
           "unrecognizedTypeCode": null,

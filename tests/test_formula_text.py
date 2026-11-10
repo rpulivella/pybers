@@ -989,6 +989,8 @@ def testAReferenceBeyondItsTablesGridShowsAsRefAsNumbersShowsIt() -> None:
 def testAFormulaAttachedOverChosenTextDropsTheTextFormat() -> None:
     table = pybers.open(findDocumentPath("18-formula-literals")).sheets[0].tables[0]
     cell = table.cell("A2")
-    assert cell.presentation.formatChosen
+    assert cell.presentation.format == pybers.CellFormatText()
     cell.formula = table.cell("A1").formula
-    assert not cell.presentation.formatChosen
+    assert cell.presentation.format == pybers.CellFormatAutomatic(
+        pybers.CellFormatText()
+    )

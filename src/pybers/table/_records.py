@@ -57,6 +57,7 @@ from .._persistence.cells import (
     checkboxFormatSlot,
     chosenFormatBit,
     chosenFormatOffset,
+    controlSlot,
     countedFormatSlots,
     currencyFormatSlot,
     dateFormatSlot,
@@ -80,13 +81,9 @@ from ..absence import UNDETERMINED
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
-from ._read import (
-    controlSlot,
-    currencyFormatType,
-    currencyTypeByte,
-    formatFamilies,
-    storedKinds,
-)
+from ..format._read import findFormatOfType
+from ..format.formats import findFormatShown
+from ._read import currencyFormatType, currencyTypeByte, storedKinds
 from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
@@ -230,21 +227,24 @@ def refuseUncreatableCell(cell: Cell, tableName: str) -> None:
             f"{where} holds a {presentation.control.controlType} control, which "
             "pybers cannot yet create. Nothing was written."
         )
-    asked = presentation.format
-    if asked is None or asked is UNDETERMINED:
+    stated = presentation.format
+    if stated is None or stated is UNDETERMINED:
+        return
+    asked = findFormatShown(stated)
+    if asked is UNDETERMINED:
         return
     if cell.value is None and cell.formula is None:
         raise WriteError(
-            f"{where} holds a {asked} format and no value, which pybers cannot yet "
-            "create. Nothing was written."
+            f"{where} holds a {asked.formatFamily} format and no value, which pybers "
+            "cannot yet create. Nothing was written."
         )
-    written = formatFamilies.get(findAutomaticFormat(cell.value).format_type)
+    written = findFormatOfType(findAutomaticFormat(cell.value).format_type)
     # A formula's format is its result's, which Numbers decides on calculating.
     if asked != written and cell.formula is None:
         raise WriteError(
-            f"{where} holds a {asked} format, and pybers writes its value in a "
-            f"{written} format, since it cannot yet create a {asked} one. Nothing was "
-            "written."
+            f"{where} holds a {asked.formatFamily} format, and pybers writes its value "
+            f"in a {written.formatFamily} format, since it cannot yet create a "
+            f"{asked.formatFamily} one. Nothing was written."
         )
 
 
@@ -412,7 +412,7 @@ def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:
     """Return a record carrying the chosen bit its cell holds, for the slot it shows."""
     header = bytearray(raw[:valueOffset])
     chosenBit = findChosenBit(raw)
-    if cell.presentation.formatChosen:
+    if cell._formatChosenCheck():
         header[chosenFormatOffset] |= chosenBit
     else:
         header[chosenFormatOffset] &= ~chosenBit

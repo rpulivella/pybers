@@ -35,7 +35,7 @@ from test_format_refcounts import forgeDataList, readTableModels
 from test_writer import copyDocument, readRecordAt
 
 import pybers
-from conftest import allDocuments, findDocumentPath
+from conftest import allDocuments, checkFormatChosen, findDocumentPath, findShownFamily
 from pybers import CellFormatFamily, CellKind, FormulaReferenceRelocation
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import chooseOffsetUnit, decodeRow, readPackage, writePackage
@@ -168,7 +168,7 @@ def testEveryCellReportsTheKindItsRecordStores(path: Path) -> None:
          CellFormatFamily.SCIENTIFIC),
         ("16-number-scientific-numeralsystems", "E1", CellKind.NUMBER,
          CellFormatFamily.NUMERAL_SYSTEM),
-        ("17-number-custom", "B1", CellKind.NUMBER, CellFormatFamily.CUSTOM_NUMBER),
+        ("17-number-custom", "B1", CellKind.NUMBER, CellFormatFamily.NUMBER_CUSTOM),
         ("68-series-kinds-base", "D2", CellKind.NUMBER, CellFormatFamily.FRACTION),
         ("02-text-rich", "A1", CellKind.RICH_TEXT, CellFormatFamily.TEXT),
         ("21-formula-errors", "B1", CellKind.ERROR, None),
@@ -179,7 +179,7 @@ def testALabeledCellReportsTheKindAndFormatItsLabelNames(
 ) -> None:
     """AC 1 and AC 5: the format is the label's, and the kind is the stored type's."""
     cell = openFirstTable(document).cell(address)
-    assert (cell.kind, cell.presentation.format) == (kind, shown)
+    assert (cell.kind, findShownFamily(cell)) == (kind, shown)
 
 
 def testAPercentageAndAPlainNumberAreBothNumbers() -> None:
@@ -187,7 +187,7 @@ def testAPercentageAndAPlainNumberAreBothNumbers() -> None:
     table = openFirstTable("13-number-percent")
     plain, percent = table.cell("A1"), table.cell("B1")
     assert plain.kind is percent.kind is CellKind.NUMBER
-    assert (plain.presentation.format, percent.presentation.format) == (
+    assert (findShownFamily(plain), findShownFamily(percent)) == (
         CellFormatFamily.NUMBER, CellFormatFamily.PERCENT
     )
 
@@ -244,7 +244,7 @@ def testAnUnmeasuredFormatTypeReportsAnUnknownFormat(tmp_path: Path) -> None:
     forgeDataList(working, "Table 1", forgePercent)
     cell = pybers.open(working).sheets[0].tables[0].cell("B1")
     assert (cell.kind, cell.presentation.format) == (
-        CellKind.NUMBER, CellFormatFamily.UNKNOWN
+        CellKind.NUMBER, pybers.CellFormatUnknown(999)
     )
 
 
@@ -293,7 +293,7 @@ def testAChangedKindsFormatIsUndeterminedUntilTheSaveChoosesOne() -> None:
     """The format the record names belongs to the old kind, so it is not reported."""
     cell = openFirstTable("11-value-types-noformats").cell("A1")
     cell.value = "words"
-    assert cell.presentation.format is pybers.UNDETERMINED
+    assert cell.presentation.format == pybers.CellFormatAutomatic(pybers.UNDETERMINED)
 
 
 def testASavedCellIsDescribedByTheRecordTheSaveLeft(tmp_path: Path) -> None:
@@ -311,7 +311,9 @@ def testASavedCellIsDescribedByTheRecordTheSaveLeft(tmp_path: Path) -> None:
         assert readStoredState(table.cell(address)) == readStoredState(
             reopened.cell(address)
         )
-    assert table.cell("A1").presentation.format is CellFormatFamily.TEXT
+    assert table.cell("A1").presentation.format == pybers.CellFormatAutomatic(
+        pybers.CellFormatText()
+    )
 
 
 def testARowInsertedIsDescribedAsAReopenDescribesIt(tmp_path: Path) -> None:
@@ -381,9 +383,9 @@ def testThePresentationIsOneFrozenObject() -> None:
     """AC 6."""
     presentation = openFirstTable("21-formula-errors").cell("B1").presentation
     with pytest.raises(dataclasses.FrozenInstanceError):
-        presentation.format = CellFormatFamily.TEXT  # type: ignore[misc]
+        presentation.format = pybers.CellFormatText()  # type: ignore[misc]
     assert {field.name for field in dataclasses.fields(presentation)} == {
-        "format", "formatChosen", "control"
+        "format", "control"
     }
 
 
@@ -399,8 +401,8 @@ def testLiteralTextReportsAChosenFormat() -> None:
     """AC 6: the chosen format is read where the kind is."""
     cell = openFirstTable("11-value-types-noformats").cell("A1")
     cell.textLiteralSet("=1+1")
-    assert (cell.kind, cell.presentation.formatChosen) == (
-        CellKind.TEXT, True
+    assert (cell.kind, cell.presentation.format) == (
+        CellKind.TEXT, pybers.CellFormatText()
     )
 
 
@@ -429,7 +431,7 @@ def testACommandLineListsEachCellsKindAsText() -> None:
         str(cell.address): {
             "kind": cell.kind.value,
             "format": (
-                None if (shown := cell.presentation.format) is None else str(shown)
+                None if (shown := findShownFamily(cell)) is None else shown.value
             ),
         }
         for cell in list(table.rows)[0]
@@ -448,4 +450,4 @@ def testAFormatIsChosenByTheBitOfTheSlotItShows(
     document: str, address: str, chosen: bool
 ) -> None:
     """findings-11-formats.md: byte 6 holds one chosen bit per format slot."""
-    assert openFirstTable(document).cell(address).presentation.formatChosen is chosen
+    assert checkFormatChosen(openFirstTable(document).cell(address)) is chosen

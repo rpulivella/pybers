@@ -9,6 +9,7 @@ outside a range control, measured in `73-values-typed-over-controls`, while pybe
 clamps, so a control that cannot show a value is dropped by the save.
 
 UPDATES
+2026-11-09  Moved into the format feature from `pybers.table`, for PYB-145.
 2026-10-24  Each control names its type, `controlType`, for PYB-259.
 2026-10-22  Written for PYB-255.
 """

@@ -12,6 +12,8 @@ stops the import.
 Private. Infrastructure the model families share.
 
 UPDATES
+2026-11-09  A union may hold another family alias, as `CellFormat` holds
+            `CellFormatShown`, for PYB-145.
 2026-10-24  A family names its members by a discriminator, for PYB-259.
 2026-10-22  Written for PYB-255.
 """
@@ -50,11 +52,22 @@ class FamilyMember:
             )
 
 
+def listFamilyMembers(declared: object) -> tuple[type, ...]:
+    """Return the classes a union names, through every alias it holds."""
+    while isinstance(declared, TypeAliasType):
+        declared = declared.__value__
+    arguments = get_args(declared)
+    if not arguments:
+        assert isinstance(declared, type)
+        return (declared,)
+    return tuple(member for each in arguments for member in listFamilyMembers(each))
+
+
 def checkFamily(
     base: type[FamilyMember], union: TypeAliasType, discriminator: str
 ) -> None:
     """Refuse a family whose members and union disagree, or whose member is mutable."""
-    members = get_args(union.__value__) or (union.__value__,)
+    members = listFamilyMembers(union)
     # By name, since `slots=True` leaves the class it replaced among the subclasses.
     named = {member.__qualname__ for member in members}
     subclassed = {each.__qualname__ for each in base.__subclasses__()}

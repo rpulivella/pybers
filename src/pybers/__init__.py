@@ -11,8 +11,9 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
-2026-11-09  `CellFormatFamily` re-exported in place of the enum `CellFormat`, for
-            PYB-145.
+2026-11-09  The format family re-exported from `pybers.format`, `CellFormat` the
+            union of its members and `CellFormatFamily` their enum, beside the
+            control family moved there, for PYB-145.
 2026-11-06  `Color`, `ColorError` and `ColorSpace` re-exported, for PYB-264.
 2026-11-03  The selector, its matches, `TableHeaders`, `CellChanges` and `CellSkip`
             re-exported, for PYB-223.
@@ -96,6 +97,36 @@ lazy from pybers.document import (
     open,
 )
 lazy from pybers.errors import PybersError, ReadError, WriteError
+lazy from pybers.format import (
+    CellControl,
+    CellControlBase,
+    CellControlCheckbox,
+    CellControlPopUpMenu,
+    CellControlSlider,
+    CellControlStarRating,
+    CellControlStepper,
+    CellControlType,
+    CellControlUnknown,
+    CellFormat,
+    CellFormatAutomatic,
+    CellFormatBase,
+    CellFormatBoolean,
+    CellFormatCheckbox,
+    CellFormatCurrency,
+    CellFormatDateTime,
+    CellFormatDuration,
+    CellFormatFamily,
+    CellFormatFraction,
+    CellFormatNumber,
+    CellFormatNumberCustom,
+    CellFormatNumeralSystem,
+    CellFormatPercent,
+    CellFormatScientific,
+    CellFormatShown,
+    CellFormatStarRating,
+    CellFormatText,
+    CellFormatUnknown,
+)
 lazy from pybers.formula import (
     ArgumentCountError,
     Coordinate,
@@ -141,16 +172,6 @@ lazy from pybers.table import (
     Cell,
     CellChange,
     CellChanges,
-    CellControl,
-    CellControlBase,
-    CellControlCheckbox,
-    CellControlPopUpMenu,
-    CellControlSlider,
-    CellControlStarRating,
-    CellControlStepper,
-    CellControlType,
-    CellControlUnknown,
-    CellFormatFamily,
     CellKind,
     CellPresentation,
     CellSkip,
@@ -234,7 +255,25 @@ __all__ = [
     "CellControlUnknown",
     "CellReferenceLike",
     "CellPresentation",
+    "CellFormat",
+    "CellFormatAutomatic",
+    "CellFormatBase",
+    "CellFormatBoolean",
+    "CellFormatCheckbox",
+    "CellFormatCurrency",
+    "CellFormatDateTime",
+    "CellFormatDuration",
     "CellFormatFamily",
+    "CellFormatFraction",
+    "CellFormatNumber",
+    "CellFormatNumberCustom",
+    "CellFormatNumeralSystem",
+    "CellFormatPercent",
+    "CellFormatScientific",
+    "CellFormatShown",
+    "CellFormatStarRating",
+    "CellFormatText",
+    "CellFormatUnknown",
     "CellKind",
     "CellRange",
     "CellRangeList",

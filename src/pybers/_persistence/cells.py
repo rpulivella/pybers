@@ -286,6 +286,13 @@ countedFormatSlots: tuple[tuple[int, int], ...] = (
 # `54-format-star-rating` stored 5 where no list holds a key 5.
 displayedKindSlot: tuple[int, int] = (9, 0x10)
 
+# The control a cell presents as, a `control_cell_spec_table` key. Measured against
+# 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
+# the table lists them and whose plain cells carry no such slot. A control describes
+# the value it was built for, so it does not survive that value being replaced: a
+# star rating left on a cell that became text makes Numbers present text as stars.
+controlSlot: tuple[int, int] = (9, 0x04)
+
 
 # Byte 6's chosen bit for each slot of `countedFormatSlots`, in its order.
 chosenFormatBits: tuple[int, ...] = (0x01, 0x02, 0x08, 0x04, 0x80, 0x20)

@@ -10,6 +10,8 @@ value in row 1 with text in row 2, and such a label is shown beside the cell it
 describes.
 
 UPDATES
+2026-11-09  A format is the cell's `CellFormat`, Automatic naming the one it chose,
+            for PYB-145.
 2026-10-24  Generated from the golden's JSON form, its machine form that form
             itself, and every value and control written by its rules, for PYB-259.
 2026-10-22  Written for PYB-255.
@@ -33,7 +35,8 @@ import pybers
 from pybers import (
     UNDETERMINED,
     CellControl,
-    CellFormatFamily,
+    CellFormat,
+    CellFormatAutomatic,
     CellKind,
     CurrencyAmount,
 )
@@ -51,8 +54,7 @@ class ExpectedCell:
     kind: CellKind
     value: pybers.CellValue
     formula: str | None
-    format: CellFormatFamily | None
-    formatChosen: bool
+    format: CellFormat | None
     control: CellControl | None
     currencyMenu: str | None
     label: str | None
@@ -118,7 +120,7 @@ def readExpectedCell(
             if isinstance(value, CurrencyAmount) else None)
     return ExpectedCell(
         cell=str(cell.address), kind=cell.kind, value=value, formula=cell.formulaText,
-        format=presentation.format, formatChosen=presentation.formatChosen,
+        format=presentation.format,
         control=presentation.control, currencyMenu=menu,
         label=None if label is None else str(label),
     )
@@ -175,8 +177,14 @@ def listControlFields(control: CellControl) -> list[tuple[str, str]]:
 
 def formatFormat(cell: ExpectedCell) -> str:
     """Return a cell's format and whether a person chose it, `currency, chosen`."""
-    family = "none" if cell.format is None else cell.format.value
-    return f"{family}, {'chosen' if cell.formatChosen else 'automatic'}"
+    match cell.format:
+        case None:
+            return "none"
+        case CellFormatAutomatic(shown=shown):
+            family = "unknown" if shown is UNDETERMINED else shown.formatFamily.value
+            return f"automatic, shown as {family}"
+        case chosen:
+            return f"{chosen.formatFamily.value}, chosen"
 
 
 def writeExpectationsJson(expected: ExpectedValues, into: Path) -> Path:

@@ -142,12 +142,12 @@ def testACellsKeysRunInTheOrderShowPrintsThem() -> None:
                         "presentation"]
 
 
-def testACellCarriesItsFormatWhetherChosenAndItsControlWithEverySetting() -> None:
+def testACellCarriesItsFormatByFamilyAndItsControlWithEverySetting() -> None:
     document = pybers.open(goldenDirectory / "11-controls-written-by-pybers.numbers")
     cell = document.sheets[0].tables[0].cell("C1")
     tree = readTree(pybers.formatJsonForm(cell))["table"]["cells"][0]
     assert tree["presentation"] == {
-        "format": cell.presentation.format, "formatChosen": True,
+        "format": {"formatFamily": "number"},
         "control": {"controlType": "slider", "minimum": Decimal(1),
                     "maximum": Decimal(100), "increment": Decimal(1)},
     }

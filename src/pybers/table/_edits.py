@@ -67,6 +67,7 @@ from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
     carriesFormula,
+    controlSlot,
     emptyOffset,
     findFormulaKeySlot,
     findSlotValue,
@@ -77,6 +78,7 @@ from .._persistence.metadata import PackageRegistry
 from .._persistence.pool import EntryPool
 from .._persistence.rows import StoredTiles, iterateTileRows
 from ..addressing.reference import CellAddress, originOffset
+from ..format._controls import readControls
 from ..formula._write import (
     attachFormulaKey,
     buildFormulaRecord,
@@ -87,10 +89,8 @@ from ..formula._write import (
 )
 from ..formula.nodes import Formula
 from ._conditions import ConditionalPlan, writeConditionalCounts
-from ._controls import readControls
 from ._lines import GridMaps
 from ._read import (
-    controlSlot,
     readCellValue,
     readCurrencyCodes,
     readRichTextTable,
@@ -431,7 +431,7 @@ def applyTableEdits(
                 )
                 edit = classifyFormulaEdit(cell.formula, record, pool)
                 chosenChanged = (
-                    cell.presentation.formatChosen != carriesChosenFormat(record)
+                    cell._formatChosenCheck() != carriesChosenFormat(record)
                 )
                 if not valueChanged and edit == "none" and not chosenChanged:
                     continue

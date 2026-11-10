@@ -21,7 +21,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `TableHeaders` | How many header rows, header columns and footer rows a table holds | Frozen |
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
 | `Cell` | One cell: its value, kind, formula and presentation | Owner |
-| `CellPresentation` | How a cell shows its value: its format, whether a person chose it, and its control | Frozen |
+| `CellPresentation` | How a cell shows its value: its format and its control | Frozen |
 | `CellControl` | The control a cell presents its value through, beside its format: one dataclass per control under `CellControlBase`, `CellControlUnknown` included | Frozen |
 | `CellChange` | What a write did to one cell: value and kind before and after, and how far the table grew | Frozen |
 | `CellChanges`, `CellSkip` | What a write did to every cell its selector matched, and each part it skipped, and why | Frozen |

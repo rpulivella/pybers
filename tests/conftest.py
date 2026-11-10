@@ -7,6 +7,8 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-11-09  `findShownFamily` and `checkFormatChosen`, a read cell's format, for
+            PYB-145.
 2026-11-05  The worker count the parallel suite runs with, for PYB-277.
 2026-11-03  `readRangeValues`, the values a range covers, and `listShownFields`,
             the fields a command folds onto its lines, for PYB-223.
@@ -68,6 +70,25 @@ def findDocumentPath(stem: str) -> Path:
     ]
     assert len(found) == 1, f"{stem}.numbers is in {len(found)} document directories"
     return found[0]
+
+
+
+def findShownFamily(cell: pybers.Cell) -> pybers.CellFormatFamily | None:
+    """Return the family a read cell is shown with, whoever chose its format."""
+    found = cell.presentation.format
+    assert found is not pybers.UNDETERMINED
+    if found is None:
+        return None
+    shown = found.shown if isinstance(found, pybers.CellFormatAutomatic) else found
+    assert shown is not pybers.UNDETERMINED
+    return shown.formatFamily
+
+
+def checkFormatChosen(cell: pybers.Cell) -> bool:
+    """Report whether a person chose a read cell's format, rather than Automatic."""
+    found = cell.presentation.format
+    assert found is not pybers.UNDETERMINED
+    return found is not None and not isinstance(found, pybers.CellFormatAutomatic)
 
 
 def readPlainText(text: str) -> str:

@@ -199,7 +199,8 @@ rather than `None`, and a `match` over a cell's format is exhaustive. The names 
 `CellFormat` so the family sorts together and never collides with text or table
 formatting. An abstract base gives every member what it shares, its discriminator
 `formatFamily` among it, a `CellFormatFamily` naming the families, and `CellFormat` is the
-union a `match` uses.
+union a `match` uses. `CellFormatAutomatic` holds the format Numbers chose, so whether a
+person chose a format is the member a cell reads as, with no flag beside it.
 Typed objects were chosen over the alternatives other libraries take, a format string as in
 openpyxl or keyword options as in numbers-parser, because Numbers has no format syntax to
 borrow and a misspelled keyword fails late or not at all.
@@ -415,10 +416,11 @@ the rest as empty stand-ins. Whether Numbers writes a table's name bare or with 
 depends on every table in the document, so a part read alone parses its formulas exactly
 as the whole document would.
 
-**`formatChosen` stays until the format family replaces it.** The chosen bit and a
-format's settings are independent in the file, and an Automatic format holds settings of
-its own, so a bare `automatic` would lose both. PYB-145 settles a `CellFormatAutomatic`
-that carries them.
+**Automatic is a member of the format family, holding the format it chose.** The chosen
+bit and a format's settings are independent in the file, and an Automatic format holds
+settings of its own, so a bare `automatic` would lose both. `CellFormatAutomatic` carries
+the format Numbers picked in `shown`, a `CellFormatShown`, which is every member but
+Automatic, so a format a person chose stays distinct from the same one Automatic picked.
 
 **Styles, rich text and drawables follow the same rules, built by their own tickets.**
 A cell carries `cellStyle`, the properties set on the cell alone, since Numbers never

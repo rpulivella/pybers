@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-11-09  A format Numbers names is read from the format family, Automatic its own
+            member, for PYB-145.
 2026-10-29  A formula is compared as Numbers saved it, its shown text in the
             document's language left for a person, for PYB-272.
 2026-10-24  The expectations' machine form is the golden's JSON form, for PYB-259.
@@ -62,6 +64,7 @@ from pybers import (
     CellControlStarRating,
     CellControlStepper,
     CellControlUnknown,
+    CellFormatAutomatic,
     CellFormatFamily,
     CellRange,
     CellReference,
@@ -595,11 +598,12 @@ def findNumbersFormat(cell: ExpectedCell) -> tuple[str, str] | None:
     """Return the format Numbers names for a cell, or None when no name is measured."""
     if cell.control is not None:
         return findControlNames(cell.control)
-    if not cell.formatChosen or cell.format is None:
+    if cell.format is None or isinstance(cell.format, CellFormatAutomatic):
         return ("automatic", "Automatic")
-    if cell.format not in numbersFormatNames:
+    family = cell.format.formatFamily
+    if family not in numbersFormatNames:
         return None
-    return (numbersFormatNames[cell.format], dataFormatTitles[cell.format])
+    return (numbersFormatNames[family], dataFormatTitles[family])
 
 
 def listInspectorSettings(cell: ExpectedCell) -> dict[str, str]:

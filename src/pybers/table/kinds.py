@@ -7,8 +7,9 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
-2026-11-09  `CellFormatFamily`, the families' enum, so `CellFormat` can name the
-            union of formats, for PYB-145.
+2026-11-09  A presentation's format is a `CellFormat`, its Automatic wrapping the one
+            Numbers chose, replacing `formatChosen`, and the family enum moved to
+            the format feature, for PYB-145.
 2026-10-24  `kindValueTypes`, the type each kind's value holds, for PYB-259.
 2026-10-22  `CellPresentation`, a cell's format and its control, replacing the
             description, whose kind is the cell's own, for PYB-255.
@@ -38,7 +39,8 @@ from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
 from pybers.currency import CurrencyAmount
-from pybers.table.controls import CellControl
+from pybers.format.controls import CellControl
+from pybers.format.formats import CellFormat
 
 if TYPE_CHECKING:
     from pybers.table.cell import CellValue
@@ -59,36 +61,16 @@ class CellKind(StrEnum):
     UNKNOWN = "unknown"
 
 
-class CellFormatFamily(StrEnum):
-    """The family of the format a cell displays its value with."""
-
-    NUMBER = "number"
-    BOOLEAN = "boolean"
-    CURRENCY = "currency"
-    PERCENT = "percent"
-    SCIENTIFIC = "scientific"
-    FRACTION = "fraction"
-    NUMERAL_SYSTEM = "numeral-system"
-    CUSTOM_NUMBER = "custom-number"
-    TEXT = "text"
-    DATE_TIME = "date-time"
-    DURATION = "duration"
-    CHECKBOX = "checkbox"
-    STAR_RATING = "star-rating"
-    UNKNOWN = "unknown"
-
-
 @dataclass(frozen=True, slots=True)
 class CellPresentation:
-    """How a cell shows its value: its format, whether a person chose it, its control.
+    """How a cell shows its value: its format and its control.
 
     `format` is None when the record names none, and UNDETERMINED once an edit
     changed the kind or dropped the control, since the save then chooses it. A
     control is kept only while it can show the cell's value, as the save keeps it.
     """
 
-    format: CellFormatFamily | UNDETERMINED | None
-    formatChosen: bool
+    format: CellFormat | UNDETERMINED | None
     control: CellControl | None = None
 
 
@@ -105,7 +87,7 @@ class CellStorage:
     unrecognizedTypeCode: int | None = None
 
 
-emptyStorage: CellStorage = CellStorage(CellKind.EMPTY, CellPresentation(None, False))
+emptyStorage: CellStorage = CellStorage(CellKind.EMPTY, CellPresentation(None))
 
 
 def findCellKind(
@@ -157,7 +139,6 @@ kindValueTypes: frozendict[CellKind, type] = frozendict({
 
 
 __all__ = [
-    "CellFormatFamily",
     "CellKind",
     "CellPresentation",
     "CellStorage",

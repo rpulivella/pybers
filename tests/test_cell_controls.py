@@ -29,26 +29,26 @@ import pytest
 from test_cell_value_kinds import openFirstTable
 
 import pybers
-from conftest import copyDocument, findDocumentPath
+from conftest import copyDocument, findDocumentPath, findShownFamily
 from pybers import (
-    UNDETERMINED,
     CellControlCheckbox,
     CellControlPopUpMenu,
     CellControlSlider,
     CellControlStarRating,
     CellControlStepper,
     CellControlUnknown,
+    CellFormatAutomatic,
     CellFormatFamily,
     CurrencyAmount,
 )
 from pybers._family import FamilyMember, checkFamily
 from pybers._generated import TSTArchives_pb2 as tst
-from pybers.table._controls import readControl
+from pybers.format._controls import readControl
 
 
-def readPresentation(stem: str, reference: str) -> pybers.CellPresentation:
-    """Return how one cell shows its value, as a fresh read finds it."""
-    return openFirstTable(findDocumentPath(stem))[1].cell(reference).presentation
+def readCell(stem: str, reference: str) -> pybers.Cell:
+    """Return one cell as a fresh read finds it."""
+    return openFirstTable(findDocumentPath(stem))[1].cell(reference)
 
 
 @pytest.mark.parametrize(("reference", "control", "shownAs"), [
@@ -68,23 +68,23 @@ def readPresentation(stem: str, reference: str) -> pybers.CellPresentation:
 def testEachControlReadsAsItsLabelSaysOverTheFormatShowingIt(
     reference: str, control: pybers.CellControl, shownAs: CellFormatFamily
 ) -> None:
-    presentation = readPresentation("81-control-formats", reference)
-    assert (presentation.control, presentation.format) == (control, shownAs)
+    cell = readCell("81-control-formats", reference)
+    assert (cell.presentation.control, findShownFamily(cell)) == (control, shownAs)
 
 
 def testARangeBoundReadsAsTheNumberNumbersShows() -> None:
-    control = readPresentation("11-value-types-noformats", "G1").control
+    control = readCell("11-value-types-noformats", "G1").presentation.control
     assert isinstance(control, CellControlSlider)
     assert [str(bound) for bound in (control.minimum, control.maximum)] == ["1", "100"]
 
 
 def testAPopUpMenuStartingWithItsFirstItemSaysSo() -> None:
-    control = readPresentation("11-value-types-noformats", "I1").control
+    control = readCell("11-value-types-noformats", "I1").presentation.control
     assert control == CellControlPopUpMenu(("Item 1", "Item 2", "Item 3"), True)
 
 
 def testACellWithNoControlReadsNone() -> None:
-    assert readPresentation("11-value-types-noformats", "A1").control is None
+    assert readCell("11-value-types-noformats", "A1").presentation.control is None
 
 
 def testAnUnmeasuredControlIsCarriedByItsInteractionType() -> None:
@@ -104,8 +104,7 @@ def testAControlThatCannotShowTheValueGoesWithItsFormat(tmp_path: Path) -> None:
     cell = table.cell("F1")
     cell.value = Decimal(7)
     presentation = cell.presentation
-    assert (presentation.control, presentation.format) == (None, UNDETERMINED)
-    assert not presentation.formatChosen
+    assert (presentation.control, presentation.format) == (None, CellFormatAutomatic())
 
 
 def testAKindChangeDropsTheControl(tmp_path: Path) -> None:
