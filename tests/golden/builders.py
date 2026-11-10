@@ -683,6 +683,34 @@ def writeAutomaticFormats(document: pybers.Document) -> None:
     document.cellSet("::Table 1::B1:G1", format=pybers.CellFormatAutomatic())
 
 
+# Each row of a created table: a label, a formula with no result yet, and its format.
+formulaFormats: tuple[tuple[str, str, pybers.CellFormat], ...] = (
+    ("the input, 5", "", pybers.CellFormatAutomatic()),
+    ("a tenth of the input in a chosen number format", "=B1/10",
+     pybers.CellFormatNumber()),
+    ("10 November 2026 in a chosen date format", "=DATE(2026,11,10)",
+     pybers.CellFormatDateTime()),
+    ("90 minutes in a chosen duration format", "=DURATION(0,0,1,30)",
+     pybers.CellFormatDuration()),
+)
+
+
+def chooseFormulaFormats(document: pybers.Document) -> None:
+    """Give formulas pybers created, with no result yet, their formats."""
+    table = document.sheet().tableAdd("Formulas", rows=len(formulaFormats), cols=2)
+    table.cell("B1").value = Decimal(5)
+    for row, (label, formula, chosen) in enumerate(formulaFormats, start=1):
+        table.cell(f"A{row}").value = label
+        if formula:
+            table.cell(f"B{row}").formulaText = formula
+            document.cellSet(f"::Formulas::B{row}", format=chosen)
+
+
+def chooseFormulaFormat(document: pybers.Document) -> None:
+    """Give the sum Numbers calculated in `20-formula-shapes` a chosen number format."""
+    document.cellSet("Sheet 1::Table 1::A11", format=pybers.CellFormatNumber())
+
+
 def removeControls(document: pybers.Document) -> None:
     """Remove each of the five controls `11-value-types-noformats` holds."""
     document.cellSet("::Table 1::E1:I1", control=None)
@@ -693,6 +721,10 @@ enabledLaterGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("13-formats-made-automatic-by-pybers", "13-number-percent",
                   writeAutomaticFormats, labeled=True,
                   sourceReason="PYB-233 enables pybers to create a percent format."),
+    GoldenBuilder("20-formula-format-chosen-by-pybers", "20-formula-shapes",
+                  chooseFormulaFormat,
+                  sourceReason="PYB-198 enables pybers to calculate a created "
+                  "formula's result, which its format must fit."),
     GoldenBuilder("11-controls-removed-by-pybers", "11-value-types-noformats",
                   removeControls, labeled=True,
                   sourceReason="PYB-240 to PYB-244 enable pybers to create controls."),
@@ -712,6 +744,8 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
                   addCreatedFormulaTables),
     GoldenBuilder("00-created-headers-set-by-pybers", None, setHeaders),
     GoldenBuilder("00-created-formats-chosen-by-pybers", None, chooseFormats),
+    GoldenBuilder("00-created-formula-formats-chosen-by-pybers", None,
+                  chooseFormulaFormats),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.
