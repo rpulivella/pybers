@@ -5,6 +5,8 @@ The format entry a cell record names, as the writer builds it.
 Private. Part of the format feature's archive half.
 
 UPDATES
+2026-11-10  An Automatic duration records the units its value holds, not minutes
+            alone, as Numbers does.
 2026-11-10  Written for PYB-145, from the format entries in `pybers.table._records`.
 """
 from __future__ import annotations
@@ -36,18 +38,14 @@ if TYPE_CHECKING:
     from ..table.cell import CellValue
 
 # Numbers' Automatic format for each kind it gives one, as the documents store it:
-# the number in `11-value-types-noformats` and `20-formula-shapes`, the duration in
-# `11` `D1`, and the boolean a formula in `69-functions-added-in-15-4` returned.
+# the number in `11-value-types-noformats` and `20-formula-shapes`, and the boolean a
+# formula in `69-functions-added-in-15-4` returned. A duration's follows its value.
 automaticNumberFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
     format_type=256, decimal_places=253, negative_style=0,
     show_thousands_separator=False,
 )
 automaticTextFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
     format_type=260
-)
-automaticDurationFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=268, duration_style=1, duration_unit_largest=8,
-    duration_unit_smallest=8, use_automatic_duration_units=True,
 )
 automaticBooleanFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
     format_type=1
@@ -73,6 +71,30 @@ def buildCurrencyFormat(code: str) -> tsk.FormatStructArchive:
     )
 
 
+# Each duration unit's bit and its length, largest first. See findings-11-formats.md.
+durationUnits: tuple[tuple[int, datetime.timedelta], ...] = (
+    (1, datetime.timedelta(weeks=1)), (2, datetime.timedelta(days=1)),
+    (4, datetime.timedelta(hours=1)), (8, datetime.timedelta(minutes=1)),
+    (16, datetime.timedelta(seconds=1)), (32, datetime.timedelta(milliseconds=1)),
+)
+minutesUnit: int = 8
+
+
+def findDurationUnits(value: datetime.timedelta) -> tuple[int, int]:
+    """Return the largest and smallest unit a duration holds an amount of, as bits.
+
+    Numbers' Automatic units record the range it shows, measured in
+    `15-number-duration-formats` and `73-values-typed-over-controls`. A duration of
+    no length shows in minutes, as Numbers shows zero.
+    """
+    remaining, held = abs(value), []
+    for bit, length in durationUnits:
+        count, remaining = divmod(remaining, length)
+        if count:
+            held.append(bit)
+    return (held[0], held[-1]) if held else (minutesUnit, minutesUnit)
+
+
 def findAutomaticFormat(value: CellValue) -> tsk.FormatStructArchive:
     """Return the format a value takes in a cell whose kind it changed."""
     if isinstance(value, CurrencyAmount):
@@ -84,7 +106,11 @@ def findAutomaticFormat(value: CellValue) -> tsk.FormatStructArchive:
     if isinstance(value, datetime.datetime):
         return dateOnlyFormat if value.time() == datetime.time() else dateAndTimeFormat
     if isinstance(value, datetime.timedelta):
-        return automaticDurationFormat
+        largest, smallest = findDurationUnits(value)
+        return tsk.FormatStructArchive(
+            format_type=268, duration_style=1, duration_unit_largest=largest,
+            duration_unit_smallest=smallest, use_automatic_duration_units=True,
+        )
     return automaticNumberFormat
 
 
@@ -114,7 +140,6 @@ def checkAskedFormatShown(
 
 __all__ = [
     "automaticBooleanFormat",
-    "automaticDurationFormat",
     "automaticNumberFormat",
     "automaticTextFormat",
     "buildCurrencyFormat",
@@ -122,4 +147,5 @@ __all__ = [
     "dateAndTimeFormat",
     "dateOnlyFormat",
     "findAutomaticFormat",
+    "findDurationUnits",
 ]

@@ -21,10 +21,12 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/10"
 
+import datetime
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from test_cell_value_kinds import readFormatEntry
 from test_cli_set import runSetCommand
 from test_writer import listArchiveDifferences, readRecordAt
 
@@ -255,3 +257,18 @@ def testABooleanFormatNoMenuOffersIsRefused(tmp_path: Path) -> None:
         pybers.open(working).cellSet(
             "::Table 1::A1", True, format=pybers.CellFormatBoolean()
         )
+
+
+@pytest.mark.parametrize(("value", "largest", "smallest"), [
+    (datetime.timedelta(minutes=20), 8, 8),
+    (datetime.timedelta(hours=1, minutes=30), 4, 8),
+    (datetime.timedelta(days=71, hours=11, milliseconds=10), 1, 32),
+])
+def testAnAutomaticDurationStoresTheUnitsItsValueHolds(
+    value: datetime.timedelta, largest: int, smallest: int, working: Path
+) -> None:
+    setAndSave(working, "A1", value)
+    entry = readFormatEntry(working, "A1").format
+    assert (entry.duration_unit_largest, entry.duration_unit_smallest) == (
+        largest, smallest
+    )

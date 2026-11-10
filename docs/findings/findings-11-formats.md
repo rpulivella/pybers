@@ -362,7 +362,14 @@ the locale section below records.
 The unit bits run 1 weeks, 2 days, 4 hours, 8 minutes, 16 seconds and 32 milliseconds.
 Weeks, hours, minutes and milliseconds are named by `15-number-duration-formats` `E1`
 "only weeks", `I1` "hours minutes" and `G1` "only milliseconds", and days and seconds by
-`77-duration-units` `A1` and `B1`. With automatic units the pair records the range Numbers last chose.
+`77-duration-units` `A1` and `B1`. With automatic units the pair records the range Numbers last chose:
+the largest unit the value holds an amount of, down to the smallest, measured 2026-11-10
+for PYB-145. 20 and 10 minutes store minutes to minutes, 1h 10m and 1h 30m hours to
+minutes, and 71 days, 11 hours and 10 milliseconds weeks to milliseconds, in
+`11-value-types-noformats` `D1`, `15-number-duration-formats` `B1` to `D1` and
+`73-values-typed-over-controls` `B1` and `D1`. A range that disagrees with the value makes
+Numbers rewrite it on opening and say "The cell was updated with a more accurate
+duration format", as the golden `00-created-formats-chosen-by-pybers` first showed.
 
 ### Text `260`, checkbox `263`, star rating `267`, and boolean `1`
 
