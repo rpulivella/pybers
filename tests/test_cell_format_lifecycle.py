@@ -6,7 +6,7 @@ A format through a range, a save, a fill, a copy and a move, and one pybers cann
 chose in `B1`, and `86-custom-text-and-currency` custom formats pybers reads as unknown.
 
 UPDATES
-2026-11-10  Written for PYB-145 AC 1 and AC 4.
+2026-11-10  Written for PYB-145 AC 1, AC 4 and AC 5.
 """
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from test_writer import readRecordAt
 
 import pybers
 from conftest import copyDocument
@@ -29,6 +30,7 @@ from pybers import (
     CellFormatAutomatic,
     CellFormatNumber,
     CellFormatPercent,
+    CellFormatUnknown,
     CellValueFill,
     FormulaReferenceRelocation,
 )
@@ -98,3 +100,14 @@ def testAFormatSetBeforeACopyOrMoveIsSavedWhereTheCellLands(
     edit(document.sheets[0].tables[0])
     document.save()
     assert readFormat(working, "H1") == CellFormatNumber()
+
+
+def testAFormatPybersCannotReadIsCarriedThroughAnEdit(tmp_path: Path) -> None:
+    working = copyDocument("86-custom-text-and-currency", tmp_path)
+    before = readRecordAt(working, "A1").raw
+    assert isinstance(readFormat(working, "A1"), CellFormatUnknown)
+    document = pybers.open(working)
+    document.cellSet("::Table 1::A2", "edited")
+    document.save()
+    assert readRecordAt(working, "A1").raw == before
+    assert isinstance(readFormat(working, "A1"), CellFormatUnknown)
