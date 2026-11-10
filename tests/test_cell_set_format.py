@@ -6,6 +6,7 @@ Each test edits a copy of `13-number-percent`, whose `A1` is a number Automatic
 formats and whose `B1` is the same number in a percent format a person chose.
 
 UPDATES
+2026-11-10  Setting one part leaves the others as they were, for PYB-145 AC 19.
 2026-11-10  Written for PYB-145.
 """
 from __future__ import annotations
@@ -23,18 +24,48 @@ from pathlib import Path
 
 import pytest
 from test_cli_set import runSetCommand
-from test_writer import listArchiveDifferences
+from test_writer import listArchiveDifferences, readRecordAt
 
 import pybers
 from conftest import copyDocument
-from pybers import CellFormatAutomatic, CellFormatNumber, CellFormatPercent, CellKind
+from pybers import (
+    UNCHANGED,
+    CellFormatAutomatic,
+    CellFormatNumber,
+    CellFormatPercent,
+    CellFormatText,
+    CellKind,
+)
 from pybers._persistence import readPackage
+from pybers._persistence.cells import (
+    controlSlot,
+    countedFormatSlots,
+    displayedKindSlot,
+    findSlotValue,
+    listReferenceSlots,
+)
 
 
 @pytest.fixture
 def working(tmp_path: Path) -> Path:
     """Return a copy of the document, so a save never touches the fixture."""
     return copyDocument("13-number-percent", tmp_path)
+
+
+def readOtherParts(path: Path, address: str) -> dict[tuple[int, int], int | None]:
+    """Return every reference a saved record holds beside its format and control."""
+    record = readRecordAt(path, address)
+    shown = {*countedFormatSlots, displayedKindSlot, controlSlot}
+    return {slot: findSlotValue(record, slot)
+            for slot in listReferenceSlots(record.raw) if slot not in shown}
+
+
+def setAndSave(path: Path, address: str, value: object, **parts: object) -> None:
+    """Set one cell of the first table and save the document."""
+    document = pybers.open(path)
+    table = document.sheets[0].tables[0]
+    document.cellSet(f"::{table.name}::{address}", value, **parts)
+    document.save()
 
 
 def readFormat(path: Path, address: str) -> object:
@@ -130,3 +161,40 @@ def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1")
     assert result.exit_code == 2
     assert "Give a VALUE, a --cell-format, or both." in result.output
+
+
+@pytest.mark.parametrize(("stem", "address"), [
+    ("28-style-fills", "B1"), ("04-text-monospace", "A1"),
+])
+def testAFormatAloneLeavesTheCellsStyle(
+    stem: str, address: str, tmp_path: Path
+) -> None:
+    working = copyDocument(stem, tmp_path)
+    before = readOtherParts(working, address)
+    setAndSave(working, address, UNCHANGED, format=CellFormatText())
+    assert readOtherParts(working, address) == before
+    assert readFormat(working, address) == CellFormatText()
+
+
+@pytest.mark.parametrize(("stem", "address", "value"), [
+    ("28-style-fills", "B1", "changed"), ("04-text-monospace", "A1", Decimal(3)),
+])
+def testAValueAloneLeavesTheCellsStyle(
+    stem: str, address: str, value: object, tmp_path: Path
+) -> None:
+    working = copyDocument(stem, tmp_path)
+    before = readOtherParts(working, address)
+    setAndSave(working, address, value)
+    assert readOtherParts(working, address) == before
+
+
+def testAValueOfTheSameKindKeepsTheFormatAPersonChose(working: Path) -> None:
+    before = findSlotValue(readRecordAt(working, "B1"), countedFormatSlots[0])
+    setAndSave(working, "B1", Decimal("0.5"))
+    assert readFormat(working, "B1") == CellFormatPercent()
+    assert findSlotValue(readRecordAt(working, "B1"), countedFormatSlots[0]) == before
+
+
+def testAValueOfAnotherKindTakesTheAutomaticFormatOfItsKind(working: Path) -> None:
+    setAndSave(working, "B1", "a quarter")
+    assert readFormat(working, "B1") == CellFormatAutomatic(CellFormatText())
