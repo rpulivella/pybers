@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-11-10  Each cell Numbers changed on saving fails, naming what changed, and each
+            blue corner chip Numbers drew fails with its close-up, for PYB-145.
 2026-11-09  A format Numbers names is read from the format family, Automatic its own
             member, for PYB-145.
 2026-10-29  A formula is compared as Numbers saved it, its shown text in the
@@ -88,6 +90,7 @@ from tools.local.lib.golden_expected import (
     writeExpectations,
     writeExpectationsJson,
 )
+from tools.local.lib.golden_saved import readSavedCellChanges
 from tools.workflow.lib.shared import readTicketNumber, repositoryRoot
 
 
@@ -829,6 +832,19 @@ def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
     return [str(difference) for difference in listPackageDifferences(before, after)]
 
 
+def checkSavedCells(golden: Path, saved: Path) -> list[Check]:
+    """Fail each cell Numbers changed on saving, naming what it changed, or pass all."""
+    changes = readSavedCellChanges(golden, saved)
+    if not changes:
+        return [Check("passed", "saved copy",
+                      "every cell holds what pybers wrote once Numbers saves it")]
+    return [
+        Check("failed", " / ".join(address),
+              "Numbers changed it on saving: " + "; ".join(found))
+        for address, found in changes.items()
+    ]
+
+
 def readSavedFormulas(saved: Path) -> dict[tuple[str, str], dict[str, str]]:
     """Return each formula of the copy Numbers saved, by table and cell."""
     return {
@@ -936,7 +952,15 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
             run.checks.append(Check(
                 "qa", capture["sheet"], "the sheet as Numbers displays it",
                 Path(capture["path"]).name))
+        for chip in result.get("chipCaptures", []):
+            run.checks.append(Check(
+                "failed", chip["sheet"],
+                "Numbers drew its blue corner chip, which marks a cell it changed or "
+                f"warns about, at ({chip['x']:.0f}, {chip['y']:.0f}) points in the "
+                "sheet capture. Open a copy and click the chip to read why",
+                Path(chip["path"]).name))
         if result.get("savedCopy") and saved.is_file():
+            run.checks.extend(checkSavedCells(golden, saved))
             differences = readSavedCopyDifferences(golden, saved)
             run.archiveDifferences.extend(differences)
             run.checks.append(Check(
