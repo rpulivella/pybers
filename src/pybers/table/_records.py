@@ -81,9 +81,10 @@ from ..absence import UNDETERMINED
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
-from ..format._read import findFormatOfType
+from ..format._read import currencyFormatType, findFormatOfType
+from ..format._write import buildCurrencyFormat, findAutomaticFormat
 from ..format.formats import findFormatShown
-from ._read import currencyFormatType, currencyTypeByte, storedKinds
+from ._read import currencyTypeByte, storedKinds
 from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
@@ -149,63 +150,10 @@ def findSlotKind(slot: tuple[int, int]) -> int:
     return countedFormatSlots.index(slot) + 1
 
 
-# Numbers' Automatic format for each kind it gives one, as the documents store it:
-# the number in `11-value-types-noformats` and `20-formula-shapes`, the duration in
-# `11` `D1`, and the boolean a formula in `69-functions-added-in-15-4` returned.
-automaticNumberFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=256, decimal_places=253, negative_style=0,
-    show_thousands_separator=False,
-)
-automaticTextFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=260
-)
-automaticDurationFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=268, duration_style=1, duration_unit_largest=8,
-    duration_unit_smallest=8, use_automatic_duration_units=True,
-)
-automaticBooleanFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=1
-)
-# A date has no Automatic, since Numbers names a pattern for every date it stores, so
-# pybers writes ISO 8601 order, the same in every region. Numbers stores `yyyy-MM-dd`
-# in `66-series-horizontal-base`; PYB-145 sets any other.
-dateOnlyFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=261, date_time_format="yyyy-MM-dd"
-)
-dateAndTimeFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=261, date_time_format="yyyy-MM-dd HH:mm"
-)
-
-
-# As Numbers' menu writes it, in `88-formula-currency-results` and `12-number-currency`.
-def buildCurrencyFormat(code: str) -> tsk.FormatStructArchive:
-    """Return the Currency format Numbers gives an amount in one currency."""
-    return tsk.FormatStructArchive(
-        format_type=currencyFormatType, decimal_places=2, currency_code=code,
-        negative_style=0,
-        show_thousands_separator=False, use_accounting_style=False,
-    )
-
-
 # A currency amount a person formatted sets both, measured on all 296 such records.
 currencyChosenBit: int = 0x02
 currencyCellOffset: int = 7
 currencyCellBit: int = 0x08
-
-
-def findAutomaticFormat(value: CellValue) -> tsk.FormatStructArchive:
-    """Return the format a value takes in a cell whose kind it changed."""
-    if isinstance(value, CurrencyAmount):
-        return buildCurrencyFormat(value.currency)
-    if isinstance(value, str):
-        return automaticTextFormat
-    if isinstance(value, bool):
-        return automaticBooleanFormat
-    if isinstance(value, datetime.datetime):
-        return dateOnlyFormat if value.time() == datetime.time() else dateAndTimeFormat
-    if isinstance(value, datetime.timedelta):
-        return automaticDurationFormat
-    return automaticNumberFormat
 
 
 def refuseUncreatableCell(cell: Cell, tableName: str) -> None:

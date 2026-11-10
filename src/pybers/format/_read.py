@@ -46,6 +46,8 @@ from .formats import (
     CellFormatUnknown,
 )
 
+currencyFormatType: int = 257
+
 # The format each measured `format_type` names, every one the documents carry.
 formatsByType: frozendict[int, CellFormatShown] = frozendict({
     1: CellFormatBoolean(),
@@ -98,4 +100,7 @@ def readRecordControl(
     return None if key is None else controls.get(key)
 
 
-__all__ = ["findFormatOfType", "formatsByType", "readRecordControl", "readRecordFormat"]
+__all__ = [
+    "currencyFormatType", "findFormatOfType", "formatsByType", "readRecordControl",
+    "readRecordFormat",
+]

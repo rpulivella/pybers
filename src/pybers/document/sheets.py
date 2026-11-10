@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-10  `cellSet` sets a value, a format or both, a part not given left as it
+            was, for PYB-145.
 2026-11-03  `select` on a document and a sheet, and every lookup by name a typed
             call into the one resolver, replacing `partSelect`, `Document.cell`
             and `Sheet.cell`, and `cellSet` writing every cell a selector
@@ -74,15 +76,27 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from pybers.absence import UNCHANGED
 from pybers.addressing.reference import (
+    CellAddress,
+    CellReference,
     TableReference,
     lastColumn,
     lastRow,
     tableNameSeparator,
 )
-from pybers.errors import PybersError
+from pybers.errors import PybersError, WriteError
+from pybers.format.formats import CellFormat
 from pybers.geometry import Position
-from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, toCellValue
+from pybers.table.cell import (
+    Cell,
+    CellChange,
+    CellChanges,
+    CellSkip,
+    findFormatRefusal,
+    findWrittenValue,
+    toCellValue,
+)
 from pybers.table.cells import Table, generateOwnerIdentity
 from pybers.timezone import TimeZoneLike, machineTimeZone, toTimeZone
 
@@ -402,38 +416,70 @@ class Document:
         return sheet
 
     def cellSet(
-        self, selector: SelectorLike, value: object, *, extend: bool = False
+        self,
+        selector: SelectorLike,
+        value: object = UNCHANGED,
+        *,
+        format: CellFormat | UNCHANGED = UNCHANGED,
+        extend: bool = False,
     ) -> CellChanges:
-        """Set the value of every cell a selector matches, and return each change.
+        """Set the value, the format or both of every cell a selector matches.
 
-        A part that is no cell, or a cell a formula backs, is skipped and reported.
-        `extend` grows a table to hold one cell past its end, `Budget::Q3::B30`.
+        A part not given stays as it was. A cell a formula backs is skipped and
+        reported, and a format pybers cannot yet write is refused before any cell
+        changes. `extend` grows a table to hold one cell past its end.
         """
         from pybers.selection.matching import findCellTargets, findExtendTarget
 
+        if value is UNCHANGED and format is UNCHANGED:
+            raise WriteError("cellSet was given neither a value nor a format to set.")
         targets, skipped = (
             ([findExtendTarget(self, selector)], []) if extend
             else findCellTargets(self, selector)
         )
-        if targets:
-            toCellValue(value, targets[0][1], self.timeZone)
-        changes: list[CellChange] = []
+        writing: list[tuple[Table, CellAddress]] = []
         for table, address in targets:
-            rowsAdded = max(0, address.row - table.rowCount)
-            colsAdded = max(0, address.col - table.colCount)
             cell = table.cells.get(address)
-            if cell is not None and cell.formula is not None:
+            if value is not UNCHANGED and cell is not None and cell.formula is not None:
                 skipped.append(CellSkip(
                     cell.reference, f"{cell.reference} is backed by a formula, which "
                     "a value would discard.",
                 ))
                 continue
+            if format is not UNCHANGED:
+                current = None if cell is None else cell.value
+                after = current if value is UNCHANGED else findWrittenValue(
+                    value, address, self.timeZone, current
+                )
+                where = CellReference(address.row, address.col, table=table.reference)
+                refusal = findFormatRefusal(cell, where, format, after)
+                if refusal is not None:
+                    raise WriteError(f"{refusal} Nothing was written.")
+            elif value is not UNCHANGED:
+                toCellValue(value, address, self.timeZone)
+            writing.append((table, address))
+        changes: list[CellChange] = []
+        for table, address in writing:
+            rowsAdded = max(0, address.row - table.rowCount)
+            colsAdded = max(0, address.col - table.colCount)
             if rowsAdded:
                 table.rowAdd(table.rowCount + 1, rowsAdded)
             if colsAdded:
                 table.columnAdd(table.colCount + 1, colsAdded)
-            change = table.cell(address)._valueChange(value)
-            changes.append(replace(change, rowsAdded=rowsAdded, colsAdded=colsAdded))
+            cell = table.cell(address)
+            change = (
+                cell._valueChange(value) if value is not UNCHANGED
+                else CellChange(
+                    cell.reference, cell.value, cell.value, cell.kind, cell.kind,
+                    cell.presentation.format, cell.presentation.format,
+                )
+            )
+            if format is not UNCHANGED:
+                cell._formatRequest(format)
+            changes.append(replace(
+                change, formatAfter=cell.presentation.format,
+                rowsAdded=rowsAdded, colsAdded=colsAdded,
+            ))
         return CellChanges(tuple(changes), tuple(skipped))
 
     def tableFor(self, identity: str) -> Table:

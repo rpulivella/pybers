@@ -79,6 +79,7 @@ from .._persistence.pool import EntryPool
 from .._persistence.rows import StoredTiles, iterateTileRows
 from ..addressing.reference import CellAddress, originOffset
 from ..format._controls import readControls
+from ..format._write import checkAskedFormatShown
 from ..formula._write import (
     attachFormulaKey,
     buildFormulaRecord,
@@ -433,7 +434,8 @@ def applyTableEdits(
                 chosenChanged = (
                     cell._formatChosenCheck() != carriesChosenFormat(record)
                 )
-                if not valueChanged and edit == "none" and not chosenChanged:
+                asked = cell._formatAsked is not None
+                if not (valueChanged or asked or chosenChanged) and edit == "none":
                     continue
                 patched = record.raw
                 # The value first, so that writing a value OVER a formula still
@@ -455,6 +457,12 @@ def applyTableEdits(
                         formulaAdded.append((row, record.column))
                     elif edit == "detach":
                         formulaRemoved.append((row, record.column))
+                if cell._formatAsked is not None and not checkAskedFormatShown(
+                    patched, cell._formatAsked, cell.value, formatOf
+                ):
+                    shown = applyAutomaticFormat(patched, cell.value, formatFor)
+                    formatsCount(patched, shown, reference)
+                    patched = shown
                 replacements[record.column] = applyChosenFormat(patched, cell)
             present = frozenset(record.column for record in walked.records)
             # A cell the model gave a formula to but the file has no record for.

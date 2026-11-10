@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-10  UNCHANGED re-exported, a part of `cellSet` left as it was, for PYB-145.
 2026-11-10  `formatCellFormat`, `parseCellFormat` and `CellFormatError`, a format's
             text form, for PYB-145.
 2026-11-09  The format family re-exported from `pybers.format`, `CellFormat` the
@@ -52,7 +53,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
-lazy from pybers.absence import UNDETERMINED, WITHHELD
+lazy from pybers.absence import UNCHANGED, UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
     CellAddress,
     CellOffset,
@@ -193,6 +194,7 @@ lazy from pybers.table import (
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
 __all__ = [
+    "UNCHANGED",
     "UNDETERMINED",
     "WITHHELD",
     "ArgumentCountError",

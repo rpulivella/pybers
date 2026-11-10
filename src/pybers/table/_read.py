@@ -77,7 +77,7 @@ from ..addressing.reference import CellAddress, originOffset
 from ..currency import CurrencyAmount
 from ..errors import ReadError
 from ..format._controls import readControls
-from ..format._read import readRecordControl, readRecordFormat
+from ..format._read import currencyFormatType, readRecordControl, readRecordFormat
 from ..format.controls import CellControl
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
@@ -149,7 +149,6 @@ def readFormatTypes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, 
 
 # The custom format type a Currency token gives; its code is in the document's list.
 customCurrencyFormatType: int = 274
-currencyFormatType: int = 257
 
 
 def readCustomCurrencyCodes(index: ArchiveIndex) -> dict[tuple[int, int], str]:

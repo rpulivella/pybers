@@ -164,6 +164,56 @@ def toCellValue(
     )
 
 
+
+def findWrittenValue(
+    value: object, address: CellAddress, zone: datetime.tzinfo, current: CellValue
+) -> CellValue:
+    """Return the value a write leaves in a cell holding `current`.
+
+    A number typed into a currency cell keeps its currency, as Numbers does.
+    """
+    written = toCellValue(value, address, zone)
+    if isinstance(written, Decimal) and isinstance(current, CurrencyAmount):
+        return CurrencyAmount(written, current.currency)
+    return written
+
+
+def findFormatRefusal(
+    cell: Cell | None, where: CellReference, cellFormat: CellFormat, value: CellValue
+) -> str | None:
+    """Return why pybers cannot yet give a cell a format over a value, or None.
+
+    A chosen family is written over the entry Numbers' Automatic picks for the value,
+    so only that family can be chosen until its own ticket teaches the writer more.
+    """
+    # Local, so the model never loads its archive halves on import.
+    from pybers.format._read import findFormatOfType
+    from pybers.format._write import findAutomaticFormat
+
+    if cell is not None and cell.formula is not None:
+        return f"{where} is backed by a formula, whose format pybers cannot yet set."
+    if cell is not None and cell.presentation.control is not None:
+        return (
+            f"{where} shows its value through a control, and pybers cannot yet set "
+            "the format beneath one."
+        )
+    if value is None:
+        return f"{where} holds no value, and pybers cannot yet format an empty cell."
+    shown = None if cell is None else cell.presentation.format
+    unchanged = cell is not None and isSameValue(cell.value, value)
+    if isinstance(cellFormat, CellFormatAutomatic) or (
+        unchanged and cellFormat == shown
+    ):
+        return None
+    written = findFormatOfType(findAutomaticFormat(value).format_type)
+    if cellFormat == written:
+        return None
+    return (
+        f"pybers cannot yet write a {cellFormat.formatFamily} format, so {where} "
+        f"can take {written.formatFamily} or automatic."
+    )
+
+
 def isSameValue(before: CellValue, after: CellValue) -> bool:
     """Report whether two values are one stored value, a Decimal down to its digits."""
     if type(before) is not type(after):
@@ -190,6 +240,8 @@ class CellChange:
     valueAfter: CellValue
     kindBefore: CellKind
     kindAfter: CellKind
+    formatBefore: CellFormat | UNDETERMINED | None
+    formatAfter: CellFormat | UNDETERMINED | None
     rowsAdded: int = 0
     colsAdded: int = 0
 
@@ -199,6 +251,7 @@ class CellChange:
         return bool(
             self.rowsAdded or self.colsAdded
             or self.kindBefore is not self.kindAfter
+            or self.formatBefore != self.formatAfter
             or not isSameValue(self.valueBefore, self.valueAfter)
         )
 
@@ -350,16 +403,13 @@ class Cell:
         a format chosen for the old kind goes with it, as it does with a control that
         cannot show the value. A currency amount's format is always a chosen one.
         """
-        written = toCellValue(value, self.address, self.timeZone)
-        # A number typed into a currency cell keeps its currency, as Numbers does.
-        if isinstance(written, Decimal) and isinstance(self._value, CurrencyAmount):
-            written = CurrencyAmount(written, self._value.currency)
+        written = findWrittenValue(value, self.address, self.timeZone, self._value)
         if self.formula is not None:
             refuseValueOverFormula(self.address)
-        before = self.kind
+        valueBefore, before = self._value, self.kind
+        formatBefore = self.presentation.format
         after = findCellKind(written, self._stored.kind, self._storedValue, False)
-        change = CellChange(self.reference, self._value, written, before, after)
-        if change.changed:
+        if not (after is before and isSameValue(valueBefore, written)):
             self._value = written
             control = self._stored.presentation.control
             dropped = control is not None and not self._controlKept()
@@ -368,7 +418,19 @@ class Cell:
                     CellFormatCurrency() if isinstance(written, CurrencyAmount)
                     else CellFormatAutomatic()
                 )
-        return change
+        return CellChange(
+            self.reference, valueBefore, written, before, after, formatBefore,
+            self.presentation.format,
+        )
+
+    def _formatRequest(self, cellFormat: CellFormat) -> None:
+        """Ask the next save to write a format here, unless the cell shows it now."""
+        shown = self.presentation.format
+        automatic = isinstance(cellFormat, CellFormatAutomatic)
+        if cellFormat != shown and not (
+            automatic and isinstance(shown, CellFormatAutomatic)
+        ):
+            self._formatAsked = cellFormat
 
     def _controlKept(self) -> bool:
         """Report whether a save keeps the stored control, which shows the value."""
@@ -446,7 +508,7 @@ class Cell:
                 "would discard it. Clear the formula first."
             )
         self._value = text
-        self._formatAsked = CellFormatText()
+        self._formatRequest(CellFormatText())
 
     @property
     def tableNames(self) -> frozendict[str, str]:
@@ -488,5 +550,5 @@ class Cell:
 __all__ = [
     "Cell", "CellChange", "CellChanges", "CellCopy", "CellSkip", "CellValue",
     "decimal128Context",
-    "refuseValueOverFormula", "toCellValue",
+    "findFormatRefusal", "findWrittenValue", "refuseValueOverFormula", "toCellValue",
 ]

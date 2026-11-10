@@ -4,12 +4,13 @@ The reasons a value can be missing, beyond there being nothing to hold.
 
 `None` means nothing exists. A sentinel here means something exists, or will, and
 pybers does not have it, and names why. Each one earns its place only where a caller
-acts differently on that reason, which is why there are two and not one per case.
+acts differently on that reason, which is why there are three and not one per case.
 
 Defined once and compared by identity, so a second definition anywhere would never
 match the first. Every feature imports them from here.
 
 UPDATES
+2026-11-10  UNCHANGED, a part of a write the caller left as it was, for PYB-145.
 2026-11-03  NOT_REQUESTED removed with its one user, `Check.names`, for PYB-223.
 2026-10-12  Written for PYB-190.
 """
@@ -24,7 +25,9 @@ __status__ = "Development"
 __date__ = "2026/10/12"
 
 # Unannotated, because mypy accepts a sentinel as a type only in this exact form.
+# A part of a write the caller did not give, so the cell keeps what it holds.
+UNCHANGED = sentinel("UNCHANGED")
 UNDETERMINED = sentinel("UNDETERMINED")
 WITHHELD = sentinel("WITHHELD")
 
-__all__ = ["UNDETERMINED", "WITHHELD"]
+__all__ = ["UNCHANGED", "UNDETERMINED", "WITHHELD"]
