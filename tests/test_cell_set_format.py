@@ -6,6 +6,8 @@ Each test edits a copy of `13-number-percent`, whose `A1` is a number Automatic
 formats and whose `B1` is the same number in a percent format a person chose.
 
 UPDATES
+2026-11-10  A format that cannot show the value is refused unless Automatic is asked
+            for, for PYB-145 AC 10.
 2026-11-10  Setting one part leaves the others as they were, for PYB-145 AC 19.
 2026-11-10  Written for PYB-145.
 """
@@ -31,6 +33,7 @@ from conftest import copyDocument
 from pybers import (
     UNCHANGED,
     CellFormatAutomatic,
+    CellFormatConflict,
     CellFormatNumber,
     CellFormatPercent,
     CellFormatText,
@@ -198,3 +201,49 @@ def testAValueOfTheSameKindKeepsTheFormatAPersonChose(working: Path) -> None:
 def testAValueOfAnotherKindTakesTheAutomaticFormatOfItsKind(working: Path) -> None:
     setAndSave(working, "B1", "a quarter")
     assert readFormat(working, "B1") == CellFormatAutomatic(CellFormatText())
+
+
+def testAFormatThatCannotShowTheValueIsRefusedNamingBoth(working: Path) -> None:
+    document = pybers.open(working)
+    refusal = "A2 holds a text value, which a number format cannot show"
+    with pytest.raises(pybers.WriteError, match=refusal):
+        document.cellSet("::Table 1::A2", format=CellFormatNumber())
+    assert document.sheets[0].tables[0].cell("A2").presentation.format == (
+        CellFormatText()
+    )
+
+
+def testAValueTheFormatFitsIsJudgedByTheValueBeingWritten(working: Path) -> None:
+    with pytest.raises(pybers.WriteError, match="would hold a text value"):
+        pybers.open(working).cellSet(
+            "::Table 1::A1", "a quarter", format=CellFormatNumber()
+        )
+
+
+def testAConflictFallingBackGivesAutomaticAndSaysWhy(working: Path) -> None:
+    document = pybers.open(working)
+    changes = document.cellSet(
+        "::Table 1::A1:A2", format=CellFormatNumber(),
+        conflict=CellFormatConflict.AUTOMATIC,
+    )
+    (skip,) = changes.skipped
+    assert skip.reason.endswith("number format cannot show. It takes Automatic.")
+    document.save()
+    assert readFormat(working, "A1") == CellFormatNumber()
+    assert readFormat(working, "A2") == CellFormatAutomatic(CellFormatText())
+
+
+def testACommandFallsBackToAutomaticWhenAsked(working: Path) -> None:
+    result = runSetCommand(
+        str(working), "::Table 1::A2", "--cell-format", "number",
+        "--conflict", "automatic",
+    )
+    assert result.exit_code == 0, result.output
+    assert "It takes Automatic." in result.output
+    assert readFormat(working, "A2") == CellFormatAutomatic(CellFormatText())
+
+
+def testACommandRefusesAFormatThatCannotShowTheValue(working: Path) -> None:
+    result = runSetCommand(str(working), "::Table 1::A2", "--cell-format", "number")
+    assert result.exit_code == 1
+    assert "which a number format cannot show" in result.output

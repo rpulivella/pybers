@@ -7,6 +7,8 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-11-10  `kindFormatFamilies`, the families each kind of value is shown with, for
+            PYB-145.
 2026-11-09  A presentation's format is a `CellFormat`, its Automatic wrapping the one
             Numbers chose, replacing `formatChosen`, and the family enum moved to
             the format feature, for PYB-145.
@@ -40,7 +42,7 @@ from typing import TYPE_CHECKING
 from pybers.absence import UNDETERMINED
 from pybers.currency import CurrencyAmount
 from pybers.format.controls import CellControl
-from pybers.format.formats import CellFormat
+from pybers.format.formats import CellFormat, CellFormatFamily
 
 if TYPE_CHECKING:
     from pybers.table.cell import CellValue
@@ -138,11 +140,30 @@ kindValueTypes: frozendict[CellKind, type] = frozendict({
 })
 
 
+# The format families Numbers shows each kind of value with, measured across the 190
+# documents in the tests on 2026-11-10. A custom format reads as unknown until its
+# family is decoded, so it is not listed.
+kindFormatFamilies: frozendict[CellKind, frozenset[CellFormatFamily]] = frozendict({
+    CellKind.NUMBER: frozenset({
+        CellFormatFamily.NUMBER, CellFormatFamily.PERCENT, CellFormatFamily.SCIENTIFIC,
+        CellFormatFamily.FRACTION, CellFormatFamily.NUMERAL_SYSTEM,
+        CellFormatFamily.NUMBER_CUSTOM, CellFormatFamily.STAR_RATING,
+    }),
+    CellKind.CURRENCY: frozenset({CellFormatFamily.CURRENCY}),
+    CellKind.DATE_TIME: frozenset({CellFormatFamily.DATE_TIME}),
+    CellKind.DURATION: frozenset({CellFormatFamily.DURATION}),
+    CellKind.BOOLEAN: frozenset({CellFormatFamily.BOOLEAN, CellFormatFamily.CHECKBOX}),
+    CellKind.TEXT: frozenset({CellFormatFamily.TEXT}),
+    CellKind.RICH_TEXT: frozenset({CellFormatFamily.TEXT}),
+})
+
+
 __all__ = [
     "CellKind",
     "CellPresentation",
     "CellStorage",
     "emptyStorage",
     "findCellKind",
+    "kindFormatFamilies",
     "kindValueTypes",
 ]

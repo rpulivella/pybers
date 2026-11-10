@@ -8,6 +8,7 @@ format can equal the one Automatic picks, so `CellFormatAutomatic` wraps the for
 Numbers chose in `shown` rather than standing in for it. See findings-11-formats.md.
 
 UPDATES
+2026-11-10  `CellFormatConflict`, what a write does with a format that does not fit.
 2026-11-09  Written for PYB-145.
 """
 from __future__ import annotations
@@ -47,6 +48,13 @@ class CellFormatFamily(StrEnum):
     CHECKBOX = "checkbox"
     STAR_RATING = "star-rating"
     UNKNOWN = "unknown"
+
+
+class CellFormatConflict(StrEnum):
+    """What a write does with a format that cannot show the value a cell holds."""
+
+    REFUSE = "refuse"
+    AUTOMATIC = "automatic"
 
 
 class CellFormatBase(FamilyMember, ABC):
@@ -206,6 +214,7 @@ __all__ = [
     "CellFormatBase",
     "CellFormatBoolean",
     "CellFormatCheckbox",
+    "CellFormatConflict",
     "CellFormatCurrency",
     "CellFormatDateTime",
     "CellFormatDuration",

@@ -9,8 +9,9 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
-2026-11-10  `--cell-format` sets a format by its text form, VALUE now optional, for
-            PYB-145.
+2026-11-10  `--cell-format` sets a format by its text form, VALUE now optional, and
+            `--conflict` falls back to Automatic for a format that does not fit,
+            for PYB-145.
 2026-11-03  SELECTOR sets every cell it matches, reporting each skipped, for
             PYB-223. Each cell written prints as `pybers show` prints it.
 2026-10-28  Where a write goes shared with `locale`, FILE itself unless `-o`
@@ -114,6 +115,16 @@ def runSet(
             ),
         ),
     ] = None,
+    conflict: Annotated[
+        pybers.CellFormatConflict,
+        typer.Option(
+            "--conflict",
+            help=(
+                "What a --cell-format that cannot show a cell's value does: refuse the "
+                "write, or give that cell the Automatic format and say so."
+            ),
+        ),
+    ] = pybers.CellFormatConflict.REFUSE,
     output: OutputOption = None,
     preview: PreviewOption = False,
     extend: Annotated[
@@ -141,6 +152,7 @@ def runSet(
                 pybers.UNCHANGED if cellFormat is None
                 else pybers.parseCellFormat(cellFormat)
             ),
+            conflict=conflict,
             extend=extend,
         )
         cells: list[ShownPart] = [

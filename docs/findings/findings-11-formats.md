@@ -370,6 +370,25 @@ Each archive holds `format_type` and nothing else. A checkbox and a star rating 
 controls, so their formats are written with a control. A typed TRUE stores the boolean
 format `1` without a control, as [values](findings-01-values.md) records.
 
+### Which families show which kinds of value
+
+Measured 2026-11-10 for PYB-145 across the 190 documents in the tests, pairing each
+cell's kind with the family it is shown with. `kindFormatFamilies` in
+`pybers.table.kinds` is this table, and a format outside it is refused.
+
+| kind | families | named by |
+| --- | --- | --- |
+| number | number, percent, scientific, fraction, numeral system, custom number, star rating | `13-number-percent`, `16-number-scientific-numeralsystems`, `17-number-custom`, `68b-series-kinds-dragged` `D2`, `54-format-star-rating` `A1` |
+| currency | currency | `12-number-currency` |
+| date and time | date and time | `14-number-date` |
+| duration | duration | `15-number-duration-formats` |
+| boolean | boolean, checkbox | `69-functions-added-in-15-4` `B9`, `11-value-types-noformats` `E1` |
+| text, rich text | text | `01-text-plain` `A1`, `02-text-rich` `A1` |
+
+An empty cell keeps a chosen number, text or date format, 172 times in `65b-series-dragged`
+and `19-formula-dragged`, so an empty cell takes any format. A custom format over text, a
+date or currency reads as unknown until PYB-245 to PYB-247 decode it, so it is not listed.
+
 ### Controls are a format plus a cell spec
 
 **A control never changes how its value is formatted.** Measured in `81-control-formats`:

@@ -53,6 +53,7 @@ from pybers.format.formats import (
     CellFormatAutomatic,
     CellFormatCurrency,
     CellFormatText,
+    findFormatShown,
 )
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
@@ -63,6 +64,7 @@ from pybers.table.kinds import (
     CellStorage,
     emptyStorage,
     findCellKind,
+    kindFormatFamilies,
 )
 from pybers.table.merges import MergeRange
 from pybers.timezone import machineTimeZone, toWallClockTime
@@ -176,6 +178,30 @@ def findWrittenValue(
     if isinstance(written, Decimal) and isinstance(current, CurrencyAmount):
         return CurrencyAmount(written, current.currency)
     return written
+
+
+def findFormatMisfit(
+    cell: Cell | None, where: CellReference, cellFormat: CellFormat, value: CellValue
+) -> str | None:
+    """Return why a format cannot show the value a cell would hold, or None if it can.
+
+    An empty cell takes any format, as Numbers keeps one on a cell it emptied.
+    """
+    shown = findFormatShown(cellFormat)
+    if shown is UNDETERMINED or value is None:
+        return None
+    unchanged = cell is not None and isSameValue(cell.value, value)
+    kind = (
+        cell.kind if cell is not None and unchanged
+        else findCellKind(value, CellKind.EMPTY, None, False)
+    )
+    if shown.formatFamily in kindFormatFamilies.get(kind, frozenset()):
+        return None
+    holds = "holds" if unchanged else "would hold"
+    return (
+        f"{where} {holds} a {kind} value, which a {shown.formatFamily} format cannot "
+        "show."
+    )
 
 
 def findFormatRefusal(
@@ -550,5 +576,6 @@ class Cell:
 __all__ = [
     "Cell", "CellChange", "CellChanges", "CellCopy", "CellSkip", "CellValue",
     "decimal128Context",
-    "findFormatRefusal", "findWrittenValue", "refuseValueOverFormula", "toCellValue",
+    "findFormatMisfit", "findFormatRefusal", "findWrittenValue",
+    "refuseValueOverFormula", "toCellValue",
 ]

@@ -12,6 +12,7 @@ the full origin story and design contract.
 
 UPDATES
 2026-11-10  UNCHANGED re-exported, a part of `cellSet` left as it was, for PYB-145.
+2026-11-10  `CellFormatConflict` re-exported, for PYB-145.
 2026-11-10  `formatCellFormat`, `parseCellFormat` and `CellFormatError`, a format's
             text form, for PYB-145.
 2026-11-09  The format family re-exported from `pybers.format`, `CellFormat` the
@@ -115,6 +116,7 @@ lazy from pybers.format import (
     CellFormatBase,
     CellFormatBoolean,
     CellFormatCheckbox,
+    CellFormatConflict,
     CellFormatCurrency,
     CellFormatDateTime,
     CellFormatDuration,
@@ -267,6 +269,7 @@ __all__ = [
     "CellFormatBase",
     "CellFormatBoolean",
     "CellFormatCheckbox",
+    "CellFormatConflict",
     "CellFormatCurrency",
     "CellFormatDateTime",
     "CellFormatDuration",

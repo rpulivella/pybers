@@ -86,13 +86,14 @@ from pybers.addressing.reference import (
     tableNameSeparator,
 )
 from pybers.errors import PybersError, WriteError
-from pybers.format.formats import CellFormat
+from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
 from pybers.geometry import Position
 from pybers.table.cell import (
     Cell,
     CellChange,
     CellChanges,
     CellSkip,
+    findFormatMisfit,
     findFormatRefusal,
     findWrittenValue,
     toCellValue,
@@ -421,13 +422,14 @@ class Document:
         value: object = UNCHANGED,
         *,
         format: CellFormat | UNCHANGED = UNCHANGED,
+        conflict: CellFormatConflict = CellFormatConflict.REFUSE,
         extend: bool = False,
     ) -> CellChanges:
         """Set the value, the format or both of every cell a selector matches.
 
-        A part not given stays as it was. A cell a formula backs is skipped and
-        reported, and a format pybers cannot yet write is refused before any cell
-        changes. `extend` grows a table to hold one cell past its end.
+        A part not given stays as it was, and a cell a formula backs is skipped and
+        reported. A format that cannot show a cell's value is refused before any cell
+        changes, unless `conflict` falls back to Automatic for that cell and says so.
         """
         from pybers.selection.matching import findCellTargets, findExtendTarget
 
@@ -437,7 +439,7 @@ class Document:
             ([findExtendTarget(self, selector)], []) if extend
             else findCellTargets(self, selector)
         )
-        writing: list[tuple[Table, CellAddress]] = []
+        writing: list[tuple[Table, CellAddress, CellFormat | UNCHANGED]] = []
         for table, address in targets:
             cell = table.cells.get(address)
             if value is not UNCHANGED and cell is not None and cell.formula is not None:
@@ -446,20 +448,27 @@ class Document:
                     "a value would discard.",
                 ))
                 continue
-            if format is not UNCHANGED:
+            asked = format
+            if asked is not UNCHANGED:
                 current = None if cell is None else cell.value
                 after = current if value is UNCHANGED else findWrittenValue(
                     value, address, self.timeZone, current
                 )
                 where = CellReference(address.row, address.col, table=table.reference)
-                refusal = findFormatRefusal(cell, where, format, after)
+                misfit = findFormatMisfit(cell, where, asked, after)
+                if misfit is not None and conflict is CellFormatConflict.REFUSE:
+                    raise WriteError(f"{misfit} Nothing was written.")
+                if misfit is not None:
+                    asked = CellFormatAutomatic()
+                    skipped.append(CellSkip(where, f"{misfit} It takes Automatic."))
+                refusal = findFormatRefusal(cell, where, asked, after)
                 if refusal is not None:
                     raise WriteError(f"{refusal} Nothing was written.")
             elif value is not UNCHANGED:
                 toCellValue(value, address, self.timeZone)
-            writing.append((table, address))
+            writing.append((table, address, asked))
         changes: list[CellChange] = []
-        for table, address in writing:
+        for table, address, asked in writing:
             rowsAdded = max(0, address.row - table.rowCount)
             colsAdded = max(0, address.col - table.colCount)
             if rowsAdded:
@@ -474,8 +483,8 @@ class Document:
                     cell.presentation.format, cell.presentation.format,
                 )
             )
-            if format is not UNCHANGED:
-                cell._formatRequest(format)
+            if asked is not UNCHANGED:
+                cell._formatRequest(asked)
             changes.append(replace(
                 change, formatAfter=cell.presentation.format,
                 rowsAdded=rowsAdded, colsAdded=colsAdded,
