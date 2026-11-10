@@ -6,7 +6,7 @@ A format through a range, a save, a fill, a copy and a move, and one pybers cann
 chose in `B1`, and `86-custom-text-and-currency` custom formats pybers reads as unknown.
 
 UPDATES
-2026-11-10  Written for PYB-145 AC 1.
+2026-11-10  Written for PYB-145 AC 1 and AC 4.
 """
 from __future__ import annotations
 
@@ -28,6 +28,8 @@ from conftest import copyDocument
 from pybers import (
     CellFormatAutomatic,
     CellFormatNumber,
+    CellFormatPercent,
+    CellValueFill,
     FormulaReferenceRelocation,
 )
 
@@ -67,3 +69,32 @@ def testARangeTakesAFormatAndEveryValueStays(working: Path) -> None:
     assert {cell.presentation.format for cell in readRowOne(working)} == {
         CellFormatAutomatic(CellFormatNumber())
     }
+
+
+@pytest.mark.parametrize(("edit", "address"), [
+    (lambda table: table.cellsFill(
+        "B1", "B1:B2", references=relative, values=CellValueFill.REPEAT_SOURCE_VALUE
+    ), "B2"),
+    (lambda table: table.cellsCopy("B1", "H1", references=relative), "H1"),
+    (lambda table: table.cellsMove("B1", "H1", references=relative), "H1"),
+    (lambda table: table.rowAdd(1), "B2"),
+])
+def testAChosenFormatTravelsWithItsCell(
+    edit: Callable[[pybers.Table], object], address: str, working: Path
+) -> None:
+    editAndSave(working, edit)
+    assert readFormat(working, address) == CellFormatPercent()
+
+
+@pytest.mark.parametrize("edit", [
+    lambda table: table.cellsCopy("A1", "H1", references=relative),
+    lambda table: table.cellsMove("A1", "H1", references=relative),
+])
+def testAFormatSetBeforeACopyOrMoveIsSavedWhereTheCellLands(
+    edit: Callable[[pybers.Table], object], working: Path
+) -> None:
+    document = pybers.open(working)
+    document.cellSet("::Table 1::A1", format=CellFormatNumber())
+    edit(document.sheets[0].tables[0])
+    document.save()
+    assert readFormat(working, "H1") == CellFormatNumber()
