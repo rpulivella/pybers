@@ -98,3 +98,13 @@ def testEachChangedCellIsAFailedCheckNamingIt(tmp_path: Path) -> None:
     (check,) = report.checkSavedCells(golden, copy)
     assert (check.status, check.subject) == ("failed", "Sheet 1 / Table 1 / B1")
     assert check.detail == "Numbers changed it on saving: value '0.25' became '0.5'"
+
+
+def testAFormatPybersChoseForAFormulaMustSurvive() -> None:
+    before = SavedCell("none", "error", "=B1/10", "number", "none",
+                       frozendict({"format_type": "256"}))
+    after = SavedCell("0.5", "number", "=B1/10", "number (automatic)", "none",
+                      frozendict({"format_type": "256"}))
+    assert listCellChanges(before, after) == [
+        "format 'number' became 'number (automatic)'",
+    ]

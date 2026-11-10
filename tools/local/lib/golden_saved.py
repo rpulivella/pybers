@@ -37,6 +37,7 @@ from pybers._persistence.cells import (
 )
 from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.types import findArchiveTypeId
+from pybers.format._read import findWaitingFormatKey
 from pybers.table._read import iterateCellRecords
 
 type SavedAddress = tuple[str, str, str]
@@ -66,7 +67,9 @@ def readFormatEntryFields(entry: object) -> frozendict[str, str]:
 def findDisplayedFormatKey(record: CellRecord) -> int | None:
     """Return the key of the format entry a record displays with, or None for none."""
     displayed = findSlotValue(record, displayedKindSlot)
-    if displayed is None or not 1 <= displayed <= len(countedFormatSlots):
+    if displayed is None:
+        return findWaitingFormatKey(record)
+    if not 1 <= displayed <= len(countedFormatSlots):
         return None
     return findSlotValue(record, countedFormatSlots[displayed - 1])
 
@@ -116,10 +119,17 @@ def readSavedCells(path: Path) -> dict[SavedAddress, SavedCell]:
 
 
 def listCellChanges(written: SavedCell, saved: SavedCell) -> list[str]:
-    """Return each field Numbers changed in one cell, its formula's results left out."""
-    recalculated = {"value", "kind", "format", "formatEntry"} if (
-        written.formula != "none"
-    ) else set()
+    """Return each field Numbers changed in one cell, its formula's results left out.
+
+    A formula's value and kind are Numbers' to recalculate, and so is its format while
+    Automatic picks it, but a format pybers chose for it must survive.
+    """
+    automatic = written.format == "none" or written.format.endswith("(automatic)")
+    recalculated = (
+        set() if written.formula == "none"
+        else {"value", "kind", "format", "formatEntry"} if automatic
+        else {"value", "kind"}
+    )
     changed = [
         f"{field.name} {getattr(written, field.name)!r} became "
         f"{getattr(saved, field.name)!r}"
