@@ -247,3 +247,11 @@ def testACommandRefusesAFormatThatCannotShowTheValue(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A2", "--cell-format", "number")
     assert result.exit_code == 1
     assert "which a number format cannot show" in result.output
+
+
+def testABooleanFormatNoMenuOffersIsRefused(tmp_path: Path) -> None:
+    working = copyDocument("90-values-for-booleans", tmp_path)
+    with pytest.raises(pybers.WriteError, match="offers no boolean format to choose"):
+        pybers.open(working).cellSet(
+            "::Table 1::A1", True, format=pybers.CellFormatBoolean()
+        )

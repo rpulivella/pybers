@@ -28,7 +28,12 @@ from pybers.addressing.reference import CellReference
 from pybers.format._read import findFormatOfType
 from pybers.format._write import findAutomaticFormat
 from pybers.format.controls import CellControl, controlFormatFamilies
-from pybers.format.formats import CellFormat, CellFormatAutomatic, findFormatShown
+from pybers.format.formats import (
+    CellFormat,
+    CellFormatAutomatic,
+    CellFormatBoolean,
+    findFormatShown,
+)
 from pybers.table.cell import isSameValue
 from pybers.table.kinds import CellKind, findCellKind, kindFormatFamilies
 
@@ -118,6 +123,11 @@ def findFormatRefusal(
         unchanged and cellFormat == shown
     ):
         return None
+    if cellFormat == CellFormatBoolean():
+        return (
+            f"Numbers offers no boolean format to choose, so {where} can take a "
+            "checkbox or automatic."
+        )
     written = findFormatOfType(findAutomaticFormat(value).format_type)
     if cellFormat == written:
         return None
