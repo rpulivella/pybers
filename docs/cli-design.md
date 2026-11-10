@@ -19,7 +19,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` naming each |
 | `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
-| `set FILE SELECTOR VALUE` | The value of every cell a selector matches |
+| `set FILE SELECTOR [VALUE] [--cell-format FORMAT]` | The value, the format or both of every cell a selector matches |
 | `locale FILE [LOCALE]` | A document's language and region, or a change to it |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
 | `diff A B` | The cells that differ between two documents |
@@ -49,7 +49,7 @@ A command parses its arguments, calls the library once, formats what comes back,
 - **`export` never changes the document it reads.** It reads FILE and writes elsewhere, a new `.numbers` document included, so no `export` changes FILE.
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
 - **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
-- **`set --format SPEC`** sets how the cells show their value, SPEC being a format's text form, tagged by its family.
+- **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--format` stays the output format every command offers.
 - **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
 ## Formulas

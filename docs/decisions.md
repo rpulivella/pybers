@@ -234,17 +234,17 @@ it. The policy is a parameter of the library and of an agent's calls, and other 
 take it later, an import or a fill among them.
 
 **A write reports each cell whose kind or format it changed**, before and after, and a
-preview reports the same without writing. Nothing about a column is special: a write
-touches the cells it names, and whether a column stays consistent is answered by reading
-the table's structure, which reports each column's kind and format and the cells that
-differ. That reading is also what keeps JSON export compact, since a column is described
-once and only its exceptions are listed.
+preview reports the same without writing. Nothing about a column or a row is special:
+a write touches the cells it names, and a caller reads any pattern across them from the
+cells themselves.
 
-**Formats apply over a range**, `table.cellFormatApply(range, format)`, and a single cell's
-value, format and style are set together in one call, `document.cellSet(selector, ...)`,
-the style a named one or one written into the cell alone. The call sits on the document
-because its selector names the tables, writes every cell the selector matches, and
-returns each change it made and each part it skipped, and why.
+**One call sets every part of a cell, and each part alone.**
+`document.cellSet(selector, value, format=...)` sets a value, a format or both on every
+cell the selector matches, a part not given `UNCHANGED`, and the style tickets add a
+cell's styles to the same call.
+Setting only a format is that call given no value, so no second call does it. The call
+sits on the document because its selector names the tables, writes every cell the
+selector matches, and returns each change it made and each part it skipped, and why.
 
 **A custom number format is a structured value** holding its positive, negative and zero
 forms, the shape Numbers stores. A shorthand parser may later build one, and the structured
@@ -260,13 +260,14 @@ that entry on read rather than holding a copy.
 **No format bit is written before it is decoded.** PYB-219 decodes each family's archive
 and flag bits, and the format work splits by family on its findings.
 
-**On the command line, the verb comes first**: `pybers set FILE ADDRESS VALUE`. A file
+**On the command line, the verb comes first**: `pybers set FILE SELECTOR VALUE`. A file
 first would leave `diff A B`, `import` and `export -o` without a consistent place, and the
 bare `pybers FILE` already covers looking at one document. `set` infers a value's kind and
 `--as` overrides the inference; should inference prove unreliable, `set` falls back to text
 unless `--as` names a kind. The inference is one table of parsers built on the standard
-library, tried in order, rather than a chain of conditions. `set --format` sets a format by
-its text form. A writing verb changes FILE itself, since the verb names the act, as a
+library, tried in order, rather than a chain of conditions. `set --cell-format` sets a
+format by its text form, with or without a value, since `--format` chooses every command's
+output. A writing verb changes FILE itself, since the verb names the act, as a
 database tool changes the database it is given. `--preview` writes nothing, the flag named
 for what it does, and `-o NEW` writes a new document instead, refusing any file that
 exists, so no option changes its meaning with the file it is given.
