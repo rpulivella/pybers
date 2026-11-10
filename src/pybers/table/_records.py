@@ -56,6 +56,7 @@ from .._persistence.cells import (
     carriesFormula,
     checkboxFormatSlot,
     chosenFormatBit,
+    chosenFormatBits,
     chosenFormatOffset,
     controlSlot,
     countedFormatSlots,
@@ -82,8 +83,13 @@ from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
 from ..format._read import currencyFormatType, findFormatOfType
-from ..format._write import buildCurrencyFormat, findAutomaticFormat
-from ..format.formats import findFormatShown
+from ..format._write import (
+    buildCurrencyFormat,
+    findAutomaticFormat,
+    findFormulaFormatEntry,
+    formatSlots,
+)
+from ..format.formats import CellFormat, CellFormatAutomatic, findFormatShown
 from ._read import currencyTypeByte, storedKinds
 from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
@@ -528,8 +534,49 @@ def retypeRecord(
     return bytes(header) + value + tail
 
 
+def applyFormulaFormat(
+    raw: bytes,
+    asked: CellFormat,
+    value: CellValue,
+    formatFor: Callable[[tsk.FormatStructArchive], int | None],
+) -> bytes:
+    """Return a formula's record holding a format in its family's slot, chosen.
+
+    Numbers shows a formula's result through the slot of the result's kind, so the
+    format waits in its own slot for a result it fits, measured in
+    findings-11-formats.md. Automatic clears every chosen bit and leaves the slots to
+    Numbers.
+    """
+    header = bytearray(raw[:valueOffset])
+    if isinstance(asked, CellFormatAutomatic):
+        for bit in chosenFormatBits:
+            header[chosenFormatOffset] &= ~bit
+        return bytes(header) + raw[valueOffset:]
+    entry = findFormulaFormatEntry(asked, value)
+    key = None if entry is None else formatFor(entry)
+    if key is None:
+        raise WriteError(
+            f"A formula cannot hold a {asked.formatFamily} format here."
+        )
+    slot = formatSlots[asked.formatFamily]
+    record = decodeRecord(0, raw)
+    slots = listReferenceSlots(raw)
+    held = dict(zip(slots, record.references, strict=True))
+    held[slot] = key
+    for at, bit in held:
+        header[at] |= bit
+    header[chosenFormatOffset] |= chosenFormatBits[countedFormatSlots.index(slot)]
+    tail = b"".join(
+        int(held[each]).to_bytes(referenceWidth, "little")
+        for each in slotOrder if each in held
+    )
+    start = len(raw) - len(slots) * referenceWidth
+    return bytes(header) + raw[valueOffset:start] + tail
+
+
 __all__ = [
     "applyChosenFormat",
+    "applyFormulaFormat",
     "borrowShape",
     "buildWrittenRecord",
     "findFormatKey",

@@ -20,6 +20,8 @@ __date__ = "2026/11/09"
 from .._persistence.cells import (
     CellRecord,
     carriesChosenFormat,
+    chosenFormatBits,
+    chosenFormatOffset,
     controlSlot,
     countedFormatSlots,
     displayedKindSlot,
@@ -72,6 +74,28 @@ def findFormatOfType(formatType: int | None) -> CellFormatShown:
     return CellFormatUnknown(formatType) if known is None else known
 
 
+def findWaitingFormatKey(record: CellRecord) -> int | None:
+    """Return the key of the one chosen format a record showing no kind holds, or None.
+
+    A formula with no result shows no kind until Numbers calculates it, so its format
+    waits in its family's slot, chosen, as findings-11-formats.md measures.
+    """
+    chosen = [
+        key for bit, slot in zip(chosenFormatBits, countedFormatSlots, strict=True)
+        if len(record.raw) > chosenFormatOffset and record.raw[chosenFormatOffset] & bit
+        and (key := findSlotValue(record, slot)) is not None
+    ]
+    return chosen[0] if len(chosen) == 1 else None
+
+
+def readWaitingFormat(
+    record: CellRecord, formatTypes: dict[int, int]
+) -> CellFormat | None:
+    """Return the format a record showing no kind holds waiting, or None for none."""
+    key = findWaitingFormatKey(record)
+    return None if key is None else findFormatOfType(formatTypes.get(key))
+
+
 def readRecordFormat(
     record: CellRecord, formatTypes: dict[int, int]
 ) -> CellFormat | None:
@@ -83,7 +107,7 @@ def readRecordFormat(
     """
     displayed = findSlotValue(record, displayedKindSlot)
     if displayed is None:
-        return None
+        return readWaitingFormat(record, formatTypes)
     key = (
         findSlotValue(record, countedFormatSlots[displayed - 1])
         if 1 <= displayed <= len(countedFormatSlots) else None
@@ -101,6 +125,7 @@ def readRecordControl(
 
 
 __all__ = [
-    "currencyFormatType", "findFormatOfType", "formatsByType", "readRecordControl",
+    "currencyFormatType", "findFormatOfType", "findWaitingFormatKey", "formatsByType",
+    "readRecordControl",
     "readRecordFormat",
 ]

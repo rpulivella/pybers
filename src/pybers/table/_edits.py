@@ -101,6 +101,7 @@ from ._read import (
 from ._records import (
     applyAutomaticFormat,
     applyChosenFormat,
+    applyFormulaFormat,
     buildWrittenRecord,
     findFormatKey,
     findTemplateRecord,
@@ -465,6 +466,13 @@ def applyTableEdits(
                     removed = removeSlots(patched, {controlSlot})
                     releaseReplaced(decodeRecord(record.column, patched), removed)
                     patched = removed
+                if cell.formula is not None and cell._formatAsked is not None:
+                    shown = applyFormulaFormat(
+                        patched, cell._formatAsked, cell.value, formatFor
+                    )
+                    formatsCount(patched, shown, reference)
+                    replacements[record.column] = shown
+                    continue
                 if cell._formatAsked is not None and not checkAskedFormatShown(
                     patched, cell._formatAsked, cell.value, formatOf
                 ):
@@ -486,9 +494,14 @@ def applyTableEdits(
                     if cell is None:
                         continue
                     if cell.formula is not None:
-                        replacements[column] = applyChosenFormat(
-                            buildFormulaRecord(pool.keyFor(cell.formula)), cell
+                        built = buildFormulaRecord(pool.keyFor(cell.formula))
+                        replacements[column] = (
+                            applyChosenFormat(built, cell) if cell._formatAsked is None
+                            else applyFormulaFormat(
+                                built, cell._formatAsked, cell.value, formatFor
+                            )
                         )
+                        formatsCount(None, replacements[column], reference)
                         formulaAdded.append((row, column))
                         continue
                     if cell.value is None:

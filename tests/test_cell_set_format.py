@@ -46,6 +46,7 @@ from pybers._persistence.cells import (
     controlSlot,
     countedFormatSlots,
     displayedKindSlot,
+    durationFormatSlot,
     findSlotValue,
     listReferenceSlots,
 )
@@ -132,7 +133,9 @@ def testAFormatPybersCannotYetWriteIsRefusedAndNothingChanges(working: Path) -> 
     )
 
 
-def testARangeSkipsItsEmptyAndFormulaCellsAndFormatsTheRest(tmp_path: Path) -> None:
+def testARangeSkipsItsEmptyCellsAndFormatsTheRestFormulasIncluded(
+    tmp_path: Path,
+) -> None:
     document = pybers.create("en_US")
     table = document.sheet().tableAdd("Range", rows=1, cols=3)
     table.cell("A1").value = Decimal(5)
@@ -144,13 +147,39 @@ def testARangeSkipsItsEmptyAndFormulaCellsAndFormatsTheRest(tmp_path: Path) -> N
     assert [(str(skip.reference), skip.reason) for skip in changes.skipped] == [
         ("Sheet 1::Range::B1",
          "Sheet 1::Range::B1 holds no value, which pybers cannot yet format."),
-        ("Sheet 1::Range::C1", "Sheet 1::Range::C1 is backed by a formula, whose "
-         "format pybers cannot yet set."),
     ]
     reopened.save()
-    assert pybers.open(working).table("Range").cell("A1").presentation.format == (
-        CellFormatNumber()
-    )
+    saved = pybers.open(working).table("Range")
+    assert [saved.cell(each).presentation.format for each in ("A1", "C1")] == [
+        CellFormatNumber(), CellFormatNumber()
+    ]
+
+
+def testAFormulaWithNoResultHoldsItsFormatUntilNumbersCalculates(
+    tmp_path: Path,
+) -> None:
+    document = pybers.create("en_US")
+    table = document.sheet().tableAdd("Calc", rows=1, cols=2)
+    table.cell("A1").formulaText = "=DATE(2026,11,10)"
+    working = tmp_path / "calc.numbers"
+    document.save(working)
+    reopened = pybers.open(working)
+    reopened.cellSet("::Calc::A1", format=pybers.CellFormatDateTime())
+    reopened.save()
+    cell = pybers.open(working).table("Calc").cell("A1")
+    assert (cell.formulaText, cell.value) == ("=DATE(2026,11,10)", None)
+    assert cell.presentation.format == pybers.CellFormatDateTime()
+
+
+def testAFormulaWithNoResultRefusesAFormatPybersCannotWriteForIt(
+    tmp_path: Path,
+) -> None:
+    document = pybers.create("en_US")
+    document.sheet().tableAdd("Calc", rows=1, cols=1).cell("A1").formulaText = "=1"
+    working = tmp_path / "calc.numbers"
+    document.save(working)
+    with pytest.raises(pybers.WriteError, match="cannot yet write a currency format"):
+        pybers.open(working).cellSet("::Calc::A1", format=pybers.CellFormatCurrency())
 
 
 def testACallGivenNeitherPartIsRefused(working: Path) -> None:
@@ -288,3 +317,33 @@ def testAnAutomaticDurationStoresTheUnitsItsValueHolds(
     assert (entry.duration_unit_largest, entry.duration_unit_smallest) == (
         largest, smallest
     )
+
+
+def testACalculatedFormulaTakesAFormatAndKeepsItsFormula(tmp_path: Path) -> None:
+    working = copyDocument("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    document.cellSet("Sheet 1::Table 1::A11", format=CellFormatNumber())
+    document.save()
+    cell = pybers.open(working).sheet("Sheet 1").table("Table 1").cell("A11")
+    assert (cell.formulaText, cell.value) == ("=SUM(A1:A10)", Decimal(55))
+    assert cell.presentation.format == CellFormatNumber()
+
+
+def testAFormatAFormulasResultDoesNotFitWaitsInItsSlot(tmp_path: Path) -> None:
+    working = copyDocument("20-formula-shapes", tmp_path)
+    document = pybers.open(working)
+    document.cellSet("Sheet 1::Table 1::A11", format=pybers.CellFormatDuration())
+    document.save()
+    cell = pybers.open(working).sheet("Sheet 1").table("Table 1").cell("A11")
+    assert cell.presentation.format == CellFormatAutomatic(CellFormatNumber())
+    record = readRecordAt(working, "A11", "Table 1")
+    assert findSlotValue(record, durationFormatSlot) is not None
+    assert record.raw[6] & 0x04
+
+
+def testAChosenTextFormatOnAFormulaIsRefused(tmp_path: Path) -> None:
+    working = copyDocument("20-formula-shapes", tmp_path)
+    with pytest.raises(pybers.WriteError, match="keeps no chosen text format"):
+        pybers.open(working).cellSet(
+            "Sheet 1::Table 1::D11", format=CellFormatText()
+        )

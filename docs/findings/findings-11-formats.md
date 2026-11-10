@@ -396,6 +396,27 @@ An empty cell keeps a chosen number, text or date format, 172 times in `65b-seri
 and `19-formula-dragged`, so an empty cell takes any format. A custom format over text, a
 date or currency reads as unknown until PYB-245 to PYB-247 decode it, so it is not listed.
 
+### A formula's format waits in its family's slot
+
+Measured 2026-11-10 for PYB-145 in Numbers 15.4, by giving three formula records a
+percent format in their number slot and saving each after Numbers opened it. Numbers
+shows a formula's result through the slot of the result's kind, so a format waits in
+its family's slot until a result of that kind arrives:
+
+| formula before | the record given | what Numbers saved |
+| --- | --- | --- |
+| `=SUM(A1:A10)` in `20-formula-shapes`, a number | the percent in its number slot, chosen | the percent kept, its entry completed with 0 decimal places, negative style 0 and no separator |
+| `=IF(SUM(A1:A5)>10,"big","small")`, text | the percent in its number slot, its text slot removed and its displayed kind left naming it | the text slot restored and shown in Automatic, the percent kept in the number slot |
+| `=A1/10` pybers created, no result yet | the percent in its number slot, not chosen, no displayed kind | calculated to 0.5, shown in percent from that slot, and marked chosen |
+
+None drew a chip or an alert. pybers therefore writes a format given to any formula into
+its family's slot, chosen, whatever the formula's result, since Numbers decides which slot
+shows once it calculates, as the goldens `00-created-formula-formats-chosen-by-pybers`
+and `20-formula-format-chosen-by-pybers` show Numbers keeping. A formula with no result
+names no displayed kind, so pybers reads its one chosen slot as its format. A chosen text
+format is the exception, refused, since none of the 897 formula records in the documents
+keeps one.
+
 ### Which formats each control shows through
 
 Measured 2026-11-10 for PYB-145 across the same 190 documents, pairing each control with

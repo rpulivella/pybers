@@ -26,12 +26,13 @@ from typing import TYPE_CHECKING
 from pybers.absence import UNCHANGED, UNDETERMINED
 from pybers.addressing.reference import CellReference
 from pybers.format._read import findFormatOfType
-from pybers.format._write import findAutomaticFormat
+from pybers.format._write import findAutomaticFormat, findFormulaFormatEntry
 from pybers.format.controls import CellControl, controlFormatFamilies
 from pybers.format.formats import (
     CellFormat,
     CellFormatAutomatic,
     CellFormatBoolean,
+    CellFormatText,
     findFormatShown,
 )
 from pybers.table.cell import isSameValue
@@ -46,10 +47,12 @@ def findFormatMisfit(
 ) -> str | None:
     """Return why a format cannot show the value a cell would hold, or None if it can.
 
-    An empty cell takes any format, as Numbers keeps one on a cell it emptied.
+    An empty cell takes any format, as Numbers keeps one on a cell it emptied, and so
+    does a formula, whose format waits in its family's slot for a result it fits.
     """
     shown = findFormatShown(cellFormat)
-    if shown is UNDETERMINED or value is None:
+    formula = cell is not None and cell.formula is not None
+    if shown is UNDETERMINED or value is None or formula:
         return None
     unchanged = cell is not None and isSameValue(cell.value, value)
     kind = (
@@ -101,11 +104,12 @@ def findFormatSkip(
 ) -> str | None:
     """Return why a cell in a range is left without the format asked, or None.
 
-    A range commonly holds an empty cell and a formula, so each is skipped and reported
-    rather than refusing the cells pybers can format.
+    A range commonly holds empty cells, so each is skipped and reported rather than
+    refusing the cells pybers can format. A formula is never skipped, since its format
+    waits in its family's slot for a result of that kind.
     """
     if cell is not None and cell.formula is not None:
-        return f"{where} is backed by a formula, whose format pybers cannot yet set."
+        return None
     if value is None:
         return f"{where} holds no value, which pybers cannot yet format."
     return None
@@ -134,6 +138,20 @@ def findFormatRefusal(
         unchanged and cellFormat == shown
     ):
         return None
+    formula = cell is not None and cell.formula is not None
+    if formula and cellFormat == CellFormatText():
+        return (
+            f"{where} is backed by a formula, and Numbers keeps no chosen text format "
+            "on one, so it can take automatic."
+        )
+    if formula:
+        if findFormulaFormatEntry(cellFormat, value) is not None:
+            return None
+        return (
+            f"{where} is backed by a formula, and pybers cannot yet write a "
+            f"{cellFormat.formatFamily} format for one, so it can take number, "
+            "date-time, duration, currency over a currency result, or automatic."
+        )
     if cellFormat == CellFormatBoolean():
         return (
             f"Numbers offers no boolean format to choose, so {where} can take a "
