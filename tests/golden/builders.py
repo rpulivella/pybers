@@ -10,6 +10,8 @@ so no golden is made any other way. A test asserting what a golden holds reads i
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-10  A label names a format or control a golden changed over the same value,
+            for PYB-145.
 2026-11-03  A golden setting a created table's headers, for PYB-223.
 2026-11-02  A golden starting from a fixture or measurement names why, for PYB-261.
 2026-11-02  A golden can start from a created document, for PYB-261.
@@ -102,31 +104,76 @@ def formatGoldenLabel(shown: str, sourceLabel: str) -> str:
     return f"written by pybers as {shown} over {sourceLabel}"
 
 
+@dataclass(frozen=True, slots=True)
+class MeasuredCell:
+    """A measured cell's text, how it shows it, and the label beneath it."""
+
+    shown: str
+    presentation: str
+    label: str
+
+
+def findPresentationText(table: pybers.Table, address: pybers.CellAddress) -> str:
+    """Return a cell's format and control as text, Automatic named without its pick.
+
+    The pick is left out because it is UNDETERMINED until a save, and a label is
+    written before one. A merge's covered cell shows nothing of its own.
+    """
+    merge = table.mergeCovering(address)
+    if merge is not None and merge.anchor != address:
+        return ""
+    shown = table.cell(address).presentation
+    cellFormat = (
+        "none" if shown.format is None
+        else "automatic" if isinstance(shown.format, pybers.CellFormatAutomatic)
+        else pybers.formatCellFormat(shown.format)
+    )
+    if shown.control is None:
+        return cellFormat
+    return f"{cellFormat} through {pybers.formatCellControl(shown.control)}"
+
+
+def findGoldenLabel(source: MeasuredCell, built: MeasuredCell) -> str:
+    """Return the label a measured cell should carry once pybers has changed it.
+
+    A changed value is named alone, and a format or control changed over the same
+    value is named with it.
+    """
+    if built.shown != source.shown:
+        return formatGoldenLabel(built.shown, source.label)
+    if built.presentation != source.presentation:
+        return formatGoldenLabel(
+            f"{built.shown} in {built.presentation}", source.label
+        )
+    return source.label
+
+
 def listMeasuredCells(table: pybers.Table) -> list[pybers.CellAddress]:
     """Return the address of every measured cell, the row its labels describe."""
     return [pybers.CellAddress(measuredRow, column)
             for column in range(1, table.colCount + 1)]
 
 
-def readMeasuredCells(table: pybers.Table) -> dict[pybers.CellAddress, tuple[str, str]]:
-    """Return each measured cell's text and the label beneath it, by its address."""
+def readMeasuredCells(table: pybers.Table) -> dict[pybers.CellAddress, MeasuredCell]:
+    """Return each measured cell's text, presentation and label, by its address."""
     return {
-        address: (findShownText(table, address),
-                  str(table.cell(row=labelRow, col=address.col).value))
+        address: MeasuredCell(
+            findShownText(table, address),
+            findPresentationText(table, address),
+            str(table.cell(row=labelRow, col=address.col).value),
+        )
         for address in listMeasuredCells(table)
     }
 
 
 def writeGoldenLabels(
-    table: pybers.Table, before: dict[pybers.CellAddress, tuple[str, str]]
+    table: pybers.Table, before: dict[pybers.CellAddress, MeasuredCell]
 ) -> None:
     """Rewrite the label beneath every measured cell the mutation changed."""
-    for address, (shown, label) in before.items():
-        now = findShownText(table, address)
-        if now != shown:
-            table.cell(row=labelRow, col=address.col).value = formatGoldenLabel(
-                now, label
-            )
+    for address, measured in readMeasuredCells(table).items():
+        wanted = findGoldenLabel(before[address], measured)
+        if wanted != before[address].label:
+            table.cell(row=labelRow, col=address.col).value = wanted
 
 
 def buildGolden(builder: GoldenBuilder, into: Path) -> Path:
@@ -610,6 +657,48 @@ def writeNothing(document: pybers.Document) -> None:
     """Write nothing, for a golden that is its starting document."""
 
 
+# ── 145: formats and controls set by pybers ─────────────────────────────────
+
+# Each row of a created table: a label, then a value in its family chosen by a person.
+chosenFormats: tuple[tuple[str, object, pybers.CellFormat], ...] = (
+    ("0.25 in a chosen number format", Decimal("0.25"), pybers.CellFormatNumber()),
+    ("words in a chosen text format", "words", pybers.CellFormatText()),
+    ("10 November 2026 in a chosen date format", datetime.datetime(2026, 11, 10),
+     pybers.CellFormatDateTime()),
+    ("90 minutes in a chosen duration format", datetime.timedelta(minutes=90),
+     pybers.CellFormatDuration()),
+)
+
+
+def chooseFormats(document: pybers.Document) -> None:
+    """Give a created table one value of each kind in its family, chosen by a person."""
+    table = document.sheet().tableAdd("Formats", rows=len(chosenFormats), cols=2)
+    for row, (label, value, chosen) in enumerate(chosenFormats, start=1):
+        table.cell(f"A{row}").value = label
+        document.cellSet(f"::Formats::B{row}", value, format=chosen)
+
+
+def writeAutomaticFormats(document: pybers.Document) -> None:
+    """Return every percent of `13-number-percent` to Numbers' Automatic format."""
+    document.cellSet("::Table 1::B1:G1", format=pybers.CellFormatAutomatic())
+
+
+def removeControls(document: pybers.Document) -> None:
+    """Remove each of the five controls `11-value-types-noformats` holds."""
+    document.cellSet("::Table 1::E1:I1", control=None)
+
+
+# Goldens of what pybers cannot create yet, each naming the ticket that enables it.
+enabledLaterGoldens: tuple[GoldenBuilder, ...] = (
+    GoldenBuilder("13-formats-made-automatic-by-pybers", "13-number-percent",
+                  writeAutomaticFormats, labeled=True,
+                  sourceReason="PYB-233 enables pybers to create a percent format."),
+    GoldenBuilder("11-controls-removed-by-pybers", "11-value-types-noformats",
+                  removeControls, labeled=True,
+                  sourceReason="PYB-240 to PYB-244 enable pybers to create controls."),
+)
+
+
 # The reason every golden confirmed before pybers could create a document gives.
 confirmedBeforeCreation: str = (
     "Edits a document Numbers made, confirmed before pybers could create one."
@@ -622,6 +711,7 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("00-created-formulas-in-tables-by-pybers", None,
                   addCreatedFormulaTables),
     GoldenBuilder("00-created-headers-set-by-pybers", None, setHeaders),
+    GoldenBuilder("00-created-formats-chosen-by-pybers", None, chooseFormats),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.
@@ -704,6 +794,7 @@ confirmedOnNumbersDocuments: tuple[GoldenBuilder, ...] = (
 
 goldens: tuple[GoldenBuilder, ...] = (
     *createdGoldens,
+    *enabledLaterGoldens,
     *(dataclasses.replace(builder, sourceReason=confirmedBeforeCreation)
       for builder in confirmedOnNumbersDocuments),
 )
@@ -717,6 +808,6 @@ def findBuilder(name: str) -> GoldenBuilder:
 __all__ = [
     "GoldenBuilder", "buildGolden", "currencyWrites", "findBuilder", "findFirstTable",
     "findShownText",
-    "formatGoldenLabel", "goldens", "labelRow", "listMeasuredCells", "measuredRow",
-    "readMeasuredCells",
+    "findGoldenLabel", "formatGoldenLabel", "goldens", "labelRow", "listMeasuredCells",
+    "measuredRow", "readMeasuredCells",
 ]

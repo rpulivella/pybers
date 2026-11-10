@@ -32,7 +32,7 @@ from golden.builders import (
     buildGolden,
     findBuilder,
     findFirstTable,
-    formatGoldenLabel,
+    findGoldenLabel,
     goldens,
     readMeasuredCells,
 )
@@ -106,14 +106,8 @@ def listStaleLabels(builder: GoldenBuilder, golden: Path) -> list[str]:
     sourceTable = findFirstTable(pybers.open(findDocumentPath(builder.source)))
     source = readMeasuredCells(sourceTable)
     built = readMeasuredCells(findFirstTable(pybers.open(golden)))
-    stale = []
-    for address, (shown, label) in built.items():
-        sourceShown, sourceLabel = source[address]
-        wanted = (sourceLabel if shown == sourceShown
-                  else formatGoldenLabel(shown, sourceLabel))
-        if label != wanted:
-            stale.append(str(address))
-    return stale
+    return [str(address) for address, measured in built.items()
+            if measured.label != findGoldenLabel(source[address], measured)]
 
 
 @pytest.mark.parametrize(
