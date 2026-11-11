@@ -31,7 +31,7 @@ from test_cli_set import runSetCommand
 from test_writer import listArchiveDifferences, readRecordAt
 
 import pybers
-from conftest import copyDocument
+from conftest import copyDocument, readPlainText
 from pybers import (
     UNCHANGED,
     CellFormatAutomatic,
@@ -227,13 +227,14 @@ def testACommandSetsAValueAndAFormatTogether(working: Path) -> None:
 def testACommandRefusesAFormatNamingNoFamily(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1", "--cell-format", "percentage")
     assert result.exit_code == 1
-    assert "'percentage' is no format family" in result.output
+    assert "'percentage' is no format family" in readPlainText(result.output)
 
 
 def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1")
     assert result.exit_code == 2
-    assert "Give a VALUE, a --cell-format or a --cell-control." in result.output
+    shown = readPlainText(result.output)
+    assert "Give a VALUE, a --cell-format or a --cell-control." in shown
 
 
 @pytest.mark.parametrize(("stem", "address"), [
@@ -309,14 +310,14 @@ def testACommandFallsBackToAutomaticWhenAsked(working: Path) -> None:
         "--conflict", "automatic",
     )
     assert result.exit_code == 0, result.output
-    assert "It takes Automatic." in result.output
+    assert "It takes Automatic." in readPlainText(result.output)
     assert readFormat(working, "A2") == CellFormatAutomatic(CellFormatText())
 
 
 def testACommandRefusesAFormatThatCannotShowTheValue(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A2", "--cell-format", "number")
     assert result.exit_code == 1
-    assert "which a number format cannot show" in result.output
+    assert "which a number format cannot show" in readPlainText(result.output)
 
 
 def testABooleanFormatNoMenuOffersIsRefused(tmp_path: Path) -> None:

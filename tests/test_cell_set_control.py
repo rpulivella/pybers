@@ -28,7 +28,7 @@ from test_cli_set import runSetCommand
 from test_writer import listArchiveDifferences
 
 import pybers
-from conftest import copyDocument
+from conftest import copyDocument, readPlainText
 from pybers import (
     UNCHANGED,
     CellControlPopUpMenu,
@@ -144,4 +144,4 @@ def testACommandRemovesAControl(working: Path) -> None:
 def testACommandRefusesAControlNamingNone(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::G1", "--cell-control", "knob")
     assert result.exit_code == 1
-    assert "'knob' is no control" in result.output
+    assert "'knob' is no control" in readPlainText(result.output)
