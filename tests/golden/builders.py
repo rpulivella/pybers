@@ -706,6 +706,23 @@ def chooseFormulaFormats(document: pybers.Document) -> None:
             document.cellSet(f"::Formulas::B{row}", format=chosen)
 
 
+# Each row of a created table: a label, and a blank cell given a chosen format.
+emptyFormats: tuple[tuple[str, pybers.CellFormat], ...] = (
+    ("blank, in a chosen number format", pybers.CellFormatNumber()),
+    ("blank, in a chosen date format", pybers.CellFormatDateTime()),
+    ("blank, in a chosen duration format", pybers.CellFormatDuration()),
+    ("blank, in a chosen text format", pybers.CellFormatText()),
+)
+
+
+def chooseEmptyFormats(document: pybers.Document) -> None:
+    """Give blank cells of a created table their formats, each labeled beside it."""
+    table = document.sheet().tableAdd("Blanks", rows=len(emptyFormats), cols=2)
+    for row, (label, chosen) in enumerate(emptyFormats, start=1):
+        table.cell(f"A{row}").value = label
+        document.cellSet(f"::Blanks::B{row}", format=chosen)
+
+
 def chooseFormulaFormat(document: pybers.Document) -> None:
     """Give the sum Numbers calculated in `20-formula-shapes` a chosen number format."""
     document.cellSet("Sheet 1::Table 1::A11", format=pybers.CellFormatNumber())
@@ -746,6 +763,8 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("00-created-formats-chosen-by-pybers", None, chooseFormats),
     GoldenBuilder("00-created-formula-formats-chosen-by-pybers", None,
                   chooseFormulaFormats),
+    GoldenBuilder("00-created-empty-formats-chosen-by-pybers", None,
+                  chooseEmptyFormats),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.
