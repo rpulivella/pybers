@@ -188,43 +188,67 @@ and lives only for the session, since the file has nowhere to keep it. Refusing 
 it puts on every caller.
 
 **A cell that changes kind takes Numbers' Automatic format for its new kind**, as a value
-typed into a fresh cell does. A boolean therefore shows TRUE or FALSE; a checkbox is a
-format, chosen through formats like any other.
+typed into a fresh cell does. A boolean therefore shows TRUE or FALSE, and a checkbox is
+chosen as a format and a control together.
 
-**A format is a value of one union, `CellFormat`**, with one frozen dataclass per family:
-`CellFormatNumber`, `CellFormatNumberCustom`, `CellFormatDuration`, `CellFormatCurrency`
-and the rest. `CellFormatAutomatic` and `CellFormatUnknown` are members too, so a format
-nobody chose and a format pybers cannot decode are explicit values rather than `None`, and
-a `match` over a cell's format is exhaustive. The names lead with `CellFormat` so the family
-sorts together and never collides with text or table formatting, and `CellFormatFamily`
-names the families. A small `Protocol` carries what every format shares.
+**A format is a member of one closed family, `CellFormat`**, with one frozen dataclass per
+family: `CellFormatNumber`, `CellFormatNumberCustom`, `CellFormatDuration`,
+`CellFormatCurrency` and the rest. `CellFormatAutomatic` and `CellFormatUnknown` are
+members too, so a format nobody chose and a format pybers cannot decode are explicit values
+rather than `None`, and a `match` over a cell's format is exhaustive. The names lead with
+`CellFormat` so the family sorts together and never collides with text or table
+formatting. An abstract base gives every member what it shares, its discriminator
+`formatFamily` among it, a `CellFormatFamily` naming the families, and `CellFormat` is the
+union a `match` uses. `CellFormatAutomatic` holds the format Numbers chose, so whether a
+person chose a format is the member a cell reads as, with no flag beside it.
 Typed objects were chosen over the alternatives other libraries take, a format string as in
 openpyxl or keyword options as in numbers-parser, because Numbers has no format syntax to
 borrow and a misspelled keyword fails late or not at all.
 
+**A control is a closed family of its own beside the format.** A slider, a stepper and a
+pop-up menu show their value through an ordinary format, so none of them is a format. A
+checkbox and a star rating are a format and a control both, since Numbers stores a format
+entry for each as well as the control that edits it. `CellControl` is the union of
+`CellControlCheckbox`, `CellControlStarRating`, `CellControlSlider` and
+`CellControlStepper` with the minimum, maximum and increment each specifies,
+`CellControlPopUpMenu` with its items, and `CellControlUnknown`. A control answers itself
+whether it can show a value, and a value write consults it to decide whether a cell keeps
+the control.
+
+**Each family refuses a malformed member at import.** `pybers/_family.py` holds both to
+one shape. A member extending another raises when its class is created, and a
+member that is not a frozen, slotted dataclass, that the union omits, or whose
+discriminator is missing or repeated stops the import. Each member is `@final`, so mypy
+holds the same line, and the structure holds by construction rather than by review.
+
 **A format belongs to no document.** One read from a cell in one document applies to a
 cell in another, and the writer finds or adds the matching entry in that table's format
-list. Every format has one text form tagged by its family, which the command line, JSON
-export and import, and an agent all use.
+list. Every format has one text form tagged by its family, which `pybers set
+--cell-format` reads and `pybers show` prints, and the JSON form carries the same setting
+names as an object, so a machine reads one grammar and a person another.
 
-**A cell's kind and format always agree.** A write that would leave a format on a value it
+**A value's kind and format always agree.** A write that would leave a format on a value it
 cannot show, such as a duration format on text, is refused, naming both, unless the caller
 passes `CellFormatConflict.AUTOMATIC`, which falls back to the Automatic format and reports
 it. The policy is a parameter of the library and of an agent's calls, and other writes can
-take it later, an import or a fill among them.
+take it later, an import or a fill among them. A formula and an empty cell are not judged:
+Numbers shows a cell through the format slot of what it holds, so a format given to either
+waits in its family's slot, chosen, until a result or a value of that kind arrives, as
+findings-11-formats.md measures.
 
 **A write reports each cell whose kind or format it changed**, before and after, and a
-preview reports the same without writing. Nothing about a column is special: a write
-touches the cells it names, and whether a column stays consistent is answered by reading
-the table's structure, which reports each column's kind and format and the cells that
-differ. That reading is also what keeps JSON export compact, since a column is described
-once and only its exceptions are listed.
+preview reports the same without writing. Nothing about a column or a row is special:
+a write touches the cells it names, and a caller reads any pattern across them from the
+cells themselves.
 
-**Formats apply over a range**, `table.cellFormatApply(range, format)`, and a single cell's
-value, format and style are set together in one call, `document.cellSet(selector, ...)`,
-the style a named one or one written into the cell alone. The call sits on the document
-because its selector names the tables, writes every cell the selector matches, and
-returns each change it made and each part it skipped, and why.
+**One call sets every part of a cell, and each part alone.**
+`document.cellSet(selector, value, format=..., control=...)` sets any of a cell's value,
+format and control on every cell the selector matches, a part not given `UNCHANGED` and
+a control of `None` removing one, and the style tickets add a cell's styles to the same
+call. A control is its own part rather than a format, as a control family beside the
+format records, and each of PYB-240 to PYB-244 teaches the writer one. Setting only a format is that call given no value, so no second call does it. The call
+sits on the document because its selector names the tables, writes every cell the
+selector matches, and returns each change it made and each part it skipped, and why.
 
 **A custom number format is a structured value** holding its positive, negative and zero
 forms, the shape Numbers stores. A shorthand parser may later build one, and the structured
@@ -240,13 +264,14 @@ that entry on read rather than holding a copy.
 **No format bit is written before it is decoded.** PYB-219 decodes each family's archive
 and flag bits, and the format work splits by family on its findings.
 
-**On the command line, the verb comes first**: `pybers set FILE ADDRESS VALUE`. A file
+**On the command line, the verb comes first**: `pybers set FILE SELECTOR VALUE`. A file
 first would leave `diff A B`, `import` and `export -o` without a consistent place, and the
 bare `pybers FILE` already covers looking at one document. `set` infers a value's kind and
 `--as` overrides the inference; should inference prove unreliable, `set` falls back to text
 unless `--as` names a kind. The inference is one table of parsers built on the standard
-library, tried in order, rather than a chain of conditions. `set --format` sets a format by
-its text form. A writing verb changes FILE itself, since the verb names the act, as a
+library, tried in order, rather than a chain of conditions. `set --cell-format` sets a
+format by its text form, with or without a value, since `--format` chooses every command's
+output. A writing verb changes FILE itself, since the verb names the act, as a
 database tool changes the database it is given. `--preview` writes nothing, the flag named
 for what it does, and `-o NEW` writes a new document instead, refusing any file that
 exists, so no option changes its meaning with the file it is given.
@@ -397,10 +422,11 @@ the rest as empty stand-ins. Whether Numbers writes a table's name bare or with 
 depends on every table in the document, so a part read alone parses its formulas exactly
 as the whole document would.
 
-**`formatChosen` stays until the format family replaces it.** The chosen bit and a
-format's settings are independent in the file, and an Automatic format holds settings of
-its own, so a bare `automatic` would lose both. PYB-145 settles a `CellFormatAutomatic`
-that carries them.
+**Automatic is a member of the format family, holding the format it chose.** The chosen
+bit and a format's settings are independent in the file, and an Automatic format holds
+settings of its own, so a bare `automatic` would lose both. `CellFormatAutomatic` carries
+the format Numbers picked in `shown`, a `CellFormatShown`, which is every member but
+Automatic, so a format a person chose stays distinct from the same one Automatic picked.
 
 **Styles, rich text and drawables follow the same rules, built by their own tickets.**
 A cell carries `cellStyle`, the properties set on the cell alone, since Numbers never

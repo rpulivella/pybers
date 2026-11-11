@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """\
-`pybers set`: the value of every cell a selector matches, its kind inferred or named.
+`pybers set`: the value, the format and the control of every cell a selector matches.
 
-The command reads the text into a value, makes one `cellSet` call, and saves only
+The command reads the text into a value and a format, makes one `cellSet` call, and
+saves only
 when a cell changed and the call was not a preview. Each cell written prints as
 `pybers show` prints it, in text and JSON alike, and each part skipped prints why on
 stderr.
 
 UPDATES
+2026-11-10  `--cell-control` sets a control by its text form, `none` removing one,
+            for PYB-145.
+2026-11-10  `--cell-format` sets a format by its text form, VALUE now optional, and
+            `--conflict` falls back to Automatic for a format that does not fit,
+            for PYB-145.
 2026-11-03  SELECTOR sets every cell it matches, reporting each skipped, for
             PYB-223. Each cell written prints as `pybers show` prints it.
 2026-10-28  Where a write goes shared with `locale`, FILE itself unless `-o`
@@ -68,16 +74,16 @@ def runSet(
         ),
     ],
     value: Annotated[
-        str,
+        str | None,
         typer.Argument(
-            metavar="VALUE",
+            metavar="[VALUE]",
             help=(
                 "The value as text: 42, 42 EUR, TRUE, 2026-10-20 09:00, 1h 30m, or any "
-                "text."
+                "text. Left out, each cell keeps its value."
             ),
             show_default=False,
         ),
-    ],
+    ] = None,
     kind: Annotated[
         str | None,
         typer.Option(
@@ -100,6 +106,38 @@ def runSet(
             ),
         ),
     ] = None,
+    cellFormat: Annotated[
+        str | None,
+        typer.Option(
+            "--cell-format",
+            metavar="FORMAT",
+            help=(
+                "The format each cell shows its value with, as `pybers show` prints "
+                "one: automatic, number or text."
+            ),
+        ),
+    ] = None,
+    cellControl: Annotated[
+        str | None,
+        typer.Option(
+            "--cell-control",
+            metavar="CONTROL",
+            help=(
+                "The control each cell presents its value through, as `pybers show` "
+                "prints one, or none to remove it."
+            ),
+        ),
+    ] = None,
+    conflict: Annotated[
+        pybers.CellFormatConflict,
+        typer.Option(
+            "--conflict",
+            help=(
+                "What a --cell-format that cannot show a cell's value does: refuse the "
+                "write, or give that cell the Automatic format and say so."
+            ),
+        ),
+    ] = pybers.CellFormatConflict.REFUSE,
     output: OutputOption = None,
     preview: PreviewOption = False,
     extend: Annotated[
@@ -111,7 +149,9 @@ def runSet(
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
-    """Set every cell SELECTOR matches, the kind inferred from VALUE unless --as."""
+    """Set every cell SELECTOR matches to VALUE, --cell-format and --cell-control."""
+    if value is None and cellFormat is None and cellControl is None:
+        raise typer.BadParameter("Give a VALUE, a --cell-format or a --cell-control.")
     target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
         document = (
@@ -119,7 +159,18 @@ def runSet(
             else pybers.open(documentPath, timeZone=timeZone)
         )
         changes = document.cellSet(
-            selector, pybers.parseCellValue(value, kind), extend=extend
+            selector,
+            pybers.UNCHANGED if value is None else pybers.parseCellValue(value, kind),
+            format=(
+                pybers.UNCHANGED if cellFormat is None
+                else pybers.parseCellFormat(cellFormat)
+            ),
+            control=(
+                pybers.UNCHANGED if cellControl is None
+                else pybers.parseCellControl(cellControl)
+            ),
+            conflict=conflict,
+            extend=extend,
         )
         cells: list[ShownPart] = [
             document.table(each.reference.table).cell(each.reference)

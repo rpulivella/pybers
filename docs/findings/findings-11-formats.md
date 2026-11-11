@@ -362,13 +362,86 @@ the locale section below records.
 The unit bits run 1 weeks, 2 days, 4 hours, 8 minutes, 16 seconds and 32 milliseconds.
 Weeks, hours, minutes and milliseconds are named by `15-number-duration-formats` `E1`
 "only weeks", `I1` "hours minutes" and `G1` "only milliseconds", and days and seconds by
-`77-duration-units` `A1` and `B1`. With automatic units the pair records the range Numbers last chose.
+`77-duration-units` `A1` and `B1`. With automatic units the pair records the range Numbers last chose:
+the largest unit the value holds an amount of, down to the smallest, measured 2026-11-10
+for PYB-145. 20 and 10 minutes store minutes to minutes, 1h 10m and 1h 30m hours to
+minutes, and 71 days, 11 hours and 10 milliseconds weeks to milliseconds, in
+`11-value-types-noformats` `D1`, `15-number-duration-formats` `B1` to `D1` and
+`73-values-typed-over-controls` `B1` and `D1`. A range that disagrees with the value makes
+Numbers rewrite it on opening and say "The cell was updated with a more accurate
+duration format", as the golden `00-created-formats-chosen-by-pybers` first showed.
 
 ### Text `260`, checkbox `263`, star rating `267`, and boolean `1`
 
 Each archive holds `format_type` and nothing else. A checkbox and a star rating are also
 controls, so their formats are written with a control. A typed TRUE stores the boolean
 format `1` without a control, as [values](findings-01-values.md) records.
+
+### Which families show which kinds of value
+
+Measured 2026-11-10 for PYB-145 across the 190 documents in the tests, pairing each
+cell's kind with the family it is shown with. `kindFormatFamilies` in
+`pybers.table.kinds` is this table, and a format outside it is refused.
+
+| kind | families | named by |
+| --- | --- | --- |
+| number | number, percent, scientific, fraction, numeral system, custom number, star rating | `13-number-percent`, `16-number-scientific-numeralsystems`, `17-number-custom`, `68b-series-kinds-dragged` `D2`, `54-format-star-rating` `A1` |
+| currency | currency | `12-number-currency` |
+| date and time | date and time | `14-number-date` |
+| duration | duration | `15-number-duration-formats` |
+| boolean | boolean, checkbox | `69-functions-added-in-15-4` `B9`, `11-value-types-noformats` `E1` |
+| text, rich text | text | `01-text-plain` `A1`, `02-text-rich` `A1` |
+
+An empty cell keeps a chosen number, text or date format, 172 times in `65b-series-dragged`
+and `19-formula-dragged`, so an empty cell takes any format. A custom format over text, a
+date or currency reads as unknown until PYB-245 to PYB-247 decode it, so it is not listed.
+
+### A format waits in its family's slot
+
+A cell holding nothing keeps a format too. `65b-series-dragged` `L3` and `M3` and
+`19-formula-dragged` `B2` are type 0 records holding a chosen number, date and text
+format: the entry in its family's slot, the displayed kind naming that slot, and the
+slot's chosen bit, `B2` the bare twelve-byte header and those two references. pybers
+writes an empty cell's format the same way, as the golden
+`00-created-empty-formats-chosen-by-pybers` shows Numbers keeping.
+
+#### A formula's format waits in its family's slot
+
+Measured 2026-11-10 for PYB-145 in Numbers 15.4, by giving three formula records a
+percent format in their number slot and saving each after Numbers opened it. Numbers
+shows a formula's result through the slot of the result's kind, so a format waits in
+its family's slot until a result of that kind arrives:
+
+| formula before | the record given | what Numbers saved |
+| --- | --- | --- |
+| `=SUM(A1:A10)` in `20-formula-shapes`, a number | the percent in its number slot, chosen | the percent kept, its entry completed with 0 decimal places, negative style 0 and no separator |
+| `=IF(SUM(A1:A5)>10,"big","small")`, text | the percent in its number slot, its text slot removed and its displayed kind left naming it | the text slot restored and shown in Automatic, the percent kept in the number slot |
+| `=A1/10` pybers created, no result yet | the percent in its number slot, not chosen, no displayed kind | calculated to 0.5, shown in percent from that slot, and marked chosen |
+
+None drew a chip or an alert. pybers therefore writes a format given to any formula into
+its family's slot, chosen, whatever the formula's result, since Numbers decides which slot
+shows once it calculates, as the goldens `00-created-formula-formats-chosen-by-pybers`
+and `20-formula-format-chosen-by-pybers` show Numbers keeping. A formula with no result
+names no displayed kind, so pybers reads its one chosen slot as its format. A chosen text
+format is the exception, refused, since none of the 897 formula records in the documents
+keeps one.
+
+### Which formats each control shows through
+
+Measured 2026-11-10 for PYB-145 across the same 190 documents, pairing each control with
+the family of the format beneath it. `controlFormatFamilies` in `pybers.format.controls`
+is this table, and a control beside any other format is refused.
+
+| control | families | named by |
+| --- | --- | --- |
+| checkbox | checkbox | `11-value-types-noformats` `E1`, `63-fill-base` `D3` |
+| star rating | star rating | `11-value-types-noformats` `F1`, `54-format-star-rating` `A1` |
+| slider, stepper | number, currency, percent, fraction, scientific, numeral system | `81-control-formats` `A1` to `H1`, `70-retirement-template-15-4` `B4` |
+| pop-up menu | text | `11-value-types-noformats` `I1`, `81-control-formats` `I1` |
+
+The slider and the stepper are read as one row: between them the documents hold every
+family PYB-242 and PYB-243 name, a slider over fraction and scientific and a stepper
+over numeral system, though no single fixture holds each under both.
 
 ### Controls are a format plus a cell spec
 

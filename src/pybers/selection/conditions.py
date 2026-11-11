@@ -8,6 +8,8 @@ A condition selects by what pybers models, never by what a cell holds. An attrib
 is read as an empty cell, so `:empty` reaches the cells a sparse table never stored.
 
 UPDATES
+2026-11-09  `format=` matches the family a cell is shown with, the one Automatic
+            chose included, for PYB-145.
 2026-11-03  Written for PYB-223.
 """
 from __future__ import annotations
@@ -28,8 +30,9 @@ from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
 from pybers.addressing.reference import CellAddress
-from pybers.table.controls import CellControlType
-from pybers.table.kinds import CellFormat, CellKind
+from pybers.format.controls import CellControlType
+from pybers.format.formats import CellFormatFamily, findFormatShown
+from pybers.table.kinds import CellKind
 
 if TYPE_CHECKING:
     from pybers.table.cell import Cell
@@ -56,7 +59,10 @@ def readKind(cell: Cell | None) -> object:
 
 def readFormat(cell: Cell | None) -> object:
     found = None if cell is None else cell.presentation.format
-    return found if found is None or found is UNDETERMINED else str(found)
+    if found is None or found is UNDETERMINED:
+        return found
+    shown = findFormatShown(found)
+    return shown if shown is UNDETERMINED else shown.formatFamily.value
 
 
 def readControl(cell: Cell | None) -> object:
@@ -72,7 +78,10 @@ def readConditional(cell: Cell | None) -> object:
 selectorAttributes: frozendict[str, SelectorAttributeField] = frozendict(
     kind=SelectorAttributeField(readKind, tuple(each.value for each in CellKind)),
     format=SelectorAttributeField(
-        readFormat, tuple(each.value for each in CellFormat)
+        readFormat, tuple(
+            each.value for each in CellFormatFamily
+            if each is not CellFormatFamily.AUTOMATIC
+        ),
     ),
     control=SelectorAttributeField(
         readControl, tuple(each.value for each in CellControlType)

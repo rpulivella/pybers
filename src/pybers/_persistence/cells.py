@@ -77,6 +77,8 @@ offsetUnitWord: int = 4
 # The value begins here in every record seen. Bytes 0-11 carry the storage version,
 # the type, a flags bitmask at 6-7, and four bytes whose purpose is not established.
 valueOffset: int = 12
+# Byte 0 of every cell record in the documents. A created record carries it too.
+recordStorageVersion: int = 5
 
 # Byte 9 of the header is a second bitmask, and this bit marks a cell backed by a
 # formula. Established across the documents on 2026-09-01: in all 74 tables, a table
@@ -286,6 +288,13 @@ countedFormatSlots: tuple[tuple[int, int], ...] = (
 # `54-format-star-rating` stored 5 where no list holds a key 5.
 displayedKindSlot: tuple[int, int] = (9, 0x10)
 
+# The control a cell presents as, a `control_cell_spec_table` key. Measured against
+# 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
+# the table lists them and whose plain cells carry no such slot. A control describes
+# the value it was built for, so it does not survive that value being replaced: a
+# star rating left on a cell that became text makes Numbers present text as stars.
+controlSlot: tuple[int, int] = (9, 0x04)
+
 
 # Byte 6's chosen bit for each slot of `countedFormatSlots`, in its order.
 chosenFormatBits: tuple[int, ...] = (0x01, 0x02, 0x08, 0x04, 0x80, 0x20)
@@ -364,3 +373,15 @@ def decodeRow(
         )
         records.append(decodeRecord(column, storageBuffer[at:end]))
     return records
+
+
+
+def buildEmptyRecord() -> bytes:
+    """Return the record of a cell holding nothing, for a format to be placed in.
+
+    The bare header Numbers stores for an empty cell it formatted, measured in
+    `19-formula-dragged` `B2`, whose format slot and displayed kind follow.
+    """
+    header = bytearray(valueOffset)
+    header[0] = recordStorageVersion
+    return bytes(header)

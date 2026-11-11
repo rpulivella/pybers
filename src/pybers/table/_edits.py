@@ -65,8 +65,10 @@ from .._generated import TSTArchives_pb2 as tst
 from .._persistence import decodeRecord
 from .._persistence.cells import (
     CellRecord,
+    buildEmptyRecord,
     carriesChosenFormat,
     carriesFormula,
+    controlSlot,
     emptyOffset,
     findFormulaKeySlot,
     findSlotValue,
@@ -76,7 +78,9 @@ from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
 from .._persistence.pool import EntryPool
 from .._persistence.rows import StoredTiles, iterateTileRows
+from ..absence import UNCHANGED
 from ..addressing.reference import CellAddress, originOffset
+from ..format._controls import readControls
 from ..formula._write import (
     attachFormulaKey,
     buildFormulaRecord,
@@ -87,16 +91,15 @@ from ..formula._write import (
 )
 from ..formula.nodes import Formula
 from ._conditions import ConditionalPlan, writeConditionalCounts
-from ._controls import readControls
 from ._lines import GridMaps
 from ._read import (
-    controlSlot,
     readCellValue,
     readCurrencyCodes,
     readRichTextTable,
     readStringTable,
 )
 from ._records import (
+    applyAskedFormat,
     applyAutomaticFormat,
     applyChosenFormat,
     buildWrittenRecord,
@@ -105,6 +108,7 @@ from ._records import (
     findWrittenTypeByte,
     patchRichTextKey,
     plainNumberRecord,
+    removeSlots,
 )
 from ._refcounts import (
     copyRichText,
@@ -141,7 +145,7 @@ from .cells import Table
 def findRowsNeedingStorage(
     table: Table, firstRow: int, tileSize: int, present: frozenset[int]
 ) -> list[int]:
-    """Return the rows of this tile holding a value or formula it stores no row for.
+    """Return the rows of this tile holding a cell to store that it has no row for.
 
     Numbers writes a `TileRowInfo` only for a row that holds something, so a table
     declaring ten rows can carry one. A formula written into any of the other nine
@@ -150,7 +154,7 @@ def findRowsNeedingStorage(
     wanted = set()
     for reference, cell in table.cells.items():
         row = reference.row - originOffset
-        if (cell.formula is None and cell.value is None) or row in present:
+        if not cell._storageCheck() or row in present:
             continue
         if firstRow <= row < firstRow + tileSize:
             wanted.add(row)
@@ -271,6 +275,15 @@ def applyTableEdits(
         if formatPool is not None:
             moveFormatReferences(formatPool, before, after, str(where))
 
+    def formatFinish(raw: bytes, cell: Cell) -> bytes:
+        """Return a record carrying its cell's format, the one asked for or its bit."""
+        asked = cell._formatAsked
+        if asked is None:
+            return applyChosenFormat(raw, cell)
+        return applyAskedFormat(
+            raw, asked, cell.value, cell.formula is None, formatFor, formatOf
+        )
+
     def releaseRecord(record: CellRecord, reference: CellAddress) -> bool:
         """Release every list entry a removed record names, reporting a formula."""
         formatsCount(record.raw, None, reference)
@@ -379,7 +392,7 @@ def applyTableEdits(
     absentTiles = {
         (reference.row - originOffset) // tileSize
         for reference, cell in table.cells.items()
-        if cell.formula is not None or cell.value is not None
+        if cell._storageCheck()
     } - {entry.tileid for entry in store.tiles.tiles}
     tilesCreated = bool(absentTiles)
     if tilesCreated:
@@ -431,9 +444,12 @@ def applyTableEdits(
                 )
                 edit = classifyFormulaEdit(cell.formula, record, pool)
                 chosenChanged = (
-                    cell.presentation.formatChosen != carriesChosenFormat(record)
+                    cell._formatChosenCheck() != carriesChosenFormat(record)
                 )
-                if not valueChanged and edit == "none" and not chosenChanged:
+                asked = (
+                    cell._formatAsked is not None or cell._controlAsked is not UNCHANGED
+                )
+                if not (valueChanged or asked or chosenChanged) and edit == "none":
                     continue
                 patched = record.raw
                 # The value first, so that writing a value OVER a formula still
@@ -455,7 +471,13 @@ def applyTableEdits(
                         formulaAdded.append((row, record.column))
                     elif edit == "detach":
                         formulaRemoved.append((row, record.column))
-                replacements[record.column] = applyChosenFormat(patched, cell)
+                if cell._controlAsked is None:
+                    removed = removeSlots(patched, {controlSlot})
+                    releaseReplaced(decodeRecord(record.column, patched), removed)
+                    patched = removed
+                finished = formatFinish(patched, cell)
+                formatsCount(patched, finished, reference)
+                replacements[record.column] = finished
             present = frozenset(record.column for record in walked.records)
             # A cell the model gave a formula to but the file has no record for.
             # The loop above cannot see these: it walks records, and these have
@@ -470,12 +492,17 @@ def applyTableEdits(
                     if cell is None:
                         continue
                     if cell.formula is not None:
-                        replacements[column] = applyChosenFormat(
+                        replacements[column] = formatFinish(
                             buildFormulaRecord(pool.keyFor(cell.formula)), cell
                         )
+                        formatsCount(None, replacements[column], reference)
                         formulaAdded.append((row, column))
                         continue
                     if cell.value is None:
+                        if cell._formatAsked is not None:
+                            built = formatFinish(buildEmptyRecord(), cell)
+                            replacements[column] = built
+                            formatsCount(None, replacements[column], reference)
                         continue
                     # A value needs a record shaped like one this table already
                     # holds, since its trailing references are keys into the
@@ -485,7 +512,7 @@ def applyTableEdits(
                     )
                     if shape is None:
                         shape = decodeRecord(column, plainNumberRecord)
-                    replacements[column] = applyChosenFormat(
+                    replacements[column] = formatFinish(
                         buildWrittenRecord(
                             cell, shape, textPool, borrowed=True, formatFor=formatFor,
                             formatOf=formatOf,

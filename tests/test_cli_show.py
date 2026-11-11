@@ -91,7 +91,7 @@ def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
     assert result.stdout.splitlines() == [
         "Cell: Sheet 1::Table 1::A11",
         "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
-        "  Format: number   Format chosen: no   Control: none",
+        "  Format: number (automatic)   Control: none",
         "  Unrecognized type code: none",
     ]
 
@@ -109,9 +109,9 @@ def testACellsFieldsFollowTheNamesAndOrderOfItsJsonForm() -> None:
 
 
 @pytest.mark.parametrize(("address", "control"), [
-    ("A1", "slider (minimum 0, maximum 200, increment 5)"),
-    ("I1", "pop-up-menu (items ['Item 1', 'Item 2', 'Item 3'], "
-           "starts with first item no)"),
+    ("A1", "slider; minimum: 0; maximum: 200; increment: 5"),
+    ("I1", 'pop-up-menu; items: "Item 1", "Item 2", "Item 3"; '
+           "starts-with-first-item: no"),
     ("J1", "star-rating"),
 ])
 def testAControlShowsEverySettingItHolds(address: str, control: str) -> None:
@@ -124,7 +124,7 @@ def testAControlsSettingsAreNamedAndOrderedAsItsJsonForm() -> None:
     family, *keys = json.loads(pybers.formatJsonForm(control))
     line = findLines(runShowCommand(controlsPath, "::Table 1::I1"), "Control")[0]
     assert family == "controlType"
-    found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', ' ', key).lower()} ")
+    found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', '-', key).lower()}: ")
              for key in keys]
     assert found == sorted(found)
 
@@ -137,28 +137,32 @@ formatStems: tuple[str, ...] = (
 )
 
 
-def listPresentations() -> list[tuple[str, object, str]]:
-    """Return each format and control the format documents hold, with its line."""
-    found = []
-    for stem in formatStems:
-        for _, _, cell in pybers.open(findDocumentPath(stem)).cellsIterate():
-            shown = cell.presentation
-            found.append((stem, shown.format, formatFormat(shown.format)))
-            found.append((stem, shown.control, formatControl(shown.control)))
-    return found
+def listPresentations() -> list[pybers.CellPresentation]:
+    """Return how each cell of the format documents shows its value."""
+    return [cell.presentation for stem in formatStems
+            for _, _, cell in pybers.open(findDocumentPath(stem)).cellsIterate()]
 
 
-def testEveryFormatAndControlShowsEachSettingOfItsJsonForm() -> None:
-    for stem, subject, line in listPresentations():
-        tree = json.loads(pybers.formatJsonForm(subject))
-        if not isinstance(tree, dict):
-            assert line == ("none" if tree is None else str(tree)), stem
-            continue
-        family, *settings = tree.values()
-        assert line.startswith(str(family)), (stem, line)
-        found = [line.index(f"{re.sub(r'(?<!^)(?=[A-Z])', ' ', key).lower()} ")
-                 for key in list(tree)[1:]]
-        assert found == sorted(found) and len(found) == len(settings), (stem, line)
+def testEveryFormatShowsAsTheTextFormItReadsBackFrom() -> None:
+    for presentation in listPresentations():
+        shown = presentation.format
+        line = formatFormat(shown)
+        if shown is None:
+            assert line == "none"
+        elif isinstance(shown, pybers.CellFormatUnknown):
+            assert line.startswith("unknown; format-type: ")
+        else:
+            assert pybers.parseCellFormat(line) == shown, line
+
+
+def testEveryControlShowsAsTheTextFormItReadsBackFrom() -> None:
+    for presentation in listPresentations():
+        control = presentation.control
+        line = formatControl(control)
+        if isinstance(control, pybers.CellControlUnknown):
+            assert line.startswith("unknown; interaction-type: ")
+        else:
+            assert pybers.parseCellControl(line) == control, line
 
 
 def testATableShowsItsSizeAndCellCountOnOneLineThenEachCell() -> None:
@@ -194,8 +198,9 @@ def testASheetHoldingNoTablesShowsItsNameAlone() -> None:
 def testAFormatASaveHasNotChosenReadsUnknown() -> None:
     cell = pybers.open(shapesPath).sheet("Sheet 1").table("Table 1").cell("A1")
     cell.value = "text"
-    assert cell.presentation.format is pybers.UNDETERMINED
-    assert ("Format", "unknown") in listShownFields(renderPlain(formatCell(cell)))
+    assert cell.presentation.format == pybers.CellFormatAutomatic()
+    shown = listShownFields(renderPlain(formatCell(cell)))
+    assert ("Format", "unknown (automatic)") in shown
 
 
 def testASheetShowsEachOfItsTablesIndentedUnderIt() -> None:

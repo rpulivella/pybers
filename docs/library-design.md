@@ -21,7 +21,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `TableHeaders` | How many header rows, header columns and footer rows a table holds | Frozen |
 | `TableRows`, `TableRow` | The rows of a table, and one row's cells | View |
 | `Cell` | One cell: its value, kind, formula and presentation | Owner |
-| `CellPresentation` | How a cell shows its value: its format, whether a person chose it, and its control | Frozen |
+| `CellPresentation` | How a cell shows its value: its format and its control | Frozen |
 | `CellControl` | The control a cell presents its value through, beside its format: one dataclass per control under `CellControlBase`, `CellControlUnknown` included | Frozen |
 | `CellChange` | What a write did to one cell: value and kind before and after, and how far the table grew | Frozen |
 | `CellChanges`, `CellSkip` | What a write did to every cell its selector matched, and each part it skipped, and why | Frozen |
@@ -98,10 +98,9 @@ A value's kind follows its Python type, as the table above lists. A currency amo
 
 - **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does, and loses any control the old value had.
 - **A value write never fails because of the cell's format.** A value of the cell's kind keeps its format, and keeps its control while the control can show it; a control that cannot, such as a slider given a number outside its range, is dropped with its format.
-- **A cell's kind and format always agree.** A format applied that cannot show the cell's value is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`.
-- **Formats apply over a range**, with `table.cellFormatApply(range, format)`, and `document.cellSet(selector, ...)` sets every cell a selector matches, its value, format and style in one call, returning `CellChanges`: each change, and each part skipped and why, such as a cell a formula backs.
+- **A value's kind and format always agree.** A format applied that cannot show a cell's value is refused, naming both, unless the call passes `CellFormatConflict.AUTOMATIC`. A formula and an empty cell take any format pybers can write, which waits in its family's slot until a result or a value of that kind arrives.
+- **One call sets a value, a format, a control or any of them**: `document.cellSet(selector, value, format=..., control=...)` sets every cell a selector matches, each part not given `UNCHANGED` and a control of `None` removing one, and returns `CellChanges`: each change, its format and control before and after, and each part skipped and why, such as a cell a formula backs. Setting only a format is the same call given no value.
 - **A write reports each cell whose kind or format it changed.** A preview is the same write left unsaved, as every command's `--preview` is, so no call takes a `preview` argument.
-- **A table's structure is readable**: each column's kind and format, and the cells that differ from them.
 
 The reasoning is in `decisions.md`, under writing values and formats.
 

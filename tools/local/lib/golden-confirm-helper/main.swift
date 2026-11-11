@@ -11,6 +11,8 @@
 // it escapes. A Data Format value is only matched against a menu item or typed into a field.
 //
 // UPDATES
+// 2026-11-10  Each sheet capture is scanned for Numbers' blue corner chip, which marks a
+//             cell it changed or warns about, and a close-up of each is saved, for PYB-145.
 // 2026-11-02  Automation is checked by asking Numbers its name, since the permission
 //             call answers a running Numbers as not running, and a Numbers whose
 //             process has gone counts as closed though macOS still lists it, for PYB-276.
@@ -47,6 +49,15 @@ let retryPauseSeconds = 0.5
 // A capture stream that failed to start stayed failed through 11 s of 0.5 s retries, 2026-09-22.
 let streamRetryPauseSeconds = 2.0
 let streamStartFailedError = -3811
+// Numbers' blue corner chip, measured 2026-11-10 at (52, 104, 244) in a capture of a golden
+// whose duration units Numbers corrected on opening, for PYB-145.
+let chipColor = (red: 52, green: 104, blue: 244)
+let chipColorTolerance = 28
+// At 2x a chip's triangle covers about 150 pixels and half its bounding box, measured the same day.
+let chipPixelRange = 40...800
+let chipFillRange = 0.3...0.75
+// How much of the sheet around a chip its close-up keeps, in points.
+let chipContextPoints: CGFloat = 80
 // The Numbers this run launched, which the deadline force-quits because nothing else will.
 nonisolated(unsafe) var numbersLaunchedByRun: NSRunningApplication?
 // The four-character code AppleScript uses for missing value, which Swift does not import.
@@ -205,6 +216,14 @@ struct SheetCapture: Codable {
     let path: String
 }
 
+// Where a chip sits, in points from the capture's top-left, and its close-up.
+struct ChipCapture: Codable {
+    let sheet: String
+    let path: String
+    let x: Double
+    let y: Double
+}
+
 struct HelperResult: Codable {
     let sourceHash: String
     let operation: String
@@ -216,6 +235,7 @@ struct HelperResult: Codable {
     var cells: [CellReading] = []
     var tables: [TableReading] = []
     var sheetCaptures: [SheetCapture] = []
+    var chipCaptures: [ChipCapture] = []
     var savedCopy: Bool?
     var stepsDone: Int?
 }
@@ -1092,9 +1112,18 @@ func captureWindowImage(id windowId: Int) -> (CGImage?, String, Bool) {
     return (image, said, streamFailed)
 }
 
+func writePng(_ image: CGImage, to path: String) -> Bool {
+    guard let destination = CGImageDestinationCreateWithURL(
+        URL(fileURLWithPath: path) as CFURL, UTType.png.identifier as CFString, 1, nil)
+    else { return false }
+    CGImageDestinationAddImage(destination, image, nil)
+    return CGImageDestinationFinalize(destination)
+}
+
+@discardableResult
 func captureWindow(
     id windowId: Int, window: AXUIElement, crop: CGRect?, to path: String, pid: pid_t
-) throws {
+) throws -> CGImage {
     var captured: CGImage?
     var said = ""
     var streamFailed = false
@@ -1131,11 +1160,82 @@ func captureWindow(
         guard let cropped = image.cropping(to: pixels) else { throw failure }
         image = cropped
     }
-    guard let destination = CGImageDestinationCreateWithURL(
-        URL(fileURLWithPath: path) as CFURL, UTType.png.identifier as CFString, 1, nil)
-    else { throw failure }
-    CGImageDestinationAddImage(destination, image, nil)
-    guard CGImageDestinationFinalize(destination) else { throw failure }
+    guard writePng(image, to: path) else { throw failure }
+    return image
+}
+
+// Every cluster of the chip's blue left of `width` pixels with a triangle's size and fill.
+func findChips(in image: CGImage, width: Int) -> [CGRect] {
+    let columns = image.width, rows = image.height
+    var pixels = [UInt8](repeating: 0, count: columns * rows * 4)
+    guard let context = CGContext(
+        data: &pixels, width: columns, height: rows, bitsPerComponent: 8,
+        bytesPerRow: columns * 4, space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return [] }
+    context.draw(image, in: CGRect(x: 0, y: 0, width: columns, height: rows))
+    let scanned = min(width, columns)
+    var marked = [Bool](repeating: false, count: columns * rows)
+    for row in 0..<rows {
+        for column in 0..<scanned {
+            let at = (row * columns + column) * 4
+            marked[row * columns + column] =
+                abs(Int(pixels[at]) - chipColor.red) <= chipColorTolerance
+                && abs(Int(pixels[at + 1]) - chipColor.green) <= chipColorTolerance
+                && abs(Int(pixels[at + 2]) - chipColor.blue) <= chipColorTolerance
+        }
+    }
+    var chips: [CGRect] = []
+    for start in marked.indices where marked[start] {
+        var stack = [start], count = 0
+        var (left, top, right, bottom) = (columns, rows, 0, 0)
+        marked[start] = false
+        while let at = stack.popLast() {
+            count += 1
+            let (row, column) = (at / columns, at % columns)
+            (left, top) = (min(left, column), min(top, row))
+            (right, bottom) = (max(right, column), max(bottom, row))
+            for next in [at - 1, at + 1, at - columns, at + columns]
+            where next >= 0 && next < marked.count && marked[next]
+                && abs(next % columns - column) <= 1 {
+                marked[next] = false
+                stack.append(next)
+            }
+        }
+        let box = CGRect(x: left, y: top, width: right - left + 1, height: bottom - top + 1)
+        let fill = Double(count) / Double(box.width * box.height)
+        if chipPixelRange.contains(count) && chipFillRange.contains(fill) {
+            chips.append(box)
+        }
+    }
+    return chips
+}
+
+// The inspector's left edge, so a chip is looked for on the sheet alone.
+func findInspectorLeft(in window: AXUIElement) -> CGFloat? {
+    collectElements(window).first(where: {
+        readText($0, kAXRoleAttribute) == kAXRadioButtonRole
+            && readText($0, kAXDescriptionAttribute) == "Table"
+    }).flatMap(readFrame).map { $0.minX - 6 }
+}
+
+func recordChips(
+    in image: CGImage, sheet: String, window: AXUIElement, captureDirectory: String,
+    result: inout HelperResult
+) {
+    guard let frame = readFrame(window), frame.width > 0 else { return }
+    let scale = CGFloat(image.width) / frame.width
+    let width = findInspectorLeft(in: window).map { Int(($0 - frame.minX) * scale) } ?? image.width
+    for (index, chip) in findChips(in: image, width: width).enumerated() {
+        let margin = chipContextPoints * scale
+        let area = chip.insetBy(dx: -margin, dy: -margin / 2)
+            .intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height)).integral
+        let path = (captureDirectory as NSString).appendingPathComponent(
+            formatCaptureName(["chip", sheet, String(index + 1)]))
+        guard let closeUp = image.cropping(to: area), writePng(closeUp, to: path) else { continue }
+        result.chipCaptures.append(ChipCapture(
+            sheet: sheet, path: path, x: Double(chip.midX / scale), y: Double(chip.midY / scale)))
+    }
 }
 
 func findDataFormatFrame(in window: AXUIElement) -> CGRect? {
@@ -1411,10 +1511,13 @@ func inspectDocument(
             formatCaptureName(["sheet", sheet]))
         // A capture that fails is recorded, and the readings that need none go on.
         do {
-            try captureWindow(
+            let image = try captureWindow(
                 id: Int(windowId), window: window, crop: nil, to: path,
                 pid: numbers.processIdentifier)
             result.sheetCaptures.append(SheetCapture(sheet: sheet, path: path))
+            recordChips(
+                in: image, sheet: sheet, window: window,
+                captureDirectory: captureDirectory, result: &result)
         } catch let failure as HelperFailure {
             result.problems.append(failure.problem)
         }

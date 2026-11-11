@@ -161,11 +161,10 @@ def testACellHoldingRichTextIsRefused() -> None:
         refuseUncreatableCell(cell, "T")
 
 
-def testACellHoldingAFormatAndNoValueIsRefused() -> None:
+def testACellHoldingAFormatAndNoValueIsAccepted() -> None:
     cell = findFixtureCell("22c-merge-overpaints", "Sheet 1", "Table 1", "I5")
 
-    with pytest.raises(pybers.WriteError, match="holds a number format and no value"):
-        refuseUncreatableCell(cell, "T")
+    refuseUncreatableCell(cell, "T")
 
 
 def testACellHoldingAFormatTheBuilderDoesNotWriteIsRefused() -> None:

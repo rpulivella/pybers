@@ -10,6 +10,8 @@ tables, against which its formulas' text is read.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-09  Version 5, a format a member of its family, Automatic holding the one
+            it chose in place of `formatChosen`, for PYB-145.
 2026-11-06  Version 4, a color carrying its fields, for PYB-264.
 2026-11-03  Version 3, a table carrying its headers, for PYB-223.
 2026-10-28  Version 2, a document carrying its locale identifier, for PYB-272.
@@ -36,7 +38,7 @@ from pybers.interchange._tree import jsonFormConst
 from pybers.table._form import TableForm
 
 # Any change to the form's shape is a new version, recorded in `docs/decisions.md`.
-jsonFormVersion: Final[int] = 4
+jsonFormVersion: Final[int] = 5
 
 
 @dataclass(frozen=True, slots=True)

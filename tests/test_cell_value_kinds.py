@@ -35,13 +35,12 @@ from test_format_refcounts import readDisplayedKind, readFormatLedger, readTable
 from test_writer import listArchiveDifferences, readRecordAt
 
 import pybers
-from conftest import copyDocument, findDocumentPath
+from conftest import checkFormatChosen, copyDocument, findDocumentPath, findShownFamily
 from pybers import CellKind
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence import readPackage
-from pybers._persistence.cells import countedFormatSlots, findSlotValue
+from pybers._persistence.cells import controlSlot, countedFormatSlots, findSlotValue
 from pybers.currency import CurrencyAmount
-from pybers.table._records import controlSlot
 
 goldenDirectory: Path = Path(__file__).resolve().parent / "golden"
 baseStem: str = "11-value-types-noformats"
@@ -140,10 +139,12 @@ def testTheCellReportsItsNewKindOnceSaved(tmp_path: Path) -> None:
     document, table = openFirstTable(copyDocument(baseStem, tmp_path))
     cell = table.cell("A1")
     cell.value = True
-    assert cell.presentation.format is pybers.UNDETERMINED
+    assert cell.presentation.format == pybers.CellFormatAutomatic()
     document.save()
     assert cell.kind is CellKind.BOOLEAN
-    assert cell.presentation.format is pybers.CellFormat.BOOLEAN
+    assert cell.presentation.format == pybers.CellFormatAutomatic(
+        pybers.CellFormatBoolean()
+    )
 
 
 # ── AC 3: exact read back ───────────────────────────────────────────────────
@@ -306,7 +307,7 @@ def testAChosenTextFormatGoesWithTheTextItWasChosenFor(tmp_path: Path) -> None:
     table.cell("A1").textLiteralSet("=1+1")
     document.save()
     cell = writeAndReopen(working, "A1", Decimal("2"))
-    assert not cell.presentation.formatChosen
+    assert not checkFormatChosen(cell)
 
 
 def testTheFormatCountsMatchTheCellsAfterEveryKindIsWritten(tmp_path: Path) -> None:
@@ -417,8 +418,8 @@ def testAValueTheControlCannotShowDropsTheControlAndKeepsTheValue(
     cell = writeAndReopen(working, address, value)
     assert cell.value == value
     assert findSlotValue(readRecordAt(working, address), controlSlot) is None
-    shown = (pybers.CellFormat.NUMBER, pybers.CellFormat.TEXT)
-    assert cell.presentation.format in shown
+    shown = (pybers.CellFormatFamily.NUMBER, pybers.CellFormatFamily.TEXT)
+    assert findShownFamily(cell) in shown
 
 
 @pytest.mark.parametrize(("address", "value"), [

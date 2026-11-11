@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-10  `cellSet` sets a value, a format or both, a part not given left as it
+            was, for PYB-145.
 2026-11-03  `select` on a document and a sheet, and every lookup by name a typed
             call into the one resolver, replacing `partSelect`, `Document.cell`
             and `Sheet.cell`, and `cellSet` writing every cell a selector
@@ -74,15 +76,31 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from pybers.absence import UNCHANGED
 from pybers.addressing.reference import (
+    CellAddress,
+    CellReference,
     TableReference,
     lastColumn,
     lastRow,
     tableNameSeparator,
 )
-from pybers.errors import PybersError
+from pybers.errors import PybersError, WriteError
+from pybers.format._check import (
+    findControlRefusal,
+    findFormatMisfit,
+    findFormatRefusal,
+)
+from pybers.format.controls import CellControl
+from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
 from pybers.geometry import Position
-from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, toCellValue
+from pybers.table.cell import (
+    Cell,
+    CellChange,
+    CellChanges,
+    CellSkip,
+    findWrittenValue,
+)
 from pybers.table.cells import Table, generateOwnerIdentity
 from pybers.timezone import TimeZoneLike, machineTimeZone, toTimeZone
 
@@ -402,38 +420,91 @@ class Document:
         return sheet
 
     def cellSet(
-        self, selector: SelectorLike, value: object, *, extend: bool = False
+        self,
+        selector: SelectorLike,
+        value: object = UNCHANGED,
+        *,
+        format: CellFormat | UNCHANGED = UNCHANGED,
+        control: CellControl | None | UNCHANGED = UNCHANGED,
+        conflict: CellFormatConflict = CellFormatConflict.REFUSE,
+        extend: bool = False,
     ) -> CellChanges:
-        """Set the value of every cell a selector matches, and return each change.
+        """Set the value, the format, the control or any of them on every matched cell.
 
-        A part that is no cell, or a cell a formula backs, is skipped and reported.
-        `extend` grows a table to hold one cell past its end, `Budget::Q3::B30`.
+        A part not given stays as it was, a control of None removes one, and a cell a
+        formula backs is skipped and reported. A format that cannot show a cell's
+        value is refused before any cell changes, unless `conflict` falls back to
+        Automatic for that cell and says so.
         """
         from pybers.selection.matching import findCellTargets, findExtendTarget
 
+        if value is UNCHANGED and format is UNCHANGED and control is UNCHANGED:
+            raise WriteError("cellSet was given no value, format or control to set.")
         targets, skipped = (
             ([findExtendTarget(self, selector)], []) if extend
             else findCellTargets(self, selector)
         )
-        if targets:
-            toCellValue(value, targets[0][1], self.timeZone)
-        changes: list[CellChange] = []
+        writing: list[tuple[Table, CellAddress, CellFormat | UNCHANGED]] = []
         for table, address in targets:
-            rowsAdded = max(0, address.row - table.rowCount)
-            colsAdded = max(0, address.col - table.colCount)
             cell = table.cells.get(address)
-            if cell is not None and cell.formula is not None:
+            if value is not UNCHANGED and cell is not None and cell.formula is not None:
                 skipped.append(CellSkip(
                     cell.reference, f"{cell.reference} is backed by a formula, which "
                     "a value would discard.",
                 ))
                 continue
+            asked = format
+            current = None if cell is None else cell.value
+            after = current if value is UNCHANGED else findWrittenValue(
+                value, address, self.timeZone, current
+            )
+            where = CellReference(address.row, address.col, table=table.reference)
+            if control is not UNCHANGED and control is not None:
+                raise WriteError(
+                    f"{findControlRefusal(cell, where, control, asked, after)} Nothing "
+                    "was written."
+                )
+            controlAfter = (
+                (None if cell is None else cell.presentation.control)
+                if control is UNCHANGED else control
+            )
+            if asked is not UNCHANGED:
+                misfit = findFormatMisfit(cell, where, asked, after)
+                if misfit is not None and conflict is CellFormatConflict.REFUSE:
+                    raise WriteError(f"{misfit} Nothing was written.")
+                if misfit is not None:
+                    asked = CellFormatAutomatic()
+                    skipped.append(CellSkip(where, f"{misfit} It takes Automatic."))
+                refusal = findFormatRefusal(cell, where, asked, after, controlAfter)
+                if refusal is not None:
+                    raise WriteError(f"{refusal} Nothing was written.")
+            writing.append((table, address, asked))
+        changes: list[CellChange] = []
+        for table, address, asked in writing:
+            rowsAdded = max(0, address.row - table.rowCount)
+            colsAdded = max(0, address.col - table.colCount)
             if rowsAdded:
                 table.rowAdd(table.rowCount + 1, rowsAdded)
             if colsAdded:
                 table.columnAdd(table.colCount + 1, colsAdded)
-            change = table.cell(address)._valueChange(value)
-            changes.append(replace(change, rowsAdded=rowsAdded, colsAdded=colsAdded))
+            cell = table.cell(address)
+            change = (
+                cell._valueChange(value) if value is not UNCHANGED
+                else CellChange(
+                    cell.reference, cell.value, cell.value, cell.kind, cell.kind,
+                    cell.presentation.format, cell.presentation.format,
+                    cell.presentation.control, cell.presentation.control,
+                )
+            )
+            if control is not UNCHANGED:
+                cell._controlRequest(control)
+            if asked is not UNCHANGED:
+                cell._formatRequest(asked)
+            changes.append(replace(
+                change, formatAfter=cell.presentation.format,
+                controlAfter=cell.presentation.control,
+                rowsAdded=rowsAdded, colsAdded=colsAdded,
+            ))
         return CellChanges(tuple(changes), tuple(skipped))
 
     def tableFor(self, identity: str) -> Table:

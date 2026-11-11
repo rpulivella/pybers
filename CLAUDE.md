@@ -28,6 +28,7 @@ pybers/
   color/          one color carrying its space, and both archive halves
   cli/            the pybers command, one module per command, a front end
   document/       Document and Sheet, the walk that reads one and the one that saves it
+  format/         a cell's format and its control, one closed family each, both halves
   formula/        the node model, the function table, the text, and both archive halves
   table/          Cell, Table and merges, and both archive halves
   drawable.py     things that float on a sheet   style.py  text.py  geometry.py
@@ -131,6 +132,17 @@ is measured against a fixture here before pybers relies on it, as the findings r
   library for all three iWork formats, MIT-licensed. Its `docs/FORMAT.md` is a second
   reading of the same format, and its guide a model for a documentation site. Not a
   source of pybers, so not credited in the README.
+
+Standards read for how a public name and structure should feel to a developer, never a
+source of code. The archive decides what pybers can store, and these decide what it is
+called. A name is approved by the maintainer before a ticket relies on it.
+
+- **CSS** (https://www.w3.org/TR/CSS/): the model for styles. A named style is a class,
+  a variation an inline style, a resolved property the computed value, and its property
+  names and declaration syntax are where a style's names start.
+- **ECMA-402 `Intl`** (https://tc39.es/ecma402/): the model for formats.
+  `Intl.NumberFormat`, `Intl.DateTimeFormat` and `Intl.DurationFormat` name the same
+  choices Numbers offers, such as `currencySign` and `minimumFractionDigits`.
 
 ## Correctness
 

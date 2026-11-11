@@ -141,6 +141,8 @@ def copyCellContent(
 
     target._value = source._value
     target._stored = source._stored
+    target._formatAsked = source._formatAsked
+    target._controlAsked = source._controlAsked
     target._storedValue = source._storedValue
     formula, conditions = source.formula, source._conditions
     if namedCell:

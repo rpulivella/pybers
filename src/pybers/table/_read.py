@@ -59,11 +59,8 @@ from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import CellDecodeError
 from .._persistence.cells import (
     CellRecord,
-    carriesChosenFormat,
     conditionalSlot,
-    countedFormatSlots,
     currencyFormatSlot,
-    displayedKindSlot,
     findSlotValue,
 )
 from .._persistence.index import (
@@ -75,18 +72,20 @@ from .._persistence.index import (
     stringListType,
 )
 from .._persistence.rows import readStoredTiles
+from ..absence import UNCHANGED
 from ..addressing import CellRange
 from ..addressing.reference import CellAddress, originOffset
 from ..currency import CurrencyAmount
 from ..errors import ReadError
+from ..format._controls import readControls
+from ..format._read import currencyFormatType, readRecordControl, readRecordFormat
+from ..format.controls import CellControl
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
-from ._controls import readControls
 from .cell import Cell, CellValue
 from .cells import Table
-from .controls import CellControl
 from .headers import TableHeaders
-from .kinds import CellFormat, CellKind, CellPresentation, CellStorage, emptyStorage
+from .kinds import CellKind, CellPresentation, CellStorage, emptyStorage
 from .merges import MergeRange
 
 # Cell record type bytes whose decoded value is a key into a pooled data list
@@ -107,23 +106,6 @@ storedKinds: frozendict[int, CellKind] = frozendict({
     8: CellKind.ERROR,
     9: CellKind.RICH_TEXT,
     10: CellKind.CURRENCY,
-})
-
-# The family each measured `format_type` belongs to, every one the documents carry.
-formatFamilies: frozendict[int, CellFormat] = frozendict({
-    1: CellFormat.BOOLEAN,
-    256: CellFormat.NUMBER,
-    257: CellFormat.CURRENCY,
-    258: CellFormat.PERCENT,
-    259: CellFormat.SCIENTIFIC,
-    260: CellFormat.TEXT,
-    261: CellFormat.DATE_TIME,
-    262: CellFormat.FRACTION,
-    263: CellFormat.CHECKBOX,
-    267: CellFormat.STAR_RATING,
-    268: CellFormat.DURATION,
-    269: CellFormat.NUMERAL_SYSTEM,
-    270: CellFormat.CUSTOM_NUMBER,
 })
 
 
@@ -168,7 +150,6 @@ def readFormatTypes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, 
 
 # The custom format type a Currency token gives; its code is in the document's list.
 customCurrencyFormatType: int = 274
-currencyFormatType: int = 257
 
 
 def readCustomCurrencyCodes(index: ArchiveIndex) -> dict[tuple[int, int], str]:
@@ -228,51 +209,14 @@ def readCellValue(
     return value
 
 
-def findDisplayedFormat(
-    record: CellRecord, formatTypes: dict[int, int]
-) -> CellFormat | None:
-    """Return the family of the format a record displays with, or None for none.
-
-    The displayed slot holds a kind, 1 to 6, naming the per-kind slot whose key is
-    the format. A kind, key or type this cannot follow is unknown, never a guess.
-    """
-    displayed = findSlotValue(record, displayedKindSlot)
-    if displayed is None:
-        return None
-    if not 1 <= displayed <= len(countedFormatSlots):
-        return CellFormat.UNKNOWN
-    key = findSlotValue(record, countedFormatSlots[displayed - 1])
-    formatType = None if key is None else formatTypes.get(key)
-    if formatType is None:
-        return CellFormat.UNKNOWN
-    return formatFamilies.get(formatType, CellFormat.UNKNOWN)
-
-
-# The control a cell presents as, a `control_cell_spec_table` key. Measured against
-# 11-value-types-noformats, whose five control cells carry keys 1 to 5 in the order
-# the table lists them and whose plain cells carry no such slot. A control describes
-# the value it was built for, so it does not survive that value being replaced: a
-# star rating left on a cell that became text makes Numbers present text as stars.
-controlSlot: tuple[int, int] = (9, 0x04)
-
-
-def findRecordControl(
-    record: CellRecord, controls: dict[int, CellControl]
-) -> CellControl | None:
-    """Return the control a record names, or None when it names none."""
-    key = findSlotValue(record, controlSlot)
-    return None if key is None else controls.get(key)
-
-
 def readRecordStorage(
     record: CellRecord, formatTypes: dict[int, int], controls: dict[int, CellControl]
 ) -> CellStorage:
     """Return what a record stores beyond its value."""
     kind = storedKinds.get(record.typeByte, CellKind.UNKNOWN)
     presentation = CellPresentation(
-        format=findDisplayedFormat(record, formatTypes),
-        formatChosen=carriesChosenFormat(record),
-        control=findRecordControl(record, controls),
+        format=readRecordFormat(record, formatTypes),
+        control=readRecordControl(record, controls),
     )
     unrecognized = record.typeByte if kind is CellKind.UNKNOWN else None
     return CellStorage(kind, presentation, unrecognized)
@@ -443,6 +387,7 @@ def setCellStorage(
     """Give a cell what its record stores and the value that record holds."""
     cell._stored = readRecordStorage(record, formatTypes, controls)
     cell._storedValue = value
+    cell._formatAsked, cell._controlAsked = None, UNCHANGED
 
 
 def updateCellStorage(
@@ -470,6 +415,7 @@ def updateCellStorage(
     for reference, cell in table.cells.items():
         if reference not in described:
             cell._stored, cell._storedValue = emptyStorage, None
+            cell._formatAsked, cell._controlAsked = None, UNCHANGED
 
 
 def resolveValue(

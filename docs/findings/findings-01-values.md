@@ -225,8 +225,8 @@ leaves it clear here.
 
 Setting it is a deliberate act with one purpose: forcing a number to render as text, or
 stopping a formula from evaluating so its own text shows. `Cell.textLiteralSet` does it,
-and a cell showing text reports it as `cell.presentation.formatChosen`, which for any
-other cell reports its own slot's bit, as findings-11-formats.md records. None of the
+and a cell showing text reports it as `CellFormatText` rather than `CellFormatAutomatic`,
+which for any other cell follows its own slot's bit, as findings-11-formats.md records. None of the
 897 formula records in the documents carries it, so a formula given to a cell drops a
 chosen Text format.
 

@@ -443,23 +443,260 @@
         }
       ]
     },
-    "CellFormat": {
-      "enum": [
-        "number",
-        "boolean",
-        "currency",
-        "percent",
-        "scientific",
-        "fraction",
-        "numeral-system",
-        "custom-number",
-        "text",
-        "date-time",
-        "duration",
-        "checkbox",
-        "star-rating",
-        "unknown"
-      ]
+    "CellFormatAutomatic": {
+      "type": "object",
+      "description": "Numbers' Automatic format and the one it chose, UNDETERMINED until saved.",
+      "properties": {
+        "formatFamily": {
+          "const": "automatic"
+        },
+        "shown": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellFormatNumber"
+            },
+            {
+              "$ref": "#/$defs/CellFormatNumberCustom"
+            },
+            {
+              "$ref": "#/$defs/CellFormatBoolean"
+            },
+            {
+              "$ref": "#/$defs/CellFormatCurrency"
+            },
+            {
+              "$ref": "#/$defs/CellFormatPercent"
+            },
+            {
+              "$ref": "#/$defs/CellFormatScientific"
+            },
+            {
+              "$ref": "#/$defs/CellFormatFraction"
+            },
+            {
+              "$ref": "#/$defs/CellFormatNumeralSystem"
+            },
+            {
+              "$ref": "#/$defs/CellFormatText"
+            },
+            {
+              "$ref": "#/$defs/CellFormatDateTime"
+            },
+            {
+              "$ref": "#/$defs/CellFormatDuration"
+            },
+            {
+              "$ref": "#/$defs/CellFormatCheckbox"
+            },
+            {
+              "$ref": "#/$defs/CellFormatStarRating"
+            },
+            {
+              "$ref": "#/$defs/CellFormatUnknown"
+            },
+            {
+              "const": "UNDETERMINED"
+            }
+          ]
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatBoolean": {
+      "type": "object",
+      "description": "The format Numbers gives TRUE and FALSE, which no menu offers.",
+      "properties": {
+        "formatFamily": {
+          "const": "boolean"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatCheckbox": {
+      "type": "object",
+      "description": "A checkbox format, shown through the checkbox control.",
+      "properties": {
+        "formatFamily": {
+          "const": "checkbox"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatCurrency": {
+      "type": "object",
+      "description": "A currency format.",
+      "properties": {
+        "formatFamily": {
+          "const": "currency"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatDateTime": {
+      "type": "object",
+      "description": "A date and time format.",
+      "properties": {
+        "formatFamily": {
+          "const": "date-time"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatDuration": {
+      "type": "object",
+      "description": "A duration format.",
+      "properties": {
+        "formatFamily": {
+          "const": "duration"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatFraction": {
+      "type": "object",
+      "description": "A fraction format.",
+      "properties": {
+        "formatFamily": {
+          "const": "fraction"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatNumber": {
+      "type": "object",
+      "description": "A number format.",
+      "properties": {
+        "formatFamily": {
+          "const": "number"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatNumberCustom": {
+      "type": "object",
+      "description": "A custom number format.",
+      "properties": {
+        "formatFamily": {
+          "const": "number-custom"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatNumeralSystem": {
+      "type": "object",
+      "description": "A numeral system format.",
+      "properties": {
+        "formatFamily": {
+          "const": "numeral-system"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatPercent": {
+      "type": "object",
+      "description": "A percent format.",
+      "properties": {
+        "formatFamily": {
+          "const": "percent"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatScientific": {
+      "type": "object",
+      "description": "A scientific format.",
+      "properties": {
+        "formatFamily": {
+          "const": "scientific"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatStarRating": {
+      "type": "object",
+      "description": "A star rating format, shown through the star rating control.",
+      "properties": {
+        "formatFamily": {
+          "const": "star-rating"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatText": {
+      "type": "object",
+      "description": "A text format, which shows every value as text.",
+      "properties": {
+        "formatFamily": {
+          "const": "text"
+        }
+      },
+      "required": [
+        "formatFamily"
+      ],
+      "additionalProperties": false
+    },
+    "CellFormatUnknown": {
+      "type": "object",
+      "description": "A format pybers cannot follow, by its entry's type when the record names one.",
+      "properties": {
+        "formatFamily": {
+          "const": "unknown"
+        },
+        "formatType": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "formatFamily",
+        "formatType"
+      ],
+      "additionalProperties": false
     },
     "CellJsonForm": {
       "type": "object",
@@ -467,7 +704,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 4
+          "const": 5
         },
         "sheetName": {
           "anyOf": [
@@ -520,12 +757,54 @@
     },
     "CellPresentation": {
       "type": "object",
-      "description": "How a cell shows its value: its format, whether a person chose it, its control.",
+      "description": "How a cell shows its value: its format and its control.",
       "properties": {
         "format": {
           "anyOf": [
             {
-              "$ref": "#/$defs/CellFormat"
+              "$ref": "#/$defs/CellFormatNumber"
+            },
+            {
+              "$ref": "#/$defs/CellFormatNumberCustom"
+            },
+            {
+              "$ref": "#/$defs/CellFormatBoolean"
+            },
+            {
+              "$ref": "#/$defs/CellFormatCurrency"
+            },
+            {
+              "$ref": "#/$defs/CellFormatPercent"
+            },
+            {
+              "$ref": "#/$defs/CellFormatScientific"
+            },
+            {
+              "$ref": "#/$defs/CellFormatFraction"
+            },
+            {
+              "$ref": "#/$defs/CellFormatNumeralSystem"
+            },
+            {
+              "$ref": "#/$defs/CellFormatText"
+            },
+            {
+              "$ref": "#/$defs/CellFormatDateTime"
+            },
+            {
+              "$ref": "#/$defs/CellFormatDuration"
+            },
+            {
+              "$ref": "#/$defs/CellFormatCheckbox"
+            },
+            {
+              "$ref": "#/$defs/CellFormatStarRating"
+            },
+            {
+              "$ref": "#/$defs/CellFormatUnknown"
+            },
+            {
+              "$ref": "#/$defs/CellFormatAutomatic"
             },
             {
               "const": "UNDETERMINED"
@@ -534,9 +813,6 @@
               "type": "null"
             }
           ]
-        },
-        "formatChosen": {
-          "type": "boolean"
         },
         "control": {
           "anyOf": [
@@ -565,8 +841,7 @@
         }
       },
       "required": [
-        "format",
-        "formatChosen"
+        "format"
       ],
       "additionalProperties": false
     },
@@ -603,7 +878,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 4
+          "const": 5
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -689,7 +964,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 4
+          "const": 5
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -1007,7 +1282,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 4
+          "const": 5
         },
         "sheetName": {
           "anyOf": [
@@ -1070,7 +1345,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 4
+          "const": 5
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1214,7 +1489,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 4
+          "const": 5
         },
         "sheetName": {
           "anyOf": [

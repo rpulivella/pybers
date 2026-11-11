@@ -56,7 +56,9 @@ from .._persistence.cells import (
     carriesFormula,
     checkboxFormatSlot,
     chosenFormatBit,
+    chosenFormatBits,
     chosenFormatOffset,
+    controlSlot,
     countedFormatSlots,
     currencyFormatSlot,
     dateFormatSlot,
@@ -80,13 +82,15 @@ from ..absence import UNDETERMINED
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
 from ..errors import WriteError
-from ._read import (
-    controlSlot,
-    currencyFormatType,
-    currencyTypeByte,
-    formatFamilies,
-    storedKinds,
+from ..format._read import currencyFormatType, findFormatOfType
+from ..format._write import (
+    buildCurrencyFormat,
+    findAutomaticFormat,
+    findFormatEntry,
+    formatSlots,
 )
+from ..format.formats import CellFormat, CellFormatAutomatic, findFormatShown
+from ._read import currencyTypeByte, storedKinds
 from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
@@ -152,71 +156,18 @@ def findSlotKind(slot: tuple[int, int]) -> int:
     return countedFormatSlots.index(slot) + 1
 
 
-# Numbers' Automatic format for each kind it gives one, as the documents store it:
-# the number in `11-value-types-noformats` and `20-formula-shapes`, the duration in
-# `11` `D1`, and the boolean a formula in `69-functions-added-in-15-4` returned.
-automaticNumberFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=256, decimal_places=253, negative_style=0,
-    show_thousands_separator=False,
-)
-automaticTextFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=260
-)
-automaticDurationFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=268, duration_style=1, duration_unit_largest=8,
-    duration_unit_smallest=8, use_automatic_duration_units=True,
-)
-automaticBooleanFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=1
-)
-# A date has no Automatic, since Numbers names a pattern for every date it stores, so
-# pybers writes ISO 8601 order, the same in every region. Numbers stores `yyyy-MM-dd`
-# in `66-series-horizontal-base`; PYB-145 sets any other.
-dateOnlyFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=261, date_time_format="yyyy-MM-dd"
-)
-dateAndTimeFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
-    format_type=261, date_time_format="yyyy-MM-dd HH:mm"
-)
-
-
-# As Numbers' menu writes it, in `88-formula-currency-results` and `12-number-currency`.
-def buildCurrencyFormat(code: str) -> tsk.FormatStructArchive:
-    """Return the Currency format Numbers gives an amount in one currency."""
-    return tsk.FormatStructArchive(
-        format_type=currencyFormatType, decimal_places=2, currency_code=code,
-        negative_style=0,
-        show_thousands_separator=False, use_accounting_style=False,
-    )
-
-
 # A currency amount a person formatted sets both, measured on all 296 such records.
 currencyChosenBit: int = 0x02
 currencyCellOffset: int = 7
 currencyCellBit: int = 0x08
 
 
-def findAutomaticFormat(value: CellValue) -> tsk.FormatStructArchive:
-    """Return the format a value takes in a cell whose kind it changed."""
-    if isinstance(value, CurrencyAmount):
-        return buildCurrencyFormat(value.currency)
-    if isinstance(value, str):
-        return automaticTextFormat
-    if isinstance(value, bool):
-        return automaticBooleanFormat
-    if isinstance(value, datetime.datetime):
-        return dateOnlyFormat if value.time() == datetime.time() else dateAndTimeFormat
-    if isinstance(value, datetime.timedelta):
-        return automaticDurationFormat
-    return automaticNumberFormat
-
-
 def refuseUncreatableCell(cell: Cell, tableName: str) -> None:
     """Refuse a cell whose record pybers would build without part of what it holds.
 
     The one place a new record's presentation is decided: a format is kept only when
-    it is the family `findAutomaticFormat` writes for the value, so a family the
-    builder learns to write is accepted without this changing.
+    `findFormatEntry` has an entry for it, so a family the writer learns to write is
+    accepted without this changing.
     """
     where = f"{tableName!r} {cell.address}"
     if cell.kind is CellKind.RICH_TEXT:
@@ -230,22 +181,16 @@ def refuseUncreatableCell(cell: Cell, tableName: str) -> None:
             f"{where} holds a {presentation.control.controlType} control, which "
             "pybers cannot yet create. Nothing was written."
         )
-    asked = presentation.format
-    if asked is None or asked is UNDETERMINED:
+    stated = presentation.format
+    if stated is None or stated is UNDETERMINED:
         return
-    if cell.value is None and cell.formula is None:
-        raise WriteError(
-            f"{where} holds a {asked} format and no value, which pybers cannot yet "
-            "create. Nothing was written."
-        )
-    written = formatFamilies.get(findAutomaticFormat(cell.value).format_type)
-    # A formula's format is its result's, which Numbers decides on calculating.
-    if asked != written and cell.formula is None:
-        raise WriteError(
-            f"{where} holds a {asked} format, and pybers writes its value in a "
-            f"{written} format, since it cannot yet create a {asked} one. Nothing was "
-            "written."
-        )
+    asked = findFormatShown(stated)
+    if asked is UNDETERMINED or findFormatEntry(asked, cell.value) is not None:
+        return
+    raise WriteError(
+        f"{where} holds a {asked.formatFamily} format, which pybers cannot yet "
+        "create. Nothing was written."
+    )
 
 
 def patchRichTextKey(raw: bytes, key: int) -> bytes:
@@ -412,7 +357,7 @@ def applyChosenFormat(raw: bytes, cell: Cell) -> bytes:
     """Return a record carrying the chosen bit its cell holds, for the slot it shows."""
     header = bytearray(raw[:valueOffset])
     chosenBit = findChosenBit(raw)
-    if cell.presentation.formatChosen:
+    if cell._formatChosenCheck():
         header[chosenFormatOffset] |= chosenBit
     else:
         header[chosenFormatOffset] &= ~chosenBit
@@ -580,8 +525,62 @@ def retypeRecord(
     return bytes(header) + value + tail
 
 
+def applyAskedFormat(
+    raw: bytes,
+    asked: CellFormat,
+    value: CellValue,
+    shows: bool,
+    formatFor: Callable[[tsk.FormatStructArchive], int | None],
+    formatOf: Callable[[int], tsk.FormatStructArchive | None],
+) -> bytes:
+    """Return a record holding the format its cell asked for, in its family's slot.
+
+    The one place a format is written. It sits in its family's slot, chosen, and
+    `shows` names that slot as the one displayed, which a formula leaves to Numbers to
+    pick by its result, measured in findings-11-formats.md. A slot already holding
+    the family keeps its entry, settings and all. Automatic clears every chosen bit,
+    and a value it shows takes Automatic's entry.
+    """
+    header = bytearray(raw[:valueOffset])
+    record = decodeRecord(0, raw)
+    if isinstance(asked, CellFormatAutomatic):
+        for bit in chosenFormatBits:
+            header[chosenFormatOffset] &= ~bit
+        cleared = bytes(header) + raw[valueOffset:]
+        displayed = findSlotValue(record, displayedKindSlot)
+        if not shows or value is None or displayed is None:
+            return cleared
+        key = findSlotValue(record, countedFormatSlots[displayed - 1])
+        current = None if key is None else formatOf(key)
+        if current == findAutomaticFormat(value):
+            return cleared
+        return applyAutomaticFormat(cleared, value, formatFor)
+    slot = formatSlots[asked.formatFamily]
+    slots = listReferenceSlots(raw)
+    held = dict(zip(slots, record.references, strict=True))
+    current = None if slot not in held else formatOf(int(held[slot]))
+    if current is None or findFormatOfType(current.format_type) != asked:
+        entry = findFormatEntry(asked, value)
+        key = None if entry is None else formatFor(entry)
+        if key is None:
+            raise WriteError(f"pybers cannot write a {asked.formatFamily} format here.")
+        held[slot] = key
+    if shows:
+        held[displayedKindSlot] = findSlotKind(slot)
+    for at, bit in held:
+        header[at] |= bit
+    header[chosenFormatOffset] |= chosenFormatBits[countedFormatSlots.index(slot)]
+    tail = b"".join(
+        int(held[each]).to_bytes(referenceWidth, "little")
+        for each in slotOrder if each in held
+    )
+    start = len(raw) - len(slots) * referenceWidth
+    return bytes(header) + raw[valueOffset:start] + tail
+
+
 __all__ = [
     "applyChosenFormat",
+    "applyAskedFormat",
     "borrowShape",
     "buildWrittenRecord",
     "findFormatKey",

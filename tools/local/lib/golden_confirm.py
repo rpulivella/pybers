@@ -7,6 +7,10 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-11-10  Each cell Numbers changed on saving fails, naming what changed, and each
+            blue corner chip Numbers drew fails with its close-up, for PYB-145.
+2026-11-09  A format Numbers names is read from the format family, Automatic its own
+            member, for PYB-145.
 2026-10-29  A formula is compared as Numbers saved it, its shown text in the
             document's language left for a person, for PYB-272.
 2026-10-24  The expectations' machine form is the golden's JSON form, for PYB-259.
@@ -62,7 +66,8 @@ from pybers import (
     CellControlStarRating,
     CellControlStepper,
     CellControlUnknown,
-    CellFormat,
+    CellFormatAutomatic,
+    CellFormatFamily,
     CellRange,
     CellReference,
     CurrencyAmount,
@@ -85,6 +90,7 @@ from tools.local.lib.golden_expected import (
     writeExpectations,
     writeExpectationsJson,
 )
+from tools.local.lib.golden_saved import readSavedCellChanges
 from tools.workflow.lib.shared import readTicketNumber, repositoryRoot
 
 
@@ -549,24 +555,26 @@ def readMergeOrder(merge: str) -> tuple[int | None, ...]:
 
 
 # A format as AppleScript's `format of cell` names it, once a person chose it.
-numbersFormatNames: dict[CellFormat, str] = {
-    CellFormat.NUMBER: "number", CellFormat.CURRENCY: "currency",
-    CellFormat.PERCENT: "percent", CellFormat.SCIENTIFIC: "scientific",
-    CellFormat.FRACTION: "fraction", CellFormat.NUMERAL_SYSTEM: "numeral system",
-    CellFormat.TEXT: "text", CellFormat.DATE_TIME: "date and time",
-    CellFormat.DURATION: "duration", CellFormat.CHECKBOX: "checkbox",
-    CellFormat.STAR_RATING: "rating",
+numbersFormatNames: dict[CellFormatFamily, str] = {
+    CellFormatFamily.NUMBER: "number", CellFormatFamily.CURRENCY: "currency",
+    CellFormatFamily.PERCENT: "percent", CellFormatFamily.SCIENTIFIC: "scientific",
+    CellFormatFamily.FRACTION: "fraction",
+    CellFormatFamily.NUMERAL_SYSTEM: "numeral system",
+    CellFormatFamily.TEXT: "text", CellFormatFamily.DATE_TIME: "date and time",
+    CellFormatFamily.DURATION: "duration", CellFormatFamily.CHECKBOX: "checkbox",
+    CellFormatFamily.STAR_RATING: "rating",
 }
 
 
 # A format as the inspector's Data Format menu titles it.
-dataFormatTitles: dict[CellFormat, str] = {
-    CellFormat.NUMBER: "Number", CellFormat.CURRENCY: "Currency",
-    CellFormat.PERCENT: "Percentage", CellFormat.SCIENTIFIC: "Scientific",
-    CellFormat.FRACTION: "Fraction", CellFormat.NUMERAL_SYSTEM: "Numeral System",
-    CellFormat.TEXT: "Text", CellFormat.DATE_TIME: "Date & Time",
-    CellFormat.DURATION: "Duration", CellFormat.CHECKBOX: "Checkbox",
-    CellFormat.STAR_RATING: "Star Rating",
+dataFormatTitles: dict[CellFormatFamily, str] = {
+    CellFormatFamily.NUMBER: "Number", CellFormatFamily.CURRENCY: "Currency",
+    CellFormatFamily.PERCENT: "Percentage", CellFormatFamily.SCIENTIFIC: "Scientific",
+    CellFormatFamily.FRACTION: "Fraction",
+    CellFormatFamily.NUMERAL_SYSTEM: "Numeral System",
+    CellFormatFamily.TEXT: "Text", CellFormatFamily.DATE_TIME: "Date & Time",
+    CellFormatFamily.DURATION: "Duration", CellFormatFamily.CHECKBOX: "Checkbox",
+    CellFormatFamily.STAR_RATING: "Star Rating",
 }
 
 
@@ -593,11 +601,12 @@ def findNumbersFormat(cell: ExpectedCell) -> tuple[str, str] | None:
     """Return the format Numbers names for a cell, or None when no name is measured."""
     if cell.control is not None:
         return findControlNames(cell.control)
-    if not cell.formatChosen or cell.format is None:
+    if cell.format is None or isinstance(cell.format, CellFormatAutomatic):
         return ("automatic", "Automatic")
-    if cell.format not in numbersFormatNames:
+    family = cell.format.formatFamily
+    if family not in numbersFormatNames:
         return None
-    return (numbersFormatNames[cell.format], dataFormatTitles[cell.format])
+    return (numbersFormatNames[family], dataFormatTitles[family])
 
 
 def listInspectorSettings(cell: ExpectedCell) -> dict[str, str]:
@@ -823,6 +832,19 @@ def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
     return [str(difference) for difference in listPackageDifferences(before, after)]
 
 
+def checkSavedCells(golden: Path, saved: Path) -> list[Check]:
+    """Fail each cell Numbers changed on saving, naming what it changed, or pass all."""
+    changes = readSavedCellChanges(golden, saved)
+    if not changes:
+        return [Check("passed", "saved copy",
+                      "every cell holds what pybers wrote once Numbers saves it")]
+    return [
+        Check("failed", " / ".join(address),
+              "Numbers changed it on saving: " + "; ".join(found))
+        for address, found in changes.items()
+    ]
+
+
 def readSavedFormulas(saved: Path) -> dict[tuple[str, str], dict[str, str]]:
     """Return each formula of the copy Numbers saved, by table and cell."""
     return {
@@ -930,7 +952,15 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
             run.checks.append(Check(
                 "qa", capture["sheet"], "the sheet as Numbers displays it",
                 Path(capture["path"]).name))
+        for chip in result.get("chipCaptures", []):
+            run.checks.append(Check(
+                "failed", chip["sheet"],
+                "Numbers drew its blue corner chip, which marks a cell it changed or "
+                f"warns about, at ({chip['x']:.0f}, {chip['y']:.0f}) points in the "
+                "sheet capture. Open a copy and click the chip to read why",
+                Path(chip["path"]).name))
         if result.get("savedCopy") and saved.is_file():
+            run.checks.extend(checkSavedCells(golden, saved))
             differences = readSavedCopyDifferences(golden, saved)
             run.archiveDifferences.extend(differences)
             run.checks.append(Check(

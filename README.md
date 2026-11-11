@@ -17,7 +17,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 `pybers check FILE` says whether pybers can read a document, what it is running on, and the tree of its sheets and tables, each shown by its kind and size, in a form safe to paste into a public bug report. `--names` names each sheet, table and unrecognized cell, for the person holding the document.
 
-`pybers set FILE SELECTOR VALUE` sets every cell a [selector](#selectors) matches, skipping a cell a formula backs, reading the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
+`pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL]` sets the value, the format and the control of every cell a [selector](#selectors) matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B4" 1250.00
@@ -28,6 +28,18 @@ pybers set budget.numbers "Summary::Costs::E4" TRUE
 pybers set budget.numbers "Summary::Costs::F4" 1:30 --as duration
 pybers set budget.numbers "Summary::Q*::B2" 0 --preview   # B2 of every quarter
 ```
+
+`--cell-format` takes a format as `pybers show` prints one: its family, then each setting as a CSS declaration, `automatic` leaving the choice to Numbers. A value of the cell's kind keeps its format, and a value of another kind takes that kind's Automatic format, as typing does in Numbers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and says why on stderr. `--cell-control none` removes a control:
+
+```bash
+pybers set budget.numbers "Summary::Costs::B4" --cell-format number      # chosen, not Automatic
+pybers set budget.numbers "Summary::Costs::B2:B9" --cell-format automatic
+pybers set budget.numbers "Summary::Costs::D4" 90 --as number --cell-format number
+pybers set budget.numbers "Summary::Costs::B2:F9" --cell-format number --conflict automatic
+pybers set budget.numbers "Summary::Costs::H4" --cell-control none
+```
+
+A format applies to every cell a range holds, an empty one included, as Numbers keeps it for whatever is typed in later. A formula takes its format whatever its result, and Numbers shows it whenever the result is of the format's kind. pybers sets each family the Data Format menu offers as its own ticket adds it, so for now a format is Automatic or the family Automatic picks for the value, and a control can be removed but not yet given. Anything else is refused by name before anything is written.
 
 A date is stored as wall-clock time, as Numbers stores it. One given with an offset, such as `2026-10-20T16:00Z`, is written as the time it was in the zone pybers is running in, or in the zone `--time-zone America/New_York` specifies.
 
@@ -52,7 +64,7 @@ Sheet: Sheet 1  2 tables
 
     Cell: Sheet 1::Table 1::A1
       Value: 1   Kind: number   Formula text: none   Value cached: no
-      Format: number   Format chosen: no   Control: none
+      Format: number (automatic)   Control: none
       Unrecognized type code: none
 …
 ```
@@ -63,7 +75,7 @@ A cell folds the fields of its JSON form, in that form's order, onto three lines
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11"
 Cell: Sheet 1::Table 1::A11
   Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
-  Format: number   Format chosen: no   Control: none
+  Format: number (automatic)   Control: none
   Unrecognized type code: none
 ```
 
@@ -73,12 +85,12 @@ Several matches print each part exactly as it prints alone:
 $ pybers show shapes.numbers "::A11, *::Table 2[kind=number]"
 Cell: Sheet 1::Table 1::A11
   Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
-  Format: number   Format chosen: no   Control: none
+  Format: number (automatic)   Control: none
   Unrecognized type code: none
 
 Cell: Sheet 1::Table 2::A1
   Value: 42   Kind: number   Formula text: none   Value cached: no
-  Format: number   Format chosen: no   Control: none
+  Format: number (automatic)   Control: none
   Unrecognized type code: none
 ```
 
@@ -91,7 +103,7 @@ Cell: Sheet 1::Table 2::A1
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 [
   {
-    "jsonFormVersion": 4,
+    "jsonFormVersion": 5,
     "sheetName": "Sheet 1",
     "cell": "A11",
     "table": {
@@ -113,8 +125,12 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
           "formulaText": "=SUM(A1:A10)",
           "valueCached": true,
           "presentation": {
-            "format": "number",
-            "formatChosen": false,
+            "format": {
+              "formatFamily": "automatic",
+              "shown": {
+                "formatFamily": "number"
+              }
+            },
             "control": null
           },
           "unrecognizedTypeCode": null,
@@ -156,7 +172,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 $ pybers show shapes.numbers "*::Table 2" --format json
 [
   {
-    "jsonFormVersion": 4,
+    "jsonFormVersion": 5,
     "sheetName": "Sheet 1",
     "table": {
       "name": "Table 2",
@@ -177,8 +193,12 @@ $ pybers show shapes.numbers "*::Table 2" --format json
           "formulaText": null,
           "valueCached": false,
           "presentation": {
-            "format": "number",
-            "formatChosen": false,
+            "format": {
+              "formatFamily": "automatic",
+              "shown": {
+                "formatFamily": "number"
+              }
+            },
             "control": null
           },
           "unrecognizedTypeCode": null,
@@ -288,6 +308,24 @@ form = json.loads(text, parse_float=Decimal, parse_int=Decimal)  # every number 
 assert pybers.parseJsonForm(text) == costs
 ```
 
+A cell's format is one of a closed family of types, so a `match` reaches every family and mypy reports one it misses. `CellFormatAutomatic` holds the format Numbers chose, and a format a person chose is its family's own type. `document.cellSet` sets a value, a format, a control or any of them, a part not given left as it was:
+
+```python
+from pybers import CellFormatAutomatic, CellFormatNumber, CellFormatPercent
+
+match costs.cell("B4").presentation.format:
+    case CellFormatPercent() | CellFormatAutomatic(shown=CellFormatPercent()):
+        print("shown as a percentage")
+    case CellFormatAutomatic(shown=shown):
+        print("Numbers chose", shown.formatFamily)
+
+document.cellSet("Summary::Costs::B4", format=CellFormatNumber())  # value kept
+document.cellSet("Summary::Costs::B2:B9", Decimal(0), format=CellFormatAutomatic())
+document.cellSet("Summary::Costs::H4", control=None)  # its slider removed
+shown = pybers.formatCellFormat(CellFormatNumber())  # "number", as pybers show prints it
+assert pybers.parseCellFormat(shown) == CellFormatNumber()
+```
+
 A whole document read from its JSON form saves as a created document holding what the form describes. A cell holding something pybers cannot yet create, rich text, a control or a format such as a percentage, is refused by name before anything is written.
 
 ### Colors
@@ -342,7 +380,8 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 
 - Creating a document from nothing, in any region, which Numbers opens and into which a person can add any kind of object
 - Opening a document and saving it back, with everything pybers does not change left exactly as it was
-- Reading every cell's value, its kind (number, currency, text, date, duration and more) and its display format
+- Reading every cell's value, its kind (number, currency, text, date, duration and more), its format as one of a closed family of types, and its control
+- Setting a cell's value, format and control in one call or each alone, a format by its type or by the text `pybers show` prints, and removing a control
 - Writing numbers, text, dates and times, durations and booleans into any cell, and formulas as the text Numbers shows
 - Adding and deleting rows and columns, with every formula and merge following
 - Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does
@@ -358,7 +397,7 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 
 - A command-line app that exports a document as JSON ([PYB-142](https://github.com/rpulivella/pybers/issues/142))
 - A terminal interface for browsing a document read-only ([PYB-171](https://github.com/rpulivella/pybers/issues/171))
-- Showing a value in any format the Data Format menu offers ([PYB-145](https://github.com/rpulivella/pybers/issues/145))
+- Setting every family the Data Format menu offers, with each of its settings, and giving a cell a control ([PYB-231](https://github.com/rpulivella/pybers/issues/231) to [PYB-247](https://github.com/rpulivella/pybers/issues/247))
 - Cell styling: fills, padding and alignment, borders, and named cell styles ([PYB-265](https://github.com/rpulivella/pybers/issues/265), [PYB-266](https://github.com/rpulivella/pybers/issues/266), [PYB-128](https://github.com/rpulivella/pybers/issues/128))
 - Rich text: styled runs inside a cell, named paragraph styles, OpenType features, tracking and leading ([PYB-270](https://github.com/rpulivella/pybers/issues/270), [PYB-268](https://github.com/rpulivella/pybers/issues/268), [PYB-129](https://github.com/rpulivella/pybers/issues/129), [PYB-131](https://github.com/rpulivella/pybers/issues/131))
 - Table appearance: banding, gridlines and outlines ([PYB-266](https://github.com/rpulivella/pybers/issues/266), [PYB-267](https://github.com/rpulivella/pybers/issues/267))

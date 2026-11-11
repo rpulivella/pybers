@@ -2,9 +2,10 @@
 """\
 A cell's control read from its spec, as the model names it.
 
-Private. Part of the table feature's archive half.
+Private. Part of the format feature's archive half.
 
 UPDATES
+2026-11-09  Moved into the format feature from `pybers.table`, for PYB-145.
 2026-10-22  Each control read as the model names it, and whether one shows a value
             answered by the control itself, for PYB-255.
 2026-10-20  Written for PYB-144.

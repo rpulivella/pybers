@@ -24,6 +24,7 @@ import pybers
 from conftest import findDocumentPath
 from pybers._persistence.types import archiveTypeIds, archiveTypes
 from pybers.cli._console import themeStyles
+from pybers.format._read import formatsByType
 from pybers.formula.functions import functionsByIndex, functionsByName
 from pybers.formula.syntax import (
     binaryOperators,
@@ -31,7 +32,7 @@ from pybers.formula.syntax import (
     operatorSymbols,
     unaryOperators,
 )
-from pybers.table._read import formatFamilies, storedKinds
+from pybers.table._read import storedKinds
 from pybers.table._records import kindPhrases
 
 
@@ -59,7 +60,7 @@ mappingReaders: dict[str, Callable[[], Mapping[Any, Any]]] = {
     "archiveTypes": lambda: archiveTypes,
     "archiveTypeIds": lambda: archiveTypeIds,
     "storedKinds": lambda: storedKinds,
-    "formatFamilies": lambda: formatFamilies,
+    "formatsByType": lambda: formatsByType,
     "kindPhrases": lambda: kindPhrases,
     "binaryOperators": lambda: binaryOperators,
     "unaryOperators": lambda: unaryOperators,
