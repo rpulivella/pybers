@@ -430,6 +430,13 @@ class Cell:
         ):
             self._formatAsked = CellFormatAutomatic()
 
+    def _storageCheck(self) -> bool:
+        """Report whether a save must store a record for this cell, for a format too."""
+        return (
+            self.formula is not None or self.value is not None
+            or self._formatAsked is not None
+        )
+
     def _formatChosenCheck(self) -> bool:
         """Report whether a person chose the format this cell's save writes.
 

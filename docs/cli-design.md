@@ -49,7 +49,7 @@ A command parses its arguments, calls the library once, formats what comes back,
 - **`export` never changes the document it reads.** It reads FILE and writes elsewhere, a new `.numbers` document included, so no `export` changes FILE.
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
 - **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
-- **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--format` stays the output format every command offers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and prints why on stderr. A range skips an empty cell, printing each on stderr, and formats the rest. A formula takes its format whatever its result, which Numbers shows once the result is of the format's kind.
+- **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--format` stays the output format every command offers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and prints why on stderr. A format applies to every cell a range holds, an empty one included. A formula takes its format whatever its result, which Numbers shows once the result is of the format's kind.
 - **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
 ## Formulas

@@ -86,7 +86,7 @@ from ..format._read import currencyFormatType, findFormatOfType
 from ..format._write import (
     buildCurrencyFormat,
     findAutomaticFormat,
-    findFormulaFormatEntry,
+    findFormatEntry,
     formatSlots,
 )
 from ..format.formats import CellFormat, CellFormatAutomatic, findFormatShown
@@ -166,8 +166,8 @@ def refuseUncreatableCell(cell: Cell, tableName: str) -> None:
     """Refuse a cell whose record pybers would build without part of what it holds.
 
     The one place a new record's presentation is decided: a format is kept only when
-    it is the family `findAutomaticFormat` writes for the value, so a family the
-    builder learns to write is accepted without this changing.
+    `findFormatEntry` has an entry for it, so a family the writer learns to write is
+    accepted without this changing.
     """
     where = f"{tableName!r} {cell.address}"
     if cell.kind is CellKind.RICH_TEXT:
@@ -185,21 +185,12 @@ def refuseUncreatableCell(cell: Cell, tableName: str) -> None:
     if stated is None or stated is UNDETERMINED:
         return
     asked = findFormatShown(stated)
-    if asked is UNDETERMINED:
+    if asked is UNDETERMINED or findFormatEntry(asked, cell.value) is not None:
         return
-    if cell.value is None and cell.formula is None:
-        raise WriteError(
-            f"{where} holds a {asked.formatFamily} format and no value, which pybers "
-            "cannot yet create. Nothing was written."
-        )
-    written = findFormatOfType(findAutomaticFormat(cell.value).format_type)
-    # A formula's format is its result's, which Numbers decides on calculating.
-    if asked != written and cell.formula is None:
-        raise WriteError(
-            f"{where} holds a {asked.formatFamily} format, and pybers writes its value "
-            f"in a {written.formatFamily} format, since it cannot yet create a "
-            f"{asked.formatFamily} one. Nothing was written."
-        )
+    raise WriteError(
+        f"{where} holds a {asked.formatFamily} format, which pybers cannot yet "
+        "create. Nothing was written."
+    )
 
 
 def patchRichTextKey(raw: bytes, key: int) -> bytes:
@@ -534,35 +525,48 @@ def retypeRecord(
     return bytes(header) + value + tail
 
 
-def applyFormulaFormat(
+def applyAskedFormat(
     raw: bytes,
     asked: CellFormat,
     value: CellValue,
+    shows: bool,
     formatFor: Callable[[tsk.FormatStructArchive], int | None],
+    formatOf: Callable[[int], tsk.FormatStructArchive | None],
 ) -> bytes:
-    """Return a formula's record holding a format in its family's slot, chosen.
+    """Return a record holding the format its cell asked for, in its family's slot.
 
-    Numbers shows a formula's result through the slot of the result's kind, so the
-    format waits in its own slot for a result it fits, measured in
-    findings-11-formats.md. Automatic clears every chosen bit and leaves the slots to
-    Numbers.
+    The one place a format is written. It sits in its family's slot, chosen, and
+    `shows` names that slot as the one displayed, which a formula leaves to Numbers to
+    pick by its result, measured in findings-11-formats.md. A slot already holding
+    the family keeps its entry, settings and all. Automatic clears every chosen bit,
+    and a value it shows takes Automatic's entry.
     """
     header = bytearray(raw[:valueOffset])
+    record = decodeRecord(0, raw)
     if isinstance(asked, CellFormatAutomatic):
         for bit in chosenFormatBits:
             header[chosenFormatOffset] &= ~bit
-        return bytes(header) + raw[valueOffset:]
-    entry = findFormulaFormatEntry(asked, value)
-    key = None if entry is None else formatFor(entry)
-    if key is None:
-        raise WriteError(
-            f"A formula cannot hold a {asked.formatFamily} format here."
-        )
+        cleared = bytes(header) + raw[valueOffset:]
+        displayed = findSlotValue(record, displayedKindSlot)
+        if not shows or value is None or displayed is None:
+            return cleared
+        key = findSlotValue(record, countedFormatSlots[displayed - 1])
+        current = None if key is None else formatOf(key)
+        if current == findAutomaticFormat(value):
+            return cleared
+        return applyAutomaticFormat(cleared, value, formatFor)
     slot = formatSlots[asked.formatFamily]
-    record = decodeRecord(0, raw)
     slots = listReferenceSlots(raw)
     held = dict(zip(slots, record.references, strict=True))
-    held[slot] = key
+    current = None if slot not in held else formatOf(int(held[slot]))
+    if current is None or findFormatOfType(current.format_type) != asked:
+        entry = findFormatEntry(asked, value)
+        key = None if entry is None else formatFor(entry)
+        if key is None:
+            raise WriteError(f"pybers cannot write a {asked.formatFamily} format here.")
+        held[slot] = key
+    if shows:
+        held[displayedKindSlot] = findSlotKind(slot)
     for at, bit in held:
         header[at] |= bit
     header[chosenFormatOffset] |= chosenFormatBits[countedFormatSlots.index(slot)]
@@ -576,7 +580,7 @@ def applyFormulaFormat(
 
 __all__ = [
     "applyChosenFormat",
-    "applyFormulaFormat",
+    "applyAskedFormat",
     "borrowShape",
     "buildWrittenRecord",
     "findFormatKey",

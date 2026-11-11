@@ -20,25 +20,20 @@ __status__ = "Development"
 __date__ = "2026/11/10"
 
 import datetime
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from .._generated import TSKArchives_pb2 as tsk
 from .._persistence.cells import (
     checkboxFormatSlot,
-    countedFormatSlots,
     currencyFormatSlot,
     dateFormatSlot,
-    decodeRecord,
-    displayedKindSlot,
     durationFormatSlot,
-    findSlotValue,
     numberFormatSlot,
     textFormatSlot,
 )
 from ..currency import CurrencyAmount
 from ._read import currencyFormatType, findFormatOfType
-from .formats import CellFormat, CellFormatAutomatic, CellFormatFamily, CellFormatShown
+from .formats import CellFormatFamily, CellFormatShown
 
 if TYPE_CHECKING:
     from ..table.cell import CellValue
@@ -137,53 +132,32 @@ formatSlots: frozendict[CellFormatFamily, tuple[int, int]] = frozendict({
     CellFormatFamily.BOOLEAN: checkboxFormatSlot,
 })
 
-# The entry pybers writes for a formula's format, each family's Automatic one.
-formulaFormatEntries: frozendict[CellFormatFamily, tsk.FormatStructArchive] = (
+# The entry each family takes over no value it could follow: an empty cell, or a
+# formula whose result is absent or of another kind. Each is its Automatic entry.
+plainFormatEntries: frozendict[CellFormatFamily, tsk.FormatStructArchive] = (
     frozendict({
         CellFormatFamily.NUMBER: automaticNumberFormat,
         CellFormatFamily.DATE_TIME: dateOnlyFormat,
         CellFormatFamily.DURATION: findAutomaticFormat(datetime.timedelta()),
+        CellFormatFamily.TEXT: automaticTextFormat,
     })
 )
 
 
-def findFormulaFormatEntry(
+def findFormatEntry(
     cellFormat: CellFormatShown, value: CellValue
 ) -> tsk.FormatStructArchive | None:
-    """Return the entry a formula takes for a format, or None when pybers has none.
+    """Return the entry pybers writes for a format over a value, or None for none.
 
-    A currency entry names its currency, which only a currency result supplies.
+    A value of the format's own family takes the entry Automatic gives it, so a
+    currency names its currency and a duration its units, and any other value takes
+    the family's plain entry. The one place pybers decides which formats it can write.
     """
-    if cellFormat.formatFamily is CellFormatFamily.CURRENCY:
-        return (
-            buildCurrencyFormat(value.currency) if isinstance(value, CurrencyAmount)
-            else None
-        )
-    return formulaFormatEntries.get(cellFormat.formatFamily)
-
-
-def checkAskedFormatShown(
-    raw: bytes,
-    asked: CellFormat,
-    value: CellValue,
-    formatOf: Callable[[int], tsk.FormatStructArchive | None],
-) -> bool:
-    """Report whether a record already names the entry a format asked for needs.
-
-    A chosen family is the one Automatic writes for the value, so a record showing
-    any other entry takes Automatic's, and the chosen bit says the rest.
-    """
-    record = decodeRecord(0, raw)
-    displayed = findSlotValue(record, displayedKindSlot)
-    key = (
-        findSlotValue(record, countedFormatSlots[displayed - 1])
-        if displayed is not None and 1 <= displayed <= len(countedFormatSlots)
-        else None
-    )
-    current = None if key is None else formatOf(key)
-    if isinstance(asked, CellFormatAutomatic):
-        return current == findAutomaticFormat(value)
-    return current is not None and findFormatOfType(current.format_type) == asked
+    if value is not None:
+        automatic = findAutomaticFormat(value)
+        if findFormatOfType(automatic.format_type) == cellFormat:
+            return automatic
+    return plainFormatEntries.get(cellFormat.formatFamily)
 
 
 __all__ = [
@@ -191,11 +165,10 @@ __all__ = [
     "automaticNumberFormat",
     "automaticTextFormat",
     "buildCurrencyFormat",
-    "checkAskedFormatShown",
     "dateAndTimeFormat",
     "dateOnlyFormat",
     "findAutomaticFormat",
     "findDurationUnits",
-    "findFormulaFormatEntry",
+    "findFormatEntry",
     "formatSlots",
 ]

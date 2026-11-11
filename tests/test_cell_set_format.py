@@ -133,7 +133,7 @@ def testAFormatPybersCannotYetWriteIsRefusedAndNothingChanges(working: Path) -> 
     )
 
 
-def testARangeSkipsItsEmptyCellsAndFormatsTheRestFormulasIncluded(
+def testARangeFormatsEveryCellItsEmptyAndFormulaCellsIncluded(
     tmp_path: Path,
 ) -> None:
     document = pybers.create("en_US")
@@ -143,16 +143,39 @@ def testARangeSkipsItsEmptyCellsAndFormatsTheRestFormulasIncluded(
     working = tmp_path / "range.numbers"
     document.save(working)
     reopened = pybers.open(working)
-    changes = reopened.cellSet("::Range::A1:C1", format=CellFormatNumber())
-    assert [(str(skip.reference), skip.reason) for skip in changes.skipped] == [
-        ("Sheet 1::Range::B1",
-         "Sheet 1::Range::B1 holds no value, which pybers cannot yet format."),
-    ]
+    assert not reopened.cellSet("::Range::A1:C1", format=CellFormatNumber()).skipped
     reopened.save()
     saved = pybers.open(working).table("Range")
-    assert [saved.cell(each).presentation.format for each in ("A1", "C1")] == [
-        CellFormatNumber(), CellFormatNumber()
+    assert [saved.cell(each).presentation.format for each in ("A1", "B1", "C1")] == [
+        CellFormatNumber(), CellFormatNumber(), CellFormatNumber()
     ]
+
+
+@pytest.mark.parametrize("chosen", [
+    CellFormatNumber(), pybers.CellFormatDateTime(), pybers.CellFormatDuration(),
+    CellFormatText(),
+])
+def testAnEmptyCellHoldsAChosenFormat(
+    chosen: pybers.CellFormat, tmp_path: Path
+) -> None:
+    document = pybers.create("en_US")
+    document.sheet().tableAdd("Blank", rows=1, cols=1)
+    working = tmp_path / "blank.numbers"
+    document.save(working)
+    reopened = pybers.open(working)
+    reopened.cellSet("::Blank::A1", format=chosen)
+    reopened.save()
+    cell = pybers.open(working).table("Blank").cell("A1")
+    assert (cell.value, cell.presentation.format) == (None, chosen)
+
+
+def testAnEmptyCellRefusesAFormatPybersCannotWriteYet(tmp_path: Path) -> None:
+    document = pybers.create("en_US")
+    document.sheet().tableAdd("Blank", rows=1, cols=1)
+    working = tmp_path / "blank.numbers"
+    document.save(working)
+    with pytest.raises(pybers.WriteError, match="cannot yet write a percent format"):
+        pybers.open(working).cellSet("::Blank::A1", format=CellFormatPercent())
 
 
 def testAFormulaWithNoResultHoldsItsFormatUntilNumbersCalculates(

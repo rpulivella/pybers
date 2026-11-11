@@ -90,7 +90,6 @@ from pybers.format._check import (
     findControlRefusal,
     findFormatMisfit,
     findFormatRefusal,
-    findFormatSkip,
 )
 from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
@@ -469,12 +468,6 @@ class Document:
                 (None if cell is None else cell.presentation.control)
                 if control is UNCHANGED else control
             )
-            skip = None if asked is UNCHANGED else findFormatSkip(cell, where, after)
-            if skip is not None:
-                skipped.append(CellSkip(where, skip))
-                asked = UNCHANGED
-                if value is UNCHANGED and control is UNCHANGED:
-                    continue
             if asked is not UNCHANGED:
                 misfit = findFormatMisfit(cell, where, asked, after)
                 if misfit is not None and conflict is CellFormatConflict.REFUSE:

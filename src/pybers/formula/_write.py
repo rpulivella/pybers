@@ -52,6 +52,7 @@ from .._persistence.cells import (
     findFormulaKeySlot,
     formulaFlagBit,
     formulaFlagOffset,
+    recordStorageVersion,
     referenceWidth,
     valueOffset,
 )
@@ -80,9 +81,6 @@ from .nodes import (
     unboundedRangeColumn,
     unboundedRangeRow,
 )
-
-# Byte 0 of every cell record in the documents. A created record carries it too.
-storageVersion: int = 5
 
 # A table identity is a 128-bit value the formula spells as four 32-bit words, so
 # the model's hexadecimal has to be cut back into them.
@@ -371,7 +369,7 @@ def buildFormulaRecord(key: int) -> bytes:
     written, since pybers never evaluates and Numbers recalculates on open.
     """
     header = bytearray(valueOffset)
-    header[0] = storageVersion
+    header[0] = recordStorageVersion
     header[1] = formulaPendingType
     header[formulaFlagOffset] = formulaFlagBit
     return bytes(header) + key.to_bytes(referenceWidth, "little")

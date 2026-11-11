@@ -77,6 +77,8 @@ offsetUnitWord: int = 4
 # The value begins here in every record seen. Bytes 0-11 carry the storage version,
 # the type, a flags bitmask at 6-7, and four bytes whose purpose is not established.
 valueOffset: int = 12
+# Byte 0 of every cell record in the documents. A created record carries it too.
+recordStorageVersion: int = 5
 
 # Byte 9 of the header is a second bitmask, and this bit marks a cell backed by a
 # formula. Established across the documents on 2026-09-01: in all 74 tables, a table
@@ -371,3 +373,15 @@ def decodeRow(
         )
         records.append(decodeRecord(column, storageBuffer[at:end]))
     return records
+
+
+
+def buildEmptyRecord() -> bytes:
+    """Return the record of a cell holding nothing, for a format to be placed in.
+
+    The bare header Numbers stores for an empty cell it formatted, measured in
+    `19-formula-dragged` `B2`, whose format slot and displayed kind follow.
+    """
+    header = bytearray(valueOffset)
+    header[0] = recordStorageVersion
+    return bytes(header)

@@ -26,12 +26,17 @@ from typing import TYPE_CHECKING
 from pybers.absence import UNCHANGED, UNDETERMINED
 from pybers.addressing.reference import CellReference
 from pybers.format._read import findFormatOfType
-from pybers.format._write import findAutomaticFormat, findFormulaFormatEntry
+from pybers.format._write import findAutomaticFormat, findFormatEntry
 from pybers.format.controls import CellControl, controlFormatFamilies
 from pybers.format.formats import (
     CellFormat,
     CellFormatAutomatic,
     CellFormatBoolean,
+    CellFormatCurrency,
+    CellFormatDateTime,
+    CellFormatDuration,
+    CellFormatNumber,
+    CellFormatShown,
     CellFormatText,
     findFormatShown,
 )
@@ -40,6 +45,13 @@ from pybers.table.kinds import CellKind, findCellKind, kindFormatFamilies
 
 if TYPE_CHECKING:
     from pybers.table.cell import Cell, CellValue
+
+
+# The formats a refusal offers instead, each family pybers can write an entry for.
+writableFormats: tuple[CellFormatShown, ...] = (
+    CellFormatNumber(), CellFormatCurrency(), CellFormatDateTime(),
+    CellFormatDuration(), CellFormatText(),
+)
 
 
 def findFormatMisfit(
@@ -99,22 +111,6 @@ def findControlRefusal(
     return f"pybers cannot yet write a {control.controlType} control at {where}."
 
 
-def findFormatSkip(
-    cell: Cell | None, where: CellReference, value: CellValue
-) -> str | None:
-    """Return why a cell in a range is left without the format asked, or None.
-
-    A range commonly holds empty cells, so each is skipped and reported rather than
-    refusing the cells pybers can format. A formula is never skipped, since its format
-    waits in its family's slot for a result of that kind.
-    """
-    if cell is not None and cell.formula is not None:
-        return None
-    if value is None:
-        return f"{where} holds no value, which pybers cannot yet format."
-    return None
-
-
 def findFormatRefusal(
     cell: Cell | None,
     where: CellReference,
@@ -122,10 +118,11 @@ def findFormatRefusal(
     value: CellValue,
     control: CellControl | None,
 ) -> str | None:
-    """Return why pybers cannot yet give a cell a format over a value, or None.
+    """Return why pybers cannot give a cell a format, or None when it can.
 
-    A chosen family is written over the entry Numbers' Automatic picks for the value,
-    so only that family can be chosen until its own ticket teaches the writer more.
+    A format sits in its family's slot over whatever the cell holds, a value, an
+    empty cell or a formula awaiting a result, so pybers refuses only a format beneath
+    a control, one Numbers keeps no chosen form of, and one it has no entry for yet.
     """
     if control is not None:
         return (
@@ -138,34 +135,27 @@ def findFormatRefusal(
         unchanged and cellFormat == shown
     ):
         return None
-    formula = cell is not None and cell.formula is not None
-    if formula and cellFormat == CellFormatText():
+    if cell is not None and cell.formula is not None and cellFormat == CellFormatText():
         return (
             f"{where} is backed by a formula, and Numbers keeps no chosen text format "
             "on one, so it can take automatic."
-        )
-    if formula:
-        if findFormulaFormatEntry(cellFormat, value) is not None:
-            return None
-        return (
-            f"{where} is backed by a formula, and pybers cannot yet write a "
-            f"{cellFormat.formatFamily} format for one, so it can take number, "
-            "date-time, duration, currency over a currency result, or automatic."
         )
     if cellFormat == CellFormatBoolean():
         return (
             f"Numbers offers no boolean format to choose, so {where} can take a "
             "checkbox or automatic."
         )
-    written = findFormatOfType(findAutomaticFormat(value).format_type)
-    if cellFormat == written:
+    if findFormatEntry(cellFormat, value) is not None:
         return None
+    writable = [
+        each.formatFamily.value for each in writableFormats
+        if findFormatEntry(each, value) is not None
+        and findFormatMisfit(cell, where, each, value) is None
+    ]
     return (
-        f"pybers cannot yet write a {cellFormat.formatFamily} format, so {where} "
-        f"can take {written.formatFamily} or automatic."
+        f"pybers cannot yet write a {cellFormat.formatFamily} format, so {where} can "
+        f"take {', '.join([*writable, 'automatic'])}."
     )
 
 
-__all__ = [
-    "findControlRefusal", "findFormatMisfit", "findFormatRefusal", "findFormatSkip",
-]
+__all__ = ["findControlRefusal", "findFormatMisfit", "findFormatRefusal"]

@@ -396,7 +396,16 @@ An empty cell keeps a chosen number, text or date format, 172 times in `65b-seri
 and `19-formula-dragged`, so an empty cell takes any format. A custom format over text, a
 date or currency reads as unknown until PYB-245 to PYB-247 decode it, so it is not listed.
 
-### A formula's format waits in its family's slot
+### A format waits in its family's slot
+
+A cell holding nothing keeps a format too. `65b-series-dragged` `L3` and `M3` and
+`19-formula-dragged` `B2` are type 0 records holding a chosen number, date and text
+format: the entry in its family's slot, the displayed kind naming that slot, and the
+slot's chosen bit, `B2` the bare twelve-byte header and those two references. pybers
+writes an empty cell's format the same way, as the golden
+`00-created-empty-formats-chosen-by-pybers` shows Numbers keeping.
+
+#### A formula's format waits in its family's slot
 
 Measured 2026-11-10 for PYB-145 in Numbers 15.4, by giving three formula records a
 percent format in their number slot and saving each after Numbers opened it. Numbers

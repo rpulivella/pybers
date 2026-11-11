@@ -12,6 +12,8 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
+2026-11-11  A cell's format is one the save writes, an empty cell's included, for
+            PYB-145.
 2026-11-03  A table's headers, for PYB-223.
 2026-10-27  The order `pybers show` prints, now that it is built, for PYB-260.
 2026-10-24  Written for PYB-259.
@@ -34,6 +36,7 @@ from pybers.absence import WITHHELD
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress
 from pybers.errors import PybersError
+from pybers.format.formats import CellFormatBase
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.interchange._leaves import JsonFormError
@@ -160,6 +163,9 @@ def addCell(table: Table, form: CellForm, path: str) -> None:
     cell._stored = CellStorage(form.kind, form.presentation, form.unrecognizedTypeCode)
     cell._value = form.value
     cell._storedValue = form.value
+    # The form's cell has no record yet, so its format is one the save must write.
+    stated = form.presentation.format
+    cell._formatAsked = stated if isinstance(stated, CellFormatBase) else None
 
 
 def assignFormulas(table: Table, form: TableForm, path: str) -> None:
