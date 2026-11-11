@@ -227,11 +227,14 @@ list. Every format has one text form tagged by its family, which `pybers set
 --cell-format` reads and `pybers show` prints, and the JSON form carries the same setting
 names as an object, so a machine reads one grammar and a person another.
 
-**A cell's kind and format always agree.** A write that would leave a format on a value it
+**A value's kind and format always agree.** A write that would leave a format on a value it
 cannot show, such as a duration format on text, is refused, naming both, unless the caller
 passes `CellFormatConflict.AUTOMATIC`, which falls back to the Automatic format and reports
 it. The policy is a parameter of the library and of an agent's calls, and other writes can
-take it later, an import or a fill among them.
+take it later, an import or a fill among them. A formula and an empty cell are not judged:
+Numbers shows a cell through the format slot of what it holds, so a format given to either
+waits in its family's slot, chosen, until a result or a value of that kind arrives, as
+findings-11-formats.md measures.
 
 **A write reports each cell whose kind or format it changed**, before and after, and a
 preview reports the same without writing. Nothing about a column or a row is special:
