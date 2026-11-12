@@ -1,0 +1,116 @@
+# How Numbers makes 98-cell-box-base: ten labeled columns, each holding 1 and awaiting the box or text styling its label specifies, made by hand. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 98-cell-box-base`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "K2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "input as 1"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "input as 1, Fill set with RGB sliders, sRGB IEC61966-2.1, 255 214 10"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "input as 1, Fill set with RGB sliders, sRGB IEC61966-2.1, 255 0 0"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "input as 1, Text vertical alignment Center"
+
+[[step]]
+action = "valueSet"
+range = "E1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "input as 1, Wrap Text in Cell cleared"
+
+[[step]]
+action = "valueSet"
+range = "F1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "F2"
+value = "input as 1, Text Inset 6 pt"
+
+[[step]]
+action = "valueSet"
+range = "G1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "G2"
+value = "input as 1, Text horizontal alignment Right"
+
+[[step]]
+action = "valueSet"
+range = "H1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "H2"
+value = "input as 1, Text Bold"
+
+[[step]]
+action = "valueSet"
+range = "I1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "I2"
+value = "input as 1, Fill set with RGB sliders, sRGB IEC61966-2.1, 255 214 10, Text horizontal alignment Right"
+
+[[step]]
+action = "valueSet"
+range = "J1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "J2"
+value = "input as 1, Fill set with RGB sliders, sRGB IEC61966-2.1, 255 214 10, Text horizontal alignment Right, Conditional Highlighting Number greater than 0, Red Fill"
+
+[[step]]
+action = "valueSet"
+range = "K2"
+value = "empty"
