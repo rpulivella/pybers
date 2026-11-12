@@ -92,9 +92,14 @@ style key of its own, where the 2pt and 0pt cells do. The value is not absent fr
 document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 times. The
 default lives in the inherited style and the cell simply declines to override it.
 
-**Padding is always uniform in practice.** Across every fixture here, 3,368 cell styles carry
-padding and **not one is uneven**, only `4/4/4/4`, `2/2/2/2` and `0/0/0/0` appear. The UI
-offers a single value and Numbers never writes anything else.
+**A side of zero is omitted**, so `0/0/0/0` stores as an empty `padding {}`, which is how the
+`0pt` cell of `31` holds it. A reader takes a missing side as zero.
+
+**Padding Numbers writes is uniform; padding it imports need not be.** Measured for PYB-265 on
+2026-11-12 across the 258 documents in the tests: 26,638 cell styles, 25,764 of them carrying
+padding. Every style Numbers composed holds one value for all four sides, which is the single
+value the UI offers. The 32 exceptions are the table styles of a table imported from Excel,
+`22e-merge-imported` and the documents made from it, holding `L2 T0 R2 B2`.
 
 That leaves an open **write** question rather than a read one. `PaddingArchive` has four
 independent floats, so pybers is able to emit `L2 T0 R4 B8`; whether Numbers honors it,
