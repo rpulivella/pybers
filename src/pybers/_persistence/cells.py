@@ -253,6 +253,9 @@ slotOrder: tuple[tuple[int, int], ...] = (
     *((10, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
 )
 
+# The slot naming a cell's own cell style, a `styleTable` key, measured in 98b.
+cellStyleSlot: tuple[int, int] = (8, 0x20)
+
 # The slot naming a cell's conditional highlighting, and the slot caching which of
 # its rules matched: the rule's index, or 15 when none did. Measured against the
 # values every highlighted cell of `57-structure-refusals-base` holds.

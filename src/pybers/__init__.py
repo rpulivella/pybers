@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-12  `CellStyle`, its values, its text form and the fill family re-exported,
+            for PYB-265.
 2026-11-10  UNCHANGED re-exported, a part of `cellSet` left as it was, for PYB-145.
 2026-11-10  `CellFormatConflict` re-exported, for PYB-145.
 2026-11-10  `formatCellControl`, `parseCellControl` and `CellControlError`, a
@@ -181,6 +183,18 @@ lazy from pybers.selection import (
     SelectorLike,
     quoteSelectorName,
 )
+lazy from pybers.style import (
+    CellStyle,
+    CellStylePaddingSides,
+    CellStyleTextWrap,
+    CellStyleVerticalAlign,
+    Fill,
+    FillGradient,
+    FillImage,
+    FillNone,
+    FillType,
+    formatCellStyle,
+)
 lazy from pybers.table import (
     Cell,
     CellChange,
@@ -238,6 +252,16 @@ __all__ = [
     "Color",
     "ColorError",
     "ColorSpace",
+    "CellStyle",
+    "CellStylePaddingSides",
+    "CellStyleTextWrap",
+    "CellStyleVerticalAlign",
+    "Fill",
+    "FillGradient",
+    "FillImage",
+    "FillNone",
+    "FillType",
+    "formatCellStyle",
     "Currency",
     "CurrencyAmount",
     "CurrencyError",

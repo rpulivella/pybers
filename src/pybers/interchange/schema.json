@@ -197,6 +197,16 @@
         "presentation": {
           "$ref": "#/$defs/CellPresentation"
         },
+        "cellStyle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "unrecognizedTypeCode": {
           "anyOf": [
             {
@@ -704,7 +714,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 5
+          "const": 6
         },
         "sheetName": {
           "anyOf": [
@@ -845,6 +855,82 @@
       ],
       "additionalProperties": false
     },
+    "CellStyle": {
+      "type": "object",
+      "description": "What a cell's own style states about its box, each property None when inherited.",
+      "properties": {
+        "background": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "$ref": "#/$defs/FillGradient"
+            },
+            {
+              "$ref": "#/$defs/FillImage"
+            },
+            {
+              "$ref": "#/$defs/FillNone"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "padding": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verticalAlign": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellStyleVerticalAlign"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "textWrap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellStyleTextWrap"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "CellStyleTextWrap": {
+      "enum": [
+        "wrap",
+        "nowrap"
+      ]
+    },
+    "CellStyleVerticalAlign": {
+      "enum": [
+        "top",
+        "middle",
+        "bottom"
+      ]
+    },
     "Color": {
       "type": "object",
       "description": "A color in Numbers' own terms, never converted, and unequal across spaces.",
@@ -878,7 +964,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 5
+          "const": 6
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -964,7 +1050,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 5
+          "const": 6
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -973,6 +1059,45 @@
       "required": [
         "jsonFormVersion",
         "document"
+      ],
+      "additionalProperties": false
+    },
+    "FillGradient": {
+      "type": "object",
+      "description": "A gradient fill, carried as stored.",
+      "properties": {
+        "fillType": {
+          "const": "gradient"
+        }
+      },
+      "required": [
+        "fillType"
+      ],
+      "additionalProperties": false
+    },
+    "FillImage": {
+      "type": "object",
+      "description": "An image fill, carried as stored.",
+      "properties": {
+        "fillType": {
+          "const": "image"
+        }
+      },
+      "required": [
+        "fillType"
+      ],
+      "additionalProperties": false
+    },
+    "FillNone": {
+      "type": "object",
+      "description": "No fill, stated rather than inherited.",
+      "properties": {
+        "fillType": {
+          "const": "none"
+        }
+      },
+      "required": [
+        "fillType"
       ],
       "additionalProperties": false
     },
@@ -1282,7 +1407,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 5
+          "const": 6
         },
         "sheetName": {
           "anyOf": [
@@ -1345,7 +1470,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 5
+          "const": 6
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1489,7 +1614,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 5
+          "const": 6
         },
         "sheetName": {
           "anyOf": [

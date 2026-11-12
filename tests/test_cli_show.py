@@ -7,6 +7,7 @@ first alone, and its `A11` holds `=SUM(A1:A10)`. `81-control-formats` holds a ce
 for each control, a slider in `A1` and a pop-up menu in `I1`.
 
 UPDATES
+2026-11-12  A cell's cell style prints on its own line, for PYB-265.
 2026-11-03  A selector read by its positions, each match printed as it prints
             alone, a document in full, and a table's headers, for PYB-223.
 2026-10-28  A document's outline opens with its locale, for PYB-272.
@@ -92,8 +93,15 @@ def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
         "Cell: Sheet 1::Table 1::A11",
         "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
         "  Format: number (automatic)   Control: none",
+        "  Cell style: none",
         "  Unrecognized type code: none",
     ]
+
+
+def testACellPrintsItsCellStyleAsItsTextForm() -> None:
+    path = findDocumentPath("98b-cell-box-styles")
+    result = runShowCommand(path, "Sheet 1::Table 1::B1")
+    assert "  Cell style: background: #ffd60aff" in result.stdout.splitlines()
 
 
 def testACellsFieldsFollowTheNamesAndOrderOfItsJsonForm() -> None:

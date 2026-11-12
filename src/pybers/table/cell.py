@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-11-12  `cellStyle`, what the cell's own style states about its box, for
+            PYB-265.
 2026-11-09  An edit records the format its save writes, Automatic included, rather
             than a chosen flag, for PYB-145.
 2026-11-03  `CellChanges` and `CellSkip`, what a write to every matched cell did, for
@@ -61,6 +63,7 @@ from pybers.format.formats import (
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
+from pybers.style.cells import CellStyle
 from pybers.table.kinds import (
     CellKind,
     CellPresentation,
@@ -482,6 +485,11 @@ class Cell:
                 presentation, format=CellFormatAutomatic(CellFormatText())
             )
         return presentation
+
+    @property
+    def cellStyle(self) -> CellStyle | None:
+        """Return what this cell's own style states about its box, or None."""
+        return self._stored.cellStyle
 
     @property
     def unrecognizedTypeCode(self) -> int | None:
