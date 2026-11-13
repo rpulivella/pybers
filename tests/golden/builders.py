@@ -61,8 +61,9 @@ class GoldenBuilder:
 
     A source of None starts from a document created in `createdLocale`, and a golden
     starting from a fixture or measurement names in `sourceReason` the ticket enabling
-    pybers to create its source, or why it does not. `labeled` marks a source laid out
-    as a measurement, whose label beneath each cell the mutation changes is rewritten.
+    pybers to create its source, or why it does not. `labeled` marks a golden laid out
+    as a measurement, and from a source, the label beneath each changed cell is
+    rewritten.
     """
 
     name: str
@@ -733,6 +734,64 @@ def removeControls(document: pybers.Document) -> None:
     document.cellSet("::Table 1::E1:I1", control=None)
 
 
+# Each row of a created table: what its cell's own style states, and the value it shows.
+wrappingText: str = (
+    "words enough to run past the edge of this column, so wrapping shows on a "
+    "second line"
+)
+cellBoxes: tuple[tuple[pybers.CellStyle, str | Decimal], ...] = (
+    (pybers.CellStyle(background=pybers.Color.parse("#ffd60aff")), Decimal(1)),
+    (pybers.CellStyle(padding=Decimal(12)), Decimal(2)),
+    (pybers.CellStyle(padding=Decimal(0)), Decimal(3)),
+    (pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.MIDDLE),
+     wrappingText),
+    (pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.BOTTOM),
+     wrappingText),
+    (pybers.CellStyle(textWrap=pybers.CellStyleTextWrap.WRAP), wrappingText),
+    (pybers.CellStyle(
+        background=pybers.Color.parse("#ffd60aff"), padding=Decimal(8),
+        verticalAlign=pybers.CellStyleVerticalAlign.MIDDLE,
+        textWrap=pybers.CellStyleTextWrap.WRAP,
+    ), wrappingText),
+)
+
+
+def setCellBoxes(document: pybers.Document) -> None:
+    """Give each row of a created table one cell style, its text form beside it."""
+    table = document.sheet().tableAdd("Boxes", rows=len(cellBoxes), cols=2)
+    for row, (cellStyle, value) in enumerate(cellBoxes, start=1):
+        table.cell(f"A{row}").value = pybers.formatCellStyle(cellStyle)
+        document.cellSet(f"::Boxes::B{row}", value, cellStyle=cellStyle)
+
+
+# Each color case of a fill, the text naming it, in a column of its own.
+fillColors: tuple[tuple[pybers.Color, str], ...] = (
+    (pybers.Color.parse("#ff8000ff"), "sRGB 255 128 0, #ff8000ff"),
+    (pybers.Color.parse("color(display-p3 1 0.5019608 0 / 1)"),
+     "Display P3 255 128 0, color(display-p3 1 0.5019608 0 / 1)"),
+    (pybers.Color.parse("color(srgb 1 0.5 0 / 0.5)"),
+     "translucent sRGB 1 0.5 0 at opacity 50%, color(srgb 1 0.5 0 / 0.5)"),
+    (pybers.Color.gray(Decimal("0.5"), 1),
+     "Color.gray 0.5, color(srgb 0.5 0.5 0.5 / 1)"),
+    (pybers.Color.black, "Color.black, #000000ff"),
+    (pybers.Color.white, "Color.white, #ffffffff"),
+)
+
+
+def setCellFills(document: pybers.Document) -> None:
+    """Fill one cell per color case across row 1, its color as text beneath it."""
+    columns = len(fillColors) + 1
+    table = document.sheet().tableAdd("Fills", rows=2, cols=columns)
+    for column, (color, label) in enumerate(fillColors, start=1):
+        above = pybers.CellAddress(1, column)
+        document.cellSet(
+            f"::Fills::{above}", Decimal(column),
+            cellStyle=pybers.CellStyle(background=color),
+        )
+        table.cell(pybers.CellAddress(2, column)).value = f"filled with {label}"
+    table.cell(pybers.CellAddress(2, columns)).value = "empty"
+
+
 # Goldens of what pybers cannot create yet, each naming the ticket that enables it.
 enabledLaterGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("13-formats-made-automatic-by-pybers", "13-number-percent",
@@ -765,6 +824,9 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
                   chooseFormulaFormats),
     GoldenBuilder("00-created-empty-formats-chosen-by-pybers", None,
                   chooseEmptyFormats),
+    GoldenBuilder("00-created-cell-boxes-styled-by-pybers", None, setCellBoxes),
+    GoldenBuilder("00-created-cell-fills-colored-by-pybers", None, setCellFills,
+                  labeled=True),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.
