@@ -344,3 +344,16 @@ def testAStyleSetBeforeAnEditReachesEveryCellItLands(
     table = pybers.open(working).sheets[0].tables[0]
     assert {table.cell(address).cellStyle for address in addresses} == {padded}
     assert listStyleCountMismatches(working) == []
+
+
+def testAScriptStylesACellsBoxAndReadsItBack(tmp_path: Path) -> None:
+    working = copyDocument("98b-cell-box-styles", tmp_path)
+    document = pybers.open(working)
+    yellowFill = pybers.Color.parse("#ffd60aff")
+    document.cellSet(
+        "::Table 1::A1:A2", cellStyle=pybers.CellStyle(background=yellowFill, padding=6)
+    )
+    document.save()
+    style = pybers.open(working).table("Table 1").cell("A1").cellStyle
+    assert style is not None
+    assert pybers.formatCellStyle(style) == "background: #ffd60aff; padding: 6pt"
