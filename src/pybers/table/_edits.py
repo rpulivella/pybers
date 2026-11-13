@@ -91,7 +91,7 @@ from ..formula._write import (
     readFormulaPool,
 )
 from ..formula.nodes import Formula
-from ..style._write import readStylePool
+from ..style._write import readStylePool, writeStylePool
 from ._cellstyles import writeAskedCellStyle
 from ._conditions import ConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
@@ -566,8 +566,8 @@ def applyTableEdits(
         )
         index.archiveWrite(store.format_table.identifier, formatPool.dataList)
 
-    if stylePool is not None and stylePool.touched:
-        index.archiveWrite(store.styleTable.identifier, stylePool.dataList)
+    if stylePool.touched:
+        writeStylePool(index, registry, store, stylePool)
 
     if richTextPool is not None and richTextPool.touched:
         removeSpentRichText(registry, richTextPool, tiles)

@@ -12,6 +12,8 @@ one style shared along each. Measured 2026-11-03 in findings-10-creation.md.
 Private. The document feature's archive half, reached by document creation.
 
 UPDATES
+2026-11-13  The cell style states the whole box a created table shows, as each
+            root cell style Numbers writes does, for PYB-265.
 2026-11-06  The palette and the sheet's fill are `Color` values in sRGB, as Numbers
             stores them, for PYB-264.
 2026-11-03  Root styles state what Numbers always states, for PYB-261.
@@ -46,12 +48,13 @@ from .._generated import TSWPArchives_pb2 as tswp
 from .._generated.themestyles import themeStyles
 from ..color._archive import composeColor
 from ..color.colors import Color, ColorSpace
+from ..style._write import composeCellProperties, composeCellStyleArchive
 from ..table._reset import (
-    applyResetCell,
     applyResetTable,
     composeBaseStyle,
     namedStyleKey,
 )
+from ..table.cells import createdCellStyle
 
 # Numbers looks each up by name, and cannot read a document missing either.
 drawingLineStyle: str = "drawingline-0-drawinglineStyle"
@@ -250,9 +253,9 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
     tableStyle = composeRootStyle(tst.TableStyleArchive, stylesheet, "table")
     applyResetTable(tableStyle)
     styleAdd("table", tableStyle)
-    cellStyle = composeStyle(tst.CellStyleArchive, stylesheet)
-    applyResetCell(cellStyle)
-    styleAdd("cell", cellStyle)
+    styleAdd("cell", composeCellStyleArchive(stylesheet, composeCellProperties(
+        createdCellStyle, tstStyles.CellStylePropertiesArchive()
+    )))
 
     sheet = tss.StylesheetArchive(is_locked=False)
     for identifier, _ in composed.styles:

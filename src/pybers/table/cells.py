@@ -126,10 +126,13 @@ def generateOwnerIdentity() -> str:
 
 # The cell style every region of a table pybers adds names, the reset: no wrapping.
 resetCellStyle: CellStyle = CellStyle(textWrap=CellStyleTextWrap.NOWRAP)
-resetCellStylesInherited: frozendict[TableRegion, CellStyle] = frozendict({
-    region: replace(numbersCellStyle, textWrap=CellStyleTextWrap.NOWRAP)
-    for region in TableRegion
-})
+# What every cell of a table pybers adds shows: Numbers' own box, not wrapping.
+createdCellStyle: CellStyle = replace(
+    numbersCellStyle, textWrap=CellStyleTextWrap.NOWRAP
+)
+resetCellStylesInherited: frozendict[TableRegion, CellStyle] = frozendict(
+    dict.fromkeys(TableRegion, createdCellStyle)
+)
 
 @dataclass(slots=True)
 class Table:

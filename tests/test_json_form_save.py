@@ -26,6 +26,7 @@ import pybers
 from conftest import findDocumentPath
 from pybers.absence import UNDETERMINED
 from pybers.interchange import formatJsonForm, parseJsonForm
+from pybers.style.cells import findOverrides
 from pybers.table._form import CellForm, buildCellForm
 from pybers.table._records import refuseUncreatableCell
 
@@ -82,14 +83,20 @@ def testAMeasurementSavedThroughItsJsonFormKeepsEveryCell(tmp_path: Path) -> Non
             }
 
 
-def findCellLoss(held: CellForm, written: CellForm | None) -> str | None:
+def findCellLoss(
+    held: CellForm, written: CellForm | None, inherited: pybers.CellStyle
+) -> str | None:
     """Return what a cell lost on the way through its JSON form and a save, or None.
+
+    A style is compared less what the rebuilt table gives the cell anyway, which a
+    variation there cannot tell from the cell's own, as findings-06 measured.
 
     A formula's result and its format are Numbers' to calculate, and a format the
     model had yet to determine is not lost.
     """
+    heldStyle = findOverrides(held.cellStyle, inherited)
     holds = (held.formulaText, held.value, held.presentation.format,
-             held.presentation.control, held.cellStyle)
+             held.presentation.control, heldStyle)
     if written is None:
         return None if holds == (None,) * len(holds) else "the cell"
     if held.formulaText != written.formulaText:
@@ -100,7 +107,7 @@ def findCellLoss(held: CellForm, written: CellForm | None) -> str | None:
         return "its value"
     if held.presentation.control != written.presentation.control:
         return "its control"
-    if held.cellStyle != written.cellStyle:
+    if heldStyle != findOverrides(written.cellStyle, inherited):
         return "its cell style"
     asked = held.presentation.format
     if held.formulaText is None and asked is not UNDETERMINED and (
@@ -134,6 +141,7 @@ def testEveryDocumentSavedThroughItsJsonFormKeepsEveryCellOrIsRefused(
             buildCellForm(cell),
             None if (other := writtenTable.cells.get(address)) is None
             else buildCellForm(other),
+            writtenTable._cellStyleInherited(address),
         )) is not None
     ]
     assert lost == []

@@ -50,7 +50,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from pathlib import Path
 from typing import cast
@@ -87,7 +87,7 @@ from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
 from ..style._read import readCellStyles
 from ..style.cells import CellStyle
-from ._cellstyles import readRegionCellStyles
+from ._cellstyles import readOwnCellStyles, readRegionCellStyles, readRegionVariations
 from .cell import Cell, CellValue
 from .cells import Table
 from .headers import TableHeaders
@@ -217,7 +217,7 @@ def readCellValue(
 
 def readRecordStorage(
     record: CellRecord, formatTypes: dict[int, int], controls: dict[int, CellControl],
-    cellStyles: dict[int, CellStyle],
+    cellStyles: Mapping[int, CellStyle],
 ) -> CellStorage:
     """Return what a record stores beyond its value."""
     kind = storedKinds.get(record.typeByte, CellKind.UNKNOWN)
@@ -349,7 +349,9 @@ def readTable(
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)
     controls = readControls(index, dataStore)
-    cellStyles = readCellStyles(index, dataStore)
+    ownStyles = readOwnCellStyles(
+        readCellStyles(index, dataStore), readRegionVariations(index, model)
+    )
     for reference, record in iterateCellRecords(index, model, source):
         # A merge imported from Excel keeps a style-only record at every covered
         # position, and the model has no cell there to hold one. The archive
@@ -358,7 +360,10 @@ def readTable(
             continue
         cell = table.cell(reference)
         value = readCellValue(record, strings, richText, currencyCodes)
-        setCellStorage(cell, record, value, formatTypes, controls, cellStyles)
+        setCellStorage(
+            cell, record, value, formatTypes, controls,
+            ownStyles[table.headers.regionFind(reference, table.rowCount)],
+        )
         cell._value = value
         # Each cell is given its own Formula even where the archive is shared, so
         # an edit to one cannot reach another. Frozen, so sharing would be safe
@@ -393,7 +398,7 @@ def iterateCellRecords(
 
 def setCellStorage(
     cell: Cell, record: CellRecord, value: CellValue, formatTypes: dict[int, int],
-    controls: dict[int, CellControl], cellStyles: dict[int, CellStyle],
+    controls: dict[int, CellControl], cellStyles: Mapping[int, CellStyle],
 ) -> None:
     """Give a cell what its record stores and the value that record holds."""
     cell._stored = readRecordStorage(record, formatTypes, controls, cellStyles)
@@ -416,14 +421,19 @@ def updateCellStorage(
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)
     controls = readControls(index, dataStore)
-    cellStyles = readCellStyles(index, dataStore)
+    ownStyles = readOwnCellStyles(
+        readCellStyles(index, dataStore), readRegionVariations(index, model)
+    )
     described: set[CellAddress] = set()
     for reference, record in iterateCellRecords(index, model, source):
         cell = table.cells.get(reference)
         if cell is None:
             continue
         value = readCellValue(record, strings, richText, currencyCodes)
-        setCellStorage(cell, record, value, formatTypes, controls, cellStyles)
+        setCellStorage(
+            cell, record, value, formatTypes, controls,
+            ownStyles[table.headers.regionFind(reference, table.rowCount)],
+        )
         described.add(reference)
     for reference, cell in table.cells.items():
         if reference not in described:

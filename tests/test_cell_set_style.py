@@ -37,11 +37,14 @@ from pybers import (
 )
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSDArchives_pb2 as tsd
+from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from pybers._persistence import readPackage
 from pybers._persistence.cells import cellStyleSlot, findSlotValue
 from pybers._persistence.index import ArchiveIndex, findRoot
+from pybers._persistence.metadata import PackageRegistry
+from pybers._persistence.types import findArchiveTypeId
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.style._write import composeCellProperties
 from pybers.table._read import iterateCellRecords
@@ -50,6 +53,7 @@ from pybers.table.fill import CellValueFill
 
 yellow = Color.parse("#ffd60aff")
 red = Color.parse("#ff0000ff")
+cellStyleTypeId = findArchiveTypeId(tst.CellStyleArchive)
 boxed = CellStyle(
     background=yellow, padding=Decimal(6),
     verticalAlign=CellStyleVerticalAlign.MIDDLE, textWrap=CellStyleTextWrap.WRAP,
@@ -357,3 +361,82 @@ def testAScriptStylesACellsBoxAndReadsItBack(tmp_path: Path) -> None:
     style = pybers.open(working).table("Table 1").cell("A1").cellStyle
     assert style is not None
     assert pybers.formatCellStyle(style) == "background: #ffd60aff; padding: 6pt"
+
+
+def readFillVariation(path: Path, address: str, table: str) -> tst.CellStyleArchive:
+    """Return the cell style variation a cell's record names."""
+    index = ArchiveIndex(readPackage(path))
+    key = findSlotValue(readRecordAt(path, address, table), cellStyleSlot)
+    for sheet in findRoot(index).sheets:
+        for drawable in index.resolve(sheet, tn.SheetArchive).drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            if model.table_name != table:
+                continue
+            styles = index.resolve(model.base_data_store.styleTable, tst.TableDataList)
+            entry = next(each for each in styles.entries if each.key == key)
+            return index.resolve(entry.reference, tst.CellStyleArchive)
+    raise AssertionError(f"{table} holds no style for {address}")
+
+
+def testAFillInACreatedTableIsTheVariationNumbersWrites(tmp_path: Path) -> None:
+    measured = readFillVariation(
+        findDocumentPath("99-cell-fill-in-a-created-table"), "A1", "Fills"
+    )
+    document, path = createTable(tmp_path)
+    document.cellSet("Sheet 1::T::A1", 1, cellStyle=CellStyle(
+        background=Color.parse("#ff8000ff")
+    ))
+    document.save(path)
+    written = readFillVariation(path, "A1", "T")
+    assert written.cell_properties == measured.cell_properties
+    assert written.override_count == measured.override_count
+    index = ArchiveIndex(readPackage(path))
+    parentId = written.super.parent.identifier
+    parent = index.identifierResolve(parentId, tst.CellStyleArchive)
+    assert not parent.super.is_variation
+
+
+def testANumbersFillReadsAsTheCellsOwnAloneInACreatedTable() -> None:
+    table = pybers.open(findDocumentPath("99-cell-fill-in-a-created-table")).sheets[0]
+    assert table.tables[0].cell("A1").cellStyle == CellStyle(
+        background=Color.parse("#ff8000ff")
+    )
+
+
+def testTheStyleListDeclaresEveryStyleItNames(tmp_path: Path) -> None:
+    document, path = createTable(tmp_path)
+    document.cellSet("Sheet 1::T::A1:B1", 1, cellStyle=boxed)
+    document.save(path)
+    index = ArchiveIndex(readPackage(path))
+    for sheet in findRoot(index).sheets:
+        for drawable in index.resolve(sheet, tn.SheetArchive).drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            store = model.base_data_store
+            styles = index.resolve(store.styleTable, tst.TableDataList)
+            registry = PackageRegistry(index)
+            declared = registry.strongReferencesOf(store.styleTable.identifier)
+            named = {int(entry.reference.identifier) for entry in styles.entries}
+            assert named <= set(declared)
+
+
+def testEveryCellStyleACreatedDocumentHoldsCountsTheOverridesItStates(
+    tmp_path: Path,
+) -> None:
+    document, path = createTable(tmp_path)
+    document.cellSet("Sheet 1::T::A1", 1, cellStyle=boxed)
+    document.save(path)
+    index = ArchiveIndex(readPackage(path))
+    counted = [
+        (style.override_count, len(style.cell_properties.ListFields()))
+        for identifier in index.byIdentifier
+        if index.typeOf(tsp.Reference(identifier=identifier)) == cellStyleTypeId
+        for style in [index.identifierResolve(identifier, tst.CellStyleArchive)]
+    ]
+    assert len(counted) == 3
+    assert all(overrides == stated for overrides, stated in counted)

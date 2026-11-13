@@ -734,7 +734,7 @@ def removeControls(document: pybers.Document) -> None:
     document.cellSet("::Table 1::E1:I1", control=None)
 
 
-# Each row of a created table: what its cell's own style states, and the value it shows.
+# Each case of a cell's box: what its own style states, and the value it shows.
 wrappingText: str = (
     "words enough to run past the edge of this column, so wrapping shows on a "
     "second line"
@@ -743,10 +743,8 @@ cellBoxes: tuple[tuple[pybers.CellStyle, str | Decimal], ...] = (
     (pybers.CellStyle(background=pybers.Color.parse("#ffd60aff")), Decimal(1)),
     (pybers.CellStyle(padding=Decimal(12)), Decimal(2)),
     (pybers.CellStyle(padding=Decimal(0)), Decimal(3)),
-    (pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.MIDDLE),
-     wrappingText),
-    (pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.BOTTOM),
-     wrappingText),
+    (pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.MIDDLE), "middle"),
+    (pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.BOTTOM), "bottom"),
     (pybers.CellStyle(textWrap=pybers.CellStyleTextWrap.WRAP), wrappingText),
     (pybers.CellStyle(
         background=pybers.Color.parse("#ffd60aff"), padding=Decimal(8),
@@ -757,11 +755,21 @@ cellBoxes: tuple[tuple[pybers.CellStyle, str | Decimal], ...] = (
 
 
 def setCellBoxes(document: pybers.Document) -> None:
-    """Give each row of a created table one cell style, its text form beside it."""
-    table = document.sheet().tableAdd("Boxes", rows=len(cellBoxes), cols=2)
-    for row, (cellStyle, value) in enumerate(cellBoxes, start=1):
-        table.cell(f"A{row}").value = pybers.formatCellStyle(cellStyle)
-        document.cellSet(f"::Boxes::B{row}", value, cellStyle=cellStyle)
+    """Style one cell per case across row 1, its style as text beneath it.
+
+    The wrapping cells make row 1 tall, so the aligned cells beside them show where
+    their text sits.
+    """
+    columns = len(cellBoxes) + 1
+    table = document.sheet().tableAdd("Boxes", rows=2, cols=columns)
+    for column, (cellStyle, value) in enumerate(cellBoxes, start=1):
+        document.cellSet(
+            f"::Boxes::{pybers.CellAddress(1, column)}", value, cellStyle=cellStyle
+        )
+        table.cell(pybers.CellAddress(2, column)).value = (
+            f"set by pybers to {pybers.formatCellStyle(cellStyle)}"
+        )
+    table.cell(pybers.CellAddress(2, columns)).value = "empty"
 
 
 # Each color case of a fill, the text naming it, in a column of its own.
@@ -824,7 +832,8 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
                   chooseFormulaFormats),
     GoldenBuilder("00-created-empty-formats-chosen-by-pybers", None,
                   chooseEmptyFormats),
-    GoldenBuilder("00-created-cell-boxes-styled-by-pybers", None, setCellBoxes),
+    GoldenBuilder("00-created-cell-boxes-styled-by-pybers", None, setCellBoxes,
+                  labeled=True),
     GoldenBuilder("00-created-cell-fills-colored-by-pybers", None, setCellFills,
                   labeled=True),
 )

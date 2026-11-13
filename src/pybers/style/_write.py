@@ -133,12 +133,19 @@ def composeCellProperties(
 
 
 def composeCellStyleArchive(
-    parent: int, stylesheetId: int, properties: tstStyles.CellStylePropertiesArchive
+    stylesheetId: int, properties: tstStyles.CellStylePropertiesArchive,
+    parent: int | None = None,
 ) -> tst.CellStyleArchive:
-    """Return a cell style variation of `parent` holding these properties."""
+    """Return a cell style holding these properties, a variation of `parent` if given.
+
+    The one place a cell style is composed. Its `override_count` is how many
+    properties it states, since Numbers ignores the properties of a style whose count
+    says it states none, as findings-06 measured.
+    """
     style = tst.CellStyleArchive(override_count=len(properties.ListFields()))
-    style.super.parent.identifier = parent
-    style.super.is_variation = True
+    if parent is not None:
+        style.super.parent.identifier = parent
+        style.super.is_variation = True
     style.super.stylesheet.identifier = stylesheetId
     style.cell_properties.CopyFrom(properties)
     return style
@@ -173,12 +180,26 @@ def readStylePool(
         identifier = registry.identifierAllocate()
         addStyles(
             index, registry, stylesheetId,
-            [(identifier, composeCellStyleArchive(parent, stylesheetId, properties))],
+            [(identifier, composeCellStyleArchive(stylesheetId, properties, parent))],
             [(parent, identifier)],
         )
         entry.reference.identifier = identifier
 
     return EntryPool(dataList=dataList, noun="style", write=writeEntry, stored=stored)
+
+
+def writeStylePool(
+    index: ArchiveIndex, registry: PackageRegistry, store: tst.DataStore,
+    pool: EntryPool[CellStyleKey],
+) -> None:
+    """Write a table's style list, declaring each style it names.
+
+    Numbers loads no style its list leaves undeclared, so it drew none of the fills
+    pybers wrote until the list declared them, as `99` showed.
+    """
+    identifier = store.styleTable.identifier
+    declared = registry.referencesReconcile(identifier, pool.dataList)
+    index.archiveWrite(identifier, pool.dataList, declared)
 
 
 def applyCellStyle(
@@ -215,4 +236,5 @@ __all__ = [
     "composeCellProperties",
     "composeCellStyleArchive",
     "readStylePool",
+    "writeStylePool",
 ]
