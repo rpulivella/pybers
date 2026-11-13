@@ -53,18 +53,18 @@ def readBoxCells() -> dict[str, pybers.Cell]:
     ("I1", CellStyle(background=yellow)),
     ("J1", CellStyle(background=yellow)),
 ])
-def test_cell_reports_what_its_own_style_states(
+def testCellReportsWhatItsOwnStyleStates(
     address: str, expected: CellStyle
 ) -> None:
     assert readBoxCells()[address].cellStyle == expected
 
 
 @pytest.mark.parametrize("address", ["A1", "G1", "H1"])
-def test_cell_with_no_cell_style_reads_none(address: str) -> None:
+def testCellWithNoCellStyleReadsNone(address: str) -> None:
     assert readBoxCells()[address].cellStyle is None
 
 
-def test_style_present_and_default_differs_from_no_style() -> None:
+def testStylePresentAndDefaultDiffersFromNoStyle() -> None:
     archive = tst.CellStyleArchive()
     archive.cell_properties.padding.SetInParent()
     archive.cell_properties.vertical_alignment = 0
@@ -74,18 +74,18 @@ def test_style_present_and_default_differs_from_no_style() -> None:
     assert readCellStyle(tst.CellStyleArchive()) == CellStyle()
 
 
-def test_cells_naming_one_archive_share_one_object() -> None:
+def testCellsNamingOneArchiveShareOneObject() -> None:
     cells = readBoxCells()
     assert cells["B1"].cellStyle is cells["I1"].cellStyle is cells["J1"].cellStyle
 
 
-def test_shared_cell_style_cannot_be_edited_through_one_cell() -> None:
+def testSharedCellStyleCannotBeEditedThroughOneCell() -> None:
     style = readBoxCells()["B1"].cellStyle
     with pytest.raises(dataclasses.FrozenInstanceError):
         style.padding = Decimal(8)  # type: ignore[misc]
 
 
-def test_uneven_imported_padding_reads_each_side() -> None:
+def testUnevenImportedPaddingReadsEachSide() -> None:
     archive = tst.CellStyleArchive()
     padding = archive.cell_properties.padding
     padding.left, padding.right, padding.bottom = 2, 2, 2
@@ -97,18 +97,18 @@ def test_uneven_imported_padding_reads_each_side() -> None:
     ("gradient", FillGradient()),
     ("image", FillImage()),
 ])
-def test_fill_other_than_color_reads_by_its_type(field: str, expected: object) -> None:
+def testFillOtherThanColorReadsByItsType(field: str, expected: object) -> None:
     archive = tsd.FillArchive()
     getattr(archive, field).SetInParent()
     assert readFill(archive) == expected
 
 
-def test_empty_fill_reads_as_no_fill() -> None:
+def testEmptyFillReadsAsNoFill() -> None:
     assert readFill(tsd.FillArchive()) == FillNone()
 
 
 @pytest.mark.parametrize("stored", [3, 9])
-def test_vertical_alignment_a_cell_never_takes_refuses(stored: int) -> None:
+def testVerticalAlignmentACellNeverTakesRefuses(stored: int) -> None:
     archive = tst.CellStyleArchive()
     archive.cell_properties.vertical_alignment = stored
     with pytest.raises(pybers.ReadError, match=f"vertical alignment {stored}"):
@@ -128,7 +128,18 @@ def test_vertical_alignment_a_cell_never_takes_refuses(stored: int) -> None:
                textWrap=CellStyleTextWrap.NOWRAP),
      "background: #ffd60aff; padding: 6pt; vertical-align: middle; text-wrap: nowrap"),
 ])
-def test_cell_style_text_form_states_each_property_as_css(
+def testCellStyleTextFormStatesEachPropertyAsCss(
     cellStyle: CellStyle, text: str
 ) -> None:
     assert pybers.formatCellStyle(cellStyle) == text
+
+
+def testNoFillOnAHeaderCellReadsAsAnExplicitFillNone() -> None:
+    table = pybers.open(findDocumentPath("98c-cell-box-regions")).sheets[0].tables[0]
+    assert table.cell("B1").cellStyle == CellStyle(background=FillNone())
+
+
+@pytest.mark.parametrize("address", ["C1", "D1"])
+def testAPropertySetBackToWhatTheCellInheritsLeavesNoStyle(address: str) -> None:
+    table = pybers.open(findDocumentPath("98c-cell-box-regions")).sheets[0].tables[0]
+    assert table.cell(address).cellStyle is None

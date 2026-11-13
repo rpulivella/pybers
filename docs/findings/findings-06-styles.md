@@ -92,6 +92,12 @@ style key of its own, where the 2pt and 0pt cells do. The value is not absent fr
 document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 times. The
 default lives in the inherited style and the cell simply declines to override it.
 
+**Setting a property back to what the cell inherits removes the override.** Measured for
+PYB-265 on 2026-11-12 in `98c-cell-box-regions`: C1, a header cell given a 6pt inset and then
+4pt again, and D1, its wrap cleared and checked again, each hold no cell style. **No Fill is stored where it overrides**: B1, a header cell
+given No Fill, names a variation of the header row style holding an empty `cell_fill`, which
+covers the header's gray.
+
 **A side of zero is omitted**, so `0/0/0/0` stores as an empty `padding {}`, which is how the
 `0pt` cell of `31` holds it. A reader takes a missing side as zero.
 
