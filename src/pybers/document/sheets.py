@@ -21,6 +21,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-12  `cellSet` sets a cell style, its whole box, for PYB-265.
 2026-11-10  `cellSet` sets a value, a format or both, a part not given left as it
             was, for PYB-145.
 2026-11-03  `select` on a document and a sheet, and every lookup by name a typed
@@ -94,6 +95,7 @@ from pybers.format._check import (
 from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
 from pybers.geometry import Position
+from pybers.style.cells import CellStyle, findCellStyleRefusal
 from pybers.table.cell import (
     Cell,
     CellChange,
@@ -426,20 +428,32 @@ class Document:
         *,
         format: CellFormat | UNCHANGED = UNCHANGED,
         control: CellControl | None | UNCHANGED = UNCHANGED,
+        cellStyle: CellStyle | None | UNCHANGED = UNCHANGED,
         conflict: CellFormatConflict = CellFormatConflict.REFUSE,
         extend: bool = False,
     ) -> CellChanges:
-        """Set the value, the format, the control or any of them on every matched cell.
+        """Set the value, format, control, cell style or several on every matched cell.
 
-        A part not given stays as it was, a control of None removes one, and a cell a
-        formula backs is skipped and reported. A format that cannot show a cell's
-        value is refused before any cell changes, unless `conflict` falls back to
-        Automatic for that cell and says so.
+        A part not given stays as it was, and a control or cell style of None removes
+        one. A cell a formula backs is skipped when given a value. A format that cannot
+        show a cell's value is refused before any cell changes, unless `conflict`
+        falls back to Automatic for that cell and says so.
         """
         from pybers.selection.matching import findCellTargets, findExtendTarget
 
-        if value is UNCHANGED and format is UNCHANGED and control is UNCHANGED:
-            raise WriteError("cellSet was given no value, format or control to set.")
+        if all(part is UNCHANGED for part in (value, format, control, cellStyle)):
+            raise WriteError(
+                "cellSet was given no value, format, control or cell style to set."
+            )
+        if cellStyle is not UNCHANGED and cellStyle is not None:
+            if not isinstance(cellStyle, CellStyle):
+                raise WriteError(
+                    f"A cell style is a CellStyle or None, and cellSet was given "
+                    f"{type(cellStyle).__name__}. Nothing was written."
+                )
+            refusal = findCellStyleRefusal(cellStyle)
+            if refusal is not None:
+                raise WriteError(f"{refusal} Nothing was written.")
         targets, skipped = (
             ([findExtendTarget(self, selector)], []) if extend
             else findCellTargets(self, selector)
@@ -496,13 +510,17 @@ class Document:
                     cell.presentation.control, cell.presentation.control,
                 )
             )
+            styleBefore = cell.cellStyle
             if control is not UNCHANGED:
                 cell._controlRequest(control)
             if asked is not UNCHANGED:
                 cell._formatRequest(asked)
+            if cellStyle is not UNCHANGED:
+                cell._cellStyleRequest(cellStyle)
             changes.append(replace(
                 change, formatAfter=cell.presentation.format,
                 controlAfter=cell.presentation.control,
+                cellStyleBefore=styleBefore, cellStyleAfter=cell.cellStyle,
                 rowsAdded=rowsAdded, colsAdded=colsAdded,
             ))
         return CellChanges(tuple(changes), tuple(skipped))

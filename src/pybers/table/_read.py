@@ -19,7 +19,8 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
-2026-11-12  Each cell's own cell style, for PYB-265.
+2026-11-12  Each cell's own cell style, and what each region's resolves to, for
+            PYB-265.
 2026-11-03  A table's header rows, header columns and footer rows, for PYB-223.
 2026-11-02  A table of a document never saved names none, for PYB-261.
 2026-10-29  A table's records walked through `StoredTiles`, for PYB-278.
@@ -86,6 +87,7 @@ from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
 from ..style._read import readCellStyles
 from ..style.cells import CellStyle
+from ._cellstyles import readRegionCellStyles
 from .cell import Cell, CellValue
 from .cells import Table
 from .headers import TableHeaders
@@ -342,6 +344,7 @@ def readTable(
             model.number_of_header_columns,
             model.number_of_footer_rows,
         ),
+        _cellStylesInherited=readRegionCellStyles(index, model),
     )
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)
@@ -396,6 +399,7 @@ def setCellStorage(
     cell._stored = readRecordStorage(record, formatTypes, controls, cellStyles)
     cell._storedValue = value
     cell._formatAsked, cell._controlAsked = None, UNCHANGED
+    cell._cellStyleAsked = UNCHANGED
 
 
 def updateCellStorage(
@@ -425,6 +429,7 @@ def updateCellStorage(
         if reference not in described:
             cell._stored, cell._storedValue = emptyStorage, None
             cell._formatAsked, cell._controlAsked = None, UNCHANGED
+            cell._cellStyleAsked = UNCHANGED
 
 
 def resolveValue(

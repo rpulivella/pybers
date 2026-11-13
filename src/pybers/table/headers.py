@@ -13,6 +13,8 @@ re-parents when it changes, so `headersSet` refuses to move one.
 See findings-03-structure.md.
 
 UPDATES
+2026-11-12  `TableRegion` and `regionFind`, the region whose style a cell inherits,
+            for PYB-265.
 2026-11-05  Named for Numbers' Headers & Footer, and at least one row and one
             column stay outside them, in a set and an edit alike, for PYB-223.
 2026-11-03  Written for PYB-223.
@@ -29,6 +31,7 @@ __date__ = "2026/11/03"
 
 import re
 from dataclasses import dataclass, fields
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pybers.addressing.lines import GridEdit
@@ -39,6 +42,15 @@ if TYPE_CHECKING:
 
 # The most lines each count holds, measured in `40-table-bands`, which maxes all three.
 headerLimit: int = 5
+
+
+class TableRegion(StrEnum):
+    """The part of a table whose style a cell inherits, named as the schema names it."""
+
+    BODY = "body"
+    HEADER_ROW = "header-row"
+    HEADER_COLUMN = "header-column"
+    FOOTER_ROW = "footer-row"
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +79,18 @@ class TableHeaders:
             address.col <= self.headerColumns,
             address.row > rowCount - self.footerRows,
         )
+
+    def regionFind(self, address: CellAddress, rowCount: int) -> TableRegion:
+        """Return the region a cell inherits its style from, a corner the higher one.
+
+        Header row, then header column, then footer row, as `40-table-bands` measured.
+        """
+        headerRow, headerColumn, footerRow = self.membershipFind(address, rowCount)
+        if headerRow:
+            return TableRegion.HEADER_ROW
+        if headerColumn:
+            return TableRegion.HEADER_COLUMN
+        return TableRegion.FOOTER_ROW if footerRow else TableRegion.BODY
 
 
 def formatHeaderName(field: str) -> str:
@@ -148,6 +172,6 @@ def mapHeaders(headers: TableHeaders, edit: GridEdit, held: int) -> TableHeaders
 
 
 __all__ = [
-    "TableHeaders", "checkHeadersFit", "headerLimit", "mapHeaders",
+    "TableHeaders", "TableRegion", "checkHeadersFit", "headerLimit", "mapHeaders",
     "refuseHeadersUnfit",
 ]

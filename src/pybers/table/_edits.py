@@ -9,6 +9,7 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-12  A record names the cell style its cell asked for, for PYB-265.
 2026-11-02  A value or formula in a block of rows no tile stores gains its tile,
             rather than being dropped or refused, and a first row over 255 columns
             is written wide, for PYB-276.
@@ -90,6 +91,8 @@ from ..formula._write import (
     readFormulaPool,
 )
 from ..formula.nodes import Formula
+from ..style._write import readStylePool
+from ._cellstyles import writeAskedCellStyle
 from ._conditions import ConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
 from ._read import (
@@ -111,6 +114,7 @@ from ._records import (
     removeSlots,
 )
 from ._refcounts import (
+    claimStyles,
     copyRichText,
     countFormatClaims,
     listRichTextClaims,
@@ -241,10 +245,7 @@ def applyTableEdits(
     formatPool = readFormatPool(index, store)
     formatKeys: dict[bytes, int] = {}
     walkedTiles: list[tuple[int, tst.Tile]] = []
-    stylePool = (
-        readCountedPool(index, store.styleTable, "style")
-        if store.styleTable.identifier else None
-    )
+    stylePool = readStylePool(index, registry, store)
     richTextPool = (
         readRichTextPool(index, store) if store.HasField("rich_text_table") else None
     )
@@ -283,6 +284,10 @@ def applyTableEdits(
         return applyAskedFormat(
             raw, asked, cell.value, cell.formula is None, formatFor, formatOf
         )
+
+    def styleFinish(raw: bytes, cell: Cell) -> bytes:
+        """Return a record naming the cell style its cell asked for, or as it was."""
+        return writeAskedCellStyle(index, stylePool, model, table, raw, cell)
 
     def releaseRecord(record: CellRecord, reference: CellAddress) -> bool:
         """Release every list entry a removed record names, reporting a formula."""
@@ -448,6 +453,7 @@ def applyTableEdits(
                 )
                 asked = (
                     cell._formatAsked is not None or cell._controlAsked is not UNCHANGED
+                    or cell._cellStyleAsked is not UNCHANGED
                 )
                 if not (valueChanged or asked or chosenChanged) and edit == "none":
                     continue
@@ -477,7 +483,7 @@ def applyTableEdits(
                     patched = removed
                 finished = formatFinish(patched, cell)
                 formatsCount(patched, finished, reference)
-                replacements[record.column] = finished
+                replacements[record.column] = styleFinish(finished, cell)
             present = frozenset(record.column for record in walked.records)
             # A cell the model gave a formula to but the file has no record for.
             # The loop above cannot see these: it walks records, and these have
@@ -496,13 +502,14 @@ def applyTableEdits(
                             buildFormulaRecord(pool.keyFor(cell.formula)), cell
                         )
                         formatsCount(None, replacements[column], reference)
+                        replacements[column] = styleFinish(replacements[column], cell)
                         formulaAdded.append((row, column))
                         continue
                     if cell.value is None:
-                        if cell._formatAsked is not None:
+                        if cell._storageCheck():
                             built = formatFinish(buildEmptyRecord(), cell)
-                            replacements[column] = built
-                            formatsCount(None, replacements[column], reference)
+                            formatsCount(None, built, reference)
+                            replacements[column] = styleFinish(built, cell)
                         continue
                     # A value needs a record shaped like one this table already
                     # holds, since its trailing references are keys into the
@@ -520,6 +527,8 @@ def applyTableEdits(
                         cell,
                     )
                     formatsCount(None, replacements[column], reference)
+                    claimStyles(stylePool, replacements[column], str(reference))
+                    replacements[column] = styleFinish(replacements[column], cell)
             dropped = removals & present
             if not replacements and not dropped:
                 continue

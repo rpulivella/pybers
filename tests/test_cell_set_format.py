@@ -206,7 +206,9 @@ def testAFormulaWithNoResultRefusesAFormatPybersCannotWriteForIt(
 
 
 def testACallGivenNeitherPartIsRefused(working: Path) -> None:
-    with pytest.raises(pybers.WriteError, match="no value, format or control"):
+    with pytest.raises(
+        pybers.WriteError, match="no value, format, control or cell style"
+    ):
         pybers.open(working).cellSet("::Table 1::A1")
 
 

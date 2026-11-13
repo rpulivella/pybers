@@ -12,7 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
-2026-11-12  A cell's own cell style, for PYB-265.
+2026-11-12  A cell's own cell style, one its save writes, for PYB-265.
 2026-11-11  A cell's format is one the save writes, an empty cell's included, for
             PYB-145.
 2026-11-03  A table's headers, for PYB-223.
@@ -172,6 +172,8 @@ def addCell(table: Table, form: CellForm, path: str) -> None:
     # The form's cell has no record yet, so its format is one the save must write.
     stated = form.presentation.format
     cell._formatAsked = stated if isinstance(stated, CellFormatBase) else None
+    if form.cellStyle is not None:
+        cell._cellStyleAsked = form.cellStyle
 
 
 def assignFormulas(table: Table, form: TableForm, path: str) -> None:

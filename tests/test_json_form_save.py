@@ -4,6 +4,7 @@ A document read from its JSON form saves as a created document holding what the 
 describes, or is refused, naming what pybers cannot yet create.
 
 UPDATES
+2026-11-12  A cell's style is kept through its JSON form and a save, for PYB-265.
 2026-11-03  Written for PYB-261.
 """
 from __future__ import annotations
@@ -38,6 +39,8 @@ def saveCreated(tmp_path: Path) -> Path:
     """Return a created document holding values and a formula across two sheets."""
     document = pybers.create("en_US")
     document.sheet(1).tableAdd("Inputs", 2, 2).cell("A1").value = Decimal("5")
+    padded = pybers.CellStyle(padding=Decimal(6))
+    document.cellSet("Sheet 1::Inputs::B2", cellStyle=padded)
     calc = document.sheetAdd("Second").tableAdd("Calc", 2, 2)
     calc.cell("A1").formulaText = "=Inputs::A1*2"
     calc.cell("B1").value = "text"
@@ -86,9 +89,9 @@ def findCellLoss(held: CellForm, written: CellForm | None) -> str | None:
     model had yet to determine is not lost.
     """
     holds = (held.formulaText, held.value, held.presentation.format,
-             held.presentation.control)
+             held.presentation.control, held.cellStyle)
     if written is None:
-        return None if holds == (None, None, None, None) else "the cell"
+        return None if holds == (None,) * len(holds) else "the cell"
     if held.formulaText != written.formulaText:
         return "its formula"
     if held.formulaText is None and (
@@ -97,6 +100,8 @@ def findCellLoss(held: CellForm, written: CellForm | None) -> str | None:
         return "its value"
     if held.presentation.control != written.presentation.control:
         return "its control"
+    if held.cellStyle != written.cellStyle:
+        return "its cell style"
     asked = held.presentation.format
     if held.formulaText is None and asked is not UNDETERMINED and (
         asked != written.presentation.format

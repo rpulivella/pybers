@@ -20,6 +20,8 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-11-12  `cellStyleSlot` and `applySlotValue`, which fills, replaces or empties
+            one slot, for PYB-265.
 2026-10-22  A record's chosen format is the bit of the slot it displays with, for
             PYB-255.
 2026-10-20  A date decodes as naive wall-clock time, for PYB-144.
@@ -321,6 +323,25 @@ def patchSlotValue(raw: bytes, slot: tuple[int, int], value: int) -> bytes:
     at = len(raw) - (len(slots) - slots.index(slot)) * referenceWidth
     encoded = value.to_bytes(referenceWidth, "little")
     return raw[:at] + encoded + raw[at + referenceWidth:]
+
+
+def applySlotValue(raw: bytes, slot: tuple[int, int], value: int | None) -> bytes:
+    """Return a record whose slot holds a reference, or holds none when it is None."""
+    slots = listReferenceSlots(raw)
+    start = len(raw) - len(slots) * referenceWidth
+    held = {
+        each: raw[start + index * referenceWidth:][:referenceWidth]
+        for index, each in enumerate(slots)
+    }
+    header = bytearray(raw[:start])
+    at, bit = slot
+    if value is None:
+        held.pop(slot, None)
+        header[at] &= ~bit
+    else:
+        held[slot] = value.to_bytes(referenceWidth, "little")
+        header[at] |= bit
+    return bytes(header) + b"".join(held[each] for each in slotOrder if each in held)
 
 
 def chooseOffsetUnit(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:

@@ -36,6 +36,7 @@ from pybers.style.cells import (
     CellStylePaddingSides,
     CellStyleTextWrap,
     CellStyleVerticalAlign,
+    numbersCellStyle,
 )
 from pybers.style.fills import Fill, FillGradient, FillImage, FillNone
 
@@ -96,6 +97,27 @@ def readCellStyle(archive: tst.CellStyleArchive) -> CellStyle:
     )
 
 
+def readInheritedCellStyle(index: ArchiveIndex, identifier: int) -> CellStyle:
+    """Return a style resolved through its parents, each property the nearest stated.
+
+    A property no ancestor states is Numbers' own default, `numbersCellStyle`.
+    """
+    chain: list[CellStyle] = []
+    seen: set[int] = set()
+    while identifier and identifier not in seen:
+        seen.add(identifier)
+        archive = index.identifierResolve(identifier, tst.CellStyleArchive)
+        chain.append(readCellStyle(archive))
+        identifier = int(archive.super.parent.identifier)
+    chain.append(numbersCellStyle)
+    return CellStyle(
+        background=next(each.background for each in chain if each.background),
+        padding=next(each.padding for each in chain if each.padding is not None),
+        verticalAlign=next(each.verticalAlign for each in chain if each.verticalAlign),
+        textWrap=next(each.textWrap for each in chain if each.textWrap),
+    )
+
+
 def readCellStyles(
     index: ArchiveIndex, dataStore: tst.DataStore
 ) -> dict[int, CellStyle]:
@@ -113,4 +135,7 @@ def readCellStyles(
     }
 
 
-__all__ = ["readCellStyle", "readCellStyles", "readFill", "readPadding"]
+__all__ = [
+    "readCellStyle", "readCellStyles", "readFill", "readInheritedCellStyle",
+    "readPadding",
+]
