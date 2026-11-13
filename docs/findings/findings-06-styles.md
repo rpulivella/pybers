@@ -255,6 +255,15 @@ The table and two further checks establish:
   Theme slots agree, which is why a created document's palette and sheet fill are stored
   the same way.
 
+**AppleScript reads a cell's fill converted to Generic RGB, its alpha dropped.** Measured
+for PYB-265 on 2026-11-13 against a copy of `97b` in Numbers 15.4. A cell's
+`background color` is three integers from 0 to 65535, and its scripting dictionary states
+no color space and no alpha for a cell, so `B1` and `C1` read alike. AppKit's conversion of
+each stored color to `NSColorSpace.genericRGB` reproduces every row 1 reading within 1:
+`B1` reads 27830 for sRGB 0.5, `E1` 64831, 27359, 2086, `F1` 65535, 24525, 0, and `K1`, no
+fill, reads `missing value`. A check of a fill through AppleScript therefore converts the
+stored color the same way, and leaves alpha to the eye.
+
 ## Gradients
 
 ```
