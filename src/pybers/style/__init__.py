@@ -22,9 +22,10 @@ from pybers.style.cells import (
     CellStyleVerticalAlign,
 )
 from pybers.style.fills import Fill, FillGradient, FillImage, FillNone, FillType
-from pybers.style.text import formatCellStyle
+from pybers.style.text import CellStyleError, formatCellStyle, parseCellStyle
 
 __all__ = [
     "CellStyle", "CellStylePaddingSides", "CellStyleTextWrap", "CellStyleVerticalAlign",
-    "Fill", "FillGradient", "FillImage", "FillNone", "FillType", "formatCellStyle",
+    "Fill", "FillGradient", "FillImage", "FillNone", "FillType", "CellStyleError",
+    "formatCellStyle", "parseCellStyle",
 ]

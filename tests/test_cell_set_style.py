@@ -19,10 +19,12 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from test_cli_set import runSetCommand
+from test_cli_show import runShowCommand
 from test_writer import listArchiveDifferences, readRecordAt
 
 import pybers
-from conftest import copyDocument
+from conftest import copyDocument, findDocumentPath
 from pybers import (
     CellStyle,
     CellStyleTextWrap,
@@ -213,3 +215,45 @@ def testReplacingTheBoxCarriesABorderTheStyleHolds() -> None:
     assert composed.top_stroke.width == 2
     assert not composed.HasField("text_wrap")
     assert composed.padding.top == 6
+
+
+def testACommandSetsACellsBoxAndShowPrintsIt(tmp_path: Path) -> None:
+    working = copyDocument("98b-cell-box-styles", tmp_path)
+    declared = "background: #ffd60aff; padding: 6pt; vertical-align: middle"
+    result = runSetCommand(str(working), "::Table 1::A1:A2", "--cell-style", declared)
+    assert result.exit_code == 0
+    assert f"Written: {working}" in result.stderr
+    shown = runShowCommand(working, "Sheet 1::Table 1::A1").stdout
+    assert f"  Cell style: {declared}" in shown.splitlines()
+
+
+def testACommandClearsACellsBoxWithNone(tmp_path: Path) -> None:
+    working = copyDocument("98b-cell-box-styles", tmp_path)
+    result = runSetCommand(str(working), "::Table 1::B1", "--cell-style", "none")
+    assert result.exit_code == 0
+    assert pybers.open(working).sheets[0].tables[0].cell("B1").cellStyle is None
+
+
+@pytest.mark.parametrize(("declared", "reason"), [
+    ("padding: 6", "padding is a length in points such as 6pt"),
+    ("background: gradient", "A gradient fill is read and carried"),
+    ("padding: 0pt 2pt 2pt 2pt", "one length for every side"),
+    ("vertical-align: center", "vertical-align is one of top, middle, bottom"),
+])
+def testACommandRefusesAStyleItCannotWriteAndWritesNothing(
+    tmp_path: Path, declared: str, reason: str
+) -> None:
+    working = copyDocument("98b-cell-box-styles", tmp_path)
+    before = readPackage(working)
+    result = runSetCommand(str(working), "::Table 1::A1", "--cell-style", declared)
+    assert result.exit_code == 1
+    assert reason in result.stderr
+    assert listArchiveDifferences(before, readPackage(working)) == []
+
+
+@pytest.mark.parametrize("stem", ["98b-cell-box-styles", "98c-cell-box-regions"])
+def testEveryCellStyleReadsBackFromItsTextForm(stem: str) -> None:
+    for _, _, cell in pybers.open(findDocumentPath(stem)).cellsIterate():
+        if cell.cellStyle is not None:
+            text = pybers.formatCellStyle(cell.cellStyle)
+            assert pybers.parseCellStyle(text) == cell.cellStyle
