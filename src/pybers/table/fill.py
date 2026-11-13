@@ -12,6 +12,7 @@ drag repeats the same way except where a column continues a series, the case
 `CONTINUE_SERIES` covers, in any one direction. See findings-03-structure.md.
 
 UPDATES
+2026-11-13  A copy takes the cell style its source asked for, for PYB-265.
 2026-10-24  A filled cell copies no style, since a cell holds none yet, for PYB-259.
 2026-10-14  Checks a range against the grid through `bounds`, for PYB-193.
 2026-10-01  A filled cell copies its source's record description, for PYB-141.
@@ -143,6 +144,7 @@ def copyCellContent(
     target._stored = source._stored
     target._formatAsked = source._formatAsked
     target._controlAsked = source._controlAsked
+    target._cellStyleAsked = source._cellStyleAsked
     target._storedValue = source._storedValue
     formula, conditions = source.formula, source._conditions
     if namedCell:

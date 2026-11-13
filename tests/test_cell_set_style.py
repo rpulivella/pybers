@@ -15,13 +15,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/12"
 
+from collections import Counter
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 from test_cli_set import runSetCommand
 from test_cli_show import runShowCommand
-from test_writer import listArchiveDifferences, readRecordAt
+from test_writer import listArchiveDifferences, readRecordAt, tableInfoTypeId
 
 import pybers
 from conftest import copyDocument, findDocumentPath
@@ -34,13 +35,21 @@ from pybers import (
     FillImage,
     FillNone,
 )
+from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSDArchives_pb2 as tsd
+from pybers._generated import TSTArchives_pb2 as tst
 from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from pybers._persistence import readPackage
 from pybers._persistence.cells import cellStyleSlot, findSlotValue
+from pybers._persistence.index import ArchiveIndex, findRoot
+from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.style._write import composeCellProperties
+from pybers.table._read import iterateCellRecords
+from pybers.table._refcounts import listStyleClaims
+from pybers.table.fill import CellValueFill
 
 yellow = Color.parse("#ffd60aff")
+red = Color.parse("#ff0000ff")
 boxed = CellStyle(
     background=yellow, padding=Decimal(6),
     verticalAlign=CellStyleVerticalAlign.MIDDLE, textWrap=CellStyleTextWrap.WRAP,
@@ -257,3 +266,81 @@ def testEveryCellStyleReadsBackFromItsTextForm(stem: str) -> None:
         if cell.cellStyle is not None:
             text = pybers.formatCellStyle(cell.cellStyle)
             assert pybers.parseCellStyle(text) == cell.cellStyle
+
+
+def listStyleCountMismatches(path: Path) -> list[tuple[int, int, int]]:
+    """Return each style entry whose refcount differs from the records naming it."""
+    index = ArchiveIndex(readPackage(path))
+    mismatched = []
+    for sheet in findRoot(index).sheets:
+        for drawable in index.resolve(sheet, tn.SheetArchive).drawable_infos:
+            if index.typeOf(drawable) != tableInfoTypeId:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            named = Counter(
+                key for _, record in iterateCellRecords(index, model, path)
+                for key in listStyleClaims(record)
+            )
+            styles = index.resolve(model.base_data_store.styleTable, tst.TableDataList)
+            mismatched.extend(
+                (int(entry.key), int(entry.refcount), named[entry.key])
+                for entry in styles.entries if named[entry.key] != entry.refcount
+            )
+    return mismatched
+
+
+def addCopyRows(table: pybers.Table) -> None:
+    """Give a table three more rows beneath its first, room for a copy to land."""
+    table.rowAdd(3, 3)
+
+
+keep = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
+padded = CellStyle(padding=Decimal(8))
+
+
+@pytest.mark.parametrize(("edit", "expected"), [
+    (lambda table: (
+        addCopyRows(table), table.cellsCopy("B1:C1", "B4", references=keep)
+    ),
+     {"B4": CellStyle(background=yellow), "C4": CellStyle(background=red)}),
+    (lambda table: (addCopyRows(table), table.cellsMove("B1", "B4", references=keep)),
+     {"B1": None, "B4": CellStyle(background=yellow)}),
+    (lambda table: (addCopyRows(table), table.cellsFill(
+        "F1", "F3:F5", references=keep, values=CellValueFill.REPEAT_SOURCE_VALUE)),
+     {each: CellStyle(padding=Decimal(6)) for each in ("F3", "F4", "F5")}),
+    (lambda table: table.rowAdd(1, 1), {"B2": CellStyle(background=yellow)}),
+    (lambda table: table.columnAdd(1, 1), {"G1": CellStyle(padding=Decimal(6))}),
+    (lambda table: table.columnRemove(1, 1), {"E1": CellStyle(padding=Decimal(6))}),
+], ids=["copy", "move", "fill", "row-added", "column-added", "column-removed"])
+def testAStoredStyleSurvivesEachEditAndItsSave(
+    tmp_path: Path, edit: object, expected: dict[str, CellStyle | None]
+) -> None:
+    working = copyDocument("98b-cell-box-styles", tmp_path)
+    document = pybers.open(working)
+    edit(document.sheets[0].tables[0])  # type: ignore[operator]
+    document.save()
+    table = pybers.open(working).sheets[0].tables[0]
+    assert {address: table.cell(address).cellStyle for address in expected} == expected
+    assert listStyleCountMismatches(working) == []
+
+
+@pytest.mark.parametrize(("edit", "addresses"), [
+    (lambda table: table.cellsCopy("A1", "A4", references=keep), ("A1", "A4")),
+    (lambda table: table.cellsMove("A1", "A4", references=keep), ("A4",)),
+    (lambda table: table.cellsFill(
+        "A1", "A3:A5", references=keep, values=CellValueFill.REPEAT_SOURCE_VALUE),
+     ("A1", "A3", "A4", "A5")),
+], ids=["copy", "move", "fill"])
+def testAStyleSetBeforeAnEditReachesEveryCellItLands(
+    tmp_path: Path, edit: object, addresses: tuple[str, ...]
+) -> None:
+    working = copyDocument("98b-cell-box-styles", tmp_path)
+    document = pybers.open(working)
+    addCopyRows(document.sheets[0].tables[0])
+    document.cellSet("::Table 1::A1", cellStyle=padded)
+    edit(document.sheets[0].tables[0])  # type: ignore[operator]
+    document.save()
+    table = pybers.open(working).sheets[0].tables[0]
+    assert {table.cell(address).cellStyle for address in addresses} == {padded}
+    assert listStyleCountMismatches(working) == []
