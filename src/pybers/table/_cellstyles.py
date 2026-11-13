@@ -126,15 +126,15 @@ def readOwnCellStyles(
 
 
 def writeAskedCellStyle(
-    index: ArchiveIndex, pool: EntryPool[CellStyleKey], model: tst.TableModelArchive,
-    table: Table, raw: bytes, cell: Cell,
+    index: ArchiveIndex, pool: EntryPool[CellStyleKey],
+    variations: Mapping[TableRegion, RegionVariation], table: Table, raw: bytes,
+    cell: Cell,
 ) -> bytes:
     """Return a record naming the cell style its cell asked for, or as it was."""
     asked = cell._cellStyleAsked
     if asked is UNCHANGED:
         return raw
-    region = table.headers.regionFind(cell.address, table.rowCount)
-    variation = readRegionVariations(index, model)[region]
+    variation = variations[table.headers.regionFind(cell.address, table.rowCount)]
     copied = None if asked is None else mergeCellStyles(asked, variation.copied)
     return applyCellStyle(index, pool, raw, copied, variation.root)
 

@@ -92,7 +92,7 @@ from ..formula._write import (
 )
 from ..formula.nodes import Formula
 from ..style._write import readStylePool, writeStylePool
-from ._cellstyles import writeAskedCellStyle
+from ._cellstyles import readRegionVariations, writeAskedCellStyle
 from ._conditions import ConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
 from ._read import (
@@ -246,6 +246,7 @@ def applyTableEdits(
     formatKeys: dict[bytes, int] = {}
     walkedTiles: list[tuple[int, tst.Tile]] = []
     stylePool = readStylePool(index, registry, store)
+    variations = readRegionVariations(index, model)
     richTextPool = (
         readRichTextPool(index, store) if store.HasField("rich_text_table") else None
     )
@@ -287,7 +288,7 @@ def applyTableEdits(
 
     def styleFinish(raw: bytes, cell: Cell) -> bytes:
         """Return a record naming the cell style its cell asked for, or as it was."""
-        return writeAskedCellStyle(index, stylePool, model, table, raw, cell)
+        return writeAskedCellStyle(index, stylePool, variations, table, raw, cell)
 
     def releaseRecord(record: CellRecord, reference: CellAddress) -> bool:
         """Release every list entry a removed record names, reporting a formula."""

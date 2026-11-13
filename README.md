@@ -318,7 +318,7 @@ form = json.loads(text, parse_float=Decimal, parse_int=Decimal)  # every number 
 assert pybers.parseJsonForm(text) == costs
 ```
 
-A cell's format is one of a closed family of types, so a `match` reaches every family and mypy reports one it misses. `CellFormatAutomatic` holds the format Numbers chose, and a format a person chose is its family's own type. `document.cellSet` sets a value, a format, a control or any of them, a part not given left as it was:
+A cell's format is one of a closed family of types, so a `match` reaches every family and mypy reports one it misses. `CellFormatAutomatic` holds the format Numbers chose, and a format a person chose is its family's own type. `document.cellSet` sets a value, a format, a control, a cell style or any of them, a part not given left as it was:
 
 ```python
 from pybers import CellFormatAutomatic, CellFormatNumber, CellFormatPercent

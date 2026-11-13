@@ -19,7 +19,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` naming each |
 | `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
-| `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL]` | The value, the format and the control of every cell a selector matches, each optional |
+| `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE]` | The value, the format, the control and the cell style of every cell a selector matches, each optional |
 | `locale FILE [LOCALE]` | A document's language and region, or a change to it |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
 | `diff A B` | The cells that differ between two documents |
