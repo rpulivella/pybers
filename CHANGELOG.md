@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-265] Style a cell's box: fill, padding, alignment and wrap
 - [PYB-145] Model a cell's format as a closed family
 - [PYB-264] Give color one home, with its color space
 - [PYB-277] Measure test coverage and show it on the README
