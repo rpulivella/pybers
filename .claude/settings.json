@@ -81,6 +81,9 @@
       "Bash(.venv/bin/python3 -m tools.workflow.ticket export-as-source:*)",
       "Bash(.venv/bin/python3 -m tools.workflow.pr export-as-source:*)",
       "Bash(.venv/bin/python3 -m tools.workflow.pr find:*)",
+      "Bash(.venv/bin/python3 -m tools.workflow.steps skip:*)",
+      "Bash(.venv/bin/python3 -m tools.workflow.steps abandon:*)",
+      "Bash(.venv/bin/python3 -m tools.workflow.steps status:*)",
       "Bash(sed -n:*)",
       "Bash(awk:*)",
       "Bash(diff:*)",
@@ -94,6 +97,49 @@
       "Bash(printf:*)",
       "Bash(echo:*)",
       "Bash(unzip -l:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Skill|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && .venv/bin/python3 -m tools.workflow.steps hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && .venv/bin/python3 -m tools.workflow.steps hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && .venv/bin/python3 -m tools.workflow.steps hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && .venv/bin/python3 -m tools.workflow.steps hook"
+          }
+        ]
+      }
     ]
   }
 }

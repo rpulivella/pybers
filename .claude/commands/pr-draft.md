@@ -1,6 +1,13 @@
 ---
 description: Create a draft pull request for the current ticket branch, or revise a filed one's body, filling the repo's mandatory PR template.
 argument-hint: [edit] <optional issue number; inferred from the branch if omitted>
+steps:
+  - skill:changelog-add
+  - pause
+  - .venv/bin/python3 -m tools.workflow.ticket export-as-source or .venv/bin/python3 -m tools.workflow.pr export-as-source
+  - skill:standards
+  - .venv/bin/python3 -m tools.workflow.pr create or .venv/bin/python3 -m tools.workflow.pr edit
+  - .venv/bin/python3 -m tools.workflow.dashboard sync
 ---
 
 # /pr-draft

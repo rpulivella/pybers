@@ -1,5 +1,7 @@
 ---
 description: Proofread prose against the repo's writing standards, in two passes
+steps:
+  - .venv/bin/python3 -m tools.workflow.standards_check
 ---
 
 # /standards

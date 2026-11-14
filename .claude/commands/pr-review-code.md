@@ -1,6 +1,12 @@
 ---
 description: Review an open pull request. Run the gates first, then review the changed files against the rubric, and take the PR out of draft only if everything is clean.
 argument-hint: <optional PR number; inferred from the branch if omitted>
+steps:
+  - .venv/bin/python3 -m tools.workflow.preflight
+  - .venv/bin/python3 -m tools.workflow.ticket status
+  - git diff develop...HEAD
+  - .venv/bin/python3 -m tools.workflow.pr ready
+  - .venv/bin/python3 -m tools.workflow.dashboard sync
 ---
 
 # /pr-review-code

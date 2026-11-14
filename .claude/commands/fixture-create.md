@@ -1,6 +1,9 @@
 ---
 description: Design and make a fixture or measurement that labels its own contents, across row 1 with row 2 saying exactly what was input, by the helper's recipe or by hand in Numbers.
 argument-hint: <what the document must show, such as the formula text of a decimal literal under en_IT>
+steps:
+  - pause
+  - .venv/bin/python3 -m pybers show
 ---
 
 # /fixture-create

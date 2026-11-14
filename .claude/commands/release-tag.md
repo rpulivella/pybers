@@ -1,6 +1,10 @@
 ---
 description: Create and push a release tag on develop to trigger a PyPI publish.
 argument-hint: <release type and version, e.g. "beta 0.1.0" or "final 0.1.0">
+steps:
+  - pause
+  - .venv/bin/python3 -m tools.workflow.ticket list --status Done
+  - git tag -a
 ---
 
 # /release-tag

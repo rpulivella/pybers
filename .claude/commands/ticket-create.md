@@ -1,6 +1,10 @@
 ---
 description: Write and file a new GitHub Issue for pybers in this repo's exact format (opener, ACs, design, constraints), then add it to the Project board as Todo or Concept.
 argument-hint: <description of the ticket>
+steps:
+  - skill:standards
+  - pause
+  - .venv/bin/python3 -m tools.workflow.ticket create
 ---
 
 # /ticket-create

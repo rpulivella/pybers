@@ -1,6 +1,8 @@
 ---
 description: Add the current ticket's verbatim title to the CHANGELOG.md Unreleased list.
 argument-hint: <optional issue number; inferred from the branch if omitted>
+steps:
+  - .venv/bin/python3 -m tools.workflow.ticket export-as-source
 ---
 
 # /changelog-add

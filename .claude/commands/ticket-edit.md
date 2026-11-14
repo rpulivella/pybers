@@ -1,6 +1,11 @@
 ---
 description: Revise a filed ticket's title, body, or label in this repo's exact format, without disturbing its Status or the AC numbering already referenced elsewhere.
 argument-hint: <issue number> <what to change>
+steps:
+  - .venv/bin/python3 -m tools.workflow.ticket export-as-source
+  - skill:standards
+  - pause
+  - .venv/bin/python3 -m tools.workflow.ticket edit
 ---
 
 # /ticket-edit

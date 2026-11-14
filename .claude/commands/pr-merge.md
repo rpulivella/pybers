@@ -1,6 +1,11 @@
 ---
 description: Merge a reviewed pull request and get develop current. The only skill that runs pr.py merge.
 argument-hint: <optional PR number; resolved from the current branch if omitted>
+steps:
+  - git status --short --branch
+  - .venv/bin/python3 -m tools.workflow.pr merge
+  - git pull origin develop
+  - .venv/bin/python3 -m tools.workflow.dashboard merged or .venv/bin/python3 -m tools.workflow.dashboard sync
 ---
 
 # /pr-merge

@@ -1,6 +1,11 @@
 ---
 description: Stage and commit changes following pybers's mandatory commit format.
 argument-hint: <optional message hint>
+steps:
+  - skill:standards
+  - pause
+  - git commit -m
+  - git status
 ---
 
 # /commit
@@ -40,6 +45,7 @@ convention shared across this developer's repos.
      The branch prefix and the commit prefix are two different axes.
    - **≤ 60 characters** (aim 50), bracket included. Imperative mood ("add", "fix").
    - **No "Co-Authored-By", no footer, no second line.**
+   - Run `/standards` on the message with `--text`.
 4. **STOP. Present the plan and wait for explicit approval.**
    ```
    Proposed commit message:

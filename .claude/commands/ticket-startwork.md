@@ -1,6 +1,12 @@
 ---
 description: Begin work on a ticket, fetch it, surface ACs + constraints, branch, set Status In Progress, and write the acceptance criteria into workarea/dashboard.md. No code written.
 argument-hint: <issue number, #number, or issue URL>
+steps:
+  - .venv/bin/python3 -m tools.workflow.ticket show
+  - git pull origin develop
+  - git checkout -b or git switch -c
+  - .venv/bin/python3 -m tools.workflow.ticket start
+  - .venv/bin/python3 -m tools.workflow.dashboard focus
 ---
 
 # /ticket-startwork
@@ -56,9 +62,9 @@ into `workarea/dashboard.md`.
    ```
    Then read `.venv/bin/python3 --version`. The work must use what that version adds in
    any code the ticket touches.
-6. **Update the dashboard through `/dashboard-update`.** Replace the Tasks section with the new
-   ticket's tasks, one per AC or step, the first `◼` if work begins now, and keep the
-   queue. Then put the ticket in focus with `.venv/bin/python3 -m tools.workflow.dashboard focus PYB-<N>`, and show
+6. **Update the dashboard** in the shape `/dashboard-update` describes. Replace the Tasks
+   section of `workarea/dashboard.md` with the new ticket's tasks, one per AC or step, the
+   first `◼` if work begins now, and keep the queue. Then put the ticket in focus with `.venv/bin/python3 -m tools.workflow.dashboard focus PYB-<N>`, and show
    the user the file.
 
 ## Hard rules

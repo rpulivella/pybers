@@ -1,6 +1,8 @@
 ---
 description: Keep the session dashboard, workarea/dashboard.md, current. Add, start, finish or block a task, set the ticket in focus, and sync the status line with its stage.
 argument-hint: <add | start | finish | block | focus | sync> [task or ticket]
+steps:
+  - .venv/bin/python3 -m tools.workflow.dashboard
 ---
 
 # /dashboard-update
