@@ -4,6 +4,7 @@ A document read from its JSON form saves as a created document holding what the 
 describes, or is refused, naming what pybers cannot yet create.
 
 UPDATES
+2026-11-12  A cell's style is kept through its JSON form and a save, for PYB-265.
 2026-11-03  Written for PYB-261.
 """
 from __future__ import annotations
@@ -25,6 +26,7 @@ import pybers
 from conftest import findDocumentPath
 from pybers.absence import UNDETERMINED
 from pybers.interchange import formatJsonForm, parseJsonForm
+from pybers.style.cells import findOverrides
 from pybers.table._form import CellForm, buildCellForm
 from pybers.table._records import refuseUncreatableCell
 
@@ -38,6 +40,8 @@ def saveCreated(tmp_path: Path) -> Path:
     """Return a created document holding values and a formula across two sheets."""
     document = pybers.create("en_US")
     document.sheet(1).tableAdd("Inputs", 2, 2).cell("A1").value = Decimal("5")
+    padded = pybers.CellStyle(padding=Decimal(6))
+    document.cellSet("Sheet 1::Inputs::B2", cellStyle=padded)
     calc = document.sheetAdd("Second").tableAdd("Calc", 2, 2)
     calc.cell("A1").formulaText = "=Inputs::A1*2"
     calc.cell("B1").value = "text"
@@ -79,16 +83,22 @@ def testAMeasurementSavedThroughItsJsonFormKeepsEveryCell(tmp_path: Path) -> Non
             }
 
 
-def findCellLoss(held: CellForm, written: CellForm | None) -> str | None:
+def findCellLoss(
+    held: CellForm, written: CellForm | None, inherited: pybers.CellStyle
+) -> str | None:
     """Return what a cell lost on the way through its JSON form and a save, or None.
+
+    A style is compared less what the rebuilt table gives the cell anyway, which a
+    variation there cannot tell from the cell's own, as findings-06 measured.
 
     A formula's result and its format are Numbers' to calculate, and a format the
     model had yet to determine is not lost.
     """
+    heldStyle = findOverrides(held.cellStyle, inherited)
     holds = (held.formulaText, held.value, held.presentation.format,
-             held.presentation.control)
+             held.presentation.control, heldStyle)
     if written is None:
-        return None if holds == (None, None, None, None) else "the cell"
+        return None if holds == (None,) * len(holds) else "the cell"
     if held.formulaText != written.formulaText:
         return "its formula"
     if held.formulaText is None and (
@@ -97,6 +107,8 @@ def findCellLoss(held: CellForm, written: CellForm | None) -> str | None:
         return "its value"
     if held.presentation.control != written.presentation.control:
         return "its control"
+    if heldStyle != findOverrides(written.cellStyle, inherited):
+        return "its cell style"
     asked = held.presentation.format
     if held.formulaText is None and asked is not UNDETERMINED and (
         asked != written.presentation.format
@@ -129,6 +141,7 @@ def testEveryDocumentSavedThroughItsJsonFormKeepsEveryCellOrIsRefused(
             buildCellForm(cell),
             None if (other := writtenTable.cells.get(address)) is None
             else buildCellForm(other),
+            writtenTable._cellStyleInherited(address),
         )) is not None
     ]
     assert lost == []

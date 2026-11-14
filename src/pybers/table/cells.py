@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-12  Each region's inherited cell style, for PYB-265.
 2026-11-03  A table's header and footer headers, read and set, `select`, and
             `range` removed in its favor, for PYB-223.
 2026-10-29  A cell builds its own reference, for PYB-278.
@@ -86,11 +87,12 @@ from pybers.addressing.reference import (
 )
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
+from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
-from pybers.table.headers import TableHeaders, checkHeadersFit
+from pybers.table.headers import TableHeaders, TableRegion, checkHeadersFit
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
@@ -121,6 +123,16 @@ def generateOwnerIdentity() -> str:
     value = int.from_bytes(uuid.uuid4().bytes, "little") & ownerBaseMask
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
 
+
+# The cell style every region of a table pybers adds names, the reset: no wrapping.
+resetCellStyle: CellStyle = CellStyle(textWrap=CellStyleTextWrap.NOWRAP)
+# What every cell of a table pybers adds shows: Numbers' own box, not wrapping.
+createdCellStyle: CellStyle = replace(
+    numbersCellStyle, textWrap=CellStyleTextWrap.NOWRAP
+)
+resetCellStylesInherited: frozendict[TableRegion, CellStyle] = frozendict(
+    dict.fromkeys(TableRegion, createdCellStyle)
+)
 
 @dataclass(slots=True)
 class Table:
@@ -162,6 +174,12 @@ class Table:
         default_factory=list, repr=False, compare=False, kw_only=True
     )
     _headers: TableHeaders = field(default_factory=TableHeaders, kw_only=True)
+    # What each region's cell style resolves to, read from the file, so a request
+    # can drop what a cell inherits; a table pybers adds takes the reset's.
+    _cellStylesInherited: frozendict[TableRegion, CellStyle] = field(
+        default_factory=lambda: resetCellStylesInherited, repr=False, compare=False,
+        kw_only=True,
+    )
 
     def __post_init__(self) -> None:
         """Identify every line of a table that arrived without identities."""
@@ -169,6 +187,11 @@ class Table:
             self._rowIdentities = generateLineIdentities(self.rowCount)
         if not self._columnIdentities:
             self._columnIdentities = generateLineIdentities(self.colCount)
+
+    def _cellStyleInherited(self, address: CellAddress) -> CellStyle:
+        """Return the cell style a cell at `address` inherits from its region."""
+        region = self._headers.regionFind(address, self.rowCount)
+        return self._cellStylesInherited.get(region, numbersCellStyle)
 
     @property
     def headers(self) -> TableHeaders:

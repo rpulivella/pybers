@@ -92,9 +92,38 @@ style key of its own, where the 2pt and 0pt cells do. The value is not absent fr
 document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 times. The
 default lives in the inherited style and the cell simply declines to override it.
 
-**Padding is always uniform in practice.** Across every fixture here, 3,368 cell styles carry
-padding and **not one is uneven**, only `4/4/4/4`, `2/2/2/2` and `0/0/0/0` appear. The UI
-offers a single value and Numbers never writes anything else.
+**Setting a property back to what the cell inherits removes the override.** Measured for
+PYB-265 on 2026-11-12 in `98c-cell-box-regions`: C1, a header cell given a 6pt inset and then
+4pt again, and D1, its wrap cleared and checked again, each hold no cell style. **No Fill is stored where it overrides**: B1, a header cell
+given No Fill, names a variation of the header row style holding an empty `cell_fill`, which
+covers the header's gray.
+
+**A variation never inherits from a variation.** None of the 275 cell style variations and
+182 paragraph style variations in the documents Numbers made has a variation as its parent,
+and a table whose region style is a variation flattens instead. Measured for PYB-265 on
+2026-11-13 in `99-cell-fill-in-a-created-table`, a table pybers created, whose body style
+is the reset's variation stating `text_wrap: false`: A1, filled by hand, names a variation
+of the theme's root cell style stating the fill and `text_wrap: false` both, with an
+`override_count` of 2. The same save dropped the five cells' styles pybers had written as
+variations of the reset's variation, and their entries, and neither Numbers nor Quick Look
+drew those fills.
+
+**Numbers ignores the properties of a style whose `override_count` says it states none.**
+Measured for PYB-265 on 2026-11-13. The root cell style `pybers.create` composed stated an
+empty fill, 4pt padding, top alignment and no wrap with an `override_count` of 0, and every
+cell inheriting it drew its text in the middle while the inspector and AppleScript reported
+top. Raising the count to 4, the number of properties stated, drew the same cells at the top.
+Each root and variation cell style Numbers writes states a count equal to its properties:
+`tableCell-0-bodyStyle` 4, a fill alone 1, a fill copied beside a region's `nowrap` 2.
+
+**A side of zero is omitted**, so `0/0/0/0` stores as an empty `padding {}`, which is how the
+`0pt` cell of `31` holds it. A reader takes a missing side as zero.
+
+**Padding Numbers writes is uniform; padding it imports need not be.** Measured for PYB-265 on
+2026-11-12 across the 258 documents in the tests: 26,638 cell styles, 25,764 of them carrying
+padding. Every style Numbers composed holds one value for all four sides, which is the single
+value the UI offers. The 32 exceptions are the table styles of a table imported from Excel,
+`22e-merge-imported` and the documents made from it, holding `L2 T0 R2 B2`.
 
 That leaves an open **write** question rather than a read one. `PaddingArchive` has four
 independent floats, so pybers is able to emit `L2 T0 R4 B8`; whether Numbers honors it,
@@ -243,6 +272,15 @@ The table and two further checks establish:
   `srgb` or `p3`, with a headroom of 1, and every component and alpha lies from 0 to 1.
   Theme slots agree, which is why a created document's palette and sheet fill are stored
   the same way.
+
+**AppleScript reads a cell's fill converted to Generic RGB, its alpha dropped.** Measured
+for PYB-265 on 2026-11-13 against a copy of `97b` in Numbers 15.4. A cell's
+`background color` is three integers from 0 to 65535, and its scripting dictionary states
+no color space and no alpha for a cell, so `B1` and `C1` read alike. AppKit's conversion of
+each stored color to `NSColorSpace.genericRGB` reproduces every row 1 reading within 1:
+`B1` reads 27830 for sRGB 0.5, `E1` 64831, 27359, 2086, `F1` 65535, 24525, 0, and `K1`, no
+fill, reads `missing value`. A check of a fill through AppleScript therefore converts the
+stored color the same way, and leaves alpha to the eye.
 
 ## Gradients
 

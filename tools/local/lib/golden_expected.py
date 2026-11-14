@@ -3,13 +3,15 @@
 What a golden should show in Numbers, generated from its JSON form on every run.
 
 The golden is written as its JSON form and read back, and every filled cell of every
-table of what reads back is expected: its kind, value, formula, format and control.
+table of what reads back is expected: its kind, value, formula, format, control and
+the fill its own style states.
 What the JSON form loses therefore fails the check rather than passing unseen. Numbers
 is the independent reader, so a check compares the two. A measurement labels each
 value in row 1 with text in row 2, and such a label is shown beside the cell it
 describes.
 
 UPDATES
+2026-11-13  The fill a cell's own style states, for PYB-265.
 2026-11-09  A format is the cell's `CellFormat`, Automatic naming the one it chose,
             for PYB-145.
 2026-10-24  Generated from the golden's JSON form, its machine form that form
@@ -39,6 +41,7 @@ from pybers import (
     CellFormatAutomatic,
     CellKind,
     CurrencyAmount,
+    Fill,
 )
 
 # A measurement's layout: each value in row 1, the text describing it in row 2.
@@ -58,6 +61,7 @@ class ExpectedCell:
     control: CellControl | None
     currencyMenu: str | None
     label: str | None
+    background: Fill | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +127,7 @@ def readExpectedCell(
         format=presentation.format,
         control=presentation.control, currencyMenu=menu,
         label=None if label is None else str(label),
+        background=None if cell.cellStyle is None else cell.cellStyle.background,
     )
 
 

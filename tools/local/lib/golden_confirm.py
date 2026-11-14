@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-11-13  Each fill a cell's own style states is read from Numbers and checked
+            through the conversion its scripting applies, for PYB-265.
 2026-11-10  Each cell Numbers changed on saving fails, naming what changed, and each
             blue corner chip Numbers drew fails with its close-up, for PYB-145.
 2026-11-09  A format Numbers names is read from the format family, Automatic its own
@@ -673,9 +675,39 @@ def listCoveredCells(merges: tuple[str, ...]) -> frozenset[str]:
     return frozenset(covered)
 
 
+def listStoredColors(expected: ExpectedValues) -> list[pybers.Color]:
+    """Return each color a cell's own style fills it with, once, for the helper."""
+    return list(dict.fromkeys(
+        cell.background for table in expected.tables for cell in table.cells
+        if isinstance(cell.background, pybers.Color)
+    ))
+
+
+def checkBackground(
+    cell: ExpectedCell, found: list[int] | None,
+    converted: Mapping[pybers.Color, list[int]],
+) -> str | None:
+    """Return how a cell's fill differs from the one its style states, or None.
+
+    Numbers' scripting reads a fill converted to Generic RGB with no alpha, so a color
+    is compared through the same conversion, within 1, as findings-06 measured.
+    """
+    match cell.background:
+        case pybers.FillNone():
+            return None if found is None else f"fill {found}, expected none"
+        case pybers.Color() as color:
+            wanted = converted.get(color)
+            if found is None or wanted is None or len(found) != len(wanted) or any(
+                abs(each - other) > 1 for each, other in zip(found, wanted, strict=True)
+            ):
+                return f"fill {found}, expected {wanted} for {color}"
+    return None
+
+
 def checkTableGrid(
     expected: ExpectedTable, reading: dict[str, Any],
     savedFormulas: Mapping[str, str] | None,
+    converted: Mapping[pybers.Color, list[int]] = frozendict(),
 ) -> list[Check]:
     """Compare every cell of a table with what pybers read, a check per difference.
 
@@ -728,6 +760,11 @@ def checkTableGrid(
                     f"Numbers shows the formula as {formatCodeSpan(shown)}, in the "
                     "document's language and region",
                 ))
+            differs = None if cell is None else checkBackground(
+                cell, fact.get("background"), converted
+            )
+            if differs is not None:
+                checks.append(Check("failed", f"{subject} / {name}", differs))
             names = None if cell is None else findNumbersFormat(cell)
             found = fact.get("formatKind") or ""
             if names is not None and found != names[0]:
@@ -736,8 +773,8 @@ def checkTableGrid(
                                     f"{formatCodeSpan(names[0])}"))
     if not any(check.status == "failed" for check in checks):
         checks.append(Check("passed", subject,
-                            f"every cell holds the value, formula and format pybers "
-                            f"read, {len(filled)} of them filled"))
+                            f"every cell holds the value, formula, format and fill "
+                            f"pybers read, {len(filled)} of them filled"))
     for axis, declared, counted in (
         ("row", expected.rows, reading["rowCount"]),
         ("column", expected.columns, reading["columnCount"]),
@@ -884,6 +921,7 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
     writeExpectations(expected, outputDirectory)
     writeExpectationsJson(expected, outputDirectory)
     goldenHash = readFileHash(golden)
+    colors = listStoredColors(expected)
     with tempfile.TemporaryDirectory(prefix="pybers-golden-copy-") as work:
         copy = Path(work) / golden.name
         saved = Path(work) / f"{golden.stem}-saved-by-numbers.numbers"
@@ -897,6 +935,9 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
                       for t, c in inspected],
             "tables": [{"sheet": t.sheet, "table": t.table} for t in expected.tables],
             "maxCaptures": maxCaptures,
+            "colors": [{"space": color.colorSpace.value,
+                        "components": [float(each) for each in color.components]}
+                       for color in colors],
         }, deadlineSeconds=findInspectDeadline(expected),
             logPath=outputDirectory / "helper.log")
         run.numbersVersion = result.get("numbersVersion")
@@ -921,6 +962,7 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
             (r["address"]["sheet"], r["address"]["table"]): r
             for r in result.get("tables", [])
         }
+        converted = dict(zip(colors, result.get("convertedColors", []), strict=False))
         for table in expected.tables:
             tableReading = tableReadings.get((table.sheet, table.table))
             if tableReading is None:
@@ -933,6 +975,7 @@ def confirmGolden(golden: Path, run: GoldenRun) -> GoldenRun:
                 table, tableReading,
                 None if savedFormulas is None
                 else savedFormulas.get((table.sheet, table.table), {}),
+                converted,
             ))
             run.checks.extend(listLabelChecks(table))
         readings = {

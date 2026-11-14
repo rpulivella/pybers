@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-11-12  `cellStyle`, what the cell's own style states about its box, for
+            PYB-265.
 2026-11-09  An edit records the format its save writes, Automatic included, rather
             than a chosen flag, for PYB-145.
 2026-11-03  `CellChanges` and `CellSkip`, what a write to every matched cell did, for
@@ -61,6 +63,7 @@ from pybers.format.formats import (
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
+from pybers.style.cells import CellStyle, findOverrides
 from pybers.table.kinds import (
     CellKind,
     CellPresentation,
@@ -212,6 +215,8 @@ class CellChange:
     formatAfter: CellFormat | UNDETERMINED | None
     controlBefore: CellControl | None
     controlAfter: CellControl | None
+    cellStyleBefore: CellStyle | None = None
+    cellStyleAfter: CellStyle | None = None
     rowsAdded: int = 0
     colsAdded: int = 0
 
@@ -223,6 +228,7 @@ class CellChange:
             or self.kindBefore is not self.kindAfter
             or self.formatBefore != self.formatAfter
             or self.controlBefore != self.controlAfter
+            or self.cellStyleBefore != self.cellStyleAfter
             or not isSameValue(self.valueBefore, self.valueAfter)
         )
 
@@ -268,6 +274,10 @@ class Cell:
     )
     # The control an edit asked the next save to give, None to remove the one it has.
     _controlAsked: CellControl | None | UNCHANGED = field(
+        default=UNCHANGED, repr=False, compare=False, kw_only=True
+    )
+    # The cell style an edit asked the next save to write, None to remove the box's.
+    _cellStyleAsked: CellStyle | None | UNCHANGED = field(
         default=UNCHANGED, repr=False, compare=False, kw_only=True
     )
     # The value that record holds, so an edit since is told from it.
@@ -431,10 +441,11 @@ class Cell:
             self._formatAsked = CellFormatAutomatic()
 
     def _storageCheck(self) -> bool:
-        """Report whether a save must store a record for this cell, for a format too."""
+        """Report whether a save must store a record for this cell, for a style too."""
         return (
             self.formula is not None or self.value is not None
-            or self._formatAsked is not None
+            or self._formatAsked is not None or self._cellStyleAsked is not None
+            and self._cellStyleAsked is not UNCHANGED
         )
 
     def _formatChosenCheck(self) -> bool:
@@ -482,6 +493,26 @@ class Cell:
                 presentation, format=CellFormatAutomatic(CellFormatText())
             )
         return presentation
+
+    @property
+    def cellStyle(self) -> CellStyle | None:
+        """Return what this cell's own style states about its box, or None."""
+        if self._cellStyleAsked is not UNCHANGED:
+            return self._cellStyleAsked
+        return self._stored.cellStyle
+
+    def _cellStyleRequest(self, cellStyle: CellStyle | None) -> None:
+        """Ask the next save to give this cell a box style, unless it shows it now.
+
+        What equals the inherited value is dropped first, so setting a default
+        writes nothing.
+        """
+        inherited = CellStyle() if self.table is None else (
+            self.table._cellStyleInherited(self.address)
+        )
+        wanted = findOverrides(cellStyle, inherited)
+        if wanted != findOverrides(self.cellStyle, inherited):
+            self._cellStyleAsked = wanted
 
     @property
     def unrecognizedTypeCode(self) -> int | None:

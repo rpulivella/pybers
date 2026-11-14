@@ -55,10 +55,10 @@ correctly.
 Named from the fixtures that label their own contents, which is why they were worth building:
 
 ```
-byte 8  0x20   a cell fill          28-style-fills: A1 "No fill" has it clear,
-                                    every filled cell has it set
-        0x40   explicit horizontal  30-style-align: B1 "h: auto" clear,
-               alignment            C1 "h: left" and E1 "h: right" set
+byte 8  0x20   a cell style         98b-cell-box-styles: set by a fill, a vertical
+                                    alignment, wrap cleared and a 6pt inset alike
+        0x40   a paragraph style    98b-cell-box-styles: set by a horizontal
+                                    alignment and by bold alike
         0x80   conditional          47: the one highlighted cell is the only cell
                highlighting         with the bit, and the reference it contributes
                                     is the table's single conditionalstyletable key
@@ -80,6 +80,28 @@ for PYB-61 on 2026-09-14: the gate is byte 10.** The count is
 `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, with no exceptions in
 11,760 records. See [findings-01-values.md](findings-01-values.md).
 
-The reference each preceding bit contributes is identified only for `0x80`. The values
-`0x20` and `0x40` contribute are plausible keys in more than one per-table list at once, so
-naming them would take a fixture built to separate those lists.
+## Which style each of `0x20` and `0x40` names
+
+Measured for PYB-265 on 2026-11-12 in `98b-cell-box-styles`, ten cells each holding `1`, styled
+by hand in Numbers 15.4 with one change per column. **A table keeps its cell styles and its
+paragraph styles in one `styleTable`**, keys unique across both, so a key alone does not say
+which kind it names. The slot does, and the archive type each key resolves to confirms it:
+
+```
+cell  styled with                     byte 8  references   resolves to
+A1    nothing                         0x01    1 1          (the two format slots only)
+B1    fill 255 214 10                 0x21    2 1 1        2 CellStyleArchive, cell_fill
+C1    fill 255 0 0                    0x21    3 1 1        3 CellStyleArchive, cell_fill
+D1    vertical alignment Center       0x21    1 1 1        1 CellStyleArchive, vertical_alignment 1
+E1    Wrap Text in Cell cleared       0x21    4 1 1        4 CellStyleArchive, text_wrap false
+F1    Text Inset 6 pt                 0x21    6 1 1        6 CellStyleArchive, padding 6 on all four sides
+G1    horizontal alignment Right      0x41    5 1 1        5 ParagraphStyleArchive, alignment
+H1    Bold                            0x41    7 1 1        7 ParagraphStyleArchive, bold
+I1    fill and Right                  0x61    2 5 1 1      cell style, then paragraph style
+J1    as I1, and highlighting         0xE1    2 5 2 0 1 1  cell, paragraph, conditional set, matched rule 0
+```
+
+The references follow the bits in ascending order: cell style, paragraph style, conditional
+style set, then byte 9's. Every style is an unnamed variation of the table's own style of
+its kind. Numbers shares one variation among cells styled alike: B1, I1 and J1 name cell
+style 2, refcount 3, and G1, I1 and J1 name paragraph style 5, refcount 3.

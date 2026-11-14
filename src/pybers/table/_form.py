@@ -12,6 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
+2026-11-12  A cell's own cell style, one its save writes, for PYB-265.
 2026-11-11  A cell's format is one the save writes, an empty cell's included, for
             PYB-145.
 2026-11-03  A table's headers, for PYB-223.
@@ -41,6 +42,7 @@ from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.interchange._leaves import JsonFormError
 from pybers.interchange._tree import jsonFormReadOnly
+from pybers.style.cells import CellStyle
 from pybers.table.cell import Cell, CellValue
 from pybers.table.cells import Table
 from pybers.table.headers import TableHeaders
@@ -68,6 +70,7 @@ class CellForm:
     formulaText: str | None
     valueCached: bool | None = field(default=None, metadata={jsonFormReadOnly: True})
     presentation: CellPresentation
+    cellStyle: CellStyle | None = None
     unrecognizedTypeCode: int | None = None
     formula: Formula | WITHHELD | None = WITHHELD
 
@@ -116,7 +119,8 @@ def buildCellForm(cell: Cell) -> CellForm:
     return CellForm(
         address=cell.address, value=cell.value, kind=cell.kind, formulaText=text,
         valueCached=cell.valueCached, presentation=cell.presentation,
-        unrecognizedTypeCode=cell.unrecognizedTypeCode, formula=formula,
+        cellStyle=cell.cellStyle, unrecognizedTypeCode=cell.unrecognizedTypeCode,
+        formula=formula,
     )
 
 
@@ -160,12 +164,16 @@ def addCell(table: Table, form: CellForm, path: str) -> None:
         cell = table.cell(form.address)
     except PybersError as exc:
         raise JsonFormError(f"{path}: {exc}") from exc
-    cell._stored = CellStorage(form.kind, form.presentation, form.unrecognizedTypeCode)
+    cell._stored = CellStorage(
+        form.kind, form.presentation, form.unrecognizedTypeCode, form.cellStyle
+    )
     cell._value = form.value
     cell._storedValue = form.value
     # The form's cell has no record yet, so its format is one the save must write.
     stated = form.presentation.format
     cell._formatAsked = stated if isinstance(stated, CellFormatBase) else None
+    if form.cellStyle is not None:
+        cell._cellStyleAsked = form.cellStyle
 
 
 def assignFormulas(table: Table, form: TableForm, path: str) -> None:

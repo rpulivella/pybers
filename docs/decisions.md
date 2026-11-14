@@ -384,7 +384,7 @@ write skipped is a diagnostic on stderr, as `Written:` is. A `Check` and the reg
 the second is the document's `localeIdentifier` under the key its form gives it.
 
 **A key is the model's own public name.** `Cell` writes `value`, `kind`, `formulaText`,
-`valueCached`, `presentation`, `unrecognizedTypeCode` and `formula`, in the order
+`valueCached`, `presentation`, `cellStyle`, `unrecognizedTypeCode` and `formula`, in the order
 `pybers show` prints them. What describes where a value sits rather than what it is,
 such as `Cell.table` or `Cell.reference`, is left out, and so is the session's time
 zone, which the file has nowhere to keep. A document carries its language and region as

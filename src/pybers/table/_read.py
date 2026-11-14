@@ -19,6 +19,8 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-11-12  Each cell's own cell style, and what each region's resolves to, for
+            PYB-265.
 2026-11-03  A table's header rows, header columns and footer rows, for PYB-223.
 2026-11-02  A table of a document never saved names none, for PYB-261.
 2026-10-29  A table's records walked through `StoredTiles`, for PYB-278.
@@ -48,7 +50,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from pathlib import Path
 from typing import cast
@@ -59,6 +61,7 @@ from .._generated import TSWPArchives_pb2 as tswp
 from .._persistence import CellDecodeError
 from .._persistence.cells import (
     CellRecord,
+    cellStyleSlot,
     conditionalSlot,
     currencyFormatSlot,
     findSlotValue,
@@ -82,6 +85,9 @@ from ..format._read import currencyFormatType, readRecordControl, readRecordForm
 from ..format.controls import CellControl
 from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
+from ..style._read import readCellStyles
+from ..style.cells import CellStyle
+from ._cellstyles import readOwnCellStyles, readRegionCellStyles, readRegionVariations
 from .cell import Cell, CellValue
 from .cells import Table
 from .headers import TableHeaders
@@ -210,7 +216,8 @@ def readCellValue(
 
 
 def readRecordStorage(
-    record: CellRecord, formatTypes: dict[int, int], controls: dict[int, CellControl]
+    record: CellRecord, formatTypes: dict[int, int], controls: dict[int, CellControl],
+    cellStyles: Mapping[int, CellStyle],
 ) -> CellStorage:
     """Return what a record stores beyond its value."""
     kind = storedKinds.get(record.typeByte, CellKind.UNKNOWN)
@@ -219,7 +226,9 @@ def readRecordStorage(
         control=readRecordControl(record, controls),
     )
     unrecognized = record.typeByte if kind is CellKind.UNKNOWN else None
-    return CellStorage(kind, presentation, unrecognized)
+    styleKey = findSlotValue(record, cellStyleSlot)
+    cellStyle = None if styleKey is None else cellStyles[styleKey]
+    return CellStorage(kind, presentation, unrecognized, cellStyle)
 
 
 def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
@@ -335,10 +344,14 @@ def readTable(
             model.number_of_header_columns,
             model.number_of_footer_rows,
         ),
+        _cellStylesInherited=readRegionCellStyles(index, model),
     )
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)
     controls = readControls(index, dataStore)
+    ownStyles = readOwnCellStyles(
+        readCellStyles(index, dataStore), readRegionVariations(index, model)
+    )
     for reference, record in iterateCellRecords(index, model, source):
         # A merge imported from Excel keeps a style-only record at every covered
         # position, and the model has no cell there to hold one. The archive
@@ -347,7 +360,10 @@ def readTable(
             continue
         cell = table.cell(reference)
         value = readCellValue(record, strings, richText, currencyCodes)
-        setCellStorage(cell, record, value, formatTypes, controls)
+        setCellStorage(
+            cell, record, value, formatTypes, controls,
+            ownStyles[table.headers.regionFind(reference, table.rowCount)],
+        )
         cell._value = value
         # Each cell is given its own Formula even where the archive is shared, so
         # an edit to one cannot reach another. Frozen, so sharing would be safe
@@ -382,12 +398,13 @@ def iterateCellRecords(
 
 def setCellStorage(
     cell: Cell, record: CellRecord, value: CellValue, formatTypes: dict[int, int],
-    controls: dict[int, CellControl],
+    controls: dict[int, CellControl], cellStyles: Mapping[int, CellStyle],
 ) -> None:
     """Give a cell what its record stores and the value that record holds."""
-    cell._stored = readRecordStorage(record, formatTypes, controls)
+    cell._stored = readRecordStorage(record, formatTypes, controls, cellStyles)
     cell._storedValue = value
     cell._formatAsked, cell._controlAsked = None, UNCHANGED
+    cell._cellStyleAsked = UNCHANGED
 
 
 def updateCellStorage(
@@ -404,18 +421,25 @@ def updateCellStorage(
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)
     controls = readControls(index, dataStore)
+    ownStyles = readOwnCellStyles(
+        readCellStyles(index, dataStore), readRegionVariations(index, model)
+    )
     described: set[CellAddress] = set()
     for reference, record in iterateCellRecords(index, model, source):
         cell = table.cells.get(reference)
         if cell is None:
             continue
         value = readCellValue(record, strings, richText, currencyCodes)
-        setCellStorage(cell, record, value, formatTypes, controls)
+        setCellStorage(
+            cell, record, value, formatTypes, controls,
+            ownStyles[table.headers.regionFind(reference, table.rowCount)],
+        )
         described.add(reference)
     for reference, cell in table.cells.items():
         if reference not in described:
             cell._stored, cell._storedValue = emptyStorage, None
             cell._formatAsked, cell._controlAsked = None, UNCHANGED
+            cell._cellStyleAsked = UNCHANGED
 
 
 def resolveValue(

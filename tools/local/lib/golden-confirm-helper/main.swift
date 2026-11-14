@@ -158,6 +158,14 @@ struct HelperRequest: Codable {
     var freshNumbers: Bool?
     var documentPaths: [String]?
     var steps: [EditStep]?
+    // Stored fills to convert as Numbers' scripting reads a cell's background.
+    var colors: [StoredColor]?
+}
+
+// A color as a golden stores it: its space, `srgb` or `display-p3`, and its components.
+struct StoredColor: Codable {
+    let space: String
+    let components: [Double]
 }
 
 struct HelperProblem: Codable {
@@ -209,6 +217,8 @@ struct CellFact: Codable {
     let value: CellValue
     let formula: String?
     let formatKind: String?
+    // Generic RGB from 0 to 65535, nil where the cell shows no fill, findings-06.
+    var background: [Int]?
 }
 
 struct SheetCapture: Codable {
@@ -238,6 +248,7 @@ struct HelperResult: Codable {
     var chipCaptures: [ChipCapture] = []
     var savedCopy: Bool?
     var stepsDone: Int?
+    var convertedColors: [[Int]] = []
 }
 
 struct HelperFailure: Error {
@@ -439,6 +450,21 @@ func isMissingValue(_ descriptor: NSAppleEventDescriptor) -> Bool {
 
 func readOptionalText(_ descriptor: NSAppleEventDescriptor) -> String? {
     isMissingValue(descriptor) ? nil : descriptor.stringValue
+}
+
+func readBackground(_ descriptor: NSAppleEventDescriptor) -> [Int]? {
+    guard !isMissingValue(descriptor), descriptor.numberOfItems == 3 else { return nil }
+    return (1...3).map { Int(descriptor.atIndex($0)?.int32Value ?? 0) }
+}
+
+// AppKit's conversion to Generic RGB reproduces every reading of `97b` within 1.
+func convertStoredColor(_ color: StoredColor) -> [Int] {
+    let red = color.components[0], green = color.components[1], blue = color.components[2]
+    let stored = color.space == "display-p3"
+        ? NSColor(displayP3Red: red, green: green, blue: blue, alpha: 1)
+        : NSColor(srgbRed: red, green: green, blue: blue, alpha: 1)
+    guard let read = stored.usingColorSpace(.genericRGB) else { return [] }
+    return [read.redComponent, read.greenComponent, read.blueComponent].map { Int(($0 * 65535).rounded()) }
 }
 
 func readCellValue(_ descriptor: NSAppleEventDescriptor) -> CellValue {
@@ -1363,6 +1389,7 @@ func runDocumentInspect(_ request: HelperRequest) -> HelperResult {
     var result = HelperResult(sourceHash: readSourceHash(), operation: request.operation.rawValue)
     result.problems = findSessionProblems() + findGrantProblems()
     guard result.problems.isEmpty else { return result }
+    result.convertedColors = (request.colors ?? []).map(convertStoredColor)
     do {
         let documentPath = try checkTemporaryPath(request.documentPath, field: "documentPath")
         let savedCopyPath = try checkTemporaryPath(request.savedCopyPath, field: "savedCopyPath")
@@ -1600,7 +1627,8 @@ func readTable(_ address: TableAddress, documentId: String) throws -> TableReadi
             + "repeat with c in cells of r\n"
             + "set end of kinds to (format of c) as text\n"
             + "end repeat\n"
-            + "set end of grid to {value of cells of r, formula of cells of r, kinds}\n"
+            + "set end of grid to {value of cells of r, formula of cells of r, kinds, "
+            + "background color of cells of r}\n"
             + "end repeat\n"
             + "return {row count of t, column count of t, names, grid}")
     let rows = facts.atIndex(3)
@@ -1612,11 +1640,13 @@ func readTable(_ address: TableAddress, documentId: String) throws -> TableReadi
     let cellFacts = (0..<(grid?.numberOfItems ?? 0)).map { row -> [CellFact] in
         let columns = grid?.atIndex(row + 1)
         let values = columns?.atIndex(1), formulas = columns?.atIndex(2), kinds = columns?.atIndex(3)
+        let backgrounds = columns?.atIndex(4)
         return (0..<(values?.numberOfItems ?? 0)).map { column in
             CellFact(
                 value: values?.atIndex(column + 1).map(readCellValue) ?? CellValue(kind: "empty", text: ""),
                 formula: formulas?.atIndex(column + 1).flatMap(readOptionalText),
-                formatKind: kinds?.atIndex(column + 1)?.stringValue)
+                formatKind: kinds?.atIndex(column + 1)?.stringValue,
+                background: backgrounds?.atIndex(column + 1).flatMap(readBackground))
         }
     }
     return TableReading(

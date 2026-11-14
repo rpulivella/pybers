@@ -10,6 +10,10 @@ per document and found again by name. See docs/decisions.md.
 Private. Part of the table feature's archive half, reached by table creation.
 
 UPDATES
+2026-11-13  The reset's cell properties composed where its variation is, the
+            theme's cell style stating a created table's whole box, for PYB-265.
+2026-11-12  Styles registered through the style feature's `addStyles`, and the reset's
+            cell style composed from a `CellStyle`, for PYB-265.
 2026-11-06  Black comes from `Color`, for PYB-264.
 2026-11-02  The reset's table and cell properties applied in one place each, which a
             created theme's table preset shares, for PYB-261.
@@ -37,19 +41,20 @@ from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
-from .._persistence.index import ArchiveIndex, findRoot, generateUuid
-from .._persistence.metadata import PackageRegistry, composeArchive
+from .._persistence.index import ArchiveIndex, findRoot
+from .._persistence.metadata import PackageRegistry
 from .._persistence.types import findArchiveTypeId, readArchiveTypeId
 from ..color._archive import composeColor
 from ..color.colors import Color
 from ..errors import WriteError
+from ..style._write import addStyles, composeCellProperties, composeCellStyleArchive
+from .cells import resetCellStyle
 
 baseStyleName: str = "pybers-base"
 namedStyleKey: str = "text-{}-paragraphstyle"
 
 # The properties each variation overrides, as `52-table-reset-styled` counted them.
 tableStyleOverrides: int = 3
-cellStyleOverrides: int = 1
 baseStyleOverrides: int = 57
 
 character = tswp.CharacterStylePropertiesArchive
@@ -122,11 +127,6 @@ def applyResetTable(style: tst.TableStyleArchive) -> None:
     properties.table_border_visible = False
 
 
-def applyResetCell(style: tst.CellStyleArchive) -> None:
-    """Give a cell style the reset's properties: text that does not wrap."""
-    style.cell_properties.text_wrap = False
-
-
 def composeTableStyle(parent: int, stylesheet: int) -> tst.TableStyleArchive:
     """Return the reset's table style, a variation of a theme's table style."""
     style = tst.TableStyleArchive(override_count=tableStyleOverrides)
@@ -134,16 +134,6 @@ def composeTableStyle(parent: int, stylesheet: int) -> tst.TableStyleArchive:
     style.super.is_variation = True
     style.super.stylesheet.identifier = stylesheet
     applyResetTable(style)
-    return style
-
-
-def composeCellStyle(parent: int, stylesheet: int) -> tst.CellStyleArchive:
-    """Return the reset's cell style, a variation of a theme's cell style."""
-    style = tst.CellStyleArchive(override_count=cellStyleOverrides)
-    style.super.parent.identifier = parent
-    style.super.is_variation = True
-    style.super.stylesheet.identifier = stylesheet
-    applyResetCell(style)
     return style
 
 
@@ -238,7 +228,13 @@ def createResetStyles(
     created: list[tuple[int, Message]] = [
         (registry.identifierAllocate(), body) for body in (
             composeTableStyle(network.table_style.identifier, styles.stylesheet),
-            composeCellStyle(network.body_cell_style.identifier, styles.stylesheet),
+            composeCellStyleArchive(
+                styles.stylesheet,
+                composeCellProperties(
+                    resetCellStyle, tstStyles.CellStylePropertiesArchive()
+                ),
+                network.body_cell_style.identifier,
+            ),
         )
     ]
     if existing is None:
@@ -262,32 +258,10 @@ def createResetStyles(
         textStyle=created[2][0] if existing is None else existing,
     )
 
-    componentId = registry.componentRequire(styles.stylesheet)
-    for identifier, body in created:
-        archive = composeArchive(identifier, body, weak={styles.stylesheet})
-        registry.archiveAdd(componentId, archive, body)
-        stylesheet.styles.add(identifier=identifier)
-        registry.objectUuidAdd(componentId, identifier, generateUuid())
-    for parent, child in (
+    addStyles(index, registry, styles.stylesheet, created, (
         (network.table_style.identifier, reset.tableStyle),
         (network.body_cell_style.identifier, reset.cellStyle),
-    ):
-        entry = next(
-            (
-                entry for entry in stylesheet.parent_to_children_style_map
-                if entry.parent.identifier == parent
-            ),
-            None,
-        )
-        if entry is None:
-            entry = stylesheet.parent_to_children_style_map.add()
-            entry.parent.identifier = parent
-        entry.children.add(identifier=child)
-    references = registry.strongReferencesOf(styles.stylesheet)
-    references.extend(
-        identifier for identifier, _ in created if identifier not in references
-    )
-    registry.archiveReplace(styles.stylesheet, stylesheet, references)
+    ))
 
     if existing is None:
         themeId, theme = findTheme(index)
@@ -318,7 +292,6 @@ def findSlotStyle(slot: str, styles: DocumentStyles, reset: ResetStyles) -> int:
 
 __all__ = [
     "DocumentStyles",
-    "applyResetCell",
     "applyResetTable",
     "composeBaseStyle",
     "ResetStyles",

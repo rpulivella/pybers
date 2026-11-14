@@ -111,7 +111,10 @@ def listStaleLabels(builder: GoldenBuilder, golden: Path) -> list[str]:
 
 
 @pytest.mark.parametrize(
-    "builder", [builder for builder in goldens if builder.labeled],
+    "builder", [
+        builder for builder in goldens
+        if builder.labeled and builder.source is not None
+    ],
     ids=lambda builder: builder.name,
 )
 def testEveryLabelDescribesItsCell(builder: GoldenBuilder) -> None:

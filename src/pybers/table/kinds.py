@@ -7,6 +7,7 @@ format with a type of its own, because the currency code is information a number
 cannot carry. See findings-01-values.md.
 
 UPDATES
+2026-11-12  A record's own cell style, for PYB-265.
 2026-11-10  `kindFormatFamilies`, the families each kind of value is shown with, for
             PYB-145.
 2026-11-09  A presentation's format is a `CellFormat`, its Automatic wrapping the one
@@ -43,6 +44,7 @@ from pybers.absence import UNDETERMINED
 from pybers.currency import CurrencyAmount
 from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatFamily
+from pybers.style.cells import CellStyle
 
 if TYPE_CHECKING:
     from pybers.table.cell import CellValue
@@ -87,6 +89,7 @@ class CellStorage:
     kind: CellKind
     presentation: CellPresentation
     unrecognizedTypeCode: int | None = None
+    cellStyle: CellStyle | None = None
 
 
 emptyStorage: CellStorage = CellStorage(CellKind.EMPTY, CellPresentation(None))

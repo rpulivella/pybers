@@ -144,8 +144,8 @@ plausible entry in several lists at once.
 
 | bit | what its reference is | evidence |
 | --- | --- | --- |
-| byte 8 `0x20` | a `styleTable` key | 349 of 349 unambiguous |
-| byte 8 `0x40` | a `styleTable` key | 395 of 395 unambiguous |
+| byte 8 `0x20` | a `styleTable` key naming a cell style | 349 of 349 unambiguous; the kind from `98b-cell-box-styles` |
+| byte 8 `0x40` | a `styleTable` key naming a paragraph style | 395 of 395 unambiguous; the kind from `98b-cell-box-styles` |
 | byte 9 `0x02` | a `formula_table` key | 63 of 63 unambiguous |
 | byte 9 `0x20` | the **number** format | 6105 name `256`, the rest `258`, `259`, `269`, `270` |
 | byte 9 `0x40` | the **currency** format | 34 of 34 name `257` and nothing else |

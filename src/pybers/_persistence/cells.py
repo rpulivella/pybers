@@ -20,6 +20,8 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-11-12  `cellStyleSlot` and `applySlotValue`, which fills, replaces or empties
+            one slot, for PYB-265.
 2026-10-22  A record's chosen format is the bit of the slot it displays with, for
             PYB-255.
 2026-10-20  A date decodes as naive wall-clock time, for PYB-144.
@@ -190,10 +192,9 @@ def decodeRecord(column: int, record: bytes) -> CellRecord:
 # Which bits put a reference AHEAD of the formula key, so its position moves as a
 # cell gains attributes. Byte 8 carries three and byte 9 one, and each is worth a
 # single slot, counted rather than added, so widening either mask stays correct.
-# Identified from the documents that label themselves: 0x20 is a cell
-# fill (28-style-fills reads "No fill" without it and every filled cell with it),
-# 0x40 is an explicit horizontal alignment (30-style-align reads "h: auto" without
-# it and "h: left" with it), and 0x80 is conditional highlighting. A comment adds a
+# Identified from the documents that label themselves: 0x20 is a cell style and
+# 0x40 a paragraph style (98b-cell-box-styles, both keys into one styleTable), and
+# 0x80 is conditional highlighting. A comment adds a
 # reference BEHIND the key, which is why one does not move it.
 precedingByteEightBits: int = 0xE0
 precedingByteNineBit: int = 0x01
@@ -253,6 +254,9 @@ slotOrder: tuple[tuple[int, int], ...] = (
     *((9, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
     *((10, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
 )
+
+# The slot naming a cell's own cell style, a `styleTable` key, measured in 98b.
+cellStyleSlot: tuple[int, int] = (8, 0x20)
 
 # The slot naming a cell's conditional highlighting, and the slot caching which of
 # its rules matched: the rule's index, or 15 when none did. Measured against the
@@ -319,6 +323,25 @@ def patchSlotValue(raw: bytes, slot: tuple[int, int], value: int) -> bytes:
     at = len(raw) - (len(slots) - slots.index(slot)) * referenceWidth
     encoded = value.to_bytes(referenceWidth, "little")
     return raw[:at] + encoded + raw[at + referenceWidth:]
+
+
+def applySlotValue(raw: bytes, slot: tuple[int, int], value: int | None) -> bytes:
+    """Return a record whose slot holds a reference, or holds none when it is None."""
+    slots = listReferenceSlots(raw)
+    start = len(raw) - len(slots) * referenceWidth
+    held = {
+        each: raw[start + index * referenceWidth:][:referenceWidth]
+        for index, each in enumerate(slots)
+    }
+    header = bytearray(raw[:start])
+    at, bit = slot
+    if value is None:
+        held.pop(slot, None)
+        header[at] &= ~bit
+    else:
+        held[slot] = value.to_bytes(referenceWidth, "little")
+        header[at] |= bit
+    return bytes(header) + b"".join(held[each] for each in slotOrder if each in held)
 
 
 def chooseOffsetUnit(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:

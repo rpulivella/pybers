@@ -25,6 +25,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 import pybers
 from conftest import findDocumentPath
 from pybers import (
@@ -267,3 +269,33 @@ def testACellAMergeCoversIsLeftToTheMergeCheck() -> None:
 def testATableOfTextIsNotTakenForALabeledMeasurement() -> None:
     expected = buildGolden("45-merged-by-pybers")
     assert all(cell.label is None for table in expected.tables for cell in table.cells)
+
+
+orange = pybers.Color.parse("#ff8000ff")
+orangeRead = [64831, 27359, 2086]
+
+
+@pytest.mark.parametrize(("background", "found", "fails"), [
+    (orange, orangeRead, False),
+    (orange, [64832, 27358, 2086], False),
+    (orange, [64831, 27361, 2086], True),
+    (orange, None, True),
+    (pybers.FillNone(), None, False),
+    (pybers.FillNone(), [0, 0, 0], True),
+    (None, [0, 0, 0], False),
+])
+def testAFillIsCheckedThroughNumbersConversionWithinOne(
+    background: pybers.Fill | None, found: list[int] | None, fails: bool
+) -> None:
+    fact = buildFact("number", "1.0") | {"background": found}
+    reading = buildReading([[fact, buildFact()]])
+    table = buildTable(buildCell(background=background))
+    checks = report.checkTableGrid(table, reading, {}, {orange: orangeRead})
+    assert any(check.status == "failed" for check in checks) is fails
+
+
+def testEachColorAFillStatesIsSentOnceForConversion() -> None:
+    cells = (buildCell(background=orange), buildCell(cell="B1", background=orange),
+             buildCell(cell="C1", background=pybers.FillNone()))
+    expected = ExpectedValues(Path("x.numbers"), (buildTable(*cells),), "")
+    assert report.listStoredColors(expected) == [orange]

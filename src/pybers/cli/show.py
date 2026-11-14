@@ -10,6 +10,7 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-12  A cell's own cell style prints as its text form, for PYB-265.
 2026-11-10  A control prints as its text form, as a format does, for PYB-145.
 2026-11-10  A format prints as its text form, `(automatic)` after one Automatic chose,
             for PYB-145.
@@ -60,6 +61,12 @@ def formatYesNo(flag: bool) -> str:
 def formatControl(control: pybers.CellControl | None) -> str:
     """Return a control as its text form, which `pybers set --cell-control` reads."""
     return "none" if control is None else pybers.formatCellControl(control)
+
+
+def formatCellStyle(cellStyle: pybers.CellStyle | None) -> str:
+    """Return a cell style as its text form, which `pybers set --cell-style` reads."""
+    shown = None if cellStyle is None else pybers.formatCellStyle(cellStyle)
+    return shown or "none"
 
 
 def formatFormat(cellFormat: pybers.CellFormat | pybers.UNDETERMINED | None) -> str:
@@ -119,6 +126,7 @@ def formatCell(cell: pybers.Cell, indent: int = 0) -> Group:
             ("Format", formatFormat(presentation.format)),
             ("Control", formatControl(presentation.control)),
         ),
+        formatFields(inner, ("Cell style", formatCellStyle(cell.cellStyle))),
         formatFields(
             inner,
             ("Unrecognized type code", "none" if typeCode is None else str(typeCode)),

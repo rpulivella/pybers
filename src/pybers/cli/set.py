@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-`pybers set`: the value, the format and the control of every cell a selector matches.
+`pybers set`: the value, format, control and cell style of each cell a selector matches.
 
 The command reads the text into a value and a format, makes one `cellSet` call, and
 saves only
@@ -9,6 +9,8 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-13  `--cell-style` sets a cell's whole box by its text form, `none`
+            removing it, for PYB-265.
 2026-11-10  `--cell-control` sets a control by its text form, `none` removing one,
             for PYB-145.
 2026-11-10  `--cell-format` sets a format by its text form, VALUE now optional, and
@@ -128,6 +130,18 @@ def runSet(
             ),
         ),
     ] = None,
+    cellStyle: Annotated[
+        str | None,
+        typer.Option(
+            "--cell-style",
+            metavar="STYLE",
+            help=(
+                "The box each cell is drawn in, as `pybers show` prints one: "
+                "background, padding, vertical-align and text-wrap as CSS, or none to "
+                "remove it. The style given replaces the whole box."
+            ),
+        ),
+    ] = None,
     conflict: Annotated[
         pybers.CellFormatConflict,
         typer.Option(
@@ -149,9 +163,11 @@ def runSet(
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
-    """Set every cell SELECTOR matches to VALUE, --cell-format and --cell-control."""
-    if value is None and cellFormat is None and cellControl is None:
-        raise typer.BadParameter("Give a VALUE, a --cell-format or a --cell-control.")
+    """Set every cell SELECTOR matches to VALUE, a format, a control or a cell style."""
+    if all(part is None for part in (value, cellFormat, cellControl, cellStyle)):
+        raise typer.BadParameter(
+            "Give a VALUE, a --cell-format, a --cell-control or a --cell-style."
+        )
     target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
         document = (
@@ -168,6 +184,10 @@ def runSet(
             control=(
                 pybers.UNCHANGED if cellControl is None
                 else pybers.parseCellControl(cellControl)
+            ),
+            cellStyle=(
+                pybers.UNCHANGED if cellStyle is None
+                else pybers.parseCellStyle(cellStyle)
             ),
             conflict=conflict,
             extend=extend,

@@ -11,6 +11,8 @@ an `EntryPool`, which keys, claims and releases its entries.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-12  `claimStyles`, the styles a record from a borrowed shape names, for
+            PYB-265.
 2026-10-29  Every list is an `EntryPool`, for PYB-278.
 2026-10-01  The per-kind format slots moved to `_persistence.cells`, for PYB-141.
 2026-09-29  A copied record claims its string and style entries, a copied
@@ -30,6 +32,7 @@ __date__ = "2026/09/22"
 
 from collections import Counter
 from collections.abc import Iterable
+from typing import Any
 
 from .._generated import TSKArchives_pb2 as tsk
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
@@ -157,6 +160,12 @@ def listStyleClaims(record: CellRecord) -> Iterable[int]:
     ]
 
 
+def claimStyles(pool: EntryPool[Any], raw: bytes, where: str) -> None:
+    """Claim the styles a record built from a borrowed shape names."""
+    for key in listStyleClaims(decodeRecord(0, raw)):
+        pool.claim(key, where=where)
+
+
 def listRichTextClaims(record: CellRecord) -> Iterable[int]:
     """Return the rich-text key a rich-text record names, if it is one."""
     if record.typeByte == richTextTypeByte and isinstance(record.value, int):
@@ -246,6 +255,7 @@ def removeSpentRichText(
 
 __all__ = [
     "countFormatClaims",
+    "claimStyles",
     "countedStyleSlots",
     "copyRichText",
     "listRichTextClaims",

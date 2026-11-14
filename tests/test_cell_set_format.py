@@ -206,7 +206,9 @@ def testAFormulaWithNoResultRefusesAFormatPybersCannotWriteForIt(
 
 
 def testACallGivenNeitherPartIsRefused(working: Path) -> None:
-    with pytest.raises(pybers.WriteError, match="no value, format or control"):
+    with pytest.raises(
+        pybers.WriteError, match="no value, format, control or cell style"
+    ):
         pybers.open(working).cellSet("::Table 1::A1")
 
 
@@ -234,7 +236,9 @@ def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1")
     assert result.exit_code == 2
     shown = readPlainText(result.output)
-    assert "Give a VALUE, a --cell-format or a --cell-control." in shown
+    assert "Give a VALUE, a --cell-format, a --cell-control or a --cell-style." in (
+        shown
+    )
 
 
 @pytest.mark.parametrize(("stem", "address"), [

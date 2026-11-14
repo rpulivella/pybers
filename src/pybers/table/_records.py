@@ -14,6 +14,7 @@ a value typed into a fresh cell takes it, and drops the control the old value ha
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-12  A borrowed shape drops the sibling's cell style, for PYB-265.
 2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
 2026-10-29  A format keyed through the format pool, and a template found
             through `StoredTiles`, for PYB-278.
@@ -54,6 +55,7 @@ from .._persistence.cells import (
     CellRecord,
     appleEpoch,
     carriesFormula,
+    cellStyleSlot,
     checkboxFormatSlot,
     chosenFormatBit,
     chosenFormatBits,
@@ -434,11 +436,14 @@ def borrowShape(record: CellRecord) -> bytes:
     it the pop-up menu of the cell whose shape it took. Found by the golden on
     2026-09-14. Every format slot and the displayed kind go too, since a new cell
     takes the Automatic format of its own kind, and so does byte 6's `0x80`, a
-    format a person chose. A borrowed shape is not a borrowed decision.
+    format a person chose. A borrowed shape is not a borrowed decision, and neither
+    is the sibling's cell style, its fill among it.
     """
     raw = record.raw
     raw = bytes(raw[:6]) + bytes([raw[6] & ~chosenFormatBit]) + bytes(raw[7:])
-    return removeSlots(raw, {controlSlot, displayedKindSlot, *countedFormatSlots})
+    return removeSlots(
+        raw, {controlSlot, displayedKindSlot, cellStyleSlot, *countedFormatSlots}
+    )
 
 
 def removeSlots(raw: bytes, dropped: set[tuple[int, int]]) -> bytes:
