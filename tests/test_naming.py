@@ -8,6 +8,7 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-11-14  `handle` and `replay` are verbs, for PYB-294.
 2026-11-05  `pytest_xdist_auto_num_workers`, a hook xdist finds by name, is exempt, for
             PYB-277.
 2026-11-03  `match` is a verb, for PYB-223.
@@ -51,7 +52,8 @@ leadingVerbs: frozenset[str] = frozenset({
     "decode",
     "decompress",
     "delete", "detach", "drop", "edit", "emit", "encode", "expand", "extract",
-    "fill", "find", "forge", "format", "generate", "hold", "index", "is", "iterate",
+    "fill", "find", "forge", "format", "generate", "handle",
+    "hold", "index", "is", "iterate",
     "list",
     "load", "locate",
     "map", "mark", "match", "measure", "merge", "move", "normalize", "open", "order",
@@ -59,7 +61,7 @@ leadingVerbs: frozenset[str] = frozenset({
     "patch",
     "place", "post", "print", "qualify", "quote", "read", "record", "recount", "reduce",
     "refuse",
-    "register", "release", "relocate", "remap", "remove", "render", "reopen",
+    "register", "release", "relocate", "remap", "remove", "render", "reopen", "replay",
     "report", "request",
     "resolve", "restart",
     "retype", "rewrite", "run", "save", "select", "set", "shape", "show",
