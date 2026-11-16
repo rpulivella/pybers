@@ -40,6 +40,11 @@ repeating its checks or assuming nobody made them.
 
    Exit codes carry the same three cases (`0`, `1`, `2`) for anything scripting this, but
    the printed output is the contract here. Do not depend on `$?`.
+
+   Then relay what to bump, which informs and never stops the review:
+   ```
+   .venv/bin/python3 -m tools.workflow.deps report
+   ```
 2. **Run the preflight and stop if it fails:**
    ```
    .venv/bin/python3 -m tools.workflow.preflight
