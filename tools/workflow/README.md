@@ -16,6 +16,7 @@ pr                pull requests, their checks and runs, merging, and comments
 preflight         every gate in one pass: pytest, the prose gate, ruff and mypy
 standards_check   the prose gate alone, for a file, the tree or a string
 dashboard         the session dashboard's status line, task order and merges
+deps              open Dependabot alerts and declared packages to bump, never blocking
 ```
 
 ## Layout

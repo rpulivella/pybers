@@ -24,6 +24,8 @@ Runs on the repository's venv, though the posting workflow installs rich alone, 
 needs a GitHub token for `check` and `report`, resolved by tools/workflow/lib/github.py.
 
 UPDATES
+2026-11-16  Reads the declared packages from the shared dependencies module, for
+            PYB-295.
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
 2026-10-14  Moved to `tools/local/`, since no other repository uses it, for PYB-204.
@@ -63,10 +65,10 @@ from tools.local.lib import readiness_posting as posting
 from tools.local.lib import readiness_presenter as presenter
 from tools.local.lib.readiness import (
     checkPullRequest,
-    readDeclaredPackages,
     readResolvedPackages,
 )
 from tools.workflow.lib import github
+from tools.workflow.lib.dependencies import readDeclaredPackages
 from tools.workflow.lib.pull_request import (
     defaultBaseBranch,
     formatPullRequestRef,
