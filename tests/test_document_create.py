@@ -253,6 +253,23 @@ def testACreatedTablePresetCarriesTheReset(tmp_path: Path) -> None:
     assert network.preset_id == 0 and network.HasField("preset_id")
 
 
+def testATableAddedToACreatedDocumentNamesTheThemesRootStyles(tmp_path: Path) -> None:
+    document = pybers.create("en_US")
+    document.sheet(1).tableAdd("T", 2, 2)
+    path = tmp_path / "with-table.numbers"
+    document.save(path)
+    index, network = findPresetNetwork(path)
+
+    info = next(
+        index.resolve(drawable, tst.TableInfoArchive)
+        for drawable in index.resolve(findRoot(index).sheets[0], tn.SheetArchive)
+        .drawable_infos
+    )
+    model = index.resolve(info.tableModel, tst.TableModelArchive)
+    assert model.table_style.identifier == network.table_style.identifier
+    assert model.body_cell_style.identifier == network.body_cell_style.identifier
+
+
 def testACreatedChartPresetCentersTextOfItsOwnApartFromTables(tmp_path: Path) -> None:
     path = createSaved(tmp_path)
     index, network = findPresetNetwork(path)
