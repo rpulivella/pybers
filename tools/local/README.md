@@ -23,8 +23,9 @@ locales_extract.py   read each region's formatting symbols from macOS's own ICU,
                      as Numbers reads them. Writes src/pybers/_generated/locales.py
 themestyles_extract.py
                      read the properties Numbers states on every root style of each
-                     type a created theme holds, valued as 00-baseline's Blank theme
-                     states them. Writes src/pybers/_generated/themestyles.py
+                     type a created theme holds, the styles Numbers looks up by key,
+                     and the gradient and shadow presets, valued as 00-baseline's
+                     Blank theme states them. Writes src/pybers/_generated/themestyles.py
 coverage_report.py   write the coverage badge and report the `health` workflow publishes
                      on the `coverage` branch. Runs in CI
 locales_sweep.py     change a document to each region the locale table holds, open
@@ -78,8 +79,8 @@ generated from the golden's JSON form by `lib/golden_expected.py` on every run, 
 filled cell of every table as pybers reads it back from that form, and written as
 `expectations.md`, to read beside the copy, and `expectations.json`, the JSON form itself.
 
-Every cell of every table is read through AppleScript for its value, formula and format,
-and a cell the expectations leave out must be empty. A currency or a control is read in
+Every cell of every table is read through AppleScript for its value, formula, format,
+fill and alignment, and a cell the expectations leave out must be empty. A currency or a control is read in
 the inspector too, since only the inspector shows its settings.
 
 ## A measurement's recipe
