@@ -1,0 +1,6 @@
+# How Numbers made 99b-created-document-saved-unedited: the golden
+# `00-created-tables-added-by-pybers` opened and saved with no edit, so what Numbers adds
+# or rewrites on opening a created document is all it holds beyond the golden. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 99b-created-document-saved-unedited`.
+
+base = "00-created-tables-added-by-pybers"

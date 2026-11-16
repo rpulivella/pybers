@@ -360,15 +360,17 @@ to its references, its identifier and its name gone too, passed every insertion,
 person's later actions need more, below. The table preset's 34 slots
 may name one table, one cell and one paragraph style between them, Numbers itself sharing
 one paragraph style across three header and footer slots, and one paragraph style may
-serve every slot of every preset in the document. A chart preset keeps Numbers' list
-lengths, two value axes, one category axis, six series and 30 paragraph styles, one
-style shared along each. Cutting each list to one also passed, but a chart may reach an
+serve every text slot of the table preset. A chart's text is never one a table shares,
+below. A chart preset keeps Numbers' list lengths, two value axes, one category axis,
+six series and 30 paragraph styles, one style shared along each. Cutting each list to one also passed, but a chart may reach an
 entry by position, and no insertion here turns on a title or adds a seventh series.
 
-**A created document offering one preset of each kind is 30 archives.** pybers composes it in
-`document/_theme.py`, the table preset carrying the reset and every text slot naming
-`pybers-base`, and Numbers inserted all seven objects into an `en_US` and a `de_DE`
-document created so.
+**A created document offering one preset of each kind is 51 archives**, 36 of them
+styles. pybers composes it in `document/_theme.py`: the table preset carrying the reset
+with every text slot naming `pybers-base`, the chart preset centered text of its own,
+and every style Numbers looks up by key, below. Numbers 15.4 inserted a table, a shape,
+a text box and a line into one through AppleScript on 16 November 2026, and the
+maintainer inserted a chart, an image and an SVG by hand the same day.
 
 ### What a person's later actions need
 
@@ -423,3 +425,61 @@ the one member outside `Index/` that was missing, since keeping any of the three
 styles that only the theme's presets declare in `object_references`, so dropping the
 presets left those entries naming nothing. Numbers opened that without complaint, which is
 why only the comparison of every body reference found it.
+
+## What Numbers adds or rewrites on opening a created document
+
+Measured for PYB-292 on 16 November 2026 in Numbers 15.4, by opening a created document,
+reading `alignment of cell` through AppleScript, saving it with no edit, and comparing
+every archive. `99-cell-fill-in-a-created-table` holds what Numbers added to a created
+theme whose chart preset named `pybers-base`, and `99b-created-document-saved-unedited`
+the composition below, saved with nothing added or rewritten.
+
+**Numbers centers the text style a chart preset names.** On opening, it sets that
+paragraph style's `alignment` to center (2) and `show_in_bookmarks_list` to false. The
+change lands on the style rather than the slot, so a created theme whose chart preset
+named `pybers-base` drew every table cell centered, and saved `pybers-base` at alignment
+2. Every cell of such a document read `center`, and read `auto align` once the chart
+preset named a style of its own. Numbers' Blank theme gives its chart preset 30 such
+styles, `chart-0-paragraphStyle_0` to `_29`, each centered. A created chart preset names
+one, the reset's text centered and out of the bookmarks list, which Numbers keeps.
+
+**Numbers looks up 17 styles by key and composes each one missing.** They are
+`text-0-liststyle-None`, `paragraph-style-default`, nine
+`stickyComment-0-paragraphstyle-<size>` styles at 12, 13, 14, 15, 16, 18, 22, 24 and 28
+pt, `stickyComment-0-shapeStyle`, `equation-0-imageStyle`,
+`captions-0-shapestyle-Object Title` and `captions-0-shapestyle-Object Caption`, all in
+the stylesheet's `identifier_to_style_map`, and `drop-cap-style-default` and
+`sheet-0-sheetStyle` in its `styles_for_10_0` map. A style holding one of the last two
+keys but listed in the top-level map is not found, and Numbers adds another. What
+Numbers composes is not what its Blank theme holds: `paragraph-style-default` is
+Helvetica 12 pt named `Free Form` where Blank's is Helvetica Neue 11 pt named `Default`,
+the list indents by 18 pt rather than 36, and each caption names `pybers-base`, since
+the caption paragraph styles Blank's name are absent. pybers composes each as the Blank
+theme states it, read into `keyedStyles` by `tools/local/themestyles_extract.py`, and a
+caption's paragraph style as `pybers-base`. Numbers keeps all 17, but clears
+`show_in_bookmarks_list` on `paragraph-style-default`, which pybers composes cleared.
+
+**Numbers recounts a root style's `override_count` from the properties it states.** A
+media style stating its stroke alone with a count of 4 was saved at 1, and the table
+style stating 62 properties with a count of 63 at 62. Each count in `themeStyles` is
+therefore the number of properties pybers keeps, not the Blank theme's.
+
+**Numbers drops a variation stating only what its parent states.** The reset's table
+and cell variations restated a created theme's root styles, which carry the reset
+already, so Numbers removed both and pointed the table model's slots at the roots. A
+table pybers adds names the root style wherever the variation would restate it.
+
+**Numbers completes the theme and the stylesheet.** It adds six `gradient_fill_presets`
+and eight `shadow_presets` of its own, gives the theme an `svg_import_style_presets`
+entry naming `svgimport-0-shapestyle`, the chart preset a `uuid`, the table network
+`preset_id: 0` and the stylesheet `can_cull_styles: true`, and keeps the stylesheet's
+`styles` in identifier order and each map in key order. pybers composes each, the
+presets as the Blank theme states them. A created document saved unedited then differs
+only in what the sections above record Numbers rebuilds on every save: the sidebar,
+the calculation engine's owners and tiles, the data lists, the view state and the
+document's own flags.
+
+`tests/test_document_create.py` fails when a created document lacks a key
+`99-cell-fill-in-a-created-table` holds, or when `99b-created-document-saved-unedited`
+holds any style, stylesheet, theme, preset or network the golden it was saved from does
+not hold identically.
