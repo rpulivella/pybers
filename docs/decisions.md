@@ -156,6 +156,10 @@ environment in the `readiness` comment, so alerts cover the time between pull re
 An action that falls behind with no advisory against it goes unreported, which costs
 nothing while it carries no vulnerability.
 
+`/pr-review-code` opens with `deps report`, which lists the open alerts and every
+declared package installed at less than its newest release. It informs and blocks
+nothing, so the `readiness` scan stays the only dependency check that gates a merge.
+
 No rule auto-dismisses an alert, because the dev dependencies run in CI with the
 repository's token and an alert nobody reads defeats advising. Automatic dependency
 submission stays off: it spends Actions minutes to find the indirect dependencies, which

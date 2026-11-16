@@ -4,7 +4,7 @@ Setting a board Status reads it back, because GitHub answers a mutation without 
 even when the board ends up holding something else.
 
 UPDATES
-2026-10-26  Taken from wingmate, which found the fault first.
+2026-10-26  Written.
 """
 from __future__ import annotations
 
