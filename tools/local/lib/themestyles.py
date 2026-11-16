@@ -2,14 +2,17 @@
 """\
 The properties a created theme's root styles state, measured from Numbers' documents.
 
-Numbers states some properties on every root style of a type, a sheet style's fill and
-a table style's 62 stroke and layout properties among them, and fails when an action
-reaches a style missing one. The census finds which, across every fixture and
-measurement, and their values are read from the Blank theme of `00-baseline`. Read by
+Numbers states some properties on every root style of a type, a table style's 62 stroke
+and layout properties among them, and fails when an action reaches a style missing one.
+The census finds which, across every fixture and measurement, and their values are read
+from the Blank theme of `00-baseline`, as are the styles Numbers looks up by key and its
+gradient and shadow presets. Read by
 `themestyles_extract.py`, and held to the documents by `tests/test_theme_styles.py`.
 See findings-10-creation.md.
 
 UPDATES
+2026-11-16  Reads each style Numbers looks up by key, and counts a role's overrides
+            from the properties it keeps, for PYB-292.
 2026-11-03  Written for PYB-261.
 """
 from __future__ import annotations
@@ -23,17 +26,19 @@ __status__ = "Development"
 __date__ = "2026/11/03"
 
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from pprint import pformat
+from typing import Any, cast
 
 from google.protobuf.message import Message
 
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCHArchives_pb2 as tsch
 from pybers._generated import TSDArchives_pb2 as tsd
+from pybers._generated import TSSArchives_pb2 as tss
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
-from pybers._generated import TSWPArchives_pb2 as tswp
 from pybers._persistence import readPackage
 from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.types import parseArchive, readArchiveTypeId
@@ -48,9 +53,25 @@ modulePath: Path = repositoryRoot / "src" / "pybers" / "_generated" / "themestyl
 
 # The style types whose root styles the census reads, by role in a created theme.
 roleTypes: dict[str, int] = {
-    "sheet": 12050, "table": 6003, "list": 2023, "media": 3016, "chart": 5022,
-    "legend": 5024, "axis": 5026, "series": 5028, "referenceLine": 5030,
+    "table": 6003, "media": 3016, "chart": 5022, "legend": 5024, "axis": 5026,
+    "series": 5028, "referenceLine": 5030,
 }
+
+# The styles Numbers looks up by key, and composes on opening a document missing one.
+stickyCommentSizes: tuple[int, ...] = (12, 13, 14, 15, 16, 18, 22, 24, 28)
+keyedStyleNames: tuple[str, ...] = (
+    "text-0-liststyle-None",
+    "sheet-0-sheetStyle",
+    "drop-cap-style-default",
+    "paragraph-style-default",
+    *(f"stickyComment-0-paragraphstyle-{size}" for size in stickyCommentSizes),
+    "stickyComment-0-shapeStyle",
+    "equation-0-imageStyle",
+    "captions-0-shapestyle-Object Title",
+    "captions-0-shapestyle-Object Caption",
+)
+# The drawable presets Numbers composes on opening a theme offering none.
+drawablePresetNames: tuple[str, ...] = ("gradient_fill_presets", "shadow_presets")
 
 Path_ = tuple[str, ...]
 
@@ -119,7 +140,6 @@ def findRoleStyles(index: ArchiveIndex) -> dict[str, int]:
     """Return the Blank theme's style for each role, from its first preset where any."""
     root = findRoot(index)
     theme = index.resolve(root.theme, tn.ThemeArchive)
-    sheet = index.resolve(root.sheets[0], tn.SheetArchive)
     table = index.resolve(
         theme.super.Extensions[tstStyles.ThemePresetsArchive.extension].table_style_presets[0],
         tstStyles.TableStylePresetArchive,
@@ -131,11 +151,8 @@ def findRoleStyles(index: ArchiveIndex) -> dict[str, int]:
     )
     lines = chart.Extensions[tsch.preset_reference_line_styles]
     drawables = theme.super.Extensions[tsd.ThemePresetsArchive.extension]
-    text = theme.super.Extensions[tswp.ThemePresetsArchive.extension]
     return {
-        "sheet": sheet.style.identifier,
         "table": network.table_style.identifier,
-        "list": text.list_style_presets[0].identifier,
         "media": drawables.image_style_presets[0].identifier,
         "chart": chart.chart_style.identifier,
         "legend": chart.legend_style.identifier,
@@ -190,27 +207,118 @@ def readRoleValues(
                 values[name] = kept
         elif (name,) in always:
             values[name] = readValue(field, value)
+    # Numbers recounts a style's overrides from what its properties message states.
+    nested = [name for name in values if name.endswith("properties")]
+    if counted and nested:
+        values["override_count"] = sum(
+            len(cast(dict[str, object], values[name])) for name in nested
+        )
     return values
 
 
-def buildThemeStyles() -> dict[str, dict[str, object]]:
-    """Return each role's always-stated properties, valued as the Blank theme's."""
+def findStyleBase(style: Message) -> Message:
+    """Return the `TSS.StyleArchive` at the root of a style's `super` chain."""
+    holder = style
+    while holder.DESCRIPTOR.full_name != "TSS.StyleArchive":
+        holder = holder.super  # type: ignore[attr-defined]
+    return holder
+
+
+def listStyleReferences(message: Message, path: Path_ = ()) -> list[tuple[Path_, int]]:
+    """Return every style a style references, by field path, its stylesheet aside."""
+    found: list[tuple[Path_, int]] = []
+    for field, value in message.ListFields():
+        skipped = field.is_repeated or field.name == "stylesheet"
+        if field.message_type is None or skipped:
+            continue
+        if field.message_type.full_name == "TSP.Reference":
+            found.append(((*path, field.name), value.identifier))
+        else:
+            found += listStyleReferences(value, (*path, field.name))
+    return found
+
+
+def readKeyedStyles(index: ArchiveIndex) -> dict[str, dict[str, object]]:
+    """Return each keyed style as the Blank theme states it, a reference by its key."""
+    stylesheet = index.resolve(
+        index.resolve(findRoot(index).theme, tn.ThemeArchive).super.document_stylesheet,
+        tss.StylesheetArchive,
+    )
+    # A key sits in the stylesheet's own map or in one of its versioned lists.
+    maps = {
+        entry.identifier: name
+        for name, holder in (
+            ("identifier_to_style_map", stylesheet),
+            *((field.name, value) for field, value in stylesheet.ListFields()
+              if field.name.startswith("styles_for_")),
+        )
+        for entry in holder.identifier_to_style_map
+    }
+    byKey: dict[str, int] = {}
+    keyOf: dict[int, str] = {}
+    for reference in stylesheet.styles:
+        base: Any = findStyleBase(parseArchive(index.archive(reference.identifier)))
+        if base.style_identifier:
+            byKey[base.style_identifier] = reference.identifier
+            keyOf[reference.identifier] = base.style_identifier
+    keyed: dict[str, dict[str, object]] = {}
+    for key in keyedStyleNames:
+        archive = index.archive(byKey[key])
+        style = parseArchive(archive)
+        keyed[key] = {
+            "type": readArchiveTypeId(archive),
+            "map": maps.get(key),
+            "values": readMessageValues(style),
+            "references": tuple(
+                (path, keyOf[target]) for path, target in listStyleReferences(style)
+            ),
+        }
+    return keyed
+
+
+@dataclass(frozen=True)
+class ThemeStyleTables:
+    """Each role's always-stated properties, each keyed style, and drawable presets."""
+
+    roles: dict[str, dict[str, object]]
+    keyed: dict[str, dict[str, object]]
+    presets: dict[str, object]
+
+
+def readDrawablePresets(index: ArchiveIndex) -> dict[str, object]:
+    """Return the Blank theme's gradient and shadow presets as plain data."""
+    theme = index.resolve(findRoot(index).theme, tn.ThemeArchive)
+    drawables = readMessageValues(
+        theme.super.Extensions[tsd.ThemePresetsArchive.extension]
+    )
+    return {name: drawables[name] for name in drawablePresetNames}
+
+
+def buildThemeStyles() -> ThemeStyleTables:
+    """Return both tables, valued as the Blank theme states them."""
     always = surveyAlwaysStated(listSurveyDocuments())
     index = ArchiveIndex(readPackage(baselinePath))
-    return {
-        role: readRoleValues(index, identifier, always[roleTypes[role]])
-        for role, identifier in findRoleStyles(index).items()
-    }
+    return ThemeStyleTables(
+        roles={
+            role: readRoleValues(index, identifier, always[roleTypes[role]])
+            for role, identifier in findRoleStyles(index).items()
+        },
+        keyed=readKeyedStyles(index),
+        presets=readDrawablePresets(index),
+    )
 
 
-def renderModule(styles: dict[str, dict[str, object]]) -> str:
+def renderModule(tables: ThemeStyleTables) -> str:
     """Return the generated module's source, every value a plain literal."""
-    body = pformat(styles, width=88, sort_dicts=True)
+    roles = pformat(tables.roles, width=88, sort_dicts=True)
+    keyed = pformat(tables.keyed, width=88, sort_dicts=True)
+    presets = pformat(tables.presets, width=88, sort_dicts=True)
     return f'''#!/usr/bin/env python3
 """\\
-The properties a created theme's root styles state, valued as Numbers' Blank theme
-states them. Generated by `tools/local/themestyles_extract.py` from `tests/fixtures/`
-and `tests/measurements/`, so it is regenerated rather than edited. See
+The properties a created theme's root styles state, the styles Numbers looks up by key,
+and its gradient and shadow presets, valued as Numbers' Blank theme states them.
+Generated by `tools/local/themestyles_extract.py` from `tests/fixtures/` and
+`tests/measurements/`, so it is regenerated rather than edited. See
 findings-10-creation.md.
 """
 from __future__ import annotations
@@ -223,8 +331,12 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/03"
 
-themeStyles: frozendict[str, dict[str, object]] = frozendict({body})
+themeStyles: frozendict[str, dict[str, object]] = frozendict({roles})
+
+keyedStyles: frozendict[str, dict[str, object]] = frozendict({keyed})
+
+drawablePresets: frozendict[str, object] = frozendict({presets})
 '''
 
 
-__all__ = ["buildThemeStyles", "modulePath", "renderModule"]
+__all__ = ["ThemeStyleTables", "buildThemeStyles", "modulePath", "renderModule"]

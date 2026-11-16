@@ -8,6 +8,8 @@ kind a person adds, into which Numbers 15.4 inserted a table, text box, shape, l
 chart, image and SVG on 2 November 2026, and one sheet in the pybers reset.
 
 UPDATES
+2026-11-16  A created theme keys every style Numbers adds on opening one, and its
+            chart text is its own, for PYB-292.
 2026-11-06  Created grays and the sheet's fill are sRGB, for PYB-264.
 2026-11-03  `pybers show` prints a created document in full, for PYB-223.
 2026-11-02  Written for PYB-261.
@@ -32,16 +34,19 @@ from google.protobuf.message import Message
 from typer.testing import CliRunner
 
 import pybers
+from conftest import findDocumentPath
 from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSCHArchives_pb2 as tsch
 from pybers._generated import TSPArchiveMessages_pb2 as tspArchive
 from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSSArchives_pb2 as tss
 from pybers._generated import TSTArchives_pb2 as tst
+from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from pybers._generated import TSWPArchives_pb2 as tswp
 from pybers._generated.themestyles import themeStyles
 from pybers._persistence import NumbersPackage, readPackage
 from pybers._persistence.difference import readTypeName
+from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.types import archiveVersions, parseArchive
 from pybers.cli._app import app
 
@@ -52,10 +57,10 @@ floorMembers: frozendict[str, frozendict[str, int]] = frozendict({
         "TST.TableStyleNetworkArchive": 1, "TSCH.ChartStylePreset": 1,
     }),
     "Index/DocumentStylesheet.iwa": frozendict({
-        "TSS.StylesheetArchive": 1, "TSWP.ParagraphStyleArchive": 1,
+        "TSS.StylesheetArchive": 1, "TSWP.ParagraphStyleArchive": 12,
         "TSWP.ListStyleArchive": 1, "TSWP.CharacterStyleArchive": 1,
-        "TSWP.DropCapStyleArchive": 1, "TSWP.ShapeStyleArchive": 6,
-        "TSD.MediaStyleArchive": 2, "TN.SheetStyleArchive": 1,
+        "TSWP.DropCapStyleArchive": 1, "TSWP.ShapeStyleArchive": 9,
+        "TSD.MediaStyleArchive": 3, "TN.SheetStyleArchive": 1,
         "TST.TableStyleArchive": 1, "TST.CellStyleArchive": 1,
         "TSCH.ChartStyleArchive": 1, "TSCH.LegendStyleArchive": 1,
         "TSCH.ChartAxisStyleArchive": 1, "TSCH.ChartSeriesStyleArchive": 1,
@@ -90,6 +95,8 @@ def readWithoutIdentities(package: NumbersPackage) -> list[tuple[int, bytes]]:
                 for component in body.components:
                     for entry in component.object_uuid_map_entries:
                         entry.uuid.lower = entry.uuid.upper = 0
+            if isinstance(body, tsch.ChartStylePreset):
+                body.ClearField("uuid")
             encoded = body.SerializeToString(deterministic=True)
             bodies.append((archive.identifier, encoded))
     return bodies
@@ -146,15 +153,60 @@ def testACreatedThemeOffersThirtySlotsOpeningWithSixGrays(tmp_path: Path) -> Non
     assert len({(slot.r, slot.g, slot.b) for slot in slots[6:]}) == 24
 
 
-def testACreatedStylesheetMapsTheShapeStylesNumbersLooksUp(tmp_path: Path) -> None:
+def readStyleKeys(path: Path) -> dict[str, set[str]]:
+    """Return the keys of a document's stylesheet, by the map holding each."""
+    package = readPackage(path)
+    index = ArchiveIndex(package)
+    theme = index.resolve(findRoot(index).theme, tn.ThemeArchive)
+    stylesheet = index.resolve(theme.super.document_stylesheet, tss.StylesheetArchive)
+    maps: dict[str, set[str]] = {
+        "identifier_to_style_map": {
+            entry.identifier for entry in stylesheet.identifier_to_style_map
+        },
+    }
+    for field, value in stylesheet.ListFields():
+        if field.name.startswith("styles_for_"):
+            maps[field.name] = {
+                entry.identifier for entry in value.identifier_to_style_map
+            }
+    return maps
+
+
+def testACreatedStylesheetKeysEveryStyleNumbersAddsOnOpeningOne(
+    tmp_path: Path,
+) -> None:
+    measured = readStyleKeys(findDocumentPath("99-cell-fill-in-a-created-table"))
+    created = readStyleKeys(createSaved(tmp_path))
+
+    for name, keys in measured.items():
+        assert keys <= created.get(name, set()), name
+
+
+def readThemeArchives(path: Path) -> dict[int, bytes]:
+    """Return every style, stylesheet, theme, preset and network body, by identifier."""
+    themed = ("Style", "Theme", "Preset", "Network")
+    return {
+        archive.identifier: parseArchive(archive).SerializeToString(deterministic=True)
+        for member in readPackage(path).iwaFiles for archive in member.archives
+        if any(each in readTypeName(archive) for each in themed)
+    }
+
+
+def testNumbersOpensAndSavesACreatedDocumentChangingNoStyle() -> None:
+    written = readThemeArchives(
+        Path(__file__).parent / "golden" / "00-created-tables-added-by-pybers.numbers"
+    )
+    saved = readThemeArchives(findDocumentPath("99b-created-document-saved-unedited"))
+
+    assert saved == written
+
+
+def testACreatedStylesheetIsLockedAndCullable(tmp_path: Path) -> None:
     stylesheet = readBodies(readPackage(createSaved(tmp_path)))["TSS.StylesheetArchive"]
 
     assert isinstance(stylesheet, tss.StylesheetArchive)
     assert stylesheet.HasField("is_locked")
-    assert sorted(entry.identifier for entry in stylesheet.identifier_to_style_map) == [
-        "drawingline-0-drawinglineStyle", "svgimport-0-shapestyle",
-        "text-0-paragraphstyle",
-    ]
+    assert stylesheet.can_cull_styles
 
 
 def testACreatedThemeOffersOnePresetOfEachKindAPersonAdds(tmp_path: Path) -> None:
@@ -171,24 +223,53 @@ def testACreatedThemeOffersOnePresetOfEachKindAPersonAdds(tmp_path: Path) -> Non
         "image_style_presets", "movie_style_presets", "drawing_line_style_presets",
         "list_style_presets", "character_style_presets", "paragraph_style_presets",
         "dropcap_style_presets", "chart_presets", "table_style_presets",
-        "caption_style_presets",
-    ), 1)
+        "caption_style_presets", "svg_import_style_presets",
+    ), 1) | {"gradient_fill_presets": 6, "shadow_presets": 8}
+
+
+def findPresetNetwork(path: Path) -> tuple[ArchiveIndex, tst.TableStyleNetworkArchive]:
+    """Return a created document's index and its table preset's network."""
+    index = ArchiveIndex(readPackage(path))
+    theme = index.resolve(findRoot(index).theme, tn.ThemeArchive)
+    preset = index.resolve(
+        theme.super.Extensions[tstStyles.ThemePresetsArchive.extension]
+        .table_style_presets[0],
+        tstStyles.TableStylePresetArchive,
+    )
+    return index, index.resolve(preset.style_network, tst.TableStyleNetworkArchive)
 
 
 def testACreatedTablePresetCarriesTheReset(tmp_path: Path) -> None:
-    bodies = readBodies(readPackage(createSaved(tmp_path)))
+    index, network = findPresetNetwork(createSaved(tmp_path))
 
-    tableStyle = bodies["TST.TableStyleArchive"]
-    cellStyle = bodies["TST.CellStyleArchive"]
-    text = bodies["TSWP.ParagraphStyleArchive"]
-    assert isinstance(tableStyle, tst.TableStyleArchive)
-    assert isinstance(cellStyle, tst.CellStyleArchive)
-    assert isinstance(text, tswp.ParagraphStyleArchive)
+    tableStyle = index.resolve(network.table_style, tst.TableStyleArchive)
+    cellStyle = index.resolve(network.body_cell_style, tst.CellStyleArchive)
+    text = index.resolve(network.body_text_style, tswp.ParagraphStyleArchive)
     assert not tableStyle.table_properties.v_strokes_visible
     assert not tableStyle.table_properties.h_strokes_visible
     assert not tableStyle.table_properties.table_border_visible
     assert not cellStyle.cell_properties.text_wrap
     assert text.super.name == "pybers-base"
+    assert network.preset_id == 0 and network.HasField("preset_id")
+
+
+def testACreatedChartPresetCentersTextOfItsOwnApartFromTables(tmp_path: Path) -> None:
+    path = createSaved(tmp_path)
+    index, network = findPresetNetwork(path)
+    theme = index.resolve(findRoot(index).theme, tn.ThemeArchive)
+    chart = index.resolve(
+        theme.super.Extensions[tsch.ChartPresetsArchive.extension].chart_presets[0],
+        tsch.ChartStylePreset,
+    )
+
+    texts = {reference.identifier for reference in chart.paragraph_styles}
+    assert network.body_text_style.identifier not in texts
+    for identifier in texts:
+        style = index.identifierResolve(identifier, tswp.ParagraphStyleArchive)
+        assert style.para_properties.alignment == (
+            tswp.ParagraphStylePropertiesArchive.TATvalue2
+        )
+    assert chart.HasField("uuid")
 
 
 def testACreatedSheetIsFilledWhiteWithAnUncoloredTab(tmp_path: Path) -> None:

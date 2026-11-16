@@ -3,6 +3,8 @@
 Setting a cell's style: its whole box replaced, a default dropped, a match shared.
 
 UPDATES
+2026-11-16  A created table's fill is checked against Numbers' fill of a table naming
+            the theme's root cell style, for PYB-292.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -383,11 +385,11 @@ def readFillVariation(path: Path, address: str, table: str) -> tst.CellStyleArch
 
 def testAFillInACreatedTableIsTheVariationNumbersWrites(tmp_path: Path) -> None:
     measured = readFillVariation(
-        findDocumentPath("99-cell-fill-in-a-created-table"), "A1", "Fills"
+        findDocumentPath("99c-cell-fill-in-a-created-table"), "A1", "Fills"
     )
     document, path = createTable(tmp_path)
     document.cellSet("Sheet 1::T::A1", 1, cellStyle=CellStyle(
-        background=Color.parse("#ff8000ff")
+        background=Color.parse("#2e8b57ff")
     ))
     document.save(path)
     written = readFillVariation(path, "A1", "T")
@@ -438,5 +440,5 @@ def testEveryCellStyleACreatedDocumentHoldsCountsTheOverridesItStates(
         if index.typeOf(tsp.Reference(identifier=identifier)) == cellStyleTypeId
         for style in [index.identifierResolve(identifier, tst.CellStyleArchive)]
     ]
-    assert len(counted) == 3
+    assert len(counted) == 2
     assert all(overrides == stated for overrides, stated in counted)
