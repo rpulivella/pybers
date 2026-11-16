@@ -11,8 +11,8 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
-2026-11-16  `readDeclaredPackages` moves to `tools/workflow/lib/dependencies.py`,
-            for PYB-295.
+2026-11-16  `readDeclaredPackages` and the PyPI address move to
+            `tools/workflow/lib/dependencies.py`, for PYB-295.
 2026-11-05  Reports the coverage the preflight measured against `develop`,
             and counts one golden in the singular, for PYB-277.
 2026-10-23  A golden the branch deleted is not counted as touched, for PYB-255.
@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import Any
 
 from tools.workflow.lib import github
+from tools.workflow.lib.dependencies import networkTimeoutSeconds, pypiRoot
 from tools.workflow.lib.pull_request import (
     defaultBaseBranch,
     findBodyFindings,
@@ -65,8 +66,6 @@ changelogPath: Path = repositoryRoot / "CHANGELOG.md"
 goldenReadmePath: Path = goldenDirectory / "README.md"
 
 osvBatchUrl: str = "https://api.osv.dev/v1/querybatch"
-pypiRoot: str = "https://pypi.org/pypi"
-networkTimeoutSeconds: float = 30.0
 
 templateCheckName: str = "PR Template"
 changelogCheckName: str = "Changelog"

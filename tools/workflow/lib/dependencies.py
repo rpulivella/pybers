@@ -17,20 +17,27 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/16"
 
+import importlib.metadata
 import json
 import re
-import subprocess
-import sys
 import tomllib
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+# Lazy, since the job posting the readiness comment installs rich alone.
+lazy from packaging.version import Version
 
 from tools.workflow.lib import github
 from tools.workflow.lib.shared import repositoryRoot
 
 projectPath: Path = repositoryRoot / "pyproject.toml"
 alertsPageSize: int = 100
+pypiRoot: str = "https://pypi.org/pypi"
+networkTimeoutSeconds: float = 30.0
 
 
 @dataclass(frozen=True)
@@ -111,18 +118,34 @@ def readOpenAlerts(token: str) -> list[DependencyAlert]:
     return [summarizeAlert(item) for item in raw]
 
 
+def readNewestRelease(name: str) -> str:
+    """Return a package's newest release on PyPI, raising when PyPI cannot answer."""
+    url = f"{pypiRoot}/{urllib.parse.quote(name)}/json"
+    try:
+        with urllib.request.urlopen(url, timeout=networkTimeoutSeconds) as response:
+            return str(json.loads(response.read())["info"]["version"])
+    except (urllib.error.URLError, KeyError, ValueError) as exc:
+        raise RuntimeError(f"PyPI could not say the newest {name}: {exc}") from exc
+
+
 def readOutdatedPackages() -> list[OutdatedPackage]:
-    """Return each declared package installed here at less than its newest release."""
-    listed = subprocess.run(
-        [sys.executable, "-m", "pip", "list", "--outdated", "--exclude-editable",
-         "--format=json"],
-        capture_output=True, text=True, check=False,
+    """Return each declared package installed here at less than its newest release.
+
+    Asks PyPI directly, because `pip list --outdated` answers [] when the index is
+    unreachable, which would read as every package being current.
+    """
+    with projectPath.open("rb") as handle:
+        projectName = normalizePackageName(tomllib.load(handle)["project"]["name"])
+    names = sorted(
+        {normalizePackageName(name) for name in readDeclaredPackages()} - {projectName}
     )
-    if listed.returncode != 0:
-        raise RuntimeError(f"pip could not list outdated packages: {listed.stderr}")
-    declared = {normalizePackageName(name) for name in readDeclaredPackages()}
-    return [
-        OutdatedPackage(entry["name"], entry["version"], entry["latest_version"])
-        for entry in json.loads(listed.stdout)
-        if normalizePackageName(entry["name"]) in declared
-    ]
+    outdated: list[OutdatedPackage] = []
+    for name in names:
+        try:
+            installed = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+        newest = readNewestRelease(name)
+        if Version(installed) < Version(newest):
+            outdated.append(OutdatedPackage(name, installed, newest))
+    return outdated

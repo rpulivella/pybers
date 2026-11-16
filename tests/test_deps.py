@@ -18,8 +18,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/16"
 
-import json
-import subprocess
+import importlib.metadata
+import urllib.error
 from pathlib import Path
 from typing import Any
 
@@ -53,12 +53,20 @@ def patchGitHub(monkeypatch: pytest.MonkeyPatch, answer: Any) -> None:
     monkeypatch.setattr(github, "resolveToken", lambda: "token")
 
 
-def patchPip(monkeypatch: pytest.MonkeyPatch, entries: list[dict[str, str]]) -> None:
-    """Answer `pip list --outdated` with these entries."""
-    def run(command: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(command, 0, json.dumps(entries), "")
+def patchReleases(
+    monkeypatch: pytest.MonkeyPatch, releases: dict[str, tuple[str, str]]
+) -> None:
+    """Install and publish each package at (installed, newest); any other is current."""
+    def version(name: str) -> str:
+        if name == "jsonschema":
+            raise importlib.metadata.PackageNotFoundError(name)
+        return releases.get(name, ("1.0", "1.0"))[0]
 
-    monkeypatch.setattr(dependencies.subprocess, "run", run)
+    monkeypatch.setattr(dependencies.importlib.metadata, "version", version)
+    monkeypatch.setattr(
+        dependencies, "readNewestRelease",
+        lambda name: releases.get(name, ("1.0", "1.0"))[1],
+    )
 
 
 def testAnAlertReportsItsPackageFixedReleaseAndLink() -> None:
@@ -85,16 +93,33 @@ def testARefusedTokenIsUnreadableNeverEmpty(
         dependencies.readOpenAlerts("token")
 
 
-def testOnlyDeclaredPackagesAreReportedOutdated(
+def testOnlyAnOlderInstalledVersionIsReported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    patchPip(monkeypatch, [
-        {"name": "Typer", "version": "0.27.3", "latest_version": "0.29.1"},
-        {"name": "pluggy", "version": "1.6.0", "latest_version": "1.7.0"},
-    ])
+    patchReleases(monkeypatch, {
+        "typer": ("0.27.3", "0.29.1"),
+        "ruff": ("0.10.0", "0.9.9"),
+        "pluggy": ("1.6.0", "1.7.0"),
+    })
     assert dependencies.readOutdatedPackages() == [
-        dependencies.OutdatedPackage("Typer", "0.27.3", "0.29.1")
+        dependencies.OutdatedPackage("typer", "0.27.3", "0.29.1")
     ]
+
+
+def testVersionsCompareAsReleasesNotText(monkeypatch: pytest.MonkeyPatch) -> None:
+    patchReleases(monkeypatch, {"mypy": ("2.9.0", "2.10.0")})
+    assert dependencies.readOutdatedPackages() == [
+        dependencies.OutdatedPackage("mypy", "2.9.0", "2.10.0")
+    ]
+
+
+def testAnUnreachablePyPIIsUnreadNeverCurrent(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(url: str, **_: Any) -> Any:
+        raise urllib.error.URLError("refused")
+
+    monkeypatch.setattr(dependencies.urllib.request, "urlopen", refuse)
+    with pytest.raises(RuntimeError, match="PyPI could not say"):
+        dependencies.readNewestRelease("ruff")
 
 
 def testDeclaredNamesCompareInTheirNormalSpelling() -> None:
@@ -106,9 +131,7 @@ def testFindingsStillExitZero(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     patchGitHub(monkeypatch, [rawAlert])
-    patchPip(monkeypatch, [
-        {"name": "ruff", "version": "0.16.10", "latest_version": "0.17.5"}
-    ])
+    patchReleases(monkeypatch, {"ruff": ("0.16.10", "0.17.5")})
     assert deps.runReport(deps.buildParser().parse_args(["report"])) == 0
     out = capsys.readouterr().out
     assert "1 open Dependabot alert" in out
@@ -119,7 +142,7 @@ def testNothingToBumpSaysSo(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     patchGitHub(monkeypatch, [])
-    patchPip(monkeypatch, [])
+    patchReleases(monkeypatch, {})
     assert deps.runReport(deps.buildParser().parse_args(["report"])) == 0
     out = capsys.readouterr().out
     assert "No open Dependabot alerts" in out
@@ -130,7 +153,7 @@ def testUnreadableAlertsStillReportOutdatedAndExitTwo(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     patchGitHub(monkeypatch, github.GitHubHttpError(403, "refused"))
-    patchPip(monkeypatch, [])
+    patchReleases(monkeypatch, {})
     exitCode = deps.runReport(deps.buildParser().parse_args(["report"]))
     out = capsys.readouterr().out
     assert exitCode == deps.errorExitCode
