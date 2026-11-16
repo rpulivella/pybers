@@ -11,6 +11,7 @@
 // it escapes. A Data Format value is only matched against a menu item or typed into a field.
 //
 // UPDATES
+// 2026-11-16  Each cell's horizontal alignment is read, for PYB-292.
 // 2026-11-10  Each sheet capture is scanned for Numbers' blue corner chip, which marks a
 //             cell it changed or warns about, and a close-up of each is saved, for PYB-145.
 // 2026-11-02  Automation is checked by asking Numbers its name, since the permission
@@ -219,6 +220,8 @@ struct CellFact: Codable {
     let formatKind: String?
     // Generic RGB from 0 to 65535, nil where the cell shows no fill, findings-06.
     var background: [Int]?
+    // The horizontal alignment Numbers applies, natural reading `auto align`.
+    var alignment: String?
 }
 
 struct SheetCapture: Codable {
@@ -1624,11 +1627,13 @@ func readTable(_ address: TableAddress, documentId: String) throws -> TableReadi
             + "repeat with r in rows of t\n"
             + "set end of names to name of cells of r\n"
             + "set kinds to {}\n"
+            + "set aligns to {}\n"
             + "repeat with c in cells of r\n"
             + "set end of kinds to (format of c) as text\n"
+            + "set end of aligns to (alignment of c) as text\n"
             + "end repeat\n"
             + "set end of grid to {value of cells of r, formula of cells of r, kinds, "
-            + "background color of cells of r}\n"
+            + "background color of cells of r, aligns}\n"
             + "end repeat\n"
             + "return {row count of t, column count of t, names, grid}")
     let rows = facts.atIndex(3)
@@ -1640,13 +1645,14 @@ func readTable(_ address: TableAddress, documentId: String) throws -> TableReadi
     let cellFacts = (0..<(grid?.numberOfItems ?? 0)).map { row -> [CellFact] in
         let columns = grid?.atIndex(row + 1)
         let values = columns?.atIndex(1), formulas = columns?.atIndex(2), kinds = columns?.atIndex(3)
-        let backgrounds = columns?.atIndex(4)
+        let backgrounds = columns?.atIndex(4), alignments = columns?.atIndex(5)
         return (0..<(values?.numberOfItems ?? 0)).map { column in
             CellFact(
                 value: values?.atIndex(column + 1).map(readCellValue) ?? CellValue(kind: "empty", text: ""),
                 formula: formulas?.atIndex(column + 1).flatMap(readOptionalText),
                 formatKind: kinds?.atIndex(column + 1)?.stringValue,
-                background: backgrounds?.atIndex(column + 1).flatMap(readBackground))
+                background: backgrounds?.atIndex(column + 1).flatMap(readBackground),
+                alignment: alignments?.atIndex(column + 1)?.stringValue)
         }
     }
     return TableReading(

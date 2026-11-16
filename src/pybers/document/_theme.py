@@ -5,13 +5,17 @@ Compose a created document's theme and stylesheet: a preset of each kind a perso
 Numbers fails when a person inserts a table, chart, shape, line, text box or image into
 a document whose theme offers no preset for it, and a person's later actions fail on a
 root style missing what Numbers states on every one of its type. Each root style states
-those, from the generated `themestyles` table, every text slot names `pybers-base`, and
-the table preset carries the reset. A chart preset keeps the lengths of Numbers' lists,
-one style shared along each. Measured 2026-11-03 in findings-10-creation.md.
+those, from the generated `themestyles` table, every table text slot names
+`pybers-base`, and the table preset carries the reset. A chart preset keeps the lengths
+of Numbers' lists, one style shared along each, its text its own. Every style Numbers
+looks up by key is composed, so Numbers adds and rewrites no style on opening one.
+Measured 2026-11-03 and 2026-11-16 in findings-10-creation.md.
 
 Private. The document feature's archive half, reached by document creation.
 
 UPDATES
+2026-11-16  Composes every style Numbers looks up by key, the chart's text of its own,
+            and the presets and flags Numbers adds on opening, for PYB-292.
 2026-11-13  The cell style states the whole box a created table shows, as each
             root cell style Numbers writes does, for PYB-265.
 2026-11-06  The palette and the sheet's fill are `Color` values in sRGB, as Numbers
@@ -29,6 +33,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/02"
 
+import uuid
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -45,13 +50,15 @@ from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
-from .._generated.themestyles import themeStyles
+from .._generated.themestyles import drawablePresets, keyedStyles, themeStyles
+from .._persistence.types import archiveTypes
 from ..color._archive import composeColor
 from ..color.colors import Color, ColorSpace
 from ..style._write import composeCellProperties, composeCellStyleArchive
 from ..table._reset import (
     applyResetTable,
     composeBaseStyle,
+    composeResetText,
     namedStyleKey,
 )
 from ..table.cells import createdCellStyle
@@ -59,6 +66,11 @@ from ..table.cells import createdCellStyle
 # Numbers looks each up by name, and cannot read a document missing either.
 drawingLineStyle: str = "drawingline-0-drawinglineStyle"
 svgImportStyle: str = "svgimport-0-shapestyle"
+# Keyed styles a created theme's presets name, from the generated `keyedStyles`.
+listStyleKey: str = "text-0-liststyle-None"
+sheetStyleKey: str = "sheet-0-sheetStyle"
+dropCapStyleKey: str = "drop-cap-style-default"
+defaultParagraphKey: str = "paragraph-style-default"
 
 # The lengths of the chart preset's lists in Numbers' Blank theme, kept in case a chart
 # reaches an entry by position.
@@ -136,10 +148,39 @@ def composeRootStyle[StyleT: Message](
     return style
 
 
-def composeSheetStyle(stylesheet: int) -> tn.SheetStyleArchive:
-    """Return a sheet style filled white, its tab uncolored, as Numbers writes one."""
-    style = composeRootStyle(tn.SheetStyleArchive, stylesheet, "sheet")
-    style.sheet_properties.fill.color.CopyFrom(composeColor(Color.white))
+def composeKeyedStyle(
+    key: str, stylesheet: int, styleIds: Mapping[str, int], baseStyle: int
+) -> Message:
+    """Return a style Numbers looks up by key, valued as the Blank theme's.
+
+    A reference to a style no created theme holds names `pybers-base`, as Numbers
+    chose when it composed these styles itself, findings-10-creation.md.
+    """
+    entry = keyedStyles[key]
+    style = composeStyle(archiveTypes[cast(int, entry["type"])], stylesheet)
+    applyStyleValues(style, cast(Mapping[str, object], entry["values"]))
+    if key == defaultParagraphKey:
+        # Numbers clears it on opening, measured 2026-11-16.
+        paragraph = cast(tswp.ParagraphStyleArchive, style)
+        paragraph.para_properties.show_in_bookmarks_list = False
+    references = cast(tuple[tuple[tuple[str, ...], str], ...], entry["references"])
+    for path, target in references:
+        holder: Any = style
+        for name in path:
+            holder = getattr(holder, name)
+        holder.identifier = styleIds.get(target, baseStyle)
+    return style
+
+
+def composeChartText(stylesheet: int, listStyle: int) -> tswp.ParagraphStyleArchive:
+    """Return the reset's text centered, out of bookmarks, as Numbers sets chart text.
+
+    Numbers rewrites the text style a chart preset names on opening a document, so a
+    chart sharing `pybers-base` centered every table, findings-10-creation.md.
+    """
+    style = composeResetText(stylesheet, listStyle)
+    style.para_properties.alignment = tswp.ParagraphStylePropertiesArchive.TATvalue2
+    style.para_properties.show_in_bookmarks_list = False
     return style
 
 
@@ -169,7 +210,7 @@ def composeTableNetwork(
     tableStyle: int, cellStyle: int, textStyle: int, nameShapeStyle: int
 ) -> tst.TableStyleNetworkArchive:
     """Return a network naming one table, one cell and one text style in every slot."""
-    network = tst.TableStyleNetworkArchive()
+    network = tst.TableStyleNetworkArchive(preset_id=0)
     for slot in tst.TableStyleNetworkArchive.DESCRIPTOR.fields:
         if slot.message_type is None:
             continue
@@ -189,7 +230,7 @@ def composeChartPreset(
     chart: int, legend: int, axis: int, series: int, referenceLine: int, text: int
 ) -> tsch.ChartStylePreset:
     """Return a chart preset with Numbers' list lengths, one style shared along each."""
-    preset = tsch.ChartStylePreset()
+    preset = tsch.ChartStylePreset(uuid=uuid.uuid4().bytes)
     preset.chart_style.identifier = chart
     preset.legend_style.identifier = legend
     for target, count, style in (
@@ -220,17 +261,23 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
         stylesheet=stylesheet, theme=next(identifiers), sheetStyle=0, baseStyle=0,
         listStyle=0,
     )
-    composed.listStyle = styleAdd(
-        "list", composeRootStyle(tswp.ListStyleArchive, stylesheet, "list")
-    )
+    # Keyed styles name one another, so each is numbered before any is composed.
+    for key in keyedStyles:
+        styleIds[key] = next(identifiers)
+    composed.listStyle = styleIds[listStyleKey]
+    composed.sheetStyle = styleIds[sheetStyleKey]
     composed.baseStyle = styleAdd(
         "base",
         composeBaseStyle(namedStyleKey.format(0), stylesheet, composed.listStyle),
     )
-    composed.sheetStyle = styleAdd("sheet", composeSheetStyle(stylesheet))
+    composed.styles += [
+        (styleIds[key],
+         composeKeyedStyle(key, stylesheet, styleIds, composed.baseStyle))
+        for key in keyedStyles
+    ]
+    styleAdd("chartText", composeChartText(stylesheet, composed.listStyle))
     for name, styleClass in (
         ("character", tswp.CharacterStyleArchive),
-        ("dropcap", tswp.DropCapStyleArchive),
         ("line", tswp.ShapeStyleArchive),
         ("shape", tswp.ShapeStyleArchive),
         ("textbox", tswp.ShapeStyleArchive),
@@ -257,15 +304,24 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
         createdCellStyle, tstStyles.CellStylePropertiesArchive()
     )))
 
-    sheet = tss.StylesheetArchive(is_locked=False)
-    for identifier, _ in composed.styles:
+    sheet = tss.StylesheetArchive(is_locked=False, can_cull_styles=True)
+    # Numbers keeps the list in identifier order and the maps in key order.
+    for identifier, _ in sorted(composed.styles, key=lambda each: each[0]):
         sheet.styles.add(identifier=identifier)
-    for key, name in (
-        (drawingLineStyle, "drawingLine"), (svgImportStyle, "svgImport"),
-        (namedStyleKey.format(0), "base"),
-    ):
-        sheet.identifier_to_style_map.add(identifier=key).style.identifier = (
-            styleIds[name]
+    styleIds |= {drawingLineStyle: styleIds["drawingLine"],
+                 svgImportStyle: styleIds["svgImport"],
+                 namedStyleKey.format(0): composed.baseStyle}
+    maps = {key: "identifier_to_style_map"
+            for key in (drawingLineStyle, svgImportStyle, namedStyleKey.format(0))}
+    maps |= {key: cast(str, entry["map"])
+             for key, entry in keyedStyles.items() if entry["map"] is not None}
+    for key in sorted(maps):
+        holder: Any = sheet
+        if maps[key] != "identifier_to_style_map":
+            holder = getattr(sheet, maps[key])
+            holder.styles.add(identifier=styleIds[key])
+        holder.identifier_to_style_map.add(identifier=key).style.identifier = (
+            styleIds[key]
         )
     composed.styles.insert(0, (stylesheet, sheet))
 
@@ -282,7 +338,7 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
         )),
         (chartPreset, composeChartPreset(
             styleIds["chart"], styleIds["legend"], styleIds["axis"], styleIds["series"],
-            styleIds["referenceLine"], composed.baseStyle,
+            styleIds["referenceLine"], styleIds["chartText"],
         )),
     ]
 
@@ -290,6 +346,7 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
     theme.super.document_stylesheet.identifier = stylesheet
     composeColorSlots(theme)
     drawables = theme.super.Extensions[tsd.ThemePresetsArchive.extension]
+    applyStyleValues(drawables, drawablePresets)
     for presets, name in (
         (drawables.line_style_presets, "line"),
         (drawables.shape_style_presets, "shape"),
@@ -303,16 +360,16 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
     text.list_style_presets.add(identifier=composed.listStyle)
     text.character_style_presets.add(identifier=styleIds["character"])
     text.paragraph_style_presets.add(identifier=composed.baseStyle)
-    text.dropcap_style_presets.add(identifier=styleIds["dropcap"])
+    text.dropcap_style_presets.add(identifier=styleIds[dropCapStyleKey])
     theme.super.Extensions[tsch.ChartPresetsArchive.extension].chart_presets.add(
         identifier=chartPreset
     )
     theme.super.Extensions[tstStyles.ThemePresetsArchive.extension].table_style_presets.add(
         identifier=tablePreset
     )
-    theme.super.Extensions[tsa.ThemePresetsArchive.extension].caption_style_presets.add(
-        identifier=composed.baseStyle
-    )
+    numbersPresets = theme.super.Extensions[tsa.ThemePresetsArchive.extension]
+    numbersPresets.caption_style_presets.add(identifier=composed.baseStyle)
+    numbersPresets.svg_import_style_presets.add(identifier=styleIds["svgImport"])
     composed.document.insert(0, (composed.theme, theme))
     return composed
 

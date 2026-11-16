@@ -520,8 +520,11 @@ fit to page off, and the page size is left to Numbers.
 **The theme offers one preset of each kind a person adds, in the pybers reset.** Each
 root style states what Numbers states on every root style of its type, valued as the
 Blank theme states it and read into a generated table rather than copied, every text slot
-names `pybers-base`, and the table preset has no gridlines, outline or banding and does
-not wrap while every stroke choice stays offered. The rest stay as Numbers' Blank theme
+of the table preset names `pybers-base`, and the table preset has no gridlines, outline or
+banding and does not wrap while every stroke choice stays offered. The chart preset names
+centered text of its own, since Numbers centers whatever text style a chart names, and
+every style Numbers looks up by key is composed as the Blank theme states it, so Numbers
+adds and rewrites no style on opening a created document (findings-10-creation.md). The rest stay as Numbers' Blank theme
 values them until a ticket gives them a reset value. A chart preset keeps
 Numbers' list lengths. When PYB-268 brings named paragraph and character styles, and
 PYB-265 to PYB-267 cell and table styling, each builds these from its model's defaults in

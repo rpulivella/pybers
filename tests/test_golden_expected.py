@@ -6,6 +6,7 @@ A reading here is a dictionary of the shape the helper returns, so nothing drive
 Numbers.
 
 UPDATES
+2026-11-16  Each cell's stated alignment, and its check against Numbers', for PYB-292.
 2026-10-29  A formula checked as Numbers saved it, for PYB-272.
 2026-10-24  The machine form is the golden's JSON form, for PYB-259.
 2026-10-22  Written for PYB-255.
@@ -42,11 +43,13 @@ from tools.local.lib.golden_expected import (
     ExpectedTable,
     ExpectedValues,
     buildExpectedValues,
+    readStatedAlignments,
     writeExpectations,
     writeExpectationsJson,
 )
 
 goldenDirectory: Path = report.goldenDirectory
+naturalRow: tuple[str, ...] = ("auto align", "auto align")
 
 
 def buildGolden(name: str) -> ExpectedValues:
@@ -82,7 +85,7 @@ def buildFact(kind: str = "empty", text: str = "", formula: str | None = None,
               formatKind: str = "automatic") -> dict[str, Any]:
     """Return what AppleScript answers for one cell."""
     return {"value": {"kind": kind, "text": text}, "formula": formula,
-            "formatKind": formatKind}
+            "formatKind": formatKind, "alignment": "auto align"}
 
 
 def testEveryFilledCellOfEveryTableIsExpected() -> None:
@@ -168,7 +171,7 @@ def testASliderIsInspectedForItsRange() -> None:
 
 def buildTable(*cells: ExpectedCell) -> ExpectedTable:
     """Return a one-row table of two columns holding these cells."""
-    return ExpectedTable("Sheet 1", "Table 1", 1, 2, (), cells)
+    return ExpectedTable("Sheet 1", "Table 1", 1, 2, (), cells, (naturalRow,))
 
 
 def testAGridMatchingWhatPybersReadPassesInOneCheck() -> None:
@@ -258,7 +261,9 @@ def testEachLabeledCellIsLeftForAPersonToCompare() -> None:
 
 
 def testACellAMergeCoversIsLeftToTheMergeCheck() -> None:
-    table = ExpectedTable("Sheet 1", "Table 1", 1, 2, ("A1:B1",), (buildCell(),))
+    table = ExpectedTable(
+        "Sheet 1", "Table 1", 1, 2, ("A1:B1",), (buildCell(),), (naturalRow,)
+    )
     reading = buildReading([[buildFact("number", "1.0"),
                              buildFact("number", "1.0")]])
     reading["cellNames"] = [["A1", "A1"]]
@@ -299,3 +304,27 @@ def testEachColorAFillStatesIsSentOnceForConversion() -> None:
              buildCell(cell="C1", background=pybers.FillNone()))
     expected = ExpectedValues(Path("x.numbers"), (buildTable(*cells),), "")
     assert report.listStoredColors(expected) == [orange]
+
+
+def testEveryCellOfACreatedGoldenIsExpectedAtNaturalAlignment() -> None:
+    expected = buildGolden("00-created-tables-added-by-pybers")
+    stated = {each for table in expected.tables
+              for row in table.alignments for each in row}
+    assert stated == {"auto align"}
+
+
+def testEachCellsStatedAlignmentIsTheOneNumbersApplies() -> None:
+    grids = readStatedAlignments(findDocumentPath("30-style-align"))
+    assert grids[("Sheet 1", "Table 1")][0] == (
+        "auto align", "auto align", "left", "center", "right", "justify", "left",
+        "left", "auto align",
+    )
+
+
+def testACellDrawnAtAnotherAlignmentThanItsStyleStatesFails() -> None:
+    reading = buildReading([[buildFact("number", "1.0") | {"alignment": "center"},
+                             buildFact()]])
+    checks = report.checkTableGrid(buildTable(buildCell()), reading, {})
+    assert [check.detail for check in checks if check.status == "failed"] == [
+        "alignment `center`, expected `auto align`",
+    ]

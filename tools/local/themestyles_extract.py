@@ -3,8 +3,9 @@
 pybers theme style table
 
 Read the properties Numbers states on every root style of each type a created theme
-holds, valued as the Blank theme of `00-baseline` states them, and report whether the
-table committed at src/pybers/_generated/themestyles.py still matches.
+holds, the styles Numbers looks up by key, and the gradient and shadow presets, valued
+as the Blank theme of `00-baseline` states them, and report whether the table committed
+at src/pybers/_generated/themestyles.py still matches.
 
 **Why the documents are the source.** A root style missing a property Numbers always
 states fails the first action that reaches it, so the census reads every fixture and
@@ -20,6 +21,7 @@ Usage:
     .venv/bin/python3 -m tools.local.themestyles_extract --write
 
 UPDATES
+2026-11-16  Reads the keyed styles and presets too, for PYB-292.
 2026-11-03  Written for PYB-261.
 """
 from __future__ import annotations
@@ -47,8 +49,9 @@ def main() -> int:
     """Read the table, report whether the committed one matches, and write if asked."""
     parser = argparse.ArgumentParser(
         description=(
-            "Read the properties a created theme's root styles state, and report "
-            "whether the committed table matches."
+            "Read the properties a created theme's root styles state, the styles "
+            "Numbers looks up by key and the theme's presets, and report whether the "
+            "committed table matches."
         ),
         formatter_class=RichHelpFormatter,
     )

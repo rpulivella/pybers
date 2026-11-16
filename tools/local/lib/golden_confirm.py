@@ -7,6 +7,8 @@ expects, comparing it with what Numbers read, and writing the report.
 without Numbers, the helper or a logged-in Mac.
 
 UPDATES
+2026-11-16  Each cell's alignment is read from Numbers and checked against the one its
+            paragraph style states, for PYB-292.
 2026-11-13  Each fill a cell's own style states is read from Numbers and checked
             through the conversion its scripting applies, for PYB-265.
 2026-11-10  Each cell Numbers changed on saving fails, naming what changed, and each
@@ -765,6 +767,11 @@ def checkTableGrid(
             )
             if differs is not None:
                 checks.append(Check("failed", f"{subject} / {name}", differs))
+            stated = expected.alignments[row - 1][column - 1]
+            if (applied := fact.get("alignment")) != stated:
+                checks.append(Check("failed", f"{subject} / {name}",
+                                    f"alignment {formatCodeSpan(applied)}, expected "
+                                    f"{formatCodeSpan(stated)}"))
             names = None if cell is None else findNumbersFormat(cell)
             found = fact.get("formatKind") or ""
             if names is not None and found != names[0]:
@@ -773,8 +780,8 @@ def checkTableGrid(
                                     f"{formatCodeSpan(names[0])}"))
     if not any(check.status == "failed" for check in checks):
         checks.append(Check("passed", subject,
-                            f"every cell holds the value, formula, format and fill "
-                            f"pybers read, {len(filled)} of them filled"))
+                            f"every cell holds the value, formula, format, fill and "
+                            f"alignment pybers read, {len(filled)} of them filled"))
     for axis, declared, counted in (
         ("row", expected.rows, reading["rowCount"]),
         ("column", expected.columns, reading["columnCount"]),

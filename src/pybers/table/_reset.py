@@ -10,6 +10,9 @@ per document and found again by name. See docs/decisions.md.
 Private. Part of the table feature's archive half, reached by table creation.
 
 UPDATES
+2026-11-16  A variation stating only what its parent states is not written, since
+            Numbers drops it, and the reset's text is composed apart from its name,
+            for PYB-292.
 2026-11-13  The reset's cell properties composed where its variation is, the
             theme's cell style stating a created table's whole box, for PYB-265.
 2026-11-12  Styles registered through the style feature's `addStyles`, and the reset's
@@ -140,14 +143,20 @@ def composeTableStyle(parent: int, stylesheet: int) -> tst.TableStyleArchive:
 def composeBaseStyle(
     key: str, stylesheet: int, listStyle: int
 ) -> tswp.ParagraphStyleArchive:
-    """Return `pybers-base`: Avenir Next 11 pt on exact 15.5 pt lines.
+    """Return `pybers-base`, the reset's text named and keyed."""
+    style = composeResetText(stylesheet, listStyle)
+    style.super.name = baseStyleName
+    style.super.style_identifier = key
+    return style
+
+
+def composeResetText(stylesheet: int, listStyle: int) -> tswp.ParagraphStyleArchive:
+    """Return the reset's text, unnamed: Avenir Next 11 pt on exact 15.5 pt lines.
 
     Numbers resolves every property of a named root style, so all 57 are stated, as
     `53-paragraph-style-named` holds them. See docs/decisions.md.
     """
     style = tswp.ParagraphStyleArchive()
-    style.super.name = baseStyleName
-    style.super.style_identifier = key
     style.super.stylesheet.identifier = stylesheet
     chars = style.char_properties
     chars.bold = False
@@ -216,28 +225,54 @@ def composeBaseStyle(
     return style
 
 
+def checkRestates(parent: Message, variation: Message) -> bool:
+    """Report whether a variation restates only its parent, which Numbers drops.
+
+    Measured 2026-11-16 in a created document, findings-10-creation.md.
+    """
+    return all(
+        (field.is_repeated or parent.HasField(field.name))
+        and getattr(parent, field.name) == value
+        for field, value in variation.ListFields()
+    )
+
+
 def createResetStyles(
     index: ArchiveIndex, registry: PackageRegistry, styles: DocumentStyles
 ) -> ResetStyles:
-    """Create the reset's two variations, and `pybers-base` unless it exists."""
+    """Create the reset's variations their parents lack, and `pybers-base` if absent."""
     network = styles.network
     stylesheet = index.resolve(
         tsp.Reference(identifier=styles.stylesheet), tss.StylesheetArchive
     )
+    tableParent = network.table_style.identifier
+    cellParent = network.body_cell_style.identifier
+    tableStyle = composeTableStyle(tableParent, styles.stylesheet)
+    cellStyle = composeCellStyleArchive(
+        styles.stylesheet,
+        composeCellProperties(resetCellStyle, tstStyles.CellStylePropertiesArchive()),
+        cellParent,
+    )
+    created: list[tuple[int, Message]] = []
+    children: list[tuple[int, int]] = []
+    chosen: list[int] = []
+    tableRoot = index.resolve(network.table_style, tst.TableStyleArchive)
+    cellRoot = index.resolve(network.body_cell_style, tst.CellStyleArchive)
+    for parent, body, properties, variation in (
+        (tableParent, tableStyle, tableRoot.table_properties,
+         tableStyle.table_properties),
+        (cellParent, cellStyle, cellRoot.cell_properties, cellStyle.cell_properties),
+    ):
+        if checkRestates(properties, variation):
+            chosen.append(parent)
+            continue
+        identifier = registry.identifierAllocate()
+        created.append((identifier, body))
+        children.append((parent, identifier))
+        chosen.append(identifier)
     existing = findNamedStyle(index, styles.stylesheet)
-    created: list[tuple[int, Message]] = [
-        (registry.identifierAllocate(), body) for body in (
-            composeTableStyle(network.table_style.identifier, styles.stylesheet),
-            composeCellStyleArchive(
-                styles.stylesheet,
-                composeCellProperties(
-                    resetCellStyle, tstStyles.CellStylePropertiesArchive()
-                ),
-                network.body_cell_style.identifier,
-            ),
-        )
-    ]
-    if existing is None:
+    textStyle = existing
+    if textStyle is None:
         keys = {entry.identifier for entry in stylesheet.identifier_to_style_map}
         key = next(
             namedStyleKey.format(number)
@@ -245,23 +280,17 @@ def createResetStyles(
             if namedStyleKey.format(number) not in keys
         )
         bodyText = index.resolve(network.body_text_style, tswp.ParagraphStyleArchive)
-        textId = registry.identifierAllocate()
-        created.append((textId, composeBaseStyle(
+        textStyle = registry.identifierAllocate()
+        created.append((textStyle, composeBaseStyle(
             key, styles.stylesheet, bodyText.para_properties.list_style.identifier
         )))
         stylesheet.identifier_to_style_map.add(
-            identifier=key, style=tsp.Reference(identifier=textId)
+            identifier=key, style=tsp.Reference(identifier=textStyle)
         )
-    reset = ResetStyles(
-        tableStyle=created[0][0],
-        cellStyle=created[1][0],
-        textStyle=created[2][0] if existing is None else existing,
-    )
+    reset = ResetStyles(tableStyle=chosen[0], cellStyle=chosen[1], textStyle=textStyle)
 
-    addStyles(index, registry, styles.stylesheet, created, (
-        (network.table_style.identifier, reset.tableStyle),
-        (network.body_cell_style.identifier, reset.cellStyle),
-    ))
+    if created:
+        addStyles(index, registry, styles.stylesheet, created, children)
 
     if existing is None:
         themeId, theme = findTheme(index)
@@ -294,6 +323,7 @@ __all__ = [
     "DocumentStyles",
     "applyResetTable",
     "composeBaseStyle",
+    "composeResetText",
     "ResetStyles",
     "createResetStyles",
     "namedStyleKey",
