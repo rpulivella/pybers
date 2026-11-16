@@ -4,13 +4,16 @@ What a golden should show in Numbers, generated from its JSON form on every run.
 
 The golden is written as its JSON form and read back, and every filled cell of every
 table of what reads back is expected: its kind, value, formula, format, control and
-the fill its own style states.
+the fill its own style states. Every cell of every table, filled or not, is expected
+at the alignment its paragraph style states.
 What the JSON form loses therefore fails the check rather than passing unseen. Numbers
 is the independent reader, so a check compares the two. A measurement labels each
 value in row 1 with text in row 2, and such a label is shown beside the cell it
 describes.
 
 UPDATES
+2026-11-16  The horizontal alignment every cell's paragraph style states, read from
+            the archive since pybers does not model it yet, for PYB-292.
 2026-11-13  The fill a cell's own style states, for PYB-265.
 2026-11-09  A format is the cell's `CellFormat`, Automatic naming the one it chose,
             for PYB-145.
@@ -43,6 +46,22 @@ from pybers import (
     CurrencyAmount,
     Fill,
 )
+from pybers._generated import TNArchives_pb2 as tn
+from pybers._generated import TSTArchives_pb2 as tst
+from pybers._generated import TSWPArchives_pb2 as tswp
+from pybers._persistence import readPackage
+from pybers._persistence.cells import findSlotValue
+from pybers._persistence.index import ArchiveIndex, findRoot
+from pybers._persistence.types import findArchiveTypeId
+from pybers.table._read import iterateCellRecords
+
+# The slot naming a cell's own paragraph style, a `styleTable` key, measured in 98b.
+textStyleSlot: tuple[int, int] = (8, 0x40)
+
+# A paragraph style's alignment as Numbers' scripting names it, natural `auto align`.
+alignmentNames: frozendict[int, str] = frozendict({
+    0: "left", 1: "right", 2: "center", 3: "justify", 4: "auto align",
+})
 
 # A measurement's layout: each value in row 1, the text describing it in row 2.
 measuredRow: int = 1
@@ -66,7 +85,7 @@ class ExpectedCell:
 
 @dataclass(frozen=True, slots=True)
 class ExpectedTable:
-    """One table's size, merges and filled cells, every other cell empty."""
+    """One table's size, merges and filled cells, and every cell's stated alignment."""
 
     sheet: str
     table: str
@@ -74,6 +93,7 @@ class ExpectedTable:
     columns: int
     merges: tuple[str, ...]
     cells: tuple[ExpectedCell, ...]
+    alignments: tuple[tuple[str, ...], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,12 +151,74 @@ def readExpectedCell(
     )
 
 
+def readParagraphAlignment(index: ArchiveIndex, identifier: int) -> str:
+    """Return the alignment a paragraph style states, or the first its parents state."""
+    style = index.identifierResolve(identifier, tswp.ParagraphStyleArchive)
+    while not style.para_properties.HasField("alignment") and style.super.HasField(
+        "parent"
+    ):
+        style = index.resolve(style.super.parent, tswp.ParagraphStyleArchive)
+    return alignmentNames[style.para_properties.alignment]
+
+
+def readModelAlignments(
+    index: ArchiveIndex, model: tst.TableModelArchive
+) -> tuple[tuple[str, ...], ...]:
+    """Return every cell's stated alignment, its own paragraph style over its region's.
+
+    Where a header row meets a header column the row's style is taken, unmeasured.
+    """
+    styles = index.resolve(model.base_data_store.styleTable, tst.TableDataList)
+    keyed = {entry.key: entry.reference.identifier for entry in styles.entries}
+    own = {
+        address.asRowColumn(): keyed[key]
+        for address, record in iterateCellRecords(index, model, None)
+        if (key := findSlotValue(record, textStyleSlot)) is not None
+    }
+    rows, columns = model.number_of_rows, model.number_of_columns
+    grid = []
+    for row in range(1, rows + 1):
+        line = []
+        for column in range(1, columns + 1):
+            region = (
+                model.header_row_text_style if row <= model.number_of_header_rows
+                else model.footer_row_text_style
+                if row > rows - model.number_of_footer_rows
+                else model.header_column_text_style
+                if column <= model.number_of_header_columns
+                else model.body_text_style
+            )
+            styleId = own.get((row, column), region.identifier)
+            line.append(readParagraphAlignment(index, styleId))
+        grid.append(tuple(line))
+    return tuple(grid)
+
+
+def readStatedAlignments(
+    golden: Path,
+) -> dict[tuple[str, str], tuple[tuple[str, ...], ...]]:
+    """Return each table's grid of stated alignments, by sheet and table name."""
+    index = ArchiveIndex(readPackage(golden))
+    tableInfo = findArchiveTypeId(tst.TableInfoArchive)
+    grids = {}
+    for reference in findRoot(index).sheets:
+        sheet = index.resolve(reference, tn.SheetArchive)
+        for drawable in sheet.drawable_infos:
+            if index.typeOf(drawable) != tableInfo:
+                continue
+            info = index.resolve(drawable, tst.TableInfoArchive)
+            model = index.resolve(info.tableModel, tst.TableModelArchive)
+            grids[(sheet.name, model.table_name)] = readModelAlignments(index, model)
+    return grids
+
+
 def buildExpectedValues(golden: Path) -> ExpectedValues:
     """Return what every table of a golden should show, read through its JSON form."""
     document = pybers.open(golden)
     jsonForm = pybers.formatJsonForm(document)
     readBack = pybers.parseJsonForm(jsonForm)
     assert isinstance(readBack, pybers.Document)
+    alignments = readStatedAlignments(golden)
     tables = []
     for sheet in readBack.sheets:
         for table in sheet.tables:
@@ -151,7 +233,7 @@ def buildExpectedValues(golden: Path) -> ExpectedValues:
                 sheet=sheet.name, table=table.name, rows=table.rowCount,
                 columns=table.colCount,
                 merges=tuple(str(merge.extent) for merge in table.mergeRanges),
-                cells=cells,
+                cells=cells, alignments=alignments[(sheet.name, table.name)],
             ))
     return ExpectedValues(golden, tuple(tables), jsonForm)
 
