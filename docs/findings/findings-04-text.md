@@ -411,9 +411,9 @@ so **a reader checking only the pattern would call a chalk stroke solid**, `smar
 has to be checked before the pattern is believed. `stroke_name` is an internal identifier,
 not a localized label: `'Chalk2'` carries a digit no menu shows. `cap` varies with the brush
 (`Calligraphy` uses `ButtCap` where the others use `RoundCap`), so it is part of the preset
-rather than a constant. `random_seed` exists because these strokes are randomized,
-preserving it is what keeps a document rendering identically, so it must be carried through
-rather than regenerated.
+rather than a constant. `random_seed` exists because these strokes are randomized, and
+none of the five in `38` stores one, so a seed is carried when present and never invented
+when absent.
 
 `parameterValues` is a `ReferenceDictionary` and is unset on all five, so per-brush tuning is
 possible but unexercised. Brush strokes default to **8pt**; the fixture includes 3pt versions

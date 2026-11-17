@@ -9,6 +9,7 @@ findings-09-cell-records.md.
 Private. The archive half of the style feature.
 
 UPDATES
+2026-11-17  A stroke read from `TSD.StrokeArchive`, for PYB-266.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -39,6 +40,18 @@ from pybers.style.cells import (
     numbersCellStyle,
 )
 from pybers.style.fills import Fill, FillGradient, FillImage, FillNone
+from pybers.style.strokes import (
+    Stroke,
+    StrokeBrush,
+    StrokeCap,
+    StrokeDash,
+    StrokeEmpty,
+    StrokeFrame,
+    StrokeJoin,
+    StrokePattern,
+    StrokePatterned,
+    StrokeSolid,
+)
 
 # By stored value, the three the inspector offers; the shared text frame's justify, 3,
 # is never a cell's.
@@ -57,6 +70,65 @@ def readFill(archive: tsd.FillArchive) -> Fill:
     if archive.HasField("image"):
         return FillImage()
     return FillNone()
+
+
+strokeCaps: tuple[StrokeCap, ...] = (StrokeCap.BUTT, StrokeCap.ROUND, StrokeCap.SQUARE)
+strokeJoins: tuple[StrokeJoin, ...] = (
+    StrokeJoin.MITER, StrokeJoin.ROUND, StrokeJoin.BEVEL,
+)
+
+
+def readStrokePattern(archive: tsd.StrokeArchive) -> StrokePattern:
+    """Return what a stroke draws, a brush, frame or pattern before its stored pattern.
+
+    A brush stores a solid pattern, so trusting the pattern alone misreads it.
+    """
+    if archive.HasField("smart_stroke"):
+        brush = archive.smart_stroke
+        seed = brush.random_seed if brush.HasField("random_seed") else None
+        return StrokeBrush(name=brush.stroke_name, seed=seed)
+    if archive.HasField("frame"):
+        return StrokeFrame()
+    if archive.HasField("patterned_stroke"):
+        return StrokePatterned()
+    pattern = archive.pattern
+    match pattern.type:
+        case tsd.StrokePatternArchive.TSDSolidPattern:
+            return StrokeSolid()
+        case tsd.StrokePatternArchive.TSDEmptyPattern:
+            return StrokeEmpty()
+        case tsd.StrokePatternArchive.TSDPattern if 0 < pattern.count <= len(
+            pattern.pattern
+        ):
+            return StrokeDash(
+                lengths=tuple(
+                    findShortestDecimal(each)
+                    for each in pattern.pattern[:pattern.count]
+                ),
+                phase=findShortestDecimal(pattern.phase),
+            )
+    raise ReadError(
+        f"A stroke holds pattern type {pattern.type} with {pattern.count} of "
+        f"{len(pattern.pattern)} dash lengths live, which pybers does not recognize."
+    )
+
+
+def readStroke(archive: tsd.StrokeArchive) -> Stroke:
+    """Return the line a stroke archive holds."""
+    if not 0 <= archive.cap < len(strokeCaps):
+        raise ReadError(f"A stroke holds line cap {archive.cap}, which pybers does "
+                        "not recognize.")
+    if not 0 <= archive.join < len(strokeJoins):
+        raise ReadError(f"A stroke holds line join {archive.join}, which pybers does "
+                        "not recognize.")
+    return Stroke(
+        width=findShortestDecimal(archive.width),
+        color=readColor(archive.color),
+        pattern=readStrokePattern(archive),
+        cap=strokeCaps[archive.cap],
+        join=strokeJoins[archive.join],
+        miterLimit=findShortestDecimal(archive.miter_limit),
+    )
 
 
 def readPadding(archive: tswp.PaddingArchive) -> Decimal | CellStylePaddingSides:
@@ -137,5 +209,5 @@ def readCellStyles(
 
 __all__ = [
     "readCellStyle", "readCellStyles", "readFill", "readInheritedCellStyle",
-    "readPadding",
+    "readPadding", "readStroke", "readStrokePattern",
 ]
