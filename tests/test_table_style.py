@@ -27,7 +27,7 @@ import pytest
 
 import pybers
 from conftest import findDocumentPath
-from pybers import Color, Stroke, StrokeDash
+from pybers import CellBorderSide, Color, Stroke, StrokeDash, StrokeSolid
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._persistence.container import readPackage
 from pybers._persistence.index import ArchiveIndex
@@ -192,3 +192,57 @@ def test_a_longhand_changes_one_part_of_a_line() -> None:
 def test_text_a_table_style_lacks_is_refused(text: str, message: str) -> None:
     with pytest.raises(TableStyleError, match=message):
         parseTableStyle(text, blankTableStyle)
+
+
+separator = Stroke(width=Decimal("0.75"), color=Color.black, pattern=StrokeSolid())
+gridline = Stroke(width=Decimal("0.35"), color=Color.black, pattern=StrokeSolid())
+
+
+@pytest.mark.parametrize(("address", "side", "drawn"), [
+    ("B2", CellBorderSide.BOTTOM, gridline),
+    ("A2", CellBorderSide.BOTTOM, gridline),
+    ("B1", CellBorderSide.BOTTOM, separator),
+    ("B3", CellBorderSide.BOTTOM, separator),
+    ("A2", CellBorderSide.RIGHT, separator),
+    ("B1", CellBorderSide.RIGHT, gridline),
+    ("B4", CellBorderSide.RIGHT, gridline),
+    ("C2", CellBorderSide.RIGHT, gridline),
+    ("B2", CellBorderSide.RIGHT, gridline),
+])
+def test_an_edge_with_no_border_shows_the_table_line_for_its_region(
+    address: str, side: CellBorderSide, drawn: Stroke
+) -> None:
+    table = pybers.open(findDocumentPath("100-lines-base")).table("Untouched")
+    assert table.cellBorderShown(address, side) == drawn
+
+
+@pytest.mark.parametrize(("table", "address", "side"), [
+    ("Body horizontal", "B2", CellBorderSide.BOTTOM),
+    ("Header columns horizontal", "A2", CellBorderSide.BOTTOM),
+    ("Header rows vertical", "B1", CellBorderSide.RIGHT),
+    ("Footer rows vertical", "B4", CellBorderSide.RIGHT),
+    ("Body vertical", "B2", CellBorderSide.RIGHT),
+])
+def test_a_hidden_table_line_shows_nothing_at_its_region(
+    table: str, address: str, side: CellBorderSide
+) -> None:
+    measured = pybers.open(findDocumentPath("100b-lines")).table(table)
+    assert measured.cellBorderShown(address, side) is None
+
+
+def test_of_two_facing_strokes_the_later_shows() -> None:
+    table = pybers.open(findDocumentPath("63d-fill-border-base")).table("Table 1")
+    shown = table.cellBorderShown("C3", CellBorderSide.RIGHT)
+    assert isinstance(shown, Stroke) and shown.width == 5
+
+
+def test_a_hidden_border_shows_nothing_over_the_gridline() -> None:
+    table = pybers.open(findDocumentPath("57-structure-refusals-base")).table(
+        "Borders"
+    )
+    assert table.cellBorderShown("A1", CellBorderSide.BOTTOM) is None
+
+
+def test_a_line_inside_a_merge_shows_nothing() -> None:
+    table = pybers.open(findDocumentPath("22-merge-2x2")).table("Table 1")
+    assert table.cellBorderShown("A1", CellBorderSide.RIGHT) is None

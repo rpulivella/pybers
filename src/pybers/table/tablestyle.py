@@ -41,6 +41,7 @@ from pybers.style.strokes import (
     formatStroke,
 )
 from pybers.style.text import CellStyleError, parseLength
+from pybers.table.headers import TableHeaders
 
 
 class TableStyleError(PybersError, ValueError):
@@ -135,6 +136,38 @@ def buildTableStyle(base: TableStyle, lines: Mapping[str, object]) -> TableStyle
             )
     update: dict[str, Any] = dict(lines)
     return replace(base, **update)
+
+
+def findTableLine(
+    tableStyle: TableStyle, headers: TableHeaders, rowCount: int, colCount: int,
+    row: int, column: int, horizontal: bool,
+) -> TableLine:
+    """Return the table line governing an edge, by the rows or columns it divides.
+
+    `row` and `column` count from one and name the line before the edge, 0 for the
+    table's top or left. A horizontal line follows the column it runs through and a
+    vertical one its row, as each Gridlines tooltip names it, and a separator takes
+    the edge where a header or footer meets the body.
+    """
+    if horizontal:
+        if row in (0, rowCount):
+            return tableStyle.tableOutline
+        if headers.headerRows and row == headers.headerRows:
+            return tableStyle.headerRowsSeparator
+        if headers.footerRows and row == rowCount - headers.footerRows:
+            return tableStyle.footerRowsSeparator
+        if column <= headers.headerColumns:
+            return tableStyle.headerColumnsHorizontalGridlines
+        return tableStyle.bodyHorizontalGridlines
+    if column in (0, colCount):
+        return tableStyle.tableOutline
+    if headers.headerColumns and column == headers.headerColumns:
+        return tableStyle.headerColumnsSeparator
+    if row <= headers.headerRows:
+        return tableStyle.headerRowsVerticalGridlines
+    if row > rowCount - headers.footerRows:
+        return tableStyle.footerRowsVerticalGridlines
+    return tableStyle.bodyVerticalGridlines
 
 
 # The Blank theme's lines, 0.35pt black and 0.75pt where a header or footer meets
@@ -329,7 +362,7 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
 
 __all__ = [
     "TableLine", "TableStyle", "TableStyleChange", "TableStyleError",
-    "buildTableStyle", "formatTableLine",
+    "buildTableStyle", "findTableLine", "formatTableLine",
     "applyTableReset", "blankTableStyle", "formatTableStyle", "gridlineStroke",
     "lineNames", "parseTableStyle",
     "resetTableStyle", "separatorStroke",

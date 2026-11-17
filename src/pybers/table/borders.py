@@ -282,6 +282,29 @@ class TableBorders:
             )
         return CellBorders(**sides)
 
+    def edgeShownFind(
+        self, rowIdentities: Sequence[int], columnIdentities: Sequence[int],
+        cell: CellAddress, side: CellBorderSide,
+    ) -> Stroke | None:
+        """Return the stroke stored at a cell's side that Numbers draws, the later one.
+
+        Of two facing strokes, the higher order prevails, as `63d` measured.
+        """
+        facing, down, across = facingSides[side]
+        own = self.edges.get(
+            (rowIdentities[cell.row - 1], columnIdentities[cell.col - 1], side)
+        )
+        row, column = cell.row + down, cell.col + across
+        neighbor = None
+        if 1 <= row <= len(rowIdentities) and 1 <= column <= len(columnIdentities):
+            neighbor = self.edges.get(
+                (rowIdentities[row - 1], columnIdentities[column - 1], facing)
+            )
+        held = [edge for edge in (own, neighbor) if edge is not None]
+        if not held:
+            return None
+        return max(held, key=lambda edge: edge.order).stroke
+
     def edgesDraw(
         self, rowIdentities: Sequence[int], columnIdentities: Sequence[int],
         sides: Iterable[tuple[int, int, CellBorderSide]], stroke: Stroke | None,

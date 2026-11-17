@@ -76,6 +76,7 @@ from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from pybers.absence import MIXED
 from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
@@ -91,7 +92,13 @@ from pybers.addressing.reference import (
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
-from pybers.table.borders import CellBorders, TableBorders
+from pybers.style.strokes import Stroke, StrokeEmpty
+from pybers.table.borders import (
+    CellBorders,
+    CellBorderSide,
+    TableBorders,
+    facingSides,
+)
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
@@ -110,6 +117,7 @@ from pybers.table.tablestyle import (
     TableStyle,
     TableStyleChange,
     buildTableStyle,
+    findTableLine,
     resetTableStyle,
 )
 
@@ -536,6 +544,34 @@ class Table:
         return self._borders.cellBordersRead(
             self._rowIdentities, self._columnIdentities, top, left, bottom, right
         )
+
+    def cellBorderShown(
+        self, address: CellReferenceLike, side: CellBorderSide
+    ) -> Stroke | MIXED | None:
+        """Return the line an edge displays, or None where it displays none.
+
+        A stored stroke prevails, the later of two that disagree, and a hidden one
+        draws nothing; else the table's own line for that edge, while it shows.
+        """
+        cell = self._addressResolve(address)
+        merge = self.mergeCovering(cell)
+        _, down, across = facingSides[side]
+        neighbor = CellAddress(cell.row + down, cell.col + across)
+        if merge is not None and merge.covers(neighbor):
+            return None
+        drawn = self._borders.edgeShownFind(
+            self._rowIdentities, self._columnIdentities, cell, side
+        )
+        if drawn is not None:
+            return None if isinstance(drawn.pattern, StrokeEmpty) else drawn
+        # The line before the edge: a top or left edge belongs to the one before.
+        line = findTableLine(
+            self._tableStyle, self._headers, self.rowCount, self.colCount,
+            cell.row - (side is CellBorderSide.TOP),
+            cell.col - (side is CellBorderSide.LEFT),
+            side in (CellBorderSide.TOP, CellBorderSide.BOTTOM),
+        )
+        return line.stroke if line.visible else None
 
     def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
