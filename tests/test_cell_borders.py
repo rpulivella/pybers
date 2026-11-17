@@ -55,14 +55,14 @@ def test_a_cell_with_no_border_reads_none_on_every_side() -> None:
 
 def test_an_outer_side_is_stored_on_the_selected_cell_alone() -> None:
     borders = openTable("100b-lines", "Positions Top").cell("A1").borders
-    assert borders.left == CellBorder(gridline, None)
-    assert borders.top == CellBorder(gridline, None)
+    assert borders.left == CellBorder(gridline, None, prevails=True)
+    assert borders.top == CellBorder(gridline, None, prevails=True)
     assert borders.right is None
 
 
 def test_an_inner_line_is_stored_on_both_facing_sides() -> None:
     borders = openTable("100b-lines", "Positions Top").cell("C1").borders
-    assert borders.right == CellBorder(gridline, gridline)
+    assert borders.right == CellBorder(gridline, gridline, prevails=True)
     assert not borders.right.disagrees
 
 

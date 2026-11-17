@@ -108,6 +108,7 @@ from pybers.table.borders import (
     borderWidthOffered,
     buildBorderStroke,
     findBlockRing,
+    findMergedBlock,
 )
 from pybers.table.cell import (
     Cell,
@@ -589,12 +590,10 @@ class Document:
             except StrokeError as exc:
                 raise WriteError(f"{exc} Nothing was written.") from exc
         table, block = findBlockTarget(self, selector, "border")
+        block = findMergedBlock(table, block)
         before = {
-            address: table._borders.cellBordersRead(
-                table._rowIdentities, table._columnIdentities,
-                address.row, address.col,
-            )
-            for address in findBlockRing(table, block)
+            address: table._bordersRead(address)
+            for address in findBlockRing(table, block) if table.addressable(address)
         }
         drawn = set(applyBlockBorders(table, block, position, stroke))
         changes = []

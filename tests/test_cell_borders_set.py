@@ -114,8 +114,9 @@ def test_an_outer_side_is_written_to_the_neighbor_facing_it() -> None:
     document = pybers.create("en_US")
     table = document.sheet().tableAdd("Lines", rows=3, cols=3)
     document.cellBordersSet("::Lines::B2", CellBorderPosition.OUTER)
-    assert table.cell("A2").borders.right == CellBorder(gridline, gridline)
-    assert table.cell("B1").borders.bottom == CellBorder(gridline, gridline)
+    drawn = CellBorder(gridline, gridline, prevails=True)
+    assert table.cell("A2").borders.right == drawn
+    assert table.cell("B1").borders.bottom == drawn
 
 
 def test_hidden_states_an_empty_stroke_and_none_removes_both_sides() -> None:

@@ -94,6 +94,7 @@ def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
         "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
         "  Format: number (automatic)   Control: none",
         "  Cell style: none",
+        "  Borders: none",
         "  Unrecognized type code: none",
     ]
 

@@ -27,19 +27,19 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from pybers.absence import MIXED
+from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress
 from pybers.color.colors import Color
 from pybers.style.strokes import (
     Stroke,
-    StrokeCap,
-    StrokeDash,
     StrokeEmpty,
-    StrokeJoin,
-    StrokeSolid,
+    cellStrokePresets,
+    formatStroke,
 )
 
 if TYPE_CHECKING:
-    from pybers.addressing.ranges import CellRange
+    from pybers.table.cell import Cell
     from pybers.table.cells import Table
 
 # What Numbers draws for a line style given alone, the gridline's own stroke.
@@ -99,22 +99,37 @@ def buildBorderStroke(
     style: CellBorderStyle, width: Decimal | int, color: Color
 ) -> Stroke:
     """Return the stroke Numbers 15.4 stores for a line style, as `100b-lines` shows."""
-    match style:
-        case CellBorderStyle.SOLID:
-            return Stroke(width=Decimal(width), color=color, pattern=StrokeSolid())
-        case CellBorderStyle.DASHED:
-            return Stroke(
-                width=Decimal(width), color=color,
-                pattern=StrokeDash(lengths=(Decimal(2), Decimal(2))),
-            )
-        case CellBorderStyle.DOTTED:
-            return Stroke(
-                width=Decimal(width), color=color,
-                pattern=StrokeDash(lengths=(Decimal("0.001"), Decimal(2))),
-                cap=StrokeCap.ROUND, join=StrokeJoin.ROUND,
-            )
-        case CellBorderStyle.HIDDEN:
-            return Stroke(width=Decimal(0), color=Color.black, pattern=StrokeEmpty())
+    if style is CellBorderStyle.HIDDEN:
+        return Stroke(width=Decimal(0), color=Color.black, pattern=StrokeEmpty())
+    pattern, cap, join = cellStrokePresets[style.value]
+    return Stroke(
+        width=Decimal(width), color=color, pattern=pattern, cap=cap, join=join
+    )
+
+
+def formatSpanStroke(stroke: Stroke | MIXED) -> str:
+    """Return a side's stroke as CSS writes it, or `mixed` where positions differ."""
+    return "mixed" if stroke is MIXED else formatStroke(stroke)
+
+
+def formatCellBorders(cell: Cell) -> str:
+    """Return the sides a cell stores as CSS longhands, a neighbor's other stroke noted.
+
+    `border-top: 1pt dashed #000000ff; border-left: hidden`, a side storing nothing
+    left out.
+    """
+    declarations = []
+    for side in CellBorderSide:
+        border = getattr(cell.borders, side.value)
+        if border is None or border.stroke is None:
+            continue
+        shown = f"border-{side}: {formatSpanStroke(border.stroke)}"
+        if border.disagrees and border.neighborStroke is not None:
+            _, down, across = facingSides[side]
+            neighbor = CellAddress(cell.address.row + down, cell.address.col + across)
+            shown += f" ({neighbor} draws {formatSpanStroke(border.neighborStroke)})"
+        declarations.append(shown)
+    return "; ".join(declarations)
 
 
 def listDrawnSides(
@@ -168,15 +183,17 @@ class BorderEdge:
 class CellBorder:
     """A side of a cell: the stroke the cell stores, and the one its neighbor stores."""
 
-    stroke: Stroke | None
-    neighborStroke: Stroke | None
+    stroke: Stroke | MIXED | None
+    neighborStroke: Stroke | MIXED | None
+    # Whether this cell's stroke is the one drawn, as the later of the two.
+    prevails: bool = False
 
     @property
     def disagrees(self) -> bool:
         """Report whether both cells store a stroke here and the two differ."""
         return (
             self.stroke is not None and self.neighborStroke is not None
-            and self.stroke != self.neighborStroke
+            and (self.stroke is MIXED or self.stroke != self.neighborStroke)
         )
 
 
@@ -190,6 +207,14 @@ class CellBorders:
     left: CellBorder | None = None
 
 
+def findSpanStroke(edges: Sequence[BorderEdge | None]) -> Stroke | MIXED | None:
+    """Return the one stroke every position of a side stores, None, or `MIXED`."""
+    strokes = {None if edge is None else edge.stroke for edge in edges}
+    if len(strokes) > 1:
+        return MIXED
+    return strokes.pop()
+
+
 @dataclass(slots=True)
 class TableBorders:
     """Every stroke a table stores on a side of a cell, and the highest order drawn."""
@@ -199,27 +224,45 @@ class TableBorders:
 
     def cellBordersRead(
         self, rowIdentities: Sequence[int], columnIdentities: Sequence[int],
-        row: int, column: int,
+        top: int, left: int, bottom: int, right: int,
     ) -> CellBorders:
-        """Return the four sides of the cell at a row and column counted from one."""
+        """Return the four sides of a cell spanning rows and columns counted from one.
+
+        A merged cell's side runs along every position of it, and reads `MIXED` where
+        the strokes stored along it differ.
+        """
+        spans = {
+            CellBorderSide.TOP: [(top, column) for column in range(left, right + 1)],
+            CellBorderSide.BOTTOM: [
+                (bottom, column) for column in range(left, right + 1)
+            ],
+            CellBorderSide.LEFT: [(row, left) for row in range(top, bottom + 1)],
+            CellBorderSide.RIGHT: [(row, right) for row in range(top, bottom + 1)],
+        }
         sides: dict[str, CellBorder | None] = {}
         for side, (facing, down, across) in facingSides.items():
-            own = self.edges.get(
-                (rowIdentities[row - 1], columnIdentities[column - 1], side)
-            )
-            neighborRow, neighborColumn = row + down, column + across
-            neighbor = None
-            if (1 <= neighborRow <= len(rowIdentities)
-                    and 1 <= neighborColumn <= len(columnIdentities)):
-                neighbor = self.edges.get((
+            owns, neighbors = [], []
+            for row, column in spans[side]:
+                owns.append(self.edges.get(
+                    (rowIdentities[row - 1], columnIdentities[column - 1], side)
+                ))
+                neighborRow, neighborColumn = row + down, column + across
+                inside = (1 <= neighborRow <= len(rowIdentities)
+                          and 1 <= neighborColumn <= len(columnIdentities))
+                neighbors.append(None if not inside else self.edges.get((
                     rowIdentities[neighborRow - 1],
                     columnIdentities[neighborColumn - 1], facing,
-                ))
-            sides[side.value] = (
-                None if own is None and neighbor is None else CellBorder(
-                    None if own is None else own.stroke,
-                    None if neighbor is None else neighbor.stroke,
-                )
+                )))
+            if all(edge is None for edge in (*owns, *neighbors)):
+                sides[side.value] = None
+                continue
+            sides[side.value] = CellBorder(
+                findSpanStroke(owns), findSpanStroke(neighbors),
+                all(
+                    own is not None
+                    and (neighbor is None or own.order >= neighbor.order)
+                    for own, neighbor in zip(owns, neighbors, strict=True)
+                ),
             )
         return CellBorders(**sides)
 
@@ -346,6 +389,47 @@ def findBlockRing(table: Table, block: CellRange) -> list[CellAddress]:
     ]
 
 
+def isMergeInterior(
+    table: Table, row: int, column: int, side: CellBorderSide
+) -> bool:
+    """Report whether a side lies between two positions of one merge."""
+    _, down, across = facingSides[side]
+    merge = table.mergeCovering(CellAddress(row, column))
+    return merge is not None and merge.covers(
+        CellAddress(row + down, column + across)
+    )
+
+
+def findMergedBlock(table: Table, block: CellRange) -> CellRange:
+    """Return a block widened until it covers whole every merge it touches.
+
+    Numbers widens a selection so, and a merged cell is bordered whole.
+    """
+    top, left, bottom, right = (
+        block.startRow, block.startCol, block.endRow, block.endCol,
+    )
+    assert top is not None and left is not None
+    assert bottom is not None and right is not None
+    widened = True
+    while widened:
+        widened = False
+        for merge in table.mergeRanges:
+            extent = merge.extent
+            mergeTop, mergeLeft = extent.startRow, extent.startCol
+            mergeBottom, mergeRight = extent.endRow, extent.endCol
+            assert mergeTop is not None and mergeLeft is not None
+            assert mergeBottom is not None and mergeRight is not None
+            touches = (mergeTop <= bottom and top <= mergeBottom
+                       and mergeLeft <= right and left <= mergeRight)
+            covered = (top <= mergeTop and mergeBottom <= bottom
+                       and left <= mergeLeft and mergeRight <= right)
+            if touches and not covered:
+                top, left = min(top, mergeTop), min(left, mergeLeft)
+                bottom, right = max(bottom, mergeBottom), max(right, mergeRight)
+                widened = True
+    return CellRange.fromReferences(CellAddress(top, left), CellAddress(bottom, right))
+
+
 def applyBlockBorders(
     table: Table, block: CellRange, position: CellBorderPosition, stroke: Stroke | None
 ) -> list[CellAddress]:
@@ -365,6 +449,8 @@ def applyBlockBorders(
         for side in listDrawnSides(
             position, row == top, row == bottom, column == left, column == right
         )
+        # A line inside a merge is never drawn, as Numbers draws a merge whole.
+        if not isMergeInterior(table, row, column, side)
     ]
     if not table._borders.edgesDraw(
         table._rowIdentities, table._columnIdentities, sides, stroke
@@ -386,7 +472,8 @@ def applyBlockBorders(
 __all__ = [
     "BorderEdge", "BorderEdgeKey", "CellBorder", "CellBorderPosition",
     "CellBorderSide", "CellBorderStyle", "CellBorders", "TableBorders",
-    "borderOrderInitial", "borderWidthOffered", "buildBorderStroke",
-    "applyBlockBorders", "facingSides", "findBlockRing",
+    "applyBlockBorders", "borderOrderInitial", "borderWidthOffered",
+    "buildBorderStroke", "facingSides", "findBlockRing", "findMergedBlock",
+    "findSpanStroke", "formatCellBorders", "formatSpanStroke", "isMergeInterior",
     "listDrawnSides", "rowSides",
 ]

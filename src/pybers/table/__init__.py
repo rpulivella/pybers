@@ -55,6 +55,7 @@ from pybers.table.borders import (
     CellBorders,
     CellBorderSide,
     CellBorderStyle,
+    formatCellBorders,
 )
 from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
 from pybers.table.cells import Table
@@ -84,6 +85,7 @@ __all__ = [
     "TableHeaders",
     "TableRow",
     "TableRows",
+    "formatCellBorders",
     "formatCellValue",
     "parseCellValue",
 ]

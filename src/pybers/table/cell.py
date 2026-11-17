@@ -518,13 +518,13 @@ class Cell:
 
     @property
     def borders(self) -> CellBorders:
-        """Return this cell's four sides, each the stroke it and its neighbor store."""
+        """Return this cell's four sides, each the stroke it and its neighbor store.
+
+        A merged cell's sides run along the whole merge.
+        """
         if self.table is None:
             return CellBorders()
-        return self.table._borders.cellBordersRead(
-            self.table._rowIdentities, self.table._columnIdentities,
-            self.address.row, self.address.col,
-        )
+        return self.table._bordersRead(self.address)
 
     @property
     def unrecognizedTypeCode(self) -> int | None:

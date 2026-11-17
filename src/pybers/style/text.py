@@ -7,6 +7,8 @@ what `pybers show` prints and `pybers set --cell-style` reads, each name the CSS
 and `none` sets no style.
 
 UPDATES
+2026-11-17  `parseLength`, one length in points, which a border's width shares, for
+            PYB-266.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -79,16 +81,19 @@ def parseFill(text: str) -> Fill:
         raise CellStyleError(f"background: {exc}") from exc
 
 
+def parseLength(text: str, name: str) -> Decimal:
+    """Return a length in points from `6pt`, or `0`, refusing anything else."""
+    found = lengthPattern.fullmatch(text.strip())
+    if found is None:
+        raise CellStyleError(
+            f"{name} is a length in points such as 6pt, and {text!r} is not one."
+        )
+    return Decimal(found[1] or 0)
+
+
 def parsePadding(text: str) -> Decimal | CellStylePaddingSides:
     """Return one length in points, or four in CSS order, from `6pt` or `0pt 2pt…`."""
-    lengths = []
-    for each in text.split():
-        found = lengthPattern.fullmatch(each)
-        if found is None:
-            raise CellStyleError(
-                f"padding is a length in points such as 6pt, and {each!r} is not one."
-            )
-        lengths.append(Decimal(found[1] or 0))
+    lengths = [parseLength(each, "padding") for each in text.split()]
     if len(lengths) == 1:
         return lengths[0]
     if len(lengths) != 4:
@@ -144,5 +149,5 @@ def parseCellStyle(text: str) -> CellStyle | None:
 
 __all__ = [
     "CellStyleError", "formatCellStyle", "formatFill", "formatPadding",
-    "parseCellStyle", "parseFill", "parsePadding",
+    "parseCellStyle", "parseFill", "parseLength", "parsePadding",
 ]

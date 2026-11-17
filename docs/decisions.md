@@ -644,6 +644,14 @@ and `--border-color` say it plainly. A table's lines are a stylesheet of ten reg
 `--table-style` takes declarations, `show` prints the same text, and a longhand such as
 `table-outline-color` changes one part of a line. Separate flags would number thirty-six.
 
+**A merged cell's borders are its merge's four sides.** A side is one stroke where every
+position along it stores the same one, and `MIXED` where they differ, which pybers never
+creates and Numbers' Border control cannot, since each draws a merge's whole side. Drawing on
+a block widens it to whole merges and never draws a merge's interior. The table's store keeps
+every position's stroke, so a `.numbers` save loses nothing. A document rebuilt from the JSON
+form keeps a merge's uniform outer sides and drops its interior strokes and any `MIXED` side,
+since the form reports what a merge draws rather than how each position stores it.
+
 **A table's outline is one stroke.** Numbers stores it in five slots, one per band, and
 its control always writes them equal, so a document whose slots differ cannot be made or
 edited in Numbers. Five that differ read as `MIXED` and survive untouched, and a write

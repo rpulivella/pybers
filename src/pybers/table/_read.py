@@ -376,6 +376,13 @@ def readTable(
         key = findSlotValue(record, conditionalSlot)
         if key is not None:
             cell._conditions = conditions.get(key, ())
+    # A position holding a border and no record is a cell too, as `64d` shows.
+    rows = {identity: at for at, identity in enumerate(rowIdentities, 1)}
+    columns = {identity: at for at, identity in enumerate(columnIdentities, 1)}
+    for rowIdentity, columnIdentity, _ in table._borders.edges:
+        address = CellAddress(rows[rowIdentity], columns[columnIdentity])
+        if table.addressable(address):
+            table.cell(address)
     return table
 
 

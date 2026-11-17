@@ -211,7 +211,52 @@ class Stroke:
         )
 
 
+# A line style's name, and the pattern, cap and join Numbers stores for it.
+type StrokePresets = frozendict[str, tuple[StrokePattern, StrokeCap, StrokeJoin]]
+
+# The cell Border Styles menu's lines, as Numbers 15.4 stores them in `100b-lines`.
+cellStrokePresets: StrokePresets = frozendict({
+    "solid": (StrokeSolid(), StrokeCap.BUTT, StrokeJoin.MITER),
+    "dashed": (
+        StrokeDash(lengths=(Decimal(2), Decimal(2))), StrokeCap.BUTT, StrokeJoin.MITER,
+    ),
+    "dotted": (
+        StrokeDash(lengths=(Decimal("0.001"), Decimal(2))), StrokeCap.ROUND,
+        StrokeJoin.ROUND,
+    ),
+})
+
+
+def formatStrokePattern(stroke: Stroke, presets: StrokePresets) -> str:
+    """Return a stroke's line as a preset names it, or as its pattern, cap and join."""
+    for name, (pattern, cap, join) in presets.items():
+        if (stroke.pattern, stroke.cap, stroke.join) == (pattern, cap, join):
+            return name
+    match stroke.pattern:
+        case StrokeEmpty():
+            return "hidden"
+        case StrokeDash(lengths=lengths, phase=phase):
+            shown = " ".join(map(str, lengths))
+            word = f"dash({shown})" if phase == 0 else f"dash({shown} / {phase})"
+        case StrokeBrush(name=name):
+            word = f"brush({name})"
+        case other:
+            word = other.patternType.value
+    return f"{word} cap({stroke.cap}) join({stroke.join})"
+
+
+def formatStroke(stroke: Stroke, presets: StrokePresets = cellStrokePresets) -> str:
+    """Return a stroke as CSS writes a border, `1pt dashed #000000ff`.
+
+    A hidden stroke draws nothing, so it is `hidden` alone.
+    """
+    if isinstance(stroke.pattern, StrokeEmpty):
+        return "hidden"
+    return f"{stroke.width}pt {formatStrokePattern(stroke, presets)} {stroke.color}"
+
+
 __all__ = [
+    "StrokePresets", "cellStrokePresets", "formatStroke", "formatStrokePattern",
     "Stroke", "StrokeBrush", "StrokeCap", "StrokeDash", "StrokeEmpty", "StrokeError",
     "StrokeFrame", "StrokeJoin", "StrokePattern", "StrokePatternBase",
     "StrokePatternType", "StrokePatterned", "StrokeSolid", "readStrokeNumber",

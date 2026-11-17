@@ -3,6 +3,7 @@
 The JSON form of a document and its parts: what it holds, and that it reads back.
 
 UPDATES
+2026-11-17  A read-back form drops a merge side whose strokes differ, for PYB-266.
 2026-10-28  A document's `localeIdentifier` is in its form, for PYB-272.
 2026-10-27  A table's `reference` is where it sits, not what it holds, for PYB-260.
 2026-10-24  Written for PYB-259.
@@ -62,10 +63,35 @@ def testADocumentWritesTheSameBytesOnEveryRun(path: Path) -> None:
     assert pybers.formatJsonForm(pybers.open(path)) == writeForm(path)
 
 
+def removeMixedMergeSides(document: pybers.Document) -> None:
+    """Remove every stroke along a merge side whose positions store different ones.
+
+    The form holds such a side as `MIXED`, with no strokes to rebuild it from.
+    """
+    for sheet in document.sheets:
+        for table in sheet.tables:
+            for merge in table.mergeRanges:
+                borders = table._bordersRead(merge.anchor)
+                extent = merge.extent
+                for side in pybers.CellBorderSide:
+                    border = getattr(borders, side.value)
+                    if border is None or border.stroke is not pybers.MIXED:
+                        continue
+                    for address in extent:
+                        table._borders.edges.pop((
+                            table._rowIdentities[address.row - 1],
+                            table._columnIdentities[address.col - 1], side,
+                        ), None)
+
+
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testWhatReadsBackWritesTheSameJsonForm(path: Path) -> None:
     written = writeForm(path)
-    assert pybers.formatJsonForm(pybers.parseJsonForm(written)) == written
+    document = pybers.open(path)
+    removeMixedMergeSides(document)
+    assert pybers.formatJsonForm(pybers.parseJsonForm(written)) == (
+        pybers.formatJsonForm(document)
+    )
 
 
 def testTheFormOpensWithItsVersion() -> None:
@@ -115,7 +141,7 @@ def testATableOnNoSheetNamesNone() -> None:
 @pytest.mark.parametrize(("model", "form", "excluded"), [
     # Where a cell sits, or what its owners derive, rather than what it holds.
     (pybers.Cell, CellForm, {"table", "reference", "tableNames", "timeZone",
-                             "mergeAnchored", "borders"}),
+                             "mergeAnchored"}),
     # Back-pointers and views derived from the declared size and the cells.
     (pybers.Table, TableForm, {"document", "sheet", "extent", "rows", "reference"}),
     (pybers.Sheet, SheetForm, {"document", "tableIdentities"}),

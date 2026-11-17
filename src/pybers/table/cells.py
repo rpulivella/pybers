@@ -89,7 +89,7 @@ from pybers.addressing.reference import (
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
-from pybers.table.borders import TableBorders
+from pybers.table.borders import CellBorders, TableBorders
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
@@ -492,6 +492,20 @@ class Table:
             )
         refuseRangeOutside(self, item)
         return item
+
+    def _bordersRead(self, address: CellAddress) -> CellBorders:
+        """Return the sides of the cell at an address, a merge's spanning all of it."""
+        merge = self.mergeCovering(address)
+        extent = merge.extent if merge is not None else CellRange.fromReferences(
+            address, address
+        )
+        top, left = extent.startRow, extent.startCol
+        bottom, right = extent.endRow, extent.endCol
+        assert top is not None and left is not None
+        assert bottom is not None and right is not None
+        return self._borders.cellBordersRead(
+            self._rowIdentities, self._columnIdentities, top, left, bottom, right
+        )
 
     def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.

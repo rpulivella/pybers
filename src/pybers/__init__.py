@@ -61,7 +61,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
-lazy from pybers.absence import UNCHANGED, UNDETERMINED, WITHHELD
+lazy from pybers.absence import MIXED, UNCHANGED, UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
     CellAddress,
     CellOffset,
@@ -210,7 +210,9 @@ lazy from pybers.style import (
     StrokePatternType,
     StrokeSolid,
     formatCellStyle,
+    formatStroke,
     parseCellStyle,
+    parseLength,
 )
 lazy from pybers.table import (
     Cell,
@@ -231,12 +233,14 @@ lazy from pybers.table import (
     TableHeaders,
     TableRow,
     TableRows,
+    formatCellBorders,
     formatCellValue,
     parseCellValue,
 )
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
 __all__ = [
+    "MIXED",
     "UNCHANGED",
     "UNDETERMINED",
     "WITHHELD",
@@ -265,6 +269,7 @@ __all__ = [
     "FormulaVariable",
     "FormulaLambda",
     "Formula",
+    "formatCellBorders",
     "formatCellValue",
     "formatJsonForm",
     "JsonFormError",
@@ -296,7 +301,9 @@ __all__ = [
     "StrokePatterned",
     "StrokeSolid",
     "formatCellStyle",
+    "formatStroke",
     "parseCellStyle",
+    "parseLength",
     "CellStyleError",
     "Currency",
     "CurrencyAmount",

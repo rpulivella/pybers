@@ -236,8 +236,9 @@ def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1")
     assert result.exit_code == 2
     shown = readPlainText(result.output)
-    assert "Give a VALUE, a --cell-format, a --cell-control or a --cell-style." in (
-        shown
+    assert (
+        "Give a VALUE, a --cell-format, a --cell-control, a --cell-style or a "
+        "--border." in shown
     )
 
 
