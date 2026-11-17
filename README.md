@@ -49,7 +49,7 @@ pybers set budget.numbers "Summary::Costs::B2:B9" --cell-style none
 
 A background is a color in any form [Colors](#colors) lists, or `none` for no fill even where the table gives the cell one. A gradient or image background is read and kept but not yet written, and padding is one length for every side, since Numbers offers one. Either is refused by name before anything is written.
 
-`--border` draws borders on one block of cells, at a position named for the part of the block it draws: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed` or `dotted`, `--border-width` a length such as `1pt` and `--border-color` a color, and a style given alone draws 0.35pt black, as Numbers does. `hidden` draws nothing and hides the table's gridline there, as Numbers' No Border does, and `none` removes the borders so the table's own lines show. A merged cell is bordered whole:
+`--border` draws borders on one block of cells, at a position named for the part of the block it draws: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed` or `dotted`, `--border-width` a length such as `1pt` and `--border-color` a color, and a style given alone draws 0.35pt black, as Numbers does. `hidden` draws nothing and hides the table's line there, as Numbers' No Border does, and `none` removes the borders so the table's own lines show. A merged cell is bordered whole:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B2:D9" --border outer --border-style dashed --border-width 1pt --border-color black

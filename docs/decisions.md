@@ -627,7 +627,8 @@ stroke lands on. pybers names the nine for what they draw, `all`, `outer`, `oute
 **pybers writes both facing edges of every edge it sets.** Numbers writes only the
 selected cells' edges and draws the stroke with the higher `order`, so the same picture
 can be stored several ways. Writing both sides at `max_order + 1` leaves the stored result
-depending on the picture rather than on the route, and Numbers draws what pybers meant.
+depending on the picture rather than on the route, and Numbers draws the stroke pybers
+wrote, whichever side it reads.
 
 **A border's style follows CSS's table borders: `none` is no border of the cell's own,
 `hidden` draws nothing.** Under `border-collapse`, `none` lets the neighbor's or the
@@ -642,7 +643,8 @@ because CSS gives backgrounds no `hidden`.
 border is one stroke at one position, so `--border`, `--border-style`, `--border-width`
 and `--border-color` say it plainly. A table's lines are a stylesheet of ten regions, so
 `--table-style` takes declarations, `show` prints the same text, and a longhand such as
-`table-outline-color` changes one part of a line. Separate flags would number thirty-six.
+`table-outline-color` changes one part of a line, where separate flags would number
+thirty-six.
 
 **A merged cell's borders are its merge's four sides.** A side is one stroke where every
 position along it stores the same one, and `MIXED` where they differ, which pybers never

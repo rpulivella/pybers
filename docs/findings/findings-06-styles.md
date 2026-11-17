@@ -175,7 +175,7 @@ blue right border on C1 is `right_column` layer 2; a dashed bottom on D1 carries
 
 ### Which line an edge displays
 
-Measured 2026-11-16 from the preview each of these documents stores, which Numbers renders as
+Measured 16 November 2026 from the preview each of these documents stores, which Numbers renders as
 it saves, so it shows what Numbers drew rather than what pybers would.
 
 **A run prevails over the gridline and the outline at its edge, an empty one included.**
@@ -205,13 +205,14 @@ at draw time by `order`. Reading has the mirror problem: a border reported from 
 perspective may or may not be matched by its neighbor, and those are different document
 states.
 
-**The inspector treats a neighbor's facing stroke as the cell's own.** In `100b-lines`, C1
-sat beside B1's dashed right edge, so its line style read Multiple, and one edit at 5 pt kept
-C1's left edge dashed and made its other three solid, all at order 7.
+**A cell beside a bordered neighbor reads Multiple as its line style.** In `100b-lines`, C1
+sat beside B1's dashed right edge and read Multiple, and one edit at 5 pt kept C1's left edge
+dashed and made its other three solid, all at order 7. That the inspector reads the
+neighbor's facing stroke as the cell's own is inferred from this one case, not measured.
 
 ### The Border control: nine positions, each a selection
 
-Measured 2026-11-17 in `100b-lines`. A button chooses which edges the next line style,
+Measured 17 November 2026 in `100b-lines`. A button chooses which edges the next line style,
 width or color applies to, and writes nothing on its own. Each block was a 2×2 range given
 the solid line, and each choice wrote one `order`:
 
@@ -229,7 +230,7 @@ a cell outside the range.
 
 ### The stroke a line style takes
 
-Measured 2026-11-17 in `100b-lines`. A cell with no border shows **No Border** as its line
+Measured 17 November 2026 in `100b-lines`. A cell with no border shows **No Border** as its line
 style, and choosing the solid line with nothing else changed writes **0.35 pt, black, sRGB,
 alpha 1, solid, butt cap, miter join**, the gridline's own stroke, so the cell looks
 unchanged. A color with an opacity stores its alpha: `rgb 1, 0, 0, a 0.5` in `srgb`.
@@ -248,7 +249,7 @@ or column.
 
 ### What each Gridlines and Table Outline control sets
 
-Measured 2026-11-17 in `100b-lines` and `101b-outline`, on tables with one header row, one
+Measured 17 November 2026 in `100b-lines` and `101b-outline`, on tables with one header row, one
 header column and one footer row. Each control writes a variation of the root table style
 overriding only what it lists, and a choice equal to the root writes nothing.
 
