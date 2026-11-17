@@ -104,9 +104,11 @@ from pybers.style.strokes import StrokeError
 from pybers.table.borders import (
     CellBorderPosition,
     CellBorderStyle,
-    applyBlockBorders,
     borderWidthOffered,
     buildBorderStroke,
+)
+from pybers.table.bordersdraw import (
+    applyBlockBorders,
     findBlockRing,
     findMergedBlock,
 )

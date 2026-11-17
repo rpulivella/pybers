@@ -11,6 +11,7 @@ writes a table it draws, where a deletion it made would have split one.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-17  Each edge read keeps the run it lies in, for PYB-266.
 2026-11-17  Written for PYB-266, replacing `_strokes`, which mapped the archive at
             save time.
 """
@@ -25,6 +26,7 @@ __status__ = "Development"
 __date__ = "2026/11/17"
 
 from collections.abc import Sequence
+from dataclasses import replace
 
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
@@ -87,19 +89,22 @@ def readTableBorders(
         return TableBorders()
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
     borders = TableBorders(maxOrder=sidecar.max_order)
+    runs = 0
     for side, name in sideLists:
         byRow = side in (CellBorderSide.TOP, CellBorderSide.BOTTOM)
-        for (line, position), (stored, order) in readStoredEdges(
-            index, listLayerReferences(sidecar, name)
-        ).items():
-            row, column = (line, position) if byRow else (position, line)
-            if row >= len(rowIdentities) or column >= len(columnIdentities):
-                continue
-            borders.edges[(rowIdentities[row], columnIdentities[column], side)] = (
-                BorderEdge(
-                    readStroke(tsd.StrokeArchive.FromString(stored)), order, stored
-                )
-            )
+        for reference in listLayerReferences(sidecar, name):
+            layer = index.resolve(reference, tst.StrokeLayerArchive)
+            for run in layer.stroke_runs:
+                runs += 1
+                stored = run.stroke.SerializeToString(deterministic=True)
+                edge = BorderEdge(readStroke(run.stroke), run.order, stored, runs)
+                for position in range(run.origin, run.origin + run.length):
+                    line = layer.row_column_index
+                    row, column = (line, position) if byRow else (position, line)
+                    if row < len(rowIdentities) and column < len(columnIdentities):
+                        borders.edges[
+                            (rowIdentities[row], columnIdentities[column], side)
+                        ] = edge
     return borders
 
 
@@ -229,6 +234,10 @@ def writeTableBorders(
     )
     for identifier in spent:
         registry.archiveRemove(identifier)
+    # The layers now join neighbors drawing alike, so no edge keeps the run it had.
+    table._borders.edges = {
+        key: replace(edge, run=None) for key, edge in table._borders.edges.items()
+    }
 
 
 __all__ = ["readTableBorders", "writeTableBorders"]

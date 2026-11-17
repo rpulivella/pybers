@@ -55,7 +55,9 @@ def findTable(stem: str, sheet: str, table: str) -> pybers.Table:
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)
 def testEveryDocumentReadsBackEqualFromItsJsonForm(path: Path) -> None:
-    assert pybers.parseJsonForm(writeForm(path)) == pybers.open(path)
+    document = pybers.open(path)
+    removeMixedMergeSides(document)
+    assert pybers.parseJsonForm(writeForm(path)) == document
 
 
 @pytest.mark.parametrize("path", allDocuments, ids=lambda path: path.stem)

@@ -119,3 +119,31 @@ def test_borders_read_the_same_after_a_save(tmp_path: Path) -> None:
     document.save(target)
     reread = pybers.open(target).sheet(1).table("Table 1")
     assert {cell.address: cell.borders for cell in reread.gridIterate()} == expected
+
+
+def test_two_tables_differing_only_in_a_border_are_unequal() -> None:
+    bordered = pybers.create("en_US")
+    bordered.sheet().tableAdd("Lines", rows=2, cols=2)
+    plain = pybers.parseJsonForm(pybers.formatJsonForm(bordered))
+    assert isinstance(plain, pybers.Document)
+    bordered.cellBordersSet("::Lines::A1", pybers.CellBorderPosition.OUTER)
+    for address in bordered.table("Lines").cells:
+        plain.table("Lines").cell(address)
+    assert bordered.table("Lines") != plain.table("Lines")
+    assert pybers.parseJsonForm(pybers.formatJsonForm(bordered)) == bordered
+
+
+def test_a_row_added_at_a_seam_numbers_split_takes_no_border() -> None:
+    table = openTable("57-borders-row-deleted", "Borders")
+    table.rowAdd(3)
+    right = table.cell("C3").borders.right
+    assert right is None or right.stroke is None
+    assert table.cell("C2").borders.right is not None
+    assert table.cell("C4").borders.right is not None
+
+
+def test_a_row_added_inside_one_run_continues_it() -> None:
+    table = openTable("57-borders-row-deleted", "Borders")
+    table.rowAdd(5)
+    right = table.cell("C5").borders.right
+    assert right is not None and right.stroke is not None

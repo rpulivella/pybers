@@ -72,7 +72,7 @@ __date__ = "2026/09/02"
 
 import uuid
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -92,13 +92,13 @@ from pybers.addressing.reference import (
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
-from pybers.style.strokes import Stroke, StrokeEmpty
+from pybers.style.strokes import Stroke
 from pybers.table.borders import (
     CellBorders,
     CellBorderSide,
     TableBorders,
-    isMergeInterior,
 )
+from pybers.table.bordersdraw import findCellBordersByPosition, findShownLine
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
@@ -117,7 +117,6 @@ from pybers.table.tablestyle import (
     TableStyle,
     TableStyleChange,
     buildTableStyle,
-    findTableLine,
     resetTableStyle,
 )
 
@@ -212,6 +211,19 @@ class Table:
             self._rowIdentities = generateLineIdentities(self.rowCount)
         if not self._columnIdentities:
             self._columnIdentities = generateLineIdentities(self.colCount)
+
+    def __eq__(self, other: object) -> bool:
+        """Compare every field equality covers, and the borders each cell shows.
+
+        Borders are kept by line identity, which a table read from its JSON form does
+        not share, so they compare by position.
+        """
+        if not isinstance(other, Table):
+            return NotImplemented
+        return all(
+            getattr(self, each.name) == getattr(other, each.name)
+            for each in fields(self) if each.compare
+        ) and findCellBordersByPosition(self) == findCellBordersByPosition(other)
 
     def _cellStyleInherited(self, address: CellAddress) -> CellStyle:
         """Return the cell style a cell at `address` inherits from its region."""
@@ -553,22 +565,7 @@ class Table:
         A stored stroke prevails, the later of two that disagree, and a hidden one
         draws nothing; else the table's own line for that edge, while it shows.
         """
-        cell = self._addressResolve(address)
-        if isMergeInterior(self, cell.row, cell.col, side):
-            return None
-        drawn = self._borders.edgeShownFind(
-            self._rowIdentities, self._columnIdentities, cell, side
-        )
-        if drawn is not None:
-            return None if isinstance(drawn.pattern, StrokeEmpty) else drawn
-        # The line before the edge: a top or left edge belongs to the one before.
-        line = findTableLine(
-            self._tableStyle, self._headers, self.rowCount, self.colCount,
-            cell.row - (side is CellBorderSide.TOP),
-            cell.col - (side is CellBorderSide.LEFT),
-            side in (CellBorderSide.TOP, CellBorderSide.BOTTOM),
-        )
-        return line.stroke if line.visible else None
+        return findShownLine(self, self._addressResolve(address), side)
 
     def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.

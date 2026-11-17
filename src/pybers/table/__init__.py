@@ -55,8 +55,8 @@ from pybers.table.borders import (
     CellBorders,
     CellBorderSide,
     CellBorderStyle,
-    formatCellBorders,
 )
+from pybers.table.bordersdraw import formatCellBorders
 from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
 from pybers.table.cells import Table
 from pybers.table.fill import CellValueFill
