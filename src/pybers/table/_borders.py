@@ -35,7 +35,12 @@ from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.metadata import PackageRegistry, composeArchive
 from pybers.style._read import readStroke
 from pybers.style._write import composeStroke
-from pybers.table.borders import BorderEdge, CellBorderSide, TableBorders
+from pybers.table.borders import (
+    BorderEdge,
+    CellBorderSide,
+    TableBorders,
+    borderOrderInitial,
+)
 from pybers.table.cells import Table
 
 # One stroke as a layer stores it: the run's stroke bytes and its order.
@@ -138,17 +143,38 @@ def buildLayerRuns(
     ]
 
 
+def createStrokeSidecar(
+    index: ArchiveIndex, registry: PackageRegistry, modelId: int,
+    model: tst.TableModelArchive,
+) -> None:
+    """Give a created table the empty sidecar Numbers gives it on its first save.
+
+    Measured in `99b-created-document-saved-unedited`: no layers, the order at 2,
+    in the model's own member.
+    """
+    sidecar = tst.StrokeSidecarArchive(max_order=borderOrderInitial)
+    identifier = registry.identifierAllocate()
+    registry.archiveAdd(
+        registry.componentRequire(modelId), composeArchive(identifier, sidecar),
+        sidecar,
+    )
+    model.stroke_sidecar.identifier = identifier
+    index.archiveWrite(modelId, model, registry.referencesReconcile(modelId, model))
+
+
 def writeTableBorders(
-    index: ArchiveIndex, registry: PackageRegistry,
+    index: ArchiveIndex, registry: PackageRegistry, modelId: int,
     model: tst.TableModelArchive, table: Table,
 ) -> None:
     """Rewrite a table's sidecar from its borders, when what it holds differs.
 
-    A created table has no sidecar until Numbers saves it, and gains none here
-    while it holds no border.
+    A created table has no sidecar until Numbers saves it, and gains one here only
+    once it holds a border.
     """
     if not model.HasField("stroke_sidecar"):
-        return
+        if not table._borders.edges:
+            return
+        createStrokeSidecar(index, registry, modelId, model)
     sidecarId = model.stroke_sidecar.identifier
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
     wanted = composeWantedEdges(table)

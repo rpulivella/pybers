@@ -196,7 +196,7 @@ class TableSave:
             index, table, model, swallowed, maps, self.registry, plan, moves, copies
         )
         # After the edits, which leave the sidecar's size and layers as stored.
-        writeTableBorders(index, self.registry, model, table)
+        writeTableBorders(index, self.registry, modelIdentifier, model, table)
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
         headed = applyHeaders(table, model)
         reshaped = maps.changed or moves or copies or edits.tilesCreated

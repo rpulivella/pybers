@@ -216,6 +216,8 @@ class CellChange:
     controlAfter: CellControl | None
     cellStyleBefore: CellStyle | None = None
     cellStyleAfter: CellStyle | None = None
+    bordersBefore: CellBorders = CellBorders()
+    bordersAfter: CellBorders = CellBorders()
     rowsAdded: int = 0
     colsAdded: int = 0
 
@@ -228,6 +230,7 @@ class CellChange:
             or self.formatBefore != self.formatAfter
             or self.controlBefore != self.controlAfter
             or self.cellStyleBefore != self.cellStyleAfter
+            or self.bordersBefore != self.bordersAfter
             or not isSameValue(self.valueBefore, self.valueAfter)
         )
 

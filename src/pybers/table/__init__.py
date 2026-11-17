@@ -49,7 +49,13 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
-from pybers.table.borders import CellBorder, CellBorders, CellBorderSide
+from pybers.table.borders import (
+    CellBorder,
+    CellBorderPosition,
+    CellBorders,
+    CellBorderSide,
+    CellBorderStyle,
+)
 from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
 from pybers.table.cells import Table
 from pybers.table.fill import CellValueFill
@@ -62,7 +68,9 @@ from pybers.table.rows import TableRow, TableRows
 __all__ = [
     "Cell",
     "CellBorder",
+    "CellBorderPosition",
     "CellBorderSide",
+    "CellBorderStyle",
     "CellBorders",
     "CellPresentation",
     "CellKind",

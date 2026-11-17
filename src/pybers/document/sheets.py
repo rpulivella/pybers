@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-17  `cellBordersSet`, borders drawn at a position of one block, for
+            PYB-266.
 2026-11-12  `cellSet` sets a cell style, its whole box, for PYB-265.
 2026-11-10  `cellSet` sets a value, a format or both, a part not given left as it
             was, for PYB-145.
@@ -74,6 +76,7 @@ import datetime
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field, replace
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -86,6 +89,7 @@ from pybers.addressing.reference import (
     lastRow,
     tableNameSeparator,
 )
+from pybers.color.colors import Color
 from pybers.errors import PybersError, WriteError
 from pybers.format._check import (
     findControlRefusal,
@@ -96,6 +100,15 @@ from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, findCellStyleRefusal
+from pybers.style.strokes import StrokeError
+from pybers.table.borders import (
+    CellBorderPosition,
+    CellBorderStyle,
+    applyBlockBorders,
+    borderWidthOffered,
+    buildBorderStroke,
+    findBlockRing,
+)
 from pybers.table.cell import (
     Cell,
     CellChange,
@@ -524,6 +537,80 @@ class Document:
                 rowsAdded=rowsAdded, colsAdded=colsAdded,
             ))
         return CellChanges(tuple(changes), tuple(skipped))
+
+    def cellBordersSet(
+        self,
+        selector: SelectorLike,
+        position: CellBorderPosition,
+        *,
+        style: CellBorderStyle | None = CellBorderStyle.SOLID,
+        width: Decimal | int | None = None,
+        color: Color | None = None,
+    ) -> CellChanges:
+        """Draw borders at a position of one block of cells, or remove them with None.
+
+        A style given alone draws 0.35pt black, as Numbers does, and `HIDDEN` draws
+        nothing and hides the table's line. Both facing sides of every edge are set.
+        """
+        from pybers.selection.matching import findBlockTarget
+
+        stroke = None
+        if not isinstance(position, CellBorderPosition):
+            choices = ", ".join(each.value for each in CellBorderPosition)
+            raise WriteError(
+                f"A border's position is one of {choices}, and cellBordersSet was "
+                f"given {position!r}. Nothing was written."
+            )
+        if style is not None and not isinstance(style, CellBorderStyle):
+            choices = ", ".join(each.value for each in CellBorderStyle)
+            raise WriteError(
+                f"A cell border's style is one of {choices}, or None to remove it, and "
+                f"cellBordersSet was given {style!r}. Nothing was written."
+            )
+        if style in (None, CellBorderStyle.HIDDEN) and (
+            width is not None or color is not None
+        ):
+            effect = "removes the borders" if style is None else "draws no line"
+            raise WriteError(
+                f"A style of {style} {effect}, so it takes no width or color. Nothing "
+                "was written."
+            )
+        if isinstance(width, bool) or not isinstance(width, Decimal | int | None):
+            raise WriteError(
+                f"A border's width is a Decimal or an int number of points, and "
+                f"cellBordersSet was given {width!r}. Nothing was written."
+            )
+        if style is not None:
+            try:
+                stroke = buildBorderStroke(
+                    style, borderWidthOffered if width is None else width,
+                    Color.black if color is None else color,
+                )
+            except StrokeError as exc:
+                raise WriteError(f"{exc} Nothing was written.") from exc
+        table, block = findBlockTarget(self, selector, "border")
+        before = {
+            address: table._borders.cellBordersRead(
+                table._rowIdentities, table._columnIdentities,
+                address.row, address.col,
+            )
+            for address in findBlockRing(table, block)
+        }
+        drawn = set(applyBlockBorders(table, block, position, stroke))
+        changes = []
+        for address, held in before.items():
+            cell = table.cell(address) if address in drawn or block.covers(
+                address
+            ) else None
+            if cell is None or (not block.covers(address) and cell.borders == held):
+                continue
+            changes.append(CellChange(
+                cell.reference, cell.value, cell.value, cell.kind, cell.kind,
+                cell.presentation.format, cell.presentation.format,
+                cell.presentation.control, cell.presentation.control,
+                bordersBefore=held, bordersAfter=cell.borders,
+            ))
+        return CellChanges(tuple(changes))
 
     def tableFor(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.
