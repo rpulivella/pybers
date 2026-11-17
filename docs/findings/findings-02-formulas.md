@@ -37,7 +37,7 @@ Two consequences. Reading a value never requires evaluating anything, because th
 already stored. **Writing a formula means writing a plausible cached result too**, a
 stale or missing one would display the wrong number until Numbers recalculated.
 
-**Opening the document is not when it recalculates**, measured 2026-09-02 against
+**Opening the document is not when it recalculates**, measured 2 September 2026 against
 `tests/golden/20-formula-shapes-multisheet-edited.numbers`. That file's `A1:A10` were
 raised to 10055 while `A11`, holding `SUM(A1:A10)`, still displayed the cached 55 after
 a clean open with no warning. The staleness above is not a transient a writer can
@@ -45,7 +45,7 @@ count on Numbers resolving: it survives on screen, and it reaches every formula
 depending on an edited cell, not only a formula the writer wrote itself.
 
 **But a writer can ask for the recalculation, and marking the edited cells is enough.**
-Measured 2026-09-02 for PYB-25. `TSCE.CalculationEngineArchive.refs_to_dirty` points at a
+Measured 2 September 2026 for PYB-25. `TSCE.CalculationEngineArchive.refs_to_dirty` points at a
 `TSCE.ReferencesToDirtyArchive` that every clean document carries and every clean
 document serializes to zero bytes. Populating it with the cells that changed, and
 nothing else, makes Numbers recalculate on open:
@@ -128,7 +128,7 @@ absolute_row    { range_begin: 0 }
 four true for the locked one, so anchoring is expressed twice, in the field variant and in
 the bits.
 
-**That doubling belongs to RANGES only**, measured across every document on 2026-09-03
+**That doubling belongs to RANGES only**, measured across every document on 3 September 2026
 for PYB-41 and stated here because the paragraph above reads as a general rule and is not
 one. A range node carries both records. A single-cell reference carries the `absolute`
 flag on each coordinate and **no sticky bits at all**, 0 of 21 in the documents. A reader
@@ -219,7 +219,7 @@ template's `VLOOKUP(Life Plans::B1,Data::B:E,4,FALSE)` surfaced it.
 
 ### The engine keeps its own register of which cells hold formulas, stored TWICE
 
-From PYB-42, measured 2026-09-04, and found only because a golden was opened in
+From PYB-42, measured 4 September 2026, and found only because a golden was opened in
 Numbers. Setting a cell record's formula flag and pooling the archive is **necessary but
 not sufficient**. `TSCE.FormulaOwnerDependenciesArchive` carries a register of the cells
 that hold formulas, and a cell missing from it is never evaluated.
@@ -258,7 +258,7 @@ whatever order created them.
 
 ### A registered formula still has to say what it reads, or it computes once
 
-Measured 2026-09-16 for PYB-86, and found the same way: a golden opened twice gave two
+Measured 16 September 2026 for PYB-86, and found the same way: a golden opened twice gave two
 answers. `SUM(A1:B1)` read 8 on the first open and `Cell "B1" contains an error` on the
 second, because Numbers evaluates in an order of its own and a formula reading a cell
 computed later caches whatever that cell still held. Nothing warns, and the second
@@ -282,7 +282,7 @@ stores. A call naming one range twice, as `SUMIFS` does in `20-formula-shapes`, 
 entry. A rectangle of one line omits that axis of its size, as the default is 1.
 
 **A formula swapped for another has to re-declare what it reads**, which is a third
-state beside attaching and detaching one. Confirmed 2026-09-16 in
+state beside attaching and detaching one. Confirmed 16 September 2026 in
 `20-formula-precedent-replaced`: a cell moved from `=A1*3` to `=A2*3` follows `A2` and
 ignores `A1`, where the register left alone had it the other way round.
 
@@ -332,7 +332,7 @@ error text for anything else would mean evaluating the formula.
 34/35  a bracketing pair around each argument of a nested call
 ```
 
-**An operator IS its node type, and carries nothing else**, added 2026-09-04 from
+**An operator IS its node type, and carries nothing else**, added 4 September 2026 from
 PYB-41 along with types 3 and 6. `1+1` is type 1, `2*3` is type 3, `"a"&"b"` is type 6,
 and none of them holds a field beyond `AST_node_type`, arity being implied. Every
 FUNCTION, by contrast, is type 16 distinguished by a number. The name map below is
@@ -344,7 +344,7 @@ and `ROUND(2.5,0)` share index 126 with different `numArgs`, so arity is carried
 the call rather than encoded in the index. The full name map is derived
 from Numbers itself by `tools/local/functions_extract.py`, rather than borrowed.
 
-**Excel's table is not that map, checked 2026-09-03.** The comparison is worth making
+**Excel's table is not that map, checked 3 September 2026.** The comparison is worth making
 because the two applications interoperate and because Excel's older binary format stores
 formulas the same way Numbers does, as postfix tokens whose calls carry a numeric index.
 Microsoft documents that index table as the `Ftab` in `[MS-XLS]`, and it disagrees

@@ -45,7 +45,7 @@ covered cell from an empty one by looking at the tile; it has to consult the mer
 That makes merges essential to reading a table correctly, not an optional nicety.
 
 **No gesture inside Numbers leaves a record at a covered position.** `22c-merge-overpaints`
-tried four, measured 2026-09-07: content then merge, style then merge, a whole-row fill over
+tried four, measured 7 September 2026: content then merge, style then merge, a whole-row fill over
 an existing merge, and a whole-column fill over one. Every uncovered empty cell a fill
 touches gains a type-0 record with a style and no value; every covered one stays absent.
 `22d` confirms it on the vertical axis.
@@ -66,7 +66,7 @@ text cell separated by tab characters**:
 1 + 10                    ->   '1\t10'      a STRING, not a number
 ```
 
-`22d` completes the rule on the second axis, measured 2026-09-07. The join is **row-major,
+`22d` completes the rule on the second axis, measured 7 September 2026. The join is **row-major,
 a tab between columns and a newline between rows**, so a two-by-two merge of cells naming
 themselves produces `'two by two, anchor\td2\nc3\td3'`. Every merge in the documents was one
 row tall until that fixture, which is why only the tab half was known.
@@ -87,7 +87,7 @@ kind (consistent with the finding that error kinds are not stored) it simply bec
 error cell and un-becomes one.
 
 **So merging is a recalculation event, and a writer that forgets this ships a wrong
-number.** Added 2026-09-02 from PYB-16: writing the merge store alone leaves `L1` holding
+number.** Added 2 September 2026 from PYB-16: writing the merge store alone leaves `L1` holding
 whatever it resolved to before, so a file merged by this library displayed 0 where the
 error belonged and an unmerged one displayed the error where 0 belonged. Numbers does not
 notice on its own, for the same reason it does not notice an edited operand, see
@@ -154,7 +154,7 @@ did not maintain the merge store. Any row or column operation in pybers must upd
 ## Adding and removing rows and columns, measured against Numbers' own edits
 
 From `56-structure-base` and six copies, each with one edit made in Numbers, measured
-2026-09-18 for PYB-17. The base carries labeled formulas, merges before, across and
+18 September 2026 for PYB-17. The base carries labeled formulas, merges before, across and
 beyond each edit, a hidden row and column, and a second table reading the first.
 
 **Numbers widens a selected row or column to cover every merge it touches**, and does
@@ -197,7 +197,7 @@ entry, which pybers leaves to the recalculation it asks for.
 
 ## What else a structural edit carries, and what Numbers does to each
 
-From the `57`, `58` and `59` measurements and `27b` and `27c`, measured 2026-09-21
+From the `57`, `58` and `59` measurements and `27b` and `27c`, measured 21 September 2026
 for PYB-17. Each is one edit Numbers made to a document built for it.
 
 **A merged value outlives its anchor's line.** Deleting the row a merge's anchor
@@ -268,7 +268,7 @@ moved spill is listed first.
 From `60-move-base`, which holds `B2:D5` with formulas pointing inside it, out of it,
 locked, mixed and across tables, and `61-move-styles-base`, which holds a fill, a bold
 face, a border and a highlighting rule in the same block. Each copy is one move made by
-hand in Numbers 15.3.1, measured 2026-09-23 for PYB-18.
+hand in Numbers 15.3.1, measured 23 September 2026 for PYB-18.
 
 **Dragging preserves the cell each reference names.** A reference inside the block to
 another cell in it follows, `=B2+C2` becoming `=F8+G8`. One leaving the block keeps its
@@ -279,7 +279,7 @@ wholly inside the block follows it, from another table too: `=SUM(B2:D5)` became
 **Cut and paste preserves each reference's position relative to its formula.** It
 rewrites only a moved range that would reach past its table's edge, clamping it there:
 `SUM(A1:A12)` pasted six rows lower in a twelve row table was stored as `SUM(E7:E12)`,
-not `SUM(E7:E18)`, measured 2026-09-24. The engine registers every range the same way,
+not `SUM(E7:E18)`, measured 24 September 2026. The engine registers every range the same way,
 bounded by the table it reads, whether or not anything moved. `=A3` became `=E9`, the locked axis of `=$B2` stayed so it
 became `=$B8`, and a formula elsewhere kept naming the address the block left, reading
 empty cells. An offset landing outside a table is stored as it is, `=I7` in an eight
@@ -299,14 +299,14 @@ border on `C3` moved to `G9` with no layer left behind. The highlighting rule wa
 rebuilt as a new archive with identical contents, its operand still one column left,
 because the cell it reads moved with it. No record remains at a vacated position.
 
-**A drag rewrites highlighting as it rewrites formulas**, measured 2026-09-24 in
+**A drag rewrites highlighting as it rewrites formulas**, measured 24 September 2026 in
 `62b-move-rules-dragged`. The rule on `C2` reading `A1` kept reading `A1` from `G8`, and
 the rule on `E2` reading `C2`, outside the block, now reads `G8`. Each cell kept its
 cached match. Numbers reused the two list keys, where a structural edit issues new ones.
 
 ## Filling a block of cells: what a drag and Autofill Down each write
 
-Measured 2026-09-29 in Numbers 15.3.1 against `63-fill-base`, which
+Measured 29 September 2026 in Numbers 15.3.1 against `63-fill-base`, which
 `golden-confirm.py measure` made from `61-move-styles-base` by pasting the rich text of
 `02-text-rich` into `B3` and giving `D3` a checkbox. `63c` and `63e` are `B2:D3` dragged
 down to row 7 by hand, `63d` is the base with a border added around `D3`, `63f` is `63e`
@@ -336,7 +336,7 @@ with its payload, its storage and the character styles only that storage named.
 
 ## Filling a series: what a drag continues and what it repeats
 
-Measured 2026-09-30 in Numbers 15.3.1 for PYB-137. `65-series-base` is imported from
+Measured 30 September 2026 in Numbers 15.3.1 for PYB-137. `65-series-base` is imported from
 `65-series-base.csv` and `65b-series-dragged` is every column of it dragged down by hand.
 `66-series-vertical-base` and `66-series-horizontal-base` are imported from the CSVs that
 `66-series-directions.py` writes, twenty cases each with room on every side. `66b` and
@@ -414,7 +414,7 @@ alternately. A lone cell in `66b` is a different case, and steps as above.
 
 ## Copying a block of cells: copy and paste keeps each offset and every border
 
-Measured 2026-09-29 in Numbers 15.3.1 for PYB-136. `64-copy-pasted` is `60-move-base`
+Measured 29 September 2026 in Numbers 15.3.1 for PYB-136. `64-copy-pasted` is `60-move-base`
 and `64b-copy-styles-pasted` is `61-move-styles-base`, each with `B2:D5` copied and
 pasted at `F8` by `golden-confirm.py measure`.
 
@@ -614,7 +614,7 @@ on each entry is what maps a tile to its row range.
 
 ## A table declares its size, and it is often larger than its cells reach
 
-From every document, measured 2026-09-01.
+From every document, measured 1 September 2026.
 
 **`TableModelArchive.number_of_rows` and `number_of_columns` are explicitly set on all 74
 tables**, and they are the table's real size. A Numbers table is a fixed grid rather than the
@@ -775,7 +775,7 @@ case-insensitively**, `I am a Table` and `I AM a TAAble` are treated as the same
 appends `-1`, `-2`, `-1-1` to force it. A writer that renames a table has to enforce the same
 rule or it will produce a document Numbers itself would not have written.
 
-**Corrected 2026-09-01: the scope is the sheet, not the document.** This section read "unique
+**Corrected 1 September 2026: the scope is the sheet, not the document.** This section read "unique
 within a document", generalized from `42`, whose eight tables all sit on one sheet.
 `20-formula-shapes` disproves that reading directly: it carries `Table 1` on Sheet 1 and
 another `Table 1` on Sheet 2, in one document, with `Table 2` alongside the first. A name

@@ -2,7 +2,7 @@
 
 What each format family stores in its `TSK.FormatStructArchive`, which bits the format
 sets in the cell record, and which fields pybers writes or carries through. Measured
-2026-10-20 and 2026-10-21 for PYB-219, and every count below is across all 74,304 records
+20 October 2026 and 21 October 2026 for PYB-219, and every count below is across all 74,304 records
 in 161 documents.
 
 Part of [FINDINGS.md](FINDINGS.md), which indexes every topic. How a cell names its format,
@@ -363,7 +363,7 @@ The unit bits run 1 weeks, 2 days, 4 hours, 8 minutes, 16 seconds and 32 millise
 Weeks, hours, minutes and milliseconds are named by `15-number-duration-formats` `E1`
 "only weeks", `I1` "hours minutes" and `G1` "only milliseconds", and days and seconds by
 `77-duration-units` `A1` and `B1`. With automatic units the pair records the range Numbers last chose:
-the largest unit the value holds an amount of, down to the smallest, measured 2026-11-10
+the largest unit the value holds an amount of, down to the smallest, measured 10 November 2026
 for PYB-145. 20 and 10 minutes store minutes to minutes, 1h 10m and 1h 30m hours to
 minutes, and 71 days, 11 hours and 10 milliseconds weeks to milliseconds, in
 `11-value-types-noformats` `D1`, `15-number-duration-formats` `B1` to `D1` and
@@ -379,7 +379,7 @@ format `1` without a control, as [values](findings-01-values.md) records.
 
 ### Which families show which kinds of value
 
-Measured 2026-11-10 for PYB-145 across the 190 documents in the tests, pairing each
+Measured 10 November 2026 for PYB-145 across the 190 documents in the tests, pairing each
 cell's kind with the family it is shown with. `kindFormatFamilies` in
 `pybers.table.kinds` is this table, and a format outside it is refused.
 
@@ -407,7 +407,7 @@ writes an empty cell's format the same way, as the golden
 
 #### A formula's format waits in its family's slot
 
-Measured 2026-11-10 for PYB-145 in Numbers 15.4, by giving three formula records a
+Measured 10 November 2026 for PYB-145 in Numbers 15.4, by giving three formula records a
 percent format in their number slot and saving each after Numbers opened it. Numbers
 shows a formula's result through the slot of the result's kind, so a format waits in
 its family's slot until a result of that kind arrives:
@@ -428,7 +428,7 @@ keeps one.
 
 ### Which formats each control shows through
 
-Measured 2026-11-10 for PYB-145 across the same 190 documents, pairing each control with
+Measured 10 November 2026 for PYB-145 across the same 190 documents, pairing each control with
 the family of the format beneath it. `controlFormatFamilies` in `pybers.format.controls`
 is this table, and a control beside any other format is refused.
 

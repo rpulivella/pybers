@@ -73,7 +73,7 @@ of the spec registry the same way `tools/local/functions_extract.py` reads the a
 
 A cross-table reference holds `AST_cross_table_reference_extra_info.table_id`, four 32-bit
 words. That value is the `formula_owner_uid` on the calculation engine's dependency entry
-for the target table, low half first, matched across `20-formula-shapes` on 2026-09-08.
+for the target table, low half first, matched across `20-formula-shapes` on 8 September 2026.
 
 **`TableModelArchive.haunted_owner.owner_uid` is not it**, and it looks like it is: it agrees
 in 15 of 16 bytes and differs in the low byte (`0x37` against `0x14` for `Table 2`). Reading
@@ -132,7 +132,7 @@ column would otherwise count many times:
 A bracket precedence requires is recorded every time, 185 out of 185. A further 193
 formulas record a bracket nothing requires, which is what preserving what a person typed
 looks like: `22+(3/12)` is stored with its bracket and displayed with it, confirmed in
-Numbers 15.3.1 on 2026-09-11.
+Numbers 15.3.1 on 11 September 2026.
 
 **The last row is the exception that shapes the design.** One formula, `F22/(C22/1000)`,
 needs a bracket that no node records. Its stored result is 1233.33 for F22 of 18500 and
@@ -158,7 +158,7 @@ Numbers did not store. Nothing is lost and nothing changes meaning.
 - **Whether Numbers ever writes `numArgs` above 1.** Nothing measured does, so the
   renderer refuses a wider one rather than writing a bracket around a single value.
 - ~~**What Numbers does with a bracket around one value**, such as `(5)`.~~ Settled
-  2026-09-13 in Numbers 15.3.1 against `tests/golden/20-formula-brackets.numbers`, which
+  13 September 2026 in Numbers 15.3.1 against `tests/golden/20-formula-brackets.numbers`, which
   no formula in six documents demonstrates: `=(5)` displays as `(5)` and evaluates to 5,
   and `=1-(2-3)` keeps a bracket Numbers stores no node for and evaluates to 2. Writing
   a list node for every bracket read is therefore safe.
