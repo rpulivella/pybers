@@ -388,6 +388,45 @@ class TableBorders:
         """Return a side's key, from its line's identity on the edited axis."""
         return (line, other, side) if rows else (other, line, side)
 
+    def facingPairsLift(
+        self, rowIdentities: Sequence[int], columnIdentities: Sequence[int],
+        moves: Sequence[tuple[CellAddress, CellAddress]],
+    ) -> list[tuple[BorderEdgeKey, BorderEdge]]:
+        """Lift each facing side outside a moving block that pairs a side inside it.
+
+        A pair is the same stroke at the same order, as pybers writes both sides of
+        an edge, so it moves with the block. A side a neighbor drew for itself stays.
+        Returns where each lifted side lands, beside the block's destination.
+        """
+        moving = {source for source, _ in moves}
+        rows, columns = len(rowIdentities), len(columnIdentities)
+
+        def keyFind(
+            row: int, column: int, side: CellBorderSide
+        ) -> BorderEdgeKey | None:
+            if not (1 <= row <= rows and 1 <= column <= columns):
+                return None
+            return (rowIdentities[row - 1], columnIdentities[column - 1], side)
+
+        lifted: list[tuple[BorderEdgeKey, BorderEdge]] = []
+        for source, target in moves:
+            for side, (facing, down, across) in facingSides.items():
+                row, column = source.row + down, source.col + across
+                if (row, column) in {(each.row, each.col) for each in moving}:
+                    continue
+                own = self.edges.get((
+                    rowIdentities[source.row - 1], columnIdentities[source.col - 1],
+                    side,
+                ))
+                held = keyFind(row, column, facing)
+                if own is None or held is None or self.edges.get(held) != own:
+                    continue
+                del self.edges[held]
+                landed = keyFind(target.row + down, target.col + across, facing)
+                if landed is not None:
+                    lifted.append((landed, own))
+        return lifted
+
     def cellsCarry(
         self, carries: Sequence[tuple[tuple[int, int], tuple[int, int]]], keep: bool
     ) -> None:

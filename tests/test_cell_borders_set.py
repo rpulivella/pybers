@@ -41,6 +41,7 @@ from pybers import (
 from pybers.errors import WriteError
 from pybers.selection.matching import SelectionError
 
+named = pybers.FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 gridline = Stroke(width=Decimal("0.35"), color=Color.black, pattern=StrokeSolid())
 positionBlocks: dict[CellBorderPosition, tuple[str, str]] = {
     CellBorderPosition.OUTER: ("Positions Top", "A1:B2"),
@@ -200,3 +201,24 @@ def test_a_merge_on_a_tables_first_row_is_bordered_along_its_top() -> None:
     document.cellBordersSet("::Lines::A1", CellBorderPosition.ALL)
     assert table.cell("A1").borders.top == CellBorder(gridline, None, prevails=True)
     assert table.cellBorderShown("A1", pybers.CellBorderSide.TOP) == gridline
+
+
+def test_a_moved_cell_takes_the_facing_sides_its_border_wrote() -> None:
+    document = pybers.create("en_US")
+    table = document.sheet().tableAdd("Lines", rows=6, cols=6)
+    document.cellBordersSet("::Lines::B2", CellBorderPosition.OUTER)
+    table.cellsMove("B2", "D4", references=named)
+    assert all(
+        table.cell(address).borders == CellBorders()
+        for address in ("A2", "B1", "B2", "B3", "C2")
+    )
+    drawn = CellBorder(gridline, gridline, prevails=True)
+    assert table.cell("D4").borders == CellBorders(drawn, drawn, drawn, drawn)
+
+
+def test_a_move_leaves_a_side_a_neighbor_drew_for_itself() -> None:
+    table = pybers.open(findDocumentPath("63d-fill-border-base")).table("Table 1")
+    table.cellsMove("D3", "F9", references=named)
+    right = table.cell("C3").borders.right
+    assert right is not None and right.stroke is not None
+    assert right.stroke.width == 3

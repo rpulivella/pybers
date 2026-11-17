@@ -10,8 +10,8 @@ on without asking, measured 2026-09-23 in `60e-move-overwrite`, and pybers refus
 instead, since that discards a value nobody asked to lose.
 
 UPDATES
-2026-11-17  Every position of the block carries its borders in the model, for
-            PYB-266.
+2026-11-17  Every position of the block carries its borders in the model, and
+            the facing side pybers wrote beside it, for PYB-266.
 2026-10-14  Writes the table's own store, `cells` being read-only, and checks a
             range against the grid through `bounds`, for PYB-193.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
@@ -273,6 +273,9 @@ def moveCells(
         cell.formula = formula
         cell._conditions = conditions
     rows, columns = table._rowIdentities, table._columnIdentities
+    pairs = table._borders.facingPairsLift(
+        rows, columns, [(reference, move.cellMap(reference)) for reference in extent]
+    )
     table._borders.cellsCarry(
         [
             (
@@ -284,6 +287,7 @@ def moveCells(
         ],
         keep=False,
     )
+    table._borders.edges.update(pairs)
     table.mergeRanges = [
         MergeRange(CellRange.fromReferences(
             move.cellMap(merge.anchor), move.cellMap(merge.corner)
