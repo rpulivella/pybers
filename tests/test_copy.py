@@ -7,6 +7,7 @@ leave a table as it was, and the few lines a script or a command line writes to
 copy a block.
 
 UPDATES
+2026-11-17  Borders read side by side, for PYB-266.
 2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-29  Written for PYB-136.
 """
@@ -74,12 +75,7 @@ def listLeftEdges(path: Path) -> set[tuple[int, int]]:
     """Return each (column, row) of Table 1 drawing a left border, counted from zero."""
     layers = readTableFacts(path)["Table 1"]["strokes"]
     assert isinstance(layers, dict)
-    return {
-        (column, row)
-        for column, runs in layers["left"]
-        for origin, length, _ in runs
-        for row in range(origin, origin + length)
-    }
+    return {(column, row) for column, row, _ in layers["left"]}
 
 
 def copyAndSave(

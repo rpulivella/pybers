@@ -19,6 +19,7 @@ to a caller:
 Private. The table feature offers `Table` and `Cell`, not the walk that builds one.
 
 UPDATES
+2026-11-17  The table's borders, keyed by row and column identity, for PYB-266.
 2026-11-12  Each cell's own cell style, and what each region's resolves to, for
             PYB-265.
 2026-11-03  A table's header rows, header columns and footer rows, for PYB-223.
@@ -87,6 +88,7 @@ from ..formula._read import readFormula, readFormulaTable, resolveFormula
 from ..formula.nodes import Formula
 from ..style._read import readCellStyles
 from ..style.cells import CellStyle
+from ._borders import readTableBorders
 from ._cellstyles import readOwnCellStyles, readRegionCellStyles, readRegionVariations
 from .cell import Cell, CellValue
 from .cells import Table
@@ -345,6 +347,7 @@ def readTable(
             model.number_of_footer_rows,
         ),
         _cellStylesInherited=readRegionCellStyles(index, model),
+        _borders=readTableBorders(index, model, rowIdentities, columnIdentities),
     )
     formatTypes = readFormatTypes(index, dataStore)
     currencyCodes = readCurrencyCodes(index, dataStore)

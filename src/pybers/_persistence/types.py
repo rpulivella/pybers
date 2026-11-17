@@ -21,6 +21,7 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-11-17  The version of a stroke sidecar and layer, for PYB-266.
 2026-11-02  Every style and preset a created theme holds, and the version of each
             type a created document holds, for PYB-261.
 2026-11-02  The version Numbers writes each created type at, for PYB-276.
@@ -166,6 +167,8 @@ archiveVersions: frozendict[type[Message], tuple[int, ...]] = frozendict({
     tst.TableDataList: (1, 0, 5),
     tst.HeaderStorageBucket: (1, 0, 5),
     tst.ColumnRowUIDMapArchive: (1, 0, 5),
+    tst.StrokeSidecarArchive: (1, 0, 5),
+    tst.StrokeLayerArchive: (1, 0, 5),
 })
 bncDataListVersion: tuple[int, ...] = (3, 2, 10)
 

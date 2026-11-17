@@ -6,6 +6,8 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and naming it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-11-17  `borders`, each side's stroke and its neighbor's, and a copy no
+            longer says whether borders go with it, for PYB-266.
 2026-11-12  `cellStyle`, what the cell's own style states about its box, for
             PYB-265.
 2026-11-09  An edit records the format its save writes, Automatic included, rather
@@ -64,6 +66,7 @@ from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
 from pybers.formula.render import renderFormula
 from pybers.style.cells import CellStyle, findOverrides
+from pybers.table.borders import CellBorders
 from pybers.table.kinds import (
     CellKind,
     CellPresentation,
@@ -116,13 +119,9 @@ CellValue = (
 
 @dataclass(frozen=True, slots=True)
 class CellCopy:
-    """The cell whose stored record a save duplicates, and whether its borders go too.
-
-    A fill copies no border and a paste copies all four, as `63e` and `64b` measured.
-    """
+    """The cell whose stored record a save duplicates."""
 
     source: Cell
-    borders: bool
 
 
 def toCellValue(
@@ -513,6 +512,16 @@ class Cell:
         wanted = findOverrides(cellStyle, inherited)
         if wanted != findOverrides(self.cellStyle, inherited):
             self._cellStyleAsked = wanted
+
+    @property
+    def borders(self) -> CellBorders:
+        """Return this cell's four sides, each the stroke it and its neighbor store."""
+        if self.table is None:
+            return CellBorders()
+        return self.table._borders.cellBordersRead(
+            self.table._rowIdentities, self.table._columnIdentities,
+            self.address.row, self.address.col,
+        )
 
     @property
     def unrecognizedTypeCode(self) -> int | None:

@@ -12,6 +12,8 @@ drag repeats the same way except where a column continues a series, the case
 `CONTINUE_SERIES` covers, in any one direction. See findings-03-structure.md.
 
 UPDATES
+2026-11-17  A copy no longer says whether borders go with it, since the table's
+            borders follow a paste and ignore a fill, for PYB-266.
 2026-11-13  A copy takes the cell style its source asked for, for PYB-265.
 2026-10-24  A filled cell copies no style, since a cell holds none yet, for PYB-259.
 2026-10-14  Checks a range against the grid through `bounds`, for PYB-193.
@@ -134,9 +136,7 @@ def findSeriesValues(
     return values
 
 
-def copyCellContent(
-    target: Cell, source: Cell, namedCell: bool, borders: bool
-) -> None:
+def copyCellContent(target: Cell, source: Cell, namedCell: bool) -> None:
     """Give a cell everything another holds, its formulas under the rule named."""
     from pybers.table.cell import CellCopy
 
@@ -157,13 +157,9 @@ def copyCellContent(
         )
     target.formula = formula
     target._conditions = conditions
-    # A copy of a pending copy duplicates the record that one will duplicate, and
-    # draws only the borders that one will draw.
+    # A copy of a pending copy duplicates the record that one will duplicate.
     pending = source._copiedFrom
-    target._copiedFrom = (
-        CellCopy(source, borders) if pending is None
-        else CellCopy(pending.source, borders and pending.borders)
-    )
+    target._copiedFrom = CellCopy(source if pending is None else pending.source)
 
 
 def fillCells(
@@ -194,7 +190,6 @@ def fillCells(
             cell,
             table.cell(findSourcePosition(extent, position)),
             namedCell,
-            borders=False,
         )
         if position in continued:
             cell._value = continued[position]

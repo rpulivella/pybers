@@ -6,6 +6,7 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-17  The table's borders, kept by row and column identity, for PYB-266.
 2026-11-12  Each region's inherited cell style, for PYB-265.
 2026-11-03  A table's header and footer headers, read and set, `select`, and
             `range` removed in its favor, for PYB-223.
@@ -88,6 +89,7 @@ from pybers.addressing.reference import (
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
+from pybers.table.borders import TableBorders
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
@@ -179,6 +181,11 @@ class Table:
     _cellStylesInherited: frozendict[TableRegion, CellStyle] = field(
         default_factory=lambda: resetCellStylesInherited, repr=False, compare=False,
         kw_only=True,
+    )
+
+    # Every stroke stored on a side of a cell, keyed by row and column identity.
+    _borders: TableBorders = field(
+        default_factory=TableBorders, repr=False, compare=False, kw_only=True
     )
 
     def __post_init__(self) -> None:

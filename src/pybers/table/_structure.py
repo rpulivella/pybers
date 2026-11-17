@@ -4,7 +4,7 @@ A table's rows and columns added or removed, carried into every archive indexed 
 
 The orchestration of one structural edit's archives, from the line maps `_lines`
 derives. Here: the UID map, the header buckets and their counts, hidden state, the
-declared counts and the layout cache. Borders move in `_strokes`, conditional
+declared counts and the layout cache. Borders are written by `_borders`, conditional
 highlighting in `_conditions`, the merge store in `_merges`, and tiles in the tile
 pass of `_edits`, where the lists a removed record releases are already open. The
 calculation engine is re-registered by the table save in `_write`, which knows what
@@ -13,6 +13,8 @@ every formula reads.
 Private. The table feature offers `Table.rowAdd` and its siblings.
 
 UPDATES
+2026-11-17  Borders are written from the table's own, after every edit, for
+            PYB-266.
 2026-11-03  Header and footer counts are the model's, moved by the edit and
             written by the table's save, for PYB-223.
 2026-11-02  A table with no stroke sidecar or layout cache, as a created one is,
@@ -46,7 +48,6 @@ from ._conditions import ConditionalPlan, buildConditionalPlan
 from ._lines import GridMaps, LineMap, assignUids
 from ._merges import remapMergeStore
 from ._read import readLineIdentities
-from ._strokes import applyStrokeLayers, listStrokeLayers
 from .cells import Table
 
 
@@ -169,16 +170,6 @@ def applyGridStructure(
     columnBucket = index.resolve(store.columnHeaders, tst.HeaderStorageBucket)
     remapHeaders([columnBucket], maps.columns, columnCounts)
     index.archiveWrite(store.columnHeaders.identifier, columnBucket)
-
-    # A created table has no sidecar until Numbers saves it, so no border to move.
-    if model.HasField("stroke_sidecar"):
-        sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-        applyStrokeLayers(index, registry, sidecar, maps)
-        sidecar.row_count = table.rowCount
-        sidecar.column_count = table.colCount
-        index.archiveWrite(
-            model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
-        )
 
     model.number_of_rows = table.rowCount
     model.number_of_columns = table.colCount

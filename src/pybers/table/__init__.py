@@ -20,6 +20,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-11-17  A cell's borders, for PYB-266.
 2026-11-09  The controls and the format family enum moved to `pybers.format`, for
             PYB-145.
 2026-11-03  `TableHeaders`, a table's header rows, header columns and footer rows,
@@ -48,6 +49,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from pybers.table.borders import CellBorder, CellBorders, CellBorderSide
 from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
 from pybers.table.cells import Table
 from pybers.table.fill import CellValueFill
@@ -59,6 +61,9 @@ from pybers.table.rows import TableRow, TableRows
 
 __all__ = [
     "Cell",
+    "CellBorder",
+    "CellBorderSide",
+    "CellBorders",
     "CellPresentation",
     "CellKind",
     "CellChange",

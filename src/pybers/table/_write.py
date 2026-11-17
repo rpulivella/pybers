@@ -14,6 +14,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-17  Borders are written from the table's own after every edit, for
+            PYB-266.
 2026-11-03  A table's header and footer counts, for PYB-223.
 2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
 2026-11-02  A document holding no table needs no engine, and its first table creates
@@ -70,6 +72,7 @@ from .._persistence.metadata import PackageRegistry
 from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula._dependencies import resolveFormulaDependencies
+from ._borders import writeTableBorders
 from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
@@ -77,8 +80,6 @@ from ._merges import applyMerges, listSwallowedPositions
 from ._read import updateCellStorage
 from ._records import refuseUncreatableCell
 from ._relocation import (
-    applyBorderCopies,
-    findBorderCopies,
     findCellCopies,
     findCellMoves,
 )
@@ -194,10 +195,8 @@ class TableSave:
         edits = applyTableEdits(
             index, table, model, swallowed, maps, self.registry, plan, moves, copies
         )
-        # After the edits, which carry any moved source's borders to where it sits.
-        borderCopies = findBorderCopies(table)
-        if borderCopies:
-            applyBorderCopies(index, self.registry, model, borderCopies)
+        # After the edits, which leave the sidecar's size and layers as stored.
+        writeTableBorders(index, self.registry, model, table)
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
         headed = applyHeaders(table, model)
         reshaped = maps.changed or moves or copies or edits.tilesCreated

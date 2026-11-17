@@ -11,7 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
-2026-11-17  The stroke family, for PYB-266.
+2026-11-17  The stroke family and a cell's borders, for PYB-266.
 2026-11-13  `parseCellStyle` and `CellStyleError`, a cell style read from its text
             form, for PYB-265.
 2026-11-12  `CellStyle`, its values, its text form and the fill family re-exported,
@@ -214,6 +214,9 @@ lazy from pybers.style import (
 )
 lazy from pybers.table import (
     Cell,
+    CellBorder,
+    CellBorders,
+    CellBorderSide,
     CellChange,
     CellChanges,
     CellKind,
@@ -310,6 +313,9 @@ __all__ = [
     "NumbersVersion",
     "checkDocument",
     "Cell",
+    "CellBorder",
+    "CellBorderSide",
+    "CellBorders",
     "CellChange",
     "CellChanges",
     "CellSkip",

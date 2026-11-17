@@ -5,6 +5,7 @@ Borders, bands, spills and merges carried through a structural edit.
 Each against one edit Numbers made to `57-structure-refusals-base`.
 
 UPDATES
+2026-11-17  Borders compared side by side, for PYB-266.
 2026-10-22  The golden's comparison moved to the golden builders, for PYB-255.
 2026-09-29  A line added beside one with no border, for PYB-118.
 2026-09-21  Split out of `test_structure` for PYB-17.
@@ -118,12 +119,12 @@ def testAMergeLosingItsAnchorOrItsSecondCell(name: str, tmp_path: Path) -> None:
     ("edit", "expected"),
     [
         (lambda table: table.rowAdd(2), {
-            "left": [(2, [(3, 1, 3.0)])], "right": [(2, [(3, 1, 3.0)])],
-            "top": [(3, [(2, 1, 3.0)])], "bottom": [(3, [(2, 1, 3.0)])],
+            "left": [(2, 3, 3.0)], "right": [(2, 3, 3.0)],
+            "top": [(3, 2, 3.0)], "bottom": [(3, 2, 3.0)],
         }),
         (lambda table: table.columnAdd(2), {
-            "left": [(3, [(2, 1, 3.0)])], "right": [(3, [(2, 1, 3.0)])],
-            "top": [(2, [(3, 1, 3.0)])], "bottom": [(2, [(3, 1, 3.0)])],
+            "left": [(3, 2, 3.0)], "right": [(3, 2, 3.0)],
+            "top": [(2, 3, 3.0)], "bottom": [(2, 3, 3.0)],
         }),
     ],
 )
@@ -144,6 +145,6 @@ def testTheBorderGoldenHoldsTheStrokesNumbersConfirmed() -> None:
     name = "61-lines-added-beside-no-border-by-pybers"
     golden = Path(__file__).resolve().parent / "golden" / f"{name}.numbers"
     assert readTableFacts(golden)["Table 1"]["strokes"] == {
-        "left": [(3, [(3, 1, 3.0)])], "right": [(3, [(3, 1, 3.0)])],
-        "top": [(3, [(3, 1, 3.0)])], "bottom": [(3, [(3, 1, 3.0)])],
+        "left": [(3, 3, 3.0)], "right": [(3, 3, 3.0)],
+        "top": [(3, 3, 3.0)], "bottom": [(3, 3, 3.0)],
     }

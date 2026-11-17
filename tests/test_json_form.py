@@ -115,7 +115,7 @@ def testATableOnNoSheetNamesNone() -> None:
 @pytest.mark.parametrize(("model", "form", "excluded"), [
     # Where a cell sits, or what its owners derive, rather than what it holds.
     (pybers.Cell, CellForm, {"table", "reference", "tableNames", "timeZone",
-                             "mergeAnchored"}),
+                             "mergeAnchored", "borders"}),
     # Back-pointers and views derived from the declared size and the cells.
     (pybers.Table, TableForm, {"document", "sheet", "extent", "rows", "reference"}),
     (pybers.Sheet, SheetForm, {"document", "tableIdentities"}),

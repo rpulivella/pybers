@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-Cells moved or copied, carried into the tiles, headers and borders that hold them.
+Cells moved or copied, carried into the tiles and headers that hold them.
 
 **The move is derived, never recorded**, as a structural edit is. Each cell read
 from the file remembers where its record sat, so comparing that, after any rows
@@ -18,6 +18,8 @@ count is refused rather than guessed.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-17  Borders are written from the table's own, so neither a move nor a
+            copy carries them here, for PYB-266.
 2026-11-02  A table with no stroke sidecar, as a created one is, moves and copies
             no border, for PYB-276.
 2026-10-29  Lines counted by the one `countLineRecords`, and records walked
@@ -71,7 +73,6 @@ from ..formula._read import readFormula
 from ._conditions import readConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
 from ._refcounts import countedStyleSlots
-from ._strokes import copyStrokeEdges, listStrokeLayers, moveStrokeEdges
 from ._structure import countLineRecords, rowsPerBucket
 from ._tiles import (
     TileRange,
@@ -183,25 +184,6 @@ def findCellCopies(table: Table) -> CellCopies:
             covered.add((row + down, column + across))
     return CellCopies(records, frozenset(covered))
 
-
-def findBorderCopies(table: Table) -> CellMoves:
-    """Return each copied cell drawing its source's borders, and where that source sits.
-
-    Keyed by where the copy landed, since one source may be copied twice. A source
-    holding no record may still hold a border, so every one is named.
-    """
-    copies: CellMoves = {}
-    for reference, cell in table.cells.items():
-        copy = cell._copiedFrom
-        if copy is None or not copy.borders:
-            continue
-        source = copy.source.address
-        row, column = reference.row - originOffset, reference.col - originOffset
-        top, left = source.row - originOffset, source.col - originOffset
-        copies[(row, column)] = (top, left)
-        for down, across in listCoveredOffsets(copy.source):
-            copies[(row + down, column + across)] = (top + down, left + across)
-    return copies
 
 
 @dataclass(frozen=True, slots=True)
@@ -479,22 +461,6 @@ def applyCellCopies(
     return copied
 
 
-def applyBorderCopies(
-    index: ArchiveIndex,
-    registry: PackageRegistry,
-    model: tst.TableModelArchive,
-    copies: CellMoves,
-) -> None:
-    """Give every copied cell exactly its source's borders, as a paste did in `64f`."""
-    # A created table has no sidecar until Numbers saves it, so no border to copy.
-    if not model.HasField("stroke_sidecar"):
-        return
-    sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    copyStrokeEdges(index, registry, sidecar, copies)
-    index.archiveWrite(
-        model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
-    )
-
 
 def applyCellMoves(
     index: ArchiveIndex,
@@ -502,18 +468,10 @@ def applyCellMoves(
     model: tst.TableModelArchive,
     moves: Mapping[tuple[int, int], tuple[int, int]],
 ) -> RecordMoves:
-    """Carry every moved cell into its records, headers and borders."""
+    """Carry every moved cell into its records and headers."""
     store = model.base_data_store
     moved = moveCellRecords(index, registry, store, moves)
     recountLineHeaders(index, store, moved.rows, moved.columns)
-
-    # A created table has no sidecar until Numbers saves it, so no border to move.
-    if model.HasField("stroke_sidecar"):
-        sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-        moveStrokeEdges(index, registry, sidecar, moves)
-        index.archiveWrite(
-            model.stroke_sidecar.identifier, sidecar, listStrokeLayers(sidecar)
-        )
     return moved
 
 
@@ -523,11 +481,9 @@ __all__ = [
     "RecordCopies",
     "RecordClaim",
     "RecordMoves",
-    "applyBorderCopies",
     "applyCellCopies",
     "applyCellMoves",
     "applyConditionChanges",
-    "findBorderCopies",
     "findCellCopies",
     "listCoveredOffsets",
     "findCellMoves",
