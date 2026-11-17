@@ -191,3 +191,12 @@ def test_a_border_numbers_cannot_draw_is_refused_before_anything_changes(
     with pytest.raises(error, match=message):
         document.cellBordersSet(selector, **stated)  # type: ignore[arg-type]
     assert not table._borders.edges
+
+
+def test_a_merge_on_a_tables_first_row_is_bordered_along_its_top() -> None:
+    document = pybers.create("en_US")
+    table = document.sheet().tableAdd("Lines", rows=3, cols=3)
+    table.mergeAdd("A1:B2")
+    document.cellBordersSet("::Lines::A1", CellBorderPosition.ALL)
+    assert table.cell("A1").borders.top == CellBorder(gridline, None, prevails=True)
+    assert table.cellBorderShown("A1", pybers.CellBorderSide.TOP) == gridline

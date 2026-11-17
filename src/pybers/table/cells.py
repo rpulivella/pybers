@@ -97,7 +97,7 @@ from pybers.table.borders import (
     CellBorders,
     CellBorderSide,
     TableBorders,
-    facingSides,
+    isMergeInterior,
 )
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
@@ -554,10 +554,7 @@ class Table:
         draws nothing; else the table's own line for that edge, while it shows.
         """
         cell = self._addressResolve(address)
-        merge = self.mergeCovering(cell)
-        _, down, across = facingSides[side]
-        neighbor = CellAddress(cell.row + down, cell.col + across)
-        if merge is not None and merge.covers(neighbor):
+        if isMergeInterior(self, cell.row, cell.col, side):
             return None
         drawn = self._borders.edgeShownFind(
             self._rowIdentities, self._columnIdentities, cell, side
