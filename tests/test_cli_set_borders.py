@@ -26,6 +26,7 @@ from typer.testing import CliRunner, Result
 import pybers
 from conftest import copyDocument, findDocumentPath, listShownFields
 from pybers.cli._app import app
+from pybers.cli.set import borderPositions, borderStyles
 
 runner: CliRunner = CliRunner()
 
@@ -108,3 +109,8 @@ def testABorderPybersCannotDrawIsRefused(
     assert result.exit_code != 0
     assert message in " ".join((result.stdout + result.stderr).split())
     assert working.read_bytes() == before
+
+
+def testTheCommandsBorderNamesAreTheLibrarys() -> None:
+    assert borderPositions == tuple(pybers.CellBorderPosition)
+    assert borderStyles == tuple(pybers.CellBorderStyle)

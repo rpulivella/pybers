@@ -38,8 +38,9 @@ from pybers.style._read import readStroke
 from pybers.style._write import addStyles, composeStroke
 from pybers.table.tablestyle import TableLine, TableStyle
 
-# Each line's visibility and the stroke fields it draws with, the outline one per band.
-lineFields: frozendict[str, tuple[str, tuple[str, ...]]] = frozendict({
+# Each line's visibility, None where no control hides it, and the stroke fields it
+# draws with, the outline one per band.
+lineFields: frozendict[str, tuple[str | None, tuple[str, ...]]] = frozendict({
     "bodyHorizontalGridlines": (
         "h_strokes_visible", ("table_body_horizontal_stroke",),
     ),
@@ -53,6 +54,9 @@ lineFields: frozendict[str, tuple[str, tuple[str, ...]]] = frozendict({
     "footerRowsVerticalGridlines": (
         "table_footer_divider_visible", ("footer_row_vertical_stroke",),
     ),
+    "headerRowsHorizontalGridlines": (None, ("header_row_horizontal_stroke",)),
+    "headerColumnsVerticalGridlines": (None, ("header_column_vertical_stroke",)),
+    "footerRowsHorizontalGridlines": (None, ("footer_row_horizontal_stroke",)),
     "headerRowsSeparator": ("hr_separator_visible", ("header_row_separator_stroke",)),
     "headerColumnsSeparator": (
         "hc_separator_visible", ("header_column_separator_stroke",),
@@ -98,7 +102,10 @@ def readTableLine(chain: list[tst.TableStyleArchive], field: str) -> TableLine:
         readStroke(getattr(findStated(chain, name), name)) for name in strokeNames
     }
     return TableLine(
-        visible=getattr(findStated(chain, visibleName), visibleName),
+        visible=(
+            True if visibleName is None
+            else getattr(findStated(chain, visibleName), visibleName)
+        ),
         stroke=strokes.pop() if len(strokes) == 1 else MIXED,
     )
 
@@ -108,6 +115,7 @@ def readTableStyle(index: ArchiveIndex, model: tst.TableModelArchive) -> TableSt
     chain = readStyleChain(index, model.table_style)
     return TableStyle(
         **{field: readTableLine(chain, field) for field in lineFields},
+        tableTitle=model.table_name_enabled,
         tableOutlineTitle=model.table_name_border_enabled,
     )
 
@@ -128,9 +136,10 @@ def composeVariationProperties(
     named: Message = properties
     for field, (visibleName, strokeNames) in lineFields.items():
         line: TableLine = getattr(wanted, field)
-        named.ClearField(visibleName)
-        if line.visible != getattr(root, visibleName):
-            setattr(properties, visibleName, line.visible)
+        if visibleName is not None:
+            named.ClearField(visibleName)
+            if line.visible != getattr(root, visibleName):
+                setattr(properties, visibleName, line.visible)
         if line.stroke is MIXED:
             continue
         composed = composeStroke(line.stroke)
@@ -147,7 +156,8 @@ def applyTableStyle(
     """State every line of a table style, as a root style states all of its own."""
     for field, (visibleName, strokeNames) in lineFields.items():
         line: TableLine = getattr(tableStyle, field)
-        setattr(properties, visibleName, line.visible)
+        if visibleName is not None:
+            setattr(properties, visibleName, line.visible)
         if line.stroke is MIXED:
             continue
         composed = composeStroke(line.stroke)
@@ -162,6 +172,7 @@ def readThemeTableStyle(
     chain = readStyleChain(index, network.table_style)
     return TableStyle(
         **{field: readTableLine(chain, field) for field in lineFields},
+        tableTitle=False,
         tableOutlineTitle=False,
     )
 
@@ -201,6 +212,9 @@ def writeTableStyle(
     """Point a table at the style drawing what it wants, when what it names differs."""
     if readTableStyle(index, model) == wanted:
         return
+    # Written only when it changes, so a table whose title never showed keeps no flag.
+    if model.table_name_enabled != wanted.tableTitle:
+        model.table_name_enabled = wanted.tableTitle
     model.table_name_border_enabled = wanted.tableOutlineTitle
     current = index.resolve(model.table_style, tst.TableStyleArchive)
     rootId, root = findRootStyle(index, model.table_style)

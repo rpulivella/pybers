@@ -57,6 +57,14 @@ from pybers.cli._formats import FormatOption, OutputFormat, printResult
 from pybers.cli._report import formatLine
 from pybers.cli.show import ShownPart, formatShownParts
 
+# Spelled out rather than read from the enums, so `--help` never loads the model;
+# `test_cli_set_borders` holds each equal to its enum.
+borderPositions: tuple[str, ...] = (
+    "all", "outer", "outer-top", "outer-right", "outer-bottom", "outer-left",
+    "between", "between-rows", "between-columns",
+)
+borderStyles: tuple[str, ...] = ("solid", "dashed", "dotted", "hidden")
+
 
 def runSet(
     context: typer.Context,
@@ -197,12 +205,14 @@ def runSet(
             help=(
                 "The lines each table SELECTOR matches draws, as `pybers show` prints "
                 "them, each `width style color` or none: table-outline, "
-                "table-outline-title (yes or no), body-horizontal-gridlines, "
-                "body-vertical-gridlines, header-rows-vertical-gridlines, "
-                "header-columns-horizontal-gridlines, footer-rows-vertical-gridlines, "
+                "body-horizontal-gridlines, body-vertical-gridlines, "
+                "header-rows-horizontal-gridlines, header-rows-vertical-gridlines, "
+                "header-columns-horizontal-gridlines, "
+                "header-columns-vertical-gridlines, "
+                "footer-rows-horizontal-gridlines, footer-rows-vertical-gridlines, "
                 "header-rows-separator, header-columns-separator and "
-                "footer-rows-separator. A line's -width, -style or -color changes "
-                "one part."
+                "footer-rows-separator; and table-title and table-outline-title, "
+                "yes or no. A line's -width, -style or -color changes one part."
             ),
         ),
     ] = None,
@@ -241,16 +251,12 @@ def runSet(
             "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
             "--border or a --table-style."
         )
-    positions = ("all", "outer", "outer-top", "outer-right", "outer-bottom",
-                 "outer-left", "between", "between-rows", "between-columns")
-    if border is not None and border not in positions:
+    if border is not None and border not in borderPositions:
         raise typer.BadParameter(
-            pybers.composeChoiceRefusal(border, "a border position", positions)
+            pybers.composeChoiceRefusal(border, "a border position", borderPositions)
         )
-    if borderStyle is not None and borderStyle not in (
-        "none", "solid", "dashed", "dotted", "hidden"
-    ):
-        choices = "solid, dashed, dotted, hidden"
+    if borderStyle is not None and borderStyle not in ("none", *borderStyles):
+        choices = ", ".join(borderStyles)
         raise typer.BadParameter(
             f"--border-style is one of {choices} or none, and is {borderStyle!r}."
         )

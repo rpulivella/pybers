@@ -78,9 +78,10 @@ def readOverrides(path: Path, table: str) -> list[str]:
 ])
 def test_each_gridline_button_hides_its_one_line(table: str, field: str) -> None:
     measured = readTableStyleOf("100b-lines", table)
+    # Numbers shows a table's title once a second table joins its sheet.
     assert measured == replace(
-        blankTableStyle, **{field: replace(getattr(blankTableStyle, field),
-                                           visible=False)},
+        blankTableStyle, tableTitle=True,
+        **{field: replace(getattr(blankTableStyle, field), visible=False)},
     )
 
 
@@ -250,3 +251,37 @@ def test_a_hidden_border_shows_nothing_over_the_gridline() -> None:
 def test_a_line_inside_a_merge_shows_nothing() -> None:
     table = pybers.open(findDocumentPath("22-merge-2x2")).table("Table 1")
     assert table.cellBorderShown("A1", CellBorderSide.RIGHT) is None
+
+
+deepBands: Path = (
+    Path(__file__).resolve().parent / "golden"
+    / "00-created-table-lines-deep-bands-by-pybers.numbers"
+)
+redLine = Stroke(
+    width=Decimal(1), color=Color.parse("#ff0000ff"), pattern=StrokeSolid()
+)
+
+
+@pytest.mark.parametrize(("table", "address", "side"), [
+    ("Header rows horizontal", "C1", CellBorderSide.BOTTOM),
+    ("Header rows horizontal", "A1", CellBorderSide.BOTTOM),
+    ("Header columns vertical", "A3", CellBorderSide.RIGHT),
+    ("Footer rows horizontal", "C6", CellBorderSide.BOTTOM),
+    ("Footer rows horizontal", "A6", CellBorderSide.BOTTOM),
+])
+def test_an_edge_between_two_lines_of_a_band_shows_that_bands_line(
+    table: str, address: str, side: CellBorderSide
+) -> None:
+    lined = pybers.open(deepBands).table(table)
+    assert lined.cellBorderShown(address, side) == redLine
+
+
+@pytest.mark.parametrize("field", [
+    "headerRowsHorizontalGridlines", "headerColumnsVerticalGridlines",
+    "footerRowsHorizontalGridlines",
+])
+def test_a_line_no_control_hides_takes_a_stroke_but_not_none(field: str) -> None:
+    table = pybers.create("en_US").sheet().tableAdd("Lines", rows=4, cols=4)
+    with pytest.raises(TableStyleError, match="no Numbers control hides it"):
+        table.tableStyleSet(**{field: TableLine(False, gridline)})
+    assert table.tableStyleSet(**{field: TableLine(True, redLine)}).changed

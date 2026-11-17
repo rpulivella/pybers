@@ -1947,6 +1947,15 @@
         "footerRowsVerticalGridlines": {
           "$ref": "#/$defs/TableLine"
         },
+        "headerRowsHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerColumnsVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "footerRowsHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
         "headerRowsSeparator": {
           "$ref": "#/$defs/TableLine"
         },
@@ -1959,6 +1968,9 @@
         "tableOutline": {
           "$ref": "#/$defs/TableLine"
         },
+        "tableTitle": {
+          "type": "boolean"
+        },
         "tableOutlineTitle": {
           "type": "boolean"
         }
@@ -1969,10 +1981,14 @@
         "headerRowsVerticalGridlines",
         "headerColumnsHorizontalGridlines",
         "footerRowsVerticalGridlines",
+        "headerRowsHorizontalGridlines",
+        "headerColumnsVerticalGridlines",
+        "footerRowsHorizontalGridlines",
         "headerRowsSeparator",
         "headerColumnsSeparator",
         "footerRowsSeparator",
         "tableOutline",
+        "tableTitle",
         "tableOutlineTitle"
       ],
       "additionalProperties": false

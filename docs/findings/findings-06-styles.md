@@ -274,6 +274,16 @@ a cell's dotted border has a round join.
 `29-style-border` reads the same way: the table labeled for gridlines on holds the 2pt
 outline with `table_border_visible` false, which is the outline set and then set to None.
 
+**Three more lines draw inside a band and no control names them.** Seen 17 November 2026
+in Numbers 15.4 rendering `00-created-table-lines-deep-bands-by-pybers`, a table of two
+header rows, two header columns and two footer rows with one stroke set red at a time:
+`header_row_horizontal_stroke` draws between two header rows across every column,
+`footer_row_horizontal_stroke` between two footer rows, and
+`header_column_vertical_stroke` between two header columns in the body rows. Each shows
+in the reset, which hides the body's gridlines, so no visibility flag governs it. Where two
+bands meet, the row band's lines prevail: a header row's vertical gridlines cross the
+header columns' separator, and its horizontal ones cross the header columns.
+
 Tables that only change a table-level setting show it as an override list on a variation
 style, `Table 1-1-1-1` sets exactly `v_strokes_visible`, `h_strokes_visible` and
 `table_border_visible`, the same parent-plus-override pattern seen in sheet tab colors.

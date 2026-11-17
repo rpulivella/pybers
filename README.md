@@ -57,7 +57,7 @@ pybers set budget.numbers "Summary::Costs::B2:D9" --border between-rows
 pybers set budget.numbers "Summary::Costs::B2:D9" --border all --border-style none
 ```
 
-`--table-style` sets the lines a table draws, as `pybers show` prints them: `table-outline`, `table-outline-title`, and the gridlines and separators of its body, header rows, header columns and footer rows, each `width style color` or `none`. A line's `-width`, `-style` or `-color` changes one part of it, and setting what a table already draws writes nothing:
+`--table-style` sets the lines a table draws, as `pybers show` prints them: `table-outline`, `table-title`, `table-outline-title`, and the gridlines and separators of its body, header rows, header columns and footer rows, each `width style color` or `none`. A line's `-width`, `-style` or `-color` changes one part of it, and setting what a table already draws writes nothing:
 
 ```bash
 pybers set budget.numbers "Summary::Costs" --table-style "body-vertical-gridlines: none; table-outline: 1pt solid black"

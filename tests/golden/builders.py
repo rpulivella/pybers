@@ -890,7 +890,8 @@ tableLineCases: tuple[tuple[str, str], ...] = (
     ("Footer rows separator", "footer-rows-separator: 2pt solid #ff0000ff"),
     ("Outline dashed", "table-outline: 2pt dashed #ff0000ff"),
     ("Outline dotted", "table-outline: 2pt dotted #ff0000ff"),
-    ("Outline title", "table-outline: 1pt solid #ff0000ff; table-outline-title: yes"),
+    ("Outline title", "table-title: yes; table-outline: 1pt solid #ff0000ff; "
+                      "table-outline-title: yes"),
 )
 
 
@@ -903,6 +904,27 @@ def setTableLines(document: pybers.Document) -> None:
             table.tableStyleSet(pybers.parseTableStyle(declarations, table.tableStyle))
         table.cell("B1").value = Decimal(1)
         table.cell("B2").value = declarations or "the reset, unchanged"
+
+
+deepBandLineCases: tuple[tuple[str, str], ...] = (
+    ("Header rows horizontal",
+     "header-rows-horizontal-gridlines: 1pt solid #ff0000ff"),
+    ("Header columns vertical",
+     "header-columns-vertical-gridlines: 1pt solid #ff0000ff"),
+    ("Footer rows horizontal",
+     "footer-rows-horizontal-gridlines: 1pt solid #ff0000ff"),
+)
+
+
+def setDeepBandLines(document: pybers.Document) -> None:
+    """Give each table of two header rows, columns and footer rows one red line."""
+    for name, declarations in (*tableLineCases[:9], *deepBandLineCases):
+        table = document.sheet().tableAdd(name, rows=7, cols=5)
+        table.headersSet(headerRows=2, headerColumns=2, footerRows=2)
+        if declarations:
+            table.tableStyleSet(pybers.parseTableStyle(declarations, table.tableStyle))
+        table.cell("C1").value = Decimal(1)
+        table.cell("C2").value = declarations or "the reset, unchanged"
 
 
 def editBorderedLines(document: pybers.Document) -> None:
@@ -972,6 +994,8 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
                   labeled=True),
     GoldenBuilder("00-created-borders-edited-by-pybers", None, editBorderedLines,
                   labeled=True),
+    GoldenBuilder("00-created-table-lines-deep-bands-by-pybers", None,
+                  setDeepBandLines, labeled=True),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.

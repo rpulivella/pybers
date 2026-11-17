@@ -641,10 +641,10 @@ because CSS gives backgrounds no `hidden`.
 
 **A border is given as separate settings, and a table's lines as CSS declarations.** A
 border is one stroke at one position, so `--border`, `--border-style`, `--border-width`
-and `--border-color` say it plainly. A table's lines are a stylesheet of ten regions, so
+and `--border-color` say it plainly. A table's lines are a stylesheet of twelve lines and two flags, so
 `--table-style` takes declarations, `show` prints the same text, and a longhand such as
 `table-outline-color` changes one part of a line, where separate flags would number
-thirty-six.
+fifty.
 
 **A merged cell's borders are its merge's four sides.** A side is one stroke where every
 position along it stores the same one, and `MIXED` where they differ, which pybers never

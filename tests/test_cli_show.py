@@ -191,12 +191,13 @@ def testATablesBandsShowWhenItHasThem() -> None:
 def testATableShowsItsLinesUnderItsOwnLineEachPastingBack() -> None:
     table = pybers.create("en_US").sheet().tableAdd("Lines", 2, 2)
     lines = renderPlain(formatTable(table)).splitlines()
-    assert lines[1:4] == [
+    assert lines[1:5] == [
         "  Table style:",
         "    table-outline: hidden 0.35pt solid #000000ff",
+        "    table-title: no",
         "    table-outline-title: no",
     ]
-    declarations = "; ".join(line.strip() for line in lines[2:12])
+    declarations = "; ".join(line.strip() for line in lines[2:16])
     assert pybers.parseTableStyle(declarations, table.tableStyle) == table.tableStyle
 
 

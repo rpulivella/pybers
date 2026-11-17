@@ -81,10 +81,14 @@ class TableStyle:
     headerRowsVerticalGridlines: TableLine
     headerColumnsHorizontalGridlines: TableLine
     footerRowsVerticalGridlines: TableLine
+    headerRowsHorizontalGridlines: TableLine
+    headerColumnsVerticalGridlines: TableLine
+    footerRowsHorizontalGridlines: TableLine
     headerRowsSeparator: TableLine
     headerColumnsSeparator: TableLine
     footerRowsSeparator: TableLine
     tableOutline: TableLine
+    tableTitle: bool
     tableOutlineTitle: bool
 
 
@@ -119,11 +123,11 @@ def buildTableStyle(base: TableStyle, lines: Mapping[str, object]) -> TableStyle
                 f"A table style holds {', '.join(names)}, and {name!r} is not one. "
                 "Nothing was written."
             )
-        if name == "tableOutlineTitle":
+        if name in flagNames.values():
             if not isinstance(value, bool):
                 raise TableStyleError(
-                    f"tableOutlineTitle is a bool, and was given {value!r}. Nothing "
-                    "was written."
+                    f"{name} is a bool, and was given {value!r}. Nothing was "
+                    "written."
                 )
             continue
         if not isinstance(value, TableLine) or not isinstance(value.visible, bool) or (
@@ -135,7 +139,15 @@ def buildTableStyle(base: TableStyle, lines: Mapping[str, object]) -> TableStyle
                 f"{value!r}. Nothing was written."
             )
     update: dict[str, Any] = dict(lines)
-    return replace(base, **update)
+    built = replace(base, **update)
+    hidden = sorted(name for name in alwaysShown if not getattr(built, name).visible)
+    if hidden:
+        raise TableStyleError(
+            f"{hidden[0]} shows wherever its band has two lines, and no Numbers "
+            "control hides it, so it takes a stroke but not none. Nothing was "
+            "written."
+        )
+    return built
 
 
 def findTableLine(
@@ -148,7 +160,7 @@ def findTableLine(
     table's top or left. A horizontal line follows the column it runs through and a
     vertical one its row, as each Gridlines tooltip names it, and a separator takes
     the edge where a header or footer meets the body, as
-    `00-created-table-lines-set-by-pybers` shows in Numbers 15.4.
+    `00-created-table-lines-set-by-pybers` and `-deep-bands-` show in Numbers 15.4.
     """
     if horizontal:
         if row in (0, rowCount):
@@ -157,6 +169,11 @@ def findTableLine(
             return tableStyle.headerRowsSeparator
         if headers.footerRows and row == rowCount - headers.footerRows:
             return tableStyle.footerRowsSeparator
+        # A header or footer row's own gridlines cross the header columns.
+        if row < headers.headerRows:
+            return tableStyle.headerRowsHorizontalGridlines
+        if row > rowCount - headers.footerRows:
+            return tableStyle.footerRowsHorizontalGridlines
         if column <= headers.headerColumns:
             return tableStyle.headerColumnsHorizontalGridlines
         return tableStyle.bodyHorizontalGridlines
@@ -169,6 +186,8 @@ def findTableLine(
         return tableStyle.footerRowsVerticalGridlines
     if headers.headerColumns and column == headers.headerColumns:
         return tableStyle.headerColumnsSeparator
+    if column < headers.headerColumns:
+        return tableStyle.headerColumnsVerticalGridlines
     return tableStyle.bodyVerticalGridlines
 
 
@@ -187,10 +206,14 @@ blankTableStyle: TableStyle = TableStyle(
     headerRowsVerticalGridlines=TableLine(True, gridlineStroke),
     headerColumnsHorizontalGridlines=TableLine(True, gridlineStroke),
     footerRowsVerticalGridlines=TableLine(True, gridlineStroke),
+    headerRowsHorizontalGridlines=TableLine(True, gridlineStroke),
+    headerColumnsVerticalGridlines=TableLine(True, gridlineStroke),
+    footerRowsHorizontalGridlines=TableLine(True, gridlineStroke),
     headerRowsSeparator=TableLine(True, separatorStroke),
     headerColumnsSeparator=TableLine(True, separatorStroke),
     footerRowsSeparator=TableLine(True, separatorStroke),
     tableOutline=TableLine(True, gridlineStroke),
+    tableTitle=False,
     tableOutlineTitle=False,
 )
 
@@ -219,11 +242,22 @@ lineNames: frozendict[str, str] = frozendict({
     "header-rows-vertical-gridlines": "headerRowsVerticalGridlines",
     "header-columns-horizontal-gridlines": "headerColumnsHorizontalGridlines",
     "footer-rows-vertical-gridlines": "footerRowsVerticalGridlines",
+    "header-rows-horizontal-gridlines": "headerRowsHorizontalGridlines",
+    "header-columns-vertical-gridlines": "headerColumnsVerticalGridlines",
+    "footer-rows-horizontal-gridlines": "footerRowsHorizontalGridlines",
     "header-rows-separator": "headerRowsSeparator",
     "header-columns-separator": "headerColumnsSeparator",
     "footer-rows-separator": "footerRowsSeparator",
 })
-titleName: str = "table-outline-title"
+# The lines no Numbers control hides, measured in `-deep-bands-`, so each shows.
+alwaysShown: frozenset[str] = frozenset({
+    "headerRowsHorizontalGridlines", "headerColumnsVerticalGridlines",
+    "footerRowsHorizontalGridlines",
+})
+# Each setting that is yes or no rather than a line, by its CSS name.
+flagNames: frozendict[str, str] = frozendict({
+    "table-title": "tableTitle", "table-outline-title": "tableOutlineTitle",
+})
 longhandPattern: re.Pattern[str] = re.compile(r"(.+)-(width|style|color)")
 
 
@@ -241,9 +275,11 @@ def formatTableStyle(tableStyle: TableStyle) -> list[str]:
         f"{name}: {formatTableLine(getattr(tableStyle, field))}"
         for name, field in lineNames.items()
     ]
-    title = "yes" if tableStyle.tableOutlineTitle else "no"
-    declarations.insert(1, f"{titleName}: {title}")
-    return declarations
+    flags = [
+        f"{name}: {'yes' if getattr(tableStyle, field) else 'no'}"
+        for name, field in flagNames.items()
+    ]
+    return [declarations[0], *flags, *declarations[1:]]
 
 
 def parseLineStyle(text: str, line: TableLine, name: str) -> TableLine:
@@ -339,10 +375,11 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
         if name in seen:
             raise TableStyleError(f"A table style states {name} once, and twice here.")
         seen.add(name)
-        if name == titleName:
+        if name in flagNames:
             if value not in ("yes", "no"):
-                raise TableStyleError(f"{titleName} is yes or no, and is {value!r}.")
-            changed = replace(changed, tableOutlineTitle=value == "yes")
+                raise TableStyleError(f"{name} is yes or no, and is {value!r}.")
+            flag: dict[str, Any] = {flagNames[name]: value == "yes"}
+            changed = replace(changed, **flag)
             continue
         longhand = longhandPattern.fullmatch(name)
         if name in lineNames:
@@ -353,7 +390,7 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             line = parseLonghand(longhand[2], value, getattr(changed, field), name)
         else:
             raise TableStyleError(composeChoiceRefusal(name, "a table line", [
-                *lineNames, titleName,
+                *lineNames, *flagNames,
                 *(f"{line}-{part}" for line in lineNames
                   for part in ("width", "style", "color")),
             ]))
