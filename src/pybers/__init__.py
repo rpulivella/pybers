@@ -11,7 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
-2026-11-17  The stroke family and a cell's borders, for PYB-266.
+2026-11-17  The stroke family, a cell's borders and a table's lines, for PYB-266.
 2026-11-13  `parseCellStyle` and `CellStyleError`, a cell style read from its text
             form, for PYB-265.
 2026-11-12  `CellStyle`, its values, its text form and the fill family re-exported,
@@ -231,11 +231,17 @@ lazy from pybers.table import (
     MergeRange,
     Table,
     TableHeaders,
+    TableLine,
     TableRow,
     TableRows,
+    TableStyle,
+    TableStyleChange,
+    TableStyleError,
     formatCellBorders,
     formatCellValue,
+    formatTableStyle,
     parseCellValue,
+    parseTableStyle,
 )
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
@@ -271,11 +277,13 @@ __all__ = [
     "Formula",
     "formatCellBorders",
     "formatCellValue",
+    "formatTableStyle",
     "formatJsonForm",
     "JsonFormError",
     "jsonFormVersion",
     "parseJsonForm",
     "parseCellValue",
+    "parseTableStyle",
     "Color",
     "ColorError",
     "ColorSpace",
@@ -394,6 +402,10 @@ __all__ = [
     "SelectorLike",
     "quoteSelectorName",
     "TableHeaders",
+    "TableLine",
+    "TableStyle",
+    "TableStyleChange",
+    "TableStyleError",
     "Sheet",
     "Table",
     "TableRow",

@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-17  The lines a table draws written as its table style, for PYB-266.
 2026-11-17  Borders are written from the table's own after every edit, for
             PYB-266.
 2026-11-03  A table's header and footer counts, for PYB-223.
@@ -84,6 +85,7 @@ from ._relocation import (
     findCellMoves,
 )
 from ._structure import applyGridStructure, listModelFormulas
+from ._tablestyle import writeTableStyle
 from .cells import Table
 
 if TYPE_CHECKING:
@@ -197,6 +199,7 @@ class TableSave:
         )
         # After the edits, which leave the sidecar's size and layers as stored.
         writeTableBorders(index, self.registry, modelIdentifier, model, table)
+        writeTableStyle(index, self.registry, modelIdentifier, model, table.tableStyle)
         moved = applyMerges(table, model, entry.dependencies.formula_owner_uid)
         headed = applyHeaders(table, model)
         reshaped = maps.changed or moves or copies or edits.tilesCreated

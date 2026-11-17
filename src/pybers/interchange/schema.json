@@ -1823,6 +1823,9 @@
         "headers": {
           "$ref": "#/$defs/TableHeaders"
         },
+        "tableStyle": {
+          "$ref": "#/$defs/TableStyle"
+        },
         "mergeRanges": {
           "type": "array",
           "items": {
@@ -1842,6 +1845,7 @@
         "rowCount",
         "colCount",
         "headers",
+        "tableStyle",
         "mergeRanges",
         "cells"
       ],
@@ -1897,6 +1901,79 @@
         "sheetName",
         "table",
         "documentTables"
+      ],
+      "additionalProperties": false
+    },
+    "TableLine": {
+      "type": "object",
+      "description": "One line a table draws: whether it shows, and its stroke, kept while hidden.",
+      "properties": {
+        "visible": {
+          "type": "boolean"
+        },
+        "stroke": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stroke"
+            },
+            {
+              "const": "MIXED"
+            }
+          ]
+        }
+      },
+      "required": [
+        "visible",
+        "stroke"
+      ],
+      "additionalProperties": false
+    },
+    "TableStyle": {
+      "type": "object",
+      "description": "The lines a table draws, each region named for what it draws.",
+      "properties": {
+        "bodyHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "bodyVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerRowsVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerColumnsHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "footerRowsVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerRowsSeparator": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerColumnsSeparator": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "footerRowsSeparator": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "tableOutline": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "tableOutlineTitle": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bodyHorizontalGridlines",
+        "bodyVerticalGridlines",
+        "headerRowsVerticalGridlines",
+        "headerColumnsHorizontalGridlines",
+        "footerRowsVerticalGridlines",
+        "headerRowsSeparator",
+        "headerColumnsSeparator",
+        "footerRowsSeparator",
+        "tableOutline",
+        "tableOutlineTitle"
       ],
       "additionalProperties": false
     }

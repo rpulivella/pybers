@@ -31,7 +31,8 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `Color` | A color in Numbers' own terms: its color space, its components, its alpha and its headroom, never converted | Frozen |
 | `Stroke` | A line: its width in points, its `Color`, its pattern, cap, join and miter limit, shared by borders, gridlines, shapes and text outlines | Frozen |
 | `CellBorders`, `CellBorder` | A cell's four sides, in CSS order, each the stroke the cell stores and the one its neighbor stores on the same edge, or `None` where neither stores one | Frozen |
-| `TableStyle`, `TableLine` | A table's ten lines, each whether it shows and its stroke | Frozen |
+| `TableStyle`, `TableLine` | A table's lines, each whether it shows and its stroke, and whether its outline outlines its title | Frozen |
+| `TableStyleChange` | What setting a table's lines did: the lines it drew before and after | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
 | `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |

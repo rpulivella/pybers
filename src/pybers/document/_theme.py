@@ -14,6 +14,7 @@ Measured 2026-11-03 and 2026-11-16 in findings-10-creation.md.
 Private. The document feature's archive half, reached by document creation.
 
 UPDATES
+2026-11-17  The table preset's table style states the model's reset, for PYB-266.
 2026-11-16  Composes every style Numbers looks up by key, the chart's text of its own,
             and the presets and flags Numbers adds on opening, for PYB-292.
 2026-11-13  The cell style states the whole box a created table shows, as each
@@ -56,12 +57,13 @@ from ..color._archive import composeColor
 from ..color.colors import Color, ColorSpace
 from ..style._write import composeCellProperties, composeCellStyleArchive
 from ..table._reset import (
-    applyResetTable,
     composeBaseStyle,
     composeResetText,
     namedStyleKey,
 )
+from ..table._tablestyle import applyTableStyle
 from ..table.cells import createdCellStyle
+from ..table.tablestyle import resetTableStyle
 
 # Numbers looks each up by name, and cannot read a document missing either.
 drawingLineStyle: str = "drawingline-0-drawinglineStyle"
@@ -298,7 +300,7 @@ def composeTheme(identifiers: Iterator[int]) -> ComposedTheme:
     for name, rootClass, role in rootStyles:
         styleAdd(name, composeRootStyle(rootClass, stylesheet, role))
     tableStyle = composeRootStyle(tst.TableStyleArchive, stylesheet, "table")
-    applyResetTable(tableStyle)
+    applyTableStyle(tableStyle.table_properties, resetTableStyle)
     styleAdd("table", tableStyle)
     styleAdd("cell", composeCellStyleArchive(stylesheet, composeCellProperties(
         createdCellStyle, tstStyles.CellStylePropertiesArchive()

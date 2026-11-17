@@ -118,6 +118,7 @@ from pybers.table.cell import (
     findWrittenValue,
 )
 from pybers.table.cells import Table, generateOwnerIdentity
+from pybers.table.tablestyle import TableStyle, applyTableReset, blankTableStyle
 from pybers.timezone import TimeZoneLike, machineTimeZone, toTimeZone
 
 if TYPE_CHECKING:
@@ -288,6 +289,10 @@ class Sheet:
             identifier=generateOwnerIdentity(),
             document=self.document,
             _origin=position,
+            _tableStyle=applyTableReset(
+                blankTableStyle if self.document is None
+                else self.document._tableStyleTheme
+            ),
         )
         self.tables.append(table)
         return table
@@ -315,6 +320,10 @@ class Document:
     )
     _currencyPattern: str = field(default="", repr=False, compare=False)
     _localeIdentifier: str | None = field(default=None, repr=False, compare=False)
+    # The lines the theme's table preset draws, which a table added here starts from.
+    _tableStyleTheme: TableStyle = field(
+        default=blankTableStyle, repr=False, compare=False
+    )
 
     @property
     def localeIdentifier(self) -> str | None:

@@ -10,6 +10,8 @@ per document and found again by name. See docs/decisions.md.
 Private. Part of the table feature's archive half, reached by table creation.
 
 UPDATES
+2026-11-17  The reset's table style composed from the model's reset over the theme,
+            for PYB-266.
 2026-11-16  A variation stating only what its parent states is not written, since
             Numbers drops it, and the reset's text is composed apart from its name,
             for PYB-292.
@@ -51,13 +53,13 @@ from ..color._archive import composeColor
 from ..color.colors import Color
 from ..errors import WriteError
 from ..style._write import addStyles, composeCellProperties, composeCellStyleArchive
+from ._tablestyle import composeTableStyleVariation, readThemeTableStyle
 from .cells import resetCellStyle
+from .tablestyle import applyTableReset
 
 baseStyleName: str = "pybers-base"
 namedStyleKey: str = "text-{}-paragraphstyle"
 
-# The properties each variation overrides, as `52-table-reset-styled` counted them.
-tableStyleOverrides: int = 3
 baseStyleOverrides: int = 57
 
 character = tswp.CharacterStylePropertiesArchive
@@ -122,22 +124,21 @@ def findNamedStyle(index: ArchiveIndex, stylesheetId: int) -> int | None:
     return None
 
 
-def applyResetTable(style: tst.TableStyleArchive) -> None:
-    """Give a table style the reset's properties: no strokes and no border."""
-    properties = style.table_properties
-    properties.v_strokes_visible = False
-    properties.h_strokes_visible = False
-    properties.table_border_visible = False
+def composeTableStyle(
+    index: ArchiveIndex, network: tst.TableStyleNetworkArchive
+) -> tst.TableStyleArchive:
+    """Return the reset's table style, a variation of a theme's table style.
 
-
-def composeTableStyle(parent: int, stylesheet: int) -> tst.TableStyleArchive:
-    """Return the reset's table style, a variation of a theme's table style."""
-    style = tst.TableStyleArchive(override_count=tableStyleOverrides)
-    style.super.parent.identifier = parent
-    style.super.is_variation = True
-    style.super.stylesheet.identifier = stylesheet
-    applyResetTable(style)
-    return style
+    An empty variation where the theme already states the reset, which the caller
+    then does not write.
+    """
+    root = index.resolve(network.table_style, tst.TableStyleArchive)
+    wanted = applyTableReset(readThemeTableStyle(index, network))
+    style = composeTableStyleVariation(
+        wanted, network.table_style.identifier, root,
+        tstStyles.TableStylePropertiesArchive(),
+    )
+    return style if style is not None else tst.TableStyleArchive()
 
 
 def composeBaseStyle(
@@ -247,7 +248,7 @@ def createResetStyles(
     )
     tableParent = network.table_style.identifier
     cellParent = network.body_cell_style.identifier
-    tableStyle = composeTableStyle(tableParent, styles.stylesheet)
+    tableStyle = composeTableStyle(index, network)
     cellStyle = composeCellStyleArchive(
         styles.stylesheet,
         composeCellProperties(resetCellStyle, tstStyles.CellStylePropertiesArchive()),
@@ -321,7 +322,6 @@ def findSlotStyle(slot: str, styles: DocumentStyles, reset: ResetStyles) -> int:
 
 __all__ = [
     "DocumentStyles",
-    "applyResetTable",
     "composeBaseStyle",
     "composeResetText",
     "ResetStyles",

@@ -12,7 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
-2026-11-17  A cell's borders, for PYB-266.
+2026-11-17  A cell's borders and a table's style, for PYB-266.
 2026-11-12  A cell's own cell style, one its save writes, for PYB-265.
 2026-11-11  A cell's format is one the save writes, an empty cell's included, for
             PYB-145.
@@ -61,6 +61,7 @@ from pybers.table.kinds import (
     kindValueTypes,
 )
 from pybers.table.merges import MergeRange
+from pybers.table.tablestyle import TableStyle
 
 # Kinds whose cell holds no value, so a value of None needs no formula to explain it.
 valuelessKinds: frozenset[CellKind] = frozenset(
@@ -99,6 +100,7 @@ class TableForm:
     rowCount: int
     colCount: int
     headers: TableHeaders
+    tableStyle: TableStyle
     mergeRanges: tuple[MergeRange, ...]
     cells: tuple[CellForm, ...]
 
@@ -108,7 +110,7 @@ def buildTableForm(table: Table, extent: CellRange | None = None) -> TableForm:
     cells = sorted(table.cells.items(), key=lambda each: each[0].asRowColumn())
     return TableForm(
         name=table.name, identifier=table.identifier, rowCount=table.rowCount,
-        colCount=table.colCount, headers=table.headers,
+        colCount=table.colCount, headers=table.headers, tableStyle=table.tableStyle,
         mergeRanges=tuple(table.mergeRanges),
         cells=tuple(
             buildCellForm(cell) for address, cell in cells
@@ -148,7 +150,7 @@ def buildTable(form: TableForm, path: str) -> Table:
     table = Table(
         name=form.name, rowCount=form.rowCount, colCount=form.colCount,
         mergeRanges=list(form.mergeRanges), identifier=form.identifier,
-        _headers=form.headers,
+        _headers=form.headers, _tableStyle=form.tableStyle,
     )
     for index, cellForm in enumerate(form.cells):
         addCell(table, cellForm, f"{path}.cells[{index}]")

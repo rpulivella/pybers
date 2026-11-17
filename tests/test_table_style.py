@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""\
+A table's lines, read from its table style and set as Numbers' controls set them.
+
+`100-lines-base` holds one table per Gridlines and Table Outline control, and
+`100b-lines` and `101b-outline` hold what each control wrote. Setting the same line
+with pybers must write the variation Numbers wrote, overriding exactly its fields.
+
+UPDATES
+2026-11-17  Written for PYB-266.
+"""
+from __future__ import annotations
+
+__author__ = "Richard P Ulivella"
+__copyright__ = "Copyright 2026 Richard P Ulivella"
+__license__ = "Apache-2.0"
+__version__ = "0.1.0"
+__email__ = "pybers@richardulivella.com"
+__status__ = "Development"
+__date__ = "2026/11/17"
+
+from dataclasses import replace
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+import pybers
+from conftest import findDocumentPath
+from pybers import Color, Stroke, StrokeDash
+from pybers._generated import TSTArchives_pb2 as tst
+from pybers._persistence.container import readPackage
+from pybers._persistence.index import ArchiveIndex
+from pybers._persistence.types import readArchiveTypeId
+from pybers.table.tablestyle import (
+    TableLine,
+    TableStyle,
+    TableStyleError,
+    blankTableStyle,
+    formatTableStyle,
+    parseTableStyle,
+    resetTableStyle,
+)
+
+dashed = Stroke(
+    width=Decimal("0.35"), color=Color.black,
+    pattern=StrokeDash(lengths=(Decimal(2), Decimal(2))),
+)
+
+
+def readTableStyleOf(stem: str, table: str) -> TableStyle:
+    """Return the lines one table of a test document draws."""
+    return pybers.open(findDocumentPath(stem)).table(table).tableStyle
+
+
+def readOverrides(path: Path, table: str) -> list[str]:
+    """Return the fields a table's own style variation states, none for the root."""
+    index = ArchiveIndex(readPackage(path))
+    for identifier, archive in index.byIdentifier.items():
+        if readArchiveTypeId(archive) != 6001:
+            continue
+        model = index.identifierResolve(identifier, tst.TableModelArchive)
+        if model.table_name == table:
+            style = index.resolve(model.table_style, tst.TableStyleArchive)
+            if not style.super.is_variation:
+                return []
+            stated = style.table_properties.ListFields()
+            return sorted(field.name for field, _ in stated)
+    raise AssertionError(f"{path.name} holds no table named {table}")
+
+
+@pytest.mark.parametrize(("table", "field"), [
+    ("Body horizontal", "bodyHorizontalGridlines"),
+    ("Body vertical", "bodyVerticalGridlines"),
+    ("Header columns horizontal", "headerColumnsHorizontalGridlines"),
+    ("Header rows vertical", "headerRowsVerticalGridlines"),
+    ("Footer rows vertical", "footerRowsVerticalGridlines"),
+])
+def test_each_gridline_button_hides_its_one_line(table: str, field: str) -> None:
+    measured = readTableStyleOf("100b-lines", table)
+    assert measured == replace(
+        blankTableStyle, **{field: replace(getattr(blankTableStyle, field),
+                                           visible=False)},
+    )
+
+
+def test_an_outline_style_reads_as_the_outline_stroke() -> None:
+    assert readTableStyleOf("100b-lines", "Outline dashed").tableOutline == (
+        TableLine(True, dashed)
+    )
+
+
+def test_outline_none_hides_the_outline_and_keeps_its_stroke() -> None:
+    outline = readTableStyleOf("101b-outline", "Outline then None").tableOutline
+    assert not outline.visible
+    assert isinstance(outline.stroke, Stroke) and outline.stroke.width == 2
+
+
+def test_outline_table_title_reads_from_the_table() -> None:
+    assert readTableStyleOf("100b-lines", "Outline title").tableOutlineTitle
+
+
+@pytest.mark.parametrize(("table", "change"), [
+    ("Body horizontal", {"bodyHorizontalGridlines": TableLine(
+        False, blankTableStyle.bodyHorizontalGridlines.stroke)}),
+    ("Footer rows vertical", {"footerRowsVerticalGridlines": TableLine(
+        False, blankTableStyle.footerRowsVerticalGridlines.stroke)}),
+    ("Outline dashed", {"tableOutline": TableLine(True, dashed)}),
+])
+def test_a_line_set_writes_the_variation_numbers_wrote(
+    table: str, change: dict[str, TableLine], tmp_path: Path
+) -> None:
+    document = pybers.open(findDocumentPath("100-lines-base"))
+    assert document.table(table).tableStyleSet(**change).changed
+    target = tmp_path / "set.numbers"
+    document.save(target)
+    assert readOverrides(target, table) == readOverrides(
+        findDocumentPath("100b-lines"), table
+    )
+    assert pybers.open(target).table(table).tableStyle == (
+        readTableStyleOf("100b-lines", table)
+    )
+
+
+def test_setting_what_a_table_draws_changes_and_writes_nothing(tmp_path: Path) -> None:
+    document = pybers.open(findDocumentPath("100b-lines"))
+    table = document.table("Outline dashed")
+    assert not table.tableStyleSet(table.tableStyle).changed
+    target = tmp_path / "same.numbers"
+    document.save(target)
+    assert readOverrides(target, "Outline dashed") == readOverrides(
+        findDocumentPath("100b-lines"), "Outline dashed"
+    )
+
+
+def test_a_style_equal_to_the_root_names_the_root(tmp_path: Path) -> None:
+    document = pybers.open(findDocumentPath("100b-lines"))
+    document.table("Outline dashed").tableStyleSet(blankTableStyle)
+    target = tmp_path / "default.numbers"
+    document.save(target)
+    assert readOverrides(target, "Outline dashed") == []
+
+
+def test_a_created_table_starts_from_the_reset_and_keeps_what_is_set(
+    tmp_path: Path,
+) -> None:
+    document = pybers.create("en_US")
+    table = document.sheet().tableAdd("Lines", rows=3, cols=3)
+    assert table.tableStyle == resetTableStyle
+    table.tableStyleSet(tableOutline=TableLine(True, dashed), tableOutlineTitle=True)
+    expected = table.tableStyle
+    target = tmp_path / "created.numbers"
+    document.save(target)
+    assert pybers.open(target).table("Lines").tableStyle == expected
+
+
+@pytest.mark.parametrize(("lines", "message"), [
+    ({"tableBorder": TableLine(True, dashed)}, "is not one"),
+    ({"tableOutline": "1pt solid black"}, "is a TableLine"),
+    ({"tableOutlineTitle": "yes"}, "is a bool"),
+])
+def test_a_line_pybers_cannot_hold_is_refused(
+    lines: dict[str, object], message: str
+) -> None:
+    table = pybers.create("en_US").sheet().tableAdd("Lines", rows=1, cols=1)
+    with pytest.raises(TableStyleError, match=message):
+        table.tableStyleSet(**lines)  # type: ignore[arg-type]
+    assert table.tableStyle == resetTableStyle
+
+
+def test_the_text_form_reads_back_what_it_prints() -> None:
+    measured = readTableStyleOf("101b-outline", "Outline then None")
+    text = "; ".join(formatTableStyle(measured))
+    assert parseTableStyle(text, blankTableStyle) == measured
+
+
+def test_a_longhand_changes_one_part_of_a_line() -> None:
+    red = Color.parse("#ff0000ff")
+    changed = parseTableStyle("table-outline-color: #ff0000ff", blankTableStyle)
+    outline = changed.tableOutline
+    assert isinstance(outline.stroke, Stroke)
+    assert outline.stroke == replace(blankTableStyle.tableOutline.stroke, color=red)
+
+
+@pytest.mark.parametrize(("text", "message"), [
+    ("table-border: none", "is not one"),
+    ("table-outline: thick", "a width, a style and a color"),
+    ("table-outline: 1pt brush black", "is one of solid, dashed, dotted or none"),
+    ("table-outline-title: maybe", "yes or no"),
+    ("table-outline: none; table-outline: none", "once, and twice"),
+])
+def test_text_a_table_style_lacks_is_refused(text: str, message: str) -> None:
+    with pytest.raises(TableStyleError, match=message):
+        parseTableStyle(text, blankTableStyle)
