@@ -147,7 +147,8 @@ def findTableLine(
     `row` and `column` count from one and name the line before the edge, 0 for the
     table's top or left. A horizontal line follows the column it runs through and a
     vertical one its row, as each Gridlines tooltip names it, and a separator takes
-    the edge where a header or footer meets the body.
+    the edge where a header or footer meets the body, as
+    `00-created-table-lines-set-by-pybers` shows in Numbers 15.4.
     """
     if horizontal:
         if row in (0, rowCount):
@@ -161,12 +162,13 @@ def findTableLine(
         return tableStyle.bodyHorizontalGridlines
     if column in (0, colCount):
         return tableStyle.tableOutline
-    if headers.headerColumns and column == headers.headerColumns:
-        return tableStyle.headerColumnsSeparator
+    # A header or footer row's own gridlines cross the header columns' separator.
     if row <= headers.headerRows:
         return tableStyle.headerRowsVerticalGridlines
     if row > rowCount - headers.footerRows:
         return tableStyle.footerRowsVerticalGridlines
+    if headers.headerColumns and column == headers.headerColumns:
+        return tableStyle.headerColumnsSeparator
     return tableStyle.bodyVerticalGridlines
 
 

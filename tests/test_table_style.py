@@ -204,6 +204,8 @@ gridline = Stroke(width=Decimal("0.35"), color=Color.black, pattern=StrokeSolid(
     ("B1", CellBorderSide.BOTTOM, separator),
     ("B3", CellBorderSide.BOTTOM, separator),
     ("A2", CellBorderSide.RIGHT, separator),
+    ("A1", CellBorderSide.RIGHT, gridline),
+    ("A4", CellBorderSide.RIGHT, gridline),
     ("B1", CellBorderSide.RIGHT, gridline),
     ("B4", CellBorderSide.RIGHT, gridline),
     ("C2", CellBorderSide.RIGHT, gridline),
@@ -221,6 +223,8 @@ def test_an_edge_with_no_border_shows_the_table_line_for_its_region(
     ("Header columns horizontal", "A2", CellBorderSide.BOTTOM),
     ("Header rows vertical", "B1", CellBorderSide.RIGHT),
     ("Footer rows vertical", "B4", CellBorderSide.RIGHT),
+    ("Header rows vertical", "A1", CellBorderSide.RIGHT),
+    ("Footer rows vertical", "A4", CellBorderSide.RIGHT),
     ("Body vertical", "B2", CellBorderSide.RIGHT),
 ])
 def test_a_hidden_table_line_shows_nothing_at_its_region(
