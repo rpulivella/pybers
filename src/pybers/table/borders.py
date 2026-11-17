@@ -113,29 +113,45 @@ def formatSpanStroke(stroke: Stroke | MIXED) -> str:
 
 
 def formatCellBorders(cell: Cell) -> str:
-    """Return the sides a cell stores as CSS longhands, a neighbor's other stroke noted.
+    """Return the sides a cell stores as CSS, a neighbor's other stroke noted.
 
-    `border-top: 1pt dashed #000000ff; border-left: hidden`, a side storing nothing
-    left out.
+    `border: 1pt dashed #000000ff` where all four sides agree, else a longhand per
+    side, `border-top: 1pt dashed #000000ff; border-left: hidden`, a side storing
+    nothing left out.
     """
+    borders = {side: getattr(cell.borders, side.value) for side in CellBorderSide}
+    strokes = {
+        None if border is None else border.stroke for border in borders.values()
+    }
+    shorthand = len(strokes) == 1 and None not in strokes
     declarations = []
-    for side in CellBorderSide:
-        border = getattr(cell.borders, side.value)
+    notes = []
+    for side, border in borders.items():
         if border is None or border.stroke is None:
             continue
-        shown = f"border-{side}: {formatSpanStroke(border.stroke)}"
+        if not shorthand:
+            declarations.append(f"border-{side}: {formatSpanStroke(border.stroke)}")
         if border.disagrees and border.neighborStroke is not None:
             _, down, across = facingSides[side]
             neighbor = CellAddress(cell.address.row + down, cell.address.col + across)
-            shown += f" ({neighbor} draws {formatSpanStroke(border.neighborStroke)})"
-        declarations.append(shown)
+            drawn = formatSpanStroke(border.neighborStroke)
+            notes.append(
+                f"({neighbor} draws {drawn}"
+                + (f" on the {side})" if shorthand else ")")
+            )
+            if not shorthand:
+                declarations[-1] += f" {notes.pop()}"
+    if shorthand:
+        stroke = strokes.pop()
+        assert stroke is not None
+        declarations.append(" ".join([f"border: {formatSpanStroke(stroke)}", *notes]))
     return "; ".join(declarations)
 
 
 def listDrawnSides(
     position: CellBorderPosition, top: bool, bottom: bool, left: bool, right: bool
 ) -> list[CellBorderSide]:
-    """Return the sides a position draws of a cell, by the block lines it is on.
+    """Return the sides a position draws of a cell on the block's given outer lines.
 
     An inner line is drawn once, as the bottom or right of the cell before it, and
     `edgesDraw` gives the facing cell its side.
@@ -169,7 +185,7 @@ type BorderEdgeKey = tuple[int, int, CellBorderSide]
 
 @dataclass(frozen=True, slots=True)
 class BorderEdge:
-    """One stroke stored on one side of one cell, and the order it was drawn in.
+    """One stroke stored on one side of one cell, and the order in which it was drawn.
 
     `stored` is the archive it was read from, so a brush or frame is carried.
     """

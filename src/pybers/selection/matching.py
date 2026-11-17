@@ -460,10 +460,7 @@ def findCellTargets(
         table, cells = part.table, part.cells
         if table is None or cells is None:
             kind = "sheet" if table is None else "table"
-            skipped.append(CellSkip(
-                part.reference, f"{part.reference} is a {kind}, and a value is "
-                "written into cells.",
-            ))
+            skipped.append(CellSkip(part.reference, f"a {kind}, not cells"))
             continue
         addresses = (
             [cells] if isinstance(cells, CellAddress)

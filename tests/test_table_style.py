@@ -183,7 +183,7 @@ def test_a_longhand_changes_one_part_of_a_line() -> None:
 
 
 @pytest.mark.parametrize(("text", "message"), [
-    ("table-border: none", "is not one"),
+    ("table-border: none", "is not a table line. The closest is table-outline"),
     ("table-outline: thick", "a width, a style and a color"),
     ("table-outline: 1pt brush black", "is one of solid, dashed, dotted or none"),
     ("table-outline-title: maybe", "yes or no"),

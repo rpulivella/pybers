@@ -90,7 +90,7 @@ from pybers.addressing.reference import (
     tableNameSeparator,
 )
 from pybers.color.colors import Color
-from pybers.errors import PybersError, WriteError
+from pybers.errors import PybersError, WriteError, composeChoiceRefusal
 from pybers.format._check import (
     findControlRefusal,
     findFormatMisfit,
@@ -485,10 +485,7 @@ class Document:
         for table, address in targets:
             cell = table.cells.get(address)
             if value is not UNCHANGED and cell is not None and cell.formula is not None:
-                skipped.append(CellSkip(
-                    cell.reference, f"{cell.reference} is backed by a formula, which "
-                    "a value would discard.",
-                ))
+                skipped.append(CellSkip(cell.reference, "holds a formula"))
                 continue
             asked = format
             current = None if cell is None else cell.value
@@ -511,7 +508,10 @@ class Document:
                     raise WriteError(f"{misfit} Nothing was written.")
                 if misfit is not None:
                     asked = CellFormatAutomatic()
-                    skipped.append(CellSkip(where, f"{misfit} It takes Automatic."))
+                    skipped.append(CellSkip(
+                        where, "takes automatic, as the format given cannot show its "
+                        "value",
+                    ))
                 refusal = findFormatRefusal(cell, where, asked, after, controlAfter)
                 if refusal is not None:
                     raise WriteError(f"{refusal} Nothing was written.")
@@ -566,11 +566,10 @@ class Document:
 
         stroke = None
         if not isinstance(position, CellBorderPosition):
-            choices = ", ".join(each.value for each in CellBorderPosition)
-            raise WriteError(
-                f"A border's position is one of {choices}, and cellBordersSet was "
-                f"given {position!r}. Nothing was written."
+            refusal = composeChoiceRefusal(
+                position, "a border position", list(CellBorderPosition)
             )
+            raise WriteError(f"{refusal} Nothing was written.")
         if style is not None and not isinstance(style, CellBorderStyle):
             choices = ", ".join(each.value for each in CellBorderStyle)
             raise WriteError(

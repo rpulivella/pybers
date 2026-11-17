@@ -9,6 +9,7 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-17  `--table-style` sets the lines of each table matched, for PYB-266.
 2026-11-17  `--border` draws borders on one block, with `--border-style`,
             `--border-width` and `--border-color`, for PYB-266.
 2026-11-13  `--cell-style` sets a cell's whole box by its text form, `none`
@@ -188,6 +189,23 @@ def runSet(
             ),
         ),
     ] = None,
+    tableStyle: Annotated[
+        str | None,
+        typer.Option(
+            "--table-style",
+            metavar="STYLE",
+            help=(
+                "The lines each table SELECTOR matches draws, as `pybers show` prints "
+                "them, each `width style color` or none: table-outline, "
+                "table-outline-title (yes or no), body-horizontal-gridlines, "
+                "body-vertical-gridlines, header-rows-vertical-gridlines, "
+                "header-columns-horizontal-gridlines, footer-rows-vertical-gridlines, "
+                "header-rows-separator, header-columns-separator and "
+                "footer-rows-separator. A line's -width, -style or -color changes "
+                "one part."
+            ),
+        ),
+    ] = None,
     conflict: Annotated[
         pybers.CellFormatConflict,
         typer.Option(
@@ -218,16 +236,16 @@ def runSet(
             "--border-style, --border-width and --border-color describe a --border, "
             "so give its POSITION."
         )
-    if all(part is None for part in cellParts) and border is None:
+    if all(part is None for part in (*cellParts, border, tableStyle)):
         raise typer.BadParameter(
-            "Give a VALUE, a --cell-format, a --cell-control, a --cell-style or a "
-            "--border."
+            "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
+            "--border or a --table-style."
         )
     positions = ("all", "outer", "outer-top", "outer-right", "outer-bottom",
                  "outer-left", "between", "between-rows", "between-columns")
     if border is not None and border not in positions:
         raise typer.BadParameter(
-            f"--border is one of {', '.join(positions)}, and is {border!r}."
+            pybers.composeChoiceRefusal(border, "a border position", positions)
         )
     if borderStyle is not None and borderStyle not in (
         "none", "solid", "dashed", "dotted", "hidden"
@@ -281,19 +299,33 @@ def runSet(
                 changes.changes + drawn.changes, changes.skipped + drawn.skipped
             )
         # Each cell once, though a value and a border may both have changed it.
-        cells: list[ShownPart] = [
+        shown: list[ShownPart] = [
             document.table(reference.table).cell(reference)
             for reference in dict.fromkeys(
                 each.reference for each in changes.changes
             )
             if reference.table is not None
         ]
-        if target is not None and changes.changed:
+        skipped = [(str(skip.reference), skip.reason) for skip in changes.skipped]
+        restyled = False
+        if tableStyle is not None:
+            for match in document.select(selector):
+                if not isinstance(match, pybers.TableReference):
+                    skipped.append((str(match), "not a table"))
+                    continue
+                table = document.table(match)
+                if table.tableStyleSet(
+                    pybers.parseTableStyle(tableStyle, table.tableStyle)
+                ).changed:
+                    restyled = True
+                    shown.append(table)
+        changed = changes.changed or restyled
+        if target is not None and changed:
             document.save(target)
-    printResult(cells, outputFormat, formatShownParts)
-    for skip in changes.skipped:
-        statusConsole.print(formatLine("Skipped", skip.reason))
-    reportWrite(changes.changed, target, "no cell it matched changes.")
+    printResult(shown, outputFormat, formatShownParts)
+    for reference, reason in skipped:
+        statusConsole.print(formatLine("Skipped", f"{reference}  {reason}"))
+    reportWrite(changed, target, "already set")
 
 
 __all__ = ["runSet"]

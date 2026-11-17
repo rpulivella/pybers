@@ -169,7 +169,8 @@ def test_borders_drawn_on_a_created_table_survive_a_save(tmp_path: Path) -> None
 @pytest.mark.parametrize(
     ("selector", "arguments", "error", "message"),
     [
-        ("::Lines::A1", {"position": "outline"}, WriteError, "position is one of"),
+        ("::Lines::A1", {"position": "outline"}, WriteError,
+         "'outline' is not a border position. The closest is outer."),
         ("::Lines::A1", {"style": "brush"}, WriteError, "style is one of"),
         ("::Lines::A1", {"style": CellBorderStyle.HIDDEN, "width": 1}, WriteError,
          "draws no line, so it takes no width"),

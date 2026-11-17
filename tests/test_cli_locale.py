@@ -65,7 +65,7 @@ def testAPreviewWritesNothing(working: Path) -> None:
     before = working.read_bytes()
     result = runLocaleCommand(working, "de_DE", "--preview")
     assert result.exit_code == 0
-    assert "Nothing written: a preview." in result.stderr
+    assert "Nothing written: previewing only" in result.stderr
     assert working.read_bytes() == before
 
 
@@ -73,7 +73,7 @@ def testTheRegionADocumentHoldsWritesNothing(working: Path) -> None:
     before = working.read_bytes()
     result = runLocaleCommand(working, "en_US")
     assert result.exit_code == 0
-    assert "Nothing written: the document already uses that region." in result.stderr
+    assert "Nothing written: already en_US" in result.stderr
     assert working.read_bytes() == before
 
 

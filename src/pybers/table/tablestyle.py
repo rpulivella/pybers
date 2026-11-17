@@ -28,7 +28,7 @@ from typing import Any
 from pybers.absence import MIXED
 from pybers.addressing.reference import TableReference
 from pybers.color.colors import Color, ColorError
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeChoiceRefusal
 from pybers.format.text import splitDeclarations
 from pybers.style.strokes import (
     Stroke,
@@ -317,11 +317,11 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             field = lineNames[longhand[1]]
             line = parseLonghand(longhand[2], value, getattr(changed, field), name)
         else:
-            known = ", ".join([*lineNames, titleName])
-            raise TableStyleError(
-                f"A table style states {known}, or a line's -width, -style or "
-                f"-color, and {name!r} is not one."
-            )
+            raise TableStyleError(composeChoiceRefusal(name, "a table line", [
+                *lineNames, titleName,
+                *(f"{line}-{part}" for line in lineNames
+                  for part in ("width", "style", "color")),
+            ]))
         update: dict[str, Any] = {field: line}
         changed = replace(changed, **update)
     return changed

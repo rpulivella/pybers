@@ -100,7 +100,7 @@ def testAPreviewReportsTheChangeAndWritesNothing(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 2::B2", "42", "--preview")
     assert result.exit_code == 0
     assert ("Value", "42") in listShownFields(result.stdout)
-    assert "Nothing written: a preview." in result.stderr
+    assert "Nothing written: previewing only" in result.stderr
     assert working.read_bytes() == before
 
 
@@ -109,7 +109,7 @@ def testAChangeThatAltersNothingWritesNothingAndSaysSo(working: Path) -> None:
     before = working.read_bytes()
     result = runSetCommand(str(working), "::Table 2::B2", "42")
     assert result.exit_code == 0
-    assert "Nothing written: no cell it matched changes." in result.stderr
+    assert "Nothing written: already set" in result.stderr
     assert working.read_bytes() == before
 
 
@@ -161,8 +161,8 @@ def testACellItCannotWriteIsSkippedOnStderrSayingWhy(working: Path) -> None:
     assert "Cell: Sheet 1::Table 1::A10" in result.stdout
     assert "Skipped" not in result.stdout
     assert (
-        "Skipped: Sheet 1::Table 1::A11 is backed by a formula, which a value would "
-        "discard." in result.stderr.splitlines()
+        "Skipped: Sheet 1::Table 1::A11  holds a formula"
+        in result.stderr.splitlines()
     )
 
 

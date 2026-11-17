@@ -58,10 +58,7 @@ def testABorderIsDrawnAndEachCellItChangedPrinted(working: Path) -> None:
         [value for label, value in fields if label == "Borders"],
         strict=True,
     ))
-    assert shown["Sheet 1::Table 1::B1"] == (
-        "border-top: 1pt dashed #ff0000ff; border-right: 1pt dashed #ff0000ff; "
-        "border-bottom: 1pt dashed #ff0000ff; border-left: 1pt dashed #ff0000ff"
-    )
+    assert shown["Sheet 1::Table 1::B1"] == "border: 1pt dashed #ff0000ff"
     assert shown["Sheet 1::Table 1::A1"] == "border-right: 1pt dashed #ff0000ff"
     assert f"Written: {working}" in result.stderr
 
@@ -76,7 +73,7 @@ def testAStyleGivenAloneDrawsWhatNumbersDraws(working: Path) -> None:
 def testNoneRemovesWhatHiddenStates(working: Path) -> None:
     runSetCommand(str(working), "::Table 1::A1:B1", "--border", "all",
                   "--border-style", "hidden")
-    assert "border-left: hidden" in pybers.formatCellBorders(
+    assert "border: hidden" in pybers.formatCellBorders(
         pybers.open(working).table("Table 1").cell("B1")
     )
     runSetCommand(str(working), "::Table 1::A1:B1", "--border", "all",

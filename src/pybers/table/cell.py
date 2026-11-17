@@ -237,7 +237,7 @@ class CellChange:
 
 @dataclass(frozen=True, slots=True)
 class CellSkip:
-    """A part a write matched and did not write, and why, in a sentence naming it."""
+    """A part a write matched and did not write as asked, and why, as a short phrase."""
 
     reference: SelectionMatch
     reason: str
