@@ -605,6 +605,52 @@ back equal.
 
 ---
 
+## A table's lines: borders, gridlines and the outline, decided 2026-11-17
+
+A table's lines are read and set for PYB-266, and `docs/findings/findings-06-styles.md`
+records what Numbers stores and which line an edge displays.
+
+**A stroke is one value shared by everything with a line.** `Stroke` holds a width in
+points, a `Color`, a pattern, a cap, a join and a miter limit, so a cell border, a table's
+gridline and later a shape or a text outline are the same type. Its pattern is a closed
+family: `StrokeSolid`, `StrokeDash` carrying its lengths in multiples of the width,
+`StrokeEmpty`, and `StrokeBrush`, `StrokeFrame` and `StrokePatterned`, read and carried as
+stored. A dash carries its array rather than a name, because Numbers 15.4 stores the cell
+menu's dashed line as `[2, 2]` where an earlier save stored `[1, 1]`.
+
+**A border position names the part of a range it draws, and is never stored.** Numbers
+keeps four strokes per cell, and its nine Border buttons only choose which edges the next
+stroke lands on. pybers names the nine for what they draw, `all`, `outer`, `outer-top`,
+`outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` and
+`between-columns`, which sort into their groups and never read two ways on one cell.
+
+**pybers writes both facing edges of every edge it sets.** Numbers writes only the
+selected cells' edges and draws the stroke with the higher `order`, so the same picture
+can be stored several ways. Writing both sides at `max_order + 1` leaves the stored result
+depending on the picture rather than on the route, and Numbers draws what pybers meant.
+
+**A border's style follows CSS's table borders: `none` is no border of the cell's own,
+`hidden` draws nothing.** Under `border-collapse`, `none` lets the neighbor's or the
+table's line show, and `hidden` suppresses every line at that edge, which is exactly
+Numbers' No Border, an empty stroke that prevails over the gridline and the outline. In
+Python a side holding nothing is `None` and `style=None` removes, as `cellSet` removes a
+control. The CLI's `--border-style none` removes, as `--cell-style none` does, so one word
+means removal in every option. A fill keeps `background: none` for its stated No Fill,
+because CSS gives backgrounds no `hidden`.
+
+**A border is given as separate settings, and a table's lines as CSS declarations.** A
+border is one stroke at one position, so `--border`, `--border-style`, `--border-width`
+and `--border-color` say it plainly. A table's lines are a stylesheet of ten regions, so
+`--table-style` takes declarations, `show` prints the same text, and a longhand such as
+`table-outline-color` changes one part of a line. Separate flags would number thirty-six.
+
+**A table's outline is one stroke.** Numbers stores it in five slots, one per band, and
+its control always writes them equal, so a document whose slots differ cannot be made or
+edited in Numbers. Five that differ read as `MIXED` and survive untouched, and a write
+over them sets all five.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

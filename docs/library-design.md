@@ -29,6 +29,9 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
 | `Color` | A color in Numbers' own terms: its color space, its components, its alpha and its headroom, never converted | Frozen |
+| `Stroke` | A line: its width in points, its `Color`, its pattern, cap, join and miter limit, shared by borders, gridlines, shapes and text outlines | Frozen |
+| `CellBorders`, `CellBorder` | A cell's four sides, in CSS order, each the stroke the cell stores and the one its neighbor stores on the same edge, or `None` where neither stores one | Frozen |
+| `TableStyle`, `TableLine` | A table's ten lines, each whether it shows and its stroke | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
 | `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |
@@ -115,6 +118,12 @@ The reasoning is in `decisions.md`, under writing values and formats.
 ## Colors
 
 A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert it to another space. `pybers.Color.parse(text)` reads its one text form and `str(color)` prints it, as the [README](../README.md#colors) shows for each color system.
+
+## Lines
+
+A cell's borders are `cell.borders`, and `document.cellBordersSet(selector, position, style=..., width=..., color=...)` draws them on one block of cells. The position is a `CellBorderPosition` naming the part of the block drawn: `ALL`, `OUTER`, `OUTER_TOP`, `OUTER_RIGHT`, `OUTER_BOTTOM`, `OUTER_LEFT`, `BETWEEN`, `BETWEEN_ROWS` or `BETWEEN_COLUMNS`. The style is a `CellBorderStyle`, `SOLID`, `DASHED`, `DOTTED` or `HIDDEN`, and `None` removes the borders, so the table's own lines show. A style given alone draws 0.35pt black, as Numbers does. Both facing sides of every edge are written, so a border reads the same from either cell.
+
+A table's lines are `table.tableStyle`, set by `table.tableStyleSet(...)`, one `TableLine` per region: `bodyHorizontalGridlines`, `bodyVerticalGridlines`, `headerRowsVerticalGridlines`, `headerColumnsHorizontalGridlines`, `footerRowsVerticalGridlines`, `headerRowsSeparator`, `headerColumnsSeparator`, `footerRowsSeparator` and `tableOutline`, and `tableOutlineTitle`. `table.cellBorderShown(address, side)` returns the line an edge displays: the border stored there, the later of two that disagree, or else the table's line for that edge.
 
 ## What is stored
 

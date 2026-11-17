@@ -19,7 +19,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` naming each |
 | `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
-| `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE]` | The value, the format, the control and the cell style of every cell a selector matches, each optional |
+| `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional |
 | `locale FILE [LOCALE]` | A document's language and region, or a change to it |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
 | `diff A B` | The cells that differ between two documents |
@@ -50,6 +50,17 @@ A command parses its arguments, calls the library once, formats what comes back,
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
 - **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
 - **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--format` stays the output format every command offers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and prints why on stderr. A format applies to every cell a range holds, an empty one included. A formula takes its format whatever its result, which Numbers shows once the result is of the format's kind.
+- **`set --border POSITION`** draws borders on one block of cells, POSITION naming the part drawn: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed`, `dotted` or `hidden`, `--border-width` a length such as `1pt`, and `--border-color` a color's text form, each a separate option, and a style given alone draws 0.35pt black. `hidden` draws nothing and hides the table's line there, and `none` removes the borders so the table's line shows, as CSS names the two for a table's borders.
+
+  ```bash
+  pybers set budget.numbers 'Budget::Q3::B2:D9' --border outer --border-style dashed --border-width 1pt --border-color black
+  pybers set budget.numbers 'Budget::Q3::B2:D9' --border all --border-style none
+  ```
+- **`set --table-style STYLE`** sets the lines of every table a selector matches, STYLE being CSS declarations, one per line a table draws: `body-horizontal-gridlines`, `body-vertical-gridlines`, `header-rows-vertical-gridlines`, `header-columns-horizontal-gridlines`, `footer-rows-vertical-gridlines`, `header-rows-separator`, `header-columns-separator`, `footer-rows-separator` and `table-outline`, each `width style color` or `none`, and `table-outline-title`, `yes` or `no`. A longhand such as `table-outline-color` changes one part of a line. `show` prints a table's style as these declarations, one per line, so a line pastes back, and `hidden` before a stroke marks a line set to none whose stroke is kept.
+
+  ```bash
+  pybers set budget.numbers 'Budget::Q3' --table-style 'body-vertical-gridlines: none; body-horizontal-gridlines: 0.5pt solid #8e8e93ff; table-outline: 1pt dashed black'
+  ```
 - **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
 ## Formulas
@@ -65,7 +76,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **A flag reads `yes` or `no`.**
 - **Several parts print one after another, a blank line between each**, and each opens with a line naming it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
 - **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is left out. A size reads `5 rows × 3 columns`, in a tree as on a line.
-- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its cell style, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. A cell style prints as CSS declarations, `background: #ffd60aff; padding: 6pt`, so it pastes into `set --cell-style`, and `none` removes one. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
+- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its cell style, then its borders, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. A cell style prints as CSS declarations, `background: #ffd60aff; padding: 6pt`, so it pastes into `set --cell-style`, and `none` removes one. Borders print as CSS longhands, `border-top: 1pt dashed #000000ff; border-left: hidden`, leaving out a side that stores none, and a side whose neighbor stores another stroke names that cell and its stroke in parentheses. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
   ```
