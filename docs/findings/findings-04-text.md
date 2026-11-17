@@ -362,9 +362,10 @@ cap**, the classic construction, not a distinct pattern kind: `0.001` is as clos
 Numbers writes. `cap` and `join` change with the preset, so they are part of the style
 rather than constants.
 
-Still open: every outline in `38` has `width: 1.0`, so whether the dash numbers are **points
-or multiples of the stroke width** cannot be told apart here. That is now the only thing
-`46-stroke-dashes` still needs to answer.
+Every outline in `38` has `width: 1.0`, so it cannot tell points from multiples of the
+width. `43-stroke-dashes` settles it for shapes and `100b-lines` for cell borders: the dash
+numbers are **multiples of the stroke width** ([drawables](findings-07-drawables.md),
+[styles](findings-06-styles.md)).
 
 ### Cell borders use the SAME encoding, from a different menu
 
