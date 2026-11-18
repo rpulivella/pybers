@@ -12,6 +12,7 @@
 // and a color or a count is parsed before it reaches a script.
 //
 // UPDATES
+// 2026-11-18  A step merges a range through scripting, for PYB-267.
 // 2026-11-18  Steps set a table's header counts, its Alternating Row Color, and a
 //             cell's fill, through scripting or the Fill section, for PYB-267.
 // 2026-11-16  Each cell's horizontal alignment is read, for PYB-292.
@@ -124,6 +125,7 @@ enum EditAction: String, Codable {
     case cellBackgroundSet
     case tableBandSet
     case tableHeadersSet
+    case cellsMerge
 }
 
 // `document` counts the request's `documentPaths` from zero; the first is the one saved.
@@ -1898,6 +1900,9 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
         _ = try runAppleScript(
             "set t to \(table)\nset background color of \(range) of t to "
                 + "{\(color.map(String.init).joined(separator: ", "))}")
+    case .cellsMerge:
+        let (table, range) = try formatRangeReference(step, documentId: documentId)
+        _ = try runAppleScript("set t to \(table)\nmerge \(range) of t")
     case .tableBandSet:
         try selectRange(step, documentId: documentId)
         try setTableBand(step.value ?? "", in: window)

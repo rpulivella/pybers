@@ -110,6 +110,7 @@ cellBackgroundSet give the range's cells the opaque color in value, such as #FF3
 tableBandSet     turn the table's Alternating Row Color on or off, as value says
 tableHeadersSet  set header row count, header column count or footer row count,
                  named by setting, to the count in value
+cellsMerge       merge the range, as Table, Merge Cells does
 ```
 
 `dataFormatSet` and `cellFillSet` name a control by the label Numbers shows beside it, such as
