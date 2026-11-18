@@ -23,6 +23,94 @@
     }
   ],
   "$defs": {
+    "CellBorder": {
+      "type": "object",
+      "description": "A side of a cell: the stroke the cell stores, and the one its neighbor stores.",
+      "properties": {
+        "stroke": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stroke"
+            },
+            {
+              "const": "MIXED"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "neighborStroke": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stroke"
+            },
+            {
+              "const": "MIXED"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prevails": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "stroke",
+        "neighborStroke"
+      ],
+      "additionalProperties": false
+    },
+    "CellBorders": {
+      "type": "object",
+      "description": "A cell's four sides in CSS order, each None where neither cell stores one.",
+      "properties": {
+        "top": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellBorder"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "right": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellBorder"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bottom": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellBorder"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "left": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellBorder"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
     "CellControlCheckbox": {
       "type": "object",
       "description": "A checkbox, over a true or false value.",
@@ -206,6 +294,9 @@
               "type": "null"
             }
           ]
+        },
+        "borders": {
+          "$ref": "#/$defs/CellBorders"
         },
         "unrecognizedTypeCode": {
           "anyOf": [
@@ -714,7 +805,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 6
+          "const": 7
         },
         "sheetName": {
           "anyOf": [
@@ -964,7 +1055,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 6
+          "const": 7
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -1050,7 +1141,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 6
+          "const": 7
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -1407,7 +1498,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 6
+          "const": 7
         },
         "sheetName": {
           "anyOf": [
@@ -1470,7 +1561,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 6
+          "const": 7
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1512,6 +1603,171 @@
       },
       "required": [
         "begin"
+      ],
+      "additionalProperties": false
+    },
+    "Stroke": {
+      "type": "object",
+      "description": "A line, its width in points and its color never assumed opaque.",
+      "properties": {
+        "width": {
+          "type": "number"
+        },
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StrokeSolid"
+            },
+            {
+              "$ref": "#/$defs/StrokeDash"
+            },
+            {
+              "$ref": "#/$defs/StrokeEmpty"
+            },
+            {
+              "$ref": "#/$defs/StrokeBrush"
+            },
+            {
+              "$ref": "#/$defs/StrokeFrame"
+            },
+            {
+              "$ref": "#/$defs/StrokePatterned"
+            }
+          ]
+        },
+        "cap": {
+          "$ref": "#/$defs/StrokeCap"
+        },
+        "join": {
+          "$ref": "#/$defs/StrokeJoin"
+        },
+        "miterLimit": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "color",
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "StrokeBrush": {
+      "type": "object",
+      "description": "A brush stroke Numbers draws by name, randomized by its seed.",
+      "properties": {
+        "patternType": {
+          "const": "brush"
+        },
+        "name": {
+          "type": "string"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "patternType",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "StrokeCap": {
+      "enum": [
+        "butt",
+        "round",
+        "square"
+      ]
+    },
+    "StrokeDash": {
+      "type": "object",
+      "description": "Dashes and gaps in turn, each length a multiple of the stroke's width.",
+      "properties": {
+        "patternType": {
+          "const": "dash"
+        },
+        "lengths": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "phase": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "patternType",
+        "lengths"
+      ],
+      "additionalProperties": false
+    },
+    "StrokeEmpty": {
+      "type": "object",
+      "description": "No line, stated, which hides any other line drawn at the same place.",
+      "properties": {
+        "patternType": {
+          "const": "empty"
+        }
+      },
+      "required": [
+        "patternType"
+      ],
+      "additionalProperties": false
+    },
+    "StrokeFrame": {
+      "type": "object",
+      "description": "A picture frame, carried as stored.",
+      "properties": {
+        "patternType": {
+          "const": "frame"
+        }
+      },
+      "required": [
+        "patternType"
+      ],
+      "additionalProperties": false
+    },
+    "StrokeJoin": {
+      "enum": [
+        "miter",
+        "round",
+        "bevel"
+      ]
+    },
+    "StrokePatterned": {
+      "type": "object",
+      "description": "A patterned stroke, carried as stored.",
+      "properties": {
+        "patternType": {
+          "const": "patterned"
+        }
+      },
+      "required": [
+        "patternType"
+      ],
+      "additionalProperties": false
+    },
+    "StrokeSolid": {
+      "type": "object",
+      "description": "An unbroken line.",
+      "properties": {
+        "patternType": {
+          "const": "solid"
+        }
+      },
+      "required": [
+        "patternType"
       ],
       "additionalProperties": false
     },
@@ -1567,6 +1823,9 @@
         "headers": {
           "$ref": "#/$defs/TableHeaders"
         },
+        "tableStyle": {
+          "$ref": "#/$defs/TableStyle"
+        },
         "mergeRanges": {
           "type": "array",
           "items": {
@@ -1586,6 +1845,7 @@
         "rowCount",
         "colCount",
         "headers",
+        "tableStyle",
         "mergeRanges",
         "cells"
       ],
@@ -1614,7 +1874,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 6
+          "const": 7
         },
         "sheetName": {
           "anyOf": [
@@ -1641,6 +1901,95 @@
         "sheetName",
         "table",
         "documentTables"
+      ],
+      "additionalProperties": false
+    },
+    "TableLine": {
+      "type": "object",
+      "description": "One line a table draws: whether it shows, and its stroke, kept while hidden.",
+      "properties": {
+        "visible": {
+          "type": "boolean"
+        },
+        "stroke": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stroke"
+            },
+            {
+              "const": "MIXED"
+            }
+          ]
+        }
+      },
+      "required": [
+        "visible",
+        "stroke"
+      ],
+      "additionalProperties": false
+    },
+    "TableStyle": {
+      "type": "object",
+      "description": "The lines a table draws, each region named for what it draws.",
+      "properties": {
+        "bodyHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "bodyVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerRowsVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerColumnsHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "footerRowsVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerRowsHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerColumnsVerticalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "footerRowsHorizontalGridlines": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerRowsSeparator": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "headerColumnsSeparator": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "footerRowsSeparator": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "tableOutline": {
+          "$ref": "#/$defs/TableLine"
+        },
+        "tableTitle": {
+          "type": "boolean"
+        },
+        "tableOutlineTitle": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bodyHorizontalGridlines",
+        "bodyVerticalGridlines",
+        "headerRowsVerticalGridlines",
+        "headerColumnsHorizontalGridlines",
+        "footerRowsVerticalGridlines",
+        "headerRowsHorizontalGridlines",
+        "headerColumnsVerticalGridlines",
+        "footerRowsHorizontalGridlines",
+        "headerRowsSeparator",
+        "headerColumnsSeparator",
+        "footerRowsSeparator",
+        "tableOutline",
+        "tableTitle",
+        "tableOutlineTitle"
       ],
       "additionalProperties": false
     }

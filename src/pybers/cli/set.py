@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-`pybers set`: the value, format, control and cell style of each cell a selector matches.
+`pybers set`: the value, format, control, cell style and borders of the cells matched.
 
 The command reads the text into a value and a format, makes one `cellSet` call, and
 saves only
@@ -9,6 +9,9 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-17  `--table-style` sets the lines of each table matched, for PYB-266.
+2026-11-17  `--border` draws borders on one block, with `--border-style`,
+            `--border-width` and `--border-color`, for PYB-266.
 2026-11-13  `--cell-style` sets a cell's whole box by its text form, `none`
             removing it, for PYB-265.
 2026-11-10  `--cell-control` sets a control by its text form, `none` removing one,
@@ -53,6 +56,14 @@ from pybers.cli._console import statusConsole
 from pybers.cli._formats import FormatOption, OutputFormat, printResult
 from pybers.cli._report import formatLine
 from pybers.cli.show import ShownPart, formatShownParts
+
+# Spelled out rather than read from the enums, so `--help` never loads the model;
+# `test_cli_set_borders` holds each equal to its enum.
+borderPositions: tuple[str, ...] = (
+    "all", "outer", "outer-top", "outer-right", "outer-bottom", "outer-left",
+    "between", "between-rows", "between-columns",
+)
+borderStyles: tuple[str, ...] = ("solid", "dashed", "dotted", "hidden")
 
 
 def runSet(
@@ -142,6 +153,69 @@ def runSet(
             ),
         ),
     ] = None,
+    # Text rather than the enum, so `--help` never loads the model.
+    border: Annotated[
+        str | None,
+        typer.Option(
+            "--border",
+            metavar="POSITION",
+            help=(
+                "Draw borders on the one block SELECTOR names, at this part of it: "
+                "all, outer, outer-top, outer-right, outer-bottom, outer-left, "
+                "between, between-rows or between-columns."
+            ),
+        ),
+    ] = None,
+    borderStyle: Annotated[
+        str | None,
+        typer.Option(
+            "--border-style",
+            metavar="STYLE",
+            help=(
+                "The --border line: solid, dashed, dotted, hidden to draw nothing and "
+                "hide the table's line, or none to remove the borders. Solid when "
+                "left out."
+            ),
+        ),
+    ] = None,
+    borderWidth: Annotated[
+        str | None,
+        typer.Option(
+            "--border-width",
+            metavar="LENGTH",
+            help="The --border line's width, such as 1pt. 0.35pt when left out.",
+        ),
+    ] = None,
+    borderColor: Annotated[
+        str | None,
+        typer.Option(
+            "--border-color",
+            metavar="COLOR",
+            help=(
+                "The --border line's color, as `pybers show` prints one, such as "
+                "#ff0000ff. Black when left out."
+            ),
+        ),
+    ] = None,
+    tableStyle: Annotated[
+        str | None,
+        typer.Option(
+            "--table-style",
+            metavar="STYLE",
+            help=(
+                "The lines each table SELECTOR matches draws, as `pybers show` prints "
+                "them, each `width style color` or none: table-outline, "
+                "body-horizontal-gridlines, body-vertical-gridlines, "
+                "header-rows-horizontal-gridlines, header-rows-vertical-gridlines, "
+                "header-columns-horizontal-gridlines, "
+                "header-columns-vertical-gridlines, "
+                "footer-rows-horizontal-gridlines, footer-rows-vertical-gridlines, "
+                "header-rows-separator, header-columns-separator and "
+                "footer-rows-separator; and table-title and table-outline-title, "
+                "yes or no. A line's -width, -style or -color changes one part."
+            ),
+        ),
+    ] = None,
     conflict: Annotated[
         pybers.CellFormatConflict,
         typer.Option(
@@ -163,10 +237,28 @@ def runSet(
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
-    """Set every cell SELECTOR matches to VALUE, a format, a control or a cell style."""
-    if all(part is None for part in (value, cellFormat, cellControl, cellStyle)):
+    """Set every cell SELECTOR matches to a value, format, control, style or borders."""
+    cellParts = (value, cellFormat, cellControl, cellStyle)
+    if border is None and any(
+        part is not None for part in (borderStyle, borderWidth, borderColor)
+    ):
         raise typer.BadParameter(
-            "Give a VALUE, a --cell-format, a --cell-control or a --cell-style."
+            "--border-style, --border-width and --border-color describe a --border, "
+            "so give its POSITION."
+        )
+    if all(part is None for part in (*cellParts, border, tableStyle)):
+        raise typer.BadParameter(
+            "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
+            "--border or a --table-style."
+        )
+    if border is not None and border not in borderPositions:
+        raise typer.BadParameter(
+            pybers.composeChoiceRefusal(border, "a border position", borderPositions)
+        )
+    if borderStyle is not None and borderStyle not in ("none", *borderStyles):
+        choices = ", ".join(borderStyles)
+        raise typer.BadParameter(
+            f"--border-style is one of {choices} or none, and is {borderStyle!r}."
         )
     target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
@@ -174,34 +266,72 @@ def runSet(
             pybers.open(documentPath) if timeZone is None
             else pybers.open(documentPath, timeZone=timeZone)
         )
-        changes = document.cellSet(
-            selector,
-            pybers.UNCHANGED if value is None else pybers.parseCellValue(value, kind),
-            format=(
-                pybers.UNCHANGED if cellFormat is None
-                else pybers.parseCellFormat(cellFormat)
-            ),
-            control=(
-                pybers.UNCHANGED if cellControl is None
-                else pybers.parseCellControl(cellControl)
-            ),
-            cellStyle=(
-                pybers.UNCHANGED if cellStyle is None
-                else pybers.parseCellStyle(cellStyle)
-            ),
-            conflict=conflict,
-            extend=extend,
-        )
-        cells: list[ShownPart] = [
-            document.table(each.reference.table).cell(each.reference)
-            for each in changes.changes if each.reference.table is not None
+        changes = pybers.CellChanges(())
+        if any(part is not None for part in cellParts):
+            changes = document.cellSet(
+                selector,
+                pybers.UNCHANGED if value is None
+                else pybers.parseCellValue(value, kind),
+                format=(
+                    pybers.UNCHANGED if cellFormat is None
+                    else pybers.parseCellFormat(cellFormat)
+                ),
+                control=(
+                    pybers.UNCHANGED if cellControl is None
+                    else pybers.parseCellControl(cellControl)
+                ),
+                cellStyle=(
+                    pybers.UNCHANGED if cellStyle is None
+                    else pybers.parseCellStyle(cellStyle)
+                ),
+                conflict=conflict,
+                extend=extend,
+            )
+        if border is not None:
+            drawn = document.cellBordersSet(
+                selector, pybers.CellBorderPosition(border),
+                style=(
+                    pybers.CellBorderStyle.SOLID if borderStyle is None
+                    else None if borderStyle == "none"
+                    else pybers.CellBorderStyle(borderStyle)
+                ),
+                width=(
+                    None if borderWidth is None
+                    else pybers.parseLength(borderWidth, "--border-width")
+                ),
+                color=None if borderColor is None else pybers.Color.parse(borderColor),
+            )
+            changes = pybers.CellChanges(
+                changes.changes + drawn.changes, changes.skipped + drawn.skipped
+            )
+        # Each cell once, though a value and a border may both have changed it.
+        shown: list[ShownPart] = [
+            document.table(reference.table).cell(reference)
+            for reference in dict.fromkeys(
+                each.reference for each in changes.changes
+            )
+            if reference.table is not None
         ]
-        if target is not None and changes.changed:
+        skipped = [(str(skip.reference), skip.reason) for skip in changes.skipped]
+        restyled = False
+        if tableStyle is not None:
+            for match in document.select(selector):
+                if not isinstance(match, pybers.TableReference):
+                    skipped.append((str(match), "not a table"))
+                    continue
+                table = document.table(match)
+                if table.tableStyleSet(
+                    pybers.parseTableStyle(tableStyle, table.tableStyle)
+                ).changed:
+                    restyled = True
+                    shown.append(table)
+        changed = changes.changed or restyled
+        if target is not None and changed:
             document.save(target)
-    printResult(cells, outputFormat, formatShownParts)
-    for skip in changes.skipped:
-        statusConsole.print(formatLine("Skipped", skip.reason))
-    reportWrite(changes.changed, target, "no cell it matched changes.")
+    printResult(shown, outputFormat, formatShownParts)
+    for reference, reason in skipped:
+        statusConsole.print(formatLine("Skipped", f"{reference}  {reason}"))
+    reportWrite(changed, target, "already set")
 
 
 __all__ = ["runSet"]

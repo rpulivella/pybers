@@ -15,7 +15,7 @@ named by `locator`, or by `preferred_locator` when the member carries no suffix,
 component's identifier is its root archive's.
 
 **A component's strong external references are exactly what its archives reference in other
-components.** Measured across all 51 fixtures on 2026-09-14: collect each archive's
+components.** Measured across all 51 fixtures on 14 September 2026: collect each archive's
 `ArchiveInfo.object_references`, keep the targets held by another component, and name the
 object as 0 when it is that component's root. The result equals every component's stored
 strong references, with no exception. Everything stored beyond that is marked `is_weak`, and
@@ -48,7 +48,7 @@ The one engine owner `49` gained is left over from the default table Numbers put
 sheet, which was then deleted. An empty sheet itself registers nothing in the engine.
 
 **Numbers cannot make a sheet without a background.** Confirmed in the interface on
-2026-09-14: neither No Fill nor a transparent color is accepted. The theme's sheet style
+14 September 2026: neither No Fill nor a transparent color is accepted. The theme's sheet style
 fills white, and every sheet shares it by reference.
 
 ## A new table
@@ -150,13 +150,13 @@ A created table stores 24 pt rows, one line of 11 pt text on exact 15.5 pt spaci
 4 pt padding, 23.5 pt in all. Numbers draws those rows at its fitted height, about 24.43 pt,
 and reports 0.34 in. `52-table-reset-styled` stored the same 24.43 as its fitting size. The
 roughly 0.93 pt beyond 23.5 is Numbers' text layout rather than rounding. Whether a cell
-border adds to the fit was unmeasured as of 2026-09-14, and belongs to PYB-87.
+border adds to the fit was unmeasured as of 14 September 2026, and belongs to PYB-87.
 
 ## The first formula in a table
 
 `48` → `55-table-inserted-formula` types `2` into `A1` and `=A1*3` into `B1` of the
 inserted table, whose owner of kind 1 held no dependency tile. Measured for PYB-86 on
-2026-09-15.
+15 September 2026.
 
 **Numbers creates the tile.** One `TSCE.CellRecordTileArchive` joins
 `CalculationEngine.iwa`, in the component already holding the owner, so no external
@@ -174,7 +174,7 @@ writes an empty edge set, as it does for every formula. Whether Numbers then rec
 **`TableModelArchive.table_id` is the table's formula-owner identity, spelled as a
 canonical uppercase UUID.** It matches in every table of every fixture: the identity's
 four words, each written low byte first, are the UUID's sixteen bytes. pybers wrote a
-fresh unrelated UUID there until 2026-09-16, and the cost was the whole calculation
+fresh unrelated UUID there until 16 September 2026, and the cost was the whole calculation
 engine registration.
 
 Numbers opens such a document without a prompt, then **re-identifies the table**: it mints

@@ -12,6 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
+2026-11-17  A cell's borders and a table's style, for PYB-266.
 2026-11-12  A cell's own cell style, one its save writes, for PYB-265.
 2026-11-11  A cell's format is one the save writes, an empty cell's included, for
             PYB-145.
@@ -43,6 +44,13 @@ from pybers.formula.parse import parseFormula
 from pybers.interchange._leaves import JsonFormError
 from pybers.interchange._tree import jsonFormReadOnly
 from pybers.style.cells import CellStyle
+from pybers.style.strokes import Stroke
+from pybers.table.borders import (
+    BorderEdge,
+    CellBorders,
+    CellBorderSide,
+    borderOrderInitial,
+)
 from pybers.table.cell import Cell, CellValue
 from pybers.table.cells import Table
 from pybers.table.headers import TableHeaders
@@ -53,6 +61,7 @@ from pybers.table.kinds import (
     kindValueTypes,
 )
 from pybers.table.merges import MergeRange
+from pybers.table.tablestyle import TableStyle
 
 # Kinds whose cell holds no value, so a value of None needs no formula to explain it.
 valuelessKinds: frozenset[CellKind] = frozenset(
@@ -71,6 +80,7 @@ class CellForm:
     valueCached: bool | None = field(default=None, metadata={jsonFormReadOnly: True})
     presentation: CellPresentation
     cellStyle: CellStyle | None = None
+    borders: CellBorders = CellBorders()
     unrecognizedTypeCode: int | None = None
     formula: Formula | WITHHELD | None = WITHHELD
 
@@ -90,6 +100,7 @@ class TableForm:
     rowCount: int
     colCount: int
     headers: TableHeaders
+    tableStyle: TableStyle
     mergeRanges: tuple[MergeRange, ...]
     cells: tuple[CellForm, ...]
 
@@ -99,7 +110,7 @@ def buildTableForm(table: Table, extent: CellRange | None = None) -> TableForm:
     cells = sorted(table.cells.items(), key=lambda each: each[0].asRowColumn())
     return TableForm(
         name=table.name, identifier=table.identifier, rowCount=table.rowCount,
-        colCount=table.colCount, headers=table.headers,
+        colCount=table.colCount, headers=table.headers, tableStyle=table.tableStyle,
         mergeRanges=tuple(table.mergeRanges),
         cells=tuple(
             buildCellForm(cell) for address, cell in cells
@@ -119,8 +130,8 @@ def buildCellForm(cell: Cell) -> CellForm:
     return CellForm(
         address=cell.address, value=cell.value, kind=cell.kind, formulaText=text,
         valueCached=cell.valueCached, presentation=cell.presentation,
-        cellStyle=cell.cellStyle, unrecognizedTypeCode=cell.unrecognizedTypeCode,
-        formula=formula,
+        cellStyle=cell.cellStyle, borders=cell.borders,
+        unrecognizedTypeCode=cell.unrecognizedTypeCode, formula=formula,
     )
 
 
@@ -139,11 +150,48 @@ def buildTable(form: TableForm, path: str) -> Table:
     table = Table(
         name=form.name, rowCount=form.rowCount, colCount=form.colCount,
         mergeRanges=list(form.mergeRanges), identifier=form.identifier,
-        _headers=form.headers,
+        _headers=form.headers, _tableStyle=form.tableStyle,
     )
     for index, cellForm in enumerate(form.cells):
         addCell(table, cellForm, f"{path}.cells[{index}]")
+        addBorders(table, cellForm)
     return table
+
+
+def addBorders(table: Table, form: CellForm) -> None:
+    """Store each side of a cell's borders, along a merge's whole side for a merge.
+
+    A form holds no order, so a stroke that prevails takes one more than one that
+    does not, which is all that decides the line drawn. A side `MIXED` along a merge
+    holds no one stroke to store.
+    """
+    merge = table.mergeCovering(form.address)
+    extent = merge.extent if merge is not None else CellRange.fromReferences(
+        form.address, form.address
+    )
+    top, left, bottom, right = (
+        extent.startRow, extent.startCol, extent.endRow, extent.endCol,
+    )
+    assert top is not None and left is not None
+    assert bottom is not None and right is not None
+    spans = {
+        CellBorderSide.TOP: [(top, column) for column in range(left, right + 1)],
+        CellBorderSide.BOTTOM: [(bottom, column) for column in range(left, right + 1)],
+        CellBorderSide.LEFT: [(row, left) for row in range(top, bottom + 1)],
+        CellBorderSide.RIGHT: [(row, right) for row in range(top, bottom + 1)],
+    }
+    for side, positions in spans.items():
+        border = getattr(form.borders, side.value)
+        if border is None or not isinstance(border.stroke, Stroke):
+            continue
+        order = borderOrderInitial + (2 if border.prevails else 1)
+        for row, column in positions:
+            key = (
+                table._rowIdentities[row - 1], table._columnIdentities[column - 1],
+                side,
+            )
+            table._borders.edges[key] = BorderEdge(border.stroke, order)
+        table._borders.maxOrder = max(table._borders.maxOrder, order)
 
 
 def addCell(table: Table, form: CellForm, path: str) -> None:

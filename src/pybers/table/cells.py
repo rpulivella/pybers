@@ -6,6 +6,9 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-17  `tableStyle`, the lines a table draws, and `tableStyleSet`, for
+            PYB-266.
+2026-11-17  The table's borders, kept by row and column identity, for PYB-266.
 2026-11-12  Each region's inherited cell style, for PYB-265.
 2026-11-03  A table's header and footer headers, read and set, `select`, and
             `range` removed in its favor, for PYB-223.
@@ -69,10 +72,11 @@ __date__ = "2026/09/02"
 
 import uuid
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from pybers.absence import MIXED
 from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
@@ -88,6 +92,13 @@ from pybers.addressing.reference import (
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
+from pybers.style.strokes import Stroke
+from pybers.table.borders import (
+    CellBorders,
+    CellBorderSide,
+    TableBorders,
+)
+from pybers.table.bordersdraw import findCellBordersByPosition, findShownLine
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
@@ -100,6 +111,13 @@ from pybers.table.structure import (
     buildGridEdit,
     editGrid,
     generateLineIdentities,
+)
+from pybers.table.tablestyle import (
+    TableLine,
+    TableStyle,
+    TableStyleChange,
+    buildTableStyle,
+    resetTableStyle,
 )
 
 if TYPE_CHECKING:
@@ -181,6 +199,12 @@ class Table:
         kw_only=True,
     )
 
+    # Every stroke stored on a side of a cell, keyed by row and column identity.
+    _borders: TableBorders = field(
+        default_factory=TableBorders, repr=False, compare=False, kw_only=True
+    )
+    _tableStyle: TableStyle = field(default=resetTableStyle, kw_only=True)
+
     def __post_init__(self) -> None:
         """Identify every line of a table that arrived without identities."""
         if not self._rowIdentities:
@@ -188,10 +212,43 @@ class Table:
         if not self._columnIdentities:
             self._columnIdentities = generateLineIdentities(self.colCount)
 
+    def __eq__(self, other: object) -> bool:
+        """Compare every field equality covers, and the borders each cell shows.
+
+        Borders are kept by line identity, which a table read from its JSON form does
+        not share, so they compare by position.
+        """
+        if not isinstance(other, Table):
+            return NotImplemented
+        return all(
+            getattr(self, each.name) == getattr(other, each.name)
+            for each in fields(self) if each.compare
+        ) and findCellBordersByPosition(self) == findCellBordersByPosition(other)
+
     def _cellStyleInherited(self, address: CellAddress) -> CellStyle:
         """Return the cell style a cell at `address` inherits from its region."""
         region = self._headers.regionFind(address, self.rowCount)
         return self._cellStylesInherited.get(region, numbersCellStyle)
+
+    @property
+    def tableStyle(self) -> TableStyle:
+        """Return the lines this table draws: gridlines, separators and outline."""
+        return self._tableStyle
+
+    def tableStyleSet(
+        self,
+        tableStyle: TableStyle | None = None,
+        **lines: TableLine | bool,
+    ) -> TableStyleChange:
+        """Set the lines this table draws, wholly or by name, and report the change.
+
+        `tableStyleSet(tableOutline=TableLine(True, stroke))`. Setting what the table
+        already draws changes nothing and writes nothing.
+        """
+        before = self._tableStyle
+        after = buildTableStyle(before if tableStyle is None else tableStyle, lines)
+        self._tableStyle = after
+        return TableStyleChange(self.reference, before, after)
 
     @property
     def headers(self) -> TableHeaders:
@@ -485,6 +542,30 @@ class Table:
             )
         refuseRangeOutside(self, item)
         return item
+
+    def _bordersRead(self, address: CellAddress) -> CellBorders:
+        """Return the sides of the cell at an address, a merge's spanning all of it."""
+        merge = self.mergeCovering(address)
+        extent = merge.extent if merge is not None else CellRange.fromReferences(
+            address, address
+        )
+        top, left = extent.startRow, extent.startCol
+        bottom, right = extent.endRow, extent.endCol
+        assert top is not None and left is not None
+        assert bottom is not None and right is not None
+        return self._borders.cellBordersRead(
+            self._rowIdentities, self._columnIdentities, top, left, bottom, right
+        )
+
+    def cellBorderShown(
+        self, address: CellReferenceLike, side: CellBorderSide
+    ) -> Stroke | MIXED | None:
+        """Return the line an edge displays, or None where it displays none.
+
+        A stored stroke prevails, the later of two that disagree, and a hidden one
+        draws nothing; else the table's own line for that edge, while it shows.
+        """
+        return findShownLine(self, self._addressResolve(address), side)
 
     def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.

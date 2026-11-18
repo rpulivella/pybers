@@ -93,7 +93,7 @@ document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 time
 default lives in the inherited style and the cell simply declines to override it.
 
 **Setting a property back to what the cell inherits removes the override.** Measured for
-PYB-265 on 2026-11-12 in `98c-cell-box-regions`: C1, a header cell given a 6pt inset and then
+PYB-265 on 12 November 2026 in `98c-cell-box-regions`: C1, a header cell given a 6pt inset and then
 4pt again, and D1, its wrap cleared and checked again, each hold no cell style. **No Fill is stored where it overrides**: B1, a header cell
 given No Fill, names a variation of the header row style holding an empty `cell_fill`, which
 covers the header's gray.
@@ -101,7 +101,7 @@ covers the header's gray.
 **A variation never inherits from a variation.** None of the 275 cell style variations and
 182 paragraph style variations in the documents Numbers made has a variation as its parent,
 and a table whose region style is a variation flattens instead. Measured for PYB-265 on
-2026-11-13 in `99-cell-fill-in-a-created-table`, a table pybers created, whose body style
+13 November 2026 in `99-cell-fill-in-a-created-table`, a table pybers created, whose body style
 is the reset's variation stating `text_wrap: false`: A1, filled by hand, names a variation
 of the theme's root cell style stating the fill and `text_wrap: false` both, with an
 `override_count` of 2. The same save dropped the five cells' styles pybers had written as
@@ -109,7 +109,7 @@ variations of the reset's variation, and their entries, and neither Numbers nor 
 drew those fills.
 
 **Numbers ignores the properties of a style whose `override_count` says it states none.**
-Measured for PYB-265 on 2026-11-13. The root cell style `pybers.create` composed stated an
+Measured for PYB-265 on 13 November 2026. The root cell style `pybers.create` composed stated an
 empty fill, 4pt padding, top alignment and no wrap with an `override_count` of 0, and every
 cell inheriting it drew its text in the middle while the inspector and AppleScript reported
 top. Raising the count to 4, the number of properties stated, drew the same cells at the top.
@@ -120,7 +120,7 @@ Each root and variation cell style Numbers writes states a count equal to its pr
 `0pt` cell of `31` holds it. A reader takes a missing side as zero.
 
 **Padding Numbers writes is uniform; padding it imports need not be.** Measured for PYB-265 on
-2026-11-12 across the 258 documents in the tests: 26,638 cell styles, 25,764 of them carrying
+12 November 2026 across the 258 documents in the tests: 26,638 cell styles, 25,764 of them carrying
 padding. Every style Numbers composed holds one value for all four sides, which is the single
 value the UI offers. The 32 exceptions are the table styles of a table imported from Excel,
 `22e-merge-imported` and the documents made from it, holding `L2 T0 R2 B2`.
@@ -163,13 +163,33 @@ top_row_stroke_layers        one layer per ROW,    runs indexed by column
 bottom_row_stroke_layers     one layer per ROW,    runs indexed by column
 ```
 
-Each run carries an origin, a length, and a stroke with width, color and a dash pattern. A
-width of `0` is how "no border" is expressed, so the layers are dense rather than sparse,
-every position has a run, most of them empty.
+Each run carries an origin, a length, an `order`, and a stroke with width, color and a dash
+pattern. **The layers are sparse**: an edge no one has touched has no run, and a line with no
+run has no layer, as `61-move-styles-base` holds four layers for one bordered cell. An edge
+set to No Border holds a run of width `0` with a `TSDEmptyPattern`, which is a different state
+from no run at all, because it hides what the table would draw there.
 
 Verified against the fixture: a 3pt top border on B1 is `top_row` layer 0 at column 1; a 0.5pt
 blue right border on C1 is `right_column` layer 2; a dashed bottom on D1 carries
-`dash[1, 1]`; a dotted left on E1 carries `dash[0, 2]`.
+`dash[1, 1]`; a dotted left on E1 carries `dash[0.001, 2]` with a round cap.
+
+### Which line an edge displays
+
+Measured 16 November 2026 from the preview each of these documents stores, which Numbers renders as
+it saves, so it shows what Numbers drew rather than what pybers would.
+
+**A run prevails over the gridline and the outline at its edge, an empty one included.**
+The `Borders` table of `57-structure-refusals-base` covers every edge with empty runs and
+shows no gridline, while its four siblings, sharing its table style and holding no runs,
+show every one. All five tables of `29-style-border` descend from one whose every edge was
+set to No Border, so the table labeled for a 2pt outline draws none, and the one labeled for
+gridlines draws none either.
+
+**Of two disagreeing facing strokes, Numbers draws the one with the higher `order`.**
+`63d-fill-border-base` stores C3's right edge as red 3pt at order 10 and D3's left edge as
+green 5pt at order 13, and the shared edge is green. `order` rises with each border edit,
+with gaps, and `StrokeSidecarArchive.max_order` holds the highest issued, so a stroke pybers
+writes takes `max_order + 1` to prevail.
 
 ### One line between two cells is stored TWICE
 
@@ -179,10 +199,45 @@ The border between F1 and G1 appears as **both** F1's right stroke and G1's left
 border between H1 and H2 appears as **both** H1's bottom and H2's top. A single visual line is
 two independent stored strokes on the facing edges.
 
-**Setting a border between two cells means writing both sides.** Writing one leaves the
-pair disagreeing, and which one Numbers renders is not something this fixture establishes.
-Reading has the mirror problem: a border reported from one cell's perspective may or may not
-be matched by its neighbor, and those are different document states.
+**Numbers writes only the edges of the cells selected.** A border drawn around D3 in `63d`
+left C3's facing edge as it was, so a disagreeing pair is an ordinary document state, settled
+at draw time by `order`. Reading has the mirror problem: a border reported from one cell's
+perspective may or may not be matched by its neighbor, and those are different document
+states.
+
+**A cell beside a bordered neighbor reads Multiple as its line style.** In `100b-lines`, C1
+sat beside B1's dashed right edge and read Multiple, and one edit at 5 pt kept C1's left edge
+dashed and made its other three solid, all at order 7. That the inspector reads the
+neighbor's facing stroke as the cell's own is inferred from this one case, not measured.
+
+### The Border control: nine positions, each a selection
+
+Measured 17 November 2026 in `100b-lines`. A button chooses which edges the next line style,
+width or color applies to, and writes nothing on its own. Each block was a 2×2 range given
+the solid line, and each choice wrote one `order`:
+
+```
+Outline          the range's outer edges          Left Border     the left edges
+Inside Borders   every inner line                 Center Borders  the inner vertical lines
+All Borders      outer edges and inner lines      Right Border    the right edges
+Top Border       the top edges                    Middle Borders  the inner horizontal lines
+                                                  Bottom Border   the bottom edges
+```
+
+**An inner line is written to both facing edges, an outer edge to the selected cell only.**
+Inside, Center, Middle and All Borders each wrote the pair at one order, and no button wrote
+a cell outside the range.
+
+### The stroke a line style takes
+
+Measured 17 November 2026 in `100b-lines`. A cell with no border shows **No Border** as its line
+style, and choosing the solid line with nothing else changed writes **0.35 pt, black, sRGB,
+alpha 1, solid, butt cap, miter join**, the gridline's own stroke, so the cell looks
+unchanged. A color with an opacity stores its alpha: `rgb 1, 0, 0, a 0.5` in `srgb`.
+
+**Cell border dashes are multiples of the width**, as `43-stroke-dashes` measured for
+shapes. Dashed stores `[2, 2]` at 1 pt and at 5 pt, and dotted `[0.001, 2]` with a round cap
+and round join at both.
 
 ### The table style has more than sixty stroke slots
 
@@ -191,6 +246,43 @@ body horizontal and vertical strokes, five levels of category strokes, and a set
 variants. The border vocabulary is large and almost all of it is **band-level** rather than
 cell-level, consistent with the earlier finding that styles exist per band and not per row
 or column.
+
+### What each Gridlines and Table Outline control sets
+
+Measured 17 November 2026 in `100b-lines` and `101b-outline`, on tables with one header row, one
+header column and one footer row. Each control writes a variation of the root table style
+overriding only what it lists, and a choice equal to the root writes nothing.
+
+| control, as its tooltip or menu names it | writes |
+|---|---|
+| Show or hide horizontal gridlines in body columns | `h_strokes_visible` |
+| Show or hide vertical gridlines in body rows | `v_strokes_visible` |
+| Show or hide horizontal gridlines in header columns | `table_hc_divider_visible` |
+| Show or hide vertical gridlines in header rows | `table_hr_divider_visible` |
+| Show or hide vertical gridlines in footer rows | `table_footer_divider_visible` |
+| Table Outline, a line style or width | the five `*_border_stroke` |
+| Table Outline, None | `table_border_visible` false, keeping the five strokes |
+| Table Outline, Default Table Style | removes the variation, back to the root |
+| Outline Table Title | `table_name_border_enabled` on `TableModelArchive` |
+
+No control sets `hr_separator_visible`, `hc_separator_visible` or `footer_separator_visible`.
+The root style states a solid 0.35 pt outline with `table_border_visible` true and the menu
+reads None over it, so choosing the solid line at 0.35 pt writes nothing. The dashed outline
+stores `[2, 2]`, and the dotted one `[0.001, 2]` with a round cap and a **miter** join, where
+a cell's dotted border has a round join.
+
+`29-style-border` reads the same way: the table labeled for gridlines on holds the 2pt
+outline with `table_border_visible` false, which is the outline set and then set to None.
+
+**Three more lines draw inside a band and no control names them.** Seen 17 November 2026
+in Numbers 15.4 rendering `00-created-table-lines-deep-bands-by-pybers`, a table of two
+header rows, two header columns and two footer rows with one stroke set red at a time:
+`header_row_horizontal_stroke` draws between two header rows across every column,
+`footer_row_horizontal_stroke` between two footer rows, and
+`header_column_vertical_stroke` between two header columns in the body rows. Each shows
+in the reset, which hides the body's gridlines, so no visibility flag governs it. Where two
+bands meet, the row band's lines prevail: a header row's vertical gridlines cross the
+header columns' separator, and its horizontal ones cross the header columns.
 
 Tables that only change a table-level setting show it as an override list on a variation
 style, `Table 1-1-1-1` sets exactly `v_strokes_visible`, `h_strokes_visible` and
@@ -274,7 +366,7 @@ The table and two further checks establish:
   the same way.
 
 **AppleScript reads a cell's fill converted to Generic RGB, its alpha dropped.** Measured
-for PYB-265 on 2026-11-13 against a copy of `97b` in Numbers 15.4. A cell's
+for PYB-265 on 13 November 2026 against a copy of `97b` in Numbers 15.4. A cell's
 `background color` is three integers from 0 to 65535, and its scripting dictionary states
 no color space and no alpha for a cell, so `B1` and `C1` read alike. AppKit's conversion of
 each stored color to `NSColorSpace.genericRGB` reproduces every row 1 reading within 1:

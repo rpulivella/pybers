@@ -1,0 +1,39 @@
+# How Numbers makes 101-outline-base: three tables, each awaiting the Table Outline change its label specifies. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 101-outline-base`, then 1 header row, 1 header column and 1 footer row set by hand on every table after `Table 1`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+
+[[step]]
+action = "tableAdd"
+table = "Outline solid 2pt"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline solid 2pt"
+range = "B2"
+value = "Table Outline set to the solid line, first item, width 2 pt"
+
+[[step]]
+action = "tableAdd"
+table = "Outline then None"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline then None"
+range = "B2"
+value = "Table Outline set to the solid line, first item, width 2 pt, then None"
+
+[[step]]
+action = "tableAdd"
+table = "Outline then default"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline then default"
+range = "B2"
+value = "Table Outline set to the solid line, first item, width 2 pt, then Default Table Style"

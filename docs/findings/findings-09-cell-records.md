@@ -76,13 +76,13 @@ reference, and those two are the two cells with comments.
 ~~**Bytes 8 and 9 do not fully determine how many trailing references a record carries.**
 The two commented cells above share their flag bytes with eighteen others and carry one
 more reference than they do, so at least one more gate lives somewhere else.~~ **Answered
-for PYB-61 on 2026-09-14: the gate is byte 10.** The count is
+for PYB-61 on 14 September 2026: the gate is byte 10.** The count is
 `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, with no exceptions in
 11,760 records. See [findings-01-values.md](findings-01-values.md).
 
 ## Which style each of `0x20` and `0x40` names
 
-Measured for PYB-265 on 2026-11-12 in `98b-cell-box-styles`, ten cells each holding `1`, styled
+Measured for PYB-265 on 12 November 2026 in `98b-cell-box-styles`, ten cells each holding `1`, styled
 by hand in Numbers 15.4 with one change per column. **A table keeps its cell styles and its
 paragraph styles in one `styleTable`**, keys unique across both, so a key alone does not say
 which kind it names. The slot does, and the archive type each key resolves to confirms it:

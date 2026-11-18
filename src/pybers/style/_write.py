@@ -10,6 +10,7 @@ findings-09-cell-records.md.
 Private. The archive half of the style feature.
 
 UPDATES
+2026-11-17  A stroke composed as `TSD.StrokeArchive`, for PYB-266.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -27,6 +28,7 @@ from typing import Literal
 
 from google.protobuf.message import Message
 
+from pybers._generated import TSDArchives_pb2 as tsd
 from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSSArchives_pb2 as tss
 from pybers._generated import TSTArchives_pb2 as tst
@@ -46,6 +48,15 @@ from pybers.style.cells import (
     CellStyleVerticalAlign,
 )
 from pybers.style.fills import FillNone
+from pybers.style.strokes import (
+    Stroke,
+    StrokeCap,
+    StrokeDash,
+    StrokeEmpty,
+    StrokeJoin,
+    StrokeSolid,
+    strokeDashSlots,
+)
 
 # A variation's identity in its table's pool: its parent and its serialized properties.
 type CellStyleKey = tuple[int, bytes]
@@ -57,6 +68,51 @@ verticalAlignValues: frozendict[CellStyleVerticalAlign, int] = frozendict({
     CellStyleVerticalAlign.TOP: 0, CellStyleVerticalAlign.MIDDLE: 1,
     CellStyleVerticalAlign.BOTTOM: 2,
 })
+
+
+type StrokeCapValue = tsd.StrokeArchive.LineCap.ValueType
+
+strokeCapValues: frozendict[StrokeCap, StrokeCapValue] = frozendict({
+    StrokeCap.BUTT: tsd.StrokeArchive.ButtCap,
+    StrokeCap.ROUND: tsd.StrokeArchive.RoundCap,
+    StrokeCap.SQUARE: tsd.StrokeArchive.SquareCap,
+})
+strokeJoinValues: frozendict[StrokeJoin, tsd.LineJoin.ValueType] = frozendict({
+    StrokeJoin.MITER: tsd.MiterJoin, StrokeJoin.ROUND: tsd.RoundJoin,
+    StrokeJoin.BEVEL: tsd.BevelJoin,
+})
+
+
+def composeStroke(stroke: Stroke) -> tsd.StrokeArchive:
+    """Return the archive a solid, dashed or empty stroke is stored as.
+
+    Numbers states all six dash slots on every pattern, zero beyond `count`, and a
+    brush, frame or patterned stroke is carried as read rather than composed.
+    """
+    pattern = tsd.StrokePatternArchive(phase=0, count=0)
+    match stroke.pattern:
+        case StrokeSolid():
+            pattern.type = tsd.StrokePatternArchive.TSDSolidPattern
+        case StrokeEmpty():
+            pattern.type = tsd.StrokePatternArchive.TSDEmptyPattern
+        case StrokeDash(lengths=lengths, phase=phase):
+            pattern.type = tsd.StrokePatternArchive.TSDPattern
+            pattern.phase = float(phase)
+            pattern.count = len(lengths)
+        case other:
+            raise WriteError(
+                f"A {other.patternType} stroke is read and carried, and pybers does "
+                "not write one."
+            )
+    lengths = stroke.pattern.lengths if isinstance(stroke.pattern, StrokeDash) else ()
+    pattern.pattern.extend(
+        [float(each) for each in lengths] + [0.0] * (strokeDashSlots - len(lengths))
+    )
+    return tsd.StrokeArchive(
+        color=composeColor(stroke.color), width=float(stroke.width),
+        cap=strokeCapValues[stroke.cap], join=strokeJoinValues[stroke.join],
+        miter_limit=float(stroke.miterLimit), pattern=pattern,
+    )
 
 
 def addStyles(
@@ -230,6 +286,7 @@ def applyCellStyle(
 
 
 __all__ = [
+    "composeStroke",
     "CellStyleKey",
     "addStyles",
     "applyCellStyle",

@@ -11,6 +11,7 @@ No formula outside the copy changes, under either rule. See findings-03-structur
 afterward exactly as it did before.
 
 UPDATES
+2026-11-17  Each position takes its source's borders in the model, for PYB-266.
 2026-10-14  Writes the table's own store, `cells` being read-only, and checks a
             range against the grid through `bounds`, for PYB-193.
 2026-09-29  Written for PYB-136.
@@ -73,8 +74,7 @@ def copyCells(
     refuseMergeCut(table, copy, "copy")
     refuseOccupied(table, copy, "copy")
 
-    # Every position, empty ones included, since a paste gives each its source's
-    # borders and one holding nothing else may still hold a border, as `64d` shows.
+    # Every position, empty ones included, since a paste empties the destination.
     copied = [
         table.cell(reference) for reference in extent
         if table.addressable(reference)
@@ -83,12 +83,25 @@ def copyCells(
         table._cells.pop(reference, None)
     for cell in copied:
         target = Cell(address=copy.cellMap(cell.address), table=table)
-        copyCellContent(target, cell, named, borders=True)
+        copyCellContent(target, cell, named)
         if target.formula is not None and not named:
             target.formula = clampFormulaRanges(
                 target.formula, target.address, table.rowCount, table.colCount
             )
         table._cells[target.address] = target
+    rows, columns = table._rowIdentities, table._columnIdentities
+    # Every position, those a merge covers included, as a paste draws them all.
+    table._borders.cellsCarry(
+        [
+            (
+                (rows[reference.row - 1], columns[reference.col - 1]),
+                (rows[copy.cellMap(reference).row - 1],
+                 columns[copy.cellMap(reference).col - 1]),
+            )
+            for reference in extent
+        ],
+        keep=True,
+    )
     table.mergeRanges.extend(
         MergeRange(CellRange.fromReferences(
             copy.cellMap(merge.anchor), copy.cellMap(merge.corner)

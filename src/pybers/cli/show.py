@@ -10,6 +10,8 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-17  A table's lines, as CSS declarations under its own line, for PYB-266.
+2026-11-17  A cell's borders, after its cell style, for PYB-266.
 2026-11-12  A cell's own cell style prints as its text form, for PYB-265.
 2026-11-10  A control prints as its text form, as a format does, for PYB-145.
 2026-11-10  A format prints as its text form, `(automatic)` after one Automatic chose,
@@ -127,6 +129,7 @@ def formatCell(cell: pybers.Cell, indent: int = 0) -> Group:
             ("Control", formatControl(presentation.control)),
         ),
         formatFields(inner, ("Cell style", formatCellStyle(cell.cellStyle))),
+        formatFields(inner, ("Borders", pybers.formatCellBorders(cell) or "none")),
         formatFields(
             inner,
             ("Unrecognized type code", "none" if typeCode is None else str(typeCode)),
@@ -146,7 +149,7 @@ def listCells(
 
 
 def formatTable(table: pybers.Table, indent: int = 0) -> Group:
-    """Return a table's size, headers, merges and cell count, then each of its cells."""
+    """Return a table's size, headers, merges and cell count, its lines, then cells."""
     headers = table.headers
     cells = listCells(table)
     merges = ", ".join(str(merge.extent) for merge in table.mergeRanges)
@@ -163,7 +166,22 @@ def formatTable(table: pybers.Table, indent: int = 0) -> Group:
             f"merges {merges}" if merges else "",
             formatCountShown(len(cells), "cell"),
         ),
+        formatTableStyleLines(table.tableStyle, indent + childIndent),
         *listChildren([formatCell(cell, indent + childIndent) for cell in cells]),
+    )
+
+
+def formatTableStyleLines(tableStyle: pybers.TableStyle, indent: int) -> Group:
+    """Return a table's lines as CSS declarations, one per line under their label.
+
+    Each line pastes back into `pybers set --table-style`.
+    """
+    return Group(
+        Text.assemble(" " * indent, ("Table style:", "label")),
+        *(
+            Text.assemble(" " * (indent + childIndent), (declaration, "value"))
+            for declaration in pybers.formatTableStyle(tableStyle)
+        ),
     )
 
 

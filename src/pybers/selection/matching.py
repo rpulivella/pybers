@@ -14,6 +14,7 @@ not create two table names differing only in case on one sheet, and enforces not
 about sheet names, so folding them would invent a collision the file does not have.
 
 UPDATES
+2026-11-17  `findBlockTarget`, the one block a border is drawn on, for PYB-266.
 2026-11-03  Written for PYB-223.
 """
 from __future__ import annotations
@@ -459,10 +460,7 @@ def findCellTargets(
         table, cells = part.table, part.cells
         if table is None or cells is None:
             kind = "sheet" if table is None else "table"
-            skipped.append(CellSkip(
-                part.reference, f"{part.reference} is a {kind}, and a value is "
-                "written into cells.",
-            ))
+            skipped.append(CellSkip(part.reference, f"a {kind}, not cells"))
             continue
         addresses = (
             [cells] if isinstance(cells, CellAddress)
@@ -473,6 +471,27 @@ def findCellTargets(
         for address in addresses:
             targets.setdefault((id(table), address), (table, address))
     return list(targets.values()), skipped
+
+
+def findBlockTarget(
+    document: Document, selector: SelectorLike, action: str
+) -> tuple[Table, CellRange]:
+    """Return the one bounded block of one table a selector names, or refuse.
+
+    Refused before anything is written, listing what the selector matched.
+    """
+    parts = selectParts(document, selector)
+    if len(parts) != 1 or parts[0].table is None or parts[0].cells is None:
+        raise SelectionError(
+            f"A {action} draws on one block of cells in one table, and the selector "
+            f"matched {formatMatches([part.reference for part in parts])}."
+        )
+    table, cells = parts[0].table, parts[0].cells
+    block = (
+        CellRange.fromReferences(cells, cells) if isinstance(cells, CellAddress)
+        else cells
+    )
+    return table, table.rangeSingle(block, action)
 
 
 def findExtendTarget(

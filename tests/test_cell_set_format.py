@@ -236,8 +236,9 @@ def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1")
     assert result.exit_code == 2
     shown = readPlainText(result.output)
-    assert "Give a VALUE, a --cell-format, a --cell-control or a --cell-style." in (
-        shown
+    assert (
+        "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
+        "--border or a --table-style." in shown
     )
 
 
@@ -302,7 +303,7 @@ def testAConflictFallingBackGivesAutomaticAndSaysWhy(working: Path) -> None:
         conflict=CellFormatConflict.AUTOMATIC,
     )
     (skip,) = changes.skipped
-    assert skip.reason.endswith("number format cannot show. It takes Automatic.")
+    assert skip.reason == "takes automatic, as the format given cannot show its value"
     document.save()
     assert readFormat(working, "A1") == CellFormatNumber()
     assert readFormat(working, "A2") == CellFormatAutomatic(CellFormatText())
@@ -314,7 +315,7 @@ def testACommandFallsBackToAutomaticWhenAsked(working: Path) -> None:
         "--conflict", "automatic",
     )
     assert result.exit_code == 0, result.output
-    assert "It takes Automatic." in readPlainText(result.output)
+    assert "takes automatic" in readPlainText(result.output)
     assert readFormat(working, "A2") == CellFormatAutomatic(CellFormatText())
 
 

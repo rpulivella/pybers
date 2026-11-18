@@ -1,0 +1,392 @@
+# How Numbers makes 100-lines-base: the labels for cell borders at each position and line style, and one table per table-level line control, each awaiting the change its label specifies. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 100-lines-base`, then 1 header row, 1 header column and 1 footer row set by hand on every table after `Positions Bottom`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "G2"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "input as 1, Border Outline, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "input as 1, Border Outline, dashed line chosen from the No Border menu, 1 pt"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "input as 1, Border Outline, dashed line chosen from the No Border menu, 5 pt"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "input as 1, Border Outline, dotted line chosen from the No Border menu, 1 pt"
+
+[[step]]
+action = "valueSet"
+range = "E1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "input as 1, Border Outline, dotted line chosen from the No Border menu, 5 pt"
+
+[[step]]
+action = "valueSet"
+range = "F1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "F2"
+value = "input as 1, Border Outline, solid line chosen from the No Border menu, 1 pt, color set with RGB sliders, sRGB IEC61966-2.1, 255 0 0, Opacity 50%"
+
+[[step]]
+action = "valueSet"
+range = "G1"
+value = "empty"
+
+[[step]]
+action = "tableAdd"
+table = "Positions Top"
+range = "G2"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "A1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "B1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "A2"
+value = "input as 1 in A1:B2, Border Outline, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "C1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "D1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "C2"
+value = "input as 1 in C1:D2, Border Inside Borders, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "E1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "F1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "E2"
+value = "input as 1 in E1:F2, Border All Borders, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Top"
+range = "G1"
+value = "empty"
+
+[[step]]
+action = "tableAdd"
+table = "Positions Middle"
+range = "G2"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "A1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "B1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "A2"
+value = "input as 1 in A1:B2, Border Left Border, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "C1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "D1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "C2"
+value = "input as 1 in C1:D2, Border Center Borders, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "E1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "F1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "E2"
+value = "input as 1 in E1:F2, Border Right Border, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Middle"
+range = "G1"
+value = "empty"
+
+[[step]]
+action = "tableAdd"
+table = "Positions Bottom"
+range = "G2"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "A1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "B1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "A2"
+value = "input as 1 in A1:B2, Border Top Border, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "C1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "D1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "C2"
+value = "input as 1 in C1:D2, Border Middle Borders, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "E1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "F1"
+value = "1"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "E2"
+value = "input as 1 in E1:F2, Border Bottom Border, solid line chosen from the No Border menu, width and color left as offered"
+
+[[step]]
+action = "valueSet"
+table = "Positions Bottom"
+range = "G1"
+value = "empty"
+
+[[step]]
+action = "tableAdd"
+table = "Untouched"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Untouched"
+range = "B2"
+value = "nothing changed"
+
+[[step]]
+action = "tableAdd"
+table = "Body horizontal"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Body horizontal"
+range = "B2"
+value = "Gridlines, Show or hide horizontal gridlines in body columns, pressed once"
+
+[[step]]
+action = "tableAdd"
+table = "Body vertical"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Body vertical"
+range = "B2"
+value = "Gridlines, Show or hide vertical gridlines in body rows, pressed once"
+
+[[step]]
+action = "tableAdd"
+table = "Header columns horizontal"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Header columns horizontal"
+range = "B2"
+value = "Gridlines, Show or hide horizontal gridlines in header columns, pressed once"
+
+[[step]]
+action = "tableAdd"
+table = "Header rows vertical"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Header rows vertical"
+range = "B2"
+value = "Gridlines, Show or hide vertical gridlines in header rows, pressed once"
+
+[[step]]
+action = "tableAdd"
+table = "Footer rows vertical"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Footer rows vertical"
+range = "B2"
+value = "Gridlines, Show or hide vertical gridlines in footer rows, pressed once"
+
+[[step]]
+action = "tableAdd"
+table = "Outline solid"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline solid"
+range = "B2"
+value = "Table Outline set to the solid line, first item"
+
+[[step]]
+action = "tableAdd"
+table = "Outline dashed"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline dashed"
+range = "B2"
+value = "Table Outline set to the dashed line, second item"
+
+[[step]]
+action = "tableAdd"
+table = "Outline dotted"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline dotted"
+range = "B2"
+value = "Table Outline set to the dotted line, third item"
+
+[[step]]
+action = "tableAdd"
+table = "Outline default"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline default"
+range = "B2"
+value = "Table Outline set to Default Table Style"
+
+[[step]]
+action = "tableAdd"
+table = "Outline title"
+range = "C4"
+
+[[step]]
+action = "valueSet"
+table = "Outline title"
+range = "B2"
+value = "Table Outline set to the solid line, first item, then Outline Table Title checked"

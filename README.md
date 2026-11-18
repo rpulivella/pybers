@@ -17,7 +17,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 `pybers check FILE` says whether pybers can read a document, what it is running on, and the tree of its sheets and tables, each shown by its kind and size, in a form safe to paste into a public bug report. `--names` names each sheet, table and unrecognized cell, for the person holding the document.
 
-`pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE]` sets the value, the format, the control and the cell style of every cell a [selector](#selectors) matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
+`pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--border POSITION] [--table-style STYLE]` sets the value, the format, the control, the cell style and the borders of every cell a [selector](#selectors) matches, and the lines of every table it matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B4" 1250.00
@@ -48,6 +48,21 @@ pybers set budget.numbers "Summary::Costs::B2:B9" --cell-style none
 ```
 
 A background is a color in any form [Colors](#colors) lists, or `none` for no fill even where the table gives the cell one. A gradient or image background is read and kept but not yet written, and padding is one length for every side, since Numbers offers one. Either is refused by name before anything is written.
+
+`--border` draws borders on one block of cells, at a position named for the part of the block it draws: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed` or `dotted`, `--border-width` a length such as `1pt` and `--border-color` a color, and a style given alone draws 0.35pt black, as Numbers does. `hidden` draws nothing and hides the table's line there, as Numbers' No Border does, and `none` removes the borders so the table's own lines show. A merged cell is bordered whole:
+
+```bash
+pybers set budget.numbers "Summary::Costs::B2:D9" --border outer --border-style dashed --border-width 1pt --border-color black
+pybers set budget.numbers "Summary::Costs::B2:D9" --border between-rows
+pybers set budget.numbers "Summary::Costs::B2:D9" --border all --border-style none
+```
+
+`--table-style` sets the lines a table draws, as `pybers show` prints them: `table-outline`, `table-title`, `table-outline-title`, and the gridlines and separators of its body, header rows, header columns and footer rows, each `width style color` or `none`. A line's `-width`, `-style` or `-color` changes one part of it, and setting what a table already draws writes nothing:
+
+```bash
+pybers set budget.numbers "Summary::Costs" --table-style "body-vertical-gridlines: none; table-outline: 1pt solid black"
+pybers set budget.numbers "Summary::Costs" --table-style "table-outline-color: #ff3b30ff; table-outline-title: yes"
+```
 
 A format applies to every cell a range holds, an empty one included, as Numbers keeps it for whatever is typed in later. A formula takes its format whatever its result, and Numbers shows it whenever the result is of the format's kind. pybers sets each family the Data Format menu offers as its own ticket adds it, so for now a format is Automatic or the family Automatic picks for the value, and a control can be removed but not yet given. Anything else is refused by name before anything is written.
 
@@ -352,11 +367,26 @@ print(pybers.formatCellStyle(costs.cell("B2").cellStyle))  # background: #ffd60a
 document.cellSet("Summary::Costs::B2:B9", cellStyle=None)  # each cell's own style removed
 ```
 
+A cell's borders are `cell.borders`, each side the stroke the cell stores and the one its neighbor stores on the same edge. `document.cellBordersSet` draws them on one block, writing both sides of every edge, and `table.cellBorderShown` says which line an edge displays: the later of two borders, or else the table's own line there. A table's lines are `table.tableStyle`, one `TableLine` per gridline, separator and the outline, set by `table.tableStyleSet`:
+
+```python
+from pybers import CellBorderPosition, CellBorderSide, CellBorderStyle, Color
+
+document.cellBordersSet(
+    "Summary::Costs::B2:D9", CellBorderPosition.OUTER,
+    style=CellBorderStyle.DASHED, width=1, color=Color.black,
+)
+print(pybers.formatCellBorders(costs.cell("B2")))  # border-top: 1pt dashed #000000ff; border-left: …
+costs.tableStyleSet(pybers.parseTableStyle("body-vertical-gridlines: none", costs.tableStyle))
+costs.tableStyleSet(tableOutlineTitle=True)
+print(costs.cellBorderShown("C5", CellBorderSide.RIGHT))  # None: the vertical gridlines are hidden
+```
+
 A whole document read from its JSON form saves as a created document holding what the form describes. A cell holding something pybers cannot yet create, rich text, a control or a format such as a percentage, is refused by name before anything is written.
 
 ### Colors
 
-A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert it to another space. A cell's background takes one, through `cellStyle` or `pybers set --cell-style`. Build one through `import pybers` or read one from its text:
+A `Color` specifies its space and always includes an alpha (opacity). pybers does not convert it to another space. A cell's background, a border and a table's lines each take one, through `import pybers` or `pybers set`. Build one through `import pybers` or read one from its text:
 
 | System | Through `import pybers` | As text |
 | --- | --- | --- |
@@ -409,6 +439,8 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Reading every cell's value, its kind (number, currency, text, date, duration and more), its format as one of a closed family of types, and its control
 - Setting a cell's value, format and control in one call or each alone, a format by its type or by the text `pybers show` prints, and removing a control
 - Reading and setting a cell's box, its fill, padding, vertical alignment and wrap, through `import pybers` or as CSS at the command line
+- Drawing and removing a cell's borders at any position Numbers' Border control offers, reading each side, and resolving the line an edge displays
+- Reading and setting a table's gridlines, separators and outline, through `import pybers` or as CSS at the command line
 - Writing numbers, text, dates and times, durations and booleans into any cell, and formulas as the text Numbers shows
 - Adding and deleting rows and columns, with every formula and merge following
 - Moving, copying and filling blocks of cells, a fill continuing a series as Numbers does
@@ -425,9 +457,9 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - A command-line app that exports a document as JSON ([PYB-142](https://github.com/rpulivella/pybers/issues/142))
 - A terminal interface for browsing a document read-only ([PYB-171](https://github.com/rpulivella/pybers/issues/171))
 - Setting every family the Data Format menu offers, with each of its settings, and giving a cell a control ([PYB-231](https://github.com/rpulivella/pybers/issues/231) to [PYB-247](https://github.com/rpulivella/pybers/issues/247))
-- Cell styling: borders, and named cell styles ([PYB-266](https://github.com/rpulivella/pybers/issues/266), [PYB-128](https://github.com/rpulivella/pybers/issues/128))
+- Named cell styles ([PYB-128](https://github.com/rpulivella/pybers/issues/128))
 - Rich text: styled runs inside a cell, named paragraph styles, OpenType features, tracking and leading ([PYB-270](https://github.com/rpulivella/pybers/issues/270), [PYB-268](https://github.com/rpulivella/pybers/issues/268), [PYB-129](https://github.com/rpulivella/pybers/issues/129), [PYB-131](https://github.com/rpulivella/pybers/issues/131))
-- Table appearance: banding, gridlines and outlines ([PYB-266](https://github.com/rpulivella/pybers/issues/266), [PYB-267](https://github.com/rpulivella/pybers/issues/267))
+- Banding a table's rows with an alternating color ([PYB-267](https://github.com/rpulivella/pybers/issues/267))
 - Text boxes and the other objects floating on a sheet ([PYB-271](https://github.com/rpulivella/pybers/issues/271))
 - Placing anything on a sheet by a named anchor, at the sizes Numbers draws ([PYB-87](https://github.com/rpulivella/pybers/issues/87))
 - Calculating formula values, so a document read without opening Numbers shows what Numbers would ([PYB-196](https://github.com/rpulivella/pybers/issues/196), [PYB-197](https://github.com/rpulivella/pybers/issues/197), [PYB-198](https://github.com/rpulivella/pybers/issues/198))

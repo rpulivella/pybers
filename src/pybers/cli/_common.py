@@ -7,6 +7,7 @@ The root callback stores `CommandSettings` on Typer's context object, which is
 how Typer hands a group's options down to its commands.
 
 UPDATES
+2026-11-17  A report's value is a phrase, `previewing only`, for PYB-266.
 2026-10-28  Where a write goes, its two options and its report, shared by `set`
             and `locale`, FILE itself unless `-o` names a new one, for PYB-272.
 2026-10-07  Written for PYB-169.
@@ -97,7 +98,7 @@ def reportWrite(changed: bool, target: Path | None, unchanged: str) -> None:
     if not changed:
         statusConsole.print(Text(f"Nothing written: {unchanged}", "detail"))
     elif target is None:
-        statusConsole.print(Text("Nothing written: a preview.", "detail"))
+        statusConsole.print(Text("Nothing written: previewing only", "detail"))
     else:
         statusConsole.print(
             Text.assemble(("Written: ", "label"), (str(target), "value"))

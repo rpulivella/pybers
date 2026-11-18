@@ -11,6 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-17  The stroke family, a cell's borders and a table's lines, for PYB-266.
 2026-11-13  `parseCellStyle` and `CellStyleError`, a cell style read from its text
             form, for PYB-265.
 2026-11-12  `CellStyle`, its values, its text form and the fill family re-exported,
@@ -60,7 +61,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/12"
 
-lazy from pybers.absence import UNCHANGED, UNDETERMINED, WITHHELD
+lazy from pybers.absence import MIXED, UNCHANGED, UNDETERMINED, WITHHELD
 lazy from pybers.addressing import (
     CellAddress,
     CellOffset,
@@ -106,7 +107,12 @@ lazy from pybers.document import (
     locales,
     open,
 )
-lazy from pybers.errors import PybersError, ReadError, WriteError
+lazy from pybers.errors import (
+    PybersError,
+    ReadError,
+    WriteError,
+    composeChoiceRefusal,
+)
 lazy from pybers.format import (
     CellControl,
     CellControlBase,
@@ -196,11 +202,30 @@ lazy from pybers.style import (
     FillImage,
     FillNone,
     FillType,
+    Stroke,
+    StrokeBrush,
+    StrokeCap,
+    StrokeDash,
+    StrokeEmpty,
+    StrokeError,
+    StrokeFrame,
+    StrokeJoin,
+    StrokePattern,
+    StrokePatterned,
+    StrokePatternType,
+    StrokeSolid,
     formatCellStyle,
+    formatStroke,
     parseCellStyle,
+    parseLength,
 )
 lazy from pybers.table import (
     Cell,
+    CellBorder,
+    CellBorderPosition,
+    CellBorders,
+    CellBorderSide,
+    CellBorderStyle,
     CellChange,
     CellChanges,
     CellKind,
@@ -211,14 +236,22 @@ lazy from pybers.table import (
     MergeRange,
     Table,
     TableHeaders,
+    TableLine,
     TableRow,
     TableRows,
+    TableStyle,
+    TableStyleChange,
+    TableStyleError,
+    formatCellBorders,
     formatCellValue,
+    formatTableStyle,
     parseCellValue,
+    parseTableStyle,
 )
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
 
 __all__ = [
+    "MIXED",
     "UNCHANGED",
     "UNDETERMINED",
     "WITHHELD",
@@ -240,6 +273,7 @@ __all__ = [
     "PybersError",
     "ReadError",
     "WriteError",
+    "composeChoiceRefusal",
     "FormulaNode",
     "FormulaError",
     "FormulaSyntaxError",
@@ -247,12 +281,15 @@ __all__ = [
     "FormulaVariable",
     "FormulaLambda",
     "Formula",
+    "formatCellBorders",
     "formatCellValue",
+    "formatTableStyle",
     "formatJsonForm",
     "JsonFormError",
     "jsonFormVersion",
     "parseJsonForm",
     "parseCellValue",
+    "parseTableStyle",
     "Color",
     "ColorError",
     "ColorSpace",
@@ -265,8 +302,22 @@ __all__ = [
     "FillImage",
     "FillNone",
     "FillType",
+    "Stroke",
+    "StrokeBrush",
+    "StrokeCap",
+    "StrokeDash",
+    "StrokeEmpty",
+    "StrokeError",
+    "StrokeFrame",
+    "StrokeJoin",
+    "StrokePattern",
+    "StrokePatternType",
+    "StrokePatterned",
+    "StrokeSolid",
     "formatCellStyle",
+    "formatStroke",
     "parseCellStyle",
+    "parseLength",
     "CellStyleError",
     "Currency",
     "CurrencyAmount",
@@ -285,6 +336,11 @@ __all__ = [
     "NumbersVersion",
     "checkDocument",
     "Cell",
+    "CellBorder",
+    "CellBorderPosition",
+    "CellBorderSide",
+    "CellBorderStyle",
+    "CellBorders",
     "CellChange",
     "CellChanges",
     "CellSkip",
@@ -352,6 +408,10 @@ __all__ = [
     "SelectorLike",
     "quoteSelectorName",
     "TableHeaders",
+    "TableLine",
+    "TableStyle",
+    "TableStyleChange",
+    "TableStyleError",
     "Sheet",
     "Table",
     "TableRow",

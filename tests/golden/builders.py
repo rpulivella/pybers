@@ -800,6 +800,158 @@ def setCellFills(document: pybers.Document) -> None:
     table.cell(pybers.CellAddress(2, columns)).value = "empty"
 
 
+# ── PYB-266: a table's lines ────────────────────────────────────────────────
+
+red: pybers.Color = pybers.Color(pybers.ColorSpace.SRGB, (1, 0, 0), 1)
+borderStyleCases: tuple[tuple[str, dict[str, object]], ...] = (
+    ("outer, solid, width and color left as offered", {}),
+    ("outer, dashed, 1pt", {"style": pybers.CellBorderStyle.DASHED, "width": 1}),
+    ("outer, dashed, 5pt", {"style": pybers.CellBorderStyle.DASHED, "width": 5}),
+    ("outer, dotted, 1pt", {"style": pybers.CellBorderStyle.DOTTED, "width": 1}),
+    ("outer, dotted, 5pt", {"style": pybers.CellBorderStyle.DOTTED, "width": 5}),
+    ("outer, solid, 1pt, red at 50% opacity", {
+        "style": pybers.CellBorderStyle.SOLID, "width": 1,
+        "color": pybers.Color(pybers.ColorSpace.SRGB, (1, 0, 0), Decimal("0.5")),
+    }),
+    ("outer, hidden, the gridlines hidden around it", {
+        "style": pybers.CellBorderStyle.HIDDEN,
+    }),
+)
+positionRows: tuple[tuple[str, tuple[pybers.CellBorderPosition, ...]], ...] = (
+    ("Positions Top", (pybers.CellBorderPosition.OUTER,
+                       pybers.CellBorderPosition.BETWEEN,
+                       pybers.CellBorderPosition.ALL)),
+    ("Positions Middle", (pybers.CellBorderPosition.OUTER_LEFT,
+                          pybers.CellBorderPosition.BETWEEN_COLUMNS,
+                          pybers.CellBorderPosition.OUTER_RIGHT)),
+    ("Positions Bottom", (pybers.CellBorderPosition.OUTER_TOP,
+                          pybers.CellBorderPosition.BETWEEN_ROWS,
+                          pybers.CellBorderPosition.OUTER_BOTTOM)),
+)
+
+
+def applyCellBorders(document: pybers.Document) -> None:
+    """Draw each line style, each position, a later border over an earlier, a merge."""
+    sheet = document.sheet()
+    styles = sheet.tableAdd("Styles", rows=2, cols=2 * len(borderStyleCases) + 1)
+    styles.tableStyleSet(
+        bodyHorizontalGridlines=pybers.TableLine(
+            True, styles.tableStyle.bodyHorizontalGridlines.stroke
+        ),
+        bodyVerticalGridlines=pybers.TableLine(
+            True, styles.tableStyle.bodyVerticalGridlines.stroke
+        ),
+    )
+    for at, (label, arguments) in enumerate(borderStyleCases):
+        column = 2 * at + 1
+        above = pybers.CellAddress(1, column)
+        styles.cell(above).value = Decimal(1)
+        document.cellBordersSet(
+            f"::Styles::{above}", pybers.CellBorderPosition.OUTER,
+            **arguments,  # type: ignore[arg-type]
+        )
+        styles.cell(pybers.CellAddress(2, column)).value = f"drawn {label}"
+    for name, positions in positionRows:
+        table = sheet.tableAdd(name, rows=3, cols=3 * len(positions))
+        for at, position in enumerate(positions):
+            left = 3 * at + 1
+            block = pybers.CellRange.fromReferences(
+                pybers.CellAddress(1, left), pybers.CellAddress(2, left + 1)
+            )
+            for address in block:
+                table.cell(address).value = Decimal(1)
+            document.cellBordersSet(f"::{name}::{block}", position)
+            table.cell(pybers.CellAddress(3, left)).value = (
+                f"{block} drawn {position}, solid"
+            )
+    order = sheet.tableAdd("Order", rows=3, cols=3)
+    document.cellBordersSet("::Order::A1", pybers.CellBorderPosition.OUTER,
+                            width=3, color=red)
+    document.cellBordersSet("::Order::B1", pybers.CellBorderPosition.OUTER,
+                            width=5, color=pybers.Color.black)
+    order.cell("A2").value = "A1 red 3pt, then B1 black 5pt: their edge black"
+    merged = sheet.tableAdd("Merged", rows=3, cols=4)
+    merged.mergeAdd("B1:C2")
+    document.cellBordersSet("::Merged::B1", pybers.CellBorderPosition.ALL,
+                            style=pybers.CellBorderStyle.DASHED, width=2)
+    merged.cell("A3").value = "B1:C2 merged, all borders dashed 2pt: its outline only"
+
+
+tableLineCases: tuple[tuple[str, str], ...] = (
+    ("Reset", ""),
+    ("Body horizontal", "body-horizontal-gridlines: 1pt solid #ff0000ff"),
+    ("Body vertical", "body-vertical-gridlines: 1pt solid #ff0000ff"),
+    ("Header rows vertical", "header-rows-vertical-gridlines: 1pt solid #ff0000ff"),
+    ("Header columns horizontal",
+     "header-columns-horizontal-gridlines: 1pt solid #ff0000ff"),
+    ("Footer rows vertical", "footer-rows-vertical-gridlines: 1pt solid #ff0000ff"),
+    ("Header rows separator", "header-rows-separator: 2pt solid #ff0000ff"),
+    ("Header columns separator", "header-columns-separator: 2pt solid #ff0000ff"),
+    ("Footer rows separator", "footer-rows-separator: 2pt solid #ff0000ff"),
+    ("Outline dashed", "table-outline: 2pt dashed #ff0000ff"),
+    ("Outline dotted", "table-outline: 2pt dotted #ff0000ff"),
+    ("Outline title", "table-title: yes; table-outline: 1pt solid #ff0000ff; "
+                      "table-outline-title: yes"),
+)
+
+
+def setTableLines(document: pybers.Document) -> None:
+    """Give each table one line in red, its declaration as text in B2."""
+    for name, declarations in tableLineCases:
+        table = document.sheet().tableAdd(name, rows=4, cols=3)
+        table.headersSet(headerRows=1, headerColumns=1, footerRows=1)
+        if declarations:
+            table.tableStyleSet(pybers.parseTableStyle(declarations, table.tableStyle))
+        table.cell("B1").value = Decimal(1)
+        table.cell("B2").value = declarations or "the reset, unchanged"
+
+
+deepBandLineCases: tuple[tuple[str, str], ...] = (
+    ("Header rows horizontal",
+     "header-rows-horizontal-gridlines: 1pt solid #ff0000ff"),
+    ("Header columns vertical",
+     "header-columns-vertical-gridlines: 1pt solid #ff0000ff"),
+    ("Footer rows horizontal",
+     "footer-rows-horizontal-gridlines: 1pt solid #ff0000ff"),
+)
+
+
+def setDeepBandLines(document: pybers.Document) -> None:
+    """Give each table of two header rows, columns and footer rows one red line."""
+    for name, declarations in (*tableLineCases[:9], *deepBandLineCases):
+        table = document.sheet().tableAdd(name, rows=7, cols=5)
+        table.headersSet(headerRows=2, headerColumns=2, footerRows=2)
+        if declarations:
+            table.tableStyleSet(pybers.parseTableStyle(declarations, table.tableStyle))
+        table.cell("C1").value = Decimal(1)
+        table.cell("C2").value = declarations or "the reset, unchanged"
+
+
+def editBorderedLines(document: pybers.Document) -> None:
+    """Add and remove a row inside a red line, and move an empty bordered cell."""
+    sheet = document.sheet()
+    for name, edit, label in (
+        ("Row added", lambda table: table.rowAdd(4),
+         "B2:B5 outer-left red, then a row added at 4: the line unbroken over B2:B6"),
+        ("Row removed", lambda table: table.rowRemove(4),
+         "B2:B5 outer-left red, then row 4 removed: the line unbroken over B2:B4"),
+    ):
+        table = sheet.tableAdd(name, rows=7, cols=3)
+        document.cellBordersSet(
+            f"::{name}::B2:B5", pybers.CellBorderPosition.OUTER_LEFT, width=2,
+            color=red,
+        )
+        edit(table)
+        table.cell("C1").value = Decimal(1)
+        table.cell("C2").value = label
+    moved = sheet.tableAdd("Moved", rows=6, cols=6)
+    document.cellBordersSet("::Moved::B2", pybers.CellBorderPosition.OUTER,
+                            width=2, color=red)
+    moved.cellsMove("B2", "D4", references=named)
+    moved.cell("A1").value = Decimal(1)
+    moved.cell("A2").value = "B2, empty and bordered red, moved to D4: the border at D4"
+
+
 # Goldens of what pybers cannot create yet, each naming the ticket that enables it.
 enabledLaterGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("13-formats-made-automatic-by-pybers", "13-number-percent",
@@ -836,6 +988,14 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
                   labeled=True),
     GoldenBuilder("00-created-cell-fills-colored-by-pybers", None, setCellFills,
                   labeled=True),
+    GoldenBuilder("00-created-cell-borders-drawn-by-pybers", None, applyCellBorders,
+                  labeled=True),
+    GoldenBuilder("00-created-table-lines-set-by-pybers", None, setTableLines,
+                  labeled=True),
+    GoldenBuilder("00-created-borders-edited-by-pybers", None, editBorderedLines,
+                  labeled=True),
+    GoldenBuilder("00-created-table-lines-deep-bands-by-pybers", None,
+                  setDeepBandLines, labeled=True),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.

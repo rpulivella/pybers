@@ -4,7 +4,7 @@ The long form of settled calls. `CLAUDE.md` states each decision in a line or tw
 and points here; this file keeps the reasoning so a settled call is not
 re-litigated from scratch. Nothing here is a rule. The rules are in `CLAUDE.md`.
 
-Moved out of `CLAUDE.md` on 2026-09-04, which had grown to 357 lines with two
+Moved out of `CLAUDE.md` on 4 September 2026, which had grown to 357 lines with two
 history sections making up 40% of it.
 
 ---
@@ -62,7 +62,7 @@ Python-ecosystem targets, and `.numbers` files are small enough that this is not
 performance-bound workload. If a Rust core is ever wanted, PyO3 bindings are the path,
 not a rewrite.
 
-### numbers-parser is NOT vendored here: removed 2026-08-27
+### numbers-parser is NOT vendored here: removed 27 August 2026
 
 It was, under `reference/`: 353 files, 31 MB, committed. That was a mistake and the whole
 path has been **purged from git history**, not merely untracked, because this repository is
@@ -84,7 +84,7 @@ into `workarea/` as data, the way the type map was.
 
 ---
 
-## Document is the single handle, decided 2026-08-31
+## Document is the single handle, decided 31 August 2026
 
 `pybers.open(path)` returns a `Document`, and that one object is the whole public surface.
 It holds the entire document in memory, it is what `document.save()` writes back, and
@@ -112,7 +112,7 @@ Two consequences that are easy to get wrong:
 
 ---
 
-## A created sheet or table starts from the pybers reset, decided 2026-09-14
+## A created sheet or table starts from the pybers reset, decided 14 September 2026
 
 A spreadsheet built by a program serves a different purpose from one built in the
 interface, so pybers does not start from Numbers' own new sheet or table. It starts from a
@@ -139,7 +139,7 @@ The name leads with `pybers` so later styles sort beside it, and carries no lead
 
 ---
 
-## Dependabot advises and opens no pull request, decided 2026-10-05
+## Dependabot advises and opens no pull request, decided 5 October 2026
 
 Dependabot alerts report an advisory against a dependency `pyproject.toml` declares, or
 against an action a workflow uses, and each alert reaches a maintainer by email.
@@ -167,7 +167,7 @@ the per-pull-request scan already resolves.
 
 ---
 
-## Writing values and formats, decided 2026-10-16
+## Writing values and formats, decided 16 October 2026
 
 Settled for PYB-217, PYB-144 and PYB-145 across three users at once: a person at the
 command line, a script through `import pybers`, and an agent holding several documents
@@ -282,7 +282,7 @@ exists, so no option changes its meaning with the file it is given.
 
 ---
 
-## A cell's position, how it is pointed at, and how far apart two are, decided 2026-10-19
+## A cell's position, how it is pointed at, and how far apart two are, decided 19 October 2026
 
 Three types, each one idea. **`CellAddress`** is where a cell sits in any table: a row and a
 column counted from one, bounded by the largest table Numbers holds, with no table and no
@@ -323,7 +323,7 @@ text syntax, never an alias.
 
 ---
 
-## A reference is a path, and a selector is CSS, decided 2026-10-20
+## A reference is a path, and a selector is CSS, decided 20 October 2026
 
 Selecting cells borrows two models a developer already knows, one for naming a single
 cell and one for matching many.
@@ -368,7 +368,7 @@ a CSS reset, and an item on a sheet is placed by the anchor names of `background
 makes the change in memory and does not save, and every command's `--preview` does
 exactly that, so a preview reports what the change does because it is the change.
 
-## The JSON form, decided 2026-10-24
+## The JSON form, decided 24 October 2026
 
 One JSON structure for a document and each part of it, which every tool reading or
 writing pybers' data agrees on, built in PYB-259. `pybers.formatJsonForm` writes it and
@@ -450,7 +450,7 @@ the version by one. A reader refuses any version but its own.
 
 ---
 
-## A document's language and region, decided 2026-10-27
+## A document's language and region, decided 27 October 2026
 
 A document is changed to a language and region as Numbers changes it, for PYB-272, and
 `docs/findings/findings-12-language-and-region.md` records what Numbers rewrites.
@@ -478,7 +478,7 @@ region confirms that Numbers does.
 
 ---
 
-## A formula's nodes have no one visitor, decided 2026-10-29
+## A formula's nodes have no one visitor, decided 29 October 2026
 
 Four operations walk a formula's nodes: reading them from the archive, encoding them back
 into it, and two rewrites, restructuring after a row or column edit and relocating after
@@ -498,7 +498,7 @@ what it does to one node.
 
 ---
 
-## A document created from nothing, decided 2026-11-02
+## A document created from nothing, decided 2 November 2026
 
 `pybers.create(locale)` composes a document from the least Numbers both opens and lets a
 person add to, which PYB-261 measured (findings-10-creation.md), rather than from a
@@ -554,7 +554,7 @@ their objects are known by, and in their timestamps.
 
 ---
 
-## A color carries its space and its alpha, decided 2026-11-06
+## A color carries its space and its alpha, decided 6 November 2026
 
 `pybers/color/` is the one home of color, for PYB-264, and
 `docs/findings/findings-06-styles.md` records what Numbers stores.
@@ -605,9 +605,65 @@ back equal.
 
 ---
 
+## A table's lines: borders, gridlines and the outline, decided 17 November 2026
+
+A table's lines are read and set for PYB-266, and `docs/findings/findings-06-styles.md`
+records what Numbers stores and which line an edge displays.
+
+**A stroke is one value shared by everything with a line.** `Stroke` holds a width in
+points, a `Color`, a pattern, a cap, a join and a miter limit, so a cell border, a table's
+gridline and later a shape or a text outline are the same type. Its pattern is a closed
+family: `StrokeSolid`, `StrokeDash` carrying its lengths in multiples of the width,
+`StrokeEmpty`, and `StrokeBrush`, `StrokeFrame` and `StrokePatterned`, read and carried as
+stored. A dash carries its array rather than a name, because Numbers 15.4 stores the cell
+menu's dashed line as `[2, 2]` where an earlier save stored `[1, 1]`.
+
+**A border position names the part of a range it draws, and is never stored.** Numbers
+keeps four strokes per cell, and its nine Border buttons only choose which edges the next
+stroke lands on. pybers names the nine for what they draw, `all`, `outer`, `outer-top`,
+`outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` and
+`between-columns`, which sort into their groups and never read two ways on one cell.
+
+**pybers writes both facing edges of every edge it sets.** Numbers writes only the
+selected cells' edges and draws the stroke with the higher `order`, so the same picture
+can be stored several ways. Writing both sides at `max_order + 1` leaves the stored result
+depending on the picture rather than on the route, and Numbers draws the stroke pybers
+wrote, whichever side it reads.
+
+**A border's style follows CSS's table borders: `none` is no border of the cell's own,
+`hidden` draws nothing.** Under `border-collapse`, `none` lets the neighbor's or the
+table's line show, and `hidden` suppresses every line at that edge, which is exactly
+Numbers' No Border, an empty stroke that prevails over the gridline and the outline. In
+Python a side holding nothing is `None` and `style=None` removes, as `cellSet` removes a
+control. The CLI's `--border-style none` removes, as `--cell-style none` does, so one word
+means removal in every option. A fill keeps `background: none` for its stated No Fill,
+because CSS gives backgrounds no `hidden`.
+
+**A border is given as separate settings, and a table's lines as CSS declarations.** A
+border is one stroke at one position, so `--border`, `--border-style`, `--border-width`
+and `--border-color` say it plainly. A table's lines are a stylesheet of twelve lines and two flags, so
+`--table-style` takes declarations, `show` prints the same text, and a longhand such as
+`table-outline-color` changes one part of a line, where separate flags would number
+fifty.
+
+**A merged cell's borders are its merge's four sides.** A side is one stroke where every
+position along it stores the same one, and `MIXED` where they differ, which pybers never
+creates and Numbers' Border control cannot, since each draws a merge's whole side. Drawing on
+a block widens it to whole merges and never draws a merge's interior. The table's store keeps
+every position's stroke, so a `.numbers` save loses nothing. A document rebuilt from the JSON
+form keeps a merge's uniform outer sides and drops its interior strokes and any `MIXED` side,
+since the form reports what a merge draws rather than how each position stores it.
+
+**A table's outline is one stroke.** Numbers stores it in five slots, one per band, and
+its control always writes them equal, so a document whose slots differ cannot be made or
+edited in Numbers. Five that differ read as `MIXED` and survive untouched, and a write
+over them sets all five.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on
-2026-09-04. Every fact in it already lived somewhere better: the named-style rules in
+4 September 2026. Every fact in it already lived somewhere better: the named-style rules in
 `docs/findings/findings-06-styles.md`, and the schema provenance in
 `src/pybers/protos/README.md`. A third copy would have gone stale against both.

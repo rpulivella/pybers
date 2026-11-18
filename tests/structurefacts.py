@@ -6,6 +6,7 @@ Each reads what one kind of archive says about a table, in a form two documents
 can be compared by: the one pybers saved and the one Numbers made of the same edit.
 
 UPDATES
+2026-11-17  Borders compared side by side rather than run by run, for PYB-266.
 2026-09-21  Split out of `test_structure` for PYB-17.
 """
 from __future__ import annotations
@@ -85,29 +86,29 @@ def reduceModel(document: pybers.Document) -> dict[str, object]:
 
 def readStrokeLayers(
     index: ArchiveIndex, model: tst.TableModelArchive
-) -> dict[str, list[object]]:
-    """Return every border of a table, as the layer and run Numbers stores."""
+) -> dict[str, list[tuple[int, int, float]]]:
+    """Return every border of a table, one per cell side, as (line, position, width).
+
+    By side rather than by run, since a run's boundaries are how a layer encodes its
+    sides, and Numbers splits one at a deletion where pybers joins it.
+    """
     sidecar = index.resolve(model.stroke_sidecar, tst.StrokeSidecarArchive)
-    described: dict[str, list[object]] = {}
+    described: dict[str, list[tuple[int, int, float]]] = {}
     for label, references in (
         ("left", sidecar.left_column_stroke_layers),
         ("right", sidecar.right_column_stroke_layers),
         ("top", sidecar.top_row_stroke_layers),
         ("bottom", sidecar.bottom_row_stroke_layers),
     ):
-        described[label] = [
-            (
-                layer.row_column_index,
-                [
-                    (run.origin, run.length, round(run.stroke.width, 3))
-                    for run in layer.stroke_runs
-                ],
-            )
+        described[label] = sorted(
+            (layer.row_column_index, position, round(run.stroke.width, 3))
             for layer in (
                 index.resolve(reference, tst.StrokeLayerArchive)
                 for reference in references
             )
-        ]
+            for run in layer.stroke_runs
+            for position in range(run.origin, run.origin + run.length)
+        )
     return described
 
 

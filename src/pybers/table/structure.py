@@ -20,6 +20,7 @@ single selected cell does, which is what `56f` and `56g` were made from.
 is unmerged rather than kept, both measured in `57-anchors-*` and `57-collapse-*`.
 
 UPDATES
+2026-11-17  An edit carries the table's borders as Numbers does, for PYB-266.
 2026-11-05  An edit leaving a header or footer count past five, or no line
             outside them, is refused, for PYB-223.
 2026-11-03  An edit moves the table's header and footer counts in the model, for
@@ -272,10 +273,19 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
     table.mergeRanges = merges
     table._headers = mapHeaders(table._headers, edit, held)
     start = edit.at - 1
+    crossing = columnIdentities if edit.rows else rowIdentities
     if edit.removing:
+        table._borders.linesRemove(edit.rows, identities[start:start + edit.count])
         del identities[start:start + edit.count]
     else:
-        identities[start:start] = generateLineIdentities(edit.count)
+        added = generateLineIdentities(edit.count)
+        table._borders.linesAdd(
+            edit.rows, added,
+            previous=identities[start - 1] if start > 0 else None,
+            displaced=identities[start] if start < len(identities) else None,
+            crossing=crossing,
+        )
+        identities[start:start] = added
     if edit.rows:
         table._rowIdentities = identities
         table.rowCount = len(identities)

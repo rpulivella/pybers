@@ -23,7 +23,7 @@ cell_storage_buffer    records laid end to end; a record runs to the next live o
 
 ### A wide table counts its offsets in words, and the width never changes
 
-`has_wide_offsets` does **not** select a `uint32`. Measured 2026-09-06 against
+`has_wide_offsets` does **not** select a `uint32`. Measured 6 September 2026 against
 `45-columns-over-255`, a 300-column table: each row carries 600 bytes of offsets for 300
 cells, which is two bytes each and can be nothing else. Reading them as `uint32` gives 150
 slots for 300 cells and puts every one of them past the end of a 7,200-byte buffer, which
@@ -75,7 +75,7 @@ common types. Treat the enum as a useful guide and **not** as an exhaustive list
 further values that neither enum names. Anything reading this byte must handle an unknown
 value by preserving it rather than rejecting the cell.
 
-Measured 2026-10-01 for PYB-141 across 73,445 records in 142 documents, with the enum names
+Measured 1 October 2026 for PYB-141 across 73,445 records in 142 documents, with the enum names
 attached where they exist. Type 9 holds rich text, whatever `automaticCellType` suggests:
 
 | value | `TST.CellType` | records | what it stores | `CellKind` |
@@ -85,7 +85,7 @@ attached where they exist. Type 9 holds rich text, whatever `automaticCellType` 
 | 2 | `numberCellType` | 49,701 | IEEE-754 decimal128, little-endian, 16 bytes | `NUMBER` |
 | 3 | `textCellType` | 20,960 | uint32 key into the `STRING` `TableDataList` | `TEXT` |
 | 4 | `formulaCellType` | 0 | not seen | |
-| 5 | `dateCellType` | 370 | float64 wall-clock seconds since 2001-01-01, in no zone | `DATE_TIME` |
+| 5 | `dateCellType` | 370 | float64 wall-clock seconds since 1 January 2001, in no zone | `DATE_TIME` |
 | 6 | `boolCellType` | 12 | float64, zero is false | `BOOLEAN` |
 | 7 | `durationCellType` | 27 | float64 seconds | `DURATION` |
 | 8 | `formulaErrorCellType` | 42 | no value: a formula that failed, or one not yet calculated | `ERROR` |
@@ -169,8 +169,8 @@ carries nothing but its `format_type`, so one can be created where a table has n
 per-kind slots above, which remember one format per kind so that switching a cell back
 restores what it had. Its value is the position of a per-kind slot, counted from 1 in slot
 order: 1 number, 2 currency, 3 date, 4 duration, 5 text, 6 checkbox. Across 73,445 records
-in 142 documents, measured 2026-10-01, it always names a kind slot the record holds. A golden of
-2026-09-14 showed it is what the Data Format inspector reads: two text cells with
+in 142 documents, measured 1 October 2026, it always names a kind slot the record holds. A golden of
+14 September 2026 showed it is what the Data Format inspector reads: two text cells with
 identical slots showed `Text` with 5 here and `Automatic` with 1.
 
 **It is a kind, never a key, and the fixture that names it hides that.**
@@ -181,7 +181,7 @@ a key 5.
 
 ### The family of the format a cell displays with
 
-Measured 2026-10-01 for PYB-141 across 73,445 records in 142 documents. The displayed
+Measured 1 October 2026 for PYB-141 across 73,445 records in 142 documents. The displayed
 kind names a per-kind slot, that slot's key names a format list entry, and the entry's
 `format_type` is the family. Every one of the twelve families the documents carry is
 named by a fixture whose label states it:
@@ -218,7 +218,7 @@ type, as `UNKNOWN` rather than guessing one.
 
 **Byte 6 bit `0x80` marks a format a person chose** rather than one Numbers decided, and
 the Data Format inspector reads `Automatic` without it and `Text` with it. Across 73,445
-records in 142 documents, measured 2026-10-01, it is set on 119 text records against
+records in 142 documents, measured 1 October 2026, it is set on 119 text records against
 20,841 that leave it clear, and on 13 empty records, one rich-text record and one
 currency amount. Typing text into Numbers leaves it clear, which is why writing a string
 leaves it clear here.
@@ -231,7 +231,7 @@ which for any other cell follows its own slot's bit, as findings-11-formats.md r
 chosen Text format.
 
 **Pressing return does not interpret stored text, even under Automatic.** Measured
-2026-09-17 on the golden `11-text-literal-written` and on a new document made in Numbers:
+17 September 2026 on the golden `11-text-literal-written` and on a new document made in Numbers:
 `=1+1` stored as text with an Automatic format stays text when the cell is clicked into and
 return is pressed. Numbers interprets only when `=` is typed into a cleared cell. What a
 chosen Text format changes is that interpretation step, not the editing that comes before it.
@@ -251,7 +251,7 @@ byte 1 and byte 8's value bits change, the old kind's format slot and any contro
 new kind's slot names that kind's Automatic format, the displayed kind names that slot,
 and bytes 6 and 7 clear, since a value typed into a fresh cell stores no flags there. Every
 other reference keeps its slot and its value, which carries the style across. Numbers
-accepted the number and text retypes in Numbers 15.3.1 on 2026-09-14, where a cell
+accepted the number and text retypes in Numbers 15.3.1 on 14 September 2026, where a cell
 converted from a star-rating control displays as plain text with no control.
 
 The Automatic format of each kind is taken from what Numbers stored: `256` with 253
@@ -264,7 +264,7 @@ holds, and `yyyy-MM-dd HH:mm` for one with a time.
 
 ### What a format's refcount counts
 
-Measured 2026-09-15 for PYB-89 across all 89 tables in the fixtures that carry a format
+Measured 15 September 2026 for PYB-89 across all 89 tables in the fixtures that carry a format
 list. **A format entry's `refcount` is the number of times its key appears in the six
 per-kind slots**: number, currency, date, duration, text and checkbox. Each occurrence
 counts once, so a cell naming one format in two kind slots would count twice. That rule
@@ -288,7 +288,7 @@ sibling holds no claim before the write, and it keeps none of the sibling's form
 
 ### What Numbers does with a format nothing names
 
-**Numbers removes it on save.** Measured 2026-09-15 against
+**Numbers removes it on save.** Measured 15 September 2026 against
 `54c-format-star-rating-cleared`, made from `54` by Clear All on `A1:A2`, which were the
 only two cells naming the star-rating format. Key 2 is absent from the saved format list,
 and `nextListID` stays at 3.
@@ -393,7 +393,7 @@ when the number and currency formats were chosen as well. See
 
 ### A date has no time zone: it is floating wall-clock time
 
-Measured 2026-10-20 for PYB-218 against `72-date-time-zones` and `72b-date-time-zones-region`,
+Measured 20 October 2026 for PYB-218 against `72-date-time-zones` and `72b-date-time-zones-region`,
 saved by Numbers 15.4. `2026-10-20 09:00` typed on a Mac set to America/New_York and again on
 one set to America/Los_Angeles stores the same value, 814,179,600 seconds, where two moments
 would differ by 10,800. Reopened in Los Angeles, the New York cell still shows 09:00.
@@ -635,7 +635,7 @@ A checkbox, star rating, slider, stepper and popup menu all store a **normal val
 number, or string, and reference a `CONTROL_CELL_SPEC` separately. The control is how the
 value is edited, not what it is. They need no new value type, only a reference to carry.
 
-**A value the control cannot show is clamped or loses the control.** Measured 2026-10-20 for
+**A value the control cannot show is clamped or loses the control.** Measured 20 October 2026 for
 PYB-144 in `73-values-typed-over-controls`, typed into `11-value-types-noformats` by Numbers
 15.4. A number outside a range control is clamped to it, and the control stays: 7 in the star
 rating of 0 to 5 stores 5, and 150 in the slider and 500 in the stepper, each of 1 to 100,
@@ -648,7 +648,7 @@ show resets the cell to its kind's Automatic format and drops the control, as Nu
 for a pop-up menu. **A star rating is a format as well as a control**, `267` in the number
 slot, so dropping the control alone is not enough: `11-controls-written-by-pybers`, written
 that way, opened with 7 drawn as five stars, and Numbers' scripting failed on the cell.
-Reset to Automatic, the same cell shows 7, confirmed by `/golden-confirm` on 2026-10-20 in
+Reset to Automatic, the same cell shows 7, confirmed by `/golden-confirm` on 20 October 2026 in
 Numbers 15.4. A pop-up menu whose items include a kind other than text or the blank choice
 is not measured, so pybers keeps its control.
 

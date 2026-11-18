@@ -7,6 +7,7 @@ it. With one it makes one `localeSet` call, prints the region the same way, and 
 only when the region changed and the call was not a preview.
 
 UPDATES
+2026-11-17  Nothing written reads `already de_DE`, a phrase, for PYB-266.
 2026-11-03  The region prints as `show` prints it, before and after a change
             alike, and the regions offered are left to the library, for PYB-223.
 2026-10-28  Written for PYB-272.
@@ -84,7 +85,7 @@ def runLocale(
             document.save(target)
     printResult(DocumentLocale(document.localeIdentifier), outputFormat, formatLocale)
     if identifier is not None:
-        reportWrite(changed, target, "the document already uses that region.")
+        reportWrite(changed, target, f"already {document.localeIdentifier}")
 
 
 __all__ = ["runLocale"]

@@ -107,8 +107,8 @@ def testACellAFormulaBacksIsSkippedSayingWhy(working: Path) -> None:
     document = pybers.open(working)
     changes = document.cellSet("Sheet 1::Table 1::A11", 1)
     assert changes.changes == ()
-    assert [each.reason for each in changes.skipped] == [
-        "Sheet 1::Table 1::A11 is backed by a formula, which a value would discard."
+    assert [(str(each.reference), each.reason) for each in changes.skipped] == [
+        ("Sheet 1::Table 1::A11", "holds a formula"),
     ]
     assert document.sheet("Sheet 1").table("Table 1").cell("A11").formula is not None
 

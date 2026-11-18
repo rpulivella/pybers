@@ -20,6 +20,7 @@ measured rather than chosen, and it is why a covered position has no record and
 `Table.cell` refuses one by name.
 
 UPDATES
+2026-11-17  A cell's borders and a table's lines, for PYB-266.
 2026-11-09  The controls and the format family enum moved to `pybers.format`, for
             PYB-145.
 2026-11-03  `TableHeaders`, a table's header rows, header columns and footer rows,
@@ -48,6 +49,14 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from pybers.table.borders import (
+    CellBorder,
+    CellBorderPosition,
+    CellBorders,
+    CellBorderSide,
+    CellBorderStyle,
+)
+from pybers.table.bordersdraw import formatCellBorders
 from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
 from pybers.table.cells import Table
 from pybers.table.fill import CellValueFill
@@ -56,9 +65,22 @@ from pybers.table.inference import formatCellValue, parseCellValue
 from pybers.table.kinds import CellKind, CellPresentation
 from pybers.table.merges import MergeRange
 from pybers.table.rows import TableRow, TableRows
+from pybers.table.tablestyle import (
+    TableLine,
+    TableStyle,
+    TableStyleChange,
+    TableStyleError,
+    formatTableStyle,
+    parseTableStyle,
+)
 
 __all__ = [
     "Cell",
+    "CellBorder",
+    "CellBorderPosition",
+    "CellBorderSide",
+    "CellBorderStyle",
+    "CellBorders",
     "CellPresentation",
     "CellKind",
     "CellChange",
@@ -69,8 +91,15 @@ __all__ = [
     "MergeRange",
     "Table",
     "TableHeaders",
+    "TableLine",
+    "TableStyle",
+    "TableStyleChange",
+    "TableStyleError",
     "TableRow",
     "TableRows",
+    "formatCellBorders",
     "formatCellValue",
+    "formatTableStyle",
     "parseCellValue",
+    "parseTableStyle",
 ]

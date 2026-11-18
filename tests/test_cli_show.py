@@ -94,6 +94,7 @@ def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
         "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
         "  Format: number (automatic)   Control: none",
         "  Cell style: none",
+        "  Borders: none",
         "  Unrecognized type code: none",
     ]
 
@@ -174,20 +175,30 @@ def testEveryControlShowsAsTheTextFormItReadsBackFrom() -> None:
 
 
 def testATableShowsItsSizeAndCellCountOnOneLineThenEachCell() -> None:
-    result = runShowCommand(shapesPath, "*::Table 2")
-    assert result.stdout.splitlines()[:3] == [
-        "Table: Sheet 1::Table 2  10 rows × 5 columns  1 cell",
-        "",
-        "  Cell: Sheet 1::Table 2::A1",
-    ]
+    lines = runShowCommand(shapesPath, "*::Table 2").stdout.splitlines()
+    assert lines[0] == "Table: Sheet 1::Table 2  10 rows × 5 columns  1 cell"
+    assert lines[lines.index("") + 1] == "  Cell: Sheet 1::Table 2::A1"
 
 
 def testATablesBandsShowWhenItHasThem() -> None:
     table = pybers.create("en_US").sheet().tableAdd("Headers", 4, 3)
     table.headersSet(headerRows=1, footerRows=2)
-    assert renderPlain(formatTable(table)).splitlines() == [
-        "Table: Sheet 1::Headers  4 rows × 3 columns  1 header row, 2 footer rows",
+    assert renderPlain(formatTable(table)).splitlines()[0] == (
+        "Table: Sheet 1::Headers  4 rows × 3 columns  1 header row, 2 footer rows"
+    )
+
+
+def testATableShowsItsLinesUnderItsOwnLineEachPastingBack() -> None:
+    table = pybers.create("en_US").sheet().tableAdd("Lines", 2, 2)
+    lines = renderPlain(formatTable(table)).splitlines()
+    assert lines[1:5] == [
+        "  Table style:",
+        "    table-outline: hidden 0.35pt solid #000000ff",
+        "    table-title: no",
+        "    table-outline-title: no",
     ]
+    declarations = "; ".join(line.strip() for line in lines[2:16])
+    assert pybers.parseTableStyle(declarations, table.tableStyle) == table.tableStyle
 
 
 def testATableListsEachOfItsMerges() -> None:

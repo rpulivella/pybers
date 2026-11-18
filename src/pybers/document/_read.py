@@ -28,6 +28,7 @@ to a caller:
   that looks like a perfectly good number.
 
 UPDATES
+2026-11-17  The theme's table style, which a table added starts from, for PYB-266.
 2026-11-02  A package pybers created becomes a document too, for PYB-261.
 2026-10-27  The document's locale identifier is read, for PYB-272.
 2026-10-24  The sheets and tables linked by `Document._ownersLink`, for PYB-259.
@@ -66,6 +67,7 @@ from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import ReadError
 from ..table._read import readTable
+from ..table._tablestyle import readDocumentTableStyle
 from ..timezone import TimeZoneLike, machineTimeZone, toTimeZone
 from .sheets import Document, Sheet
 
@@ -130,6 +132,7 @@ def readDocument(package: NumbersPackage, source: Path | None) -> Document:
         ),
         _currencyPattern=symbols.currency_pattern,
         _localeIdentifier=locale.locale_identifier,
+        _tableStyleTheme=readDocumentTableStyle(index),
     )
     identities = readTableIdentities(index)
     for reference in root.sheets:
