@@ -310,13 +310,14 @@ offered, read from the preview Numbers saved with each.
 - **A cell's own fill prevails over the band**: a color and a gradient show unchanged on
   banded rows. The body region states `FillNone` and still bands, so a region's stated
   No Fill does not hide the band.
-- **Header rows and header columns show their own region fill.** The only header cells
-  without one, B1:B8 of `102b`, state No Fill, so whether the band skips a header or a
-  cell's stated No Fill hides it is left to a golden.
-- **Numbers' interface never states No Fill on a body cell.** Choosing it on a cell
-  holding a color removes the color and states nothing, E3:E8 of `102-bands-base`, and on
-  a cell holding none it writes nothing. What Numbers draws for a body cell stating
-  `FillNone` is likewise left to a golden.
+- **A header row or header column takes no band, filled or not.** In a Blank theme
+  table each shows its own region fill. In `00-created-rows-banded-by-pybers`, whose
+  created table fills no header, Numbers 15.4 draws no band in the header column or the
+  footer row on a banded position, confirmed 18 November 2026.
+- **No body cell states No Fill.** Choosing it on a cell holding a color removes the
+  color and states nothing, E3:E8 of `102-bands-base`, and on a cell holding none it
+  writes nothing, since the body region already states `FillNone`. pybers drops the
+  same request, so a body cell beneath the band always shows it.
 
 ## A fill is a three-way union
 
