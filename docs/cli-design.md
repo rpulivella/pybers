@@ -91,7 +91,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 
 ## Errors
 
-- **A refusal is one line on stderr**, naming the command, the file and the reason the library's error gives: `pybers check: /tmp/a.numbers does not exist.`
+- **A refusal is one line on stderr**, the command and then the reason the library's error gives, which names the file only where the file is at fault: `pybers check: /tmp/a.numbers does not exist.`, `pybers set: Numbers cannot band rows with a gradient.`
 - **A refused choice names the closest valid one**, `'table-border' is not a table line. The closest is table-outline.`, and where none is close, says where every choice is: `` `pybers set --help` provides a complete list.`` A message lists its choices only when there are five or fewer, and `--help` lists every one. `pybers.composeChoiceRefusal` writes every such message.
 - **A message the command writes itself** follows the library's rule for wording an error.
 - **`--debug`, or `PYBERS_DEBUG=1`, replaces that line with the full traceback.** Tracebacks never show local variables, because one can hold a cell's value.
