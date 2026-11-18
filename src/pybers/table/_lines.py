@@ -9,6 +9,8 @@ comparing the two gives the whole mapping from stored lines to new ones.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-18  A stored map's methods name their counting, so mypy refuses one where a
+            map counted from one belongs, for PYB-267.
 2026-09-22  The UID map is written here, by creation and by a structural edit alike, for
             PYB-113.
 2026-09-21  Split out of `_structure` for PYB-17.
@@ -53,13 +55,13 @@ class LineMap:
         """Return how many lines the edit added, less how many it removed."""
         return self.count - len(self.lines)
 
-    def spanCut(self, begin: int, end: int) -> bool:
+    def storedSpanCut(self, begin: int, end: int) -> bool:
         """Report whether the edit removes a line of a span or adds one inside it.
 
         A line added before the span's first line moves the whole span, and one
         added after its last line leaves it alone, so neither cuts it.
         """
-        if any(self.lineMap(line) is None for line in range(begin, end + 1)):
+        if any(self.storedLineMap(line) is None for line in range(begin, end + 1)):
             return True
         return any(
             begin < (len(self.lines) if displaced is None else displaced) <= end
@@ -68,16 +70,14 @@ class LineMap:
             )
         )
 
-    def lineMap(self, line: int) -> int | None:
+    def storedLineMap(self, line: int) -> int | None:
         """Return where one stored line lands, or None when it was removed."""
         return self.lines[line] if line < len(self.lines) else None
 
-    def spanMap(self, begin: int, end: int) -> tuple[int, int] | None:
+    def storedSpanMap(self, begin: int, end: int) -> tuple[int, int] | None:
         """Return where a span lands, its first and last surviving lines kept."""
-        kept = [
-            moved for moved in (self.lineMap(line) for line in range(begin, end + 1))
-            if moved is not None
-        ]
+        moves = (self.storedLineMap(line) for line in range(begin, end + 1))
+        kept = [moved for moved in moves if moved is not None]
         if not kept:
             return None
         return (min(kept), max(kept))
@@ -91,12 +91,12 @@ class ModelLines:
 
     def lineMap(self, line: int) -> int | None:
         """Return where a line counted from one lands, or None when it was removed."""
-        moved = self.stored.lineMap(line - originOffset)
+        moved = self.stored.storedLineMap(line - originOffset)
         return None if moved is None else moved + originOffset
 
     def spanMap(self, begin: int, end: int) -> tuple[int, int] | None:
         """Return where a span counted from one lands, None when it lost every line."""
-        mapped = self.stored.spanMap(begin - originOffset, end - originOffset)
+        mapped = self.stored.storedSpanMap(begin - originOffset, end - originOffset)
         if mapped is None:
             return None
         return (mapped[0] + originOffset, mapped[1] + originOffset)

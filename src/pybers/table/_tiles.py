@@ -194,11 +194,11 @@ def moveGridRecords(
     moved: list[tuple[int, tst.TileRowInfo]] = []
     storedRecords: dict[int, list[CellRecord]] = {}
     for stored in walked:
-        row = maps.rows.lineMap(stored.row)
+        row = maps.rows.storedLineMap(stored.row)
         records = stored.records
         storedRecords[stored.row] = records
         for record in records:
-            column = maps.columns.lineMap(record.column)
+            column = maps.columns.storedLineMap(record.column)
             if row is None or column is None:
                 reference = CellAddress(
                     stored.row + originOffset, record.column + originOffset
@@ -279,7 +279,7 @@ def addInheritedRecords(
             continue
         for record in storedRecords.get(displaced, []):
             key = findSlotValue(record, conditionalSlot)
-            column = maps.columns.lineMap(record.column)
+            column = maps.columns.storedLineMap(record.column)
             if key is not None and column is not None:
                 inherited[(row, column)] = buildInheritedRecord(
                     plan.keyFor(key, displaced, record.column)[0]
@@ -289,7 +289,7 @@ def addInheritedRecords(
         if displaced is None:
             continue
         for stored, records in storedRecords.items():
-            movedRow = maps.rows.lineMap(stored)
+            movedRow = maps.rows.storedLineMap(stored)
             if movedRow is None:
                 continue
             for record in records:
@@ -424,7 +424,7 @@ def rewriteRowColumns(
         slots = colCount
     placed: dict[int, bytes] = {}
     for record in decodeRow(offsets, buffer, unit):
-        column = columns.lineMap(record.column)
+        column = columns.storedLineMap(record.column)
         if column is None:
             continue
         if column >= slots:

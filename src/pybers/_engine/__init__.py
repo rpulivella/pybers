@@ -58,7 +58,7 @@ from .registration import (
     registerFormulaCells,
 )
 from .remapping import (
-    LineMapping,
+    StoredLineMapping,
     moveOwnerCoordinates,
     remapOwnerCoordinates,
 )
@@ -66,7 +66,7 @@ from .remapping import (
 __all__ = [
     "CellEdge",
     "FormulaDependencies",
-    "LineMapping",
+    "StoredLineMapping",
     "RangeEdge",
     "SpanEdge",
     "TableOwner",

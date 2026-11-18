@@ -188,7 +188,7 @@ def remapMergeStore(model: tst.TableModelArchive, maps: GridMaps) -> None:
                 for span in axis:
                     begin = span.range_begin
                     end = span.range_end if span.HasField("range_end") else begin
-                    mapped = lines.spanMap(begin, end)
+                    mapped = lines.storedSpanMap(begin, end)
                     if mapped is None:
                         survives = False
                         continue

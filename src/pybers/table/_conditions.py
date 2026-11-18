@@ -333,7 +333,7 @@ def rewriteConditionalRecord(
     key = findSlotValue(record, conditionalSlot)
     assert plan.maps is not None
     # A record on a removed column goes with it, so it names no rule afterward.
-    if key is None or plan.maps.columns.lineMap(record.column) is None:
+    if key is None or plan.maps.columns.storedLineMap(record.column) is None:
         return None
     moved, broken = plan.keyFor(key, row, record.column)
     if moved == key:
