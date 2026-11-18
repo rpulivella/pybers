@@ -1,0 +1,207 @@
+# How Numbers makes 102-bands-base: a table of 2 header rows, 2 header columns, 5 body
+# rows and 1 footer row, its columns holding no fill, a stated No Fill, a color, a color
+# then No Fill and a gradient, and a table with no headers, each awaiting Alternating
+# Row Color. Made by `.venv/bin/python3 -m tools.local.golden_confirm measure 102-bands-base`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+
+[[step]]
+action = "tableExtend"
+range = "G8"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header row count"
+value = "2"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header column count"
+value = "2"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "footer row count"
+value = "1"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "header column"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "input as nothing"
+
+[[step]]
+action = "valueSet"
+range = "A3"
+value = "body row 1"
+
+[[step]]
+action = "valueSet"
+range = "A4"
+value = "body row 2"
+
+[[step]]
+action = "valueSet"
+range = "A5"
+value = "body row 3"
+
+[[step]]
+action = "valueSet"
+range = "A6"
+value = "body row 4"
+
+[[step]]
+action = "valueSet"
+range = "A7"
+value = "body row 5"
+
+[[step]]
+action = "valueSet"
+range = "A8"
+value = "footer row"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "header column, No Fill"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "input as Fill, No Fill chosen, on B1:B8"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "no fill"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "input as nothing"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "color fill"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "input as background color #FF3B30 through scripting, on D3:D8"
+
+[[step]]
+action = "valueSet"
+range = "E1"
+value = "color, then No Fill"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "input as background color #FF3B30 through scripting, then Fill, No Fill chosen, on E3:E8"
+
+[[step]]
+action = "valueSet"
+range = "F1"
+value = "gradient fill"
+
+[[step]]
+action = "valueSet"
+range = "F2"
+value = "input as Fill, Gradient Fill chosen as offered, on F3:F8"
+
+[[step]]
+action = "valueSet"
+range = "G1"
+value = "empty"
+
+[[step]]
+action = "cellFillSet"
+range = "B1:B8"
+setting = "Fill"
+value = "No Fill"
+
+[[step]]
+action = "cellBackgroundSet"
+range = "D3:D8"
+value = "#FF3B30"
+
+[[step]]
+action = "cellBackgroundSet"
+range = "E3:E8"
+value = "#FF3B30"
+
+[[step]]
+action = "cellFillSet"
+range = "E3:E8"
+setting = "Fill"
+value = "No Fill"
+
+[[step]]
+action = "cellFillSet"
+range = "F3:F8"
+setting = "Fill"
+value = "Gradient Fill"
+
+[[step]]
+action = "sheetAdd"
+sheet = "No headers"
+
+[[step]]
+action = "tableExtend"
+sheet = "No headers"
+range = "B6"
+
+[[step]]
+action = "valueSet"
+sheet = "No headers"
+range = "A1"
+value = "no headers"
+
+[[step]]
+action = "valueSet"
+sheet = "No headers"
+range = "A2"
+value = "input as nothing, a table with no header rows, header columns or footer rows"
+
+[[step]]
+action = "valueSet"
+sheet = "No headers"
+range = "A3"
+value = "row 3"
+
+[[step]]
+action = "valueSet"
+sheet = "No headers"
+range = "A4"
+value = "row 4"
+
+[[step]]
+action = "valueSet"
+sheet = "No headers"
+range = "A5"
+value = "row 5"
+
+[[step]]
+action = "valueSet"
+sheet = "No headers"
+range = "A6"
+value = "row 6"
+
+[[step]]
+action = "valueSet"
+sheet = "No headers"
+range = "B1"
+value = "empty"
+
+[[step]]
+action = "select"
+range = "C3"

@@ -1,0 +1,19 @@
+# How Numbers makes 102b-bands-on: `102-bands-base` with Alternating Row Color turned on,
+# its color as offered, in both tables, saved with Sheet 1 active. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 102b-bands-on`.
+
+base = "102-bands-base"
+document = 0
+table = "Table 1"
+
+[[step]]
+action = "tableBandSet"
+sheet = "No headers"
+range = "B3"
+value = "on"
+
+[[step]]
+action = "tableBandSet"
+sheet = "Sheet 1"
+range = "B3"
+value = "on"

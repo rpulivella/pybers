@@ -1,0 +1,64 @@
+# How Numbers makes 103-bands-one-header-base: a table of 1 header row and 5 body rows,
+# so a band counted from the table's first row and one counted from its first body row
+# fall on different rows, awaiting Alternating Row Color. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 103-bands-one-header-base`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+
+[[step]]
+action = "tableExtend"
+range = "B6"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header row count"
+value = "1"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header column count"
+value = "0"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "footer row count"
+value = "0"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "one header row"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "input as nothing, 1 header row and no header column or footer row"
+
+[[step]]
+action = "valueSet"
+range = "A3"
+value = "body row 2"
+
+[[step]]
+action = "valueSet"
+range = "A4"
+value = "body row 3"
+
+[[step]]
+action = "valueSet"
+range = "A5"
+value = "body row 4"
+
+[[step]]
+action = "valueSet"
+range = "A6"
+value = "body row 5"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "empty"
