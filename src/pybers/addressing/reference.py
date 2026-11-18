@@ -50,8 +50,8 @@ from typing import overload
 from pybers.addressing.text import (
     ReferenceError,
     composeReferenceText,
+    escapeSelectorName,
     quoteReferenceText,
-    quoteSelectorName,
     readReferenceName,
     splitReferenceText,
 )
@@ -277,7 +277,7 @@ class SheetReference:
         return cls(readReferenceName(parts[0], text))
 
     def __str__(self) -> str:
-        return quoteSelectorName(self.name)
+        return escapeSelectorName(self.name)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -303,7 +303,7 @@ class TableReference:
         return buildTableReference(parts, text)
 
     def __str__(self) -> str:
-        name = quoteSelectorName(self.name)
+        name = escapeSelectorName(self.name)
         if self.sheet is None:
             return name
         return composeReferenceText(str(self.sheet), name)

@@ -37,7 +37,7 @@ class ReferenceError(PybersError, ValueError):
     """An address, a range or a name that is not valid reference text."""
 
 
-def quoteSelectorName(name: str) -> str:
+def escapeSelectorName(name: str) -> str:
     """Return a name as a reference or a selector writes it, `Budget\\, draft`."""
     last = len(name) - 1
     return "".join(
@@ -112,7 +112,7 @@ def readReferenceName(written: str, text: str) -> str:
             name = readEscapedText(trimmed)
             raise ReferenceError(
                 f"{quoteReferenceText(text)} holds `{character}` in a name without "
-                f"escaping it. Write {quoteReferenceText(quoteSelectorName(name))}."
+                f"escaping it. Write {quoteReferenceText(escapeSelectorName(name))}."
             )
     name = readEscapedText(trimmed)
     if not name:
@@ -130,7 +130,7 @@ __all__ = [
     "escapeMarker",
     "findEscaped",
     "composeReferenceText",
-    "quoteSelectorName",
+    "escapeSelectorName",
     "quoteReferenceText",
     "readEscapedText",
     "readReferenceName",

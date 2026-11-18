@@ -21,7 +21,7 @@ why each carries its own guard in the module that owns it:
   cannot represent what Numbers stores.
 
 UPDATES
-2026-11-18  `quoteSelectorName` and `referenceSeparator`, from `addressing.text`,
+2026-11-18  `escapeSelectorName` and `referenceSeparator`, from `addressing.text`,
             for PYB-267.
 2026-09-18  `GridEdit`, where lines land after a structural edit, for PYB-17.
 2026-09-08  Made a package of its own for #58, out of `pybers.model`.
@@ -69,7 +69,7 @@ from pybers.addressing.reference import (
 )
 from pybers.addressing.text import (
     ReferenceError,
-    quoteSelectorName,
+    escapeSelectorName,
     referenceSeparator,
 )
 
@@ -88,7 +88,7 @@ __all__ = [
     "RangeEndpoint",
     "SelectionMatch",
     "ReferenceError",
-    "quoteSelectorName",
+    "escapeSelectorName",
     "referenceSeparator",
     "SheetReference",
     "TableReference",

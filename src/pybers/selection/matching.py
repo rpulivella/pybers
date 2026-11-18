@@ -45,8 +45,8 @@ from pybers.addressing.reference import (
 from pybers.addressing.text import (
     ReferenceError,
     escapeMarker,
+    escapeSelectorName,
     quoteReferenceText,
-    quoteSelectorName,
     readEscapedText,
 )
 from pybers.document.sheets import Document, SelectionError, Sheet, listPresent
@@ -399,7 +399,7 @@ def findSheet(document: Document, name: str | SheetReference | None) -> Sheet:
         sheets = document.sheets
     else:
         reference = SheetReference.parse(name) if isinstance(name, str) else name
-        group = SelectorGroup((SelectorComponent(quoteSelectorName(reference.name)),))
+        group = SelectorGroup((SelectorComponent(escapeSelectorName(reference.name)),))
         sheets = [part.sheet for part in matchGroup(document, group)
                   if part.sheet is not None]
     if len(sheets) == 1:
@@ -420,7 +420,7 @@ def buildTableGroup(
 
     A reference naming its sheet, given to a sheet, names that sheet or is refused.
     """
-    name = SelectorComponent(quoteSelectorName(reference.name))
+    name = SelectorComponent(escapeSelectorName(reference.name))
     if isinstance(owner, Sheet):
         if reference.sheet is not None and reference.sheet.name != owner.name:
             raise SelectionError(
@@ -431,7 +431,7 @@ def buildTableGroup(
         return SelectorGroup((name,))
     if reference.sheet is None:
         return SelectorGroup((SelectorComponent(""), name))
-    sheet = SelectorComponent(quoteSelectorName(reference.sheet.name))
+    sheet = SelectorComponent(escapeSelectorName(reference.sheet.name))
     return SelectorGroup((sheet, name))
 
 

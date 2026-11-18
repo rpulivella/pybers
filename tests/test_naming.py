@@ -8,6 +8,7 @@ is checkable, and only against a list: a noun that doubles as a verb, `formatCla
 once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
 
 UPDATES
+2026-11-18  `escape` is a verb, as `CSS.escape` names it, for PYB-267.
 2026-11-05  `pytest_xdist_auto_num_workers`, a hook xdist finds by name, is exempt, for
             PYB-277.
 2026-11-03  `match` is a verb, for PYB-223.
@@ -50,7 +51,7 @@ leadingVerbs: frozenset[str] = frozenset({
     "compare", "compose", "compress", "confirm", "convert", "copy", "count", "create",
     "decode",
     "decompress",
-    "delete", "detach", "drop", "edit", "emit", "encode", "expand", "extract",
+    "delete", "detach", "drop", "edit", "emit", "encode", "escape", "expand", "extract",
     "fill", "find", "forge", "format", "generate", "hold", "index", "is", "iterate",
     "list",
     "load", "locate",
