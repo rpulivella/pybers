@@ -175,8 +175,8 @@ def buildTableStyle(
 def refuseBand(value: object, held: TableBand) -> None:
     """Refuse a band that is not a visibility and a color, unless the table holds it.
 
-    A gradient or an image band is read and carried, and setting one is refused,
-    naming its type, until PYB-287 composes them.
+    Numbers' Alternating Row Color offers only a color, so a band of another fill is
+    carried where a document holds one and refused anywhere else.
     """
     if not isinstance(value, TableBand) or not isinstance(value.visible, bool):
         raise TableStyleError(
@@ -185,11 +185,17 @@ def refuseBand(value: object, held: TableBand) -> None:
         )
     if isinstance(value.fill, Color) or value.fill == held.fill:
         return
-    kind = getattr(value.fill, "fillType", type(value.fill).__name__)
-    raise TableStyleError(
-        f"A band's fill is a color, and was given a {kind} fill, which pybers reads "
-        "and carries but does not yet write. Nothing was written."
-    )
+    raise TableStyleError(f"{composeBandRefusal(value.fill)} Nothing was written.")
+
+
+def composeBandRefusal(fill: Fill) -> str:
+    """Return the sentence refusing a band of a fill other than a color.
+
+    The one place it is worded, for a script and a command alike.
+    """
+    phrase = {"gradient": "a gradient", "image": "an image", "none": "no fill"}
+    kind = str(getattr(fill, "fillType", ""))
+    return f"Numbers cannot band rows with {phrase.get(kind, kind)}."
 
 
 def findShownFill(table: Table, where: CellAddress) -> Fill:
@@ -360,8 +366,16 @@ def parseTableBand(text: str, band: TableBand, name: str) -> TableBand:
         return replace(band, visible=False)
     hidden, _, rest = text.partition(" ")
     if hidden == "hidden":
-        return TableBand(False, parseBandFill(rest.strip(), name))
-    return TableBand(True, parseBandFill(text, name))
+        return TableBand(False, parseBandColor(rest.strip(), band, name))
+    return TableBand(True, parseBandColor(text, band, name))
+
+
+def parseBandColor(text: str, band: TableBand, name: str) -> Fill:
+    """Return a band's color, or the other fill the table already holds, as written."""
+    fill = parseBandFill(text, name)
+    if isinstance(fill, Color) or fill == band.fill:
+        return fill
+    raise TableStyleError(composeBandRefusal(fill))
 
 
 def formatTableStyle(tableStyle: TableStyle) -> list[str]:
@@ -481,7 +495,7 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             band = changed.bandedRows
             changed = replace(changed, bandedRows=(
                 parseTableBand(value, band, name) if name == bandName
-                else replace(band, fill=parseBandFill(value, name))
+                else replace(band, fill=parseBandColor(value, band, name))
             ))
             continue
         longhand = longhandPattern.fullmatch(name)

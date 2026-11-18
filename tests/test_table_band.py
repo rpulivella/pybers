@@ -108,11 +108,11 @@ def testSettingTheBandATableHoldsReportsNoChange() -> None:
 
 
 @pytest.mark.parametrize(("fill", "named"), [
-    (FillGradient(), "gradient"), (FillImage(), "image"), (FillNone(), "none"),
+    (FillGradient(), "a gradient"), (FillImage(), "an image"), (FillNone(), "no fill"),
 ])
 def testABandOtherThanAColorIsRefusedNamingItsType(fill: Fill, named: str) -> None:
     table = pybers.create("en_US").sheet().tableAdd("Bands", rows=4, cols=2)
-    with pytest.raises(TableStyleError, match=f"given a {named} fill"):
+    with pytest.raises(TableStyleError, match=f"cannot band rows with {named}."):
         table.tableStyleSet(bandedRows=TableBand(True, fill))
     assert table.tableStyle.bandedRows == TableBand(False, bandGray)
 
@@ -139,8 +139,9 @@ def testABandReadsFromItsDeclaration(text: str, band: TableBand) -> None:
 ])
 def testABandPrintsAsADeclarationThatReadsBack(band: TableBand) -> None:
     base = pybers.create("en_US").sheet().tableAdd("Bands", rows=4, cols=2).tableStyle
-    declaration = formatTableStyle(replace(base, bandedRows=band))[-1]
-    assert parseTableStyle(declaration, base).bandedRows == band
+    banded = replace(base, bandedRows=band)
+    declaration = formatTableStyle(banded)[-1]
+    assert parseTableStyle(declaration, banded).bandedRows == band
 
 
 @pytest.mark.parametrize(("address", "fill"), [
@@ -192,6 +193,20 @@ def testACommandBandsATableAndShowsIt(tmp_path: Path) -> None:
     shown = runner.invoke(app, ["show", path, "Sheet 1::Table 1"]).stdout
 
     assert "banded-rows: #ffd60aff" in shown
+
+
+@pytest.mark.parametrize(("declaration", "named"), [
+    ("banded-rows: gradient", "a gradient"), ("banded-rows: hidden image", "an image"),
+    ("banded-rows-background: none", "no fill"),
+])
+def testACommandRefusesABandNumbersCannotDraw(
+    declaration: str, named: str, tmp_path: Path
+) -> None:
+    path = copyDocument("102-bands-base", tmp_path)
+    result = CliRunner().invoke(app, [
+        "set", str(path), "Sheet 1::Table 1", "--table-style", declaration,
+    ])
+    assert result.stderr == f"pybers set: Numbers cannot band rows with {named}.\n"
 
 
 def testACommandSettingTheBandATableHoldsWritesNothing(tmp_path: Path) -> None:
