@@ -73,6 +73,7 @@ lazy from pybers.addressing import (
     ReferenceError,
     SheetReference,
     TableReference,
+    quoteSelectorName,
     toCellRanges,
     toCellReference,
     toColumnLetter,
@@ -189,7 +190,6 @@ lazy from pybers.selection import (
     Selector,
     SelectorError,
     SelectorLike,
-    quoteSelectorName,
 )
 lazy from pybers.style import (
     CellStyle,

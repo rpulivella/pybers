@@ -81,7 +81,6 @@ from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
     CellReferenceLike,
-    ReferenceError,
     SheetReference,
     TableReference,
     firstColumn,
@@ -89,6 +88,7 @@ from pybers.addressing.reference import (
     toCellReference,
     toCellReferenceNamed,
 )
+from pybers.addressing.text import ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle

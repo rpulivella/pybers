@@ -805,7 +805,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheetName": {
           "anyOf": [
@@ -1055,7 +1055,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -1141,7 +1141,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -1498,7 +1498,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheetName": {
           "anyOf": [
@@ -1561,7 +1561,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1874,7 +1874,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheetName": {
           "anyOf": [

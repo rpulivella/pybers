@@ -13,6 +13,8 @@ written `Q3\\, draft`. A colon begins a condition only when a condition's name
 follows it, which is why `B2:D9` stays a range.
 
 UPDATES
+2026-11-18  A name's escapes are read through `addressing.text`, the one reference
+            grammar, for PYB-267.
 2026-11-03  Written for PYB-223.
 """
 from __future__ import annotations
@@ -28,7 +30,11 @@ __date__ = "2026/11/03"
 import re
 from dataclasses import dataclass
 
-from pybers.addressing.reference import tableNameSeparator
+from pybers.addressing.text import (
+    escapeMarker,
+    normalizeWrittenText,
+    referenceSeparator,
+)
 from pybers.errors import PybersError
 from pybers.selection.conditions import (
     nthPattern,
@@ -37,48 +43,14 @@ from pybers.selection.conditions import (
     selectorAttributes,
 )
 
-escapeMarker: str = "\\"
 groupSeparator: str = ","
 wildcards: str = "*?"
-# Every character a name escapes, so a typed lookup can take any name literally.
-specialCharacters: str = "\\*?[](),:"
 positionNames: tuple[str, ...] = ("sheet", "table", "cells")
 pseudoName: re.Pattern[str] = re.compile(r"[a-z][a-z-]*")
 
 
 class SelectorError(PybersError, ValueError):
     """A selector that does not parse, naming the part that is wrong and where."""
-
-
-def quoteSelectorName(name: str) -> str:
-    """Return a name written so a selector reads it literally, `Q3\\, draft`."""
-    last = len(name) - 1
-    return "".join(
-        f"{escapeMarker}{character}"
-        if character in specialCharacters
-        or (character == " " and index in (0, last))
-        else character
-        for index, character in enumerate(name)
-    )
-
-
-def normalizePattern(written: str) -> str:
-    """Return a written pattern without the spaces around it, keeping escaped ones."""
-    pattern = written.lstrip(" ")
-    while pattern.endswith(" ") and not findEscaped(pattern, len(pattern) - 1):
-        pattern = pattern[:-1]
-    return pattern
-
-
-def findEscaped(text: str, index: int) -> bool:
-    """Report whether the character at an index follows an unescaped backslash."""
-    markers = len(text[:index]) - len(text[:index].rstrip(escapeMarker))
-    return markers % 2 == 1
-
-
-def readEscapedText(text: str) -> str:
-    """Return written text with its escapes removed, the name it spells."""
-    return re.sub(r"\\(.)", r"\1", text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,8 +125,8 @@ class SelectorGroup:
     conditions: tuple[SelectorCondition, ...] = ()
 
     def __str__(self) -> str:
-        written = tableNameSeparator.join(str(each) for each in self.components)
-        lead = tableNameSeparator if self.fromRight else ""
+        written = referenceSeparator.join(str(each) for each in self.components)
+        lead = referenceSeparator if self.fromRight else ""
         return f"{lead}{written}{''.join(str(each) for each in self.conditions)}"
 
 
@@ -259,7 +231,7 @@ class SelectorParser:
 
     def findPseudoName(self) -> str | None:
         """Return the condition name after a single colon here, or None."""
-        if not self.startsWith(":") or self.startsWith(tableNameSeparator):
+        if not self.startsWith(":") or self.startsWith(referenceSeparator):
             return None
         found = pseudoName.match(self.text, self.index + 1, self.end)
         if found is None or found.group() not in {*pseudoClasses, pseudoNegation}:
@@ -273,9 +245,9 @@ class SelectorParser:
             if not self.text.strip():
                 raise self.fault("A selector names something, and this one is empty.")
             raise self.fault("A selector group is empty.")
-        fromRight = self.startsWith(tableNameSeparator)
+        fromRight = self.startsWith(referenceSeparator)
         if fromRight:
-            self.index += len(tableNameSeparator)
+            self.index += len(referenceSeparator)
         components: list[SelectorComponent] = []
         conditions: tuple[SelectorCondition, ...] = ()
         while True:
@@ -286,8 +258,8 @@ class SelectorParser:
                 )
             component = self.componentParse()
             components.append(component)
-            if self.startsWith(tableNameSeparator):
-                self.index += len(tableNameSeparator)
+            if self.startsWith(referenceSeparator):
+                self.index += len(referenceSeparator)
                 continue
             break
         if self.index < self.end:
@@ -311,7 +283,7 @@ class SelectorParser:
                 written += self.text[self.index:self.index + 2]
                 self.index += 2
                 continue
-            if self.startsWith(tableNameSeparator) or character == "[":
+            if self.startsWith(referenceSeparator) or character == "[":
                 break
             name = self.findPseudoName()
             if name == pseudoNegation and not self.negatesConditions():
@@ -325,7 +297,7 @@ class SelectorParser:
                 )
             written += character
             self.index += 1
-        pattern = normalizePattern(written)
+        pattern = normalizeWrittenText(written)
         if not pattern and exclusions:
             raise self.fault("A `:not()` follows a name it removes from.", start)
         return SelectorComponent(pattern, tuple(exclusions))
@@ -378,7 +350,7 @@ class SelectorParser:
             self.skipSpaces()
             if self.index >= self.end:
                 return tuple(conditions)
-            if self.startsWith(tableNameSeparator):
+            if self.startsWith(referenceSeparator):
                 raise self.fault(
                     "Conditions follow every component, and a `::` follows a "
                     "condition here."
@@ -469,9 +441,7 @@ __all__ = [
     "SelectorLike",
     "SelectorNegation",
     "SelectorPseudoClass",
-    "quoteSelectorName",
     "findWildcard",
     "positionNames",
-    "readEscapedText",
     "toSelector",
 ]

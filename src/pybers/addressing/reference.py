@@ -16,6 +16,8 @@ why each carries its own guard:
   reverse, so a single flag per reference cannot represent what Numbers stores.
 
 UPDATES
+2026-11-18  A reference prints each name escaped and parses through `addressing.text`,
+            and a sheet and a table reference parse their own text, for PYB-267.
 2026-10-27  `splitTableName`, the table a reference or a range names, for
             PYB-260.
 2026-10-20  A reference reads the table and sheet its text names, for PYB-217.
@@ -45,7 +47,14 @@ import re
 from dataclasses import dataclass, field
 from typing import overload
 
-from pybers.errors import PybersError
+from pybers.addressing.text import (
+    ReferenceError,
+    composeReferenceText,
+    quoteReferenceText,
+    quoteSelectorName,
+    readReferenceName,
+    splitReferenceText,
+)
 
 # Rows and columns count from ONE throughout the model, because that is what
 # Numbers shows and what a caller means by "row 1". Nothing here ever holds a stored
@@ -73,16 +82,7 @@ alphabetSize: int = 26
 
 absoluteMarker: str = "$"
 
-# What separates a table's name from an address inside it, and a sheet's name from
-# a table's. Numbers writes `Table 2::A1` and qualifies it further when a bare table
-# name would be ambiguous.
-tableNameSeparator: str = "::"
-
 cellPattern: re.Pattern[str] = re.compile(r"^(\$?)([A-Za-z]+)(\$?)([0-9]+)$")
-
-
-class ReferenceError(PybersError, ValueError):
-    """An address that is not a valid A1-style reference, range or list."""
 
 
 def toColumnLetter(col: int) -> str:
@@ -183,12 +183,14 @@ class CellAddress:
         reference = CellReference.parse(text)
         if reference.table is not None:
             raise ReferenceError(
-                f"{text!r} names a table, which belongs to a `CellReference`. An "
+                f"{quoteReferenceText(text)} names a table, which belongs to a "
+                "`CellReference`. An "
                 f"address is the position alone, such as {reference.address}."
             )
         if reference.rowAbsolute or reference.colAbsolute:
             raise ReferenceError(
-                f"{text!r} carries a lock, which belongs to a `CellReference`. An "
+                f"{quoteReferenceText(text)} carries a lock, which belongs to a "
+                "`CellReference`. An "
                 "address is the position alone, such as "
                 f"{reference.address}."
             )
@@ -263,8 +265,19 @@ class SheetReference:
         if not isinstance(self.name, str) or not self.name:
             raise ReferenceError(f"A sheet is named, and {self.name!r} is no name.")
 
+    @classmethod
+    def parse(cls, text: str) -> SheetReference:
+        """Return the sheet `Budget` or `Budget\\, draft` writes."""
+        parts = splitReferenceText(text)
+        if len(parts) != 1:
+            raise ReferenceError(
+                f"{quoteReferenceText(text)} names more than a sheet. A `::` inside a "
+                "sheet's name is written `\\:\\:`."
+            )
+        return cls(readReferenceName(parts[0], text))
+
     def __str__(self) -> str:
-        return self.name
+        return quoteSelectorName(self.name)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -278,20 +291,42 @@ class TableReference:
         if not isinstance(self.name, str) or not self.name:
             raise ReferenceError(f"A table is named, and {self.name!r} is no name.")
 
+    @classmethod
+    def parse(cls, text: str) -> TableReference:
+        """Return the table `Q3` or `Budget::Q3` writes, qualified as far as written."""
+        parts = splitReferenceText(text)
+        if len(parts) > 2:
+            raise ReferenceError(
+                f"{quoteReferenceText(text)} names more than a sheet and a table. "
+                "A `::` inside a name is written `\\:\\:`."
+            )
+        return buildTableReference(parts, text)
+
     def __str__(self) -> str:
+        name = quoteSelectorName(self.name)
         if self.sheet is None:
-            return self.name
-        return f"{self.sheet}{tableNameSeparator}{self.name}"
+            return name
+        return composeReferenceText(str(self.sheet), name)
+
+
+def buildTableReference(parts: list[str], text: str) -> TableReference:
+    """Return the table one or two written parts name, the sheet's first."""
+    sheet = None if len(parts) < 2 else SheetReference(
+        readReferenceName(parts[0], text)
+    )
+    return TableReference(sheet=sheet, name=readReferenceName(parts[-1], text))
 
 
 def splitTableName(text: str) -> tuple[TableReference | None, str]:
-    """Return the table written before the last `::`, if any, and what follows it."""
-    tableName, separator, rest = text.strip().rpartition(tableNameSeparator)
-    if not separator:
-        return None, rest
-    sheetName, sheetSeparator, name = tableName.rpartition(tableNameSeparator)
-    sheet = SheetReference(sheetName) if sheetSeparator else None
-    return TableReference(sheet=sheet, name=name), rest
+    """Return the table written before an address, if any, and the address."""
+    parts = splitReferenceText(text.strip())
+    if len(parts) > 3:
+        raise ReferenceError(
+            f"{quoteReferenceText(text)} names more than a sheet, a table and a cell. "
+            "A `::` inside a name is written `\\:\\:`."
+        )
+    table = buildTableReference(parts[:-1], text) if len(parts) > 1 else None
+    return table, parts[-1]
 
 
 @dataclass(frozen=True, slots=True)
@@ -334,14 +369,16 @@ class CellReference:
         table, cellText = splitTableName(reference)
         match = cellPattern.match(cellText.strip())
         if match is None:
-            raise ReferenceError(f"{reference!r} is not an A1-style cell reference.")
+            raise ReferenceError(
+                f"{quoteReferenceText(reference)} is not an A1-style cell reference."
+            )
         colMarker, letters, rowMarker, digits = match.groups()
         # Checked against the written form rather than left to the constructor,
         # which would report row 0 without saying that `A0` is where it came from.
         if int(digits) < firstRow:
             raise ReferenceError(
-                f"{reference!r} names row {int(digits)}, and rows count from "
-                f"{firstRow}."
+                f"{quoteReferenceText(reference)} names row {int(digits)}, and rows "
+                f"count from {firstRow}."
             )
         return cls(
             int(digits),
@@ -366,7 +403,7 @@ class CellReference:
         """Return the written form, qualified by its table when it names one."""
         if self.table is None:
             return self.asReference()
-        return f"{self.table}{tableNameSeparator}{self.asReference()}"
+        return composeReferenceText(str(self.table), self.asReference())
 
 
 # What a caller may hand to anything that addresses one cell. The string form is

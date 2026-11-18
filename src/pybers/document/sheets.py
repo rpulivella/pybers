@@ -21,6 +21,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-18  A refusal lists names as reference text, quoted verbatim, for PYB-267.
 2026-11-17  `cellBordersSet`, borders drawn at a position of one block, for
             PYB-266.
 2026-11-12  `cellSet` sets a cell style, its whole box, for PYB-265.
@@ -84,11 +85,12 @@ from pybers.absence import UNCHANGED
 from pybers.addressing.reference import (
     CellAddress,
     CellReference,
+    SheetReference,
     TableReference,
     lastColumn,
     lastRow,
-    tableNameSeparator,
 )
+from pybers.addressing.text import quoteReferenceText
 from pybers.color.colors import Color
 from pybers.errors import PybersError, WriteError, composeChoiceRefusal
 from pybers.format._check import (
@@ -98,6 +100,7 @@ from pybers.format._check import (
 )
 from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
+from pybers.formula.syntax import formulaQualifierSeparator
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, findCellStyleRefusal
 from pybers.style.strokes import StrokeError
@@ -155,7 +158,8 @@ def listPresent(kind: str, names: Sequence[str]) -> str:
     """Return the sentence ending a refusal with the names present, to ask for one."""
     if not names:
         return f"It holds no {kind}s."
-    return f"The {kind}s are {', '.join(repr(name) for name in names)}."
+    quoted = ", ".join(quoteReferenceText(name) for name in names)
+    return f"The {kind}s are {quoted}."
 
 
 def selectByPosition[NamedT: Named](
@@ -198,7 +202,8 @@ def findTableIdentities(
         for table in sheet.tables:
             if not table.identifier:
                 continue
-            names[f"{sheet.name}{tableNameSeparator}{table.name}"] = table.identifier
+            qualified = f"{sheet.name}{formulaQualifierSeparator}{table.name}"
+            names[qualified] = table.identifier
             if seen[table.name] == 1:
                 names[table.name] = table.identifier
     names |= {table.name: table.identifier for table in local.tables
@@ -228,7 +233,8 @@ class Sheet:
         refuseUnnamed(nameOrPosition, "table")
         if isinstance(nameOrPosition, int):
             return selectByPosition(
-                self.tables, nameOrPosition, "table", repr(self.name)
+                self.tables, nameOrPosition, "table",
+                quoteReferenceText(str(SheetReference(self.name))),
             )
         from pybers.selection.matching import findTable
 

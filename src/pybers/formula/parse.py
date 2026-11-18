@@ -44,9 +44,9 @@ from pybers.addressing.reference import (
     CellAddress,
     CellReference,
     CellReferenceLike,
-    ReferenceError,
     toCellReference,
 )
+from pybers.addressing.text import ReferenceError
 from pybers.formula.functions import FunctionAvailability, functionsByName
 from pybers.formula.nodes import (
     Formula,

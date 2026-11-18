@@ -31,8 +31,8 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, CellRangeLike
 from pybers.addressing.reference import (
     CellReferenceLike,
-    ReferenceError,
 )
+from pybers.addressing.text import ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation, clampFormulaRanges
 from pybers.table.bounds import refuseRangeOutside
 from pybers.table.fill import copyCellContent

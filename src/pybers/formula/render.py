@@ -52,7 +52,6 @@ from pybers.addressing.ranges import RangeEndpoint, renderEndpoint
 from pybers.addressing.reference import (
     CellAddress,
     CellReferenceLike,
-    tableNameSeparator,
     toCellReference,
 )
 from pybers.formula.nodes import (
@@ -84,6 +83,7 @@ from pybers.formula.syntax import (
     brokenReferenceText,
     cosmeticNodeTypes,
     formulaMarker,
+    formulaQualifierSeparator,
     lambdaName,
     letName,
     operatorPrecedence,
@@ -200,7 +200,7 @@ def qualifyAddress(
             f"This formula reaches into table {tableId}, and no name was given "
             "for it. Pass `tables=sheet.tableIdentities` to name it."
         )
-    return f"{name}{tableNameSeparator}{body}"
+    return f"{name}{formulaQualifierSeparator}{body}"
 
 
 def renderNumber(value: Decimal) -> str:

@@ -20,6 +20,8 @@ conversion here takes that cell. Passing the wrong one is not an error, it is a
 wrong answer.
 
 UPDATES
+2026-11-18  `formulaQualifierSeparator`, Numbers' own, apart from a reference's, for
+            PYB-267.
 2026-10-13  A span of whole rows reads as an address, and TRUE and FALSE as
             literals, for PYB-139.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
@@ -42,7 +44,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from pybers.addressing.ranges import CellRange
-from pybers.addressing.reference import CellAddress, tableNameSeparator
+from pybers.addressing.reference import CellAddress
 from pybers.formula.nodes import (
     Coordinate,
     FormulaError,
@@ -204,6 +206,8 @@ rowSpanPattern: re.Pattern[str] = re.compile(
 # A table name in front of an address, `Table 2::A1`, qualified further as
 # `Sheet 2::Table 1::A1` when a bare table name would name two tables. Names carry
 # spaces, so this stops at the punctuation a formula cannot put inside one.
+# Numbers' formula text qualifies a reference by `::`, its own grammar, never escaped.
+formulaQualifierSeparator: str = "::"
 qualifierPattern: re.Pattern[str] = re.compile(r'(?:[^,()"\s][^,()"]*?::)+')
 
 numberPattern: re.Pattern[str] = re.compile(
@@ -354,8 +358,8 @@ def readQualifier(text: str, position: int, known: Sequence[str]) -> str:
     the impossible column rather than a table nobody typed.
     """
     for name in known:
-        if text.startswith(name + tableNameSeparator, position):
-            return name + tableNameSeparator
+        if text.startswith(name + formulaQualifierSeparator, position):
+            return name + formulaQualifierSeparator
     match = qualifierPattern.match(text, position)
     if match is None:
         return ""
@@ -427,7 +431,7 @@ def resolveQualifierIdentity(
     """
     if not token.qualifier:
         return None
-    name = token.qualifier[: -len(tableNameSeparator)]
+    name = token.qualifier[: -len(formulaQualifierSeparator)]
     identity = tables.get(name)
     if identity is None:
         offered = ", ".join(sorted(repr(key) for key in tables)) or "nothing"

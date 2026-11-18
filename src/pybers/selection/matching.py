@@ -14,6 +14,8 @@ not create two table names differing only in case on one sheet, and enforces not
 about sheet names, so folding them would invent a collision the file does not have.
 
 UPDATES
+2026-11-18  A typed lookup parses a reference rather than one literal name, and a
+            refusal quotes reference text verbatim, for PYB-267.
 2026-11-17  `findBlockTarget`, the one block a border is drawn on, for PYB-266.
 2026-11-03  Written for PYB-223.
 """
@@ -36,11 +38,16 @@ from pybers.addressing.ranges import CellRange, SelectionMatch
 from pybers.addressing.reference import (
     CellAddress,
     CellReference,
-    ReferenceError,
     SheetReference,
     TableReference,
     cellPattern,
-    tableNameSeparator,
+)
+from pybers.addressing.text import (
+    ReferenceError,
+    escapeMarker,
+    quoteReferenceText,
+    quoteSelectorName,
+    readEscapedText,
 )
 from pybers.document.sheets import Document, SelectionError, Sheet, listPresent
 from pybers.selection.conditions import matchPseudoClass, selectorAttributes
@@ -53,11 +60,8 @@ from pybers.selection.selector import (
     SelectorLike,
     SelectorNegation,
     SelectorPseudoClass,
-    escapeMarker,
     formatPlace,
     positionNames,
-    quoteSelectorName,
-    readEscapedText,
     toSelector,
 )
 from pybers.table.bounds import findCellsMiss
@@ -180,9 +184,9 @@ def refuseExactMiss(
     """Refuse a component naming one thing exactly that nothing searched carries."""
     if component is None or not component.exact:
         return
-    name = readEscapedText(component.pattern)
     raise SelectionError(
-        f"No {kind} in {within} is named {name!r}. {listPresent(kind, names)}"
+        f"No {kind} in {within} is named {quoteReferenceText(component.pattern)}. "
+        f"{listPresent(kind, names)}"
     )
 
 
@@ -305,7 +309,7 @@ def formatTablesPlace(
     if len(sheets) == 1 and (isinstance(owner, Sheet) or (
         component is not None and component.exact
     )):
-        return repr(sheets[0].name)
+        return quoteReferenceText(str(SheetReference(sheets[0].name)))
     if component is None or component.pattern in ("", "*"):
         return "this document"
     return "the sheets selected"
@@ -323,7 +327,7 @@ def matchGroup(owner: SelectionOwner, group: SelectorGroup) -> list[PartMatch]:
         if not sheets:
             refuseExactMiss(
                 placed[0], "sheet", "this document",
-                [each.name for each in owner.sheets],
+                [str(SheetReference(each.name)) for each in owner.sheets],
             )
         if depth == 0:
             return [PartMatch(sheet) for sheet in sheets]
@@ -336,8 +340,10 @@ def matchGroup(owner: SelectionOwner, group: SelectorGroup) -> list[PartMatch]:
         refuseExactMiss(
             placed[1], "table", within,
             [
-                each.name if len(sheets) == 1
-                else f"{sheet.name}{tableNameSeparator}{each.name}"
+                str(TableReference(
+                    sheet=None if len(sheets) == 1 else SheetReference(sheet.name),
+                    name=each.name,
+                ))
                 for sheet in sheets for each in sheet.tables
             ],
         )
@@ -355,7 +361,8 @@ def refuseSharedSheetName(
         if any(each is sheet for sheet in sheets)
     )
     raise SelectionError(
-        f"{len(sheets)} sheets in this document are named {sheets[0].name!r}, at "
+        f"{len(sheets)} sheets in this document are named "
+        f"{quoteReferenceText(str(SheetReference(sheets[0].name)))}, at "
         f"positions {positions}. {remedy}"
     )
 
@@ -386,53 +393,68 @@ def selectWithin(
     return tuple(part.reference for part in selectParts(owner, selector))
 
 
-def buildNameGroup(name: str, fromRight: bool = False, depth: int = 1) -> SelectorGroup:
-    """Return a group naming one thing literally, at the position `depth` counts."""
-    components = (
-        *(SelectorComponent("") for _ in range(depth - 1)),
-        SelectorComponent(quoteSelectorName(name)),
-    )
-    return SelectorGroup(components, fromRight)
-
-
-def findSheet(document: Document, name: str | None) -> Sheet:
-    """Return the one sheet a name names, or the only sheet when none is named."""
+def findSheet(document: Document, name: str | SheetReference | None) -> Sheet:
+    """Return the one sheet a reference names, or the only sheet when none is named."""
     if name is None:
         sheets = document.sheets
     else:
-        sheets = [part.sheet for part in matchGroup(document, buildNameGroup(name))
+        reference = SheetReference.parse(name) if isinstance(name, str) else name
+        group = SelectorGroup((SelectorComponent(quoteSelectorName(reference.name)),))
+        sheets = [part.sheet for part in matchGroup(document, group)
                   if part.sheet is not None]
     if len(sheets) == 1:
         return sheets[0]
     if name is None:
+        present = [str(SheetReference(each.name)) for each in document.sheets]
         raise SelectionError(
             f"No sheet was named, and this document holds {len(sheets)}. Name one. "
-            f"{listPresent('sheet', [each.name for each in document.sheets])}"
+            f"{listPresent('sheet', present)}"
         )
     refuseSharedSheetName(document, sheets, "Reach one by position instead.")
 
 
+def buildTableGroup(
+    owner: Document | Sheet, reference: TableReference
+) -> SelectorGroup:
+    """Return the one-group selection a table reference makes within an owner.
+
+    A reference naming its sheet, given to a sheet, names that sheet or is refused.
+    """
+    name = SelectorComponent(quoteSelectorName(reference.name))
+    if isinstance(owner, Sheet):
+        if reference.sheet is not None and reference.sheet.name != owner.name:
+            raise SelectionError(
+                f"{quoteReferenceText(str(reference))} names a table on sheet "
+                f"{quoteReferenceText(str(reference.sheet))}, and this is sheet "
+                f"{quoteReferenceText(str(SheetReference(owner.name)))}."
+            )
+        return SelectorGroup((name,))
+    if reference.sheet is None:
+        return SelectorGroup((SelectorComponent(""), name))
+    sheet = SelectorComponent(quoteSelectorName(reference.sheet.name))
+    return SelectorGroup((sheet, name))
+
+
 def findTable(owner: Document | Sheet, name: str | TableReference | None) -> Table:
-    """Return the one table a name names, or the only table when none is named."""
-    depth = 2 if isinstance(owner, Document) else 1
-    if isinstance(name, TableReference) and name.sheet is not None:
-        group = SelectorGroup((
-            SelectorComponent(quoteSelectorName(name.sheet.name)),
-            SelectorComponent(quoteSelectorName(name.name)),
-        ))
-    elif name is None:
+    """Return the one table a reference names, or the only table when none is named."""
+    if name is None:
+        depth = 2 if isinstance(owner, Document) else 1
         group = SelectorGroup(tuple(SelectorComponent("") for _ in range(depth)))
     else:
-        written = name.name if isinstance(name, TableReference) else name
-        group = buildNameGroup(written, depth=depth)
+        reference = TableReference.parse(name) if isinstance(name, str) else name
+        group = buildTableGroup(owner, reference)
     found = [part for part in matchGroup(owner, group) if part.table is not None]
     if len(found) == 1 and found[0].table is not None:
         return found[0].table
     qualified = [
-        part.table.name if isinstance(owner, Sheet) else str(part.reference)
+        str(TableReference(name=part.table.name)) if isinstance(owner, Sheet)
+        else str(part.reference)
         for part in found if part.table is not None
     ]
-    within = "this document" if isinstance(owner, Document) else repr(owner.name)
+    within = (
+        "this document" if isinstance(owner, Document)
+        else quoteReferenceText(str(SheetReference(owner.name)))
+    )
     if name is None:
         if not found:
             raise SelectionError(f"No table was named, and {within} holds none.")
@@ -440,10 +462,10 @@ def findTable(owner: Document | Sheet, name: str | TableReference | None) -> Tab
             f"No table was named, and {within} holds {len(found)}. Name one. "
             f"{listPresent('table', qualified)}"
         )
-    shared = ", ".join(repr(each) for each in qualified)
+    shared = ", ".join(quoteReferenceText(each) for each in qualified)
     raise SelectionError(
-        f"{str(name)!r} names a table on more than one sheet. Name its sheet as "
-        f"well: {shared}."
+        f"{quoteReferenceText(str(name))} names a table on more than one sheet. Name "
+        f"its sheet as well: {shared}."
     )
 
 
