@@ -28,9 +28,11 @@ import pytest
 import pybers
 from conftest import findDocumentPath
 from pybers import CellBorderSide, Color, Stroke, StrokeDash, StrokeSolid
+from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSTArchives_pb2 as tst
-from pybers._persistence.container import readPackage
-from pybers._persistence.index import ArchiveIndex
+from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
+from pybers._persistence.container import readPackage, writePackage
+from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.types import readArchiveTypeId
 from pybers.table.tablestyle import (
     TableLine,
@@ -285,3 +287,21 @@ def test_a_line_no_control_hides_takes_a_stroke_but_not_none(field: str) -> None
     with pytest.raises(TableStyleError, match="no Numbers control hides it"):
         table.tableStyleSet(**{field: TableLine(False, gridline)})
     assert table.tableStyleSet(**{field: TableLine(True, redLine)}).changed
+
+
+def test_a_document_whose_theme_has_no_table_preset_still_opens(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "created.numbers"
+    pybers.create("en_US").save(source)
+    package = readPackage(source)
+    index = ArchiveIndex(package)
+    root = findRoot(index)
+    theme = index.resolve(root.theme, tn.ThemeArchive)
+    presets = theme.super.Extensions[tstStyles.ThemePresetsArchive.extension]
+    del presets.table_style_presets[:]
+    index.archiveWrite(root.theme.identifier, theme)
+    stripped = tmp_path / "stripped.numbers"
+    writePackage(package, stripped)
+    added = pybers.open(stripped).sheet().tableAdd("Lines", rows=1, cols=1)
+    assert added.tableStyle == resetTableStyle

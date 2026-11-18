@@ -67,8 +67,7 @@ from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import ReadError
 from ..table._read import readTable
-from ..table._reset import findDocumentStyles
-from ..table._tablestyle import readThemeTableStyle
+from ..table._tablestyle import readDocumentTableStyle
 from ..timezone import TimeZoneLike, machineTimeZone, toTimeZone
 from .sheets import Document, Sheet
 
@@ -133,7 +132,7 @@ def readDocument(package: NumbersPackage, source: Path | None) -> Document:
         ),
         _currencyPattern=symbols.currency_pattern,
         _localeIdentifier=locale.locale_identifier,
-        _tableStyleTheme=readThemeTableStyle(index, findDocumentStyles(index).network),
+        _tableStyleTheme=readDocumentTableStyle(index),
     )
     identities = readTableIdentities(index)
     for reference in root.sheets:

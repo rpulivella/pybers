@@ -28,15 +28,16 @@ __date__ = "2026/11/17"
 
 from google.protobuf.message import Message
 
+from pybers._generated import TNArchives_pb2 as tn
 from pybers._generated import TSPMessages_pb2 as tsp
 from pybers._generated import TSTArchives_pb2 as tst
 from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
-from pybers._persistence.index import ArchiveIndex
+from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.metadata import PackageRegistry
 from pybers.absence import MIXED
 from pybers.style._read import readStroke
 from pybers.style._write import addStyles, composeStroke
-from pybers.table.tablestyle import TableLine, TableStyle
+from pybers.table.tablestyle import TableLine, TableStyle, blankTableStyle
 
 # Each line's visibility, None where no control hides it, and the stroke fields it
 # draws with, the outline one per band.
@@ -177,6 +178,26 @@ def readThemeTableStyle(
     )
 
 
+def readDocumentTableStyle(index: ArchiveIndex) -> TableStyle:
+    """Return what a document's theme gives a table it adds, read without refusing.
+
+    A theme with no table preset reads as the Blank theme's lines, since a table
+    added to such a document is refused when saved, and the document still opens.
+    """
+    root = findRoot(index)
+    if not root.HasField("theme"):
+        return blankTableStyle
+    theme = index.resolve(root.theme, tn.ThemeArchive)
+    presets = theme.super.Extensions[tstStyles.ThemePresetsArchive.extension]
+    if not presets.table_style_presets:
+        return blankTableStyle
+    preset = index.resolve(
+        presets.table_style_presets[0], tstStyles.TableStylePresetArchive
+    )
+    network = index.resolve(preset.style_network, tst.TableStyleNetworkArchive)
+    return readThemeTableStyle(index, network)
+
+
 def composeTableStyleVariation(
     wanted: TableStyle, rootId: int, root: tst.TableStyleArchive,
     carried: tstStyles.TableStylePropertiesArchive,
@@ -237,5 +258,5 @@ def writeTableStyle(
 
 __all__ = [
     "applyTableStyle", "composeTableStyleVariation", "lineFields", "readTableStyle",
-    "readThemeTableStyle", "writeTableStyle",
+    "readDocumentTableStyle", "readThemeTableStyle", "writeTableStyle",
 ]
