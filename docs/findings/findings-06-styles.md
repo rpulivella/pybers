@@ -299,6 +299,10 @@ offered, read from the preview Numbers saved with each.
   Blank theme's sRGB 0.960 gray. Every table in every fixture stores a `banded_fill`
   beside `banded_rows` false, and `70-retirement-template-15-4` keeps its root's fill
   beneath a variation turning banding off, so banding turned off keeps its fill.
+- **A band's fill is a color, its alpha included.** The `Alternating Row Color` well
+  offers no gradient, image or None, as a person found in Numbers 15.4 on 18 November
+  2026, and `103c-bands-translucent`, recolored to `#ff3b30` at 50% opacity, stores
+  that color at alpha 0.5 in a variation stating `banded_rows` and `banded_fill`.
 - **The band counts from the first body row**, which is unbanded, and every second body
   row is banded, with one header row in `103b` and with two in `102b`.
 - **A footer row takes no band.** `102b` places its footer row where the band falls, and
