@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-267] Band a table's rows with an alternating color
 - [PYB-266] Draw a table's lines: borders, gridlines and outline
 - [PYB-292] Compose a created theme Numbers loads without repair
 - [PYB-295] Report and bump the dependencies Dependabot flags
