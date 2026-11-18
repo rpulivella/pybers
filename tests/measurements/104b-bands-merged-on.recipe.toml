@@ -1,0 +1,13 @@
+# How Numbers makes 104b-bands-merged-on: `104-bands-merged-base` with Alternating Row
+# Color turned on, its color as offered. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 104b-bands-merged-on`.
+
+base = "104-bands-merged-base"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableBandSet"
+range = "A2"
+value = "on"

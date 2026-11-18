@@ -305,6 +305,9 @@ offered, read from the preview Numbers saved with each.
   that color at alpha 0.5 in a variation stating `banded_rows` and `banded_fill`.
 - **The band counts from the first body row**, which is unbanded, and every second body
   row is banded, with one header row in `103b` and with two in `102b`.
+- **A merge shows its anchor's band across every row it spans.** In `104b-bands-merged-on`,
+  B2:B3 and D4:D6, anchored on unbanded rows, show no band on their banded rows, and
+  C3:C4, anchored on a banded row, shows the band on its unbanded one.
 - **A footer row takes no band.** `102b` places its footer row where the band falls, and
   it shows none, though the footer region states `FillNone` exactly as the body does.
 - **A cell's own fill prevails over the band**: a color and a gradient show unchanged on
