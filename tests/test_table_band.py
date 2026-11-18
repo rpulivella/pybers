@@ -6,7 +6,8 @@ A table's banded rows, read as Numbers stores them and set as its checkbox sets 
 and a footer row, its columns holding no fill, a stated No Fill, a color, a color
 then No Fill and a gradient, and `102b-bands-on` the same with Alternating Row Color
 turned on. Which fill each cell displays is read from the preview Numbers saved.
-`103c-bands-translucent` holds a band recolored by hand to `#ff3b30` at half opacity.
+`103c-bands-translucent` holds a band recolored by hand to `#ff3b30` at half opacity,
+and `104b-bands-merged-on` merges across banded and unbanded rows.
 
 UPDATES
 2026-11-18  Written for PYB-267.
@@ -165,6 +166,15 @@ def testACellShowsTheFillNumbersDrewForIt(address: str, fill: Fill | str) -> Non
         assert isinstance(shown, Color) and shown != bandGray
     else:
         assert shown == fill
+
+
+@pytest.mark.parametrize(("address", "banded"), [
+    ("B2", False), ("B3", False), ("C3", True), ("C4", True),
+    ("D4", False), ("D5", False), ("D6", False), ("E5", True), ("F5", True),
+])
+def testAMergeShowsItsAnchorsBandAcrossEveryRow(address: str, banded: bool) -> None:
+    table = pybers.open(findDocumentPath("104b-bands-merged-on")).table()
+    assert table.cellFillShown(address) == (bandGray if banded else FillNone())
 
 
 def testTheBandCountsFromTheFirstBodyRow() -> None:

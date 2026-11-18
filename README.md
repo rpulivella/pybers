@@ -390,7 +390,7 @@ costs.tableStyleSet(tableOutlineTitle=True)
 print(costs.cellBorderShown("C5", CellBorderSide.RIGHT))  # None: the vertical gridlines are hidden
 ```
 
-A table's banded rows are `table.tableStyle.bandedRows`, a `TableBand` of whether it shows and its color, which a hidden band keeps. `table.cellFillShown` says which fill a cell displays: its own, else the band on every second body row, else its region's:
+A table's banded rows are `table.tableStyle.bandedRows`, a `TableBand` of whether it shows and its color, which a hidden band keeps. `table.cellFillShown` says which fill a cell displays: its own, else the band on every second body row, else its region's, a merged cell showing what its first cell shows:
 
 ```python
 from pybers import Color, TableBand

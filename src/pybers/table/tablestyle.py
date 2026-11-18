@@ -204,8 +204,11 @@ def findShownFill(table: Table, where: CellAddress) -> Fill:
     A fill the cell states prevails. Every second body row, counted from the first,
     shows the band beneath a cell stating No Fill, and a header, a header column or
     a footer takes no band, as `102b-bands-on` and `103b-bands-one-header-on` show.
-    Else the region's fill shows.
+    Else the region's fill shows. A merge shows what its anchor shows, across every
+    row it spans, as `104b-bands-merged-on` shows.
     """
+    merge = table.mergeCovering(where)
+    where = where if merge is None else merge.anchor
     cell = table.cells.get(where)
     stated = None if cell is None else cell.cellStyle
     own = None if stated is None else stated.background
