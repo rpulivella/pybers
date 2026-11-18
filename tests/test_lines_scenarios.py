@@ -6,6 +6,8 @@ The edits compare the model with itself across a save, since `57-*`, `61-*`, `63
 and `64-*` already compare each one with what Numbers made of it.
 
 UPDATES
+2026-11-18  The table bands its rows too, so every edit keeps its banding, for
+            PYB-267.
 2026-11-17  Written for PYB-266.
 """
 from __future__ import annotations
@@ -33,7 +35,7 @@ relative = pybers.FormulaReferenceRelocation.PRESERVE_NAMED_CELL
 
 
 def buildLinedDocument() -> pybers.Document:
-    """Return a created document whose table draws borders and its own lines."""
+    """Return a created document whose table draws borders, its lines and a band."""
     document = pybers.create("en_US")
     table = document.sheet().tableAdd("Lines", rows=6, cols=6)
     table.cell("B2").value = Decimal(1)
@@ -41,7 +43,10 @@ def buildLinedDocument() -> pybers.Document:
         "::Lines::B2:C3", pybers.CellBorderPosition.ALL,
         style=pybers.CellBorderStyle.DASHED, width=2,
     )
-    table.tableStyleSet(tableOutlineTitle=True)
+    table.tableStyleSet(
+        tableOutlineTitle=True,
+        bandedRows=pybers.TableBand(True, pybers.Color.parse("#ffd60aff")),
+    )
     return document
 
 

@@ -14,6 +14,8 @@ since Numbers offers no control for one, and a golden confirms it.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-18  A table's banded rows, read through its style's parents and written as
+            a variation stating what differs from the root, for PYB-267.
 2026-11-17  Written for PYB-266.
 """
 from __future__ import annotations
@@ -35,9 +37,11 @@ from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from pybers._persistence.index import ArchiveIndex, findRoot
 from pybers._persistence.metadata import PackageRegistry
 from pybers.absence import MIXED
-from pybers.style._read import readStroke
+from pybers.color._archive import composeColor
+from pybers.color.colors import Color
+from pybers.style._read import readFill, readStroke
 from pybers.style._write import addStyles, composeStroke
-from pybers.table.tablestyle import TableLine, TableStyle, blankTableStyle
+from pybers.table.tablestyle import TableBand, TableLine, TableStyle, blankTableStyle
 
 # Each line's visibility, None where no control hides it, and the stroke fields it
 # draws with, the outline one per band.
@@ -88,12 +92,15 @@ def readStyleChain(
     return chain
 
 
-def findStated(chain: list[tst.TableStyleArchive], name: str) -> Message:
+def findStated(
+    chain: list[tst.TableStyleArchive], name: str
+) -> tstStyles.TableStylePropertiesArchive:
     """Return the nearest properties in a chain stating a field, by its name."""
+    # Typed as messages, which the generated stubs let a field be named by a variable.
     stated: list[Message] = [style.table_properties for style in chain]
-    return next(
-        (properties for properties in stated if properties.HasField(name)), stated[-1]
-    )
+    found = next((each for each in stated if each.HasField(name)), stated[-1])
+    assert isinstance(found, tstStyles.TableStylePropertiesArchive)
+    return found
 
 
 def readTableLine(chain: list[tst.TableStyleArchive], field: str) -> TableLine:
@@ -111,6 +118,13 @@ def readTableLine(chain: list[tst.TableStyleArchive], field: str) -> TableLine:
     )
 
 
+def readTableBand(chain: list[tst.TableStyleArchive]) -> TableBand:
+    """Return a table's banded rows, each part from the nearest style stating it."""
+    visible = findStated(chain, "banded_rows").banded_rows
+    stated = findStated(chain, "banded_fill")
+    return TableBand(visible, readFill(stated.banded_fill))
+
+
 def readTableStyle(index: ArchiveIndex, model: tst.TableModelArchive) -> TableStyle:
     """Return the lines a table draws, resolved through its style's parents."""
     chain = readStyleChain(index, model.table_style)
@@ -118,6 +132,7 @@ def readTableStyle(index: ArchiveIndex, model: tst.TableModelArchive) -> TableSt
         **{field: readTableLine(chain, field) for field in lineFields},
         tableTitle=model.table_name_enabled,
         tableOutlineTitle=model.table_name_border_enabled,
+        bandedRows=readTableBand(chain),
     )
 
 
@@ -148,13 +163,22 @@ def composeVariationProperties(
             named.ClearField(name)
             if readStroke(getattr(root, name)) != line.stroke:
                 getattr(properties, name).CopyFrom(composed)
+    band = wanted.bandedRows
+    properties.ClearField("banded_rows")
+    if band.visible != root.banded_rows:
+        properties.banded_rows = band.visible
+    # A fill pybers only carries stays as stated, a color where it differs.
+    if isinstance(band.fill, Color):
+        properties.ClearField("banded_fill")
+        if readFill(root.banded_fill) != band.fill:
+            properties.banded_fill.color.CopyFrom(composeColor(band.fill))
     return properties
 
 
 def applyTableStyle(
     properties: tstStyles.TableStylePropertiesArchive, tableStyle: TableStyle
 ) -> None:
-    """State every line of a table style, as a root style states all of its own."""
+    """State every line and the band of a table style, as a root states its own."""
     for field, (visibleName, strokeNames) in lineFields.items():
         line: TableLine = getattr(tableStyle, field)
         if visibleName is not None:
@@ -164,6 +188,9 @@ def applyTableStyle(
         composed = composeStroke(line.stroke)
         for name in strokeNames:
             getattr(properties, name).CopyFrom(composed)
+    properties.banded_rows = tableStyle.bandedRows.visible
+    if isinstance(tableStyle.bandedRows.fill, Color):
+        properties.banded_fill.color.CopyFrom(composeColor(tableStyle.bandedRows.fill))
 
 
 def readThemeTableStyle(
@@ -175,6 +202,7 @@ def readThemeTableStyle(
         **{field: readTableLine(chain, field) for field in lineFields},
         tableTitle=False,
         tableOutlineTitle=False,
+        bandedRows=readTableBand(chain),
     )
 
 

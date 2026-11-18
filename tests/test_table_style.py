@@ -7,6 +7,8 @@ A table's lines, read from its table style and set as Numbers' controls set them
 with pybers must write the variation Numbers wrote, overriding exactly its fields.
 
 UPDATES
+2026-11-18  `readOverrides` moved to `conftest.py`, which the band tests share, for
+            PYB-267.
 2026-11-17  Written for PYB-266.
 """
 from __future__ import annotations
@@ -26,14 +28,12 @@ from pathlib import Path
 import pytest
 
 import pybers
-from conftest import findDocumentPath
+from conftest import findDocumentPath, readOverrides
 from pybers import CellBorderSide, Color, Stroke, StrokeDash, StrokeSolid
 from pybers._generated import TNArchives_pb2 as tn
-from pybers._generated import TSTArchives_pb2 as tst
 from pybers._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from pybers._persistence.container import readPackage, writePackage
 from pybers._persistence.index import ArchiveIndex, findRoot
-from pybers._persistence.types import readArchiveTypeId
 from pybers.table.tablestyle import (
     TableLine,
     TableStyle,
@@ -53,22 +53,6 @@ dashed = Stroke(
 def readTableStyleOf(stem: str, table: str) -> TableStyle:
     """Return the lines one table of a test document draws."""
     return pybers.open(findDocumentPath(stem)).table(table).tableStyle
-
-
-def readOverrides(path: Path, table: str) -> list[str]:
-    """Return the fields a table's own style variation states, none for the root."""
-    index = ArchiveIndex(readPackage(path))
-    for identifier, archive in index.byIdentifier.items():
-        if readArchiveTypeId(archive) != 6001:
-            continue
-        model = index.identifierResolve(identifier, tst.TableModelArchive)
-        if model.table_name == table:
-            style = index.resolve(model.table_style, tst.TableStyleArchive)
-            if not style.super.is_variation:
-                return []
-            stated = style.table_properties.ListFields()
-            return sorted(field.name for field, _ in stated)
-    raise AssertionError(f"{path.name} holds no table named {table}")
 
 
 @pytest.mark.parametrize(("table", "field"), [

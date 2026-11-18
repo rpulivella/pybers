@@ -7,6 +7,8 @@ tile's own offsets is how a claim about what Numbers stored is separated from a
 claim about what pybers decoded. Both had two copies before this module existed.
 
 UPDATES
+2026-11-18  `readOverrides`, the fields a table's style variation states, for
+            PYB-267.
 2026-11-09  `findShownFamily` and `checkFormatChosen`, a read cell's format, for
             PYB-145.
 2026-11-05  The worker count the parallel suite runs with, for PYB-277.
@@ -214,3 +216,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--golden-write", action="store_true",
         help="write each selected golden from tests/golden/builders.py",
     )
+
+
+def readOverrides(path: Path, table: str) -> list[str]:
+    """Return the fields a table's own style variation states, none for the root."""
+    index = ArchiveIndex(readPackage(path))
+    for identifier, archive in index.byIdentifier.items():
+        if readArchiveTypeId(archive) != 6001:
+            continue
+        model = index.identifierResolve(identifier, tst.TableModelArchive)
+        if model.table_name == table:
+            style = index.resolve(model.table_style, tst.TableStyleArchive)
+            if not style.super.is_variation:
+                return []
+            stated = style.table_properties.ListFields()
+            return sorted(field.name for field, _ in stated)
+    raise AssertionError(f"{path.name} holds no table named {table}")

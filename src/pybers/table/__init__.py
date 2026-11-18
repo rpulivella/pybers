@@ -66,6 +66,7 @@ from pybers.table.kinds import CellKind, CellPresentation
 from pybers.table.merges import MergeRange
 from pybers.table.rows import TableRow, TableRows
 from pybers.table.tablestyle import (
+    TableBand,
     TableLine,
     TableStyle,
     TableStyleChange,
@@ -91,6 +92,7 @@ __all__ = [
     "MergeRange",
     "Table",
     "TableHeaders",
+    "TableBand",
     "TableLine",
     "TableStyle",
     "TableStyleChange",
