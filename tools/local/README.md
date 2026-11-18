@@ -89,8 +89,8 @@ the inspector too, since only the inspector shows its settings.
 from `<name>.recipe.toml` beside it: a copy of `base` and any `documents`, then each
 `[[step]]` in order. Every step names its `document`, counted from 0, and the cell it
 acts on by `sheet`, `table` and `range`, which a recipe may name once at its top for every
-step. A `dataFormatSet` or `customFormatEdit` step
-reads back what it changed, so a control Numbers did not take stops the run.
+step. A `dataFormatSet`, `customFormatEdit`, `cellFillSet`, `tableBandSet` or
+`tableHeadersSet` step reads back what it changed, so a control Numbers did not take stops the run.
 
 ```
 select           select the range
@@ -105,9 +105,14 @@ drawableAdd      add a drawable to sheet: text item, shape, line, chart, or an i
 sheetAdd         add the sheet named by sheet, its table holding no header
 dataFormatSet    set one Data Format control, named by setting, to value
 customFormatEdit build a custom format, one part per step, named by setting
+cellFillSet      set one Fill control of the range's cells, named by setting, to value
+cellBackgroundSet give the range's cells the opaque color in value, such as #FF3B30
+tableBandSet     turn the table's Alternating Row Color on or off, as value says
+tableHeadersSet  set header row count, header column count or footer row count,
+                 named by setting, to the count in value
 ```
 
-`dataFormatSet` names a control by the label Numbers shows beside it, such as
+`dataFormatSet` and `cellFillSet` name a control by the label Numbers shows beside it, such as
 `Decimals`, or by its caption, such as `Minimum`. A control with neither is
 `Unlabeled PopUpButton 1`, counted in screen order. A menu that titles two items alike
 takes ` #2` after the title for the second. `customFormatEdit` parts are `Open`, `Name`,

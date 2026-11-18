@@ -8,9 +8,12 @@
 // It performs only the operations named in `HelperOperation` and never runs a script
 // or command it is given (PYB-94 AC 15). Every AppleScript it sends is written here,
 // and the only values a request places into one are paths, cell names and cell values
-// it escapes. A Data Format value is only matched against a menu item or typed into a field.
+// it escapes. An inspector value is only matched against a menu item or typed into a field,
+// and a color or a count is parsed before it reaches a script.
 //
 // UPDATES
+// 2026-11-18  Steps set a table's header counts, its Alternating Row Color, and a
+//             cell's fill, through scripting or the Fill section, for PYB-267.
 // 2026-11-16  Each cell's horizontal alignment is read, for PYB-292.
 // 2026-11-10  Each sheet capture is scanned for Numbers' blue corner chip, which marks a
 //             cell it changed or warns about, and a close-up of each is saved, for PYB-145.
@@ -117,6 +120,10 @@ enum EditAction: String, Codable {
     case drawableAdd
     case sheetAdd
     case customFormatEdit
+    case cellFillSet
+    case cellBackgroundSet
+    case tableBandSet
+    case tableHeadersSet
 }
 
 // `document` counts the request's `documentPaths` from zero; the first is the one saved.
@@ -609,23 +616,24 @@ func readAlertText(_ alerts: [AXUIElement]) -> [String] {
     }
 }
 
-func openCellTab(in window: AXUIElement) throws {
-    if findButton(in: window, role: kAXRadioButtonRole, description: "Cell") == nil,
+// A tab of the Format inspector, Cell or Table, which shows only while a table is selected.
+func openFormatTab(_ tab: String, in window: AXUIElement) throws {
+    if findButton(in: window, role: kAXRadioButtonRole, description: tab) == nil,
        let format = findButton(in: window, role: kAXRadioButtonRole, description: "Format") {
         AXUIElementPerformAction(format, kAXPressAction as CFString)
         Thread.sleep(forTimeInterval: 0.5)
     }
-    guard let cellTab = findButton(in: window, role: kAXRadioButtonRole, description: "Cell") else {
+    guard let tabButton = findButton(in: window, role: kAXRadioButtonRole, description: tab) else {
         // A screen that locks mid-run hides the inspector too, and says more than a language guess.
         if let locked = findSessionProblems().first { throw HelperFailure(problem: locked) }
         throw HelperFailure(problem: HelperProblem(
             kind: "language",
-            detail: "the inspector's Cell tab was not found, so Numbers may run in a language "
+            detail: "the inspector's \(tab) tab was not found, so Numbers may run in a language "
                 + "other than English",
             remedy: "set Numbers to English in System Settings, General, Language & Region, "
                 + "Applications, then rerun"))
     }
-    AXUIElementPerformAction(cellTab, kAXPressAction as CFString)
+    AXUIElementPerformAction(tabButton, kAXPressAction as CFString)
     Thread.sleep(forTimeInterval: 0.5)
 }
 
@@ -663,15 +671,24 @@ func readDataFormatControls(in window: AXUIElement) throws -> [DataFormatControl
                 + "\(Int(Double(windowAttempts) * retryPauseSeconds)) seconds",
             remedy: "rerun, then read helper.log"))
     }
+    return collectSectionControls(elements[(start + 1)...], firstPopUp: "Data Format")
+}
+
+// A section ends at a disclosure triangle or at the heading of the section below it.
+let sectionHeadings: Set<String> = ["Fill", "Border", "Conditional Highlighting"]
+
+func collectSectionControls(
+    _ elements: ArraySlice<AXUIElement>, firstPopUp: String
+) -> [DataFormatControl] {
     var section: [DataFormatControl] = []
-    for element in elements[(start + 1)...] {
+    for element in elements {
         let role = readText(element, kAXRoleAttribute)
         if role == kAXDisclosureTriangleRole { break }
-        if role == kAXStaticTextRole, ["Fill", "Border"].contains(readText(element, kAXValueAttribute)) {
+        if role == kAXStaticTextRole, sectionHeadings.contains(readText(element, kAXValueAttribute)) {
             break
         }
         guard [kAXStaticTextRole, kAXTextFieldRole, kAXPopUpButtonRole, kAXCheckBoxRole,
-               kAXRadioButtonRole].contains(role) else { continue }
+               kAXRadioButtonRole, kAXSliderRole].contains(role) else { continue }
         section.append(DataFormatControl(
             element: element, frame: readFrame(element) ?? .zero,
             reading: InspectorElement(
@@ -681,8 +698,40 @@ func readDataFormatControls(in window: AXUIElement) throws -> [DataFormatControl
                 value: readText(element, kAXValueAttribute))))
     }
     section = orderOnScreen(section)
-    nameDataFormatControls(&section)
+    nameSectionControls(&section, firstPopUp: firstPopUp)
     return section
+}
+
+// The Cell tab's Fill section, below Data Format, its heading a text or a disclosure triangle.
+func readFillControls(in window: AXUIElement) throws -> [DataFormatControl] {
+    let isFillHeading = { (element: AXUIElement) -> Bool in
+        let role = readText(element, kAXRoleAttribute)
+        return (role == kAXStaticTextRole && readText(element, kAXValueAttribute) == "Fill")
+            || (role == kAXDisclosureTriangleRole && readText(element, kAXTitleAttribute) == "Fill")
+    }
+    var elements = collectElements(window)
+    var rereads = 0
+    while !elements.contains(where: isFillHeading), rereads < windowAttempts {
+        Thread.sleep(forTimeInterval: retryPauseSeconds)
+        rereads += 1
+        elements = collectElements(window)
+    }
+    guard let start = elements.firstIndex(where: isFillHeading) else {
+        if let locked = findSessionProblems().first { throw HelperFailure(problem: locked) }
+        throw HelperFailure(problem: HelperProblem(
+            kind: "inspector",
+            detail: "the Cell tab showed no Fill section within "
+                + "\(Int(Double(windowAttempts) * retryPauseSeconds)) seconds",
+            remedy: "rerun, then read helper.log"))
+    }
+    // A collapsed section shows no controls, so its triangle is opened first.
+    if readText(elements[start], kAXRoleAttribute) == kAXDisclosureTriangleRole,
+       readText(elements[start], kAXValueAttribute) == "0" {
+        AXUIElementPerformAction(elements[start], kAXPressAction as CFString)
+        Thread.sleep(forTimeInterval: 0.5)
+        return try readFillControls(in: window)
+    }
+    return collectSectionControls(elements[(start + 1)...], firstPopUp: "Fill")
 }
 
 let rowTolerance: CGFloat = 8
@@ -707,17 +756,17 @@ func readDataFormat(in window: AXUIElement) throws -> [InspectorElement] {
 }
 
 // By position, since Currency lists its Decimals field last in the tree.
-func nameDataFormatControls(_ section: inout [DataFormatControl]) {
+func nameSectionControls(_ section: inout [DataFormatControl], firstPopUp: String) {
     let texts = section.filter { $0.reading.role == kAXStaticTextRole }
-    var namedDataFormat = false
+    var namedFirstPopUp = false
     var unlabeled = 0
     for position in section.indices where section[position].reading.role != kAXStaticTextRole {
         let control = section[position]
         let reading = control.reading
         let name: String
-        if reading.role == kAXPopUpButtonRole, !namedDataFormat {
-            name = "Data Format"
-            namedDataFormat = true
+        if reading.role == kAXPopUpButtonRole, !namedFirstPopUp {
+            name = firstPopUp
+            namedFirstPopUp = true
         } else if reading.role == kAXCheckBoxRole {
             name = (reading.title.isEmpty ? reading.label : reading.title)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1041,13 +1090,16 @@ func choosePopUpItem(_ popUp: AXUIElement, title choice: String, setting: String
 }
 
 // Read back afterward, so a control Numbers did not take fails the step rather than the fixture.
-func setDataFormatControl(_ setting: String, to value: String, in window: AXUIElement) throws {
-    let section = try readDataFormatControls(in: window)
+func setSectionControl(
+    _ setting: String, to value: String, section name: String,
+    read: () throws -> [DataFormatControl]
+) throws {
+    let section = try read()
     guard let control = section.first(where: { $0.reading.setting == setting }) else {
         throw HelperFailure(problem: HelperProblem(
-            kind: "dataFormat",
-            detail: "no Data Format setting '\(setting)' among: " + describeDataFormat(section),
-            remedy: "name a setting the Data Format section shows for this format, then rerun"))
+            kind: "inspector",
+            detail: "no \(name) setting '\(setting)' among: " + describeDataFormat(section),
+            remedy: "name a setting the \(name) section shows, then rerun"))
     }
     switch control.reading.role {
     case kAXPopUpButtonRole:
@@ -1062,21 +1114,79 @@ func setDataFormatControl(_ setting: String, to value: String, in window: AXUIEl
         AXUIElementPerformAction(control.element, kAXConfirmAction as CFString)
     default:
         throw HelperFailure(problem: HelperProblem(
-            kind: "dataFormat",
+            kind: "inspector",
             detail: "'\(setting)' is a \(control.reading.role), which a step cannot set",
             remedy: "set a pop-up, a checkbox, a radio button or a field"))
     }
     Thread.sleep(forTimeInterval: 1.0)
-    let after = try readDataFormatControls(in: window)
+    let after = try read()
     let wanted = control.reading.role == kAXPopUpButtonRole ? readItemChoice(value).title : value
     guard let shown = after.first(where: { $0.reading.setting == setting }), shown.reading.value == wanted
     else {
         throw HelperFailure(problem: HelperProblem(
-            kind: "dataFormat",
-            detail: "'\(setting)' was set to '\(value)', and the section now reads: "
+            kind: "inspector",
+            detail: "'\(setting)' was set to '\(value)', and the \(name) section now reads: "
                 + describeDataFormat(after),
             remedy: "spell the value as the section reads it, then rerun"))
     }
+}
+
+let bandCheckBoxName = "Alternating Row Color"
+
+// The Table tab names the checkbox by its title or its description, so either matches.
+func findBandCheckBox(in window: AXUIElement) -> AXUIElement? {
+    collectElements(window).first {
+        readText($0, kAXRoleAttribute) == kAXCheckBoxRole
+            && [readText($0, kAXTitleAttribute), readText($0, kAXDescriptionAttribute)]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.contains(bandCheckBoxName)
+    }
+}
+
+func setTableBand(_ value: String, in window: AXUIElement) throws {
+    guard let wanted = ["on": "1", "off": "0"][value] else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "request", detail: "a tableBandSet step takes on or off, and was given '\(value)'",
+            remedy: "give on or off as the step's value"))
+    }
+    try openFormatTab("Table", in: window)
+    var checkBox = findBandCheckBox(in: window)
+    var rereads = 0
+    while checkBox == nil, rereads < windowAttempts {
+        Thread.sleep(forTimeInterval: retryPauseSeconds)
+        rereads += 1
+        checkBox = findBandCheckBox(in: window)
+    }
+    guard let checkBox else {
+        if let locked = findSessionProblems().first { throw HelperFailure(problem: locked) }
+        let boxes = collectElements(window).filter { readText($0, kAXRoleAttribute) == kAXCheckBoxRole }
+            .map { "'\(readText($0, kAXTitleAttribute))' / '\(readText($0, kAXDescriptionAttribute))'" }
+        throw HelperFailure(problem: HelperProblem(
+            kind: "inspector",
+            detail: "the Table tab holds no '\(bandCheckBoxName)' checkbox, among: "
+                + boxes.joined(separator: ", "),
+            remedy: "correct bandCheckBoxName in the helper, then rebuild it"))
+    }
+    if readText(checkBox, kAXValueAttribute) != wanted {
+        AXUIElementPerformAction(checkBox, kAXPressAction as CFString)
+        Thread.sleep(forTimeInterval: 1.0)
+    }
+    guard readText(checkBox, kAXValueAttribute) == wanted else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "inspector",
+            detail: "'\(bandCheckBoxName)' was pressed and still reads '\(readText(checkBox, kAXValueAttribute))'",
+            remedy: "select a cell of the table before the step, then rerun"))
+    }
+}
+
+// Each table property a step may set, by the name Numbers' scripting gives it.
+let tableHeaderProperties: Set<String> = ["header row count", "header column count", "footer row count"]
+
+// `#RRGGBB` as the 16-bit components Numbers' scripting takes, or nil for any other text.
+func readHexColor(_ text: String) -> [Int]? {
+    guard text.count == 7, text.first == "#", let packed = Int(text.dropFirst(), radix: 16) else {
+        return nil
+    }
+    return [packed >> 16, (packed >> 8) & 0xFF, packed & 0xFF].map { $0 * 257 }
 }
 
 // MARK: Capture
@@ -1567,7 +1677,7 @@ func inspectDocument(
             continue
         }
         try selectCell(address, documentId: documentId)
-        try openCellTab(in: window)
+        try openFormatTab("Cell", in: window)
         reading.dataFormat = try readDataFormat(in: window)
         let path = (captureDirectory as NSString).appendingPathComponent(
             formatCaptureName(["cell", address.sheet, address.table, address.cell]))
@@ -1712,17 +1822,24 @@ func pressMenuItem(_ item: EditMenuItem, pid: pid_t) throws {
     Thread.sleep(forTimeInterval: 1.0)
 }
 
-func formatRangeReference(_ step: EditStep, documentId: String) throws -> (table: String, range: String) {
-    guard let sheet = step.sheet, let table = step.table, let range = step.range else {
+func formatTableReference(_ step: EditStep, documentId: String) throws -> String {
+    guard let sheet = step.sheet, let table = step.table else {
         throw HelperFailure(problem: HelperProblem(
-            kind: "request", detail: "a \(step.action.rawValue) step needs a sheet, a table and a range",
+            kind: "request", detail: "a \(step.action.rawValue) step needs a sheet and a table",
             remedy: "run the helper only through the golden confirmation"))
     }
-    let document = "document id \(quoteAppleScript(documentId))"
-    return (
-        "table \(quoteAppleScript(table)) of sheet \(quoteAppleScript(sheet)) of \(document)",
-        "range \(quoteAppleScript(range))"
-    )
+    return "table \(quoteAppleScript(table)) of sheet \(quoteAppleScript(sheet)) "
+        + "of document id \(quoteAppleScript(documentId))"
+}
+
+func formatRangeReference(_ step: EditStep, documentId: String) throws -> (table: String, range: String) {
+    let table = try formatTableReference(step, documentId: documentId)
+    guard let range = step.range else {
+        throw HelperFailure(problem: HelperProblem(
+            kind: "request", detail: "a \(step.action.rawValue) step needs a range",
+            remedy: "run the helper only through the golden confirmation"))
+    }
+    return (table, "range \(quoteAppleScript(range))")
 }
 
 // Only letters then digits parse, so nothing else from a request reaches the script.
@@ -1758,8 +1875,49 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
                 remedy: "run the helper only through the golden confirmation"))
         }
         try selectRange(step, documentId: documentId)
-        try openCellTab(in: window)
-        try setDataFormatControl(setting, to: value, in: window)
+        try openFormatTab("Cell", in: window)
+        try setSectionControl(setting, to: value, section: "Data Format") {
+            try readDataFormatControls(in: window)
+        }
+    case .cellFillSet:
+        guard let setting = step.setting, let value = step.value else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a cellFillSet step needs a setting and a value",
+                remedy: "name a Fill control, such as Fill, and the value to give it"))
+        }
+        try selectRange(step, documentId: documentId)
+        try openFormatTab("Cell", in: window)
+        try setSectionControl(setting, to: value, section: "Fill") { try readFillControls(in: window) }
+    case .cellBackgroundSet:
+        let (table, range) = try formatRangeReference(step, documentId: documentId)
+        guard let color = step.value.flatMap(readHexColor) else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a cellBackgroundSet step needs a color such as #FF3B30",
+                remedy: "give the color as # and six hex digits"))
+        }
+        _ = try runAppleScript(
+            "set t to \(table)\nset background color of \(range) of t to "
+                + "{\(color.map(String.init).joined(separator: ", "))}")
+    case .tableBandSet:
+        try selectRange(step, documentId: documentId)
+        try setTableBand(step.value ?? "", in: window)
+    case .tableHeadersSet:
+        let table = try formatTableReference(step, documentId: documentId)
+        guard let property = step.setting, tableHeaderProperties.contains(property),
+              let count = step.value.flatMap({ Int($0) }), count >= 0 else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request",
+                detail: "a tableHeadersSet step needs a count and one of: "
+                    + tableHeaderProperties.sorted().joined(separator: ", "),
+                remedy: "name the property as its setting and the count as its value"))
+        }
+        let read = try runAppleScript("set t to \(table)\nset \(property) of t to \(count)\nget \(property) of t")
+        guard read.int32Value == count else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "inspector",
+                detail: "\(property) was set to \(count) and reads \(read.int32Value)",
+                remedy: "check the table holds enough rows and columns, then rerun"))
+        }
     case .customFormatEdit:
         guard let part = step.setting else {
             throw HelperFailure(problem: HelperProblem(
@@ -1768,7 +1926,7 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
         }
         if part == "Open" {
             try selectRange(step, documentId: documentId)
-            try openCellTab(in: window)
+            try openFormatTab("Cell", in: window)
             try openCustomFormat(in: window)
         } else {
             try editCustomFormat(part, value: step.value ?? "", in: window)
