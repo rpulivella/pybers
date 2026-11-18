@@ -24,7 +24,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 import pybers
-from conftest import copyDocument, findDocumentPath, listShownFields
+from conftest import copyDocument, findDocumentPath, listShownFields, readPlainText
 from pybers.cli._app import app
 from pybers.cli.set import borderPositions, borderStyles
 
@@ -107,7 +107,7 @@ def testABorderPybersCannotDrawIsRefused(
     before = working.read_bytes()
     result = runSetCommand(str(working), "::Table 1::A1", *arguments)
     assert result.exit_code != 0
-    assert message in " ".join((result.stdout + result.stderr).split())
+    assert message in readPlainText(result.output)
     assert working.read_bytes() == before
 
 
