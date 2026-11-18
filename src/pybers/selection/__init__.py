@@ -25,7 +25,6 @@ from pybers.selection.selector import (
     Selector,
     SelectorError,
     SelectorLike,
-    quoteSelectorName,
 )
 
 __all__ = [
@@ -33,5 +32,4 @@ __all__ = [
     "Selector",
     "SelectorError",
     "SelectorLike",
-    "quoteSelectorName",
 ]

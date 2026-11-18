@@ -805,7 +805,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheetName": {
           "anyOf": [
@@ -1055,7 +1055,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -1141,7 +1141,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -1498,7 +1498,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheetName": {
           "anyOf": [
@@ -1561,7 +1561,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1771,6 +1771,36 @@
       ],
       "additionalProperties": false
     },
+    "TableBand": {
+      "type": "object",
+      "description": "Whether a table bands its rows, and the fill it bands with, kept while off.",
+      "properties": {
+        "visible": {
+          "type": "boolean"
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "$ref": "#/$defs/FillGradient"
+            },
+            {
+              "$ref": "#/$defs/FillImage"
+            },
+            {
+              "$ref": "#/$defs/FillNone"
+            }
+          ]
+        }
+      },
+      "required": [
+        "visible",
+        "fill"
+      ],
+      "additionalProperties": false
+    },
     "TableEntry": {
       "type": "object",
       "description": "One table of the document a part came from, as its formulas name and size it.",
@@ -1874,7 +1904,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 7
+          "const": 8
         },
         "sheetName": {
           "anyOf": [
@@ -1930,7 +1960,7 @@
     },
     "TableStyle": {
       "type": "object",
-      "description": "The lines a table draws, each region named for what it draws.",
+      "description": "The lines a table draws, each region named for what it draws, and its band.",
       "properties": {
         "bodyHorizontalGridlines": {
           "$ref": "#/$defs/TableLine"
@@ -1973,6 +2003,9 @@
         },
         "tableOutlineTitle": {
           "type": "boolean"
+        },
+        "bandedRows": {
+          "$ref": "#/$defs/TableBand"
         }
       },
       "required": [
@@ -1989,7 +2022,8 @@
         "footerRowsSeparator",
         "tableOutline",
         "tableTitle",
-        "tableOutlineTitle"
+        "tableOutlineTitle",
+        "bandedRows"
       ],
       "additionalProperties": false
     }

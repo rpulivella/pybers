@@ -61,12 +61,13 @@ def countLineRecords(
     rows: Counter[int] = Counter()
     columns: Counter[int] = Counter()
     for stored in readStoredTiles(index, store):
-        row = stored.row if maps is None else maps.rows.lineMap(stored.row)
+        row = stored.row if maps is None else maps.rows.storedLineMap(stored.row)
         if row is None:
             continue
         for record in stored.records:
             column = (
-                record.column if maps is None else maps.columns.lineMap(record.column)
+                record.column if maps is None
+                else maps.columns.storedLineMap(record.column)
             )
             if column is None:
                 continue
@@ -94,7 +95,7 @@ def remapHeaders(
     placed: list[list[tst.HeaderStorageBucket.Header]] = [[] for _ in buckets]
     for bucket in buckets:
         for header in bucket.headers:
-            moved = lines.lineMap(header.index)
+            moved = lines.storedLineMap(header.index)
             if moved is None:
                 continue
             copy = tst.HeaderStorageBucket.Header()

@@ -3,6 +3,7 @@
 The rule each value follows in the JSON form, and what reading one refuses.
 
 UPDATES
+2026-11-18  A malformed form states the current version, for PYB-267.
 2026-11-06  Version 4, for PYB-264.
 2026-10-28  Version 2, whose document names its locale, for PYB-272.
 2026-10-27  A range narrowing a table may name it, and not another, for
@@ -223,11 +224,11 @@ def testAValueOfTheWrongKindIsRefusedNamingWhatItMustBe() -> None:
     ('{"jsonFormVersion": 1, "jsonFormVersion": 1}', "appears twice"),
     ('{"jsonFormVersion": NaN}', "no number NaN"),
     ('{"jsonFormVersion": 99, "document": {"sheets": []}}', "jsonFormVersion being 99"),
-    ('{"jsonFormVersion": 7, "document": {"localeIdentifier": null, "sheets": [], '
-     '"extra": 1}}', "no key 'extra'"),
-    ('{"jsonFormVersion": 7, "document": {"localeIdentifier": null}}',
-     "sheets is missing"),
-    ('{"jsonFormVersion": 7, "document": {"sheets": []}}',
+    (f'{{"jsonFormVersion": {pybers.jsonFormVersion}, "document": '
+     '{"localeIdentifier": null, "sheets": [], "extra": 1}}', "no key 'extra'"),
+    (f'{{"jsonFormVersion": {pybers.jsonFormVersion}, "document": '
+     '{"localeIdentifier": null}}', "sheets is missing"),
+    (f'{{"jsonFormVersion": {pybers.jsonFormVersion}, "document": {{"sheets": []}}}}',
      "localeIdentifier is missing"),
 ])
 def testTextThatIsNotTheFormIsRefusedSayingWhy(text: str, refusal: str) -> None:

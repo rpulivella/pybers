@@ -4,6 +4,8 @@ The engine's cell-keyed records a structural edit or a moved block carries, whic
 registration rewrites.
 
 UPDATES
+2026-11-18  `StoredLineMapping`, named apart from the map counted from one, for
+            PYB-267.
 2026-11-02  An owner carrying no extent, as a created table's does, keeps none,
             for PYB-276.
 2026-09-23  Every record follows a mapping of cells, so a moved block reuses what a
@@ -27,7 +29,7 @@ from .._generated import TSCEArchives_pb2 as tsce
 from ..errors import WriteError
 
 
-class LineMapping(Protocol):
+class StoredLineMapping(Protocol):
     """Where each stored row, or each stored column, of a table lands after an edit.
 
     Named here as a shape rather than imported, so the engine knows no table type.
@@ -38,11 +40,11 @@ class LineMapping(Protocol):
         """Return how many lines the edit added, less how many it removed."""
         ...
 
-    def lineMap(self, line: int) -> int | None:
+    def storedLineMap(self, line: int) -> int | None:
         """Return where one stored line lands, or None when the edit removed it."""
         ...
 
-    def spanCut(self, begin: int, end: int) -> bool:
+    def storedSpanCut(self, begin: int, end: int) -> bool:
         """Report whether the edit removes a line of a span or adds one inside it."""
         ...
 
@@ -173,8 +175,8 @@ def remapOwnerCells(
 
 def remapOwnerCoordinates(
     dependencies: tsce.FormulaOwnerDependenciesArchive,
-    rows: LineMapping,
-    columns: LineMapping,
+    rows: StoredLineMapping,
+    columns: StoredLineMapping,
     name: str,
 ) -> None:
     """Move the engine's cell-keyed records through rows or columns added or removed.
@@ -182,13 +184,13 @@ def remapOwnerCoordinates(
     The table's own extent follows its size as well.
     """
     def cellMap(row: int, column: int) -> tuple[int, int] | None:
-        movedRow, movedColumn = rows.lineMap(row), columns.lineMap(column)
+        movedRow, movedColumn = rows.storedLineMap(row), columns.storedLineMap(column)
         if movedRow is None or movedColumn is None:
             return None
         return (movedRow, movedColumn)
 
     def spillCut(row: int, column: int, height: int, width: int) -> bool:
-        return rows.spanCut(row, row + height - 1) or columns.spanCut(
+        return rows.storedSpanCut(row, row + height - 1) or columns.storedSpanCut(
             column, column + width - 1
         )
 
@@ -235,7 +237,7 @@ def moveOwnerCoordinates(
 
 
 __all__ = [
-    "LineMapping",
+    "StoredLineMapping",
     "moveOwnerCoordinates",
     "remapOwnerCoordinates",
 ]

@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-18  `cellFillShown`, the fill a cell displays, its banded row's included,
+            for PYB-267.
 2026-11-17  `tableStyle`, the lines a table draws, and `tableStyleSet`, for
             PYB-266.
 2026-11-17  The table's borders, kept by row and column identity, for PYB-266.
@@ -81,7 +83,6 @@ from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
     CellReferenceLike,
-    ReferenceError,
     SheetReference,
     TableReference,
     firstColumn,
@@ -89,9 +90,11 @@ from pybers.addressing.reference import (
     toCellReference,
     toCellReferenceNamed,
 )
+from pybers.addressing.text import ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
+from pybers.style.fills import Fill
 from pybers.style.strokes import Stroke
 from pybers.table.borders import (
     CellBorders,
@@ -117,6 +120,7 @@ from pybers.table.tablestyle import (
     TableStyle,
     TableStyleChange,
     buildTableStyle,
+    findShownFill,
     resetTableStyle,
 )
 
@@ -246,7 +250,9 @@ class Table:
         already draws changes nothing and writes nothing.
         """
         before = self._tableStyle
-        after = buildTableStyle(before if tableStyle is None else tableStyle, lines)
+        after = buildTableStyle(
+            before if tableStyle is None else tableStyle, lines, before
+        )
         self._tableStyle = after
         return TableStyleChange(self.reference, before, after)
 
@@ -566,6 +572,14 @@ class Table:
         draws nothing; else the table's own line for that edge, while it shows.
         """
         return findShownLine(self, self._addressResolve(address), side)
+
+    def cellFillShown(self, address: CellReferenceLike) -> Fill:
+        """Return the fill a cell displays, `FillNone` where it displays none.
+
+        A fill the cell states prevails, then the band on its body row, then its
+        region's.
+        """
+        return findShownFill(self, self._addressResolve(address))
 
     def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.

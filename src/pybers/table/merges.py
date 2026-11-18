@@ -23,8 +23,8 @@ from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
     CellAddress,
     CellReferenceLike,
-    ReferenceError,
 )
+from pybers.addressing.text import ReferenceError
 
 
 @dataclass(frozen=True, slots=True)

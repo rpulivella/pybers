@@ -34,7 +34,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 
 A command parses its arguments, calls the library once, formats what comes back, and chooses the exit status. Nothing else, so a script and a command never disagree.
 
-- **Selectors** are positional, quoted in the shell, and parsed by the library, the one syntax `library-design.md` sets out under Addresses. Tab completion offers the sheet and table names of the file being typed.
+- **Selectors** are positional, quoted in the shell, and parsed by the library, the one syntax `library-design.md` sets out under Addresses. A reference a command prints is that syntax, each name escaped, so it pastes back as a selector. Tab completion offers the sheet and table names of the file being typed.
 - **A command prints every part a selector matches, each as it prints alone.** `show` prints each part, and `set` each cell it wrote, exactly as `show` prints that part, so a part reads the same whatever reached it. A selector's JSON is always an array of those parts' forms, which `parseJsonForm` reads back.
 - **JSON on stdout reads back, and a diagnostic goes to stderr.** A part a write skipped prints `Skipped:` and its reason on stderr, as `Written:` does, so `--format json` never mixes a report into the data.
 - **Each command has one default format** that does not change when its output is piped. A terminal only turns color on. `--format` chooses another, and `-o FILE` infers it from the extension.
@@ -56,7 +56,7 @@ A command parses its arguments, calls the library once, formats what comes back,
   pybers set budget.numbers 'Budget::Q3::B2:D9' --border outer --border-style dashed --border-width 1pt --border-color black
   pybers set budget.numbers 'Budget::Q3::B2:D9' --border all --border-style none
   ```
-- **`set --table-style STYLE`** sets the lines of every table a selector matches, STYLE being CSS declarations, one per line a table draws: `body-horizontal-gridlines`, `body-vertical-gridlines`, `header-rows-horizontal-gridlines`, `header-rows-vertical-gridlines`, `header-columns-horizontal-gridlines`, `header-columns-vertical-gridlines`, `footer-rows-horizontal-gridlines`, `footer-rows-vertical-gridlines`, `header-rows-separator`, `header-columns-separator`, `footer-rows-separator` and `table-outline`, each `width style color` or `none`, and `table-title` and `table-outline-title`, each `yes` or `no`. The lines between two header rows, two header columns or two footer rows take a stroke but never `none`, since no Numbers control hides them. A longhand such as `table-outline-color` changes one part of a line. `show` prints a table's style as these declarations, one per line, so a line pastes back, and `hidden` before a stroke marks a line set to none whose stroke is kept.
+- **`set --table-style STYLE`** sets the lines of every table a selector matches, STYLE being CSS declarations, one per line a table draws: `body-horizontal-gridlines`, `body-vertical-gridlines`, `header-rows-horizontal-gridlines`, `header-rows-vertical-gridlines`, `header-columns-horizontal-gridlines`, `header-columns-vertical-gridlines`, `footer-rows-horizontal-gridlines`, `footer-rows-vertical-gridlines`, `header-rows-separator`, `header-columns-separator`, `footer-rows-separator` and `table-outline`, each `width style color` or `none`, and `table-title` and `table-outline-title`, each `yes` or `no`, and `banded-rows`, a color or `none`, with `banded-rows-background` setting the color alone. The lines between two header rows, two header columns or two footer rows take a stroke but never `none`, since no Numbers control hides them. A longhand such as `table-outline-color` changes one part of a line. `show` prints a table's style as these declarations, one per line, so a line pastes back, and `hidden` before a stroke or a band's color marks one set to none whose stroke or color is kept.
 
   ```bash
   pybers set budget.numbers 'Budget::Q3' --table-style 'body-vertical-gridlines: none; body-horizontal-gridlines: 0.5pt solid #8e8e93ff; table-outline: 1pt dashed black'
@@ -91,7 +91,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 
 ## Errors
 
-- **A refusal is one line on stderr**, naming the command, the file and the reason the library's error gives: `pybers check: /tmp/a.numbers does not exist.`
+- **A refusal is one line on stderr**, the command and then the reason the library's error gives, which names the file only where the file is at fault: `pybers check: /tmp/a.numbers does not exist.`, `pybers set: Numbers cannot band rows with a gradient.`
 - **A refused choice names the closest valid one**, `'table-border' is not a table line. The closest is table-outline.`, and where none is close, says where every choice is: `` `pybers set --help` provides a complete list.`` A message lists its choices only when there are five or fewer, and `--help` lists every one. `pybers.composeChoiceRefusal` writes every such message.
 - **A message the command writes itself** follows the library's rule for wording an error.
 - **`--debug`, or `PYBERS_DEBUG=1`, replaces that line with the full traceback.** Tracebacks never show local variables, because one can hold a cell's value.

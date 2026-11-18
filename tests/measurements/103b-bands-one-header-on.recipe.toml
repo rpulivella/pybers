@@ -1,0 +1,13 @@
+# How Numbers makes 103b-bands-one-header-on: `103-bands-one-header-base` with Alternating
+# Row Color turned on, its color as offered. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 103b-bands-one-header-on`.
+
+base = "103-bands-one-header-base"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableBandSet"
+range = "B3"
+value = "on"

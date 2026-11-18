@@ -38,7 +38,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pybers.addressing.ranges import CellRange, CellRangeLike
-from pybers.addressing.reference import CellAddress, ReferenceError
+from pybers.addressing.reference import CellAddress
+from pybers.addressing.text import ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation, relocateFormula
 from pybers.table.bounds import listRangePositions
 from pybers.table.kinds import CellKind

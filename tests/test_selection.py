@@ -242,8 +242,8 @@ def testANameIsMatchedInPartWithWildcards(
 def testAnEscapedCharacterIsTakenLiterally() -> None:
     document = pybers.create("en_US")
     document.sheetAdd("Q3, draft*")
-    assert listWritten(document.select("Q3\\, draft\\*")) == ["Q3, draft*"]
-    assert pybers.quoteSelectorName("Q3, draft*") == "Q3\\, draft\\*"
+    assert listWritten(document.select("Q3\\, draft\\*")) == ["Q3\\, draft\\*"]
+    assert pybers.escapeSelectorName("Q3, draft*") == "Q3\\, draft\\*"
 
 
 # AC 12

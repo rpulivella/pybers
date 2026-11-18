@@ -47,11 +47,11 @@ from pybers.addressing.lines import GridEdit
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import (
     CellAddress,
-    ReferenceError,
     lastColumn,
     lastRow,
     toColumnNumber,
 )
+from pybers.addressing.text import ReferenceError
 from pybers.formula.nodes import Formula
 from pybers.formula.restructure import FormulaRestructure, mapFormula
 from pybers.table.headers import mapHeaders, refuseHeadersUnfit

@@ -348,6 +348,8 @@ a header, and the table-structure read and JSON export answer to the same select
 rejected, because a table sharing a sheet's name is then reachable only by accident, and an
 agent cannot tell from the text alone what it will select.
 
+**A reference has one text form, which every reader reads.** `pybers.addressing.text` escapes each name and joins the names with `::`, and every reference type, the selector parser and the typed lookups read that text through it. A path reads back from its own string, and a reference printed in one form and read in another drifted once: `document.table` refused the `Sheet 1::Table 1` its own refusal offered, and a sheet named `Budget, draft*` printed text that read as two selector groups. Escaping every character the selector treats specially, rather than `::` alone, makes a printed reference an exact selector too, so one text serves a script, a command and an agent. Numbers' formula text is a grammar of its own and keeps Numbers' form.
+
 **One resolver, written in its simplest form.** It walks the sheets, tables and cells a
 selector reaches and parses the text on each call. The typed lookups, `document.sheet`,
 `document.table`, `sheet.table` and `table.cell`, are one-group selections through it,

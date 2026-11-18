@@ -10,6 +10,7 @@ so no golden is made any other way. A test asserting what a golden holds reads i
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-18  `00-created-rows-banded-by-pybers`, a table's banded rows, for PYB-267.
 2026-11-10  A label names a format or control a golden changed over the same value,
             for PYB-145.
 2026-11-03  A golden setting a created table's headers, for PYB-223.
@@ -927,6 +928,42 @@ def setDeepBandLines(document: pybers.Document) -> None:
         table.cell("C2").value = declarations or "the reset, unchanged"
 
 
+# ── PYB-267: a table's banded rows ──────────────────────────────────────────
+
+bandCases: tuple[tuple[str, str], ...] = (
+    ("Reset", ""),
+    ("Gray", "banded-rows: color(srgb 0.9601849 0.9601849 0.9601849 / 1)"),
+    ("Yellow", "banded-rows: #ffd60aff"),
+    ("Translucent", "banded-rows: color(srgb 1 0.23137255 0.1882353 / 0.5)"),
+    ("Off keeping yellow", "banded-rows: hidden #ffd60aff"),
+)
+
+
+def setBandedRows(document: pybers.Document) -> None:
+    """Band each table as the declaration in B2 states, and one with headers and fills.
+
+    `Headers` has one header row, one header column and a footer row on a banded
+    position, none of them filled, and C3 on a banded row filled red.
+    """
+    for name, declarations in bandCases:
+        table = document.sheet().tableAdd(name, rows=7, cols=3)
+        table.headersSet(headerRows=1)
+        if declarations:
+            table.tableStyleSet(pybers.parseTableStyle(declarations, table.tableStyle))
+        table.cell("B1").value = Decimal(1)
+        table.cell("B2").value = declarations or "the reset, unchanged"
+    table = document.sheet().tableAdd("Headers", rows=7, cols=4)
+    table.headersSet(headerRows=1, headerColumns=1, footerRows=1)
+    table.tableStyleSet(pybers.parseTableStyle(
+        "banded-rows: #ffd60aff", table.tableStyle
+    ))
+    document.cellSet("::Headers::C3", cellStyle=pybers.CellStyle(background=red))
+    table.cell("B2").value = "banded-rows: #ffd60aff"
+    table.cell("C2").value = "C3 background: #ff0000ff"
+    table.cell("A3").value = "header column, banded row"
+    table.cell("A7").value = "footer, banded position"
+
+
 def editBorderedLines(document: pybers.Document) -> None:
     """Add and remove a row inside a red line, and move an empty bordered cell."""
     sheet = document.sheet()
@@ -996,6 +1033,8 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
                   labeled=True),
     GoldenBuilder("00-created-table-lines-deep-bands-by-pybers", None,
                   setDeepBandLines, labeled=True),
+    GoldenBuilder("00-created-rows-banded-by-pybers", None, setBandedRows,
+                  labeled=True),
 )
 
 # No golden joins this tuple, since one added from a measurement states its own reason.

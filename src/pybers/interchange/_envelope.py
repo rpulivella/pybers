@@ -10,6 +10,7 @@ tables, against which its formulas' text is read.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-18  Version 8: a reference escapes each name it writes, for PYB-267.
 2026-11-17  Version 7, a cell's borders, for PYB-266.
 2026-11-12  Version 6, a cell carrying `cellStyle`, for PYB-265.
 2026-11-09  Version 5, a format a member of its family, Automatic holding the one
@@ -40,7 +41,7 @@ from pybers.interchange._tree import jsonFormConst
 from pybers.table._form import TableForm
 
 # Any change to the form's shape is a new version, recorded in `docs/decisions.md`.
-jsonFormVersion: Final[int] = 7
+jsonFormVersion: Final[int] = 8
 
 
 @dataclass(frozen=True, slots=True)

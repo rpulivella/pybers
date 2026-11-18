@@ -1,0 +1,125 @@
+# How Numbers makes 104-bands-merged-base: a table of 1 header row and 6 body rows, each
+# column merging cells across banded and unbanded rows as its label says, awaiting
+# Alternating Row Color. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 104-bands-merged-base`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+
+[[step]]
+action = "tableExtend"
+range = "G7"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header row count"
+value = "1"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header column count"
+value = "0"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "footer row count"
+value = "0"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "rows"
+
+[[step]]
+action = "valueSet"
+range = "A2"
+value = "body row 1"
+
+[[step]]
+action = "valueSet"
+range = "A3"
+value = "body row 2"
+
+[[step]]
+action = "valueSet"
+range = "A4"
+value = "body row 3"
+
+[[step]]
+action = "valueSet"
+range = "A5"
+value = "body row 4"
+
+[[step]]
+action = "valueSet"
+range = "A6"
+value = "body row 5"
+
+[[step]]
+action = "valueSet"
+range = "A7"
+value = "body row 6"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "unbanded anchor"
+
+[[step]]
+action = "valueSet"
+range = "B2"
+value = "input as B2:B3 merged"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "banded anchor"
+
+[[step]]
+action = "valueSet"
+range = "C2"
+value = "input as C3:C4 merged"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "three rows"
+
+[[step]]
+action = "valueSet"
+range = "D2"
+value = "input as D4:D6 merged"
+
+[[step]]
+action = "valueSet"
+range = "E1"
+value = "one banded row"
+
+[[step]]
+action = "valueSet"
+range = "E2"
+value = "input as E5:F5 merged"
+
+[[step]]
+action = "valueSet"
+range = "G1"
+value = "empty"
+
+[[step]]
+action = "cellsMerge"
+range = "B2:B3"
+
+[[step]]
+action = "cellsMerge"
+range = "C3:C4"
+
+[[step]]
+action = "cellsMerge"
+range = "D4:D6"
+
+[[step]]
+action = "cellsMerge"
+range = "E5:F5"

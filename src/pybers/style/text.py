@@ -71,14 +71,14 @@ def formatCellStyle(cellStyle: CellStyle) -> str:
     return "; ".join(f"{name}: {value}" for name, value in declarations if value)
 
 
-def parseFill(text: str) -> Fill:
-    """Return the fill a CSS background value specifies, a color or a fill's type."""
+def parseFill(text: str, name: str = "background") -> Fill:
+    """Return the fill a CSS value specifies, a color or a fill's type, for `name`."""
     if text in otherFills:
         return otherFills[text]
     try:
         return Color.parse(text)
     except ColorError as exc:
-        raise CellStyleError(f"background: {exc}") from exc
+        raise CellStyleError(f"{name}: {exc}") from exc
 
 
 def parseLength(text: str, name: str) -> Decimal:

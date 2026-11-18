@@ -64,6 +64,14 @@ pybers set budget.numbers "Summary::Costs" --table-style "body-vertical-gridline
 pybers set budget.numbers "Summary::Costs" --table-style "table-outline-color: #ff3b30ff; table-outline-title: yes"
 ```
 
+`banded-rows` colors every second body row, counted from the first, beneath any fill a cell has of its own, and never a header or footer row. It takes a color, or `none` to turn banding off, which keeps the color for the next time it is on, and `banded-rows-background` changes the color alone. `pybers show` prints a band that is off as `hidden` and its color:
+
+```bash
+pybers set budget.numbers "Summary::Costs" --table-style "banded-rows: #f2f2f7ff"
+pybers set budget.numbers "Summary::Costs" --table-style "banded-rows: none"
+pybers show budget.numbers "Summary::Costs" | grep banded-rows   # banded-rows: hidden #f2f2f7ff
+```
+
 A format applies to every cell a range holds, an empty one included, as Numbers keeps it for whatever is typed in later. A formula takes its format whatever its result, and Numbers shows it whenever the result is of the format's kind. pybers sets each family the Data Format menu offers as its own ticket adds it, so for now a format is Automatic or the family Automatic picks for the value, and a control can be removed but not yet given. Anything else is refused by name before anything is written.
 
 A date is stored as wall-clock time, as Numbers stores it. One given with an offset, such as `2026-10-20T16:00Z`, is written as the time it was in the zone pybers is running in, or in the zone `--time-zone America/New_York` specifies.
@@ -380,6 +388,16 @@ print(pybers.formatCellBorders(costs.cell("B2")))  # border-top: 1pt dashed #000
 costs.tableStyleSet(pybers.parseTableStyle("body-vertical-gridlines: none", costs.tableStyle))
 costs.tableStyleSet(tableOutlineTitle=True)
 print(costs.cellBorderShown("C5", CellBorderSide.RIGHT))  # None: the vertical gridlines are hidden
+```
+
+A table's banded rows are `table.tableStyle.bandedRows`, a `TableBand` of whether it shows and its color, which a hidden band keeps. `table.cellFillShown` says which fill a cell displays: its own, else the band on every second body row, else its region's, a merged cell showing what its first cell shows:
+
+```python
+from pybers import Color, TableBand
+
+costs.tableStyleSet(bandedRows=TableBand(True, Color.parse("#f2f2f7ff")))
+print(costs.cellFillShown("B3"))  # #f2f2f7ff where B3 falls on a banded row
+costs.tableStyleSet(bandedRows=TableBand(False, Color.parse("#f2f2f7ff")))  # off, color kept
 ```
 
 A whole document read from its JSON form saves as a created document holding what the form describes. A cell holding something pybers cannot yet create, rich text, a control or a format such as a percentage, is refused by name before anything is written.

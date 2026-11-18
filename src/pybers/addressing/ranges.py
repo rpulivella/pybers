@@ -13,6 +13,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-11-18  A range prints its table through `addressing.text`, for PYB-267.
 2026-11-03  `SelectionMatch`, one thing a selector matches, for PYB-223.
 2026-10-27  A range names its table when its context needs one, as a reference
             does, for PYB-260.
@@ -40,7 +41,6 @@ from pybers.addressing.reference import (
     CellAddress,
     CellReference,
     CellReferenceLike,
-    ReferenceError,
     SheetReference,
     TableReference,
     absoluteMarker,
@@ -51,11 +51,11 @@ from pybers.addressing.reference import (
     lastColumn,
     lastRow,
     splitTableName,
-    tableNameSeparator,
     toCellReference,
     toColumnLetter,
     toColumnNumber,
 )
+from pybers.addressing.text import ReferenceError, composeReferenceText
 
 rangeSeparator: str = ":"
 listSeparator: str = ","
@@ -392,7 +392,7 @@ class CellRange:
         """Return the written form, qualified by its table when it names one."""
         if self.table is None:
             return self.asReference()
-        return f"{self.table}{tableNameSeparator}{self.asReference()}"
+        return composeReferenceText(str(self.table), self.asReference())
 
 
 @dataclass(frozen=True, slots=True)

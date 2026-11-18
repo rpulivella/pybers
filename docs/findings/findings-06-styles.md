@@ -288,6 +288,40 @@ Tables that only change a table-level setting show it as an override list on a v
 style, `Table 1-1-1-1` sets exactly `v_strokes_visible`, `h_strokes_visible` and
 `table_border_visible`, the same parent-plus-override pattern seen in sheet tab colors.
 
+## Banded rows paint the body, beneath every fill
+
+Measured 18 November 2026 in Numbers 15.4 from `102b-bands-on` and
+`103b-bands-one-header-on`, each `Alternating Row Color` turned on with its color as
+offered, read from the preview Numbers saved with each.
+
+- **Turning banding on writes a variation of the table's root style stating
+  `banded_rows` true and nothing else.** `banded_fill` is inherited from the root, the
+  Blank theme's sRGB 0.960 gray. Every table in every fixture stores a `banded_fill`
+  beside `banded_rows` false, and `70-retirement-template-15-4` keeps its root's fill
+  beneath a variation turning banding off, so banding turned off keeps its fill.
+- **A band's fill is a color, its alpha included.** The `Alternating Row Color` well
+  offers no gradient, image or None, as a person found in Numbers 15.4 on 18 November
+  2026, and `103c-bands-translucent`, recolored to `#ff3b30` at 50% opacity, stores
+  that color at alpha 0.5 in a variation stating `banded_rows` and `banded_fill`.
+- **The band counts from the first body row**, which is unbanded, and every second body
+  row is banded, with one header row in `103b` and with two in `102b`.
+- **A merge shows its anchor's band across every row it spans.** In `104b-bands-merged-on`,
+  B2:B3 and D4:D6, anchored on unbanded rows, show no band on their banded rows, and
+  C3:C4, anchored on a banded row, shows the band on its unbanded one.
+- **A footer row takes no band.** `102b` places its footer row where the band falls, and
+  it shows none, though the footer region states `FillNone` exactly as the body does.
+- **A cell's own fill prevails over the band**: a color and a gradient show unchanged on
+  banded rows. The body region states `FillNone` and still bands, so a region's stated
+  No Fill does not hide the band.
+- **A header row or header column takes no band, filled or not.** In a Blank theme
+  table each shows its own region fill. In `00-created-rows-banded-by-pybers`, whose
+  created table fills no header, Numbers 15.4 draws no band in the header column or the
+  footer row on a banded position, confirmed 18 November 2026.
+- **No body cell states No Fill.** Choosing it on a cell holding a color removes the
+  color and states nothing, E3:E8 of `102-bands-base`, and on a cell holding none it
+  writes nothing, since the body region already states `FillNone`. pybers drops the
+  same request, so a body cell beneath the band always shows it.
+
 ## A fill is a three-way union
 
 From `28-style-fills`, which carries ten variants in one row. A cell's style reaches

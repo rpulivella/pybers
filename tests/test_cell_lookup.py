@@ -6,6 +6,8 @@ A sheet, a table and a cell reached by the typed lookups through the one resolve
 `Table 2`, so it holds a table name that is unique and one that is shared.
 
 UPDATES
+2026-11-18  A typed lookup reads reference text, so each table a refusal offers is
+            reached by its text, for PYB-267.
 2026-11-03  The typed lookups, `document.cell` and `sheet.cell` removed, for
             PYB-223.
 2026-10-27  Each listed table name quoted, for PYB-260.
@@ -49,7 +51,7 @@ def testAReferenceReadsTheOwnersItsTextNames(
 
 
 def testAReferenceRefusesAnEmptyTableName() -> None:
-    with pytest.raises(pybers.ReferenceError, match="is no name"):
+    with pytest.raises(pybers.ReferenceError, match="leaves a name empty"):
         CellReference.parse("::B3")
 
 
@@ -73,8 +75,10 @@ def testASheetNameMatchesOnlyItsOwnCase(document: pybers.Document) -> None:
         document.sheet("sheet 1")
 
 
-def testANameIsTakenLiterallyNeverAsAPattern(document: pybers.Document) -> None:
-    with pytest.raises(pybers.SelectionError, match="'Table \\*'"):
+def testAWildcardInATypedLookupIsRefusedNamingItsEscape(
+    document: pybers.Document,
+) -> None:
+    with pytest.raises(pybers.ReferenceError, match=r"Write 'Table \\\*'"):
         document.table("Table *")
 
 
@@ -84,6 +88,33 @@ def testASharedTableNameIsRefusedWithTheNamesThatMatch(
     with pytest.raises(pybers.SelectionError) as raised:
         document.table("Table 1")
     assert "'Sheet 1::Table 1', 'Sheet 2::Table 1'" in str(raised.value)
+
+
+def testEachTableTheSharedNameRefusalOffersIsReachedByItsText(
+    document: pybers.Document,
+) -> None:
+    for text in ("Sheet 1::Table 1", "Sheet 2::Table 1"):
+        assert str(document.table(text).reference) == text
+
+
+def testASheetReachesItsOwnTableByItsQualifiedText(document: pybers.Document) -> None:
+    assert document.sheet("Sheet 2").table("Sheet 2::Table 1").name == "Table 1"
+
+
+def testASheetRefusesQualifiedTextNamingAnotherSheet(
+    document: pybers.Document,
+) -> None:
+    with pytest.raises(pybers.SelectionError, match="this is sheet 'Sheet 2'"):
+        document.sheet("Sheet 2").table("Sheet 1::Table 1")
+
+
+def testANameHoldingASeparatorIsReachedEscaped() -> None:
+    document = pybers.create("en_US")
+    document.sheetAdd("Q3, draft*").tableAdd("a::b", rows=1, cols=1)
+    table = document.table("Q3\\, draft\\*::a\\:\\:b")
+    assert table.reference == TableReference(
+        sheet=SheetReference("Q3, draft*"), name="a::b"
+    )
 
 
 def testAnUnknownTableIsRefusedWithTheTablesThatExist(

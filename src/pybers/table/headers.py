@@ -35,7 +35,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pybers.addressing.lines import GridEdit
-from pybers.addressing.reference import CellAddress, ReferenceError
+from pybers.addressing.reference import CellAddress
+from pybers.addressing.text import ReferenceError
 
 if TYPE_CHECKING:
     from pybers.table.cells import Table

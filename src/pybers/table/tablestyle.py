@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """\
-A table's lines: its gridlines, separators and outline, and its text form.
+A table's lines and banding: gridlines, separators, outline, banded rows, as text.
 
 Each region shows or hides one line drawn with one stroke, as the table's style
 states them, and the outline also outlines the table's title. A cell's border
-prevails over all of them at its edge. See findings-06-styles.md.
+prevails over all of them at its edge. Banded rows paint every second body row
+beneath any fill a cell states. See findings-06-styles.md.
 
 UPDATES
+2026-11-18  `TableBand`, a table's banded rows, and their text form, for PYB-267.
 2026-11-17  Written for PYB-266.
 """
 from __future__ import annotations
@@ -23,13 +25,14 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, fields, replace
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pybers.absence import MIXED
 from pybers.addressing.reference import TableReference
-from pybers.color.colors import Color, ColorError
+from pybers.color.colors import Color, ColorError, ColorSpace
 from pybers.errors import PybersError, composeChoiceRefusal
 from pybers.format.text import splitDeclarations
+from pybers.style.fills import Fill, FillNone
 from pybers.style.strokes import (
     Stroke,
     StrokeCap,
@@ -40,8 +43,12 @@ from pybers.style.strokes import (
     StrokeSolid,
     formatStroke,
 )
-from pybers.style.text import CellStyleError, parseLength
-from pybers.table.headers import TableHeaders
+from pybers.style.text import CellStyleError, formatFill, parseFill, parseLength
+from pybers.table.headers import TableHeaders, TableRegion
+
+if TYPE_CHECKING:
+    from pybers.addressing.reference import CellAddress
+    from pybers.table.cells import Table
 
 
 class TableStyleError(PybersError, ValueError):
@@ -73,8 +80,16 @@ class TableLine:
 
 
 @dataclass(frozen=True, slots=True)
+class TableBand:
+    """Whether a table bands its rows, and the fill it bands with, kept while off."""
+
+    visible: bool
+    fill: Fill
+
+
+@dataclass(frozen=True, slots=True)
 class TableStyle:
-    """The lines a table draws, each region named for what it draws."""
+    """The lines a table draws, each region named for what it draws, and its band."""
 
     bodyHorizontalGridlines: TableLine
     bodyVerticalGridlines: TableLine
@@ -90,6 +105,7 @@ class TableStyle:
     tableOutline: TableLine
     tableTitle: bool
     tableOutlineTitle: bool
+    bandedRows: TableBand
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,10 +122,13 @@ class TableStyleChange:
         return self.before != self.after
 
 
-def buildTableStyle(base: TableStyle, lines: Mapping[str, object]) -> TableStyle:
+def buildTableStyle(
+    base: TableStyle, lines: Mapping[str, object], held: TableStyle
+) -> TableStyle:
     """Return a table style with lines named by field replaced, refusing any other.
 
     The one place a requested table style is checked, so nothing invalid is held.
+    `held` is the style the table holds, whose band may be one pybers only carries.
     """
     if not isinstance(base, TableStyle):
         raise TableStyleError(
@@ -123,6 +142,8 @@ def buildTableStyle(base: TableStyle, lines: Mapping[str, object]) -> TableStyle
                 f"A table style holds {', '.join(names)}, and {name!r} is not one. "
                 "Nothing was written."
             )
+        if name == "bandedRows":
+            continue
         if name in flagNames.values():
             if not isinstance(value, bool):
                 raise TableStyleError(
@@ -140,6 +161,7 @@ def buildTableStyle(base: TableStyle, lines: Mapping[str, object]) -> TableStyle
             )
     update: dict[str, Any] = dict(lines)
     built = replace(base, **update)
+    refuseBand(built.bandedRows, held.bandedRows)
     hidden = sorted(name for name in alwaysShown if not getattr(built, name).visible)
     if hidden:
         raise TableStyleError(
@@ -148,6 +170,58 @@ def buildTableStyle(base: TableStyle, lines: Mapping[str, object]) -> TableStyle
             "written."
         )
     return built
+
+
+def refuseBand(value: object, held: TableBand) -> None:
+    """Refuse a band that is not a visibility and a color, unless the table holds it.
+
+    Numbers' Alternating Row Color offers only a color, so a band of another fill is
+    carried where a document holds one and refused anywhere else.
+    """
+    if not isinstance(value, TableBand) or not isinstance(value.visible, bool):
+        raise TableStyleError(
+            f"bandedRows is a TableBand of a visibility and a fill, and was given "
+            f"{value!r}. Nothing was written."
+        )
+    if isinstance(value.fill, Color) or value.fill == held.fill:
+        return
+    raise TableStyleError(f"{composeBandRefusal(value.fill)} Nothing was written.")
+
+
+def composeBandRefusal(fill: Fill) -> str:
+    """Return the sentence refusing a band of a fill other than a color.
+
+    The one place it is worded, for a script and a command alike.
+    """
+    phrase = {"gradient": "a gradient", "image": "an image", "none": "no fill"}
+    kind = str(getattr(fill, "fillType", ""))
+    return f"Numbers cannot band rows with {phrase.get(kind, kind)}."
+
+
+def findShownFill(table: Table, where: CellAddress) -> Fill:
+    """Return the fill a cell displays, the one place a band meets a cell's own fill.
+
+    A fill the cell states prevails. Every second body row, counted from the first,
+    shows the band beneath a cell stating No Fill, and a header, a header column or
+    a footer takes no band, as `102b-bands-on` and `103b-bands-one-header-on` show.
+    Else the region's fill shows. A merge shows what its anchor shows, across every
+    row it spans, as `104b-bands-merged-on` shows.
+    """
+    merge = table.mergeCovering(where)
+    where = where if merge is None else merge.anchor
+    cell = table.cells.get(where)
+    stated = None if cell is None else cell.cellStyle
+    own = None if stated is None else stated.background
+    if own is not None and not isinstance(own, FillNone):
+        return own
+    band = table.tableStyle.bandedRows
+    headers = table.headers
+    banded = band.visible and (where.row - headers.headerRows) % 2 == 0 and (
+        headers.regionFind(where, table.rowCount) is TableRegion.BODY
+    )
+    if banded:
+        return band.fill
+    return own or table._cellStyleInherited(where).background or FillNone()
 
 
 def findTableLine(
@@ -199,6 +273,8 @@ gridlineStroke: Stroke = Stroke(
 separatorStroke: Stroke = Stroke(
     width=Decimal("0.75"), color=Color.black, pattern=StrokeSolid()
 )
+# The Blank theme's band, off and gray, as `00-baseline` and every fixture state it.
+bandGray: Color = Color(ColorSpace.SRGB, (Decimal("0.9601849"),) * 3, 1)
 # The Blank theme's table style, every line shown, as `00-baseline` states it.
 blankTableStyle: TableStyle = TableStyle(
     bodyHorizontalGridlines=TableLine(True, gridlineStroke),
@@ -215,6 +291,7 @@ blankTableStyle: TableStyle = TableStyle(
     tableOutline=TableLine(True, gridlineStroke),
     tableTitle=False,
     tableOutlineTitle=False,
+    bandedRows=TableBand(False, bandGray),
 )
 
 
@@ -258,6 +335,9 @@ alwaysShown: frozenset[str] = frozenset({
 flagNames: frozendict[str, str] = frozendict({
     "table-title": "tableTitle", "table-outline-title": "tableOutlineTitle",
 })
+# The band's shorthand, a fill or none, and its longhand, the fill alone.
+bandName: str = "banded-rows"
+bandFillName: str = "banded-rows-background"
 longhandPattern: re.Pattern[str] = re.compile(r"(.+)-(width|style|color)")
 
 
@@ -267,6 +347,38 @@ def formatTableLine(line: TableLine) -> str:
         line.stroke, tableStrokePresets
     )
     return stroke if line.visible else f"hidden {stroke}"
+
+
+def formatTableBand(band: TableBand) -> str:
+    """Return a band as its fill, `hidden` before one banding is off but keeps."""
+    fill = formatFill(band.fill)
+    return fill if band.visible else f"hidden {fill}"
+
+
+def parseBandFill(text: str, name: str) -> Fill:
+    """Return the fill a band's text specifies, refusing text that is not one."""
+    try:
+        return parseFill(text, name)
+    except CellStyleError as exc:
+        raise TableStyleError(str(exc)) from exc
+
+
+def parseTableBand(text: str, band: TableBand, name: str) -> TableBand:
+    """Return a band from `none`, a fill, or `hidden` and a fill, as `show` prints."""
+    if text == "none":
+        return replace(band, visible=False)
+    hidden, _, rest = text.partition(" ")
+    if hidden == "hidden":
+        return TableBand(False, parseBandColor(rest.strip(), band, name))
+    return TableBand(True, parseBandColor(text, band, name))
+
+
+def parseBandColor(text: str, band: TableBand, name: str) -> Fill:
+    """Return a band's color, or the other fill the table already holds, as written."""
+    fill = parseBandFill(text, name)
+    if isinstance(fill, Color) or fill == band.fill:
+        return fill
+    raise TableStyleError(composeBandRefusal(fill))
 
 
 def formatTableStyle(tableStyle: TableStyle) -> list[str]:
@@ -279,7 +391,8 @@ def formatTableStyle(tableStyle: TableStyle) -> list[str]:
         f"{name}: {'yes' if getattr(tableStyle, field) else 'no'}"
         for name, field in flagNames.items()
     ]
-    return [declarations[0], *flags, *declarations[1:]]
+    band = f"{bandName}: {formatTableBand(tableStyle.bandedRows)}"
+    return [declarations[0], *flags, *declarations[1:], band]
 
 
 def parseLineStyle(text: str, line: TableLine, name: str) -> TableLine:
@@ -381,6 +494,13 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             flag: dict[str, Any] = {flagNames[name]: value == "yes"}
             changed = replace(changed, **flag)
             continue
+        if name in (bandName, bandFillName):
+            band = changed.bandedRows
+            changed = replace(changed, bandedRows=(
+                parseTableBand(value, band, name) if name == bandName
+                else replace(band, fill=parseBandColor(value, band, name))
+            ))
+            continue
         longhand = longhandPattern.fullmatch(name)
         if name in lineNames:
             field = lineNames[name]
@@ -390,7 +510,7 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             line = parseLonghand(longhand[2], value, getattr(changed, field), name)
         else:
             raise TableStyleError(composeChoiceRefusal(name, "a table line", [
-                *lineNames, *flagNames,
+                *lineNames, *flagNames, bandName, bandFillName,
                 *(f"{line}-{part}" for line in lineNames
                   for part in ("width", "style", "color")),
             ]))
@@ -400,9 +520,10 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
 
 
 __all__ = [
-    "TableLine", "TableStyle", "TableStyleChange", "TableStyleError",
-    "buildTableStyle", "findTableLine", "formatTableLine",
-    "applyTableReset", "blankTableStyle", "formatTableStyle", "gridlineStroke",
+    "TableBand", "TableLine", "TableStyle", "TableStyleChange", "TableStyleError",
+    "buildTableStyle", "findShownFill", "findTableLine", "formatTableLine",
+    "applyTableReset", "bandGray", "blankTableStyle", "formatTableBand",
+    "formatTableStyle", "gridlineStroke",
     "lineNames", "parseTableStyle",
     "resetTableStyle", "separatorStroke",
     "tableStrokePresets",

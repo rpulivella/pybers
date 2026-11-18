@@ -126,8 +126,8 @@ def findCellMoves(table: Table, maps: GridMaps) -> CellMoves:
         origin = cell._origin
         if origin is None:
             continue
-        row = maps.rows.lineMap(origin.row - originOffset)
-        column = maps.columns.lineMap(origin.col - originOffset)
+        row = maps.rows.storedLineMap(origin.row - originOffset)
+        column = maps.columns.storedLineMap(origin.col - originOffset)
         if row is None or column is None:
             continue
         landed = (reference.row - originOffset, reference.col - originOffset)

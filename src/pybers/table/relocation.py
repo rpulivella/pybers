@@ -37,8 +37,8 @@ from pybers.addressing.reference import (
     CellAddress,
     CellReference,
     CellReferenceLike,
-    ReferenceError,
 )
+from pybers.addressing.text import ReferenceError
 from pybers.formula.nodes import Formula, FormulaRange, FormulaReference
 from pybers.formula.relocation import (
     FormulaBlockMove,
