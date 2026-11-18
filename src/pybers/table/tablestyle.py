@@ -388,7 +388,7 @@ def formatTableStyle(tableStyle: TableStyle) -> list[str]:
         f"{name}: {'yes' if getattr(tableStyle, field) else 'no'}"
         for name, field in flagNames.items()
     ]
-    band = f"banded-rows: {formatTableBand(tableStyle.bandedRows)}"
+    band = f"{bandName}: {formatTableBand(tableStyle.bandedRows)}"
     return [declarations[0], *flags, *declarations[1:], band]
 
 

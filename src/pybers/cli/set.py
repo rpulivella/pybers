@@ -9,6 +9,7 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-18  `--table-style` lists `banded-rows`, for PYB-267.
 2026-11-17  `--table-style` sets the lines of each table matched, for PYB-266.
 2026-11-17  `--border` draws borders on one block, with `--border-style`,
             `--border-width` and `--border-color`, for PYB-266.
@@ -211,8 +212,10 @@ def runSet(
                 "header-columns-vertical-gridlines, "
                 "footer-rows-horizontal-gridlines, footer-rows-vertical-gridlines, "
                 "header-rows-separator, header-columns-separator and "
-                "footer-rows-separator; and table-title and table-outline-title, "
-                "yes or no. A line's -width, -style or -color changes one part."
+                "footer-rows-separator; table-title and table-outline-title, yes "
+                "or no; and banded-rows, a color or none, with "
+                "banded-rows-background its color alone. A line's -width, -style "
+                "or -color changes one part."
             ),
         ),
     ] = None,
