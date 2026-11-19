@@ -10,6 +10,8 @@ so no golden is made any other way. A test asserting what a golden holds reads i
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-19  `00-created-cell-boxes-updated-by-pybers`, part of a cell's style
+            changed or cleared, for PYB-290.
 2026-11-18  `00-created-rows-banded-by-pybers`, a table's banded rows, for PYB-267.
 2026-11-10  A label names a format or control a golden changed over the same value,
             for PYB-145.
@@ -773,6 +775,52 @@ def setCellBoxes(document: pybers.Document) -> None:
     table.cell(pybers.CellAddress(2, columns)).value = "empty"
 
 
+
+# The box every cell of the update golden starts from, all four properties stated.
+updatedBase: pybers.CellStyle = pybers.CellStyle(
+    background=pybers.Color.parse("#ffd60aff"), padding=Decimal(8),
+    verticalAlign=pybers.CellStyleVerticalAlign.MIDDLE,
+    textWrap=pybers.CellStyleTextWrap.WRAP,
+)
+
+# Each change to the base, one per column: a style updated, or a property cleared.
+boxUpdates: tuple[pybers.CellStyle | pybers.CellStyleProperty, ...] = (
+    pybers.CellStyle(background=pybers.Color.parse("#0a84ffff")),
+    pybers.CellStyle(padding=Decimal(16)),
+    pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.BOTTOM),
+    *pybers.CellStyleProperty,
+)
+
+
+def updateCellBoxes(document: pybers.Document) -> None:
+    """Style every cell of row 1 alike, then change or clear one property per column.
+
+    Each label beneath states the change and the box it leaves, wrapped so it reads
+    in full, and the last cell keeps the base unchanged.
+    """
+    columns = len(boxUpdates) + 1
+    table = document.sheet().tableAdd("Updated", rows=2, cols=columns)
+    document.cellSet("::Updated::1", wrappingText, cellStyle=updatedBase)
+    for column, change in enumerate(boxUpdates, start=1):
+        target = f"::Updated::{pybers.CellAddress(1, column)}"
+        if isinstance(change, pybers.CellStyle):
+            document.cellStyleUpdate(target, change)
+            how = f"updated with {pybers.formatCellStyle(change)}"
+        else:
+            document.cellStylePropertyRemove(target, change)
+            how = f"{change.value} removed"
+        shown = table.cell(pybers.CellAddress(1, column)).cellStyle
+        table.cell(pybers.CellAddress(2, column)).value = (
+            f"{how}, leaving {pybers.formatCellStyle(shown or pybers.CellStyle())}"
+        )
+    table.cell(pybers.CellAddress(2, columns)).value = (
+        f"set by pybers to {pybers.formatCellStyle(updatedBase)}"
+    )
+    document.cellStyleUpdate(
+        "::Updated::2", pybers.CellStyle(textWrap=pybers.CellStyleTextWrap.WRAP)
+    )
+
+
 # Each color case of a fill, the text naming it, in a column of its own.
 fillColors: tuple[tuple[pybers.Color, str], ...] = (
     (pybers.Color.parse("#ff8000ff"), "sRGB 255 128 0, #ff8000ff"),
@@ -1024,6 +1072,8 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
     GoldenBuilder("00-created-cell-boxes-styled-by-pybers", None, setCellBoxes,
                   labeled=True),
     GoldenBuilder("00-created-cell-fills-colored-by-pybers", None, setCellFills,
+                  labeled=True),
+    GoldenBuilder("00-created-cell-boxes-updated-by-pybers", None, updateCellBoxes,
                   labeled=True),
     GoldenBuilder("00-created-cell-borders-drawn-by-pybers", None, applyCellBorders,
                   labeled=True),

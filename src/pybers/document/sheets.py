@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-19  `cellStyleUpdate` and `cellStylePropertyRemove` change part of a cell's
+            style, sharing `cellSet`'s write, for PYB-290.
 2026-11-19  `cellSet` writes through `_cellsWrite`, which composes each cell's style,
             for PYB-290.
 2026-11-18  `tableFind` takes find's verb, for PYB-301.
@@ -105,7 +107,12 @@ from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
 from pybers.formula.syntax import formulaQualifierSeparator
 from pybers.geometry import Position
-from pybers.style.cells import CellStyle, findCellStyleRefusal
+from pybers.style.cells import (
+    CellStyle,
+    CellStyleProperty,
+    findCellStyleRefusal,
+    updateCellStyles,
+)
 from pybers.style.strokes import StrokeError
 from pybers.table.borders import (
     CellBorderPosition,
@@ -585,6 +592,56 @@ class Document:
                 rowsAdded=rowsAdded, colsAdded=colsAdded,
             ))
         return CellChanges(tuple(changes), tuple(skipped))
+
+    def cellStyleUpdate(
+        self, selector: SelectorLike, cellStyle: CellStyle, *, extend: bool = False
+    ) -> CellChanges:
+        """Change each property `cellStyle` states on every matched cell, and no other.
+
+        Where `cellSet` replaces a cell's whole style, a property None here keeps what
+        each cell states, as `dict.update` keeps a key it is not given.
+        """
+        if not isinstance(cellStyle, CellStyle):
+            raise WriteError(
+                f"cellStyleUpdate takes a CellStyle, and was given "
+                f"{type(cellStyle).__name__}. Nothing was written."
+            )
+        if cellStyle == CellStyle():
+            raise WriteError(
+                "cellStyleUpdate was given a style stating no property, so it has "
+                "nothing to change. Nothing was written."
+            )
+        refusal = findCellStyleRefusal(cellStyle)
+        if refusal is not None:
+            raise WriteError(f"{refusal} Nothing was written.")
+        return self._cellsWrite(
+            selector, UNCHANGED, format=UNCHANGED, control=UNCHANGED,
+            cellStyleCompose=lambda own: (
+                cellStyle if own is None else updateCellStyles(cellStyle, own)
+            ),
+            conflict=CellFormatConflict.REFUSE, extend=extend,
+        )
+
+    def cellStylePropertyRemove(
+        self, selector: SelectorLike, styleProperty: CellStyleProperty,
+        *, extend: bool = False,
+    ) -> CellChanges:
+        """Clear one property from every matched cell's own style, keeping the rest.
+
+        The cell then shows what its table states for that property.
+        """
+        if not isinstance(styleProperty, CellStyleProperty):
+            refusal = composeChoiceRefusal(
+                styleProperty, "a cell style property", list(CellStyleProperty)
+            )
+            raise WriteError(f"{refusal} Nothing was written.")
+        return self._cellsWrite(
+            selector, UNCHANGED, format=UNCHANGED, control=UNCHANGED,
+            cellStyleCompose=lambda own: (
+                None if own is None else replace(own, **{styleProperty.fieldName: None})
+            ),
+            conflict=CellFormatConflict.REFUSE, extend=extend,
+        )
 
     def cellBordersSet(
         self,
