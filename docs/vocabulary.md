@@ -15,7 +15,7 @@ A method ends in its verb, `rowAdd`, and a module-level function begins with it,
 | Copy | Duplicate a block of cells at another position, keeping the source | Python `shutil.copy` | `table.cellsCopy` |
 | Move | Relocate a block of cells, emptying the source | Python `shutil.move` | `table.cellsMove` |
 | Fill | Repeat a block across a range | Numbers' Autofill | `table.cellsFill` |
-| Find | Return the one part a key identifies | ECMAScript `Array.prototype.find` | `findCurrency` |
+| Find | Return the part, or every part, a key identifies | ECMAScript `Array.prototype.find`, Python `re.findall` | `findCurrency` |
 | Iterate | Yield each part in order | Python `iter` | `document.cellsIterate` |
 | Shown | Return the value Numbers displays, every layer of style resolved | CSS computed value | `table.cellFillShown` |
 | select | Return every part a selector matches | DOM `querySelectorAll` | `document.select` |

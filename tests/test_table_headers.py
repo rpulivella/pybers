@@ -7,6 +7,7 @@ columns. `20-formula-shapes` holds `Table 2`, ten rows by five columns with one
 stored cell at `A1`, and no header or footer.
 
 UPDATES
+2026-11-19  Every section a cell lies in, for PYB-301.
 2026-11-05  At least one row and one column stay outside the headers, as the
             maintainer confirmed in Numbers, for PYB-223.
 2026-11-03  Written for PYB-223.
@@ -28,6 +29,8 @@ import pytest
 import pybers
 from conftest import copyDocument, findDocumentPath
 from pybers import TableHeaders
+from pybers.addressing.reference import CellAddress
+from pybers.table.headers import TableSection
 
 
 def buildTable(rows: int = 6, cols: int = 4) -> pybers.Table:
@@ -182,3 +185,24 @@ def testAScriptSelectsTheHeaderItSet() -> None:
     assert [str(each.address) for each in table.select(":header")] == [
         "A1", "B1", "C1"
     ]
+
+
+@pytest.mark.parametrize(("row", "col", "expected"), [
+    (1, 1, {TableSection.HEADER_ROW, TableSection.HEADER_COLUMN}),
+    (1, 3, {TableSection.HEADER_ROW}),
+    (3, 1, {TableSection.HEADER_COLUMN}),
+    (6, 1, {TableSection.HEADER_COLUMN, TableSection.FOOTER_ROW}),
+    (6, 3, {TableSection.FOOTER_ROW}),
+    (3, 3, {TableSection.BODY}),
+])
+def testACellLiesInEverySectionCoveringIt(
+    row: int, col: int, expected: set[TableSection]
+) -> None:
+    headers = TableHeaders(headerRows=1, headerColumns=1, footerRows=1)
+    assert headers.sectionsFind(CellAddress(row, col), 6) == expected
+
+
+def testACornerInheritsTheHigherSectionsStyle() -> None:
+    headers = TableHeaders(headerRows=1, headerColumns=1, footerRows=1)
+    assert headers.sectionFind(CellAddress(1, 1), 6) is TableSection.HEADER_ROW
+    assert headers.sectionFind(CellAddress(6, 1), 6) is TableSection.HEADER_COLUMN

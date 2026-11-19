@@ -8,6 +8,7 @@ A condition selects by what pybers models, never by what a cell holds. An attrib
 is read as an empty cell, so `:empty` reaches the cells a sparse table never stored.
 
 UPDATES
+2026-11-19  `:header` and `:footer` read a cell's sections, for PYB-301.
 2026-11-09  `format=` matches the family a cell is shown with, the one Automatic
             chose included, for PYB-145.
 2026-11-03  Written for PYB-223.
@@ -32,6 +33,7 @@ from pybers.absence import UNDETERMINED
 from pybers.addressing.reference import CellAddress
 from pybers.format.controls import CellControlType
 from pybers.format.formats import CellFormatFamily, findFormatShown
+from pybers.table.headers import TableSection
 from pybers.table.kinds import CellKind
 
 if TYPE_CHECKING:
@@ -138,10 +140,13 @@ def matchPseudoClass(
             merge = table.mergeFind(address)
             return merge is not None and merge.anchor == address
         case "header":
-            headerRow, headerColumn, _ = headers.membershipFind(address, table.rowCount)
-            return headerRow or headerColumn
+            return not headers.sectionsFind(address, table.rowCount).isdisjoint(
+                (TableSection.HEADER_ROW, TableSection.HEADER_COLUMN)
+            )
         case "footer":
-            return headers.membershipFind(address, table.rowCount)[2]
+            return TableSection.FOOTER_ROW in headers.sectionsFind(
+                address, table.rowCount
+            )
         case "nth-row":
             assert argument is not None
             return matchNth(argument, address.row)
