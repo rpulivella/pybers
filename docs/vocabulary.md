@@ -30,6 +30,7 @@ A method ends in its verb, `rowAdd`, and a module-level function begins with it,
 | create | Make a new, empty document | Numbers' File > New | `pybers.create` |
 | save | Write a document to a path | Numbers' File > Save | `document.save` |
 | check | Report whether pybers can read a document | `cargo check` | `checkDocument` |
+| show | Print a document, or what a selector matches, for a person to read | `git show` | `pybers show` |
 
 ## Verbs on the command line
 
