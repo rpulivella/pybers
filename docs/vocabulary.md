@@ -1,6 +1,6 @@
 # Vocabulary
 
-Each word pybers uses for an action or a part has one meaning, shared by the library and the command line. A new call reuses a word from this page, and a new word joins this page before any call relies on it. `CLAUDE.md` sets out how a name is built from these words, under House style, and `decisions.md` records why a contested word won.
+Each word pybers uses for an action or a part has one meaning, shared by the library and the command line. A new call reuses a word from this page, and a new word joins this page before any call relies on it. [`CLAUDE.md`](../CLAUDE.md) sets out how a name is built from these words, under House style. The [library design](library-design.md) and the [command-line design](cli-design.md) use them, and [the decisions](decisions.md) record why a contested word won. Review holds every new public name to this page, under naming in the [code review rubric](code-review-rubric.md).
 
 ## Verbs
 
@@ -23,7 +23,7 @@ A method ends in its verb, `rowAdd`, and a module-level function begins with it,
 | format | Write a value as the text that `parse` reads back | `Intl.NumberFormat.format` | `formatFormula` |
 | compose | Build a message for a person to read | Rust compiler diagnostics | `composeChoiceRefusal` |
 | escape | Mark each special character in a name so a selector reads it literally | CSS `CSS.escape` | `escapeSelectorName` |
-| resolve | Turn a relative position into an absolute one | Python `Path.resolve` | `coordinate.resolve` |
+| resolve | Turn a relative position or an unbounded range into a concrete one | Python `Path.resolve`, `slice.indices` | `coordinate.resolve`, `range.resolve` |
 | shift | Move a position in place and report whether it moved | Python `list.sort` | `location.shift` |
 | shifted | Return a moved copy and leave the original unchanged | Python `sorted` | `coordinate.shifted` |
 | open | Read a document from a path | Python `open` | `pybers.open` |

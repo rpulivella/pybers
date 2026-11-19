@@ -1,6 +1,6 @@
 # Library design
 
-How pybers presents itself to Python: the shape every public call follows, so that a script, an agent and the command line all meet one library. What a command adds on top of a call is in [the command-line design](cli-design.md). The reasoning behind either belongs in `decisions.md`. This is the shape pybers is built toward, and a part not yet built is built to it by its own ticket.
+How pybers presents itself to Python: the shape every public call follows, its words defined in [the vocabulary](vocabulary.md), so that a script, an agent and the command line all meet one library. What a command adds on top of a call is in [the command-line design](cli-design.md). The reasoning behind either belongs in `decisions.md`. This is the shape pybers is built toward, and a part not yet built is built to it by its own ticket.
 
 ## Users
 

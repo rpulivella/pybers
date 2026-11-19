@@ -1,6 +1,6 @@
 # Command-line design
 
-How pybers looks and reads in a terminal: the design system for its front ends. Every command follows it, and a new convention is added here before a second command needs it. What a command calls in the library, and what that call returns, is in [the library design](library-design.md). The reasoning behind either belongs in `decisions.md`. This is the shape pybers is built toward, and a part not yet built is built to it by its own ticket.
+How pybers looks and reads in a terminal: the design system for its front ends. Every command follows it, and a new convention is added here before a second command needs it. A command and an option take their words from [the vocabulary](vocabulary.md). What a command calls in the library, and what that call returns, is in [the library design](library-design.md). The reasoning behind either belongs in `decisions.md`. This is the shape pybers is built toward, and a part not yet built is built to it by its own ticket.
 
 ## Users
 

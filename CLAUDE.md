@@ -41,7 +41,8 @@ A feature with no archive half yet is a module rather than a directory, and beco
 directory the day it gains a `_read.py`. That is how `formula` and `table` grew.
 
 The shape every public call and command follows is in `docs/library-design.md` and
-`docs/cli-design.md`, and the reasoning for settled decisions in `docs/decisions.md`.
+`docs/cli-design.md`, the words every name is built from in `docs/vocabulary.md`, and
+the reasoning for settled decisions in `docs/decisions.md`.
 Format measurements live in `docs/findings/findings-*.md`.
 **Read the findings index before designing anything**, because several of them
 invalidate the obvious approach.
@@ -166,11 +167,12 @@ called. A name is approved by the maintainer before a ticket relies on it.
 
 - **camelCase** for functions, variables and parameters. Modules stay lowercase, classes
   PascalCase. The linter is configured for this, not against it.
-- **Method names are subject first, verb last**: `rowAdd`, `cellStyleRemove`,
-  `cellFormatNumberApply`. Sorting then groups everything acting on a row together. The
-  subject is as specific as the method. Module-level functions, test helpers included,
-  keep verb-first names, which is why the entry point is `pybers.open`. **Every function
-  name holds a noun and a verb**: `findDocumentPath`, never `documentPath`.
+- **Method names are subject first, verb last**: `rowAdd`, `mergeRemove`,
+  `cellBordersSet`, each verb one `docs/vocabulary.md` defines. Sorting then groups
+  everything acting on a row together. The subject is as specific as the method.
+  Module-level functions, test helpers included, keep verb-first names, which is why the entry point is `pybers.open`. **Every function
+  name holds a noun and a verb**: `findDocumentPath`, never `documentPath`, except the
+  forms `docs/vocabulary.md` takes from Python.
 - **Type names lead with the base noun**, so a family sorts together and builds on its
   atom: `Table`, `TableRow`, `TableRows`, never `RowOfTable`. A scientific or geometric
   value names what it is measured against: `mercatorX` rather than `x`, `cieX1931`

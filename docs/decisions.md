@@ -672,7 +672,8 @@ and keeps the rest.
 `cellStyle`, and `pybers set --cell-style`, replace a cell's whole style, as CSS `cssText`
 replaces an inline style. An update writes each property it states and leaves every other
 property as the cell had it, as Python's `dict.update` does and as assigning one property
-of a CSS `element.style` does. The method is `cellStyleUpdate`.
+of a CSS `element.style` does. The method is `cellStyleUpdate`, and `docs/vocabulary.md`
+defines Update.
 
 **Merge and add were refused because pybers already uses both.** A merge joins cells into
 one, as `mergeAdd`, `mergeRemove` and `MergeRange` do, so `cellStyleMerge` would read as
