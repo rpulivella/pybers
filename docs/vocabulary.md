@@ -31,6 +31,22 @@ A method ends in its verb, `rowAdd`, and a module-level function begins with it,
 | save | Write a document to a path | Numbers' File > Save | `document.save` |
 | check | Report whether pybers can read a document | `cargo check` | `checkDocument` |
 
+## Verbs on the command line
+
+A command is a verb, and an option of `set` is the part it sets. A verb with no entry in this table has no command yet.
+
+| Verb | Command line | Example |
+| ---- | ------------ | ------- |
+| Set | `pybers set`, one option for each part: `--cell-format`, `--cell-control`, `--cell-style`, `--border` and `--table-style` | `pybers set budget.numbers Summary::Costs::B4 --cell-format number` |
+| Set, for a locale | `pybers set` given `--locale` and no `SELECTOR` | `pybers set budget.numbers --locale de_DE` |
+| Update | An option of `pybers set`, which PYB-290 adds | |
+| select | The `SELECTOR` argument of every command taking one | `pybers show budget.numbers Summary::Costs::B2:B9` |
+| parse | The text every option and `VALUE` argument reads | `--cell-style 'background: #ff0000ff'` |
+| format | The text `pybers show` and `pybers set` print, which `parse` reads back | `pybers show budget.numbers Summary::Costs::B4` |
+| open | The `FILE` argument of every command | `pybers check budget.numbers` |
+| save | Every command that writes, unless given `--preview` | `pybers set budget.numbers Summary::Costs::B4 1250.00 --preview` |
+| check | `pybers check` | `pybers check --names budget.numbers` |
+
 ## Names by Python's conventions
 
 Python's own forms carry no verb from the table above. pybers writes each in camelCase, so Python's `as_posix` would be `asPosix` here. A method Python itself requires, such as `tzinfo.utcoffset`, keeps Python's spelling.
