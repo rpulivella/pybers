@@ -9,6 +9,8 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-19  `--cell-style-update` and `--cell-style-remove` change part of a
+            cell's box, for PYB-290.
 2026-11-19  `--locale` sets a document's language and region, for PYB-301.
 2026-11-18  `--table-style` lists `banded-rows`, for PYB-267.
 2026-11-17  `--table-style` sets the lines of each table matched, for PYB-266.
@@ -171,6 +173,28 @@ def runSet(
             ),
         ),
     ] = None,
+    cellStyleUpdate: Annotated[
+        str | None,
+        typer.Option(
+            "--cell-style-update",
+            metavar="STYLE",
+            help=(
+                "The properties of each cell's box to change, written as for "
+                "--cell-style, every property not given kept as it was."
+            ),
+        ),
+    ] = None,
+    cellStyleRemove: Annotated[
+        str | None,
+        typer.Option(
+            "--cell-style-remove",
+            metavar="PROPERTY",
+            help=(
+                "One property to clear from each cell's box, so the cell shows what "
+                "its table states: background, padding, vertical-align or text-wrap."
+            ),
+        ),
+    ] = None,
     # Text rather than the enum, so `--help` never loads the model.
     border: Annotated[
         str | None,
@@ -270,10 +294,10 @@ def runSet(
 ) -> None:
     """Set what SELECTOR matches, or with --locale the document's locale."""
     cellParts = (value, cellFormat, cellControl, cellStyle)
+    styleParts = (cellStyle, cellStyleUpdate, cellStyleRemove)
+    everyPart = (*cellParts, cellStyleUpdate, cellStyleRemove, border, tableStyle)
     if locale is not None:
-        if selector is not None or any(
-            part is not None for part in (*cellParts, border, tableStyle)
-        ):
+        if selector is not None or any(part is not None for part in everyPart):
             raise typer.BadParameter(
                 "--locale sets the whole document, so give it without a SELECTOR."
             )
@@ -288,11 +312,22 @@ def runSet(
             "--border-style, --border-width and --border-color describe a --border, "
             "so give its POSITION."
         )
-    if all(part is None for part in (*cellParts, border, tableStyle)):
+    if all(part is None for part in everyPart):
         raise typer.BadParameter(
             "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
-            "--border or a --table-style."
+            "--cell-style-update, a --cell-style-remove, a --border or a "
+            "--table-style."
         )
+    if sum(part is not None for part in styleParts) > 1:
+        raise typer.BadParameter(
+            "--cell-style replaces the whole box, --cell-style-update changes part "
+            "of it and --cell-style-remove clears one property, so give one of them."
+        )
+    styleProperties = [each.value for each in pybers.CellStyleProperty]
+    if cellStyleRemove is not None and cellStyleRemove not in styleProperties:
+        raise typer.BadParameter(pybers.composeChoiceRefusal(
+            cellStyleRemove, "a cell style property", styleProperties
+        ))
     if border is not None and border not in borderPositions:
         raise typer.BadParameter(
             pybers.composeChoiceRefusal(border, "a border position", borderPositions)
@@ -328,6 +363,24 @@ def runSet(
                 ),
                 conflict=conflict,
                 extend=extend,
+            )
+        partStyled = None
+        if cellStyleUpdate is not None:
+            stated = pybers.parseCellStyle(cellStyleUpdate)
+            if stated is None:
+                raise pybers.CellStyleError(
+                    "--cell-style-update changes properties, so it takes no none. "
+                    "Give --cell-style none to remove the whole box."
+                )
+            partStyled = document.cellStyleUpdate(selector, stated, extend=extend)
+        if cellStyleRemove is not None:
+            partStyled = document.cellStylePropertyRemove(
+                selector, pybers.CellStyleProperty(cellStyleRemove), extend=extend
+            )
+        if partStyled is not None:
+            changes = pybers.CellChanges(
+                changes.changes + partStyled.changes,
+                changes.skipped + partStyled.skipped,
             )
         if border is not None:
             drawn = document.cellBordersSet(

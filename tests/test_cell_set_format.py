@@ -6,6 +6,7 @@ Each test edits a copy of `13-number-percent`, whose `A1` is a number Automatic
 formats and whose `B1` is the same number in a percent format a person chose.
 
 UPDATES
+2026-11-19  The refusal lists the cell style update options, for PYB-290.
 2026-11-10  A format that cannot show the value is refused unless Automatic is asked
             for, for PYB-145 AC 10.
 2026-11-10  Setting one part leaves the others as they were, for PYB-145 AC 19.
@@ -238,7 +239,8 @@ def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     shown = readPlainText(result.output)
     assert (
         "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
-        "--border or a --table-style." in shown
+        "--cell-style-update, a --cell-style-remove, a --border or a --table-style."
+        in shown
     )
 
 
