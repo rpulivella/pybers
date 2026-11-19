@@ -13,8 +13,8 @@ UPDATES
             cell badged under its table, `--names` naming them, for PYB-223.
 2026-10-27  Report lines and the sheet outline shared with `show`, a size of one
             row reading `1 row`, for PYB-260.
-2026-10-12  `--format json` prints the same facts, and an uninstalled pybers reads
-            unknown, for PYB-187.
+2026-10-12  `--output-format json` prints the same facts, and an uninstalled pybers
+            reads unknown, for PYB-187.
 2026-10-12  A part a check could not determine reads unknown, for PYB-190.
 2026-10-11  Type counts arrive as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.

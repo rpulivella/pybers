@@ -92,7 +92,7 @@ from ..formula._write import (
 )
 from ..formula.nodes import Formula
 from ..style._write import readStylePool, writeStylePool
-from ._cellstyles import readRegionVariations, writeAskedCellStyle
+from ._cellstyles import readSectionVariations, writeAskedCellStyle
 from ._conditions import ConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
 from ._read import (
@@ -246,7 +246,7 @@ def applyTableEdits(
     formatKeys: dict[bytes, int] = {}
     walkedTiles: list[tuple[int, tst.Tile]] = []
     stylePool = readStylePool(index, registry, store)
-    variations = readRegionVariations(index, model)
+    variations = readSectionVariations(index, model)
     richTextPool = (
         readRichTextPool(index, store) if store.HasField("rich_text_table") else None
     )

@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""A table's grid, the cells in it, and the regions merged across it.
+"""A table's grid, the cells in it, and the merges across it.
 
 Addressing lives in `pybers.addressing`. Nothing
 here takes a bare row and column pair: a cell is named by an address, or by `row=`
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-18  `mergeFind`, `isAddressable`, a private `_rangeSingle` and a table's
+            sections follow the vocabulary, for PYB-301.
 2026-11-18  `cellFillShown`, the fill a cell displays, its banded row's included,
             for PYB-267.
 2026-11-17  `tableStyle`, the lines a table draws, and `tableStyleSet`, for
             PYB-266.
 2026-11-17  The table's borders, kept by row and column identity, for PYB-266.
-2026-11-12  Each region's inherited cell style, for PYB-265.
+2026-11-12  Each section's inherited cell style, for PYB-265.
 2026-11-03  A table's header and footer headers, read and set, `select`, and
             `range` removed in its favor, for PYB-223.
 2026-10-29  A cell builds its own reference, for PYB-278.
@@ -106,7 +108,7 @@ from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
-from pybers.table.headers import TableHeaders, TableRegion, checkHeadersFit
+from pybers.table.headers import TableHeaders, TableSection, checkHeadersFit
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
@@ -146,19 +148,19 @@ def generateOwnerIdentity() -> str:
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
 
 
-# The cell style every region of a table pybers adds names, the reset: no wrapping.
+# The cell style every section of a table pybers adds specifies, the reset: no wrapping.
 resetCellStyle: CellStyle = CellStyle(textWrap=CellStyleTextWrap.NOWRAP)
 # What every cell of a table pybers adds shows: Numbers' own box, not wrapping.
 createdCellStyle: CellStyle = replace(
     numbersCellStyle, textWrap=CellStyleTextWrap.NOWRAP
 )
-resetCellStylesInherited: frozendict[TableRegion, CellStyle] = frozendict(
-    dict.fromkeys(TableRegion, createdCellStyle)
+resetCellStylesInherited: frozendict[TableSection, CellStyle] = frozendict(
+    dict.fromkeys(TableSection, createdCellStyle)
 )
 
 @dataclass(slots=True)
 class Table:
-    """A single table on a sheet, a sparse grid of cells plus its merged regions.
+    """A single table on a sheet, a sparse grid of cells plus its merges.
 
     `identifier` is what a formula in another table names this one by, and it lives
     in the calculation engine rather than on the table, which is why a table a script
@@ -196,9 +198,9 @@ class Table:
         default_factory=list, repr=False, compare=False, kw_only=True
     )
     _headers: TableHeaders = field(default_factory=TableHeaders, kw_only=True)
-    # What each region's cell style resolves to, read from the file, so a request
+    # What each section's cell style resolves to, read from the file, so a request
     # can drop what a cell inherits; a table pybers adds takes the reset's.
-    _cellStylesInherited: frozendict[TableRegion, CellStyle] = field(
+    _cellStylesInherited: frozendict[TableSection, CellStyle] = field(
         default_factory=lambda: resetCellStylesInherited, repr=False, compare=False,
         kw_only=True,
     )
@@ -230,9 +232,9 @@ class Table:
         ) and findCellBordersByPosition(self) == findCellBordersByPosition(other)
 
     def _cellStyleInherited(self, address: CellAddress) -> CellStyle:
-        """Return the cell style a cell at `address` inherits from its region."""
-        region = self._headers.regionFind(address, self.rowCount)
-        return self._cellStylesInherited.get(region, numbersCellStyle)
+        """Return the cell style a cell at `address` inherits from its section."""
+        section = self._headers.sectionFind(address, self.rowCount)
+        return self._cellStylesInherited.get(section, numbersCellStyle)
 
     @property
     def tableStyle(self) -> TableStyle:
@@ -433,14 +435,14 @@ class Table:
             f"{found} names another table, and this is {self.reference}."
         )
 
-    def addressable(self, address: CellReferenceLike) -> bool:
+    def isAddressable(self, address: CellReferenceLike) -> bool:
         """Report whether an address names a cell this table can hand over.
 
         False for a position swallowed by a merge, which is why a range over a
         merged block yields the anchor once rather than one cell per position.
         """
         reference = self._addressResolve(address)
-        merge = self.mergeCovering(reference)
+        merge = self.mergeFind(reference)
         return merge is None or merge.anchor == reference
 
     @property
@@ -489,7 +491,7 @@ class Table:
         covers. A merge IMPORTED from Excel is the exception and keeps a style-only
         record at each one, which a save preserves rather than cleans up.
         """
-        extent = self.rangeSingle(address, "merge")
+        extent = self._rangeSingle(address, "merge")
         # A single cell is refused because Numbers cannot produce one: no document holds
         # a merge covering one cell and the interface offers no way to make one, so
         # writing the formula for it would put a construct in the file that has never
@@ -521,7 +523,7 @@ class Table:
         claim one cell. Every covered position reads as empty afterward: the values
         went when the merge was made, and nothing restores them.
         """
-        merge = self.mergeCovering(address)
+        merge = self.mergeFind(address)
         if merge is None:
             raise ReferenceError(
                 f"No merge in {self.name!r} covers "
@@ -530,7 +532,7 @@ class Table:
         self.mergeRanges.remove(merge)
         return merge
 
-    def rangeSingle(self, address: CellRangeLike, action: str) -> CellRange:
+    def _rangeSingle(self, address: CellRangeLike, action: str) -> CellRange:
         """Return the one bounded rectangle an address names, inside this table.
 
         An unbounded range is refused rather than bounded by the table, because a block
@@ -551,7 +553,7 @@ class Table:
 
     def _bordersRead(self, address: CellAddress) -> CellBorders:
         """Return the sides of the cell at an address, a merge's spanning all of it."""
-        merge = self.mergeCovering(address)
+        merge = self.mergeFind(address)
         extent = merge.extent if merge is not None else CellRange.fromReferences(
             address, address
         )
@@ -577,11 +579,11 @@ class Table:
         """Return the fill a cell displays, `FillNone` where it displays none.
 
         A fill the cell states prevails, then the band on its body row, then its
-        region's.
+        section's.
         """
         return findShownFill(self, self._addressResolve(address))
 
-    def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
+    def mergeFind(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
 
         The only way to tell a covered cell from an empty one, since a covered

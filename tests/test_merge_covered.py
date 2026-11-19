@@ -137,7 +137,7 @@ def testAMergeAlreadyInTheFileIsNotTreatedAsAdded() -> None:
         model = tst.TableModelArchive()
         model.ParseFromString(archive.messages[0].data)
         assert findAddedMerges(table, model) == []
-        table.mergeRanges.append(MergeRange(table.rangeSingle("A4:B4", "merge")))
+        table.mergeRanges.append(MergeRange(table._rangeSingle("A4:B4", "merge")))
         assert len(findAddedMerges(table, model)) == 1
         return
     raise AssertionError("No table model in the imported fixture.")

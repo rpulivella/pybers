@@ -242,7 +242,7 @@ def listCells(
     found = []
     cells = table.cells
     for address in area:
-        merge = table.mergeCovering(address) if table.mergeRanges else None
+        merge = table.mergeFind(address) if table.mergeRanges else None
         if merge is not None and merge.anchor != address:
             continue
         if any(
@@ -287,7 +287,7 @@ def matchCells(
         assert extent is not None
         bounded = (
             CellRange.fromReferences(area, area) if isinstance(area, CellAddress)
-            else area.boundedBy(extent)
+            else area.resolve(extent)
         )
         matches += [
             PartMatch(sheet, table, address)
@@ -487,8 +487,8 @@ def findCellTargets(
         addresses = (
             [cells] if isinstance(cells, CellAddress)
             else [] if table.extent is None
-            else [each for each in cells.boundedBy(table.extent)
-                  if table.addressable(each)]
+            else [each for each in cells.resolve(table.extent)
+                  if table.isAddressable(each)]
         )
         for address in addresses:
             targets.setdefault((id(table), address), (table, address))
@@ -513,7 +513,7 @@ def findBlockTarget(
         CellRange.fromReferences(cells, cells) if isinstance(cells, CellAddress)
         else cells
     )
-    return table, table.rangeSingle(block, action)
+    return table, table._rangeSingle(block, action)
 
 
 def findExtendTarget(
@@ -546,7 +546,7 @@ def findExtendTarget(
             f"`{found}` matches {len(tables)} tables, and growing a table to hold "
             f"a cell grows one: {formatMatches([each.reference for each in tables])}."
         )
-    if not table.addressable(address):
+    if not table.isAddressable(address):
         raise ReferenceError(str(findCellsMiss(table, address)))
     return table, address
 

@@ -89,7 +89,7 @@ def testCheckReportsEveryFactForADocumentPybersOpens() -> None:
 @pytest.mark.parametrize("outputFormat", ["text", "json"])
 def testCheckOutputHoldsNothingFromTheDocument(stem: str, outputFormat: str) -> None:
     path = findDocumentPath(stem)
-    result = runner.invoke(app, ["check", "--format", outputFormat, str(path)])
+    result = runner.invoke(app, ["check", "--output-format", outputFormat, str(path)])
     assert result.exit_code == 0
     # Two- and three-letter cell text such as "lo" occurs inside ordinary words.
     words = {word for word in listDocumentWords(path) if len(word.strip()) > 3}
@@ -113,7 +113,7 @@ def testCheckExitsNonzeroWhenPybersCannotOpenTheDocument(
 def testJsonHoldsTheSameFactsAsTheLibraryReturns() -> None:
     found = pybers.checkDocument(recordsPath, names=True)
     result = runner.invoke(
-        app, ["check", "--names", "--format", "json", str(recordsPath)]
+        app, ["check", "--names", "--output-format", "json", str(recordsPath)]
     )
     printed = json.loads(result.stdout)
     assert result.exit_code == 0
@@ -126,7 +126,7 @@ def testJsonHoldsTheSameFactsAsTheLibraryReturns() -> None:
 
 
 def testJsonNamesWhyAPartIsMissing() -> None:
-    result = runner.invoke(app, ["check", "--format", "json", str(baselinePath)])
+    result = runner.invoke(app, ["check", "--output-format", "json", str(baselinePath)])
     assert json.loads(result.stdout)["sheets"][0]["name"] == "WITHHELD"
 
 
@@ -138,14 +138,14 @@ def testEitherFormExitsOneWhenPybersCannotOpenTheDocument(
     found = replace(pybers.checkDocument(baselinePath), failure=failure)
     monkeypatch.setattr(pybers, "checkDocument", lambda *_, **__: found)
     result = runner.invoke(
-        app, ["check", "--format", outputFormat, str(baselinePath)]
+        app, ["check", "--output-format", outputFormat, str(baselinePath)]
     )
     assert result.exit_code == 1
 
 
 def testJsonForARefusedFilePrintsNothingOnStdout(tmp_path: Path) -> None:
     result = runner.invoke(
-        app, ["check", "--format", "json", str(findAbsentPath(tmp_path))]
+        app, ["check", "--output-format", "json", str(findAbsentPath(tmp_path))]
     )
     assert result.exit_code == 1
     assert result.stdout == ""

@@ -380,7 +380,7 @@ maintainer inserted a chart, an image and an SVG by hand the same day.
 | style | properties every root style states |
 | --- | --- |
 | sheet | 2, its fill and tab color |
-| table | 62, the strokes and layout of every region |
+| table | 62, the strokes and layout of every section |
 | chart series | 113 in its properties extension, and two flags |
 | chart | 22, and one flag |
 | list | 4 |

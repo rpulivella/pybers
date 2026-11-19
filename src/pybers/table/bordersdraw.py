@@ -133,7 +133,7 @@ def isMergeInterior(
     # A side on the table's own edge has no position beyond it.
     if row + down < 1 or column + across < 1:
         return False
-    merge = table.mergeCovering(CellAddress(row, column))
+    merge = table.mergeFind(CellAddress(row, column))
     return merge is not None and merge.covers(
         CellAddress(row + down, column + across)
     )
@@ -257,7 +257,7 @@ def findCellBordersByPosition(table: Table) -> dict[CellAddress, CellBorders]:
         )
     return {
         address: table._bordersRead(address)
-        for address in held if table.addressable(address)
+        for address in held if table.isAddressable(address)
     }
 
 

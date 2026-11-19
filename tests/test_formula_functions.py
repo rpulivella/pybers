@@ -207,8 +207,8 @@ def testUnknownIndexRoundTripsThroughTheFileUnchanged(tmp_path: Path) -> None:
 
 def testCallByNameEqualsCallByIndex() -> None:
     """`named` is a way of spelling an index, so the two calls are one value."""
-    assert FormulaFunctionCall.named("SUM", 2) == FormulaFunctionCall(168, 2)
-    assert FormulaFunctionCall.named("IF", 3) == FormulaFunctionCall(62, 3)
+    assert FormulaFunctionCall.fromName("SUM", 2) == FormulaFunctionCall(168, 2)
+    assert FormulaFunctionCall.fromName("IF", 3) == FormulaFunctionCall(62, 3)
 
 
 def testAuthoringByNameWritesTheSameArchiveAsAuthoringByIndex(
@@ -230,7 +230,9 @@ def testAuthoringByNameWritesTheSameArchiveAsAuthoringByIndex(
         return readDataListBytes(source)
 
     byIndex = writeCall(tmp_path / "index.numbers", FormulaFunctionCall(168, 2))
-    byName = writeCall(tmp_path / "name.numbers", FormulaFunctionCall.named("sum", 2))
+    byName = writeCall(
+        tmp_path / "name.numbers", FormulaFunctionCall.fromName("sum", 2)
+    )
     assert byIndex == byName
 
 
@@ -297,9 +299,9 @@ def testAPairedRepeatingGroupIsStillUnbounded() -> None:
 def testAuthoringByNameRefusesACountTheFunctionRejects() -> None:
     """The ergonomic path refuses what Numbers would store as an error cell."""
     with pytest.raises(ArgumentCountError):
-        FormulaFunctionCall.named("ROUND", 1)
+        FormulaFunctionCall.fromName("ROUND", 1)
     with pytest.raises(ArgumentCountError):
-        FormulaFunctionCall.named("PI", 1)
+        FormulaFunctionCall.fromName("PI", 1)
 
 
 def testAuthoringByIndexStillWritesWhateverIsAsked() -> None:
@@ -397,7 +399,7 @@ def testAReservedFunctionAcceptsNoArgumentCountAtAll() -> None:
     altitude = findFunctionNamed("ALTITUDE")
     assert not any(altitude.accepts(count) for count in range(0, 6))
     with pytest.raises(ArgumentCountError):
-        FormulaFunctionCall.named("ALTITUDE", 1)
+        FormulaFunctionCall.fromName("ALTITUDE", 1)
 
 
 def testAnInternalFunctionIsNamedSoASpilledDocumentIsLegible() -> None:
@@ -418,7 +420,7 @@ def testAnInternalFunctionIsNamedSoASpilledDocumentIsLegible() -> None:
 def testAnInternalFunctionIsRefusedByNameAndAllowedByIndex() -> None:
     """The ergonomic path declines; the explicit one stays open."""
     with pytest.raises(ArgumentCountError):
-        FormulaFunctionCall.named("SPILL", 1)
+        FormulaFunctionCall.fromName("SPILL", 1)
     assert FormulaFunctionCall(index=337, argumentCount=1).name == "SPILL"
 
 

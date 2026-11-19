@@ -175,8 +175,8 @@ lazy from pybers.formula import (
     findFunctionIndex,
     findFunctionName,
     findFunctionNamed,
+    formatFormula,
     parseFormula,
-    renderFormula,
 )
 lazy from pybers.geometry import Position
 lazy from pybers.interchange import (
@@ -326,7 +326,7 @@ __all__ = [
     "currencies",
     "findCurrency",
     "parseFormula",
-    "renderFormula",
+    "formatFormula",
     "Coordinate",
     "Check",
     "CheckCell",

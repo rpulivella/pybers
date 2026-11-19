@@ -49,7 +49,7 @@ def testACommandsJsonIsTheLibrarysJsonForm(tmp_path: Path) -> None:
     working = copyDocument("20-formula-shapes", tmp_path)
     result = runner.invoke(app, [
         "set", str(working), "::Table 2::B2", "1234567890123456789012345678901234",
-        "--preview", "--format", "json",
+        "--preview", "--output-format", "json",
     ])
     printed = json.loads(result.stdout, parse_float=Decimal, parse_int=Decimal)
     exact = Decimal("1234567890123456789012345678901234")

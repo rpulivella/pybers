@@ -678,7 +678,7 @@ def test_aMergeSurvivesASaveAndAReopen(tmp_path: Path) -> None:
     assert readStoredMerges(working) == ["A1:B1", "C1:D1"]
     reopened = pybers.open(working).sheet(1).table(1)
     assert [str(merge.extent) for merge in reopened.mergeRanges] == ["A1:B1", "C1:D1"]
-    assert reopened.addressable("B1") is False
+    assert reopened.isAddressable("B1") is False
     assert reopened.cell("A1").value == "Hello"
 
 
@@ -787,9 +787,9 @@ def test_theMergeGoldensHoldWhatTheyClaimTo() -> None:
     assert unmerged.mergeRanges == []
     # The anchor survives the merge and every covered position is gone from the model.
     assert merged.cell("A1").value == "Hello"
-    assert merged.addressable("B1") is False
+    assert merged.isAddressable("B1") is False
     # Unmerging returns the positions and leaves them empty, never restoring a value.
-    assert unmerged.addressable("B1") is True
+    assert unmerged.isAddressable("B1") is True
     assert unmerged.cell("B1").value is None
 
 

@@ -41,11 +41,11 @@ def listRangePositions(table: Table, address: CellRangeLike) -> list[CellAddress
         if item.rowsUnbounded or item.colsUnbounded:
             if extent is None:
                 continue
-            item = item.boundedBy(extent)
+            item = item.resolve(extent)
         refuseRangeOutside(table, item)
         items.append(item)
     return [
-        position for item in items for position in item if table.addressable(position)
+        position for item in items for position in item if table.isAddressable(position)
     ]
 
 
@@ -63,14 +63,14 @@ def findCellsMiss(table: Table, cells: CellAddress | CellRange) -> str | None:
     if isinstance(cells, CellAddress):
         if extent is None or not extent.covers(cells):
             return f"{cells} is outside {table.name!r}, which is {size}."
-        merge = table.mergeCovering(cells)
+        merge = table.mergeFind(cells)
         if merge is not None and merge.anchor != cells:
             return (
                 f"{cells} is covered by the merge {merge.extent}, whose anchor is "
                 f"{merge.anchor}."
             )
         return None
-    bounded = cells if extent is None else cells.boundedBy(extent)
+    bounded = cells if extent is None else cells.resolve(extent)
     if extent is None or not all(
         corner is not None and extent.covers(corner)
         for corner in (bounded.start, bounded.end)

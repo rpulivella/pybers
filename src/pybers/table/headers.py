@@ -13,7 +13,10 @@ re-parents when it changes, so `headersSet` refuses to move one.
 See findings-03-structure.md.
 
 UPDATES
-2026-11-12  `TableRegion` and `regionFind`, the region whose style a cell inherits,
+2026-11-19  `sectionsFind`, every section a cell lies in, for PYB-301.
+2026-11-19  `TableSection` and `sectionFind`, named for HTML's table sections, for
+            PYB-301.
+2026-11-12  `TableSection` and `sectionFind`, the section whose style a cell inherits,
             for PYB-265.
 2026-11-05  Named for Numbers' Headers & Footer, and at least one row and one
             column stay outside them, in a set and an edit alike, for PYB-223.
@@ -45,7 +48,7 @@ if TYPE_CHECKING:
 headerLimit: int = 5
 
 
-class TableRegion(StrEnum):
+class TableSection(StrEnum):
     """The part of a table whose style a cell inherits, named as the schema names it."""
 
     BODY = "body"
@@ -71,27 +74,31 @@ class TableHeaders:
                     f"{formatHeaderName(each.name)} {count!r} is not one."
                 )
 
-    def membershipFind(
+    def sectionsFind(
         self, address: CellAddress, rowCount: int
-    ) -> tuple[bool, bool, bool]:
-        """Return whether a cell is in the header rows, header columns, footer rows."""
-        return (
-            address.row <= self.headerRows,
-            address.col <= self.headerColumns,
-            address.row > rowCount - self.footerRows,
-        )
+    ) -> frozenset[TableSection]:
+        """Return every section a cell lies in, the body when it lies in no other."""
+        found = {
+            section for section, inside in (
+                (TableSection.HEADER_ROW, address.row <= self.headerRows),
+                (TableSection.HEADER_COLUMN, address.col <= self.headerColumns),
+                (TableSection.FOOTER_ROW, address.row > rowCount - self.footerRows),
+            ) if inside
+        }
+        return frozenset(found or {TableSection.BODY})
 
-    def regionFind(self, address: CellAddress, rowCount: int) -> TableRegion:
-        """Return the region a cell inherits its style from, a corner the higher one.
+    def sectionFind(self, address: CellAddress, rowCount: int) -> TableSection:
+        """Return the section a cell inherits its style from, a corner the higher one.
 
         Header row, then header column, then footer row, as `40-table-bands` measured.
         """
-        headerRow, headerColumn, footerRow = self.membershipFind(address, rowCount)
-        if headerRow:
-            return TableRegion.HEADER_ROW
-        if headerColumn:
-            return TableRegion.HEADER_COLUMN
-        return TableRegion.FOOTER_ROW if footerRow else TableRegion.BODY
+        sections = self.sectionsFind(address, rowCount)
+        return next(
+            section for section in (
+                TableSection.HEADER_ROW, TableSection.HEADER_COLUMN,
+                TableSection.FOOTER_ROW, TableSection.BODY,
+            ) if section in sections
+        )
 
 
 def formatHeaderName(field: str) -> str:
@@ -140,8 +147,8 @@ def checkHeadersFit(table: Table, headers: TableHeaders) -> None:
     held = table.headers
     for address, cell in table.cells.items():
         recorded = cell._origin is not None or cell._copiedFrom is not None
-        moved = held.membershipFind(address, table.rowCount) != (
-            headers.membershipFind(address, table.rowCount)
+        moved = held.sectionsFind(address, table.rowCount) != (
+            headers.sectionsFind(address, table.rowCount)
         )
         if recorded and moved:
             raise ReferenceError(
@@ -173,6 +180,6 @@ def mapHeaders(headers: TableHeaders, edit: GridEdit, held: int) -> TableHeaders
 
 
 __all__ = [
-    "TableHeaders", "TableRegion", "checkHeadersFit", "headerLimit", "mapHeaders",
+    "TableHeaders", "TableSection", "checkHeadersFit", "headerLimit", "mapHeaders",
     "refuseHeadersUnfit",
 ]

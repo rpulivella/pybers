@@ -116,8 +116,8 @@ def toMicroseconds(amount: str, unit: int) -> int:
 def parseUnitDuration(text: str) -> datetime.timedelta:
     """Return the duration units name, `1h 30m` or `-2d 4h`, or ISO 8601, `PT1H30M`.
 
-    ISO 8601 is how the JSON form writes a duration, so what `--format json` prints
-    is written back as the same duration rather than as text.
+    ISO 8601 is how the JSON form writes a duration, so what `--output-format json`
+    prints is written back as the same duration rather than as text.
     """
     if text.strip().lstrip("-").startswith("P"):
         return parseIsoDuration(text)

@@ -217,7 +217,7 @@ def test_anUnboundedRangeIsNotABoundedOneOverTheSameCells() -> None:
 def test_anUnboundedRangeCannotBeWalkedUntilItIsBounded() -> None:
     with pytest.raises(ReferenceError):
         list(CellRange.parse("A"))
-    bounded = CellRange.parse("A").boundedBy(CellRange(1, 1, 3, 3))
+    bounded = CellRange.parse("A").resolve(CellRange(1, 1, 3, 3))
     assert [str(address) for address in bounded] == ["A1", "A2", "A3"]
 
 
@@ -342,7 +342,7 @@ def test_aMergeExpressesItsExtentAsARange() -> None:
 
 
 def test_aMergeCannotBeUnbounded() -> None:
-    """A merged region covers a fixed block, which a whole-column range does not."""
+    """A merge covers a fixed block, which a whole-column range does not."""
     with pytest.raises(ReferenceError):
         MergeRange(CellRange.parse("A"))
 
@@ -369,22 +369,22 @@ def test_aCellSwallowedByAMergeIsNotAddressable() -> None:
 
 
 def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
-    """A merged region is one cell, so a range over it returns one cell."""
+    """A merge is one cell, so a range over it returns one cell."""
     table = buildMergedTable()
     assert [str(each.address) for each in table.select("A1:C1[kind]")] == [
         "A1", "C1"
     ]
     with pytest.raises(pybers.ReferenceError, match="covered by the merge A1:B1"):
         table.select("B1")
-    assert table.addressable("A1") is True
-    assert table.addressable("B1") is False
+    assert table.isAddressable("A1") is True
+    assert table.isAddressable("B1") is False
 
 
-def test_mergeCoveringStillTellsACoveredCellFromAnEmptyOne() -> None:
+def test_mergeFindStillTellsACoveredCellFromAnEmptyOne() -> None:
     table = buildSampleTable()
     table.mergeRanges.append(MergeRange(CellRange.parse("A1:B1")))
-    assert table.mergeCovering("B1") is not None
-    assert table.mergeCovering("C2") is None
+    assert table.mergeFind("B1") is not None
+    assert table.mergeFind("C2") is None
 
 
 # ── AC 8: refusals name what was rejected, and one conversion exists ─────────

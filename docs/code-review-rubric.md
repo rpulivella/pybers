@@ -36,5 +36,7 @@ the file notice where this change starts?
 than *what*? Do names follow the project convention of leading with the common word for a
 module or feature, so a family sorts together in a list? Are scientific and geometric
 values unambiguous? `x` and `y` say nothing, `mercatorX` and `mercatorY` say where they
-live, and `cieX1931` beats `cieX` because it names the observer. Bytes in uncompiled code
-are the cheapest thing we have. Name things so they can be read in twenty-four months.
+live, and `cieX1931` beats `cieX` because it names the observer. Does every public name and
+command take its words from `docs/vocabulary.md`, and does a new word join that page in
+the same pull request? Bytes in uncompiled code are the cheapest thing we have. Name
+things so they can be read in twenty-four months.

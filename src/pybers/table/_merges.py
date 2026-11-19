@@ -45,9 +45,9 @@ mergeOwnerKind: int = 5
 def writeMergeFormula(
     store: tst.FormulaStoreArchive, merge: MergeRange, ownerUid: tsp.UUID
 ) -> None:
-    """Add one merged region to a table's merge store, as the formula Numbers writes.
+    """Add one merge to a table's merge store, as the formula Numbers writes.
 
-    **A merge is stored as a formula, not as a flag on a cell.** Each region is a
+    **A merge is stored as a formula, not as a flag on a cell.** Each merge is a
     complete formula shaped like `SUM($A$1:$B$1)`: a colon-tract node carrying the
     rectangle with all four sticky bits set, then the function node for SUM. Nothing
     evaluates it; the shape is how a merge is expressed.

@@ -13,6 +13,8 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-11-19  `resolve` fills a range's unbounded axes, as `slice.indices` does, for
+            PYB-301.
 2026-11-18  A range prints its table through `addressing.text`, for PYB-267.
 2026-11-03  `SelectionMatch`, one thing a selector matches, for PYB-223.
 2026-10-27  A range names its table when its context needs one, as a reference
@@ -328,7 +330,7 @@ class CellRange:
         )
         return withinRows and withinCols
 
-    def boundedBy(self, extent: CellRange) -> CellRange:
+    def resolve(self, extent: CellRange) -> CellRange:
         """Return this range with each unbounded axis filled in from an extent.
 
         A range knows nothing about the table it is used against, so a whole-column
@@ -378,7 +380,7 @@ class CellRange:
         """Yield every cell this range covers, row by row and left to right.
 
         An unbounded range cannot be walked, and refusing is better than inventing
-        a limit. `boundedBy` supplies the missing end.
+        a limit. `resolve` supplies the missing end.
         """
         if self.startRow is None or self.endRow is None:
             raise ReferenceError(f"{self} spans every row and cannot be walked.")

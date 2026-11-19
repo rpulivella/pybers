@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """\
-`pybers locale`, run the way a person or an agent at a command line runs it.
+`pybers set --locale`, run the way a person or an agent at a command line runs it.
 
 Each test changes a copy of `95-region-base`, a document under `en_US`, and the
 measurements derived from it record what Numbers writes for each region.
 
 UPDATES
+2026-11-19  `set --locale` in place of the `locale` command, for PYB-301.
 2026-11-03  The region prints as `show` prints it, read or changed, and the
             regions offered are no longer listed, for PYB-223.
 2026-10-28  Written for PYB-272.
@@ -39,9 +40,14 @@ def working(tmp_path: Path) -> Path:
     return copyDocument("95-region-base", tmp_path)
 
 
-def runLocaleCommand(*arguments: str | Path) -> Result:
-    """Return what `pybers locale` does with these arguments."""
-    return runner.invoke(app, ["locale", *(str(each) for each in arguments)])
+def runLocaleCommand(document: Path, identifier: str, *arguments: str | Path) -> Result:
+    """Return what `pybers set --locale` does with these arguments."""
+    return runner.invoke(
+        app, [
+            "set", str(document), "--locale", identifier,
+            *(str(each) for each in arguments),
+        ],
+    )
 
 
 def testACommandChangesTheDocumentItNames(working: Path) -> None:
@@ -82,7 +88,7 @@ def testARegionPybersDoesNotOfferIsRefused(working: Path) -> None:
     assert result.exit_code == 1
     assert result.stdout == ""
     assert result.stderr.startswith(
-        "pybers locale: No region pybers offers is named 'de_XX'. The closest of the "
+        "pybers set: No region pybers offers is named 'de_XX'. The closest of the "
     )
     assert pybers.open(working).localeIdentifier == "en_US"
 
@@ -98,21 +104,33 @@ def testANewFileThatExistsIsRefusedLeavingIt(working: Path, tmp_path: Path) -> N
     assert existing.read_bytes() == before
 
 
-def testWithNoRegionTheCommandShowsTheDocumentsRegionAsShowDoes(
-    working: Path,
-) -> None:
-    result = runLocaleCommand(working)
-    assert result.exit_code == 0
-    assert result.stdout.splitlines() == ["Locale: en_US"]
+def testTheRegionPrintsAsShowPrintsIt(working: Path) -> None:
+    result = runLocaleCommand(working, "en_US")
     shown = runner.invoke(app, ["show", str(working)]).stdout.splitlines()
-    assert shown[0] == "Locale: en_US"
+    assert result.stdout.splitlines() == [shown[0]]
 
 
-@pytest.mark.parametrize(("arguments", "region"), [
-    ((), "en_US"), (("de_DE", "--preview"), "de_DE"),
-])
-def testJsonIsTheRegionUnderItsJsonFormKey(
-    working: Path, arguments: tuple[str, ...], region: str
+def testJsonIsTheRegionUnderItsJsonFormKey(working: Path) -> None:
+    result = runLocaleCommand(
+        working, "de_DE", "--preview", "--output-format", "json"
+    )
+    assert json.loads(result.stdout) == {"localeIdentifier": "de_DE"}
+
+
+@pytest.mark.parametrize("arguments", [("Sheet 1",), ("Sheet 1::Table 1::A1", "1")])
+def testALocaleGivenWithASelectorIsRefusedWritingNothing(
+    working: Path, arguments: tuple[str, ...]
 ) -> None:
-    result = runLocaleCommand(working, *arguments, "--format", "json")
-    assert json.loads(result.stdout) == {"localeIdentifier": region}
+    before = working.read_bytes()
+    result = runner.invoke(
+        app, ["set", str(working), *arguments, "--locale", "de_DE"]
+    )
+    assert result.exit_code == 2
+    assert "--locale sets the whole document" in readPlainText(result.stderr)
+    assert working.read_bytes() == before
+
+
+def testSetGivenNeitherASelectorNorALocaleIsRefused(working: Path) -> None:
+    result = runner.invoke(app, ["set", str(working)])
+    assert result.exit_code == 2
+    assert "Give a SELECTOR, or a --locale." in readPlainText(result.stderr)

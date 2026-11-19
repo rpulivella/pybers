@@ -4,10 +4,10 @@ The JSON form: one structure for a document and its parts that every tool agrees
 
 One serializer. `formatJsonForm` writes a document, a sheet, a table, a range, a
 cell or a color under the form's version, and any other value pybers returns, a
-`Check` or a `CellChange`, by the same rules without one, so `--format json` and a
-script never disagree. `parseJsonForm` reads the form back into a model equal to the one
-written. The rules each value follows, and what change requires a new version, are
-in `docs/decisions.md`, and `schema.json` beside this module describes the form.
+`Check` or a `CellChange`, by the same rules without one, so `--output-format json`
+and a script never disagree. `parseJsonForm` reads the form back into a model equal to
+the one written. The rules each value follows, and what change requires a new version,
+are in `docs/decisions.md`, and `schema.json` beside this module describes the form.
 
 A feature owns its own part of the form, `table/_form.py` and `document/_form.py`,
 and this package owns only the mechanism, so a feature adding a field adds no code

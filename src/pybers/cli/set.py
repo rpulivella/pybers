@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-`pybers set`: the value, format, control, cell style and borders of the cells matched.
+`pybers set`: the cells and tables a selector matches, or a document's locale.
 
 The command reads the text into a value and a format, makes one `cellSet` call, and
 saves only
@@ -9,6 +9,7 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-19  `--locale` sets a document's language and region, for PYB-301.
 2026-11-18  `--table-style` lists `banded-rows`, for PYB-267.
 2026-11-17  `--table-style` sets the lines of each table matched, for PYB-266.
 2026-11-17  `--border` draws borders on one block, with `--border-style`,
@@ -40,10 +41,12 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/20"
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.text import Text
 
 import pybers
 from pybers.cli._common import (
@@ -67,6 +70,19 @@ borderPositions: tuple[str, ...] = (
 borderStyles: tuple[str, ...] = ("solid", "dashed", "dotted", "hidden")
 
 
+@dataclass(frozen=True, slots=True)
+class DocumentLocale:
+    """A document's language and region, under the key its JSON form gives it."""
+
+    localeIdentifier: str | None
+
+
+def formatLocale(locale: DocumentLocale) -> Text:
+    """Return a document's locale as `pybers show` prints it."""
+    current = locale.localeIdentifier
+    return formatLine("Locale", (current, "identifier") if current else "none")
+
+
 def runSet(
     context: typer.Context,
     documentPath: Annotated[
@@ -76,17 +92,18 @@ def runSet(
         ),
     ],
     selector: Annotated[
-        str,
+        str | None,
         typer.Argument(
-            metavar="SELECTOR",
+            metavar="[SELECTOR]",
             # A backslash keeps Rich from reading a condition as markup.
             help=(
                 "The cells to set: `Budget::Q3::B4`, `::Q3::B4` for B4 of every table "
-                "named Q3, or `Budget::Q*::B2:B9\\[kind=number]`."
+                "named Q3, or `Budget::Q*::B2:B9\\[kind=number]`. Left out with "
+                "--locale."
             ),
             show_default=False,
         ),
-    ],
+    ] = None,
     value: Annotated[
         str | None,
         typer.Argument(
@@ -219,6 +236,17 @@ def runSet(
             ),
         ),
     ] = None,
+    locale: Annotated[
+        str | None,
+        typer.Option(
+            "--locale",
+            metavar="LOCALE",
+            help=(
+                "The document's language and region, such as de_DE or en_GB, given "
+                "with no SELECTOR."
+            ),
+        ),
+    ] = None,
     conflict: Annotated[
         pybers.CellFormatConflict,
         typer.Option(
@@ -240,8 +268,19 @@ def runSet(
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
 ) -> None:
-    """Set every cell SELECTOR matches to a value, format, control, style or borders."""
+    """Set what SELECTOR matches, or with --locale the document's locale."""
     cellParts = (value, cellFormat, cellControl, cellStyle)
+    if locale is not None:
+        if selector is not None or any(
+            part is not None for part in (*cellParts, border, tableStyle)
+        ):
+            raise typer.BadParameter(
+                "--locale sets the whole document, so give it without a SELECTOR."
+            )
+        setLocale(context, documentPath, locale, output, preview, outputFormat)
+        return
+    if selector is None:
+        raise typer.BadParameter("Give a SELECTOR, or a --locale.")
     if border is None and any(
         part is not None for part in (borderStyle, borderWidth, borderColor)
     ):
@@ -335,6 +374,21 @@ def runSet(
     for reference, reason in skipped:
         statusConsole.print(formatLine("Skipped", f"{reference}  {reason}"))
     reportWrite(changed, target, "already set")
+
+
+def setLocale(
+    context: typer.Context, documentPath: Path, identifier: str, output: Path | None,
+    preview: bool, outputFormat: OutputFormat,
+) -> None:
+    """Change a document's locale and print it, saving only a change."""
+    target = findSaveTarget(documentPath, output, preview)
+    with reportPybersErrors(context):
+        document = pybers.open(documentPath)
+        changed = document.localeSet(identifier).changed
+        if target is not None and changed:
+            document.save(target)
+    printResult(DocumentLocale(document.localeIdentifier), outputFormat, formatLocale)
+    reportWrite(changed, target, f"already {document.localeIdentifier}")
 
 
 __all__ = ["runSet"]

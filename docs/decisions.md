@@ -274,7 +274,7 @@ bare `pybers FILE` already covers looking at one document. `set` infers a value'
 `--as` overrides the inference; should inference prove unreliable, `set` falls back to text
 unless `--as` names a kind. The inference is one table of parsers built on the standard
 library, tried in order, rather than a chain of conditions. `set --cell-format` sets a
-format by its text form, with or without a value, since `--format` chooses every command's
+format by its text form, with or without a value, since `--output-format` chooses every command's
 output. A writing verb changes FILE itself, since the verb names the act, as a
 database tool changes the database it is given. `--preview` writes nothing, the flag named
 for what it does, and `-o NEW` writes a new document instead, refusing any file that
@@ -377,12 +377,12 @@ writing pybers' data agrees on, built in PYB-259. `pybers.formatJsonForm` writes
 `pybers.parseJsonForm` reads it back into an equal model. A model with unsaved edits
 reads back with the same form but compares unequal, since equality includes the stored
 record a save replaces, and the form carries what a cell shows rather than that record.
-It is the only serializer pybers holds: `--format json` in every command, the golden
+It is the only serializer pybers holds: `--output-format json` in every command, the golden
 confirmations and any script reach it, so no two of them can disagree. A `Color` writes
 its own form too and reads back equal, its fields rather than its text.
 `src/pybers/interchange/schema.json` describes it, generated from the model.
 
-**What a command prints as JSON reads back.** A command's stdout under `--format json`
+**What a command prints as JSON reads back.** A command's stdout under `--output-format json`
 is a JSON form `parseJsonForm` reads, never a report shaped for one command: `show` and
 `set` print the parts they reach, a selector's parts always as an array, and a part a
 write skipped is a diagnostic on stderr, as `Written:` is. A `Check` and the region
@@ -660,6 +660,29 @@ since the form reports what a merge draws rather than how each position stores i
 its control always writes them equal, so a document whose slots differ cannot be made or
 edited in Numbers. Five that differ read as `MIXED` and survive untouched, and a write
 over them sets all five.
+
+---
+
+## Changing part of a style is an update, decided 18 November 2026
+
+PYB-290 chooses the word for an operation that changes some properties of a cell's style
+and keeps the rest.
+
+**A set replaces, and an update changes only what it states.** `document.cellSet` given a
+`cellStyle`, and `pybers set --cell-style`, replace a cell's whole style, as CSS `cssText`
+replaces an inline style. An update writes each property it states and leaves every other
+property as the cell had it, as Python's `dict.update` does and as assigning one property
+of a CSS `element.style` does. The method is `cellStyleUpdate`, and `docs/vocabulary.md`
+defines Update.
+
+**Merge and add were refused because pybers already uses both.** A merge joins cells into
+one, as `mergeAdd`, `mergeRemove` and `MergeRange` do, so `cellStyleMerge` would read as
+styling a merged cell. An add inserts something new, as `rowAdd` and `sheetAdd` do, and an
+update changes what exists.
+
+**The words are vocabulary for the whole API, not one method's name.** Every operation
+combining stated properties with existing ones is an update, internal functions included,
+and merge refers only to merged cells.
 
 ---
 

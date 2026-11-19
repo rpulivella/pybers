@@ -49,9 +49,9 @@ def test_aMergeIsReportedForEveryPositionItCovers() -> None:
 
     assert isinstance(merge, MergeRange)
     assert merge.anchor == pybers.CellAddress(1, 1)
-    assert table.mergeCovering("A1") is merge
-    assert table.mergeCovering("B1") is merge
-    assert table.mergeCovering("C1") is None
+    assert table.mergeFind("A1") is merge
+    assert table.mergeFind("B1") is merge
+    assert table.mergeFind("C1") is None
 
 
 def test_aMergeAcrossRowsAndColumnsCoversTheWholeBlock() -> None:
@@ -61,7 +61,7 @@ def test_aMergeAcrossRowsAndColumnsCoversTheWholeBlock() -> None:
     covered = [
         reference
         for reference in ("A1", "B1", "A2", "B2")
-        if table.mergeCovering(reference) is not None
+        if table.mergeFind(reference) is not None
     ]
     assert covered == ["A1", "B1", "A2", "B2"]
 
@@ -98,8 +98,8 @@ def test_aCoveredCellCannotBeReachedThroughTheTable() -> None:
     table = openUnmergedTable()
     table.mergeAdd("A1:B1")
 
-    assert table.addressable("A1") is True
-    assert table.addressable("B1") is False
+    assert table.isAddressable("A1") is True
+    assert table.isAddressable("B1") is False
 
 
 # ── AC 2: unmerging returns ordinary, empty cells ────────────────────────────
@@ -112,7 +112,7 @@ def test_unmergingReturnsTheBlockToOrdinaryCells() -> None:
 
     assert removed.extent == pybers.CellRange(1, 1, 1, 2)
     assert table.mergeRanges == []
-    assert table.addressable("B1") is True
+    assert table.isAddressable("B1") is True
 
 
 def test_aCoveredValueDoesNotComeBack() -> None:

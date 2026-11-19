@@ -164,7 +164,7 @@ def readParagraphAlignment(index: ArchiveIndex, identifier: int) -> str:
 def readModelAlignments(
     index: ArchiveIndex, model: tst.TableModelArchive
 ) -> tuple[tuple[str, ...], ...]:
-    """Return every cell's stated alignment, its own paragraph style over its region's.
+    """Return every cell's stated alignment, its own paragraph style over its section's.
 
     Where a header row meets a header column the row's style is taken, unmeasured.
     """
@@ -180,7 +180,7 @@ def readModelAlignments(
     for row in range(1, rows + 1):
         line = []
         for column in range(1, columns + 1):
-            region = (
+            section = (
                 model.header_row_text_style if row <= model.number_of_header_rows
                 else model.footer_row_text_style
                 if row > rows - model.number_of_footer_rows
@@ -188,7 +188,7 @@ def readModelAlignments(
                 if column <= model.number_of_header_columns
                 else model.body_text_style
             )
-            styleId = own.get((row, column), region.identifier)
+            styleId = own.get((row, column), section.identifier)
             line.append(readParagraphAlignment(index, styleId))
         grid.append(tuple(line))
     return tuple(grid)

@@ -175,7 +175,7 @@ def fillCells(
         toRelocationRule(references) is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
     )
     rule = toValueRule(values)
-    extent = table.rangeSingle(source, "fill")
+    extent = table._rangeSingle(source, "fill")
     refuseMergeInBlock(table, extent)
     targets = [
         position for position in listRangePositions(table, through)

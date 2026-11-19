@@ -165,7 +165,7 @@ def addBorders(table: Table, form: CellForm) -> None:
     does not, which is all that decides the line drawn. A side `MIXED` along a merge
     holds no one stroke to store.
     """
-    merge = table.mergeCovering(form.address)
+    merge = table.mergeFind(form.address)
     extent = merge.extent if merge is not None else CellRange.fromReferences(
         form.address, form.address
     )

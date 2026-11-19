@@ -64,7 +64,7 @@ from pybers.format.formats import (
 )
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
-from pybers.formula.render import renderFormula
+from pybers.formula.render import formatFormula
 from pybers.style.cells import CellStyle, findOverrides
 from pybers.table.borders import CellBorders
 from pybers.table.kinds import (
@@ -316,7 +316,7 @@ class Cell:
         """
         if self.formula is None:
             return None
-        return renderFormula(
+        return formatFormula(
             self.formula, self.address, tables=self.tableNames, sizes=self._tableSizes
         )
 
@@ -582,7 +582,7 @@ class Cell:
         """Return the merge this cell anchors, or None when it anchors none."""
         if self.table is None:
             return None
-        merge = self.table.mergeCovering(self.address)
+        merge = self.table.mergeFind(self.address)
         if merge is None or merge.anchor != self.address:
             return None
         return merge

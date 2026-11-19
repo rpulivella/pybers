@@ -41,7 +41,7 @@ from pybers.formula.nodes import (
     FormulaRange,
     FormulaReference,
 )
-from pybers.formula.render import findShortestNames, renderAddress
+from pybers.formula.render import findShortestNames, formatAddress
 from pybers.table.cell import Cell
 from pybers.table.cells import Table
 
@@ -99,7 +99,7 @@ class ReferenceLocation:
     @property
     def text(self) -> str:
         """This reference as Numbers spells it, `Table 2::A1`, qualified as needed."""
-        return renderAddress(
+        return formatAddress(
             self.node, self.cell.address, findShortestNames(self.cell.tableNames)
         )
 

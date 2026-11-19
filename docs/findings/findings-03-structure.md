@@ -12,7 +12,7 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 From `22-merge-2x2` and `22b-merge-unmerged`, a pair differing only by whether the merges
 exist. That pairing is what made this findable: presence checks had already misled once.
 
-**A merge region lives in `TableModelArchive.merge_owner.formula_store.formulas[]`**, and each
+**A merge lives in `TableModelArchive.merge_owner.formula_store.formulas[]`**, and each
 one is a complete `TSCE.FormulaArchive`:
 
 ```
@@ -23,7 +23,7 @@ COLON_TRACT_NODE
 FUNCTION_NODE   index=168  numArgs=1
 ```
 
-Structurally that is `SUM($A$1:$B$1)`. Numbers expresses a merged region by reusing the
+Structurally that is `SUM($A$1:$B$1)`. Numbers expresses a merge by reusing the
 reference machinery it already had, so merges participate in the same dependency and
 reference system as real formulas rather than being a parallel mechanism.
 
@@ -449,9 +449,9 @@ covered cell. Selecting `A1:G1` alone left Paste disabled, so the recipe copies 
 
 ## Styles exist per REGION, not per row or column
 
-The header rows, the header columns and the footer rows are each a region of the table,
+The header rows, the header columns and the footer rows are each a section of the table,
 the three Numbers' Headers & Footer controls set. `TST.TableModelArchive` carries a style
-reference for the body and for each region, and nothing else:
+reference for the body and for each section, and nothing else:
 
 ```
 table_style          the whole table
@@ -466,7 +466,7 @@ footer_row_style     the footer rows     (+ footer_row_text_style)
 
 The reading above was from the schema and it was wrong in both halves. Measured against `40`:
 
-**A region's style is only a parent.** `header_row_style` is a root `CellStyleArchive`
+**A section's style is only a parent.** `header_row_style` is a root `CellStyleArchive`
 (`is_variation: False`, `override_count: 4`) that no cell references directly. Every styled
 cell (header, footer **and body**) carries its own reference to an anonymous *variation*
 whose `parent` is the appropriate template:
@@ -479,7 +479,7 @@ plain body    -> no style reference at all
 ```
 
 Formatting a header row and formatting a body row are **the same operation against
-different parents**. Neither is a single-property write to a region, and the earlier design
+different parents**. Neither is a single-property write to a section, and the earlier design
 consequence (that `setHeaderRowStyle` round-trips as intent while `setRowStyle` is sugar)
 does not hold. Both are N cell writes.
 
@@ -508,12 +508,12 @@ operation, and a reader must not depend on it being populated.
 ## Header and footer membership: precedence, overlaps, and what survives un-setting
 
 `40-table-bands` maxes every count, 5 header rows, 5 header columns, 5 footer rows on a
-19x11 table, and labels the two overlap regions, so the corners can be attributed.
+19x11 table, and labels the two overlap sections, so the corners can be attributed.
 
 **Precedence is header row > header column > footer row.** Styling the header column left
 the top-left corner on the header-**row** style; styling the footer left the bottom-left
-corner on the header style. A corner belongs to the higher region, and styling a lower
-region stops at the boundary rather than painting over it.
+corner on the header style. A corner belongs to the higher section, and styling a lower
+section stops at the boundary rather than painting over it.
 
 **Five is the maximum** for each of the three counts. Header rows always sit at the top,
 header columns at the left and footer rows at the bottom, and none can be placed mid-table.
@@ -526,7 +526,7 @@ header rows beside 4 footer rows, or 2 beside 5, and a four-column table at most
 columns. Observed by the maintainer in Numbers 15.4 on 5 November 2026, on a copy of the
 golden `00-created-headers-set-by-pybers`, whose counts Numbers read as pybers set them.
 
-**Each region has TWO templates, not one:** `header_row_style` for cell appearance and
+**Each section has TWO templates, not one:** `header_row_style` for cell appearance and
 `header_row_text_style` for text, each acting as a parent for its own kind of variation.
 
 **The four cell templates differ in exactly one property.** Body, header row, header column
@@ -534,9 +534,9 @@ and footer row all carry identical `padding` (4 on every side), `text_wrap: True
 `vertical_alignment: 0`; only `cell_fill` differs, and the body and footer fills are empty.
 That is why removing header or footer rows changes less than expected.
 
-**Un-setting a region re-parents its cells and preserves their overrides.** Setting header rows
+**Un-setting a section re-parents its cells and preserves their overrides.** Setting header rows
 from 5 back to 0 leaves each cell's explicit fill intact but re-parents its style from
-`header_row_style` to the body style. The appearance the user chose survives; the region's
+`header_row_style` to the body style. The appearance the user chose survives; the section's
 own default fill, its text-style parent, and its effects (frozen, repeat-on-print) do not.
 Whether a cell is a header or footer cell is **not** recoverable from its styling after the
 fact.

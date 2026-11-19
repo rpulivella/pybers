@@ -253,8 +253,8 @@ def test_aCoveredCellIsDistinguishableFromAnEmptyOne() -> None:
     table = openOnlyTable("22-merge-2x2")
     assert CellReference.parse("B1") not in table.cells
     assert CellReference.parse("H2") not in table.cells
-    assert table.mergeCovering("B1") is not None
-    assert table.mergeCovering("H2") is None
+    assert table.mergeFind("B1") is not None
+    assert table.mergeFind("H2") is None
 
 
 def test_aCoveredCellIsNotAddressableAndLeavesNoRecord() -> None:

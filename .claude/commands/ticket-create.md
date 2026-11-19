@@ -83,6 +83,8 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
    ACs nest **one level**, an indented ordered list with markers all `1.` since markdown
    counts them. GitHub shows `i.`, `ii.`, so cite `4.ii`. A third level means two tickets.
    **Docs are ACs too**, under the rule in `.github/ticket_template.md`.
+   **A name an AC proposes uses the words in `docs/vocabulary.md`**, and a new word is
+   an AC adding it there.
 3. **Design** (optional), under a `## Design` heading: CLI, TUI or GUI specifications,
    Figma links, screenshots or wireframes. Reference for the outcome, never
    implementation, and never in place of an AC.

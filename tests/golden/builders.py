@@ -92,7 +92,7 @@ def holdSeededIdentities(name: str) -> Iterator[None]:
 
 def findShownText(table: pybers.Table, address: pybers.CellAddress) -> str:
     """Return what a cell holds as text: its formula, value, or the merge over it."""
-    merge = table.mergeCovering(address)
+    merge = table.mergeFind(address)
     if merge is not None and merge.anchor != address:
         return f"covered by the merge {merge.extent}"
     cell = table.cell(address)
@@ -121,7 +121,7 @@ def findPresentationText(table: pybers.Table, address: pybers.CellAddress) -> st
     The pick is left out because it is UNDETERMINED until a save, and a label is
     written before one. A merge's covered cell shows nothing of its own.
     """
-    merge = table.mergeCovering(address)
+    merge = table.mergeFind(address)
     if merge is not None and merge.anchor != address:
         return ""
     shown = table.cell(address).presentation

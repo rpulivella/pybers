@@ -5,10 +5,11 @@ Views rather than lists, because `Table.cell` creates a cell on first access and
 keeps it. A list would create every cell it held just to be measured or sliced,
 so these hold row and column numbers and create a cell only when one is reached.
 
-A position a merge swallowed is not in its row, which is `Table.addressable`
+A position a merge swallowed is not in its row, which is `Table.isAddressable`
 answering, so indexing a row counts the cells in it rather than its columns.
 
 UPDATES
+2026-11-19  `TableRow.addresses`, a property, for PYB-301.
 2026-09-14  Written for PYB-62.
 """
 from __future__ import annotations
@@ -91,7 +92,8 @@ class TableRow(Sequence["Cell"]):
         self.rowNumber = rowNumber
         self.columnNumbers = columnNumbers
 
-    def cellAddresses(self) -> list[CellAddress]:
+    @property
+    def addresses(self) -> list[CellAddress]:
         """Return the address of every cell in this row, a covered position omitted.
 
         Asked of the table on every call rather than kept, because a merge made after
@@ -99,7 +101,7 @@ class TableRow(Sequence["Cell"]):
         """
         candidates = (CellAddress(self.rowNumber, col) for col in self.columnNumbers)
         return [
-            reference for reference in candidates if self.table.addressable(reference)
+            reference for reference in candidates if self.table.isAddressable(reference)
         ]
 
     @overload
@@ -111,25 +113,25 @@ class TableRow(Sequence["Cell"]):
     def __getitem__(self, index: int | slice) -> Cell | TableRow:
         """Return one cell, or the cells a slice selects as another view."""
         if isinstance(index, slice):
-            selected = [reference.col for reference in self.cellAddresses()[index]]
+            selected = [reference.col for reference in self.addresses[index]]
             return TableRow(self.table, self.rowNumber, tuple(selected))
-        return self.table.cell(self.cellAddresses()[index])
+        return self.table.cell(self.addresses[index])
 
     def __iter__(self) -> Iterator[Cell]:
         """Yield each cell once, left to right, finding the addresses only once."""
-        for reference in self.cellAddresses():
+        for reference in self.addresses:
             yield self.table.cell(reference)
 
     def __len__(self) -> int:
         """Return how many cells this row holds, creating none."""
-        return len(self.cellAddresses())
+        return len(self.addresses)
 
     def __contains__(self, candidate: object) -> bool:
         """Report whether a cell is one this row holds, creating none to find out."""
         # The inherited test walks the row, which would create every cell in it.
         return any(
             self.table.cells.get(reference) is candidate
-            for reference in self.cellAddresses()
+            for reference in self.addresses
         )
 
     def __eq__(self, other: object) -> bool:

@@ -21,6 +21,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-18  `tableFind` takes find's verb, for PYB-301.
 2026-11-18  A refusal lists names as reference text, quoted verbatim, for PYB-267.
 2026-11-17  `cellBordersSet`, borders drawn at a position of one block, for
             PYB-266.
@@ -609,7 +610,7 @@ class Document:
         block = findMergedBlock(table, block)
         before = {
             address: table._bordersRead(address)
-            for address in findBlockRing(table, block) if table.addressable(address)
+            for address in findBlockRing(table, block) if table.isAddressable(address)
         }
         drawn = set(applyBlockBorders(table, block, position, stroke))
         changes = []
@@ -627,7 +628,7 @@ class Document:
             ))
         return CellChanges(tuple(changes))
 
-    def tableFor(self, identity: str) -> Table:
+    def tableFind(self, identity: str) -> Table:
         """Return the table a formula names by identity, or raise saying which.
 
         The reverse of `Sheet.tableIdentities`, and the reason renaming a table cannot

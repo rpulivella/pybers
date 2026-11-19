@@ -108,7 +108,7 @@ def readSavedCells(path: Path) -> dict[SavedAddress, SavedCell]:
                 if store.format_table.identifier else {}
             )
             for address, record in iterateCellRecords(index, model, path):
-                if not table.addressable(address):
+                if not table.isAddressable(address):
                     continue
                 key = findDisplayedFormatKey(record)
                 where = (sheetArchive.name, model.table_name, str(address))

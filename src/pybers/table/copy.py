@@ -60,7 +60,7 @@ def copyCells(
 
     rule = toRelocationRule(references)
     named = rule is FormulaReferenceRelocation.PRESERVE_NAMED_CELL
-    extent = table.rangeSingle(source, "copy")
+    extent = table._rangeSingle(source, "copy")
     landing = table._addressResolve(anchor)
     startRow, startCol, _, _ = findBlockCorners(extent)
     copy = CellsMove(extent, landing.row - startRow, landing.col - startCol)
@@ -77,7 +77,7 @@ def copyCells(
     # Every position, empty ones included, since a paste empties the destination.
     copied = [
         table.cell(reference) for reference in extent
-        if table.addressable(reference)
+        if table.isAddressable(reference)
     ]
     for reference in destination:
         table._cells.pop(reference, None)
