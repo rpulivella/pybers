@@ -663,6 +663,28 @@ over them sets all five.
 
 ---
 
+## Changing part of a style is an update, decided 18 November 2026
+
+PYB-290 names the operation that changes some properties of a cell's style and keeps the
+rest.
+
+**A set replaces, and an update changes only what it states.** `document.cellSet` given a
+`cellStyle`, and `pybers set --cell-style`, replace a cell's whole style, as CSS `cssText`
+replaces an inline style. An update writes each property it states and leaves every other
+property as the cell had it, as Python's `dict.update` does and as assigning one property
+of a CSS `element.style` does. The method is `cellStyleUpdate`.
+
+**Merge and add were refused because pybers already uses both.** A merge joins cells into
+one, as `mergeAdd`, `mergeRemove` and `MergeRange` do, so `cellStyleMerge` would read as
+styling a merged cell. An add inserts something new, as `rowAdd` and `sheetAdd` do, and an
+update changes what exists.
+
+**The words are vocabulary for the whole API, not one method's name.** Every operation
+combining stated properties with existing ones is an update, internal functions included,
+and merge refers only to merged cells.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on

@@ -11,6 +11,7 @@ properties copied in, as `99-cell-fill-in-a-created-table` measured.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-18  Combining styles is an update, for PYB-290.
 2026-11-13  A cell's variation inherits from its region's first non-variation
             style, for PYB-265.
 2026-11-12  Written for PYB-265.
@@ -89,11 +90,11 @@ def readRegionVariations(
             stated.append(readCellStyle(archive))
             identifier = int(archive.super.parent.identifier)
             archive = index.identifierResolve(identifier, tst.CellStyleArchive)
-        found[region] = RegionVariation(identifier, mergeCellStyles(*stated))
+        found[region] = RegionVariation(identifier, updateCellStyles(*stated))
     return frozendict(found)
 
 
-def mergeCellStyles(*styles: CellStyle) -> CellStyle:
+def updateCellStyles(*styles: CellStyle) -> CellStyle:
     """Return one style stating each property the first of `styles` to state it does."""
     return CellStyle(
         background=next((each.background for each in styles if each.background), None),
@@ -135,11 +136,11 @@ def writeAskedCellStyle(
     if asked is UNCHANGED:
         return raw
     variation = variations[table.headers.regionFind(cell.address, table.rowCount)]
-    copied = None if asked is None else mergeCellStyles(asked, variation.copied)
+    copied = None if asked is None else updateCellStyles(asked, variation.copied)
     return applyCellStyle(index, pool, raw, copied, variation.root)
 
 
 __all__ = [
-    "RegionVariation", "mergeCellStyles", "readOwnCellStyles", "readRegionCellStyles",
+    "RegionVariation", "updateCellStyles", "readOwnCellStyles", "readRegionCellStyles",
     "readRegionVariations", "regionStyleSlots", "writeAskedCellStyle",
 ]
