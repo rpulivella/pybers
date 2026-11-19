@@ -232,6 +232,8 @@ functions over explanation.
   by its builder in `tests/golden/builders.py`, confirmed once in real Numbers, then
   locked in as a permanent regression check. Numbers makes fixtures and measurements, and
   whatever pybers writes is a golden, never a measurement.
+- **In a golden, measurement, or test, a label describing a cell should have wrap
+  enabled** so it reads easily in the sheet.
 - **Every new golden starts from a document `pybers.create` made.** A golden starting
   from a fixture or measurement names the ticket that enables pybers to create what it
   edits, or a stated reason, and a test fails when it names neither.
