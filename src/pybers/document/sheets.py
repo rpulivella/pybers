@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-19  `cellSet` writes through `_cellsWrite`, which composes each cell's style,
+            for PYB-290.
 2026-11-18  `tableFind` takes find's verb, for PYB-301.
 2026-11-18  A refusal lists names as reference text, quoted verbatim, for PYB-267.
 2026-11-17  `cellBordersSet`, borders drawn at a position of one block, for
@@ -76,7 +78,7 @@ __date__ = "2026/09/02"
 
 import datetime
 from collections import Counter
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
@@ -134,6 +136,9 @@ if TYPE_CHECKING:
     from pybers.document.references import ReferenceLocation
     from pybers.selection.matching import SelectionMatch
     from pybers.selection.selector import SelectorLike
+
+# Given a cell's own style, the style a write leaves it with.
+type CellStyleCompose = Callable[[CellStyle | None], CellStyle | None]
 
 # Sheets and tables both count from one, matching the rest of the model and matching
 # what Numbers shows. The file counts from zero and the two meet only in the reader.
@@ -471,8 +476,6 @@ class Document:
         show a cell's value is refused before any cell changes, unless `conflict`
         falls back to Automatic for that cell and says so.
         """
-        from pybers.selection.matching import findCellTargets, findExtendTarget
-
         if all(part is UNCHANGED for part in (value, format, control, cellStyle)):
             raise WriteError(
                 "cellSet was given no value, format, control or cell style to set."
@@ -486,6 +489,32 @@ class Document:
             refusal = findCellStyleRefusal(cellStyle)
             if refusal is not None:
                 raise WriteError(f"{refusal} Nothing was written.")
+        return self._cellsWrite(
+            selector, value, format=format, control=control,
+            cellStyleCompose=(
+                UNCHANGED if cellStyle is UNCHANGED else lambda own: cellStyle
+            ),
+            conflict=conflict, extend=extend,
+        )
+
+    def _cellsWrite(
+        self,
+        selector: SelectorLike,
+        value: object,
+        *,
+        format: CellFormat | UNCHANGED,
+        control: CellControl | None | UNCHANGED,
+        cellStyleCompose: CellStyleCompose | UNCHANGED,
+        conflict: CellFormatConflict,
+        extend: bool,
+    ) -> CellChanges:
+        """Write each part given to every matched cell, its style composed per cell.
+
+        The one write path of `cellSet` and the cell style updates, so each finds its
+        cells, skips a formula and reports its changes alike.
+        """
+        from pybers.selection.matching import findCellTargets, findExtendTarget
+
         targets, skipped = (
             ([findExtendTarget(self, selector)], []) if extend
             else findCellTargets(self, selector)
@@ -547,8 +576,8 @@ class Document:
                 cell._controlRequest(control)
             if asked is not UNCHANGED:
                 cell._formatRequest(asked)
-            if cellStyle is not UNCHANGED:
-                cell._cellStyleRequest(cellStyle)
+            if cellStyleCompose is not UNCHANGED:
+                cell._cellStyleRequest(cellStyleCompose(cell.cellStyle))
             changes.append(replace(
                 change, formatAfter=cell.presentation.format,
                 controlAfter=cell.presentation.control,
