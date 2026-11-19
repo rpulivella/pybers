@@ -19,13 +19,12 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` naming each |
 | `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
-| `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional |
-| `locale FILE [LOCALE]` | A document's language and region, or a change to it |
+| `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional. `set FILE --locale LOCALE` changes a document's language and region instead |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
 | `diff A B` | The cells that differ between two documents |
 | `visinum FILE [ADDRESS]` | The read-only terminal browser |
 
-`check`, `show`, `set`, `locale` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
+`check`, `show`, `set` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
 
 - **The default action** comes from a `TyperGroup` subclass that routes a first argument naming no command to `check --names`. A file named like a command is reached as `./check`.
 - **`python -m pybers`** runs the same command.
@@ -36,9 +35,9 @@ A command parses its arguments, calls the library once, formats what comes back,
 
 - **Selectors** are positional, quoted in the shell, and parsed by the library, the one syntax `library-design.md` sets out under Addresses. A reference a command prints is that syntax, each name escaped, so it pastes back as a selector. Tab completion offers the sheet and table names of the file being typed.
 - **A command prints every part a selector matches, each as it prints alone.** `show` prints each part, and `set` each cell it wrote, exactly as `show` prints that part, so a part reads the same whatever reached it. A selector's JSON is always an array of those parts' forms, which `parseJsonForm` reads back.
-- **JSON on stdout reads back, and a diagnostic goes to stderr.** A part a write skipped prints `Skipped:` and its reason on stderr, as `Written:` does, so `--format json` never mixes a report into the data.
-- **Each command has one default format** that does not change when its output is piped. A terminal only turns color on. `--format` chooses another, and `-o FILE` infers it from the extension.
-- **Every command offers `--format text`, its default, and `--format json`**, so an agent or a pipeline never parses a report. `pybers.cli._formats` chooses between them, and every JSON comes from `pybers.formatJsonForm`, the library's one serializer, so a command never builds JSON itself. Its keys are the library's own field names, a number is a JSON number with its exact digits, `None` is `null`, and a value missing for a reason is the name of its sentinel, such as `"UNDETERMINED"`. The rule each value follows is in `decisions.md`, under the JSON form.
+- **JSON on stdout reads back, and a diagnostic goes to stderr.** A part a write skipped prints `Skipped:` and its reason on stderr, as `Written:` does, so `--output-format json` never mixes a report into the data.
+- **Each command has one default format** that does not change when its output is piped. A terminal only turns color on. `--output-format` chooses another, and `-o FILE` infers it from the extension.
+- **Every command offers `--output-format text`, its default, and `--output-format json`**, so an agent or a pipeline never parses a report. `pybers.cli._formats` chooses between them, and every JSON comes from `pybers.formatJsonForm`, the library's one serializer, so a command never builds JSON itself. Its keys are the library's own field names, a number is a JSON number with its exact digits, `None` is `null`, and a value missing for a reason is the name of its sentinel, such as `"UNDETERMINED"`. The rule each value follows is in `decisions.md`, under the JSON form.
 - **`-` is stdin or stdout** for text formats. A `.numbers` document is never written to stdout.
 - **Nothing prompts.** A command that would need an answer refuses instead.
 
@@ -49,7 +48,7 @@ A command parses its arguments, calls the library once, formats what comes back,
 - **`export` never changes the document it reads.** It reads FILE and writes elsewhere, a new `.numbers` document included, so no `export` changes FILE.
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
 - **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
-- **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--format` stays the output format every command offers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and prints why on stderr. A format applies to every cell a range holds, an empty one included. A formula takes its format whatever its result, which Numbers shows once the result is of the format's kind.
+- **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--output-format` stays the output format every command offers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and prints why on stderr. A format applies to every cell a range holds, an empty one included. A formula takes its format whatever its result, which Numbers shows once the result is of the format's kind.
 - **`set --border POSITION`** draws borders on one block of cells, POSITION naming the part drawn: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed`, `dotted` or `hidden`, `--border-width` a length such as `1pt`, and `--border-color` a color's text form, each a separate option, and a style given alone draws 0.35pt black. `hidden` draws nothing and hides the table's line there, and `none` removes the borders so the table's line shows, as CSS names the two for a table's borders.
 
   ```bash

@@ -3,7 +3,7 @@
 The formats every command offers, the option that chooses one, and how each is written.
 
 A command passes its result and its own text renderer to `printResult`, and never
-builds JSON itself: `--format json` is `pybers.formatJsonForm`, the library's one
+builds JSON itself: `--output-format json` is `pybers.formatJsonForm`, the library's one
 serializer, so a command's JSON and a script's are the same text. See
 `docs/cli-design.md`.
 
@@ -46,7 +46,9 @@ class OutputFormat(StrEnum):
 
 FormatOption = Annotated[
     OutputFormat,
-    typer.Option("--format", help="How to print the result.", show_default=True),
+    typer.Option(
+        "--output-format", help="How to print the result.", show_default=True
+    ),
 ]
 
 

@@ -115,7 +115,7 @@ The reasoning is in `decisions.md`, under writing values and formats.
 
 ## The JSON form
 
-`pybers.formatJsonForm(subject)` returns a document, a sheet, a table, a table narrowed to one range, or a cell as JSON text, and a list of them as an array, a `(table, range)` pair being that table narrowed. `pybers.parseJsonForm(text)` reads either back into an equal model. It is the one serializer, so a command's `--format json` and a script's output are the same text, and any other value a call returns, a `Check` or a `CellChange`, is written by the same rules. Every number is a JSON number with its exact digits, read back exactly with `json.loads(text, parse_float=Decimal, parse_int=Decimal)`. The rule each value follows is in `decisions.md`, and `pybers/interchange/schema.json` describes the form.
+`pybers.formatJsonForm(subject)` returns a document, a sheet, a table, a table narrowed to one range, or a cell as JSON text, and a list of them as an array, a `(table, range)` pair being that table narrowed. `pybers.parseJsonForm(text)` reads either back into an equal model. It is the one serializer, so a command's `--output-format json` and a script's output are the same text, and any other value a call returns, a `Check` or a `CellChange`, is written by the same rules. Every number is a JSON number with its exact digits, read back exactly with `json.loads(text, parse_float=Decimal, parse_int=Decimal)`. The rule each value follows is in `decisions.md`, and `pybers/interchange/schema.json` describes the form.
 
 ## Colors
 

@@ -11,7 +11,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/rpulivella/pybers/coverage/badge.json)](https://github.com/rpulivella/pybers/blob/coverage/README.md)
 [![License](https://img.shields.io/github/license/rpulivella/pybers)](LICENSE)
 
-> **Status, 28 October 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has four commands, `pybers check`, `pybers show`, `pybers set` and `pybers locale`, and nothing is on PyPI yet.
+> **Status, 19 November 2026:** pybers is early and unreleased. The Python library reads and writes real `.numbers` files, the command line has three commands, `pybers check`, `pybers show` and `pybers set`, and nothing is on PyPI yet.
 
 ## Command line
 
@@ -127,13 +127,13 @@ Cell: Sheet 1::Table 2::A1
   Unrecognized type code: none
 ```
 
-`--format json` prints the JSON form of what is selected, exactly as `pybers.formatJsonForm` writes it for a script, a selector's parts always as an array and a range as its table narrowed to it, and `pybers.parseJsonForm` reads it back, so a script and the command never disagree.
+`--output-format json` prints the JSON form of what is selected, exactly as `pybers.formatJsonForm` writes it for a script, a selector's parts always as an array and a range as its table narrowed to it, and `pybers.parseJsonForm` reads it back, so a script and the command never disagree.
 
 <details>
 <summary>The JSON of the cell and of the table above</summary>
 
 ```console
-$ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
+$ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
 [
   {
     "jsonFormVersion": 5,
@@ -202,7 +202,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --format json
 ```
 
 ```console
-$ pybers show shapes.numbers "*::Table 2" --format json
+$ pybers show shapes.numbers "*::Table 2" --output-format json
 [
   {
     "jsonFormVersion": 5,
@@ -271,16 +271,16 @@ $ pybers show shapes.numbers "*::Table 2" --format json
 
 </details>
 
-`pybers locale FILE` prints a document's language and region as `pybers show` prints it, and `pybers locale FILE LOCALE` changes it as Numbers' Language & Region does, printing the region it holds afterward and writing as `pybers set` writes:
+`pybers show FILE` prints a document's language and region on its first line, and `pybers set FILE --locale LOCALE` changes it as Numbers' Language & Region does, printing the locale it holds afterward:
 
 ```console
-$ pybers locale budget.numbers de_DE
+$ pybers set budget.numbers --locale de_DE
 Locale: de_DE
 ```
 
 The document then shows its numbers, dates and currencies as Germany writes them, `1.234,50 €`, and Numbers recalculates every formula when it opens it, since a result such as `DOLLAR` follows the region. pybers builds each locale field from macOS's own locale data, read into pybers before a release, so it writes a region exactly as Numbers would, on any system pybers runs on.
 
-All four install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
+All three install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
 
 ## Python library
 

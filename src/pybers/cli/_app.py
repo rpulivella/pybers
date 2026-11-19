@@ -11,6 +11,7 @@ draws the title over the table. `tests/test_cli_check.py` fails if a Typer relea
 brings the borders back. See `docs/cli-design.md`.
 
 UPDATES
+2026-11-19  `locale` removed, a locale set by `set --locale`, for PYB-301.
 2026-10-28  `locale` registered, for PYB-272.
 2026-10-27  `show` registered, for PYB-260.
 2026-10-20  `set` registered, for PYB-217.
@@ -41,7 +42,6 @@ from typer._click import Command, Context
 
 from pybers.cli._common import CommandSettings
 from pybers.cli.check import runCheck
-from pybers.cli.locale import runLocale
 from pybers.cli.set import runSet
 from pybers.cli.show import runShow
 
@@ -124,7 +124,6 @@ def runPybers(
 
 
 app.command("check")(runCheck)
-app.command("locale")(runLocale)
 app.command("set")(runSet)
 app.command("show")(runShow)
 

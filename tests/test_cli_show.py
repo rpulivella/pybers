@@ -267,13 +267,13 @@ def testJsonIsTheFormTheLibraryWritesForWhatIsSelected(
 ) -> None:
     expected = pybers.formatJsonForm(part(pybers.open(shapesPath)))
     arguments = [shapesPath] if selector is None else [shapesPath, selector]
-    result = runShowCommand(*arguments, "--format", "json")
+    result = runShowCommand(*arguments, "--output-format", "json")
     assert result.exit_code == 0
     assert result.stdout == expected + "\n"
 
 
 def testJsonOfSeveralPartsReadsBackAsEachPart() -> None:
-    result = runShowCommand(shapesPath, "::A1, Sheet 2", "--format", "json")
+    result = runShowCommand(shapesPath, "::A1, Sheet 2", "--output-format", "json")
     parts = pybers.parseJsonForm(result.stdout)
     assert isinstance(parts, list)
     assert [type(each).__name__ for each in parts] == ["Cell", "Cell", "Cell", "Sheet"]
@@ -333,7 +333,7 @@ def testShowNeverWritesTheDocument(tmp_path: Path, selector: str) -> None:
     working = copyDocument("20-formula-shapes", tmp_path)
     before = readFingerprint(working)
     runShowCommand(working, selector)
-    runShowCommand(working, selector, "--format", "json")
+    runShowCommand(working, selector, "--output-format", "json")
     assert readFingerprint(working) == before
     assert sorted(tmp_path.iterdir()) == [working]
 

@@ -168,7 +168,7 @@ def testACellItCannotWriteIsSkippedOnStderrSayingWhy(working: Path) -> None:
 
 def testJsonIsTheFormOfEachCellWrittenAndReadsBack(working: Path) -> None:
     result = runSetCommand(
-        str(working), "::Table 2::B2", "1.50", "--preview", "--format", "json"
+        str(working), "::Table 2::B2", "1.50", "--preview", "--output-format", "json"
     )
     form = json.loads(result.stdout, parse_float=Decimal)
     assert form[0]["table"]["cells"][0]["value"] == Decimal("1.50")
@@ -235,7 +235,8 @@ def testAZoneNoOneKnowsIsRefusedAndNothingWritten(working: Path) -> None:
 
 def testWhatJsonPrintsIsTextSetWritesBackUnchanged(working: Path) -> None:
     result = runSetCommand(
-        str(working), "::Table 2::B2", "2d 4h 0.5s", "--preview", "--format", "json"
+        str(working), "::Table 2::B2", "2d 4h 0.5s", "--preview",
+        "--output-format", "json",
     )
     printed = json.loads(result.stdout)[0]["table"]["cells"][0]["value"]
     assert printed == "P2DT4H0.5S"
