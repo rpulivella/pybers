@@ -287,7 +287,7 @@ def matchCells(
         assert extent is not None
         bounded = (
             CellRange.fromReferences(area, area) if isinstance(area, CellAddress)
-            else area.boundedBy(extent)
+            else area.resolve(extent)
         )
         matches += [
             PartMatch(sheet, table, address)
@@ -487,7 +487,7 @@ def findCellTargets(
         addresses = (
             [cells] if isinstance(cells, CellAddress)
             else [] if table.extent is None
-            else [each for each in cells.boundedBy(table.extent)
+            else [each for each in cells.resolve(table.extent)
                   if table.isAddressable(each)]
         )
         for address in addresses:

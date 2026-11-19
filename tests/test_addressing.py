@@ -217,7 +217,7 @@ def test_anUnboundedRangeIsNotABoundedOneOverTheSameCells() -> None:
 def test_anUnboundedRangeCannotBeWalkedUntilItIsBounded() -> None:
     with pytest.raises(ReferenceError):
         list(CellRange.parse("A"))
-    bounded = CellRange.parse("A").boundedBy(CellRange(1, 1, 3, 3))
+    bounded = CellRange.parse("A").resolve(CellRange(1, 1, 3, 3))
     assert [str(address) for address in bounded] == ["A1", "A2", "A3"]
 
 
