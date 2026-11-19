@@ -342,7 +342,7 @@ def test_aMergeExpressesItsExtentAsARange() -> None:
 
 
 def test_aMergeCannotBeUnbounded() -> None:
-    """A merged region covers a fixed block, which a whole-column range does not."""
+    """A merge covers a fixed block, which a whole-column range does not."""
     with pytest.raises(ReferenceError):
         MergeRange(CellRange.parse("A"))
 
@@ -369,7 +369,7 @@ def test_aCellSwallowedByAMergeIsNotAddressable() -> None:
 
 
 def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
-    """A merged region is one cell, so a range over it returns one cell."""
+    """A merge is one cell, so a range over it returns one cell."""
     table = buildMergedTable()
     assert [str(each.address) for each in table.select("A1:C1[kind]")] == [
         "A1", "C1"

@@ -34,7 +34,7 @@ row of `None` means the whole column rather than row zero. The same rule
 as a sentinel line, read here as `None`.
 
 UPDATES
-2026-11-18  `FormulaFunctionCall.fromName` names its constructor, for PYB-301.
+2026-11-18  `FormulaFunctionCall.fromName` takes the `from` form, for PYB-301.
 2026-10-29  `mapFormulaNodes`, the one walk a rewrite makes, for PYB-278.
 2026-10-24  A node's raw bytes kept in the JSON form, for PYB-259.
 2026-10-13  A boolean literal and a range reaching every row or column, for PYB-139.

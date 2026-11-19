@@ -164,7 +164,7 @@ def testNoFillOverridesAHeaderCellAndNotABodyCell(tmp_path: Path) -> None:
     body = next(
         address for address, cell in table.cells.items()
         if cell.cellStyle is None
-        and table.headers.regionFind(address, table.rowCount).value == "body"
+        and table.headers.sectionFind(address, table.rowCount).value == "body"
     )
     cleared = CellStyle(background=FillNone())
     header = document.cellSet(f"::{table.name}::B1", cellStyle=cleared)

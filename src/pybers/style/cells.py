@@ -59,7 +59,7 @@ class CellStyle:
 
 
 # What a cell shows where no style states otherwise: no fill, 4pt, top, wrapping.
-# Numbers' own region styles state these, measured in findings-03-structure.md.
+# Numbers' own section styles state these, measured in findings-03-structure.md.
 numbersCellStyle: CellStyle = CellStyle(
     background=FillNone(), padding=Decimal(4),
     verticalAlign=CellStyleVerticalAlign.TOP, textWrap=CellStyleTextWrap.WRAP,

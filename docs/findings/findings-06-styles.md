@@ -93,14 +93,14 @@ document, though: the built-in styles carry `L4 T4 R4 B4` explicitly, 3,366 time
 default lives in the inherited style and the cell simply declines to override it.
 
 **Setting a property back to what the cell inherits removes the override.** Measured for
-PYB-265 on 12 November 2026 in `98c-cell-box-regions`: C1, a header cell given a 6pt inset and then
+PYB-265 on 12 November 2026 in `98c-cell-box-sections`: C1, a header cell given a 6pt inset and then
 4pt again, and D1, its wrap cleared and checked again, each hold no cell style. **No Fill is stored where it overrides**: B1, a header cell
 given No Fill, names a variation of the header row style holding an empty `cell_fill`, which
 covers the header's gray.
 
 **A variation never inherits from a variation.** None of the 275 cell style variations and
 182 paragraph style variations in the documents Numbers made has a variation as its parent,
-and a table whose region style is a variation flattens instead. Measured for PYB-265 on
+and a table whose section style is a variation flattens instead. Measured for PYB-265 on
 13 November 2026 in `99-cell-fill-in-a-created-table`, a table pybers created, whose body style
 is the reset's variation stating `text_wrap: false`: A1, filled by hand, names a variation
 of the theme's root cell style stating the fill and `text_wrap: false` both, with an
@@ -114,7 +114,7 @@ empty fill, 4pt padding, top alignment and no wrap with an `override_count` of 0
 cell inheriting it drew its text in the middle while the inspector and AppleScript reported
 top. Raising the count to 4, the number of properties stated, drew the same cells at the top.
 Each root and variation cell style Numbers writes states a count equal to its properties:
-`tableCell-0-bodyStyle` 4, a fill alone 1, a fill copied beside a region's `nowrap` 2.
+`tableCell-0-bodyStyle` 4, a fill alone 1, a fill copied beside a section's `nowrap` 2.
 
 **A side of zero is omitted**, so `0/0/0/0` stores as an empty `padding {}`, which is how the
 `0pt` cell of `31` holds it. A reader takes a missing side as zero.
@@ -309,17 +309,17 @@ offered, read from the preview Numbers saved with each.
   B2:B3 and D4:D6, anchored on unbanded rows, show no band on their banded rows, and
   C3:C4, anchored on a banded row, shows the band on its unbanded one.
 - **A footer row takes no band.** `102b` places its footer row where the band falls, and
-  it shows none, though the footer region states `FillNone` exactly as the body does.
+  it shows none, though the footer section states `FillNone` exactly as the body does.
 - **A cell's own fill prevails over the band**: a color and a gradient show unchanged on
-  banded rows. The body region states `FillNone` and still bands, so a region's stated
+  banded rows. The body section states `FillNone` and still bands, so a section's stated
   No Fill does not hide the band.
 - **A header row or header column takes no band, filled or not.** In a Blank theme
-  table each shows its own region fill. In `00-created-rows-banded-by-pybers`, whose
+  table each shows its own section fill. In `00-created-rows-banded-by-pybers`, whose
   created table fills no header, Numbers 15.4 draws no band in the header column or the
   footer row on a banded position, confirmed 18 November 2026.
 - **No body cell states No Fill.** Choosing it on a cell holding a color removes the
   color and states nothing, E3:E8 of `102-bands-base`, and on a cell holding none it
-  writes nothing, since the body region already states `FillNone`. pybers drops the
+  writes nothing, since the body section already states `FillNone`. pybers drops the
   same request, so a body cell beneath the band always shows it.
 
 ## A fill is a three-way union

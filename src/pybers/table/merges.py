@@ -59,7 +59,7 @@ class MergeRange:
 
     @property
     def anchor(self) -> CellAddress:
-        """Return the top-left cell, the one that holds the merged region's value."""
+        """Return the top-left cell, the one that holds the merge's value."""
         anchor = self.extent.start
         if anchor is None:
             raise ReferenceError(f"{self.extent} has no anchor cell.")

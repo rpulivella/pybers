@@ -1960,7 +1960,7 @@
     },
     "TableStyle": {
       "type": "object",
-      "description": "The lines a table draws, each region named for what it draws, and its band.",
+      "description": "The lines a table draws, each section named for what it draws, and its band.",
       "properties": {
         "bodyHorizontalGridlines": {
           "$ref": "#/$defs/TableLine"

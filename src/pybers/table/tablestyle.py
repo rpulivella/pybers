@@ -2,7 +2,7 @@
 """\
 A table's lines and banding: gridlines, separators, outline, banded rows, as text.
 
-Each region shows or hides one line drawn with one stroke, as the table's style
+Each section shows or hides one line drawn with one stroke, as the table's style
 states them, and the outline also outlines the table's title. A cell's border
 prevails over all of them at its edge. Banded rows paint every second body row
 beneath any fill a cell states. See findings-06-styles.md.
@@ -44,7 +44,7 @@ from pybers.style.strokes import (
     formatStroke,
 )
 from pybers.style.text import CellStyleError, formatFill, parseFill, parseLength
-from pybers.table.headers import TableHeaders, TableRegion
+from pybers.table.headers import TableHeaders, TableSection
 
 if TYPE_CHECKING:
     from pybers.addressing.reference import CellAddress
@@ -89,7 +89,7 @@ class TableBand:
 
 @dataclass(frozen=True, slots=True)
 class TableStyle:
-    """The lines a table draws, each region named for what it draws, and its band."""
+    """The lines a table draws, each section named for what it draws, and its band."""
 
     bodyHorizontalGridlines: TableLine
     bodyVerticalGridlines: TableLine
@@ -204,7 +204,7 @@ def findShownFill(table: Table, where: CellAddress) -> Fill:
     A fill the cell states prevails. Every second body row, counted from the first,
     shows the band beneath a cell stating No Fill, and a header, a header column or
     a footer takes no band, as `102b-bands-on` and `103b-bands-one-header-on` show.
-    Else the region's fill shows. A merge shows what its anchor shows, across every
+    Else the section's fill shows. A merge shows what its anchor shows, across every
     row it spans, as `104b-bands-merged-on` shows.
     """
     merge = table.mergeFind(where)
@@ -217,7 +217,7 @@ def findShownFill(table: Table, where: CellAddress) -> Fill:
     band = table.tableStyle.bandedRows
     headers = table.headers
     banded = band.visible and (where.row - headers.headerRows) % 2 == 0 and (
-        headers.regionFind(where, table.rowCount) is TableRegion.BODY
+        headers.sectionFind(where, table.rowCount) is TableSection.BODY
     )
     if banded:
         return band.fill

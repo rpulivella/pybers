@@ -198,7 +198,7 @@ gridline = Stroke(width=Decimal("0.35"), color=Color.black, pattern=StrokeSolid(
     ("C2", CellBorderSide.RIGHT, gridline),
     ("B2", CellBorderSide.RIGHT, gridline),
 ])
-def test_an_edge_with_no_border_shows_the_table_line_for_its_region(
+def test_an_edge_with_no_border_shows_the_table_line_for_its_section(
     address: str, side: CellBorderSide, drawn: Stroke
 ) -> None:
     table = pybers.open(findDocumentPath("100-lines-base")).table("Untouched")
@@ -214,7 +214,7 @@ def test_an_edge_with_no_border_shows_the_table_line_for_its_region(
     ("Footer rows vertical", "A4", CellBorderSide.RIGHT),
     ("Body vertical", "B2", CellBorderSide.RIGHT),
 ])
-def test_a_hidden_table_line_shows_nothing_at_its_region(
+def test_a_hidden_table_line_shows_nothing_at_its_section(
     table: str, address: str, side: CellBorderSide
 ) -> None:
     measured = pybers.open(findDocumentPath("100b-lines")).table(table)

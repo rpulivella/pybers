@@ -21,7 +21,7 @@ Private. The table feature offers `Table` and `Cell`, not the walk that builds o
 UPDATES
 2026-11-17  The lines the table draws, from its table style, for PYB-266.
 2026-11-17  The table's borders, keyed by row and column identity, for PYB-266.
-2026-11-12  Each cell's own cell style, and what each region's resolves to, for
+2026-11-12  Each cell's own cell style, and what each section's resolves to, for
             PYB-265.
 2026-11-03  A table's header rows, header columns and footer rows, for PYB-223.
 2026-11-02  A table of a document never saved names none, for PYB-261.
@@ -90,7 +90,7 @@ from ..formula.nodes import Formula
 from ..style._read import readCellStyles
 from ..style.cells import CellStyle
 from ._borders import readTableBorders
-from ._cellstyles import readOwnCellStyles, readRegionCellStyles, readRegionVariations
+from ._cellstyles import readOwnCellStyles, readSectionCellStyles, readSectionVariations
 from ._tablestyle import readTableStyle
 from .cell import Cell, CellValue
 from .cells import Table
@@ -236,9 +236,9 @@ def readRecordStorage(
 
 
 def readMerges(model: tst.TableModelArchive) -> list[MergeRange]:
-    """Return the table's merged regions, read from the merge store.
+    """Return the table's merges, read from the merge store.
 
-    Merges are stored as FORMULAS, which is not guessable: each region is a
+    Merges are stored as FORMULAS, which is not guessable: each merge is a
     complete `TSCE.FormulaArchive` whose colon tract carries the range, so this
     reads `merge_owner.formula_store` rather than inferring anything from the
     grid. See findings-03-structure.md.
@@ -348,7 +348,7 @@ def readTable(
             model.number_of_header_columns,
             model.number_of_footer_rows,
         ),
-        _cellStylesInherited=readRegionCellStyles(index, model),
+        _cellStylesInherited=readSectionCellStyles(index, model),
         _borders=readTableBorders(index, model, rowIdentities, columnIdentities),
         _tableStyle=readTableStyle(index, model),
     )
@@ -356,7 +356,7 @@ def readTable(
     currencyCodes = readCurrencyCodes(index, dataStore)
     controls = readControls(index, dataStore)
     ownStyles = readOwnCellStyles(
-        readCellStyles(index, dataStore), readRegionVariations(index, model)
+        readCellStyles(index, dataStore), readSectionVariations(index, model)
     )
     for reference, record in iterateCellRecords(index, model, source):
         # A merge imported from Excel keeps a style-only record at every covered
@@ -368,7 +368,7 @@ def readTable(
         value = readCellValue(record, strings, richText, currencyCodes)
         setCellStorage(
             cell, record, value, formatTypes, controls,
-            ownStyles[table.headers.regionFind(reference, table.rowCount)],
+            ownStyles[table.headers.sectionFind(reference, table.rowCount)],
         )
         cell._value = value
         # Each cell is given its own Formula even where the archive is shared, so
@@ -435,7 +435,7 @@ def updateCellStorage(
     currencyCodes = readCurrencyCodes(index, dataStore)
     controls = readControls(index, dataStore)
     ownStyles = readOwnCellStyles(
-        readCellStyles(index, dataStore), readRegionVariations(index, model)
+        readCellStyles(index, dataStore), readSectionVariations(index, model)
     )
     described: set[CellAddress] = set()
     for reference, record in iterateCellRecords(index, model, source):
@@ -445,7 +445,7 @@ def updateCellStorage(
         value = readCellValue(record, strings, richText, currencyCodes)
         setCellStorage(
             cell, record, value, formatTypes, controls,
-            ownStyles[table.headers.regionFind(reference, table.rowCount)],
+            ownStyles[table.headers.sectionFind(reference, table.rowCount)],
         )
         described.add(reference)
     for reference, cell in table.cells.items():
