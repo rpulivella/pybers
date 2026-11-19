@@ -68,7 +68,7 @@ Each noun below keeps one meaning across the library, the command line and the d
 | Noun | Meaning | Follows |
 | ---- | ------- | ------- |
 | merge | Cells joined into one, their anchor holding the content | Numbers' Merge Cells |
-| style | How a part looks: a cell's box, a table's lines, or a named style | CSS style |
+| style | How a part looks: a cell's box, a table's lines, or a named style. `CellBorderStyle` and `--border-style` keep CSS's `border-style` name for a border's line: solid, dashed, dotted or hidden. | CSS style |
 | named style | A style a document keeps by name and several parts share | CSS class |
 | variation | A part's own changes to the named style beneath it | CSS inline style |
 | format | How a cell writes its value as text, such as currency or date | `Intl.NumberFormat` |
