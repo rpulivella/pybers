@@ -7,6 +7,7 @@ what `pybers show` prints and `pybers set --cell-style` reads, each name the CSS
 and `none` sets no style.
 
 UPDATES
+2026-11-19  Each property's name read from `CellStyleProperty`, for PYB-290.
 2026-11-17  `parseLength`, one length in points, which a border's width shares, for
             PYB-266.
 2026-11-12  Written for PYB-265.
@@ -30,13 +31,14 @@ from pybers.format.text import splitDeclarations
 from pybers.style.cells import (
     CellStyle,
     CellStylePaddingSides,
+    CellStyleProperty,
     CellStyleTextWrap,
     CellStyleVerticalAlign,
 )
 from pybers.style.fills import Fill, FillGradient, FillImage, FillNone
 
 lengthPattern: re.Pattern[str] = re.compile(r"(\d+(?:\.\d+)?)pt|0")
-properties: tuple[str, ...] = ("background", "padding", "vertical-align", "text-wrap")
+properties: tuple[str, ...] = tuple(each.value for each in CellStyleProperty)
 otherFills: frozendict[str, Fill] = frozendict({
     "none": FillNone(), "gradient": FillGradient(), "image": FillImage(),
 })

@@ -7,6 +7,8 @@ property is None while the cell inherits it from its table. Frozen, because Numb
 shares one style among every cell styled alike.
 
 UPDATES
+2026-11-19  `CellStyleProperty`, each property by its CSS name, and
+            `updateCellStyles`, moved from the table's archive half, for PYB-290.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -43,6 +45,21 @@ class CellStyleTextWrap(StrEnum):
 
     WRAP = "wrap"
     NOWRAP = "nowrap"
+
+
+class CellStyleProperty(StrEnum):
+    """One property a cell style states, by the name CSS gives it."""
+
+    BACKGROUND = "background"
+    PADDING = "padding"
+    VERTICAL_ALIGN = "vertical-align"
+    TEXT_WRAP = "text-wrap"
+
+    @property
+    def fieldName(self) -> str:
+        """Return the `CellStyle` field holding this property, `verticalAlign`."""
+        head, *rest = self.value.split("-")
+        return head + "".join(each.title() for each in rest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +112,17 @@ def findCellStyleRefusal(cellStyle: CellStyle) -> str | None:
     return None
 
 
+def updateCellStyles(*styles: CellStyle) -> CellStyle:
+    """Return one style stating each property the first of `styles` to state it does."""
+    return CellStyle(**{
+        each.fieldName: next((
+            getattr(style, each.fieldName) for style in styles
+            if getattr(style, each.fieldName) is not None
+        ), None)
+        for each in CellStyleProperty
+    })
+
+
 def findOverrides(
     cellStyle: CellStyle | None, inherited: CellStyle
 ) -> CellStyle | None:
@@ -119,6 +147,7 @@ def findOverrides(
 
 
 __all__ = [
-    "CellStyle", "CellStylePaddingSides", "CellStyleTextWrap", "CellStyleVerticalAlign",
-    "findCellStyleRefusal", "findOverrides", "numbersCellStyle",
+    "CellStyle", "CellStylePaddingSides", "CellStyleProperty", "CellStyleTextWrap",
+    "CellStyleVerticalAlign", "findCellStyleRefusal", "findOverrides",
+    "numbersCellStyle", "updateCellStyles",
 ]
