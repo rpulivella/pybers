@@ -62,7 +62,7 @@ from pybers.formula.nodes import (
 )
 from pybers.formula.parse import parseFormula
 from pybers.formula.relocation import FormulaReferenceRelocation
-from pybers.formula.render import renderFormula
+from pybers.formula.render import formatFormula
 from pybers.formula.syntax import FormulaSyntaxError
 
 __all__ = [
@@ -92,5 +92,5 @@ __all__ = [
     "findFunctionName",
     "findFunctionNamed",
     "parseFormula",
-    "renderFormula",
+    "formatFormula",
 ]

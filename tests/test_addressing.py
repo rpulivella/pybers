@@ -376,15 +376,15 @@ def test_aRangeAcrossAMergeYieldsItsAnchorOnce() -> None:
     ]
     with pytest.raises(pybers.ReferenceError, match="covered by the merge A1:B1"):
         table.select("B1")
-    assert table.addressable("A1") is True
-    assert table.addressable("B1") is False
+    assert table.isAddressable("A1") is True
+    assert table.isAddressable("B1") is False
 
 
-def test_mergeCoveringStillTellsACoveredCellFromAnEmptyOne() -> None:
+def test_mergeFindStillTellsACoveredCellFromAnEmptyOne() -> None:
     table = buildSampleTable()
     table.mergeRanges.append(MergeRange(CellRange.parse("A1:B1")))
-    assert table.mergeCovering("B1") is not None
-    assert table.mergeCovering("C2") is None
+    assert table.mergeFind("B1") is not None
+    assert table.mergeFind("C2") is None
 
 
 # ── AC 8: refusals name what was rejected, and one conversion exists ─────────

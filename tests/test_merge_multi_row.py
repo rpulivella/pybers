@@ -79,7 +79,7 @@ def testTheFixtureHoldsExactlyTheThreeMergesItWasMadeWith() -> None:
 @pytest.mark.parametrize(("anchor", "extent"), extents)
 def testEachMergeReportsTheExtentNumbersDisplays(anchor: str, extent: str) -> None:
     table = findFirstTable(pybers.open(multiRowFixture))
-    merge = table.mergeCovering(anchor)
+    merge = table.mergeFind(anchor)
     assert merge is not None
     assert str(merge.extent) == extent
     assert str(merge.anchor) == anchor
@@ -94,9 +94,9 @@ def testACoveredPositionIsRefused(reference: str) -> None:
 
 @pytest.mark.parametrize("reference", coveredPositions)
 def testACoveredPositionResolvesToTheMergeThatCoversIt(reference: str) -> None:
-    """`mergeCovering` answers on the vertical axis, which nothing had exercised."""
+    """`mergeFind` answers on the vertical axis, which nothing had exercised."""
     table = findFirstTable(pybers.open(multiRowFixture))
-    merge = table.mergeCovering(reference)
+    merge = table.mergeFind(reference)
     assert merge is not None
     assert merge.covers(reference)
 

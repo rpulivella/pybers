@@ -135,7 +135,7 @@ def matchPseudoClass(
         case "formula":
             return cell is not None and cell.formula is not None
         case "merged":
-            merge = table.mergeCovering(address)
+            merge = table.mergeFind(address)
             return merge is not None and merge.anchor == address
         case "header":
             headerRow, headerColumn, _ = headers.membershipFind(address, table.rowCount)

@@ -243,7 +243,7 @@ def moveCells(
     from pybers.table.merges import MergeRange
 
     rule = toRelocationRule(references)
-    extent = table.rangeSingle(source, "move")
+    extent = table._rangeSingle(source, "move")
     landing = table._addressResolve(anchor)
     startRow, startCol, _, _ = findBlockCorners(extent)
     move = CellsMove(extent, landing.row - startRow, landing.col - startCol)

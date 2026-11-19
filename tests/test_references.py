@@ -146,19 +146,19 @@ def testTableForFindsATableByTheIdentityAFormulaNamesItBy() -> None:
     """AC 1. The reverse of `tableIdentities`, and what a location resolves through."""
     document = openShapes()
     table = document.sheet("Sheet 1").table("Table 2")
-    assert document.tableFor(table.identifier) is table
+    assert document.tableFind(table.identifier) is table
 
 
 def testTableForRaisesNamingAnIdentityTheDocumentDoesNotHold() -> None:
     """AC 1. A miss says which identity failed rather than returning nothing."""
     with pytest.raises(pybers.SelectionError, match="ff" * 16):
-        openShapes().tableFor("ff" * 16)
+        openShapes().tableFind("ff" * 16)
 
 
 def testTheWalkRefusesAReferenceIntoATableTheDocumentDoesNotHold() -> None:
     """AC 1. Skipping it would report fewer references than the document makes.
 
-    The refusal lives in the walk rather than in `tableFor`, and the two are
+    The refusal lives in the walk rather than in `tableFind`, and the two are
     separate branches, so a test of one says nothing about the other.
     """
     document = openShapes()
@@ -539,7 +539,7 @@ def testEveryNameThisTicketAddsIsReachableFromPybersAlone() -> None:
     """Neither consumer imports anything deeper than `pybers`."""
     assert pybers.ReferenceLocation is not None
     assert hasattr(pybers.Document, "referencesIterate")
-    assert hasattr(pybers.Document, "tableFor")
+    assert hasattr(pybers.Document, "tableFind")
     assert hasattr(pybers.FormulaReference, "shifted")
     assert hasattr(pybers.FormulaRange, "shifted")
 

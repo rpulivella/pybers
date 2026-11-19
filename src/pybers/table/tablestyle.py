@@ -207,7 +207,7 @@ def findShownFill(table: Table, where: CellAddress) -> Fill:
     Else the region's fill shows. A merge shows what its anchor shows, across every
     row it spans, as `104b-bands-merged-on` shows.
     """
-    merge = table.mergeCovering(where)
+    merge = table.mergeFind(where)
     where = where if merge is None else merge.anchor
     cell = table.cells.get(where)
     stated = None if cell is None else cell.cellStyle

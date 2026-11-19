@@ -362,7 +362,7 @@ def readTable(
         # A merge imported from Excel keeps a style-only record at every covered
         # position, and the model has no cell there to hold one. The archive
         # carries it through untouched, so nothing is lost.
-        if not table.addressable(reference):
+        if not table.isAddressable(reference):
             continue
         cell = table.cell(reference)
         value = readCellValue(record, strings, richText, currencyCodes)
@@ -384,7 +384,7 @@ def readTable(
     columns = {identity: at for at, identity in enumerate(columnIdentities, 1)}
     for rowIdentity, columnIdentity, _ in table._borders.edges:
         address = CellAddress(rows[rowIdentity], columns[columnIdentity])
-        if table.addressable(address):
+        if table.isAddressable(address):
             table.cell(address)
     return table
 

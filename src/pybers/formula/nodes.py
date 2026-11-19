@@ -34,6 +34,7 @@ row of `None` means the whole column rather than row zero. The same rule
 as a sentinel line, read here as `None`.
 
 UPDATES
+2026-11-18  `FormulaFunctionCall.fromName` names its constructor, for PYB-301.
 2026-10-29  `mapFormulaNodes`, the one walk a rewrite makes, for PYB-278.
 2026-10-24  A node's raw bytes kept in the JSON form, for PYB-259.
 2026-10-13  A boolean literal and a range reaching every row or column, for PYB-139.
@@ -413,7 +414,7 @@ class FormulaFunctionCall:
         return findFunction(self.index)
 
     @classmethod
-    def named(cls, name: str, argumentCount: int) -> FormulaFunctionCall:
+    def fromName(cls, name: str, argumentCount: int) -> FormulaFunctionCall:
         """Build a call by function name, `SUM` or `sum`, checking the count.
 
         Refuses a name Numbers does not offer and a count it does not accept,

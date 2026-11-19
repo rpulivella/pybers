@@ -5,7 +5,7 @@ Views rather than lists, because `Table.cell` creates a cell on first access and
 keeps it. A list would create every cell it held just to be measured or sliced,
 so these hold row and column numbers and create a cell only when one is reached.
 
-A position a merge swallowed is not in its row, which is `Table.addressable`
+A position a merge swallowed is not in its row, which is `Table.isAddressable`
 answering, so indexing a row counts the cells in it rather than its columns.
 
 UPDATES
@@ -99,7 +99,7 @@ class TableRow(Sequence["Cell"]):
         """
         candidates = (CellAddress(self.rowNumber, col) for col in self.columnNumbers)
         return [
-            reference for reference in candidates if self.table.addressable(reference)
+            reference for reference in candidates if self.table.isAddressable(reference)
         ]
 
     @overload

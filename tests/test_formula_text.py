@@ -44,8 +44,8 @@ from pybers import (
     FormulaReference,
     FormulaSyntaxError,
     FormulaUnknownCall,
+    formatFormula,
     parseFormula,
-    renderFormula,
 )
 from pybers._generated import TSCEArchives_pb2 as tsce
 from pybers.formula import syntax as formulasyntax
@@ -213,7 +213,7 @@ def testEveryFormulaInEveryDocumentRendersAndParsesBackToItsOwnNodes() -> None:
     checked = 0
     exceptions = set()
     for name, address, formula, host, names in collectDocumentFormulas():
-        text = renderFormula(formula, host, tables=names)
+        text = formatFormula(formula, host, tables=names)
         again = parseFormula(text, host, tables=names)
         checked += 1
         if reduceFormulaShape(again) != dropTypedWhitespace(formula):
@@ -229,8 +229,8 @@ def testEveryFormulaInEveryDocumentRendersToTextThatSurvivesReparsing() -> None:
     printing a formula and writing it back actually depends on.
     """
     for name, address, formula, host, names in collectDocumentFormulas():
-        text = renderFormula(formula, host, tables=names)
-        again = renderFormula(
+        text = formatFormula(formula, host, tables=names)
+        again = formatFormula(
             parseFormula(text, host, tables=names), host, tables=names
         )
         assert again == text, f"{name} {address}"
@@ -614,7 +614,7 @@ def testASingleCellPieceBecomesACoordinateRatherThanARange() -> None:
         "={anchor}*2", "B2", pieces={"anchor": CellReference.parse("$A$1")}
     )
     assert formula.nodes[0].nodeType == referenceNodeType
-    assert renderFormula(formula, "B2") == "=$A$1*2"
+    assert formatFormula(formula, "B2") == "=$A$1*2"
 
 
 def testAPlaceholderWithNoAddressGivenIsRefusedByName() -> None:
@@ -634,7 +634,7 @@ def testLetRoundTripsThroughTextLikeAnyOtherFormula() -> None:
     """
     stored = openFirstTable("46-formula-rare-functions").cell("B9").formula
     assert stored is not None
-    assert renderFormula(stored, "B9") == "=LET(x,2,x+1)"
+    assert formatFormula(stored, "B9") == "=LET(x,2,x+1)"
     parsed = parseFormula("=LET(x,2,x+1)", "B9")
     assert reduceFormulaShape(parsed) == dropTypedWhitespace(stored)
 
@@ -644,7 +644,7 @@ def testLambdaRoundTripsThroughTextWithItsParametersAheadOfItsBody() -> None:
     stored = openFirstTable("46-formula-rare-functions").cell("B13").formula
     assert stored is not None
     text = "=LAMBDA.APPLY(2,LAMBDA(x,x+1))"
-    assert renderFormula(stored, "B13") == text
+    assert formatFormula(stored, "B13") == text
     # The stored formula carries whitespace nodes a person typed, which the text
     # cannot express and retyping in Numbers drops as well.
     assert reduceFormulaShape(parseFormula(text, "B13")) == dropTypedWhitespace(stored)
@@ -719,21 +719,21 @@ def testANumberLiteralKeepsItsOwnSpelling() -> None:
         Decimal("2.50"), Decimal("1E+3")
     ]
     # The trailing zero survives, which routing through a float would not do.
-    assert renderFormula(formula, "A1") == "=2.50+1E+3"
+    assert formatFormula(formula, "A1") == "=2.50+1E+3"
 
 
 def testAQuoteInsideAStringIsDoubledRatherThanEscaped() -> None:
     """Which is how Numbers writes one, and the only spelling it reads back."""
     formula = parseFormula('="say ""yes"""', "A1")
     assert [node.content for node in formula] == ['say "yes"']
-    assert renderFormula(formula, "A1") == '="say ""yes"""'
+    assert formatFormula(formula, "A1") == '="say ""yes"""'
 
 
 def testABrokenReferenceIsWrittenAndReadAsTheOneNumbersShows() -> None:
     """`#REF!` is coordinates pointing nowhere on purpose, both ways."""
     stored = openFirstTable("21-formula-errors").cell("C1").formula
     assert stored is not None
-    assert renderFormula(stored, "C1") == "=#REF!"
+    assert formatFormula(stored, "C1") == "=#REF!"
     assert parseFormula("=#REF!", "C1").broken
 
 
@@ -872,7 +872,7 @@ def testABracketedSubExpressionRendersWithItsBracket() -> None:
     formula = parseFormula("=22+(3/12)", "B3")
 
     assert tuple(node.nodeType for node in formula) == numbersBracketedNodeTypes
-    assert renderFormula(formula, "B3") == "=22+(3/12)"
+    assert formatFormula(formula, "B3") == "=22+(3/12)"
 
 
 def testABracketPrecedenceDoesNotNeedIsKeptRatherThanDropped() -> None:
@@ -892,7 +892,7 @@ def testABracketPrecedenceDoesNotNeedIsKeptRatherThanDropped() -> None:
         )
     ))
 
-    assert renderFormula(stored, "B3") == "=22+(3/12)"
+    assert formatFormula(stored, "B3") == "=22+(3/12)"
 
 
 def testABracketTheTreeNeedsIsWrittenWithNoListNodeToRecordIt() -> None:
@@ -907,7 +907,7 @@ def testABracketTheTreeNeedsIsWrittenWithNoListNodeToRecordIt() -> None:
         node for node in stored if node.nodeType != listNodeType
     ))
 
-    assert renderFormula(withoutTheNode, "H22") == "=F22/(C22/1000)"
+    assert formatFormula(withoutTheNode, "H22") == "=F22/(C22/1000)"
 
 
 def testAListNodeEnclosingMoreThanOneValueIsRefusedRatherThanGuessedAt() -> None:
@@ -919,7 +919,7 @@ def testAListNodeEnclosingMoreThanOneValueIsRefusedRatherThanGuessedAt() -> None
     ))
 
     with pytest.raises(pybers.FormulaError, match="encloses 2 values"):
-        renderFormula(stored, "A1")
+        formatFormula(stored, "A1")
 
 
 @pytest.mark.parametrize(
@@ -931,14 +931,14 @@ def testBracketedTextParsesBackToTheNodesItRenderedFrom(text: str) -> None:
     """AC 2. Both directions, so a bracket is neither invented nor lost."""
     formula = parseFormula(text, "B3")
 
-    assert renderFormula(formula, "B3") == text
-    reparsed = parseFormula(renderFormula(formula, "B3"), "B3")
+    assert formatFormula(formula, "B3") == text
+    reparsed = parseFormula(formatFormula(formula, "B3"), "B3")
     assert reduceFormulaShape(reparsed) == reduceFormulaShape(formula)
 
 
 def testAnEnclosedBracketIsNotBracketedTwice() -> None:
     """A group renders as an atom, so the operator around it adds no second pair."""
-    assert renderFormula(parseFormula("=((1+2))*3", "A1"), "A1") == "=((1+2))*3"
+    assert formatFormula(parseFormula("=((1+2))*3", "A1"), "A1") == "=((1+2))*3"
 
 
 def testAListNodeCarriesItsOwnCountThroughTheArchive() -> None:

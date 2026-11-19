@@ -6,6 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-18  `mergeFind`, `isAddressable` and a private `_rangeSingle` follow the
+            vocabulary, for PYB-301.
 2026-11-18  `cellFillShown`, the fill a cell displays, its banded row's included,
             for PYB-267.
 2026-11-17  `tableStyle`, the lines a table draws, and `tableStyleSet`, for
@@ -433,14 +435,14 @@ class Table:
             f"{found} names another table, and this is {self.reference}."
         )
 
-    def addressable(self, address: CellReferenceLike) -> bool:
+    def isAddressable(self, address: CellReferenceLike) -> bool:
         """Report whether an address names a cell this table can hand over.
 
         False for a position swallowed by a merge, which is why a range over a
         merged block yields the anchor once rather than one cell per position.
         """
         reference = self._addressResolve(address)
-        merge = self.mergeCovering(reference)
+        merge = self.mergeFind(reference)
         return merge is None or merge.anchor == reference
 
     @property
@@ -489,7 +491,7 @@ class Table:
         covers. A merge IMPORTED from Excel is the exception and keeps a style-only
         record at each one, which a save preserves rather than cleans up.
         """
-        extent = self.rangeSingle(address, "merge")
+        extent = self._rangeSingle(address, "merge")
         # A single cell is refused because Numbers cannot produce one: no document holds
         # a merge covering one cell and the interface offers no way to make one, so
         # writing the formula for it would put a construct in the file that has never
@@ -521,7 +523,7 @@ class Table:
         claim one cell. Every covered position reads as empty afterward: the values
         went when the merge was made, and nothing restores them.
         """
-        merge = self.mergeCovering(address)
+        merge = self.mergeFind(address)
         if merge is None:
             raise ReferenceError(
                 f"No merge in {self.name!r} covers "
@@ -530,7 +532,7 @@ class Table:
         self.mergeRanges.remove(merge)
         return merge
 
-    def rangeSingle(self, address: CellRangeLike, action: str) -> CellRange:
+    def _rangeSingle(self, address: CellRangeLike, action: str) -> CellRange:
         """Return the one bounded rectangle an address names, inside this table.
 
         An unbounded range is refused rather than bounded by the table, because a block
@@ -551,7 +553,7 @@ class Table:
 
     def _bordersRead(self, address: CellAddress) -> CellBorders:
         """Return the sides of the cell at an address, a merge's spanning all of it."""
-        merge = self.mergeCovering(address)
+        merge = self.mergeFind(address)
         extent = merge.extent if merge is not None else CellRange.fromReferences(
             address, address
         )
@@ -581,7 +583,7 @@ class Table:
         """
         return findShownFill(self, self._addressResolve(address))
 
-    def mergeCovering(self, address: CellReferenceLike) -> MergeRange | None:
+    def mergeFind(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.
 
         The only way to tell a covered cell from an empty one, since a covered

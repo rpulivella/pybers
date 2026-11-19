@@ -21,6 +21,7 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-11-18  `formatFormula` and `formatAddress` take format's verb, for PYB-301.
 2026-10-29  `renderNumber` declared the designated place a number is spelled,
             for PYB-278.
 2026-10-22  A reference beyond its table's grid renders as `#REF!`, for PYB-255.
@@ -29,7 +30,7 @@ UPDATES
 2026-10-13  A boolean literal renders as TRUE or FALSE, for PYB-139.
 2026-09-11  A bracket the author typed is written back, for #67. The claim that
             the file records no parentheses was false; node type 25 is one.
-2026-09-08  `renderAddress` and `findShortestNames` exported for #13, so that one
+2026-09-08  `formatAddress` and `findShortestNames` exported for #13, so that one
             reference can be shown without rendering the formula around it.
 2026-09-08  Written for #45.
 """
@@ -140,7 +141,7 @@ def checkOutsideTable(
     )
 
 
-def renderAddress(
+def formatAddress(
     node: FormulaNode, host: CellAddress, names: Mapping[str, str],
     sizes: Mapping[str | None, tuple[int, int]] | None = None,
 ) -> str:
@@ -275,7 +276,7 @@ class Renderer:
                 self.stack.append(Rendered(quoteString(content)))
             case FormulaReference() | FormulaRange():
                 self.stack.append(
-                    Rendered(renderAddress(node, self.host, self.names, self.sizes))
+                    Rendered(formatAddress(node, self.host, self.names, self.sizes))
                 )
             case FormulaGroup():
                 self.stepGroup(content)
@@ -408,7 +409,7 @@ class Renderer:
         self.stack.append(Rendered(f"{leftText}{symbol}{rightText}", level))
 
 
-def renderFormula(
+def formatFormula(
     formula: Formula,
     host: CellReferenceLike,
     *,
@@ -445,4 +446,4 @@ def findShortestNames(tables: Mapping[str, str] | None) -> dict[str, str]:
     return names
 
 
-__all__ = ["renderAddress", "renderFormula", "findShortestNames"]
+__all__ = ["formatAddress", "formatFormula", "findShortestNames"]
