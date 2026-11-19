@@ -43,3 +43,33 @@ Python's own forms carry no verb from the table above. pybers writes each in cam
 | A class method named for its result | Build the instance its name describes | Python `datetime.today` | `Color.gray` |
 | `is` and an adjective, or a verb in the third person | Answer a yes-or-no question | Python `str.isdigit`, `str.startswith` | `table.isAddressable`, `range.covers` |
 | A noun alone | Return the part a name or a position identifies | Python `dict[key]` | `document.sheet`, `table.cell` |
+
+## Reserved nouns
+
+Each noun below keeps one meaning across the library, the command line and the docs. A second meaning needs a second word.
+
+| Noun | Meaning | Follows |
+| ---- | ------- | ------- |
+| merge | Cells joined into one, their anchor holding the content | Numbers' Merge Cells |
+| style | How a part looks: a cell's box, a table's lines, or a named style | CSS style |
+| named style | A style a document keeps by name and several parts share | CSS class |
+| variation | A part's own changes to the named style beneath it | CSS inline style |
+| format | How a cell writes its value as text, such as currency or date | `Intl.NumberFormat` |
+| family | One kind of format, such as number, currency or duration | Numbers' Format pop-up menu |
+| control | The checkbox, slider or other device a person uses to change a cell's value | Numbers' Data Format controls |
+| kind | The sort of value a cell holds, such as number, text or date | Numbers' cell types |
+| fill | What paints an area: a color, a gradient or an image | CSS `background` |
+| stroke | How a line is drawn: its width, color and pattern | SVG `stroke` |
+| line | A stroke a table or a drawable draws for itself: a gridline, a separator, a table's outline, a shape's edge or a line on a sheet | SVG `line` |
+| border | A stroke a cell draws on one of its sides | CSS `border` |
+| band | A color painted on every second body row | Numbers' Alternating Row Color |
+| header, footer | Rows or columns at a table's edge that Numbers styles itself | Numbers' Headers & Footer |
+| section | The body, header rows, header columns or footer rows of a table | HTML table sections |
+| address | A cell's row and column, counted from one, with no table | A1 notation |
+| reference | An address with `$` on each axis and, where needed, its table | Numbers' cell reference |
+| range | A rectangle of cells | Numbers' cell range |
+| selector | Text choosing parts of a document, written as CSS writes one | CSS selector |
+| locale | The language and region whose conventions govern how a document writes its values | Numbers' Language & Region |
+| region | The country or area a locale specifies, `DE` in `de_DE` | `Intl.Locale.region` |
+
+A noun can share its spelling with a verb, and the name's position tells them apart: `formatCellFormat` writes a format as text, and `cellsFill` repeats a block where `cellFillShown` returns a fill.

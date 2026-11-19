@@ -665,8 +665,8 @@ over them sets all five.
 
 ## Changing part of a style is an update, decided 18 November 2026
 
-PYB-290 names the operation that changes some properties of a cell's style and keeps the
-rest.
+PYB-290 chooses the word for an operation that changes some properties of a cell's style
+and keeps the rest.
 
 **A set replaces, and an update changes only what it states.** `document.cellSet` given a
 `cellStyle`, and `pybers set --cell-style`, replace a cell's whole style, as CSS `cssText`
