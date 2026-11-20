@@ -3,6 +3,7 @@
 Changing part of a cell's style: properties updated or one cleared, the rest kept.
 
 UPDATES
+2026-11-19  A document Numbers saved, and every stored style counted, for PYB-290.
 2026-11-19  Written for PYB-290.
 """
 from __future__ import annotations
@@ -20,10 +21,12 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from test_cell_set_style import listStyleCountMismatches
 from test_cli_set import runSetCommand
 from test_cli_show import runShowCommand
 
 import pybers
+from conftest import copyDocument
 from pybers import (
     CellStyle,
     CellStyleProperty,
@@ -151,6 +154,33 @@ def testAScriptUpdatesARangeAndClearsOneCell(tmp_path: Path) -> None:
     padded = dataclasses.replace(boxed, padding=Decimal(12))
     assert readStyles(path, "B1 A2 B2") == {padded}
     assert readStyles(path, "A1") == {dataclasses.replace(padded, background=None)}
+
+
+def testAnUpdateAndARemovalOnADocumentNumbersSavedReadBackExactly(
+    tmp_path: Path,
+) -> None:
+    working = copyDocument("98c-cell-box-regions", tmp_path)
+    document = pybers.open(working)
+    document.cellStyleUpdate("Sheet 1::Table 1::A1", CellStyle(background=blue))
+    document.cellStyleUpdate("Sheet 1::Table 1::B1", CellStyle(padding=Decimal(12)))
+    document.cellStylePropertyRemove(
+        "Sheet 1::Table 1::B1", CellStyleProperty.BACKGROUND
+    )
+    document.save()
+    table = pybers.open(working).sheets[0].tables[0]
+    assert table.cell("A1").cellStyle == CellStyle(background=blue)
+    assert table.cell("B1").cellStyle == CellStyle(padding=Decimal(12))
+    assert [table.cell(each).cellStyle for each in ("C1", "D1")] == [None, None]
+    assert listStyleCountMismatches(working) == []
+
+
+def testUpdatesAndRemovalsOverARangeLeaveEveryStyleCounted(tmp_path: Path) -> None:
+    document, path = createStyled(tmp_path)
+    document.cellStyleUpdate("Sheet 1::T::A1:D1", CellStyle(padding=Decimal(12)))
+    document.cellStylePropertyRemove("Sheet 1::T::B2", CellStyleProperty.BACKGROUND)
+    document.cellStyleUpdate("Sheet 1::T::C3:D4", CellStyle(background=blue))
+    document.save(path)
+    assert listStyleCountMismatches(path) == []
 
 
 def saveStyled(tmp_path: Path) -> Path:
