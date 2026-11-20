@@ -6,8 +6,8 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
-2026-11-20  `cellFillComputed` and `cellBorderComputed`, as CSS computes a value, for
-            PYB-291.
+2026-11-20  `cellStyleComputed`, the box a cell displays, beside `cellFillComputed` and
+            `cellBorderComputed`, each named as CSS computes a value, for PYB-291.
 2026-11-18  `mergeFind`, `isAddressable`, a private `_rangeSingle` and a table's
             sections follow the vocabulary, for PYB-301.
 2026-11-18  `cellFillComputed`, the fill a cell displays, its banded row's included,
@@ -124,6 +124,7 @@ from pybers.table.tablestyle import (
     TableStyle,
     TableStyleChange,
     buildTableStyle,
+    findComputedCellStyle,
     findComputedFill,
     resetTableStyle,
 )
@@ -487,25 +488,18 @@ class Table:
     def mergeAdd(self, address: CellRangeLike) -> MergeRange:
         """Merge a block of cells into one, anchored at its top-left, and return it.
 
-        **The covered cells are discarded permanently, and unmerging does not restore
-        them.** Measured, not chosen: `22-merge-2x2` and its unmerged twin hold the
-        same 18 cells, and Numbers writes no record at a position its own merge
-        covers. A merge IMPORTED from Excel is the exception and keeps a style-only
-        record at each one, which a save preserves rather than cleans up.
+        **The covered cells are discarded permanently**, as Numbers writes no record
+        where its own merge covers (`22-merge-2x2`). A merge imported from Excel keeps
+        a style-only record at each, which a save preserves.
         """
         extent = self._rangeSingle(address, "merge")
-        # A single cell is refused because Numbers cannot produce one: no document holds
-        # a merge covering one cell and the interface offers no way to make one, so
-        # writing the formula for it would put a construct in the file that has never
-        # been confirmed to open. Declining to invent is not the same as inventing a
-        # rule.
+        # Numbers offers no merge of one cell, so none is written unconfirmed.
         if extent.start == extent.end:
             raise ReferenceError(
                 f"{extent} is one cell, and a merge joins two or more."
             )
         merge = MergeRange(extent)
-        # Checked against the whole block before anything is discarded, so a refused
-        # merge leaves the table exactly as it was rather than half applied.
+        # Checked before anything is discarded, so a refused merge changes nothing.
         for existing in self.mergeRanges:
             if any(existing.covers(reference) for reference in merge.extent):
                 raise ReferenceError(
@@ -584,6 +578,10 @@ class Table:
         section's.
         """
         return findComputedFill(self, self._addressResolve(address))
+
+    def cellStyleComputed(self, address: CellReferenceLike) -> CellStyle:
+        """Return the box a cell displays, every property resolved as CSS computes."""
+        return findComputedCellStyle(self, self._addressResolve(address))
 
     def mergeFind(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.

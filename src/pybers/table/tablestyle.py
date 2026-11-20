@@ -8,7 +8,8 @@ prevails over all of them at its edge. Banded rows paint every second body row
 beneath any fill a cell states. See findings-06-styles.md.
 
 UPDATES
-2026-11-20  `findComputedFill`, for PYB-291.
+2026-11-20  `findComputedCellStyle`, the box a cell displays, beside
+            `findComputedFill`, for PYB-291.
 2026-11-18  `TableBand`, a table's banded rows, and their text form, for PYB-267.
 2026-11-17  Written for PYB-266.
 """
@@ -33,6 +34,7 @@ from pybers.addressing.reference import TableReference
 from pybers.color.colors import Color, ColorError, ColorSpace
 from pybers.errors import PybersError, composeChoiceRefusal
 from pybers.format.text import splitDeclarations
+from pybers.style.cells import CellStyle, updateCellStyles
 from pybers.style.fills import Fill, FillNone
 from pybers.style.strokes import (
     Stroke,
@@ -197,6 +199,21 @@ def composeBandRefusal(fill: Fill) -> str:
     phrase = {"gradient": "a gradient", "image": "an image", "none": "no fill"}
     kind = str(getattr(fill, "fillType", ""))
     return f"Numbers cannot band rows with {phrase.get(kind, kind)}."
+
+
+def findComputedCellStyle(table: Table, where: CellAddress) -> CellStyle:
+    """Return the box a cell displays, its own style over its section's.
+
+    The fill is the one `findComputedFill` decides, so a band shows, and a merge shows
+    what its anchor shows.
+    """
+    merge = table.mergeFind(where)
+    where = where if merge is None else merge.anchor
+    cell = table.cells.get(where)
+    inherited = table._cellStyleInherited(where)
+    own = None if cell is None else cell.cellStyle
+    resolved = inherited if own is None else updateCellStyles(own, inherited)
+    return replace(resolved, background=findComputedFill(table, where))
 
 
 def findComputedFill(table: Table, where: CellAddress) -> Fill:
@@ -522,7 +539,8 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
 
 __all__ = [
     "TableBand", "TableLine", "TableStyle", "TableStyleChange", "TableStyleError",
-    "buildTableStyle", "findComputedFill", "findTableLine", "formatTableLine",
+    "buildTableStyle", "findComputedCellStyle", "findComputedFill", "findTableLine",
+    "formatTableLine",
     "applyTableReset", "bandGray", "blankTableStyle", "formatTableBand",
     "formatTableStyle", "gridlineStroke",
     "lineNames", "parseTableStyle",
