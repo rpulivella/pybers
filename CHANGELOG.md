@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-290] Combine a style with what a cell already has
 - [PYB-301] Define one vocabulary for the library and the command line
 - [PYB-267] Band a table's rows with an alternating color
 - [PYB-266] Draw a table's lines: borders, gridlines and outline

@@ -11,6 +11,7 @@ properties copied in, as `99-cell-fill-in-a-created-table` measured.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-19  `updateCellStyles` moved to the style model, for PYB-290.
 2026-11-19  A table's parts are sections, for PYB-301.
 2026-11-18  Combining styles is an update, for PYB-290.
 2026-11-13  A cell's variation inherits from its section's first non-variation
@@ -37,7 +38,7 @@ from .._persistence.pool import EntryPool
 from ..absence import UNCHANGED
 from ..style._read import readCellStyle, readInheritedCellStyle
 from ..style._write import CellStyleKey, applyCellStyle
-from ..style.cells import CellStyle, findOverrides
+from ..style.cells import CellStyle, findOverrides, updateCellStyles
 from .headers import TableSection
 
 if TYPE_CHECKING:
@@ -95,20 +96,6 @@ def readSectionVariations(
     return frozendict(found)
 
 
-def updateCellStyles(*styles: CellStyle) -> CellStyle:
-    """Return one style stating each property the first of `styles` to state it does."""
-    return CellStyle(
-        background=next((each.background for each in styles if each.background), None),
-        padding=next(
-            (each.padding for each in styles if each.padding is not None), None
-        ),
-        verticalAlign=next(
-            (each.verticalAlign for each in styles if each.verticalAlign), None
-        ),
-        textWrap=next((each.textWrap for each in styles if each.textWrap), None),
-    )
-
-
 def readOwnCellStyles(
     cellStyles: Mapping[int, CellStyle],
     variations: Mapping[TableSection, SectionVariation],
@@ -142,7 +129,7 @@ def writeAskedCellStyle(
 
 
 __all__ = [
-    "SectionVariation", "updateCellStyles", "readOwnCellStyles",
+    "SectionVariation", "readOwnCellStyles",
     "readSectionCellStyles", "readSectionVariations", "sectionStyleSlots",
     "writeAskedCellStyle",
 ]

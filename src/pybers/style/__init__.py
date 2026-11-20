@@ -3,6 +3,7 @@
 The style feature: a cell's box and the fills that paint it, and both archive halves.
 
 UPDATES
+2026-11-19  `CellStyleProperty` exported, for PYB-290.
 2026-11-17  The stroke family, for PYB-266.
 2026-11-12  Written for PYB-265.
 """
@@ -19,6 +20,7 @@ __date__ = "2026/11/12"
 from pybers.style.cells import (
     CellStyle,
     CellStylePaddingSides,
+    CellStyleProperty,
     CellStyleTextWrap,
     CellStyleVerticalAlign,
 )
@@ -46,7 +48,8 @@ from pybers.style.text import (
 )
 
 __all__ = [
-    "CellStyle", "CellStylePaddingSides", "CellStyleTextWrap", "CellStyleVerticalAlign",
+    "CellStyle", "CellStylePaddingSides", "CellStyleProperty", "CellStyleTextWrap",
+    "CellStyleVerticalAlign",
     "Fill", "FillGradient", "FillImage", "FillNone", "FillType", "CellStyleError",
     "formatCellStyle", "parseCellStyle", "parseLength", "formatStroke",
     "Stroke", "StrokeBrush", "StrokeCap", "StrokeDash", "StrokeEmpty", "StrokeError",

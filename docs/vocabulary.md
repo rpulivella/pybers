@@ -9,9 +9,9 @@ A method ends in its verb, `rowAdd`, and a module-level function begins with it,
 | Verb | Meaning | Follows | Example |
 | ---- | ------- | ------- | ------- |
 | Set | Replace a whole part with the value given | CSS `cssText` | `document.cellSet` |
-| Update | Change each property given and keep every other | Python `dict.update` | `cellStyleUpdate` |
+| Update | Change each property given and keep every other | Python `dict.update` | `document.cellStyleUpdate` |
 | Add | Insert a new part | Python `set.add` | `table.rowAdd` |
-| Remove | Delete a part and return it | Python `dict.pop` | `table.rowRemove` |
+| Remove | Delete a part and return it, or the changes that record it | Python `dict.pop` | `table.rowRemove`, `document.cellStylePropertyRemove` |
 | Copy | Duplicate a block of cells at another position, keeping the source | Python `shutil.copy` | `table.cellsCopy` |
 | Move | Relocate a block of cells, emptying the source | Python `shutil.move` | `table.cellsMove` |
 | Fill | Repeat a block across a range | Numbers' Autofill | `table.cellsFill` |
@@ -40,7 +40,8 @@ A command is a verb, and an option of `set` is the part it sets. A verb with no 
 | ---- | ------------ | ------- |
 | Set | `pybers set`, one option for each part: `--cell-format`, `--cell-control`, `--cell-style`, `--border` and `--table-style` | `pybers set budget.numbers Summary::Costs::B4 --cell-format number` |
 | Set, for a locale | `pybers set` given `--locale` and no `SELECTOR` | `pybers set budget.numbers --locale de_DE` |
-| Update | An option of `pybers set`, which PYB-290 adds | |
+| Update | `--cell-style-update` on `pybers set` | `pybers set budget.numbers Summary::Costs::B4 --cell-style-update 'padding: 12pt'` |
+| Remove | `--cell-style-remove` on `pybers set` | `pybers set budget.numbers Summary::Costs::B4 --cell-style-remove background` |
 | select | The `SELECTOR` argument of every command taking one | `pybers show budget.numbers Summary::Costs::B2:B9` |
 | parse | The text every option and `VALUE` argument reads | `--cell-style 'background: #ff0000ff'` |
 | format | The text `pybers show` and `pybers set` print, which `parse` reads back | `pybers show budget.numbers Summary::Costs::B4` |
@@ -71,6 +72,7 @@ Each noun below keeps one meaning across the library, the command line and the d
 | style | How a part looks: a cell's box, a table's lines, or a named style. `CellBorderStyle` and `--border-style` keep CSS's `border-style` name for a border's line: solid, dashed, dotted or hidden. | CSS style |
 | named style | A style a document keeps by name and several parts share | CSS class |
 | variation | A part's own changes to the named style beneath it | CSS inline style |
+| property | One quality a style states, such as its background or padding, by its CSS name | CSS property |
 | format | How a cell writes its value as text, such as currency or date | `Intl.NumberFormat` |
 | family | One kind of format, such as number, currency or duration | Numbers' Format pop-up menu |
 | control | The checkbox, slider or other device a person uses to change a cell's value | Numbers' Data Format controls |
