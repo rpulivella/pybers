@@ -99,8 +99,8 @@ from tools.local.lib.functiontable import (
     FunctionTable,
     TableComparison,
     compareTables,
+    formatModule,
     readCommitted,
-    renderModule,
 )
 from tools.local.lib.machoreader import MachOError
 from tools.local.lib.numbersapp import (
@@ -251,7 +251,7 @@ def main() -> int:
         )
         return 0
 
-    source = renderModule(table)
+    source = formatModule(table)
     if arguments.preview:
         console.print("\n[bold]Would write[/]")
         console.print(source, markup=False, highlight=False)

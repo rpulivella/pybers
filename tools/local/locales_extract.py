@@ -45,7 +45,7 @@ from rich.console import Console
 from rich.markup import escape
 
 from tools.local.lib.icudata import Icu, IcuError
-from tools.local.lib.localetable import compareTables, readCommitted, renderModule
+from tools.local.lib.localetable import compareTables, formatModule, readCommitted
 from tools.workflow.lib.shared import RichHelpFormatter, repositoryRoot
 
 console: Console = Console()
@@ -112,7 +112,7 @@ def main() -> int:
         )
         return 0
 
-    source = renderModule(table, versions, macOS)
+    source = formatModule(table, versions, macOS)
     if arguments.preview:
         console.print("\n[bold]Would write[/]")
         console.print(source, markup=False, highlight=False)

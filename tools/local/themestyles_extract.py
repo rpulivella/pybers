@@ -39,7 +39,7 @@ import argparse
 
 from rich.console import Console
 
-from tools.local.lib.themestyles import buildThemeStyles, modulePath, renderModule
+from tools.local.lib.themestyles import buildThemeStyles, formatModule, modulePath
 from tools.workflow.lib.shared import RichHelpFormatter, repositoryRoot
 
 console: Console = Console()
@@ -61,7 +61,7 @@ def main() -> int:
         help=f"write {modulePath.relative_to(repositoryRoot)}",
     )
     arguments = parser.parse_args()
-    rendered = renderModule(buildThemeStyles())
+    rendered = formatModule(buildThemeStyles())
     current = modulePath.read_text() if modulePath.is_file() else ""
     if rendered == current:
         console.print("[green]The committed theme style table matches.[/]")

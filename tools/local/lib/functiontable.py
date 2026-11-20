@@ -5,6 +5,7 @@ The function table `functions-extract.py` writes, read back and compared.
 Prints nothing and reads no binary, so a test imports it without Numbers installed.
 
 UPDATES
+2026-11-20  `formatModule` writes the source Python reads back, for PYB-309.
 2026-10-13  Moved here from `functions-extract.py`, for PYB-204.
 """
 from __future__ import annotations
@@ -134,7 +135,7 @@ def compareTables(
     return TableComparison(added, removed, changed, unchanged)
 
 
-def renderModule(table: FunctionTable) -> str:
+def formatModule(table: FunctionTable) -> str:
     """Return the source of the generated module, one line per function."""
     entries = "\n".join(
         f'    "{function.name}": ({function.index}, '

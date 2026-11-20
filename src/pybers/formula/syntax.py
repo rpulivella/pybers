@@ -74,7 +74,7 @@ from pybers.formula.nodes import (
     subtractionNodeType,
 )
 
-# The equals sign Numbers shows in front of a formula and never stores. Rendered
+# The equals sign Numbers shows in front of a formula and never stores. Written
 # because that is what a person reads in the formula bar, and optional on the way
 # in because that is what a person types.
 formulaMarker: str = "="

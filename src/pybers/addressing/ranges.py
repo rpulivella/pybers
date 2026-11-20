@@ -13,6 +13,7 @@ the same cells, and the two mean different things: one follows the table as it
 grows and the other does not.
 
 UPDATES
+2026-11-20  `formatEndpoint` writes the text a range parses back, for PYB-309.
 2026-11-19  `resolve` fills a range's unbounded axes, as `slice.indices` does, for
             PYB-301.
 2026-11-18  A range prints its table through `addressing.text`, for PYB-267.
@@ -140,7 +141,7 @@ def orderAxis(one: AxisBound, other: AxisBound) -> tuple[AxisBound, AxisBound]:
     return (one, other) if one[0] <= other[0] else (other, one)
 
 
-def renderEndpoint(bound: RangeEndpoint) -> str:
+def formatEndpoint(bound: RangeEndpoint) -> str:
     """Return one endpoint written out, omitting whichever axis is unbounded."""
     text = ""
     if bound.col is not None:
@@ -359,7 +360,7 @@ class CellRange:
         A rectangle whose two endpoints are written identically comes back as the
         single cell it is, so what goes out is what a caller would have put in.
         """
-        first = renderEndpoint(
+        first = formatEndpoint(
             RangeEndpoint(
                 self.startRow,
                 self.startCol,
@@ -367,7 +368,7 @@ class CellRange:
                 self.startColAbsolute,
             )
         )
-        last = renderEndpoint(
+        last = formatEndpoint(
             RangeEndpoint(
                 self.endRow, self.endCol, self.endRowAbsolute, self.endColAbsolute
             )

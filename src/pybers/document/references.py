@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from pybers.document.sheets import Document, SelectionError, Sheet
+from pybers.formula.formatting import findShortestNames, formatAddress
 from pybers.formula.nodes import (
     Formula,
     FormulaError,
@@ -41,7 +42,6 @@ from pybers.formula.nodes import (
     FormulaRange,
     FormulaReference,
 )
-from pybers.formula.render import findShortestNames, formatAddress
 from pybers.table.cell import Cell
 from pybers.table.cells import Table
 

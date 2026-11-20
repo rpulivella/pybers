@@ -11,6 +11,7 @@ states among them. Found one group at a time, 2026-11-02, findings-10-creation.m
 Its styles are the reset in docs/decisions.md, created by `_reset`.
 
 UPDATES
+2026-11-20  `formatIdentityText` takes format's verb, for PYB-309.
 2026-11-02  Composed field by field to the least Numbers needs, rather than copied
             from a template, for PYB-276.
 2026-09-22  The reset's styles moved to `_reset`, for PYB-113.
@@ -111,7 +112,7 @@ def readIdentityValue(identity: str) -> int:
     return words[0] | words[1] << 32 | words[2] << 64 | words[3] << 96
 
 
-def renderIdentityText(identity: str) -> str:
+def formatIdentityText(identity: str) -> str:
     """Return the canonical UUID a table's `table_id` spells its identity as.
 
     **`table_id` is how Numbers finds a table's calculation-engine owners.** A table
@@ -194,7 +195,7 @@ def composeModel(
     absent one absent rather than restoring it.
     """
     model = tst.TableModelArchive(
-        table_id=renderIdentityText(table.identifier),
+        table_id=formatIdentityText(table.identifier),
         number_of_rows=table.rowCount,
         number_of_columns=table.colCount,
         table_name=table.name,

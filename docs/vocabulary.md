@@ -4,7 +4,7 @@ Each word pybers uses for an action or a part has one meaning, shared by the lib
 
 ## Verbs
 
-A method ends in its verb, `rowAdd`, and a module-level function begins with it, `findCurrency`.
+A method ends in its verb, `rowAdd`, and a module-level function begins with it, `findCurrency`. An internal name may also open with a verb this page does not define, from `leadingVerbs` in [the naming test](../tests/test_naming.py), which reads every public function's verb from the public API rather than listing it again.
 
 | Verb | Meaning | Follows | Example |
 | ---- | ------- | ------- | ------- |
