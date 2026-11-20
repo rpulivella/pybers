@@ -8,7 +8,8 @@ shares one style among every cell styled alike.
 
 UPDATES
 2026-11-19  `CellStyleProperty`, each property by its CSS name, and
-            `updateCellStyles`, moved from the table's archive half, for PYB-290.
+            `updateCellStyles`, moved from the table's archive half, and
+            `findUnwritablePart`, for PYB-290.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -83,6 +84,20 @@ numbersCellStyle: CellStyle = CellStyle(
 )
 
 
+def findUnwritablePart(cellStyle: CellStyle) -> str | None:
+    """Return what a style holds that pybers cannot write, `a gradient fill`, or None.
+
+    The one place a style a cell already holds is judged, so a change over it refuses
+    in the reader's terms.
+    """
+    background = cellStyle.background
+    if isinstance(background, FillGradient | FillImage):
+        return {"gradient": "a gradient fill", "image": "an image fill"}[
+            background.fillType.value
+        ]
+    return "uneven padding" if isinstance(cellStyle.padding, tuple) else None
+
+
 def findCellStyleRefusal(cellStyle: CellStyle) -> str | None:
     """Return why pybers cannot write a cell style, or None when it can."""
     background = cellStyle.background
@@ -149,5 +164,5 @@ def findOverrides(
 __all__ = [
     "CellStyle", "CellStylePaddingSides", "CellStyleProperty", "CellStyleTextWrap",
     "CellStyleVerticalAlign", "findCellStyleRefusal", "findOverrides",
-    "numbersCellStyle", "updateCellStyles",
+    "findUnwritablePart", "numbersCellStyle", "updateCellStyles",
 ]

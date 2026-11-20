@@ -111,6 +111,7 @@ from pybers.style.cells import (
     CellStyle,
     CellStyleProperty,
     findCellStyleRefusal,
+    findUnwritablePart,
     updateCellStyles,
 )
 from pybers.style.strokes import StrokeError
@@ -560,6 +561,14 @@ class Document:
                 refusal = findFormatRefusal(cell, where, asked, after, controlAfter)
                 if refusal is not None:
                     raise WriteError(f"{refusal} Nothing was written.")
+            if cellStyleCompose is not UNCHANGED:
+                composed = cellStyleCompose(None if cell is None else cell.cellStyle)
+                part = None if composed is None else findUnwritablePart(composed)
+                if part is not None:
+                    raise WriteError(
+                        f"{where} has {part}, which pybers cannot write, so set its "
+                        "whole style instead. Nothing was written."
+                    )
             writing.append((table, address, asked))
         changes: list[CellChange] = []
         for table, address, asked in writing:

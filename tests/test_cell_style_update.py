@@ -3,6 +3,8 @@
 Changing part of a cell's style: properties updated or one cleared, the rest kept.
 
 UPDATES
+2026-11-19  An update keeping a fill pybers cannot write is refused before any
+            change, for PYB-290.
 2026-11-19  A document Numbers saved, and every stored style counted, for PYB-290.
 2026-11-19  Written for PYB-290.
 """
@@ -34,7 +36,9 @@ from pybers import (
     CellStyleVerticalAlign,
     Color,
     FillGradient,
+    FillImage,
 )
+from pybers.style.cells import findUnwritablePart
 
 yellow: Color = Color.parse("#ffd60aff")
 blue: Color = Color.parse("#0a84ffff")
@@ -181,6 +185,59 @@ def testUpdatesAndRemovalsOverARangeLeaveEveryStyleCounted(tmp_path: Path) -> No
     document.cellStyleUpdate("Sheet 1::T::C3:D4", CellStyle(background=blue))
     document.save(path)
     assert listStyleCountMismatches(path) == []
+
+
+def testAnUpdateKeepingAFillPybersCannotWriteIsRefusedBeforeAnyChange(
+    tmp_path: Path,
+) -> None:
+    working = copyDocument("28-style-fills", tmp_path)
+    document = pybers.open(working)
+    with pytest.raises(pybers.WriteError, match="has a gradient fill, which pybers"):
+        document.cellStyleUpdate("Sheet 1::Table 1::E1", CellStyle(padding=Decimal(12)))
+    document.save()
+    reopened = pybers.open(working).sheets[0].tables[0].cell("E1")
+    assert reopened.cellStyle == CellStyle(background=FillGradient())
+
+
+def testACommandUpdatingAFillPybersCannotWriteRefusesWritingNothing(
+    tmp_path: Path,
+) -> None:
+    working = copyDocument("28-style-fills", tmp_path)
+    before = working.read_bytes()
+    result = runSetCommand(
+        str(working), "Sheet 1::Table 1::E1", "--cell-style-update", "padding: 12pt"
+    )
+    assert result.exit_code == 1
+    assert result.stderr == (
+        "pybers set: Sheet 1::Table 1::E1 has a gradient fill, which pybers cannot "
+        "write, so set its whole style instead. Nothing was written.\n"
+    )
+    assert working.read_bytes() == before
+
+
+@pytest.mark.parametrize(("held", "part"), [
+    (CellStyle(background=FillGradient()), "a gradient fill"),
+    (CellStyle(background=FillImage()), "an image fill"),
+    (
+        CellStyle(padding=(Decimal(1), Decimal(2), Decimal(1), Decimal(2))),
+        "uneven padding",
+    ),
+    (boxed, None),
+])
+def testEachPartPybersCannotWriteIsNamedInTheReadersTerms(
+    held: CellStyle, part: str | None
+) -> None:
+    assert findUnwritablePart(held) == part
+
+
+def testRemovingAFillPybersCannotWriteLeavesAStyleItCanWrite(tmp_path: Path) -> None:
+    working = copyDocument("28-style-fills", tmp_path)
+    document = pybers.open(working)
+    document.cellStylePropertyRemove(
+        "Sheet 1::Table 1::E1", CellStyleProperty.BACKGROUND
+    )
+    document.save()
+    assert pybers.open(working).sheets[0].tables[0].cell("E1").cellStyle is None
 
 
 def saveStyled(tmp_path: Path) -> Path:
