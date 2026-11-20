@@ -24,6 +24,8 @@ those files do not give.
 
   Never a summary such as `formula, DOLLAR`, which says what the cell is for rather than
   what is in it.
+- **Every label wraps**, so it reads in full in the sheet. A recipe writes each label with
+  `labelSet`, which wraps its cell, and a label typed by hand has Wrap Text in Cell checked.
 - **The column after the last entry is labeled `empty`** and left so in row 1, which marks
   where the entries stop and measures an untouched cell.
 - **Each entry varies one thing** from its neighbors, so a difference in the file names its
