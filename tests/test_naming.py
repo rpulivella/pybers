@@ -5,9 +5,13 @@ Every module-level function name opens with a verb, checked across the repositor
 A method names its subject first and a module-level function its verb first, so a
 name reads as an action rather than as the value it returns. Only the verb position
 is checkable, and only against a list: a noun that doubles as a verb, `formatClaims`
-once, passes it, which is why a new verb joins `leadingVerbs` deliberately.
+once, passes it, which is why a new verb joins `leadingVerbs` deliberately. A verb a
+public function opens with comes from the public API instead, and `docs/vocabulary.md`
+defines what it means, so each verb is written down in one place.
 
 UPDATES
+2026-11-20  `leadingVerbs` holds only the verbs no public function opens with, each
+            public one read from `pybers.__all__`, for PYB-309.
 2026-11-18  `escape` is a verb, as `CSS.escape` names it, for PYB-267.
 2026-11-05  `pytest_xdist_auto_num_workers`, a hook xdist finds by name, is exempt, for
             PYB-277.
@@ -37,37 +41,36 @@ __status__ = "Development"
 __date__ = "2026/09/17"
 
 import ast
+import inspect
 import re
 from pathlib import Path
+
+import pybers
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 checkedDirectories: tuple[str, ...] = ("src", "tests", "tools")
 
+# The verbs only internal names open with; the public ones come from `publicVerbs`.
 leadingVerbs: frozenset[str] = frozenset({
-    "add", "apply", "assert", "assign", "attach", "author", "bind", "blank",
-    "borrow", "build", "carries", "check", "choose", "claim", "clamp", "classify",
-    "close",
-    "collect",
-    "compare", "compose", "compress", "confirm", "convert", "copy", "count", "create",
-    "decode",
-    "decompress",
-    "delete", "detach", "drop", "edit", "emit", "encode", "escape", "expand", "extract",
-    "fill", "find", "forge", "format", "generate", "hold", "index", "is", "iterate",
-    "list",
-    "load", "locate",
-    "map", "mark", "match", "measure", "merge", "move", "normalize", "open", "order",
-    "parse",
-    "patch",
-    "place", "post", "print", "qualify", "quote", "read", "record", "recount", "reduce",
-    "refuse",
-    "register", "release", "relocate", "remap", "remove", "render", "reopen",
-    "report", "request",
-    "resolve", "restart",
-    "retype", "rewrite", "run", "save", "select", "set", "shape", "show",
-    "sort", "split", "summarize", "survey", "to", "tokenize", "unquote", "unwrap",
-    "update",
-    "verify", "wait", "walk", "write",
+    "add", "apply", "assert", "assign", "attach", "author", "bind", "blank", "borrow",
+    "build", "carries", "choose", "claim", "clamp", "classify", "close", "collect",
+    "compare", "compress", "confirm", "convert", "copy", "count", "decode",
+    "decompress", "delete", "detach", "drop", "edit", "emit", "encode", "expand",
+    "extract", "fill", "forge", "generate", "hold", "index", "is", "iterate", "list",
+    "load", "locate", "map", "mark", "match", "measure", "merge", "move", "normalize",
+    "order", "patch", "place", "post", "print", "qualify", "quote", "read", "record",
+    "recount", "reduce", "refuse", "register", "release", "relocate", "remap", "remove",
+    "render", "reopen", "report", "request", "resolve", "restart", "retype", "rewrite",
+    "run", "save", "select", "set", "shape", "show", "sort", "split", "summarize",
+    "survey", "tokenize", "unquote", "unwrap", "update", "verify", "wait", "walk",
+    "write",
 })
+
+# Each verb a public function opens with, which `docs/vocabulary.md` defines.
+publicVerbs: frozenset[str] = frozenset(
+    re.split(r"(?=[A-Z])", name)[0] for name in pybers.__all__
+    if inspect.isfunction(getattr(pybers, name))
+)
 
 # `main` and a pytest hook are looked up by name, and a fixture's name is the value a
 # test receives.
@@ -89,7 +92,7 @@ def findVerblessFunctions(path: Path) -> list[str]:
         if any("fixture" in decorator for decorator in decorators):
             continue
         leading = re.match(r"_*([a-z]+)", name)
-        if leading is None or leading.group(1) not in leadingVerbs:
+        if leading is None or leading.group(1) not in leadingVerbs | publicVerbs:
             found.append(f"{path}:{node.lineno} {name}")
     return found
 
@@ -115,3 +118,8 @@ def testAVerblessNameIsReportedWithItsFileAndLine(tmp_path: Path) -> None:
     )
 
     assert findVerblessFunctions(source) == [f"{source}:5 valueFor"]
+
+
+def testNoPublicVerbIsAlsoListedForInternalNames() -> None:
+    assert leadingVerbs & publicVerbs == frozenset()
+
