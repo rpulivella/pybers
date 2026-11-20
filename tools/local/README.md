@@ -90,13 +90,15 @@ from `<name>.recipe.toml` beside it: a copy of `base` and any `documents`, then 
 `[[step]]` in order. Every step names its `document`, counted from 0, and the cell it
 acts on by `sheet`, `table` and `range`, which a recipe may name once at its top for every
 step. A `dataFormatSet`, `customFormatEdit`, `cellFillSet`, `tableBandSet` or
-`tableHeadersSet` step reads back what it changed, so a control Numbers did not take stops the run.
+`tableHeadersSet` step, and a `labelSet` step's wrap, read back what it changed, so a
+control Numbers did not take stops the run.
 
 ```
 select           select the range
 menuPress        press menuItem: copy, paste, delete, autofillDown or undo
 formatSet        set the range's format kind through AppleScript
 valueSet         type value into one cell, as a person would
+labelSet         type the label in value into one cell and wrap the cell, so it reads in full
 tableExtend      grow the table until it reaches the cell in range
 tableAdd         add the table named by table to sheet, reaching the cell in range
 tableDelete      delete the table named by table from sheet

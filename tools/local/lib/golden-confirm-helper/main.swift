@@ -12,6 +12,7 @@
 // and a color or a count is parsed before it reaches a script.
 //
 // UPDATES
+// 2026-11-20  A label step types a label and wraps its cell, for PYB-305.
 // 2026-11-18  A step merges a range through scripting, for PYB-267.
 // 2026-11-18  Steps set a table's header counts, its Alternating Row Color, and a
 //             cell's fill, through scripting or the Fill section, for PYB-267.
@@ -114,6 +115,7 @@ enum EditAction: String, Codable {
     case menuPress
     case formatSet
     case valueSet
+    case labelSet
     case dataFormatSet
     case tableExtend
     case tableAdd
@@ -2027,6 +2029,23 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
         }
         _ = try runAppleScript(
             "set t to \(table)\nset value of cell \(quoteAppleScript(cell)) of t to \(quoteAppleScript(value))")
+    case .labelSet:
+        // A label wraps, so it reads in full in the sheet rather than in the formula bar.
+        let (table, _) = try formatRangeReference(step, documentId: documentId)
+        guard let value = step.value, let cell = step.range else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a labelSet step needs a value and a single cell",
+                remedy: "run the helper only through the golden confirmation"))
+        }
+        let target = "cell \(quoteAppleScript(cell)) of t"
+        let wrapped = try runAppleScript(
+            "set t to \(table)\nset value of \(target) to \(quoteAppleScript(value))\n"
+                + "set text wrap of \(target) to true\nget text wrap of \(target)")
+        guard wrapped.booleanValue else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "edit", detail: "Numbers did not wrap the label in \(cell)",
+                remedy: "check the cell in Numbers, then rerun the recipe"))
+        }
     }
 }
 
