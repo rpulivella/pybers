@@ -684,6 +684,30 @@ update changes what exists.
 combining stated properties with existing ones is an update, internal functions included,
 and merge refers only to merged cells.
 
+**Clearing a property is a removal, not a value.** `cellStylePropertyRemove` takes a
+`CellStyleProperty` and clears it from each cell's own style, as CSS `removeProperty`
+clears an inline declaration and the stylesheet's value returns. CSS `inherit` was
+refused, since it takes the parent element's value, and a cell's parent here is its
+section's style. A `CellStyle` field of None already means not stated, so an update
+cannot also carry a clear.
+
+**A format is never combined.** A `CellFormat` is one choice from one closed family, its
+options belonging to that family, as `Intl.NumberFormat` takes its options together, so a
+format is always set whole. Changing one option within a family, such as its decimal
+places alone, would be a format update of its own ticket.
+
+**A paragraph style takes the same word once pybers writes one.** PYB-268 to PYB-270 add
+named paragraph and character styles, each a named style beneath a variation, the model a
+cell's box already follows. An update to a variation will change what it states and keep
+the rest, and each style's method belongs to its own ticket.
+
+**A named set of cell formatting is applied whole.** PYB-128 names a set of box
+formatting and a paragraph style, a pybers concept Numbers lacks. Applying one is a set,
+as assigning a CSS class is, and an update is the cell's own change over it, as an inline
+style overrides a class. Whether applying a set again after its definition changes keeps
+each cell's updates is PYB-128's to decide, and PYB-290 neither depends on it nor
+constrains it.
+
 ---
 
 ## Deliberately not here
