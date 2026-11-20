@@ -107,7 +107,7 @@ def formatCellFormat(cellFormat: CellFormat | UNDETERMINED) -> str:
     if cellFormat is UNDETERMINED:
         return "unknown"
     if isinstance(cellFormat, CellFormatAutomatic):
-        return formatCellFormat(cellFormat.shown) + automaticSuffix
+        return formatCellFormat(cellFormat.computed) + automaticSuffix
     declarations = [
         f"{formatSettingName(each.name)}: "
         f"{'none' if (setting := getattr(cellFormat, each.name)) is None else setting}"

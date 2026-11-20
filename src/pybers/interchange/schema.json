@@ -551,7 +551,7 @@
         "formatFamily": {
           "const": "automatic"
         },
-        "shown": {
+        "computed": {
           "anyOf": [
             {
               "$ref": "#/$defs/CellFormatNumber"
@@ -805,7 +805,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 8
+          "const": 9
         },
         "sheetName": {
           "anyOf": [
@@ -1055,7 +1055,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 8
+          "const": 9
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -1141,7 +1141,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 8
+          "const": 9
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -1498,7 +1498,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 8
+          "const": 9
         },
         "sheetName": {
           "anyOf": [
@@ -1561,7 +1561,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 8
+          "const": 9
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1904,7 +1904,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 8
+          "const": 9
         },
         "sheetName": {
           "anyOf": [

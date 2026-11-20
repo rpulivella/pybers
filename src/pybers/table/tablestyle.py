@@ -8,6 +8,7 @@ prevails over all of them at its edge. Banded rows paint every second body row
 beneath any fill a cell states. See findings-06-styles.md.
 
 UPDATES
+2026-11-20  `findComputedFill`, for PYB-291.
 2026-11-18  `TableBand`, a table's banded rows, and their text form, for PYB-267.
 2026-11-17  Written for PYB-266.
 """
@@ -198,7 +199,7 @@ def composeBandRefusal(fill: Fill) -> str:
     return f"Numbers cannot band rows with {phrase.get(kind, kind)}."
 
 
-def findShownFill(table: Table, where: CellAddress) -> Fill:
+def findComputedFill(table: Table, where: CellAddress) -> Fill:
     """Return the fill a cell displays, the one place a band meets a cell's own fill.
 
     A fill the cell states prevails. Every second body row, counted from the first,
@@ -521,7 +522,7 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
 
 __all__ = [
     "TableBand", "TableLine", "TableStyle", "TableStyleChange", "TableStyleError",
-    "buildTableStyle", "findShownFill", "findTableLine", "formatTableLine",
+    "buildTableStyle", "findComputedFill", "findTableLine", "formatTableLine",
     "applyTableReset", "bandGray", "blankTableStyle", "formatTableBand",
     "formatTableStyle", "gridlineStroke",
     "lineNames", "parseTableStyle",

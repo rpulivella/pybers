@@ -431,7 +431,7 @@ as the whole document would.
 **Automatic is a member of the format family, holding the format it chose.** The chosen
 bit and a format's settings are independent in the file, and an Automatic format holds
 settings of its own, so a bare `automatic` would lose both. `CellFormatAutomatic` carries
-the format Numbers picked in `shown`, a `CellFormatShown`, which is every member but
+the format Numbers picked in `computed`, a `CellFormatShown`, which is every member but
 Automatic, so a format a person chose stays distinct from the same one Automatic picked.
 
 **Styles, rich text and drawables follow the same rules, built by their own tickets.**

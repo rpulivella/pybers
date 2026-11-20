@@ -8,6 +8,7 @@ their lines. Of two facing strokes that disagree, Numbers draws the one with the
 higher `order`. See findings-06-styles.md and findings-03-structure.md.
 
 UPDATES
+2026-11-20  `edgeComputedFind`, for PYB-291.
 2026-11-17  Written for PYB-266, taking over the rules `_strokes` applied to the
             archive at save time. Drawing and reading on a table is in
             `bordersdraw`.
@@ -210,7 +211,7 @@ class TableBorders:
             )
         return CellBorders(**sides)
 
-    def edgeShownFind(
+    def edgeComputedFind(
         self, rowIdentities: Sequence[int], columnIdentities: Sequence[int],
         cell: CellAddress, side: CellBorderSide,
     ) -> Stroke | None:

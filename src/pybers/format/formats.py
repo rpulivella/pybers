@@ -5,9 +5,11 @@ The format a cell shows its value with, a closed family with one member per fami
 A cell's record names a format entry, and a person either chose that format or left
 Numbers' Automatic to choose it. The two are independent in the file, since a chosen
 format can equal the one Automatic picks, so `CellFormatAutomatic` wraps the format
-Numbers chose in `shown` rather than standing in for it. See findings-11-formats.md.
+Numbers chose in `computed` rather than standing in for it. See findings-11-formats.md.
 
 UPDATES
+2026-11-20  `CellFormatAutomatic.computed`, the format Automatic computed, for
+            PYB-291.
 2026-11-10  `CellFormatConflict`, what a write does with a format that does not fit.
 2026-11-09  Written for PYB-145.
 """
@@ -193,7 +195,7 @@ class CellFormatAutomatic(CellFormatBase):
 
     formatFamily: ClassVar[CellFormatFamily] = CellFormatFamily.AUTOMATIC
 
-    shown: CellFormatShown | UNDETERMINED = UNDETERMINED
+    computed: CellFormatShown | UNDETERMINED = UNDETERMINED
 
 
 type CellFormat = CellFormatShown | CellFormatAutomatic
@@ -206,7 +208,7 @@ def findFormatShown(
 ) -> CellFormatShown | UNDETERMINED:
     """Return the format a cell is shown with, the one Automatic chose included."""
     if isinstance(cellFormat, CellFormatAutomatic):
-        return cellFormat.shown
+        return cellFormat.computed
     return cellFormat
 
 

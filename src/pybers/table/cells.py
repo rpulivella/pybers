@@ -6,9 +6,11 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-20  `cellFillComputed` and `cellBorderComputed`, as CSS computes a value, for
+            PYB-291.
 2026-11-18  `mergeFind`, `isAddressable`, a private `_rangeSingle` and a table's
             sections follow the vocabulary, for PYB-301.
-2026-11-18  `cellFillShown`, the fill a cell displays, its banded row's included,
+2026-11-18  `cellFillComputed`, the fill a cell displays, its banded row's included,
             for PYB-267.
 2026-11-17  `tableStyle`, the lines a table draws, and `tableStyleSet`, for
             PYB-266.
@@ -103,7 +105,7 @@ from pybers.table.borders import (
     CellBorderSide,
     TableBorders,
 )
-from pybers.table.bordersdraw import findCellBordersByPosition, findShownLine
+from pybers.table.bordersdraw import findCellBordersByPosition, findComputedLine
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
@@ -122,7 +124,7 @@ from pybers.table.tablestyle import (
     TableStyle,
     TableStyleChange,
     buildTableStyle,
-    findShownFill,
+    findComputedFill,
     resetTableStyle,
 )
 
@@ -565,7 +567,7 @@ class Table:
             self._rowIdentities, self._columnIdentities, top, left, bottom, right
         )
 
-    def cellBorderShown(
+    def cellBorderComputed(
         self, address: CellReferenceLike, side: CellBorderSide
     ) -> Stroke | MIXED | None:
         """Return the line an edge displays, or None where it displays none.
@@ -573,15 +575,15 @@ class Table:
         A stored stroke prevails, the later of two that disagree, and a hidden one
         draws nothing; else the table's own line for that edge, while it shows.
         """
-        return findShownLine(self, self._addressResolve(address), side)
+        return findComputedLine(self, self._addressResolve(address), side)
 
-    def cellFillShown(self, address: CellReferenceLike) -> Fill:
+    def cellFillComputed(self, address: CellReferenceLike) -> Fill:
         """Return the fill a cell displays, `FillNone` where it displays none.
 
         A fill the cell states prevails, then the band on its body row, then its
         section's.
         """
-        return findShownFill(self, self._addressResolve(address))
+        return findComputedFill(self, self._addressResolve(address))
 
     def mergeFind(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.

@@ -167,7 +167,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
           "presentation": {
             "format": {
               "formatFamily": "automatic",
-              "shown": {
+              "computed": {
                 "formatFamily": "number"
               }
             },
@@ -235,7 +235,7 @@ $ pybers show shapes.numbers "*::Table 2" --output-format json
           "presentation": {
             "format": {
               "formatFamily": "automatic",
-              "shown": {
+              "computed": {
                 "formatFamily": "number"
               }
             },
@@ -354,10 +354,10 @@ A cell's format is one of a closed family of types, so a `match` reaches every f
 from pybers import CellFormatAutomatic, CellFormatNumber, CellFormatPercent
 
 match costs.cell("B4").presentation.format:
-    case CellFormatPercent() | CellFormatAutomatic(shown=CellFormatPercent()):
+    case CellFormatPercent() | CellFormatAutomatic(computed=CellFormatPercent()):
         print("shown as a percentage")
-    case CellFormatAutomatic(shown=shown):
-        print("Numbers chose", shown.formatFamily)
+    case CellFormatAutomatic(computed=computed):
+        print("Numbers chose", computed.formatFamily)
 
 document.cellSet("Summary::Costs::B4", format=CellFormatNumber())  # value kept
 document.cellSet("Summary::Costs::B2:B9", Decimal(0), format=CellFormatAutomatic())
@@ -392,7 +392,7 @@ document.cellStylePropertyRemove("Summary::Costs::B2", CellStyleProperty.BACKGRO
 print(pybers.formatCellStyle(costs.cell("B2").cellStyle))  # padding: 12pt
 ```
 
-A cell's borders are `cell.borders`, each side the stroke the cell stores and the one its neighbor stores on the same edge. `document.cellBordersSet` draws them on one block, writing both sides of every edge, and `table.cellBorderShown` says which line an edge displays: the later of two borders, or else the table's own line there. A table's lines are `table.tableStyle`, one `TableLine` per gridline, separator and the outline, set by `table.tableStyleSet`:
+A cell's borders are `cell.borders`, each side the stroke the cell stores and the one its neighbor stores on the same edge. `document.cellBordersSet` draws them on one block, writing both sides of every edge, and `table.cellBorderComputed` says which line an edge displays: the later of two borders, or else the table's own line there. A table's lines are `table.tableStyle`, one `TableLine` per gridline, separator and the outline, set by `table.tableStyleSet`:
 
 ```python
 from pybers import CellBorderPosition, CellBorderSide, CellBorderStyle, Color
@@ -404,16 +404,16 @@ document.cellBordersSet(
 print(pybers.formatCellBorders(costs.cell("B2")))  # border-top: 1pt dashed #000000ff; border-left: …
 costs.tableStyleSet(pybers.parseTableStyle("body-vertical-gridlines: none", costs.tableStyle))
 costs.tableStyleSet(tableOutlineTitle=True)
-print(costs.cellBorderShown("C5", CellBorderSide.RIGHT))  # None: the vertical gridlines are hidden
+print(costs.cellBorderComputed("C5", CellBorderSide.RIGHT))  # None: the vertical gridlines are hidden
 ```
 
-A table's banded rows are `table.tableStyle.bandedRows`, a `TableBand` of whether it shows and its color, which a hidden band keeps. `table.cellFillShown` says which fill a cell displays: its own, else the band on every second body row, else its section's, a merged cell showing what its first cell shows:
+A table's banded rows are `table.tableStyle.bandedRows`, a `TableBand` of whether it shows and its color, which a hidden band keeps. `table.cellFillComputed` says which fill a cell displays: its own, else the band on every second body row, else its section's, a merged cell showing what its first cell shows:
 
 ```python
 from pybers import Color, TableBand
 
 costs.tableStyleSet(bandedRows=TableBand(True, Color.parse("#f2f2f7ff")))
-print(costs.cellFillShown("B3"))  # #f2f2f7ff where B3 falls on a banded row
+print(costs.cellFillComputed("B3"))  # #f2f2f7ff where B3 falls on a banded row
 costs.tableStyleSet(bandedRows=TableBand(False, Color.parse("#f2f2f7ff")))  # off, color kept
 ```
 

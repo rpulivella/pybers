@@ -202,7 +202,7 @@ def test_an_edge_with_no_border_shows_the_table_line_for_its_section(
     address: str, side: CellBorderSide, drawn: Stroke
 ) -> None:
     table = pybers.open(findDocumentPath("100-lines-base")).table("Untouched")
-    assert table.cellBorderShown(address, side) == drawn
+    assert table.cellBorderComputed(address, side) == drawn
 
 
 @pytest.mark.parametrize(("table", "address", "side"), [
@@ -218,12 +218,12 @@ def test_a_hidden_table_line_shows_nothing_at_its_section(
     table: str, address: str, side: CellBorderSide
 ) -> None:
     measured = pybers.open(findDocumentPath("100b-lines")).table(table)
-    assert measured.cellBorderShown(address, side) is None
+    assert measured.cellBorderComputed(address, side) is None
 
 
 def test_of_two_facing_strokes_the_later_shows() -> None:
     table = pybers.open(findDocumentPath("63d-fill-border-base")).table("Table 1")
-    shown = table.cellBorderShown("C3", CellBorderSide.RIGHT)
+    shown = table.cellBorderComputed("C3", CellBorderSide.RIGHT)
     assert isinstance(shown, Stroke) and shown.width == 5
 
 
@@ -231,12 +231,12 @@ def test_a_hidden_border_shows_nothing_over_the_gridline() -> None:
     table = pybers.open(findDocumentPath("57-structure-refusals-base")).table(
         "Borders"
     )
-    assert table.cellBorderShown("A1", CellBorderSide.BOTTOM) is None
+    assert table.cellBorderComputed("A1", CellBorderSide.BOTTOM) is None
 
 
 def test_a_line_inside_a_merge_shows_nothing() -> None:
     table = pybers.open(findDocumentPath("22-merge-2x2")).table("Table 1")
-    assert table.cellBorderShown("A1", CellBorderSide.RIGHT) is None
+    assert table.cellBorderComputed("A1", CellBorderSide.RIGHT) is None
 
 
 deepBands: Path = (
@@ -259,7 +259,7 @@ def test_an_edge_between_two_lines_of_a_band_shows_that_bands_line(
     table: str, address: str, side: CellBorderSide
 ) -> None:
     lined = pybers.open(deepBands).table(table)
-    assert lined.cellBorderShown(address, side) == redLine
+    assert lined.cellBorderComputed(address, side) == redLine
 
 
 @pytest.mark.parametrize("field", [
