@@ -17,7 +17,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 `pybers check FILE` says whether pybers can read a document, what it is running on, and the tree of its sheets and tables, each shown by its kind and size, in a form safe to paste into a public bug report. `--names` names each sheet, table and unrecognized cell, for the person holding the document.
 
-`pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--border POSITION] [--table-style STYLE] [--locale LOCALE]` sets the value, the format, the control, the cell style and the borders of every cell a [selector](#selectors) matches, and the lines of every table it matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
+`pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION] [--table-style STYLE] [--locale LOCALE]` sets the value, the format, the control, the cell style and the borders of every cell a [selector](#selectors) matches, and the lines of every table it matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B4" 1250.00
@@ -48,6 +48,13 @@ pybers set budget.numbers "Summary::Costs::B2:B9" --cell-style none
 ```
 
 A background is a color in any form [Colors](#colors) lists, or `none` for no fill even where the table gives the cell one. A gradient or image background is read and kept but not yet written, and padding is one length for every side, since Numbers offers one. Either is refused by name before anything is written.
+
+`--cell-style-update` changes only the properties it states and keeps every other property each cell states, and `--cell-style-remove` clears one property, so the cell shows what its table gives it there. Either reports `Nothing written: already set` when every cell already states what it was given:
+
+```bash
+pybers set budget.numbers "Summary::Costs::B2:B9" --cell-style-update "padding: 12pt"
+pybers set budget.numbers "Summary::Costs::B2" --cell-style-remove background
+```
 
 `--border` draws borders on one block of cells, at a position named for the part of the block it draws: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed` or `dotted`, `--border-width` a length such as `1pt` and `--border-color` a color, and a style given alone draws 0.35pt black, as Numbers does. `hidden` draws nothing and hides the table's line there, as Numbers' No Border does, and `none` removes the borders so the table's own lines show. A merged cell is bordered whole:
 
@@ -373,6 +380,16 @@ document.cellSet("Summary::Costs::A1", cellStyle=CellStyle(  # a header cell
 ))
 print(pybers.formatCellStyle(costs.cell("B2").cellStyle))  # background: #ffd60aff; padding: 6pt
 document.cellSet("Summary::Costs::B2:B9", cellStyle=None)  # each cell's own style removed
+```
+
+`cellSet` replaces a cell's whole style. `document.cellStyleUpdate` changes only the properties the style given states, and `document.cellStylePropertyRemove` clears one `CellStyleProperty`, each keeping the rest of every cell's own style:
+
+```python
+from pybers import CellStyle, CellStyleProperty
+
+document.cellStyleUpdate("Summary::Costs::B2:B9", CellStyle(padding=12))  # fill kept
+document.cellStylePropertyRemove("Summary::Costs::B2", CellStyleProperty.BACKGROUND)
+print(pybers.formatCellStyle(costs.cell("B2").cellStyle))  # padding: 12pt
 ```
 
 A cell's borders are `cell.borders`, each side the stroke the cell stores and the one its neighbor stores on the same edge. `document.cellBordersSet` draws them on one block, writing both sides of every edge, and `table.cellBorderShown` says which line an edge displays: the later of two borders, or else the table's own line there. A table's lines are `table.tableStyle`, one `TableLine` per gridline, separator and the outline, set by `table.tableStyleSet`:
