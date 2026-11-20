@@ -22,7 +22,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/12"
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from enum import StrEnum
 
@@ -81,6 +81,13 @@ class CellStyle:
 numbersCellStyle: CellStyle = CellStyle(
     background=FillNone(), padding=Decimal(4),
     verticalAlign=CellStyleVerticalAlign.TOP, textWrap=CellStyleTextWrap.WRAP,
+)
+
+# The cell style every section of a table pybers adds specifies, the reset: no wrapping.
+resetCellStyle: CellStyle = CellStyle(textWrap=CellStyleTextWrap.NOWRAP)
+# What every cell of a table pybers adds shows: Numbers' own box, not wrapping.
+createdCellStyle: CellStyle = replace(
+    numbersCellStyle, textWrap=CellStyleTextWrap.NOWRAP
 )
 
 
@@ -163,6 +170,7 @@ def findOverrides(
 
 __all__ = [
     "CellStyle", "CellStylePaddingSides", "CellStyleProperty", "CellStyleTextWrap",
-    "CellStyleVerticalAlign", "findCellStyleRefusal", "findOverrides",
-    "findUnwritablePart", "numbersCellStyle", "updateCellStyles",
+    "CellStyleVerticalAlign", "createdCellStyle", "findCellStyleRefusal",
+    "findOverrides", "findUnwritablePart", "numbersCellStyle", "resetCellStyle",
+    "updateCellStyles",
 ]

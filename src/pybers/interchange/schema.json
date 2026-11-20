@@ -295,6 +295,10 @@
             }
           ]
         },
+        "cellStyleComputed": {
+          "$ref": "#/$defs/CellStyle",
+          "readOnly": true
+        },
         "borders": {
           "$ref": "#/$defs/CellBorders"
         },
@@ -1960,7 +1964,7 @@
     },
     "TableStyle": {
       "type": "object",
-      "description": "The lines a table draws, each section named for what it draws, and its band.",
+      "description": "A table's lines, its band, and the box each section's cells inherit.",
       "properties": {
         "bodyHorizontalGridlines": {
           "$ref": "#/$defs/TableLine"
@@ -2006,6 +2010,18 @@
         },
         "bandedRows": {
           "$ref": "#/$defs/TableBand"
+        },
+        "bodyCellStyle": {
+          "$ref": "#/$defs/CellStyle"
+        },
+        "headerRowsCellStyle": {
+          "$ref": "#/$defs/CellStyle"
+        },
+        "headerColumnsCellStyle": {
+          "$ref": "#/$defs/CellStyle"
+        },
+        "footerRowsCellStyle": {
+          "$ref": "#/$defs/CellStyle"
         }
       },
       "required": [
@@ -2023,7 +2039,11 @@
         "tableOutline",
         "tableTitle",
         "tableOutlineTitle",
-        "bandedRows"
+        "bandedRows",
+        "bodyCellStyle",
+        "headerRowsCellStyle",
+        "headerColumnsCellStyle",
+        "footerRowsCellStyle"
       ],
       "additionalProperties": false
     }

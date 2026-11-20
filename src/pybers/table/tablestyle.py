@@ -8,6 +8,8 @@ prevails over all of them at its edge. Banded rows paint every second body row
 beneath any fill a cell states. See findings-06-styles.md.
 
 UPDATES
+2026-11-20  A table style carries the box each section's cells inherit, the Blank
+            theme's and the reset's, for PYB-291.
 2026-11-20  `findComputedCellStyle`, the box a cell displays, beside
             `findComputedFill`, for PYB-291.
 2026-11-18  `TableBand`, a table's banded rows, and their text form, for PYB-267.
@@ -34,7 +36,12 @@ from pybers.addressing.reference import TableReference
 from pybers.color.colors import Color, ColorError, ColorSpace
 from pybers.errors import PybersError, composeChoiceRefusal
 from pybers.format.text import splitDeclarations
-from pybers.style.cells import CellStyle, updateCellStyles
+from pybers.style.cells import (
+    CellStyle,
+    createdCellStyle,
+    numbersCellStyle,
+    updateCellStyles,
+)
 from pybers.style.fills import Fill, FillNone
 from pybers.style.strokes import (
     Stroke,
@@ -92,7 +99,7 @@ class TableBand:
 
 @dataclass(frozen=True, slots=True)
 class TableStyle:
-    """The lines a table draws, each section named for what it draws, and its band."""
+    """A table's lines, its band, and the box each section's cells inherit."""
 
     bodyHorizontalGridlines: TableLine
     bodyVerticalGridlines: TableLine
@@ -109,6 +116,19 @@ class TableStyle:
     tableTitle: bool
     tableOutlineTitle: bool
     bandedRows: TableBand
+    bodyCellStyle: CellStyle
+    headerRowsCellStyle: CellStyle
+    headerColumnsCellStyle: CellStyle
+    footerRowsCellStyle: CellStyle
+
+
+# The field holding each section's box, the one its cells inherit.
+sectionCellStyleFields: frozendict[TableSection, str] = frozendict({
+    TableSection.BODY: "bodyCellStyle",
+    TableSection.HEADER_ROW: "headerRowsCellStyle",
+    TableSection.HEADER_COLUMN: "headerColumnsCellStyle",
+    TableSection.FOOTER_ROW: "footerRowsCellStyle",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,6 +313,12 @@ separatorStroke: Stroke = Stroke(
 )
 # The Blank theme's band, off and gray, as `00-baseline` and every fixture state it.
 bandGray: Color = Color(ColorSpace.SRGB, (Decimal("0.9601849"),) * 3, 1)
+# The Blank theme's header fills, as `00-baseline` states them.
+headerRowsGray: Color = Color(
+    ColorSpace.SRGB,
+    (Decimal("0.74361324"), Decimal("0.7537804"), Decimal("0.7506917")), 1,
+)
+headerColumnsGray: Color = Color(ColorSpace.SRGB, (Decimal("0.8624049"),) * 3, 1)
 # The Blank theme's table style, every line shown, as `00-baseline` states it.
 blankTableStyle: TableStyle = TableStyle(
     bodyHorizontalGridlines=TableLine(True, gridlineStroke),
@@ -310,16 +336,24 @@ blankTableStyle: TableStyle = TableStyle(
     tableTitle=False,
     tableOutlineTitle=False,
     bandedRows=TableBand(False, bandGray),
+    bodyCellStyle=numbersCellStyle,
+    headerRowsCellStyle=replace(numbersCellStyle, background=headerRowsGray),
+    headerColumnsCellStyle=replace(numbersCellStyle, background=headerColumnsGray),
+    footerRowsCellStyle=numbersCellStyle,
 )
 
 
 def applyTableReset(theme: TableStyle) -> TableStyle:
-    """Return a theme's table style with the reset: no body gridlines and no outline.
+    """Return a theme's table style with the reset: no body gridlines, outline or wrap.
 
     As `52-table-reset-styled` encodes it, keeping the theme's own strokes.
     """
     return replace(
         theme,
+        bodyCellStyle=createdCellStyle,
+        headerRowsCellStyle=createdCellStyle,
+        headerColumnsCellStyle=createdCellStyle,
+        footerRowsCellStyle=createdCellStyle,
         bodyHorizontalGridlines=replace(theme.bodyHorizontalGridlines, visible=False),
         bodyVerticalGridlines=replace(theme.bodyVerticalGridlines, visible=False),
         tableOutline=replace(theme.tableOutline, visible=False),

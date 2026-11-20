@@ -14,6 +14,8 @@ since Numbers offers no control for one, and a golden confirms it.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-20  A table style carries the box each section shows, read from a table
+            or a theme's preset, for PYB-291.
 2026-11-18  A table's banded rows, read through its style's parents and written as
             a variation stating what differs from the root, for PYB-267.
 2026-11-17  Written for PYB-266.
@@ -28,6 +30,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/17"
 
+from collections.abc import Mapping
+
 from google.protobuf.message import Message
 
 from pybers._generated import TNArchives_pb2 as tn
@@ -41,6 +45,8 @@ from pybers.color._archive import composeColor
 from pybers.color.colors import Color
 from pybers.style._read import readFill, readStroke
 from pybers.style._write import addStyles, composeStroke
+from pybers.style.cells import CellStyle
+from pybers.table._cellstyles import readSectionCellStyles
 from pybers.table.tablestyle import TableBand, TableLine, TableStyle, blankTableStyle
 
 # Each line's visibility, None where no control hides it, and the stroke fields it
@@ -125,14 +131,28 @@ def readTableBand(chain: list[tst.TableStyleArchive]) -> TableBand:
     return TableBand(visible, readFill(stated.banded_fill))
 
 
-def readTableStyle(index: ArchiveIndex, model: tst.TableModelArchive) -> TableStyle:
-    """Return the lines a table draws, resolved through its style's parents."""
-    chain = readStyleChain(index, model.table_style)
+def composeReadTableStyle(
+    chain: list[tst.TableStyleArchive], boxes: Mapping[str, CellStyle],
+    title: bool, outlineTitle: bool,
+) -> TableStyle:
+    """Return a table style from its resolved chain and the box each section shows."""
     return TableStyle(
         **{field: readTableLine(chain, field) for field in lineFields},
-        tableTitle=model.table_name_enabled,
-        tableOutlineTitle=model.table_name_border_enabled,
+        tableTitle=title,
+        tableOutlineTitle=outlineTitle,
         bandedRows=readTableBand(chain),
+        bodyCellStyle=boxes["bodyCellStyle"],
+        headerRowsCellStyle=boxes["headerRowsCellStyle"],
+        headerColumnsCellStyle=boxes["headerColumnsCellStyle"],
+        footerRowsCellStyle=boxes["footerRowsCellStyle"],
+    )
+
+
+def readTableStyle(index: ArchiveIndex, model: tst.TableModelArchive) -> TableStyle:
+    """Return a table's lines, band and section boxes, each resolved through parents."""
+    return composeReadTableStyle(
+        readStyleChain(index, model.table_style), readSectionCellStyles(index, model),
+        model.table_name_enabled, model.table_name_border_enabled,
     )
 
 
@@ -197,12 +217,9 @@ def readThemeTableStyle(
     index: ArchiveIndex, network: tst.TableStyleNetworkArchive
 ) -> TableStyle:
     """Return the table style a theme's table preset gives a table it creates."""
-    chain = readStyleChain(index, network.table_style)
-    return TableStyle(
-        **{field: readTableLine(chain, field) for field in lineFields},
-        tableTitle=False,
-        tableOutlineTitle=False,
-        bandedRows=readTableBand(chain),
+    return composeReadTableStyle(
+        readStyleChain(index, network.table_style),
+        readSectionCellStyles(index, network), False, False,
     )
 
 

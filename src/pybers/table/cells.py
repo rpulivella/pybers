@@ -97,7 +97,7 @@ from pybers.addressing.reference import (
 from pybers.addressing.text import ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
-from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
+from pybers.style.cells import CellStyle
 from pybers.style.fills import Fill
 from pybers.style.strokes import Stroke
 from pybers.table.borders import (
@@ -110,7 +110,7 @@ from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
-from pybers.table.headers import TableHeaders, TableSection, checkHeadersFit
+from pybers.table.headers import TableHeaders, checkHeadersFit
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
@@ -127,6 +127,7 @@ from pybers.table.tablestyle import (
     findComputedCellStyle,
     findComputedFill,
     resetTableStyle,
+    sectionCellStyleFields,
 )
 
 if TYPE_CHECKING:
@@ -151,15 +152,6 @@ def generateOwnerIdentity() -> str:
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
 
 
-# The cell style every section of a table pybers adds specifies, the reset: no wrapping.
-resetCellStyle: CellStyle = CellStyle(textWrap=CellStyleTextWrap.NOWRAP)
-# What every cell of a table pybers adds shows: Numbers' own box, not wrapping.
-createdCellStyle: CellStyle = replace(
-    numbersCellStyle, textWrap=CellStyleTextWrap.NOWRAP
-)
-resetCellStylesInherited: frozendict[TableSection, CellStyle] = frozendict(
-    dict.fromkeys(TableSection, createdCellStyle)
-)
 
 @dataclass(slots=True)
 class Table:
@@ -201,12 +193,6 @@ class Table:
         default_factory=list, repr=False, compare=False, kw_only=True
     )
     _headers: TableHeaders = field(default_factory=TableHeaders, kw_only=True)
-    # What each section's cell style resolves to, read from the file, so a request
-    # can drop what a cell inherits; a table pybers adds takes the reset's.
-    _cellStylesInherited: frozendict[TableSection, CellStyle] = field(
-        default_factory=lambda: resetCellStylesInherited, repr=False, compare=False,
-        kw_only=True,
-    )
 
     # Every stroke stored on a side of a cell, keyed by row and column identity.
     _borders: TableBorders = field(
@@ -237,7 +223,8 @@ class Table:
     def _cellStyleInherited(self, address: CellAddress) -> CellStyle:
         """Return the cell style a cell at `address` inherits from its section."""
         section = self._headers.sectionFind(address, self.rowCount)
-        return self._cellStylesInherited.get(section, numbersCellStyle)
+        style: CellStyle = getattr(self._tableStyle, sectionCellStyleFields[section])
+        return style
 
     @property
     def tableStyle(self) -> TableStyle:

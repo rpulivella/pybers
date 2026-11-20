@@ -11,6 +11,8 @@ properties copied in, as `99-cell-fill-in-a-created-table` measured.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-20  Each section's box read by its `TableStyle` field, from a table or a
+            theme's preset, for PYB-291.
 2026-11-19  `updateCellStyles` moved to the style model, for PYB-290.
 2026-11-19  A table's parts are sections, for PYB-301.
 2026-11-18  Combining styles is an update, for PYB-290.
@@ -38,8 +40,9 @@ from .._persistence.pool import EntryPool
 from ..absence import UNCHANGED
 from ..style._read import readCellStyle, readInheritedCellStyle
 from ..style._write import CellStyleKey, applyCellStyle
-from ..style.cells import CellStyle, findOverrides, updateCellStyles
+from ..style.cells import CellStyle, findOverrides, numbersCellStyle, updateCellStyles
 from .headers import TableSection
+from .tablestyle import sectionCellStyleFields
 
 if TYPE_CHECKING:
     from .cell import Cell
@@ -59,14 +62,20 @@ sectionStyleSlots: frozendict[TableSection, SectionStyleSlot] = frozendict({
 
 
 def readSectionCellStyles(
-    index: ArchiveIndex, model: tst.TableModelArchive
-) -> frozendict[TableSection, CellStyle]:
-    """Return what each section's cell style resolves to, for each section specified."""
-    return frozendict({
-        section: readInheritedCellStyle(index, getattr(model, slot).identifier)
+    index: ArchiveIndex, holder: tst.TableModelArchive | tst.TableStyleNetworkArchive
+) -> dict[str, CellStyle]:
+    """Return the box each section's cells inherit, by its `TableStyle` field.
+
+    A table's model and a theme's table preset name the same four slots, and a slot
+    left empty shows Numbers' own box.
+    """
+    return {
+        sectionCellStyleFields[section]: (
+            readInheritedCellStyle(index, getattr(holder, slot).identifier)
+            if holder.HasField(slot) else numbersCellStyle
+        )
         for section, slot in sectionStyleSlots.items()
-        if model.HasField(slot)
-    })
+    }
 
 
 @dataclass(frozen=True, slots=True)

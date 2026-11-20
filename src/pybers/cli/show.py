@@ -10,6 +10,7 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-20  A cell prints its computed box beside its own, for PYB-291.
 2026-11-17  A table's lines, as CSS declarations under its own line, for PYB-266.
 2026-11-17  A cell's borders, after its cell style, for PYB-266.
 2026-11-12  A cell's own cell style prints as its text form, for PYB-265.
@@ -113,6 +114,8 @@ def formatCell(cell: pybers.Cell, indent: int = 0) -> Group:
     """Return a cell's fields of its JSON form, in its order, folded onto lines."""
     presentation = cell.presentation
     text, typeCode = cell.formulaText, cell.unrecognizedTypeCode
+    table = cell.table
+    computed = None if table is None else table.cellStyleComputed(cell.address)
     inner = indent + childIndent
     return Group(
         formatSegments(indent, "Cell", str(cell.reference)),
@@ -129,6 +132,7 @@ def formatCell(cell: pybers.Cell, indent: int = 0) -> Group:
             ("Control", formatControl(presentation.control)),
         ),
         formatFields(inner, ("Cell style", formatCellStyle(cell.cellStyle))),
+        formatFields(inner, ("Cell style computed", formatCellStyle(computed))),
         formatFields(inner, ("Borders", pybers.formatCellBorders(cell) or "none")),
         formatFields(
             inner,

@@ -7,6 +7,7 @@ first alone, and its `A11` holds `=SUM(A1:A10)`. `81-control-formats` holds a ce
 for each control, a slider in `A1` and a pop-up menu in `I1`.
 
 UPDATES
+2026-11-20  A cell prints its computed box beneath its own, for PYB-291.
 2026-11-12  A cell's cell style prints on its own line, for PYB-265.
 2026-11-03  A selector read by its positions, each match printed as it prints
             alone, a document in full, and a table's headers, for PYB-223.
@@ -94,6 +95,8 @@ def testACellFoldsItsFieldsOntoLinesUnderIt() -> None:
         "  Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes",
         "  Format: number (automatic)   Control: none",
         "  Cell style: none",
+        "  Cell style computed: background: none; padding: 4pt; vertical-align: top; "
+        "text-wrap: wrap",
         "  Borders: none",
         "  Unrecognized type code: none",
     ]
