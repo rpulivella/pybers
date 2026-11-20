@@ -6,6 +6,8 @@ Every golden rebuilt from its builder and compared, archive by archive, with its
 golden is made. Narrow it with `-k`.
 
 UPDATES
+2026-11-20  A golden declared as cases wraps each label beneath its case, for
+            PYB-305.
 2026-11-02  A golden starting from a fixture or measurement must state why, for PYB-261.
 2026-10-23  Every label beneath a cell pybers changed is checked against the cell,
             for PYB-255.
@@ -29,6 +31,8 @@ from pathlib import Path
 import pytest
 from golden.builders import (
     GoldenBuilder,
+    GoldenCase,
+    buildCaseTable,
     buildGolden,
     findBuilder,
     findFirstTable,
@@ -139,3 +143,23 @@ def testTheExpectationsFindLabelsInExactlyTheLabeledGoldens() -> None:
             goldenDirectory / f"{builder.name}.numbers").tables for cell in table.cells)
     }
     assert found == {builder.name for builder in goldens if builder.labeled}
+
+
+def testACaseTableWrapsEachLabelBeneathItsCaseThenAnEmptyColumn() -> None:
+    document = pybers.create("en_US")
+    cases = tuple(
+        GoldenCase(
+            f"set to {value}", lambda doc, at, value=value: doc.cellSet(at, value)
+        )
+        for value in (Decimal(1), Decimal(2))
+    )
+    buildCaseTable(document, "Cases", cases)
+    table = document.sheet().table("Cases")
+    row1 = [table.cell(row=1, col=col).value for col in (1, 2, 3)]
+    labels = [table.cell(row=2, col=col) for col in (1, 2, 3)]
+    assert row1 == [Decimal(1), Decimal(2), None]
+    assert [label.value for label in labels] == ["set to 1", "set to 2", "empty"]
+    assert {label.cellStyle for label in labels} == {
+        pybers.CellStyle(textWrap=pybers.CellStyleTextWrap.WRAP)
+    }
+

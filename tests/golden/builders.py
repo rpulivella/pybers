@@ -10,6 +10,8 @@ so no golden is made any other way. A test asserting what a golden holds reads i
 writes from here rather than keeping a second copy.
 
 UPDATES
+2026-11-20  `GoldenCase` and `buildCaseTable`, the one layout of a golden declared
+            as cases, each label written and wrapped by `writeLabel`, for PYB-305.
 2026-11-19  `00-created-cell-boxes-updated-by-pybers`, part of a cell's style
             changed or cleared, for PYB-290.
 2026-11-18  `00-created-rows-banded-by-pybers`, a table's banded rows, for PYB-267.
@@ -49,6 +51,7 @@ from pybers import (
     Formula,
     FormulaReferenceRelocation,
 )
+from pybers.style.cells import updateCellStyles
 from tools.local.lib.golden_expected import labelRow, measuredRow
 
 relative = FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION
@@ -106,6 +109,41 @@ def findShownText(table: pybers.Table, address: pybers.CellAddress) -> str:
 def formatGoldenLabel(shown: str, sourceLabel: str) -> str:
     """Return the label beneath a cell pybers changed: what it wrote, and over what."""
     return f"written by pybers as {shown} over {sourceLabel}"
+
+
+@dataclass(frozen=True, slots=True)
+class GoldenCase:
+    """One case of a golden: the change it makes to one cell, and its label."""
+
+    label: str
+    apply: Callable[[pybers.Document, str], None]
+
+
+def writeLabel(document: pybers.Document, reference: str, text: str) -> None:
+    """Write a label describing a cell, wrapped so it reads in full in the sheet."""
+    document.cellSet(reference, text)
+    document.cellStyleUpdate(
+        reference, pybers.CellStyle(textWrap=pybers.CellStyleTextWrap.WRAP)
+    )
+
+
+def buildCaseTable(
+    document: pybers.Document, tableName: str, cases: tuple[GoldenCase, ...]
+) -> None:
+    """Lay out one case per column, its label beneath, then a column left empty.
+
+    The one layout every golden declared as cases shares, as a measurement is laid
+    out, so a change here reaches each such golden when it is regenerated.
+    """
+    columns = len(cases) + 1
+    document.sheet().tableAdd(tableName, rows=labelRow, cols=columns)
+    labels = [*(case.label for case in cases), "empty"]
+    for column, case in enumerate(cases, start=1):
+        measured = pybers.CellAddress(measuredRow, column)
+        case.apply(document, f"::{tableName}::{measured}")
+    for column, label in enumerate(labels, start=1):
+        where = pybers.CellAddress(labelRow, column)
+        writeLabel(document, f"::{tableName}::{where}", label)
 
 
 @dataclass(frozen=True, slots=True)
@@ -783,42 +821,45 @@ updatedBase: pybers.CellStyle = pybers.CellStyle(
     textWrap=pybers.CellStyleTextWrap.WRAP,
 )
 
-# Each change to the base, one per column: a style updated, or a property cleared.
-boxUpdates: tuple[pybers.CellStyle | pybers.CellStyleProperty, ...] = (
-    pybers.CellStyle(background=pybers.Color.parse("#0a84ffff")),
-    pybers.CellStyle(padding=Decimal(16)),
-    pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.BOTTOM),
-    *pybers.CellStyleProperty,
+def composeBoxCase(change: pybers.CellStyle | pybers.CellStyleProperty) -> GoldenCase:
+    """Return a case boxing a cell as the base, then updating or clearing part of it."""
+    if isinstance(change, pybers.CellStyle):
+        left = updateCellStyles(change, updatedBase)
+        how = f"updated with {pybers.formatCellStyle(change)}"
+    else:
+        left = dataclasses.replace(updatedBase, **{change.fieldName: None})
+        how = f"{change.value} removed"
+
+    def apply(document: pybers.Document, reference: str) -> None:
+        document.cellSet(reference, wrappingText, cellStyle=updatedBase)
+        if isinstance(change, pybers.CellStyle):
+            document.cellStyleUpdate(reference, change)
+        else:
+            document.cellStylePropertyRemove(reference, change)
+
+    return GoldenCase(f"{how}, leaving {pybers.formatCellStyle(left)}", apply)
+
+
+def setUpdatedBase(document: pybers.Document, reference: str) -> None:
+    """Box a cell as the base and change nothing more."""
+    document.cellSet(reference, wrappingText, cellStyle=updatedBase)
+
+
+# Each change to the base, one per column, then the base untouched.
+boxUpdateCases: tuple[GoldenCase, ...] = (
+    composeBoxCase(pybers.CellStyle(background=pybers.Color.parse("#0a84ffff"))),
+    composeBoxCase(pybers.CellStyle(padding=Decimal(16))),
+    composeBoxCase(pybers.CellStyle(verticalAlign=pybers.CellStyleVerticalAlign.BOTTOM)),
+    *(composeBoxCase(each) for each in pybers.CellStyleProperty),
+    GoldenCase(
+        f"set by pybers to {pybers.formatCellStyle(updatedBase)}", setUpdatedBase
+    ),
 )
 
 
 def updateCellBoxes(document: pybers.Document) -> None:
-    """Style every cell of row 1 alike, then change or clear one property per column.
-
-    Each label beneath states the change and the box it leaves, wrapped so it reads
-    in full, and the last cell keeps the base unchanged.
-    """
-    columns = len(boxUpdates) + 1
-    table = document.sheet().tableAdd("Updated", rows=2, cols=columns)
-    document.cellSet("::Updated::1", wrappingText, cellStyle=updatedBase)
-    for column, change in enumerate(boxUpdates, start=1):
-        target = f"::Updated::{pybers.CellAddress(1, column)}"
-        if isinstance(change, pybers.CellStyle):
-            document.cellStyleUpdate(target, change)
-            how = f"updated with {pybers.formatCellStyle(change)}"
-        else:
-            document.cellStylePropertyRemove(target, change)
-            how = f"{change.value} removed"
-        shown = table.cell(pybers.CellAddress(1, column)).cellStyle
-        table.cell(pybers.CellAddress(2, column)).value = (
-            f"{how}, leaving {pybers.formatCellStyle(shown or pybers.CellStyle())}"
-        )
-    table.cell(pybers.CellAddress(2, columns)).value = (
-        f"set by pybers to {pybers.formatCellStyle(updatedBase)}"
-    )
-    document.cellStyleUpdate(
-        "::Updated::2", pybers.CellStyle(textWrap=pybers.CellStyleTextWrap.WRAP)
-    )
+    """Box every case's cell alike, then change or clear one property per case."""
+    buildCaseTable(document, "Updated", boxUpdateCases)
 
 
 # Each color case of a fill, the text naming it, in a column of its own.
