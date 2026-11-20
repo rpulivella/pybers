@@ -44,10 +44,10 @@ from pybers.addressing.ranges import (
     CellRangeList,
     RangeEndpoint,
     SelectionMatch,
+    formatEndpoint,
     listSeparator,
     parseEndpoint,
     rangeSeparator,
-    renderEndpoint,
     toCellRanges,
 )
 from pybers.addressing.reference import (
@@ -97,7 +97,7 @@ __all__ = [
     "cellPattern",
     "toColumnLetter",
     "toColumnNumber",
-    "renderEndpoint",
+    "formatEndpoint",
     "firstColumn",
     "firstRow",
     "listSeparator",

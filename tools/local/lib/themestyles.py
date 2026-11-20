@@ -11,6 +11,7 @@ gradient and shadow presets. Read by
 See findings-10-creation.md.
 
 UPDATES
+2026-11-20  `formatModule` writes the source Python reads back, for PYB-309.
 2026-11-16  Reads each style Numbers looks up by key, and counts a role's overrides
             from the properties it keeps, for PYB-292.
 2026-11-03  Written for PYB-261.
@@ -308,7 +309,7 @@ def buildThemeStyles() -> ThemeStyleTables:
     )
 
 
-def renderModule(tables: ThemeStyleTables) -> str:
+def formatModule(tables: ThemeStyleTables) -> str:
     """Return the generated module's source, every value a plain literal."""
     roles = pformat(tables.roles, width=88, sort_dicts=True)
     keyed = pformat(tables.keyed, width=88, sort_dicts=True)
@@ -339,4 +340,4 @@ drawablePresets: frozendict[str, object] = frozendict({presets})
 '''
 
 
-__all__ = ["ThemeStyleTables", "buildThemeStyles", "modulePath", "renderModule"]
+__all__ = ["ThemeStyleTables", "buildThemeStyles", "modulePath", "formatModule"]

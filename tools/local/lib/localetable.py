@@ -6,6 +6,7 @@ Fields follow `TSK.FormattingSymbolsArchive`'s own order, so the module reads as
 archive does and a diff after a new extraction lands on the field macOS changed.
 
 UPDATES
+2026-11-20  `formatModule` writes the source Python reads back, for PYB-309.
 2026-10-28  Written for PYB-272.
 """
 from __future__ import annotations
@@ -51,7 +52,7 @@ def renderField(value: Field) -> str:
                            else repr(each) for each in value) + ",)"
 
 
-def renderModule(table: LocaleTable, versions: IcuVersions, macOS: str) -> str:
+def formatModule(table: LocaleTable, versions: IcuVersions, macOS: str) -> str:
     """Return the module holding every region's formatting symbols."""
     lines = [
         "#!/usr/bin/env python3",
@@ -117,5 +118,5 @@ __all__ = [
     "compareTables",
     "fieldOrder",
     "readCommitted",
-    "renderModule",
+    "formatModule",
 ]

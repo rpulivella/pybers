@@ -4,7 +4,7 @@ A stored formula out as the text Numbers displays for it.
 
 The other half of `pybers.formula.parse`, and the half that makes it
 testable: comparing hand-written node arrays stops scaling at about a dozen
-cases, and rendering every formula in a real document and parsing it back does
+cases, and formatting every formula in a real document and parsing it back does
 not. See docs/findings/findings-08-formula-text.md.
 
 It walks a stack, because the file is postfix. Each node takes what it needs off
@@ -21,8 +21,11 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-11-20  Named for the text it writes, which `parseFormula` reads back: the
+            module `formatting`, `FormulaFormatter` and `formatFormulaNumber`, for
+            PYB-309.
 2026-11-18  `formatFormula` and `formatAddress` take format's verb, for PYB-301.
-2026-10-29  `renderNumber` declared the designated place a number is spelled,
+2026-10-29  `formatFormulaNumber` declared the designated place a number is spelled,
             for PYB-278.
 2026-10-22  A reference beyond its table's grid renders as `#REF!`, for PYB-255.
 2026-10-13  A node renders by matching what it holds, checked exhaustive by
@@ -49,7 +52,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import assert_never
 
-from pybers.addressing.ranges import RangeEndpoint, renderEndpoint
+from pybers.addressing.ranges import RangeEndpoint, formatEndpoint
 from pybers.addressing.reference import (
     CellAddress,
     CellReferenceLike,
@@ -96,7 +99,7 @@ from pybers.formula.syntax import (
 
 
 @dataclass(frozen=True, slots=True)
-class Rendered:
+class FormulaTextPart:
     """One finished piece of text, and how tightly the operator in it binds.
 
     The precedence travels with the text so that whatever encloses it can decide
@@ -161,7 +164,7 @@ def formatAddress(
         if checkOutsideTable(resolvedRow, resolvedColumn,
                              (sizes or {}).get(content.tableId)):
             return brokenReferenceText
-        body = renderEndpoint(
+        body = formatEndpoint(
             RangeEndpoint(
                 resolvedRow, resolvedColumn,
                 row.absolute if row is not None else False,
@@ -172,13 +175,13 @@ def formatAddress(
     if not isinstance(content, FormulaRange):
         raise FormulaError(f"Node type {node.nodeType} names no address.")
     extent = content.resolve(host)
-    first = renderEndpoint(
+    first = formatEndpoint(
         RangeEndpoint(
             extent.startRow, extent.startCol,
             extent.startRowAbsolute, extent.startColAbsolute,
         )
     )
-    last = renderEndpoint(
+    last = formatEndpoint(
         RangeEndpoint(
             extent.endRow, extent.endCol,
             extent.endRowAbsolute, extent.endColAbsolute,
@@ -204,7 +207,7 @@ def qualifyAddress(
     return f"{name}{formulaQualifierSeparator}{body}"
 
 
-def renderNumber(value: Decimal) -> str:
+def formatFormulaNumber(value: Decimal) -> str:
     """Return a literal as it was written, without normalizing what it says.
 
     This is the designated place a formula spells a number.
@@ -212,14 +215,14 @@ def renderNumber(value: Decimal) -> str:
     return str(value)
 
 
-def renderCall(name: str, arguments: list[Rendered]) -> Rendered:
+def formatFormulaCall(name: str, arguments: list[FormulaTextPart]) -> FormulaTextPart:
     """Return one call written out, its arguments in the order they were stored."""
     body = argumentSeparator.join(item.text for item in arguments)
-    return Rendered(f"{name}({body})")
+    return FormulaTextPart(f"{name}({body})")
 
 
 @dataclass(slots=True)
-class Renderer:
+class FormulaFormatter:
     """One walk over a stored formula, building the text Numbers displays for it.
 
     A stack, because the file is postfix: each node takes what it needs off the
@@ -231,10 +234,10 @@ class Renderer:
     names: Mapping[str, str]
     sizes: Mapping[str | None, tuple[int, int]] = field(default_factory=dict)
     symbols: dict[int, str] = field(default_factory=dict)
-    stack: list[Rendered] = field(default_factory=list)
+    stack: list[FormulaTextPart] = field(default_factory=list)
     bindings: list[tuple[str, str, bool]] = field(default_factory=list)
 
-    def pop(self, count: int) -> list[Rendered]:
+    def pop(self, count: int) -> list[FormulaTextPart]:
         """Return the last `count` pieces, in the order they were pushed."""
         if len(self.stack) < count:
             raise FormulaError(
@@ -245,7 +248,7 @@ class Renderer:
         del self.stack[len(self.stack) - count:]
         return taken
 
-    def render(self) -> str:
+    def format(self) -> str:
         """Walk every node, and return the one piece a whole formula leaves behind."""
         self.symbols = dict(collectBoundNames(self.formula))
         for node in self.formula:
@@ -261,7 +264,7 @@ class Renderer:
         """Take one node, and put what it makes of the stack back onto it.
 
         Matched on what the node holds, and `assert_never` makes mypy name any
-        content type the model gains and this does not render.
+        content type the model gains and this does not format.
         """
         kind = node.nodeType
         content = node.content
@@ -269,22 +272,21 @@ class Renderer:
             return
         match content:
             case bool():
-                self.stack.append(Rendered(booleanTexts[content]))
+                self.stack.append(FormulaTextPart(booleanTexts[content]))
             case Decimal():
-                self.stack.append(Rendered(renderNumber(content)))
+                self.stack.append(FormulaTextPart(formatFormulaNumber(content)))
             case str():
-                self.stack.append(Rendered(quoteString(content)))
+                self.stack.append(FormulaTextPart(quoteString(content)))
             case FormulaReference() | FormulaRange():
-                self.stack.append(
-                    Rendered(formatAddress(node, self.host, self.names, self.sizes))
-                )
+                address = formatAddress(node, self.host, self.names, self.sizes)
+                self.stack.append(FormulaTextPart(address))
             case FormulaGroup():
                 self.stepGroup(content)
             case FormulaFunctionCall():
                 self.stepCall(content)
             case FormulaUnknownCall():
                 self.stack.append(
-                    renderCall(content.name, self.pop(content.argumentCount))
+                    formatFormulaCall(content.name, self.pop(content.argumentCount))
                 )
             case FormulaVariable():
                 self.stepVariable(content)
@@ -305,7 +307,7 @@ class Renderer:
         # the two whose placement is established, so those formulas round trip
         # through the text and not through the node type.
         if kind in (emptyArgumentNodeType, tokenNodeType):
-            self.stack.append(Rendered(""))
+            self.stack.append(FormulaTextPart(""))
         elif kind == endScopeNodeType:
             self.stepEndScope()
         elif kind in operatorPrecedence:
@@ -313,7 +315,7 @@ class Renderer:
         else:
             raise FormulaError(
                 f"Node type {kind} has no written form. A formula holding one can "
-                "be read and written back, and cannot be rendered as text."
+                "be read and written back, and cannot be written as text."
             )
 
     def stepGroup(self, group: FormulaGroup) -> None:
@@ -321,16 +323,16 @@ class Renderer:
 
         The result scores as an atom, so an operator enclosing it adds no second
         pair. Refuses a wider list: every one of the 4364 measured encloses one
-        value, and rendering a wider one as a bracket would state something the
+        value, and formatting a wider one as a bracket would state something the
         documents do not support.
         """
         if group.argumentCount != 1:
             raise FormulaError(
                 f"This list node encloses {group.argumentCount} values, and every "
                 "one measured encloses a single value. A formula holding it can "
-                "be read and written back, and cannot be rendered as text."
+                "be read and written back, and cannot be written as text."
             )
-        self.stack.append(Rendered(f"({self.pop(1)[0].text})"))
+        self.stack.append(FormulaTextPart(f"({self.pop(1)[0].text})"))
 
     def stepCall(self, call: FormulaFunctionCall) -> None:
         """Write one indexed call, refusing an index nothing names."""
@@ -340,7 +342,7 @@ class Renderer:
                 "there is no name to write. Regenerate it with "
                 "tools/local/functions_extract.py."
             )
-        self.stack.append(renderCall(call.name, self.pop(call.argumentCount)))
+        self.stack.append(formatFormulaCall(call.name, self.pop(call.argumentCount)))
 
     def stepVariable(self, variable: FormulaVariable) -> None:
         """Write one use of a bound name, refusing a number nothing bound."""
@@ -350,7 +352,7 @@ class Renderer:
                 f"This formula uses value {variable.symbol} and binds no name to "
                 "it, so there is nothing to write."
             )
-        self.stack.append(Rendered(name))
+        self.stack.append(FormulaTextPart(name))
 
     def stepEndScope(self) -> None:
         """Write the `LET` whose bindings have been collected, and its body."""
@@ -365,14 +367,14 @@ class Renderer:
             raise FormulaError("A scope ends here having bound nothing.")
         pieces = [part for name, value, _ in taken for part in (name, value)]
         pieces.append(body.text)
-        self.stack.append(Rendered(f"{letName}({argumentSeparator.join(pieces)})"))
+        self.stack.append(FormulaTextPart(f"{letName}({argumentSeparator.join(pieces)})"))
 
     def stepLambda(self, lambdaNode: FormulaLambda) -> None:
         """Write one `LAMBDA`, its parameter names ahead of the body they serve."""
         body = self.pop(1)[0]
         pieces = [*lambdaNode.names, body.text]
         self.stack.append(
-            Rendered(f"{lambdaName}({argumentSeparator.join(pieces)})")
+            FormulaTextPart(f"{lambdaName}({argumentSeparator.join(pieces)})")
         )
 
     def stepOperator(self, kind: int) -> None:
@@ -381,7 +383,7 @@ class Renderer:
         if kind == percentNodeType:
             operand = self.pop(1)[0]
             self.stack.append(
-                Rendered(f"{operand.enclosed(level)}{percentSymbol}", level)
+                FormulaTextPart(f"{operand.enclosed(level)}{percentSymbol}", level)
             )
             return
         if kind in (negationNodeType, plusSignNodeType):
@@ -390,7 +392,7 @@ class Renderer:
                 subtractionNodeType if kind == negationNodeType else additionNodeType
             ]
             self.stack.append(
-                Rendered(f"{symbol}{operand.enclosed(level)}", level)
+                FormulaTextPart(f"{symbol}{operand.enclosed(level)}", level)
             )
             return
         left, right = self.pop(2)
@@ -406,7 +408,7 @@ class Renderer:
             rightText = (
                 f"({right.text})" if right.precedence <= level else right.text
             )
-        self.stack.append(Rendered(f"{leftText}{symbol}{rightText}", level))
+        self.stack.append(FormulaTextPart(f"{leftText}{symbol}{rightText}", level))
 
 
 def formatFormula(
@@ -423,12 +425,12 @@ def formatFormula(
     `tables` names the tables a formula reaches into, from `Sheet.tableIdentities`,
     and `sizes` gives each its rows and columns, under None for the host's own.
     """
-    return Renderer(
+    return FormulaFormatter(
         formula=formula,
         host=toCellReference(host).address,
         names=findShortestNames(tables),
         sizes=sizes or {},
-    ).render()
+    ).format()
 
 
 def findShortestNames(tables: Mapping[str, str] | None) -> dict[str, str]:

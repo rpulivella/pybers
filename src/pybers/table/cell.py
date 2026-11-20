@@ -62,9 +62,9 @@ from pybers.format.formats import (
     CellFormatText,
     findFormatShown,
 )
+from pybers.formula.formatting import formatFormula
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
-from pybers.formula.render import formatFormula
 from pybers.style.cells import CellStyle, findOverrides
 from pybers.table.borders import CellBorders
 from pybers.table.kinds import (

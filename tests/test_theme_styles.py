@@ -19,8 +19,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/03"
 
-from tools.local.lib.themestyles import buildThemeStyles, modulePath, renderModule
+from tools.local.lib.themestyles import buildThemeStyles, formatModule, modulePath
 
 
 def testTheCommittedThemeStyleTableIsWhatTheDocumentsMeasure() -> None:
-    assert modulePath.read_text() == renderModule(buildThemeStyles())
+    assert modulePath.read_text() == formatModule(buildThemeStyles())

@@ -33,6 +33,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/08"
 
+from pybers.formula.formatting import formatFormula
 from pybers.formula.functions import (
     ArgumentCountError,
     FunctionAvailability,
@@ -62,7 +63,6 @@ from pybers.formula.nodes import (
 )
 from pybers.formula.parse import parseFormula
 from pybers.formula.relocation import FormulaReferenceRelocation
-from pybers.formula.render import formatFormula
 from pybers.formula.syntax import FormulaSyntaxError
 
 __all__ = [
