@@ -131,7 +131,7 @@ sectionCellStyleFields: frozendict[TableSection, str] = frozendict({
 
 @dataclass(frozen=True, slots=True)
 class TableStyleChange:
-    """What setting a table's lines did: the lines it drew before and after."""
+    """What setting a table's style did: the style it held before and after."""
 
     reference: TableReference
     before: TableStyle
@@ -139,14 +139,14 @@ class TableStyleChange:
 
     @property
     def changed(self) -> bool:
-        """Report whether any line differs."""
+        """Report whether any line, flag, band or section box differs."""
         return self.before != self.after
 
 
 def buildTableStyle(
-    base: TableStyle, lines: Mapping[str, object], held: TableStyle
+    base: TableStyle, parts: Mapping[str, object], held: TableStyle
 ) -> TableStyle:
-    """Return a table style with lines named by field replaced, refusing any other.
+    """Return a table style with the parts named by field replaced, refusing any other.
 
     The one place a requested table style is checked, so nothing invalid is held.
     `held` is the style the table holds, whose band may be one pybers only carries.
@@ -157,7 +157,7 @@ def buildTableStyle(
             "Nothing was written."
         )
     names = [each.name for each in fields(TableStyle)]
-    for name, value in lines.items():
+    for name, value in parts.items():
         if name not in names:
             raise TableStyleError(
                 f"A table style holds {', '.join(names)}, and {name!r} is not one. "
@@ -180,7 +180,7 @@ def buildTableStyle(
                 f"{name} is a TableLine of a visibility and a Stroke, and was given "
                 f"{value!r}. Nothing was written."
             )
-    update: dict[str, Any] = dict(lines)
+    update: dict[str, Any] = dict(parts)
     built = replace(base, **update)
     refuseBand(built.bandedRows, held.bandedRows)
     refuseSectionBoxes(built, held)

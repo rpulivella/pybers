@@ -120,6 +120,7 @@ from pybers.table.structure import (
     generateLineIdentities,
 )
 from pybers.table.tablestyle import (
+    TableBand,
     TableLine,
     TableStyle,
     TableStyleChange,
@@ -234,16 +235,16 @@ class Table:
     def tableStyleSet(
         self,
         tableStyle: TableStyle | None = None,
-        **lines: TableLine | bool,
+        **parts: TableLine | TableBand | CellStyle | bool,
     ) -> TableStyleChange:
-        """Set the lines this table draws, wholly or by name, and report the change.
+        """Set this table's style, wholly or a part by name, and report the change.
 
-        `tableStyleSet(tableOutline=TableLine(True, stroke))`. Setting what the table
-        already draws changes nothing and writes nothing.
+        `tableStyleSet(tableOutline=TableLine(True, stroke))`, or a section's box by
+        `headerRowsCellStyle`. Setting what the table already holds writes nothing.
         """
         before = self._tableStyle
         after = buildTableStyle(
-            before if tableStyle is None else tableStyle, lines, before
+            before if tableStyle is None else tableStyle, parts, before
         )
         self._tableStyle = after
         return TableStyleChange(self.reference, before, after)
