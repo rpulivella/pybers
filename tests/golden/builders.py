@@ -147,6 +147,47 @@ def buildCaseTable(
 
 
 @dataclass(frozen=True, slots=True)
+class GoldenTableCase:
+    """One case of a golden whose subject is a table: its change, and its label."""
+
+    label: str
+    apply: Callable[[pybers.Document, pybers.Table], None]
+
+
+# Points between case tables, room for a title and a row Numbers grows as it wraps.
+tableCasePitch: float = 240.0
+# What each section of a case table holds, so its box shows on text of its own.
+sectionTexts: tuple[tuple[str, str], ...] = (
+    ("A1", "corner"), ("B1", "header"), ("C1", "header"),
+    ("A2", "side"), ("B2", "body text long enough to wrap"), ("C2", "body"),
+    ("A3", "side"), ("B3", "body"), ("C3", "body"),
+    ("A4", "side"), ("B4", "footer"), ("C4", "footer"),
+)
+
+
+def buildTableCases(
+    document: pybers.Document, cases: tuple[GoldenTableCase, ...]
+) -> None:
+    """Lay out one table per case, each section labeled, its label as its title.
+
+    The one layout every golden declared as table cases shares: four rows by three
+    columns, one header row, one header column and one footer row, so every section
+    shows, and the label outside the table, which no change to it restyles. Each sits
+    a fixed pitch below the last, since Numbers grows a row that wraps.
+    """
+    for at, case in enumerate(cases):
+        table = document.sheet().tableAdd(
+            case.label, rows=4, cols=3,
+            position=pybers.Position(0.0, at * tableCasePitch),
+        )
+        table.headersSet(headerRows=1, headerColumns=1, footerRows=1)
+        for address, text in sectionTexts:
+            table.cell(address).value = text
+        case.apply(document, table)
+        table.tableStyleSet(tableTitle=True)
+
+
+@dataclass(frozen=True, slots=True)
 class MeasuredCell:
     """A measured cell's text, how it shows it, and the label beneath it."""
 
@@ -862,6 +903,53 @@ def updateCellBoxes(document: pybers.Document) -> None:
     buildCaseTable(document, "Updated", boxUpdateCases)
 
 
+def composeSectionCase(label: str, declarations: str) -> GoldenTableCase:
+    """Return a case setting a table's section boxes by their declarations."""
+
+    def apply(document: pybers.Document, table: pybers.Table) -> None:
+        if declarations:
+            table.tableStyleSet(
+                pybers.parseTableStyle(declarations, table.tableStyle)
+            )
+
+    return GoldenTableCase(label, apply)
+
+
+def setOwnPadding(document: pybers.Document, table: pybers.Table) -> None:
+    """Pad one header cell 12pt of its own, then fill the header rows yellow."""
+    document.cellStyleUpdate(
+        f"::{table.name}::B1", pybers.CellStyle(padding=Decimal(12))
+    )
+    table.tableStyleSet(pybers.parseTableStyle(
+        "header-rows-background: #ffd60aff", table.tableStyle
+    ))
+
+
+# Each section's box changed alone, then a header cell keeping its own style.
+sectionBoxCases: tuple[GoldenTableCase, ...] = (
+    composeSectionCase("The reset unchanged", ""),
+    composeSectionCase(
+        "Header rows yellow and middle",
+        "header-rows-background: #ffd60aff; header-rows-vertical-align: middle",
+    ),
+    composeSectionCase(
+        "Header columns blue and bottom",
+        "header-columns-background: #0a84ffff; header-columns-vertical-align: bottom",
+    ),
+    composeSectionCase(
+        "Body padded 12pt and wrapping",
+        "body-padding: 12pt; body-text-wrap: wrap",
+    ),
+    composeSectionCase("Footer rows green", "footer-rows-background: #34c759ff"),
+    GoldenTableCase("Header rows yellow over B1 padded 12pt", setOwnPadding),
+)
+
+
+def setSectionBoxes(document: pybers.Document) -> None:
+    """Change each section's box of its own table, its change as the table's title."""
+    buildTableCases(document, sectionBoxCases)
+
+
 # Each color case of a fill, the text naming it, in a column of its own.
 fillColors: tuple[tuple[pybers.Color, str], ...] = (
     (pybers.Color.parse("#ff8000ff"), "sRGB 255 128 0, #ff8000ff"),
@@ -1114,6 +1202,7 @@ createdGoldens: tuple[GoldenBuilder, ...] = (
                   labeled=True),
     GoldenBuilder("00-created-cell-fills-colored-by-pybers", None, setCellFills,
                   labeled=True),
+    GoldenBuilder("00-created-section-boxes-set-by-pybers", None, setSectionBoxes),
     GoldenBuilder("00-created-cell-boxes-updated-by-pybers", None, updateCellBoxes,
                   labeled=True),
     GoldenBuilder("00-created-cell-borders-drawn-by-pybers", None, applyCellBorders,
