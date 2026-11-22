@@ -39,10 +39,9 @@ from pybers.table.tablestyle import (
     TableStyle,
     TableStyleError,
     blankTableStyle,
-    formatTableStyle,
-    parseTableStyle,
     resetTableStyle,
 )
+from pybers.table.tablestyletext import formatTableStyle, parseTableStyle
 
 dashed = Stroke(
     width=Decimal("0.35"), color=Color.black,
@@ -170,7 +169,10 @@ def test_a_longhand_changes_one_part_of_a_line() -> None:
 
 
 @pytest.mark.parametrize(("text", "message"), [
-    ("table-border: none", "is not a table line. The closest is table-outline"),
+    (
+        "table-border: none",
+        "is not a table style property. The closest is table-outline",
+    ),
     ("table-outline: thick", "a width, a style and a color"),
     ("table-outline: 1pt brush black", "is one of solid, dashed, dotted or none"),
     ("table-outline-title: maybe", "yes or no"),

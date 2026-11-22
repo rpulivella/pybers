@@ -34,12 +34,8 @@ from conftest import copyDocument, findDocumentPath, readOverrides
 from pybers import Color, TableBand
 from pybers.cli._app import app
 from pybers.style.fills import Fill, FillGradient, FillImage, FillNone
-from pybers.table.tablestyle import (
-    TableStyleError,
-    bandGray,
-    formatTableStyle,
-    parseTableStyle,
-)
+from pybers.table.tablestyle import TableStyleError, bandGray
+from pybers.table.tablestyletext import formatTableStyle, parseTableStyle
 
 yellow = Color.parse("#ffd60aff")
 red = Color.parse("#ff3b30ff")
