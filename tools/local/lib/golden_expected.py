@@ -267,7 +267,7 @@ def formatFormat(cell: ExpectedCell) -> str:
     match cell.format:
         case None:
             return "none"
-        case CellFormatAutomatic(shown=shown):
+        case CellFormatAutomatic(computed=shown):
             family = "unknown" if shown is UNDETERMINED else shown.formatFamily.value
             return f"automatic, shown as {family}"
         case chosen:

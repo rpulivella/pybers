@@ -34,12 +34,8 @@ from conftest import copyDocument, findDocumentPath, readOverrides
 from pybers import Color, TableBand
 from pybers.cli._app import app
 from pybers.style.fills import Fill, FillGradient, FillImage, FillNone
-from pybers.table.tablestyle import (
-    TableStyleError,
-    bandGray,
-    formatTableStyle,
-    parseTableStyle,
-)
+from pybers.table.tablestyle import TableStyleError, bandGray
+from pybers.table.tablestyletext import formatTableStyle, parseTableStyle
 
 yellow = Color.parse("#ffd60aff")
 red = Color.parse("#ff3b30ff")
@@ -158,7 +154,7 @@ def testABandPrintsAsADeclarationThatReadsBack(band: TableBand) -> None:
 ])
 def testACellShowsTheFillNumbersDrewForIt(address: str, fill: Fill | str) -> None:
     table = pybers.open(findDocumentPath("102b-bands-on")).table("Sheet 1::Table 1")
-    shown = table.cellFillShown(address)
+    shown = table.cellFillComputed(address)
     if fill == "own color":
         cell = table.cell(address)
         assert cell.cellStyle is not None and shown == cell.cellStyle.background
@@ -174,12 +170,12 @@ def testACellShowsTheFillNumbersDrewForIt(address: str, fill: Fill | str) -> Non
 ])
 def testAMergeShowsItsAnchorsBandAcrossEveryRow(address: str, banded: bool) -> None:
     table = pybers.open(findDocumentPath("104b-bands-merged-on")).table()
-    assert table.cellFillShown(address) == (bandGray if banded else FillNone())
+    assert table.cellFillComputed(address) == (bandGray if banded else FillNone())
 
 
 def testTheBandCountsFromTheFirstBodyRow() -> None:
     table = pybers.open(findDocumentPath("103b-bands-one-header-on")).table()
-    shown = [table.cellFillShown(f"B{row}") for row in range(2, 7)]
+    shown = [table.cellFillComputed(f"B{row}") for row in range(2, 7)]
     assert shown == [FillNone(), bandGray, FillNone(), bandGray, FillNone()]
 
 
@@ -190,7 +186,7 @@ def testAScriptAuthorBandsAReportsRows(tmp_path: Path) -> None:
     document.save(tmp_path / "report.numbers")
 
     reread = pybers.open(tmp_path / "report.numbers").table("Report")
-    assert reread.cellFillShown("A2") == red
+    assert reread.cellFillComputed("A2") == red
     assert reread.tableStyle.bandedRows.visible
 
 

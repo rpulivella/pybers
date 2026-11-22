@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-291] Report a cell's computed box style
 - [PYB-309] List only internal verbs in the naming test
 - [PYB-305] Wrap every label describing a cell by default
 - [PYB-290] Combine a style with what a cell already has

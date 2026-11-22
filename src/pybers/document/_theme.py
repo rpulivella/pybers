@@ -56,13 +56,13 @@ from .._persistence.types import archiveTypes
 from ..color._archive import composeColor
 from ..color.colors import Color, ColorSpace
 from ..style._write import composeCellProperties, composeCellStyleArchive
+from ..style.cells import createdCellStyle
 from ..table._reset import (
     composeBaseStyle,
     composeResetText,
     namedStyleKey,
 )
 from ..table._tablestyle import applyTableStyle
-from ..table.cells import createdCellStyle
 from ..table.tablestyle import resetTableStyle
 
 # Numbers looks each up by name, and cannot read a document missing either.

@@ -53,8 +53,8 @@ from ..color._archive import composeColor
 from ..color.colors import Color
 from ..errors import WriteError
 from ..style._write import addStyles, composeCellProperties, composeCellStyleArchive
+from ..style.cells import resetCellStyle
 from ._tablestyle import composeTableStyleVariation, readThemeTableStyle
-from .cells import resetCellStyle
 from .tablestyle import applyTableReset
 
 baseStyleName: str = "pybers-base"

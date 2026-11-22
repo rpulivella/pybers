@@ -90,7 +90,7 @@ from ..formula.nodes import Formula
 from ..style._read import readCellStyles
 from ..style.cells import CellStyle
 from ._borders import readTableBorders
-from ._cellstyles import readOwnCellStyles, readSectionCellStyles, readSectionVariations
+from ._cellstyles import readOwnCellStyles, readSectionVariations
 from ._tablestyle import readTableStyle
 from .cell import Cell, CellValue
 from .cells import Table
@@ -348,7 +348,6 @@ def readTable(
             model.number_of_header_columns,
             model.number_of_footer_rows,
         ),
-        _cellStylesInherited=readSectionCellStyles(index, model),
         _borders=readTableBorders(index, model, rowIdentities, columnIdentities),
         _tableStyle=readTableStyle(index, model),
     )

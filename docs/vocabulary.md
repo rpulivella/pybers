@@ -17,7 +17,7 @@ A method ends in its verb, `rowAdd`, and a module-level function begins with it,
 | Fill | Repeat a block across a range | Numbers' Autofill | `table.cellsFill` |
 | Find | Return the part, or every part, a key identifies | ECMAScript `Array.prototype.find`, Python `re.findall` | `findCurrency` |
 | Iterate | Yield each part in order | Python `iter` | `document.cellsIterate` |
-| Shown | Return the value Numbers displays, every layer of style resolved | CSS computed value | `table.cellFillShown` |
+| Computed | Return the value a part ends with, every layer of style resolved | CSS `getComputedStyle` | `table.cellFillComputed` |
 | select | Return every part a selector matches | DOM `querySelectorAll` | `document.select` |
 | parse | Read a value from its text form | ECMAScript `JSON.parse` | `parseCellValue` |
 | format | Write a value as the text that `parse` reads back | `Intl.NumberFormat.format` | `formatFormula` |
@@ -91,4 +91,4 @@ Each noun below keeps one meaning across the library, the command line and the d
 | locale | The language and region whose conventions govern how a document writes its values | Numbers' Language & Region |
 | region | The country or area a locale specifies, `DE` in `de_DE` | `Intl.Locale.region` |
 
-A noun can share its spelling with a verb, and the name's position tells them apart: `formatCellFormat` writes a format as text, and `cellsFill` repeats a block where `cellFillShown` returns a fill.
+A noun can share its spelling with a verb, and the name's position tells them apart: `formatCellFormat` writes a format as text, and `cellsFill` repeats a block where `cellFillComputed` returns a fill.

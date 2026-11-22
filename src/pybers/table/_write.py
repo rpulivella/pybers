@@ -14,6 +14,8 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-20  Each changed section box written before the cells that copy it, for
+            PYB-291.
 2026-11-17  The lines a table draws written as its table style, for PYB-266.
 2026-11-17  Borders are written from the table's own after every edit, for
             PYB-266.
@@ -74,6 +76,7 @@ from ..addressing.reference import originOffset
 from ..errors import WriteError
 from ..formula._dependencies import resolveFormulaDependencies
 from ._borders import writeTableBorders
+from ._cellstyles import writeSectionCellStyles
 from ._create import createTables
 from ._edits import applyTableEdits
 from ._lines import buildGridMaps
@@ -194,6 +197,8 @@ class TableSave:
             listSwallowedPositions(table, model)
             - frozenset(moves.values()) - copies.covered
         )
+        # Before the cells, which copy their section's style into their own.
+        writeSectionCellStyles(index, self.registry, modelIdentifier, model, table)
         edits = applyTableEdits(
             index, table, model, swallowed, maps, self.registry, plan, moves, copies
         )

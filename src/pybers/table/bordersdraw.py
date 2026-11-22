@@ -7,6 +7,7 @@ merge drawn whole, the line an edge shows, and a cell's borders as `pybers show`
 prints them. See findings-06-styles.md.
 
 UPDATES
+2026-11-20  `findComputedLine`, for PYB-291.
 2026-11-17  Split out of `borders` for PYB-266, keeping each module within its limit.
 """
 from __future__ import annotations
@@ -208,7 +209,7 @@ def applyBlockBorders(
     return sorted(touched, key=lambda address: (address.row, address.col))
 
 
-def findShownLine(
+def findComputedLine(
     table: Table, cell: CellAddress, side: CellBorderSide
 ) -> Stroke | MIXED | None:
     """Return the line one side of a cell displays, or None where it displays none.
@@ -218,7 +219,7 @@ def findShownLine(
     """
     if isMergeInterior(table, cell.row, cell.col, side):
         return None
-    drawn = table._borders.edgeShownFind(
+    drawn = table._borders.edgeComputedFind(
         table._rowIdentities, table._columnIdentities, cell, side
     )
     if drawn is not None:
@@ -263,6 +264,6 @@ def findCellBordersByPosition(table: Table) -> dict[CellAddress, CellBorders]:
 
 __all__ = [
     "applyBlockBorders", "findBlockRing", "findCellBordersByPosition",
-    "findMergedBlock", "findShownLine", "formatCellBorders", "formatSpanStroke",
+    "findMergedBlock", "findComputedLine", "formatCellBorders", "formatSpanStroke",
     "isMergeInterior", "listDrawnSides",
 ]

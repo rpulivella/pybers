@@ -81,7 +81,7 @@ def findShownFamily(cell: pybers.Cell) -> pybers.CellFormatFamily | None:
     assert found is not pybers.UNDETERMINED
     if found is None:
         return None
-    shown = found.shown if isinstance(found, pybers.CellFormatAutomatic) else found
+    shown = found.computed if isinstance(found, pybers.CellFormatAutomatic) else found
     assert shown is not pybers.UNDETERMINED
     return shown.formatFamily
 

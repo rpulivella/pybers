@@ -71,9 +71,8 @@ from pybers.table.tablestyle import (
     TableStyle,
     TableStyleChange,
     TableStyleError,
-    formatTableStyle,
-    parseTableStyle,
 )
+from pybers.table.tablestyletext import formatTableStyle, parseTableStyle
 
 __all__ = [
     "Cell",

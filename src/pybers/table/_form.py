@@ -12,6 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
+2026-11-20  A cell carries `cellStyleComputed`, read-only, for PYB-291.
 2026-11-17  A cell's borders and a table's style, for PYB-266.
 2026-11-12  A cell's own cell style, one its save writes, for PYB-265.
 2026-11-11  A cell's format is one the save writes, an empty cell's included, for
@@ -80,6 +81,9 @@ class CellForm:
     valueCached: bool | None = field(default=None, metadata={jsonFormReadOnly: True})
     presentation: CellPresentation
     cellStyle: CellStyle | None = None
+    cellStyleComputed: CellStyle | None = field(
+        default=None, metadata={jsonFormReadOnly: True}
+    )
     borders: CellBorders = CellBorders()
     unrecognizedTypeCode: int | None = None
     formula: Formula | WITHHELD | None = WITHHELD
@@ -130,7 +134,11 @@ def buildCellForm(cell: Cell) -> CellForm:
     return CellForm(
         address=cell.address, value=cell.value, kind=cell.kind, formulaText=text,
         valueCached=cell.valueCached, presentation=cell.presentation,
-        cellStyle=cell.cellStyle, borders=cell.borders,
+        cellStyle=cell.cellStyle,
+        cellStyleComputed=(
+            None if cell.table is None else cell.table.cellStyleComputed(cell.address)
+        ),
+        borders=cell.borders,
         unrecognizedTypeCode=cell.unrecognizedTypeCode, formula=formula,
     )
 

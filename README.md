@@ -79,6 +79,15 @@ pybers set budget.numbers "Summary::Costs" --table-style "banded-rows: none"
 pybers show budget.numbers "Summary::Costs" | grep banded-rows   # banded-rows: hidden #f2f2f7ff
 ```
 
+A table's style also holds the box each section's cells take unless they state their own: `body`, `header-rows`, `header-columns` and `footer-rows`, each with `-background`, `-padding`, `-vertical-align` and `-text-wrap`, written as `--cell-style` writes them. A changed box is written for that table alone, so another table sharing its theme's style keeps its own, and `pybers show` prints each cell's own style beside the style it computes, every layer resolved:
+
+```bash
+pybers set budget.numbers "Summary::Costs" --table-style "header-rows-background: #ffd60aff; header-rows-vertical-align: middle"
+pybers show budget.numbers "Summary::Costs::B1" | grep "Cell style"
+#   Cell style: none
+#   Cell style computed: background: #ffd60aff; padding: 4pt; vertical-align: middle; text-wrap: wrap
+```
+
 A format applies to every cell a range holds, an empty one included, as Numbers keeps it for whatever is typed in later. A formula takes its format whatever its result, and Numbers shows it whenever the result is of the format's kind. pybers sets each family the Data Format menu offers as its own ticket adds it, so for now a format is Automatic or the family Automatic picks for the value, and a control can be removed but not yet given. Anything else is refused by name before anything is written.
 
 A date is stored as wall-clock time, as Numbers stores it. One given with an offset, such as `2026-10-20T16:00Z`, is written as the time it was in the zone pybers is running in, or in the zone `--time-zone America/New_York` specifies.
@@ -126,11 +135,17 @@ $ pybers show shapes.numbers "::A11, *::Table 2[kind=number]"
 Cell: Sheet 1::Table 1::A11
   Value: 55   Kind: number   Formula text: =SUM(A1:A10)   Value cached: yes
   Format: number (automatic)   Control: none
+  Cell style: none
+  Cell style computed: background: none; padding: 4pt; vertical-align: top; text-wrap: wrap
+  Borders: none
   Unrecognized type code: none
 
 Cell: Sheet 1::Table 2::A1
   Value: 42   Kind: number   Formula text: none   Value cached: no
   Format: number (automatic)   Control: none
+  Cell style: none
+  Cell style computed: background: none; padding: 4pt; vertical-align: top; text-wrap: wrap
+  Borders: none
   Unrecognized type code: none
 ```
 
@@ -139,11 +154,13 @@ Cell: Sheet 1::Table 2::A1
 <details>
 <summary>The JSON of the cell and of the table above</summary>
 
+Each table's `tableStyle`, its lines, its band and the box each section shows, is abridged to `{ … }` here.
+
 ```console
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
 [
   {
-    "jsonFormVersion": 5,
+    "jsonFormVersion": 9,
     "sheetName": "Sheet 1",
     "cell": "A11",
     "table": {
@@ -156,6 +173,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
         "headerColumns": 0,
         "footerRows": 0
       },
+      "tableStyle": { … },
       "mergeRanges": [],
       "cells": [
         {
@@ -167,11 +185,26 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
           "presentation": {
             "format": {
               "formatFamily": "automatic",
-              "shown": {
+              "computed": {
                 "formatFamily": "number"
               }
             },
             "control": null
+          },
+          "cellStyle": null,
+          "cellStyleComputed": {
+            "background": {
+              "fillType": "none"
+            },
+            "padding": 4,
+            "verticalAlign": "top",
+            "textWrap": "wrap"
+          },
+          "borders": {
+            "top": null,
+            "right": null,
+            "bottom": null,
+            "left": null
           },
           "unrecognizedTypeCode": null,
           "formula": "WITHHELD"
@@ -212,7 +245,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
 $ pybers show shapes.numbers "*::Table 2" --output-format json
 [
   {
-    "jsonFormVersion": 5,
+    "jsonFormVersion": 9,
     "sheetName": "Sheet 1",
     "table": {
       "name": "Table 2",
@@ -224,6 +257,7 @@ $ pybers show shapes.numbers "*::Table 2" --output-format json
         "headerColumns": 0,
         "footerRows": 0
       },
+      "tableStyle": { … },
       "mergeRanges": [],
       "cells": [
         {
@@ -235,11 +269,26 @@ $ pybers show shapes.numbers "*::Table 2" --output-format json
           "presentation": {
             "format": {
               "formatFamily": "automatic",
-              "shown": {
+              "computed": {
                 "formatFamily": "number"
               }
             },
             "control": null
+          },
+          "cellStyle": null,
+          "cellStyleComputed": {
+            "background": {
+              "fillType": "none"
+            },
+            "padding": 4,
+            "verticalAlign": "top",
+            "textWrap": "wrap"
+          },
+          "borders": {
+            "top": null,
+            "right": null,
+            "bottom": null,
+            "left": null
           },
           "unrecognizedTypeCode": null,
           "formula": null
@@ -354,10 +403,10 @@ A cell's format is one of a closed family of types, so a `match` reaches every f
 from pybers import CellFormatAutomatic, CellFormatNumber, CellFormatPercent
 
 match costs.cell("B4").presentation.format:
-    case CellFormatPercent() | CellFormatAutomatic(shown=CellFormatPercent()):
+    case CellFormatPercent() | CellFormatAutomatic(computed=CellFormatPercent()):
         print("shown as a percentage")
-    case CellFormatAutomatic(shown=shown):
-        print("Numbers chose", shown.formatFamily)
+    case CellFormatAutomatic(computed=computed):
+        print("Numbers chose", computed.formatFamily)
 
 document.cellSet("Summary::Costs::B4", format=CellFormatNumber())  # value kept
 document.cellSet("Summary::Costs::B2:B9", Decimal(0), format=CellFormatAutomatic())
@@ -392,7 +441,19 @@ document.cellStylePropertyRemove("Summary::Costs::B2", CellStyleProperty.BACKGRO
 print(pybers.formatCellStyle(costs.cell("B2").cellStyle))  # padding: 12pt
 ```
 
-A cell's borders are `cell.borders`, each side the stroke the cell stores and the one its neighbor stores on the same edge. `document.cellBordersSet` draws them on one block, writing both sides of every edge, and `table.cellBorderShown` says which line an edge displays: the later of two borders, or else the table's own line there. A table's lines are `table.tableStyle`, one `TableLine` per gridline, separator and the outline, set by `table.tableStyleSet`:
+`cell.cellStyle` is only what a cell states itself, as CSS's inline style is. `table.cellStyleComputed(address)` is the box the cell displays, as CSS computes a value: its own style over the box its table's section gives it, with the band's fill on a banded row. The section boxes are part of `table.tableStyle`, `bodyCellStyle`, `headerRowsCellStyle`, `headerColumnsCellStyle` and `footerRowsCellStyle`, and `tableStyleSet` changes them:
+
+```python
+import dataclasses
+
+style = costs.tableStyle
+costs.tableStyleSet(dataclasses.replace(
+    style, headerRowsCellStyle=dataclasses.replace(style.headerRowsCellStyle, padding=8)
+))
+print(pybers.formatCellStyle(costs.cellStyleComputed("B1")))  # its header's box, padding: 8pt
+```
+
+A cell's borders are `cell.borders`, each side the stroke the cell stores and the one its neighbor stores on the same edge. `document.cellBordersSet` draws them on one block, writing both sides of every edge, and `table.cellBorderComputed` says which line an edge displays: the later of two borders, or else the table's own line there. A table's lines are `table.tableStyle`, one `TableLine` per gridline, separator and the outline, set by `table.tableStyleSet`:
 
 ```python
 from pybers import CellBorderPosition, CellBorderSide, CellBorderStyle, Color
@@ -404,16 +465,16 @@ document.cellBordersSet(
 print(pybers.formatCellBorders(costs.cell("B2")))  # border-top: 1pt dashed #000000ff; border-left: …
 costs.tableStyleSet(pybers.parseTableStyle("body-vertical-gridlines: none", costs.tableStyle))
 costs.tableStyleSet(tableOutlineTitle=True)
-print(costs.cellBorderShown("C5", CellBorderSide.RIGHT))  # None: the vertical gridlines are hidden
+print(costs.cellBorderComputed("C5", CellBorderSide.RIGHT))  # None: the vertical gridlines are hidden
 ```
 
-A table's banded rows are `table.tableStyle.bandedRows`, a `TableBand` of whether it shows and its color, which a hidden band keeps. `table.cellFillShown` says which fill a cell displays: its own, else the band on every second body row, else its section's, a merged cell showing what its first cell shows:
+A table's banded rows are `table.tableStyle.bandedRows`, a `TableBand` of whether it shows and its color, which a hidden band keeps. `table.cellFillComputed` says which fill a cell displays: its own, else the band on every second body row, else its section's, a merged cell showing what its first cell shows:
 
 ```python
 from pybers import Color, TableBand
 
 costs.tableStyleSet(bandedRows=TableBand(True, Color.parse("#f2f2f7ff")))
-print(costs.cellFillShown("B3"))  # #f2f2f7ff where B3 falls on a banded row
+print(costs.cellFillComputed("B3"))  # #f2f2f7ff where B3 falls on a banded row
 costs.tableStyleSet(bandedRows=TableBand(False, Color.parse("#f2f2f7ff")))  # off, color kept
 ```
 

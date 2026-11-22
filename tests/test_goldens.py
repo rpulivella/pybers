@@ -6,6 +6,8 @@ Every golden rebuilt from its builder and compared, archive by archive, with its
 golden is made. Narrow it with `-k`.
 
 UPDATES
+2026-11-22  A golden declared as table cases gives each case a table of every
+            section, its label as the table's title, for PYB-291.
 2026-11-20  A golden declared as cases wraps each label beneath its case, for
             PYB-305.
 2026-11-02  A golden starting from a fixture or measurement must state why, for PYB-261.
@@ -32,8 +34,10 @@ import pytest
 from golden.builders import (
     GoldenBuilder,
     GoldenCase,
+    GoldenTableCase,
     buildCaseTable,
     buildGolden,
+    buildTableCases,
     findBuilder,
     findFirstTable,
     findGoldenLabel,
@@ -162,4 +166,16 @@ def testACaseTableWrapsEachLabelBeneathItsCaseThenAnEmptyColumn() -> None:
     assert {label.cellStyle for label in labels} == {
         pybers.CellStyle(textWrap=pybers.CellStyleTextWrap.WRAP)
     }
+
+
+def testATableCaseShowsEverySectionAndItsLabelAsItsTitle() -> None:
+    document = pybers.create("en_US")
+    case = GoldenTableCase("Untouched", lambda doc, table: None)
+    buildTableCases(document, (case,))
+    table = document.sheet().table("Untouched")
+    assert table.headers == pybers.TableHeaders(1, 1, 1)
+    assert table.tableStyle.tableTitle
+    assert [table.cell(each).value for each in ("B1", "A2", "B4")] == [
+        "header", "side", "footer"
+    ]
 

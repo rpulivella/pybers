@@ -6,9 +6,11 @@ here takes a bare row and column pair: a cell is named by an address, or by `row
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-20  `cellStyleComputed`, the box a cell displays, beside `cellFillComputed` and
+            `cellBorderComputed`, each named as CSS computes a value, for PYB-291.
 2026-11-18  `mergeFind`, `isAddressable`, a private `_rangeSingle` and a table's
             sections follow the vocabulary, for PYB-301.
-2026-11-18  `cellFillShown`, the fill a cell displays, its banded row's included,
+2026-11-18  `cellFillComputed`, the fill a cell displays, its banded row's included,
             for PYB-267.
 2026-11-17  `tableStyle`, the lines a table draws, and `tableStyleSet`, for
             PYB-266.
@@ -95,7 +97,7 @@ from pybers.addressing.reference import (
 from pybers.addressing.text import ReferenceError
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
-from pybers.style.cells import CellStyle, CellStyleTextWrap, numbersCellStyle
+from pybers.style.cells import CellStyle
 from pybers.style.fills import Fill
 from pybers.style.strokes import Stroke
 from pybers.table.borders import (
@@ -103,12 +105,12 @@ from pybers.table.borders import (
     CellBorderSide,
     TableBorders,
 )
-from pybers.table.bordersdraw import findCellBordersByPosition, findShownLine
+from pybers.table.bordersdraw import findCellBordersByPosition, findComputedLine
 from pybers.table.bounds import findCellsMiss, refuseRangeOutside
 from pybers.table.cell import Cell
 from pybers.table.copy import copyCells
 from pybers.table.fill import CellValueFill, fillCells
-from pybers.table.headers import TableHeaders, TableSection, checkHeadersFit
+from pybers.table.headers import TableHeaders, checkHeadersFit
 from pybers.table.merges import MergeRange
 from pybers.table.relocation import moveCells
 from pybers.table.rows import TableRows
@@ -118,12 +120,15 @@ from pybers.table.structure import (
     generateLineIdentities,
 )
 from pybers.table.tablestyle import (
+    TableBand,
     TableLine,
     TableStyle,
     TableStyleChange,
     buildTableStyle,
-    findShownFill,
+    findComputedCellStyle,
+    findComputedFill,
     resetTableStyle,
+    sectionCellStyleFields,
 )
 
 if TYPE_CHECKING:
@@ -148,15 +153,6 @@ def generateOwnerIdentity() -> str:
     return "".join(f"{value >> shift & 0xFFFFFFFF:08x}" for shift in (0, 32, 64, 96))
 
 
-# The cell style every section of a table pybers adds specifies, the reset: no wrapping.
-resetCellStyle: CellStyle = CellStyle(textWrap=CellStyleTextWrap.NOWRAP)
-# What every cell of a table pybers adds shows: Numbers' own box, not wrapping.
-createdCellStyle: CellStyle = replace(
-    numbersCellStyle, textWrap=CellStyleTextWrap.NOWRAP
-)
-resetCellStylesInherited: frozendict[TableSection, CellStyle] = frozendict(
-    dict.fromkeys(TableSection, createdCellStyle)
-)
 
 @dataclass(slots=True)
 class Table:
@@ -198,12 +194,6 @@ class Table:
         default_factory=list, repr=False, compare=False, kw_only=True
     )
     _headers: TableHeaders = field(default_factory=TableHeaders, kw_only=True)
-    # What each section's cell style resolves to, read from the file, so a request
-    # can drop what a cell inherits; a table pybers adds takes the reset's.
-    _cellStylesInherited: frozendict[TableSection, CellStyle] = field(
-        default_factory=lambda: resetCellStylesInherited, repr=False, compare=False,
-        kw_only=True,
-    )
 
     # Every stroke stored on a side of a cell, keyed by row and column identity.
     _borders: TableBorders = field(
@@ -234,7 +224,8 @@ class Table:
     def _cellStyleInherited(self, address: CellAddress) -> CellStyle:
         """Return the cell style a cell at `address` inherits from its section."""
         section = self._headers.sectionFind(address, self.rowCount)
-        return self._cellStylesInherited.get(section, numbersCellStyle)
+        style: CellStyle = getattr(self._tableStyle, sectionCellStyleFields[section])
+        return style
 
     @property
     def tableStyle(self) -> TableStyle:
@@ -244,16 +235,16 @@ class Table:
     def tableStyleSet(
         self,
         tableStyle: TableStyle | None = None,
-        **lines: TableLine | bool,
+        **parts: TableLine | TableBand | CellStyle | bool,
     ) -> TableStyleChange:
-        """Set the lines this table draws, wholly or by name, and report the change.
+        """Set this table's style, wholly or a part by name, and report the change.
 
-        `tableStyleSet(tableOutline=TableLine(True, stroke))`. Setting what the table
-        already draws changes nothing and writes nothing.
+        `tableStyleSet(tableOutline=TableLine(True, stroke))`, or a section's box by
+        `headerRowsCellStyle`. Setting what the table already holds writes nothing.
         """
         before = self._tableStyle
         after = buildTableStyle(
-            before if tableStyle is None else tableStyle, lines, before
+            before if tableStyle is None else tableStyle, parts, before
         )
         self._tableStyle = after
         return TableStyleChange(self.reference, before, after)
@@ -485,25 +476,18 @@ class Table:
     def mergeAdd(self, address: CellRangeLike) -> MergeRange:
         """Merge a block of cells into one, anchored at its top-left, and return it.
 
-        **The covered cells are discarded permanently, and unmerging does not restore
-        them.** Measured, not chosen: `22-merge-2x2` and its unmerged twin hold the
-        same 18 cells, and Numbers writes no record at a position its own merge
-        covers. A merge IMPORTED from Excel is the exception and keeps a style-only
-        record at each one, which a save preserves rather than cleans up.
+        **The covered cells are discarded permanently**, as Numbers writes no record
+        where its own merge covers (`22-merge-2x2`). A merge imported from Excel keeps
+        a style-only record at each, which a save preserves.
         """
         extent = self._rangeSingle(address, "merge")
-        # A single cell is refused because Numbers cannot produce one: no document holds
-        # a merge covering one cell and the interface offers no way to make one, so
-        # writing the formula for it would put a construct in the file that has never
-        # been confirmed to open. Declining to invent is not the same as inventing a
-        # rule.
+        # Numbers offers no merge of one cell, so none is written unconfirmed.
         if extent.start == extent.end:
             raise ReferenceError(
                 f"{extent} is one cell, and a merge joins two or more."
             )
         merge = MergeRange(extent)
-        # Checked against the whole block before anything is discarded, so a refused
-        # merge leaves the table exactly as it was rather than half applied.
+        # Checked before anything is discarded, so a refused merge changes nothing.
         for existing in self.mergeRanges:
             if any(existing.covers(reference) for reference in merge.extent):
                 raise ReferenceError(
@@ -565,7 +549,7 @@ class Table:
             self._rowIdentities, self._columnIdentities, top, left, bottom, right
         )
 
-    def cellBorderShown(
+    def cellBorderComputed(
         self, address: CellReferenceLike, side: CellBorderSide
     ) -> Stroke | MIXED | None:
         """Return the line an edge displays, or None where it displays none.
@@ -573,15 +557,19 @@ class Table:
         A stored stroke prevails, the later of two that disagree, and a hidden one
         draws nothing; else the table's own line for that edge, while it shows.
         """
-        return findShownLine(self, self._addressResolve(address), side)
+        return findComputedLine(self, self._addressResolve(address), side)
 
-    def cellFillShown(self, address: CellReferenceLike) -> Fill:
+    def cellFillComputed(self, address: CellReferenceLike) -> Fill:
         """Return the fill a cell displays, `FillNone` where it displays none.
 
         A fill the cell states prevails, then the band on its body row, then its
         section's.
         """
-        return findShownFill(self, self._addressResolve(address))
+        return findComputedFill(self, self._addressResolve(address))
+
+    def cellStyleComputed(self, address: CellReferenceLike) -> CellStyle:
+        """Return the box a cell displays, every property resolved as CSS computes."""
+        return findComputedCellStyle(self, self._addressResolve(address))
 
     def mergeFind(self, address: CellReferenceLike) -> MergeRange | None:
         """Return the merge occupying this cell, or None when none does.

@@ -145,7 +145,9 @@ def testAScriptFindsEveryCellShownAsAPercentage() -> None:
     percents = []
     for cell in table.cells.values():
         match cell.presentation.format:
-            case CellFormatPercent() | CellFormatAutomatic(shown=CellFormatPercent()):
+            case CellFormatPercent() | CellFormatAutomatic(
+                computed=CellFormatPercent()
+            ):
                 percents.append(str(cell.address))
     assert percents == ["B1", "C1", "D1", "E1", "F1", "G1"]
 

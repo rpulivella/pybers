@@ -200,7 +200,7 @@ def test_a_merge_on_a_tables_first_row_is_bordered_along_its_top() -> None:
     table.mergeAdd("A1:B2")
     document.cellBordersSet("::Lines::A1", CellBorderPosition.ALL)
     assert table.cell("A1").borders.top == CellBorder(gridline, None, prevails=True)
-    assert table.cellBorderShown("A1", pybers.CellBorderSide.TOP) == gridline
+    assert table.cellBorderComputed("A1", pybers.CellBorderSide.TOP) == gridline
 
 
 def test_a_moved_cell_takes_the_facing_sides_its_border_wrote() -> None:
