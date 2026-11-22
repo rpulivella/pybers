@@ -165,8 +165,9 @@ called. A name is approved by the maintainer before a ticket relies on it.
 
 ## House style
 
-- **camelCase** for functions, variables and parameters. Modules stay lowercase, classes
-  PascalCase. The linter is configured for this, not against it.
+- **camelCase** for functions, variables and parameters. Modules stay lowercase, and
+  every type is PascalCase: a class, an enum, a protocol or a type alias. No linter
+  checks names, since ruff's naming rules expect snake_case and stay off.
 - **Method names are subject first, verb last**: `rowAdd`, `mergeRemove`,
   `cellBordersSet`, each verb one `docs/vocabulary.md` defines. Sorting then groups
   everything acting on a row together. The subject is as specific as the method.
