@@ -661,6 +661,29 @@ its control always writes them equal, so a document whose slots differ cannot be
 edited in Numbers. Five that differ read as `MIXED` and survive untouched, and a write
 over them sets all five.
 
+
+## A table's style holds each section's box, decided 22 November 2026
+
+PYB-291 found that the JSON form lost a table's section styles, so a document rebuilt
+from it showed its text as pybers' reset rather than as its source did.
+
+**The box a section's cells inherit is part of the table's style.** Numbers keeps four
+slots in every table, `body_cell_style`, `header_row_style`, `header_column_style` and
+`footer_row_style`, each the style its section's cells take unless they state their own,
+as `findings-03-structure.md` measured. `TableStyle` holds them as `bodyCellStyle`,
+`headerRowsCellStyle`, `headerColumnsCellStyle` and `footerRowsCellStyle`, beside its
+lines, as Numbers' Table Style keeps both, so one type owns everything a table's look
+holds and the JSON form carries it without a second structure.
+
+**A box stays in its section, never copied into each cell.** A cell with no style of its
+own stores none, so a pasted cell takes its new table's look and a changed section reaches
+every cell in it, as in Numbers. `cellStyleComputed` resolves what a cell shows from its
+own style, its section's box and the band, as CSS computes a value.
+
+**A changed box is written as a variation for that table alone.** Numbers shares a
+section's style between tables through the theme's preset, so a style is never edited
+in place. A cell stating its own style copies its section's properties, so each such cell
+in a changed section is written again, as `98c-cell-box-regions` measured.
 ---
 
 ## Changing part of a style is an update, decided 18 November 2026

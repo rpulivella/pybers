@@ -9,6 +9,7 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-22  `--table-style` lists each section's box, for PYB-291.
 2026-11-19  `--cell-style-update` and `--cell-style-remove` change part of a
             cell's box, for PYB-290.
 2026-11-19  `--locale` sets a document's language and region, for PYB-301.
@@ -256,7 +257,9 @@ def runSet(
                 "footer-rows-separator; table-title and table-outline-title, yes "
                 "or no; and banded-rows, a color or none, with "
                 "banded-rows-background its color alone. A line's -width, -style "
-                "or -color changes one part."
+                "or -color changes one part. body, header-rows, header-columns and "
+                "footer-rows each take -background, -padding, -vertical-align and "
+                "-text-wrap, the box its cells inherit."
             ),
         ),
     ] = None,
