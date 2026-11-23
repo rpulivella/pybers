@@ -286,11 +286,14 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             field = lineNames[longhand[1]]
             line = parseLonghand(longhand[2], value, getattr(changed, field), name)
         else:
-            raise TableStyleError(composeChoiceRefusal(name, "a table style property", [
-                *lineNames, *flagNames, bandName, bandFillName, *sectionDeclarations,
-                *(f"{line}-{part}" for line in lineNames
-                  for part in ("width", "style", "color")),
-            ]))
+            raise composeChoiceRefusal(
+                TableStyleError, name, "a table style property", [
+                    *lineNames, *flagNames, bandName, bandFillName,
+                    *sectionDeclarations,
+                    *(f"{line}-{part}" for line in lineNames
+                      for part in ("width", "style", "color")),
+                ],
+            )
         update: dict[str, Any] = {field: line}
         changed = replace(changed, **update)
     return changed

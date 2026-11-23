@@ -113,6 +113,7 @@ lazy from pybers.errors import (
     ReadError,
     WriteError,
     composeChoiceRefusal,
+    composeRefusal,
 )
 lazy from pybers.format import (
     CellControl,
@@ -276,6 +277,7 @@ __all__ = [
     "ReadError",
     "WriteError",
     "composeChoiceRefusal",
+    "composeRefusal",
     "FormulaNode",
     "FormulaError",
     "FormulaSyntaxError",

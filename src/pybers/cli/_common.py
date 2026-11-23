@@ -56,10 +56,18 @@ def reportPybersErrors(context: typer.Context) -> Generator[None]:
     except pybers.PybersError as exc:
         if findCommandSettings(context).debug:
             raise
-        statusConsole.print(
-            Text.assemble((f"pybers {context.info_name}: ", "failure"), str(exc))
-        )
+        statusConsole.print(Text.assemble(
+            (f"pybers {context.info_name}: ", "failure"),
+            formatRefusalText(exc, str(context.info_name)),
+        ))
         raise typer.Exit(1) from exc
+
+
+def formatRefusalText(error: pybers.PybersError, command: str) -> str:
+    """Return a refusal as a command shows it, saying where choices it omits are."""
+    if not error.choices:
+        return str(error)
+    return f"{error} `pybers {command} --help` lists every one."
 
 
 OutputOption = Annotated[
@@ -111,6 +119,7 @@ __all__ = [
     "PreviewOption",
     "findCommandSettings",
     "findSaveTarget",
+    "formatRefusalText",
     "reportPybersErrors",
     "reportWrite",
 ]

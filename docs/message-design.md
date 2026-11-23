@@ -28,7 +28,7 @@ Nothing precedes the place, so a reader scanning a column of refusals sees the s
 ## Grammar
 
 - **The cause is in the present tense**: `holds a formula`, `is not a color`, `is not supported`.
-- **The fix is in the imperative**: `Clear the formula first.`, `Write it as #rrggbbaa.`
+- **The fix is in the imperative**: `Clear the formula first.`, `Write it as #rrggbbaa.` A refused choice states its closest as a fact, `The closest is table-outline.`, since the reader picks it.
 - **What was not done is in the past tense**: `Nothing was written.`, `Nothing was read.`
 - **Every part is a complete sentence ending in a period**, except a skipped part's phrase, which takes none.
 - **A limit of pybers reads `is not supported`**, and a fact about Numbers names Numbers: `Numbers allows at most five header rows.`
@@ -37,7 +37,7 @@ Nothing precedes the place, so a reader scanning a column of refusals sees the s
 
 ## Both consumers
 
-A message both consumers show names no call, argument or option that only one of them has. `cellStyleUpdate` means nothing at a shell, and `--cell-style` means nothing in a script. A fix that needs one consumer's own name is added by that consumer: the command line appends `` `pybers set --help` lists every one.`` to a refused choice, and the library's message ends before it. A message only one consumer shows, such as a command-line usage error, names that consumer's options freely.
+A message both consumers show names no call, argument or option that only one of them has. `cellStyleUpdate` means nothing at a shell, and `--cell-style` means nothing in a script. A fix that needs one consumer's own name is added by that consumer: a refused choice carries its choices on the error, and the command line appends `` `pybers set --help` lists every one.`` where the message names none, while the library's message ends before it. A message only one consumer shows, such as a command-line usage error, names that consumer's options freely.
 
 ## Shapes
 
@@ -62,7 +62,7 @@ Sheet 1::Table 1::B4 holds a formula, so a value written there would discard it.
 
 ### Refused choice
 
-The place is the value given, the cause says what it is not, and the fix names the closest valid choice. Where no choice is close, the message lists every choice when there are five or fewer, and otherwise ends at the cause for the consumer to add where the list is.
+The place is the value given, the cause says what it is not, and the fix names the closest valid choice. Where no choice is close, the message lists every choice when there are five or fewer, and otherwise ends at the cause, the error carrying its choices for the consumer to say where the list is.
 
 ```
 'table-border' is not a table style property. The closest is table-outline. Nothing was written.
@@ -111,4 +111,4 @@ A command line that cannot run, shown only at a shell, so it names options freel
 ### Help
 
 - **A command's help is one imperative sentence**, its docstring: `Show a document, or every part a selector matches.`
-- **An option's help is a phrase naming what it takes**, with no capital and no period: `the ticket, such as PYB-156, or none`.
+- **An option's or an argument's help is one sentence**, in the imperative for an option that acts, `Show the change and write nothing.`, and a noun phrase for a value it takes, `The .numbers document.`

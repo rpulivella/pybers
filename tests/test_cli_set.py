@@ -260,3 +260,14 @@ def testGrowingATableTakesOneCellAndIsRefusedBeforeWriting(working: Path) -> Non
 def testTheHelpShowsAConditionInItsExampleSelector() -> None:
     result = runner.invoke(app, ["set", "--help"], terminal_width=200)
     assert "[kind=number]" in result.stdout
+
+
+def testARefusedChoiceNoneIsCloseToSaysWhereEveryChoiceIs(working: Path) -> None:
+    result = runSetCommand(
+        str(working), "Sheet 1::Table 2", "--table-style", "zzzz: none"
+    )
+    assert result.exit_code == 1
+    assert readPlainText(result.stderr) == (
+        "pybers set: 'zzzz' is not a table style property. `pybers set --help` "
+        "lists every one."
+    )

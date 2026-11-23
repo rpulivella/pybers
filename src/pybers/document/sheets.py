@@ -97,7 +97,12 @@ from pybers.addressing.reference import (
 )
 from pybers.addressing.text import quoteReferenceText
 from pybers.color.colors import Color
-from pybers.errors import PybersError, WriteError, composeChoiceRefusal
+from pybers.errors import (
+    PybersError,
+    WriteError,
+    composeChoiceRefusal,
+    nothingWritten,
+)
 from pybers.format._check import (
     findControlRefusal,
     findFormatMisfit,
@@ -640,10 +645,10 @@ class Document:
         The cell then shows what its table states for that property.
         """
         if not isinstance(styleProperty, CellStyleProperty):
-            refusal = composeChoiceRefusal(
-                styleProperty, "a cell style property", list(CellStyleProperty)
+            raise composeChoiceRefusal(
+                WriteError, styleProperty, "a cell style property",
+                [each.value for each in CellStyleProperty], nothingWritten,
             )
-            raise WriteError(f"{refusal} Nothing was written.")
         return self._cellsWrite(
             selector, UNCHANGED, format=UNCHANGED, control=UNCHANGED,
             cellStyleCompose=lambda own: (
@@ -670,10 +675,10 @@ class Document:
 
         stroke = None
         if not isinstance(position, CellBorderPosition):
-            refusal = composeChoiceRefusal(
-                position, "a border position", list(CellBorderPosition)
+            raise composeChoiceRefusal(
+                WriteError, position, "a border position",
+                [each.value for each in CellBorderPosition], nothingWritten,
             )
-            raise WriteError(f"{refusal} Nothing was written.")
         if style is not None and not isinstance(style, CellBorderStyle):
             choices = ", ".join(each.value for each in CellBorderStyle)
             raise WriteError(

@@ -56,6 +56,7 @@ from pybers.cli._common import (
     OutputOption,
     PreviewOption,
     findSaveTarget,
+    formatRefusalText,
     reportPybersErrors,
     reportWrite,
 )
@@ -328,13 +329,14 @@ def runSet(
         )
     styleProperties = [each.value for each in pybers.CellStyleProperty]
     if cellStyleRemove is not None and cellStyleRemove not in styleProperties:
-        raise typer.BadParameter(pybers.composeChoiceRefusal(
-            cellStyleRemove, "a cell style property", styleProperties
-        ))
+        raise typer.BadParameter(formatRefusalText(pybers.composeChoiceRefusal(
+            pybers.PybersError, cellStyleRemove, "a cell style property",
+            styleProperties,
+        ), "set"))
     if border is not None and border not in borderPositions:
-        raise typer.BadParameter(
-            pybers.composeChoiceRefusal(border, "a border position", borderPositions)
-        )
+        raise typer.BadParameter(formatRefusalText(pybers.composeChoiceRefusal(
+            pybers.PybersError, border, "a border position", borderPositions
+        ), "set"))
     if borderStyle is not None and borderStyle not in ("none", *borderStyles):
         choices = ", ".join(borderStyles)
         raise typer.BadParameter(
