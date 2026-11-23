@@ -570,7 +570,7 @@ def testAnAddressBelowTheOriginRefusesInTheAddressingLayersOwnWords() -> None:
     which one it was rather than summarize both away.
     """
     for text, offset in (("=A0", 0), ("=SUM(A0:A5)", 4), ("=A1+B0", 3)):
-        with pytest.raises(FormulaSyntaxError, match="rows count from 1") as raised:
+        with pytest.raises(FormulaSyntaxError, match="rows count from one") as raised:
             parseFormula(text, "B2")
         assert raised.value.position == offset
 

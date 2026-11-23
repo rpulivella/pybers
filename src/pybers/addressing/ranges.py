@@ -59,6 +59,7 @@ from pybers.addressing.reference import (
     toColumnNumber,
 )
 from pybers.addressing.text import ReferenceError, composeReferenceText
+from pybers.errors import composeRefusal
 
 rangeSeparator: str = ":"
 listSeparator: str = ","
@@ -116,18 +117,22 @@ def parseEndpoint(text: str, whole: str) -> RangeEndpoint:
         marker, digits = row.groups()
         endpoint = RangeEndpoint(int(digits), None, marker == absoluteMarker, False)
     if endpoint is None:
-        raise ReferenceError(f"{whole!r} is not a range: {text!r} addresses nothing.")
+        raise ReferenceError(composeRefusal(
+            repr(whole), f"is not a range, since {text!r} addresses no cell",
+            "Write it as `B2:D9`, `B` or `3`",
+        ))
     # Checked here rather than left to the range constructor, which would report
     # row 0 without saying that `A0` is where it came from.
     if endpoint.row is not None and endpoint.row < firstRow:
-        raise ReferenceError(
-            f"{whole!r} names row {endpoint.row}, and rows count from {firstRow}."
-        )
+        raise ReferenceError(composeRefusal(
+            repr(whole), f"selects row {endpoint.row}, which does not exist, since "
+            "rows count from one",
+        ))
     if endpoint.row is not None and endpoint.row > lastRow:
-        raise ReferenceError(
-            f"{whole!r} names row {endpoint.row}, past row {lastRow}, "
-            "which is the last row a Numbers table can hold."
-        )
+        raise ReferenceError(composeRefusal(
+            repr(whole), f"selects row {endpoint.row}, past row {lastRow}, the last a "
+            "Numbers table holds",
+        ))
     return endpoint
 
 
@@ -182,26 +187,32 @@ class CellRange:
             ("Column", firstColumn, lastColumn, self.startCol, self.endCol),
         ):
             if (low is None) != (high is None):
-                raise ReferenceError(
-                    f"{axis} bounds {low} to {high}: an axis is unbounded at both "
-                    "ends or at neither."
-                )
+                raise ReferenceError(composeRefusal(
+                    f"{axis} bounds {low} to {high}", "leave one end open, and an "
+                    "axis is open at both ends or at neither",
+                ))
             if low is None or high is None:
                 continue
             if low < origin:
-                raise ReferenceError(
-                    f"{axis} {low} is before {axis.lower()} {origin}, which is "
-                    "where a table starts."
-                )
+                raise ReferenceError(composeRefusal(
+                    f"{axis} {low}", f"does not exist, since {axis.lower()}s count "
+                    "from one, as Numbers shows them",
+                ))
             if high > limit:
-                raise ReferenceError(
-                    f"{axis} {high} is past {axis.lower()} {limit}, which is where "
-                    "a table ends."
-                )
+                raise ReferenceError(composeRefusal(
+                    f"{axis} {high}", f"is past {axis.lower()} {limit}, where a "
+                    "table ends",
+                ))
             if low > high:
-                raise ReferenceError(f"{axis} bounds run backward, {low} to {high}.")
+                raise ReferenceError(composeRefusal(
+                    f"{axis} bounds {low} to {high}", "run backward",
+                    f"Write them as {high} to {low}",
+                ))
         if self.rowsUnbounded and self.colsUnbounded:
-            raise ReferenceError("A range unbounded on both axes names every cell.")
+            raise ReferenceError(composeRefusal(
+                "A range open on both axes", "selects every cell",
+                "Bound its rows or its columns",
+            ))
 
     @property
     def rowsUnbounded(self) -> bool:
@@ -304,16 +315,18 @@ class CellRange:
         table, text = splitTableName(reference)
         parts = text.strip().split(rangeSeparator)
         if len(parts) > 2:
-            raise ReferenceError(f"{reference!r} names more than two endpoints.")
+            raise ReferenceError(composeRefusal(
+                repr(reference), "has more than two ends", "Write it as `B2:D9`"
+            ))
         first = parseEndpoint(parts[0], reference)
         last = first if len(parts) == 1 else parseEndpoint(parts[1], reference)
         if (first.row is None) != (last.row is None) or (first.col is None) != (
             last.col is None
         ):
-            raise ReferenceError(
-                f"{reference!r} bounds one endpoint on an axis that the other "
-                "leaves unbounded."
-            )
+            raise ReferenceError(composeRefusal(
+                repr(reference), "bounds one end on an axis the other leaves open",
+                "Write both ends as cells, both as columns, or both as rows",
+            ))
         found = cls.fromAxes(
             ((first.row, first.rowAbsolute), (last.row, last.rowAbsolute)),
             ((first.col, first.colAbsolute), (last.col, last.colAbsolute)),
@@ -339,9 +352,10 @@ class CellRange:
         has to be bounded on both axes, since it is what supplies the answer.
         """
         if extent.rowsUnbounded or extent.colsUnbounded:
-            raise ReferenceError(
-                f"An extent is bounded on both axes, and {extent} is not."
-            )
+            raise ReferenceError(composeRefusal(
+                f"The extent {extent}", "is open on an axis, and an extent is bounded "
+                "on both",
+            ))
         return CellRange(
             extent.startRow if self.rowsUnbounded else self.startRow,
             extent.startCol if self.colsUnbounded else self.startCol,
@@ -384,9 +398,15 @@ class CellRange:
         a limit. `resolve` supplies the missing end.
         """
         if self.startRow is None or self.endRow is None:
-            raise ReferenceError(f"{self} spans every row and cannot be walked.")
+            raise ReferenceError(composeRefusal(
+                str(self), "spans every row, so its cells cannot be listed",
+                "Resolve it against a table first",
+            ))
         if self.startCol is None or self.endCol is None:
-            raise ReferenceError(f"{self} spans every column and cannot be walked.")
+            raise ReferenceError(composeRefusal(
+                str(self), "spans every column, so its cells cannot be listed",
+                "Resolve it against a table first",
+            ))
         for row in range(self.startRow, self.endRow + 1):
             for col in range(self.startCol, self.endCol + 1):
                 yield CellAddress(row, col)
@@ -411,14 +431,18 @@ class CellRangeList:
     def __post_init__(self) -> None:
         """Reject an empty list, which names nothing and reads as an oversight."""
         if not self.ranges:
-            raise ReferenceError("A range list names at least one range.")
+            raise ReferenceError(
+                composeRefusal("A range list", "is empty, and holds at least one range")
+            )
 
     @classmethod
     def parse(cls, reference: str) -> CellRangeList:
         """Return the ranges a comma-separated list names, in the order written."""
         parts = reference.split(listSeparator)
         if any(not part.strip() for part in parts):
-            raise ReferenceError(f"{reference!r} has an empty range in it.")
+            raise ReferenceError(composeRefusal(
+                repr(reference), "holds an empty range", "Remove the extra comma"
+            ))
         return cls(tuple(CellRange.parse(part) for part in parts))
 
     def asReference(self) -> str:

@@ -55,6 +55,7 @@ from pybers.addressing.text import (
     readReferenceName,
     splitReferenceText,
 )
+from pybers.errors import composeRefusal
 
 # Rows and columns count from ONE throughout the model, because that is what
 # Numbers shows and what a caller means by "row 1". Nothing here ever holds a stored
@@ -94,14 +95,15 @@ def toColumnLetter(col: int) -> str:
     over every number either accepts.
     """
     if col < firstColumn:
-        raise ReferenceError(
-            f"Column {col} is before column {firstColumn}. Columns count from one."
-        )
+        raise ReferenceError(composeRefusal(
+            f"Column {col}", "does not exist, since columns count from one, as "
+            "Numbers shows them",
+        ))
     if col > lastColumn:
-        raise ReferenceError(
-            f"Column {col} is past column {lastColumn}, which is the last column a "
-            "Numbers table can hold."
-        )
+        raise ReferenceError(composeRefusal(
+            f"Column {col}", f"is past column {lastColumn}, the last a Numbers table "
+            "holds",
+        ))
     letters = ""
     while col > 0:
         col, remainder = divmod(col - 1, alphabetSize)
@@ -118,15 +120,18 @@ def toColumnNumber(letters: str) -> int:
     raised, which is the failure this whole library is built to avoid.
     """
     if not letters or not letters.isascii() or not letters.isalpha():
-        raise ReferenceError(f"{letters!r} is not a column label.")
+        raise ReferenceError(composeRefusal(
+            repr(letters), "is not a column label", "Write a column in letters, such "
+            "as `B` or `AA`",
+        ))
     col = 0
     for letter in letters.upper():
         col = col * alphabetSize + (ord(letter) - ord("A") + 1)
     if col > lastColumn:
-        raise ReferenceError(
-            f"{letters!r} is column {col}, past column {lastColumn}, which is the "
-            "last column a Numbers table can hold."
-        )
+        raise ReferenceError(composeRefusal(
+            repr(letters), f"is column {col}, past column {lastColumn}, the last a "
+            "Numbers table holds",
+        ))
     return col
 
 
@@ -156,44 +161,46 @@ class CellAddress:
         """
         for axis, value in (("Row", self.row), ("Column", self.col)):
             if not isinstance(value, int) or isinstance(value, bool):
-                raise ReferenceError(f"{axis} {value!r} is not a whole number.")
+                raise ReferenceError(
+                    composeRefusal(f"{axis} {value!r}", "is not a whole number")
+                )
         if self.row < firstRow:
-            raise ReferenceError(
-                f"Row {self.row} is before row {firstRow}. Rows count from one."
-            )
+            raise ReferenceError(composeRefusal(
+                f"Row {self.row}", "does not exist, since rows count from one, as "
+                "Numbers shows them",
+            ))
         if self.col < firstColumn:
-            raise ReferenceError(
-                f"Column {self.col} is before column {firstColumn}. "
-                "Columns count from one."
-            )
+            raise ReferenceError(composeRefusal(
+                f"Column {self.col}", "does not exist, since columns count from one, "
+                "as Numbers shows them",
+            ))
         if self.row > lastRow:
-            raise ReferenceError(
-                f"Row {self.row} is past row {lastRow}, which is the last row a "
-                "Numbers table can hold."
-            )
+            raise ReferenceError(composeRefusal(
+                f"Row {self.row}", f"is past row {lastRow}, the last a Numbers table "
+                "holds",
+            ))
         if self.col > lastColumn:
-            raise ReferenceError(
-                f"Column {self.col} is past column {lastColumn}, which is the last "
-                "column a Numbers table can hold."
-            )
+            raise ReferenceError(composeRefusal(
+                f"Column {self.col}", f"is past column {lastColumn}, the last a "
+                "Numbers table holds",
+            ))
 
     @classmethod
     def parse(cls, text: str) -> CellAddress:
         """Return the address `B3` names, refusing a `$`, which only a reference has."""
         reference = CellReference.parse(text)
         if reference.table is not None:
-            raise ReferenceError(
-                f"{quoteReferenceText(text)} names a table, which belongs to a "
-                "`CellReference`. An "
-                f"address is the position alone, such as {reference.address}."
-            )
+            raise ReferenceError(composeRefusal(
+                quoteReferenceText(text), "selects a table, and an address is a "
+                "position alone", f"Write it as {reference.address}, or parse a "
+                "`CellReference` to keep the table",
+            ))
         if reference.rowAbsolute or reference.colAbsolute:
-            raise ReferenceError(
-                f"{quoteReferenceText(text)} carries a lock, which belongs to a "
-                "`CellReference`. An "
-                "address is the position alone, such as "
-                f"{reference.address}."
-            )
+            raise ReferenceError(composeRefusal(
+                quoteReferenceText(text), "carries a `$` lock, and an address is a "
+                "position alone", f"Write it as {reference.address}, or parse a "
+                "`CellReference` to keep the lock",
+            ))
         return reference.address
 
     def asRowColumn(self) -> tuple[int, int]:
@@ -239,7 +246,9 @@ class CellOffset:
     def __post_init__(self) -> None:
         for axis, value in (("Rows", self.rows), ("Columns", self.cols)):
             if not isinstance(value, int) or isinstance(value, bool):
-                raise ReferenceError(f"{axis} {value!r} is not a whole number.")
+                raise ReferenceError(
+                    composeRefusal(f"{axis} {value!r}", "is not a whole number")
+                )
 
     def __add__(self, other: CellOffset) -> CellOffset:
         if not isinstance(other, CellOffset):
@@ -263,17 +272,20 @@ class SheetReference:
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name:
-            raise ReferenceError(f"A sheet is named, and {self.name!r} is no name.")
+            raise ReferenceError(composeRefusal(
+                repr(self.name), "is not a sheet name, which is text of one character "
+                "or more",
+            ))
 
     @classmethod
     def parse(cls, text: str) -> SheetReference:
         """Return the sheet `Budget` or `Budget\\, draft` writes."""
         parts = splitReferenceText(text)
         if len(parts) != 1:
-            raise ReferenceError(
-                f"{quoteReferenceText(text)} names more than a sheet. A `::` inside a "
-                "sheet's name is written `\\:\\:`."
-            )
+            raise ReferenceError(composeRefusal(
+                quoteReferenceText(text), "selects more than a sheet",
+                "Write a `::` inside a name as `\\:\\:`",
+            ))
         return cls(readReferenceName(parts[0], text))
 
     def __str__(self) -> str:
@@ -289,17 +301,20 @@ class TableReference:
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name:
-            raise ReferenceError(f"A table is named, and {self.name!r} is no name.")
+            raise ReferenceError(composeRefusal(
+                repr(self.name), "is not a table name, which is text of one character "
+                "or more",
+            ))
 
     @classmethod
     def parse(cls, text: str) -> TableReference:
         """Return the table `Q3` or `Budget::Q3` writes, qualified as far as written."""
         parts = splitReferenceText(text)
         if len(parts) > 2:
-            raise ReferenceError(
-                f"{quoteReferenceText(text)} names more than a sheet and a table. "
-                "A `::` inside a name is written `\\:\\:`."
-            )
+            raise ReferenceError(composeRefusal(
+                quoteReferenceText(text), "selects more than a sheet and a table",
+                "Write a `::` inside a name as `\\:\\:`",
+            ))
         return buildTableReference(parts, text)
 
     def __str__(self) -> str:
@@ -321,10 +336,10 @@ def splitTableName(text: str) -> tuple[TableReference | None, str]:
     """Return the table written before an address, if any, and the address."""
     parts = splitReferenceText(text.strip())
     if len(parts) > 3:
-        raise ReferenceError(
-            f"{quoteReferenceText(text)} names more than a sheet, a table and a cell. "
-            "A `::` inside a name is written `\\:\\:`."
-        )
+        raise ReferenceError(composeRefusal(
+            quoteReferenceText(text), "selects more than a sheet, a table and a cell",
+            "Write a `::` inside a name as `\\:\\:`",
+        ))
     table = buildTableReference(parts[:-1], text) if len(parts) > 1 else None
     return table, parts[-1]
 
@@ -369,17 +384,18 @@ class CellReference:
         table, cellText = splitTableName(reference)
         match = cellPattern.match(cellText.strip())
         if match is None:
-            raise ReferenceError(
-                f"{quoteReferenceText(reference)} is not an A1-style cell reference."
-            )
+            raise ReferenceError(composeRefusal(
+                quoteReferenceText(reference), "is not a cell reference",
+                "Write it as `B3`, `Q3::B3` or `Budget::Q3::B3`",
+            ))
         colMarker, letters, rowMarker, digits = match.groups()
         # Checked against the written form rather than left to the constructor,
         # which would report row 0 without saying that `A0` is where it came from.
         if int(digits) < firstRow:
-            raise ReferenceError(
-                f"{quoteReferenceText(reference)} names row {int(digits)}, and rows "
-                f"count from {firstRow}."
-            )
+            raise ReferenceError(composeRefusal(
+                quoteReferenceText(reference), f"selects row {int(digits)}, which "
+                "does not exist, since rows count from one",
+            ))
         return cls(
             int(digits),
             toColumnNumber(letters),
@@ -431,9 +447,10 @@ def toCellReferenceNamed(
     """
     if address is not None:
         if row is not None or col is not None:
-            raise ReferenceError(
-                f"A cell is named by {address} or by row and col, and both were given."
-            )
+            raise ReferenceError(composeRefusal(
+                f"{address} with row and col", "specifies one cell twice",
+                "Give the address, or row and col",
+            ))
         return toCellReference(address)
     if (
         isinstance(row, int)
@@ -442,7 +459,7 @@ def toCellReferenceNamed(
         and not isinstance(col, bool)
     ):
         return CellReference(row, col)
-    raise ReferenceError(
-        "A cell is named by an address such as 'E3', or by row= and col= together "
-        f"as numbers, and was given row={row!r}, col={col!r}."
-    )
+    raise ReferenceError(composeRefusal(
+        f"row={row!r}, col={col!r}", "specifies no cell, which needs both as "
+        "whole numbers", "Give both, or an address such as 'E3'",
+    ))

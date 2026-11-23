@@ -25,7 +25,7 @@ __date__ = "2026/11/18"
 
 import re
 
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeRefusal
 
 referenceSeparator: str = "::"
 escapeMarker: str = "\\"
@@ -102,21 +102,25 @@ def readReferenceName(written: str, text: str) -> str:
     """
     trimmed = normalizeWrittenText(written)
     if trimmed.endswith(escapeMarker) and not findEscaped(trimmed, len(trimmed) - 1):
-        raise ReferenceError(
-            f"{quoteReferenceText(text)} ends in a backslash, escaping nothing."
-        )
+        raise ReferenceError(composeRefusal(
+            quoteReferenceText(text), "ends in a backslash, which escapes nothing",
+            "Write a backslash in a name as `\\\\`",
+        ))
     for index, character in enumerate(trimmed):
         if character in specialCharacters and character != escapeMarker and not (
             findEscaped(trimmed, index)
         ):
             name = readEscapedText(trimmed)
-            raise ReferenceError(
-                f"{quoteReferenceText(text)} holds `{character}` in a name without "
-                f"escaping it. Write {quoteReferenceText(escapeSelectorName(name))}."
-            )
+            raise ReferenceError(composeRefusal(
+                quoteReferenceText(text), f"holds `{character}` in a name without "
+                "escaping it",
+                f"Write {quoteReferenceText(escapeSelectorName(name))}",
+            ))
     name = readEscapedText(trimmed)
     if not name:
-        raise ReferenceError(f"{quoteReferenceText(text)} leaves a name empty.")
+        raise ReferenceError(
+            composeRefusal(quoteReferenceText(text), "leaves a name empty")
+        )
     return name
 
 
