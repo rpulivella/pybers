@@ -154,7 +154,7 @@ def toCellValue(
             Decimal128(value)
         except Decimal128Error as exc:
             raise WriteError(composeRefusal(
-                str(address), f"cannot hold {value}, since decimal128 holds a finite "
+                str(address), f"cannot hold {value}, since Numbers stores a finite "
                 "number of at most 34 significant digits", notDone=nothingWritten,
             )) from exc
         return value

@@ -204,7 +204,7 @@ def testAnUnrecognizedRecordElsewhereSurvivesAWrite(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(("value", "reason"), [
     (1.5, r"Give Decimal\('1.5'\)"),
-    (Decimal("NaN"), "cannot hold NaN, since decimal128 holds a finite"),
+    (Decimal("NaN"), "cannot hold NaN, since Numbers stores a finite"),
     (Decimal("1." + "1" * 40), "at most 34 significant digits"),
     (datetime.time(9, 30), "cannot hold a time. Give a Decimal"),
 ])

@@ -1,6 +1,6 @@
 # Message design
 
-How every message pybers writes is built and worded: an error a call raises, a refusal a command prints, a part a write skipped, and the help a command gives. Each shape below has one composer, so a message's structure comes from the composer and its author supplies only the words. The [library design](library-design.md) says which error a call raises, the [command-line design](cli-design.md) says where a command prints a message and how it looks, and [`CLAUDE.md`](../CLAUDE.md) holds the house style the words follow. The [vocabulary](vocabulary.md) supplies every word a message uses for an action or a part.
+How every message pybers writes is built and worded: an error a call raises, a refusal a command prints, a part a write skipped, and the help a command gives. Each shape below has one composer, so a message's structure comes from the composer and its author supplies only the words. A feature that shows one place again and again wraps its shape's composer rather than writing beside it, as `composeFormRefusal` places a path within a JSON form, and `pybers.nothingWritten` and `pybers.nothingRead` are the two sentences saying what was not done. The [library design](library-design.md) says which error a call raises, the [command-line design](cli-design.md) says where a command prints a message and how it looks, and [`CLAUDE.md`](../CLAUDE.md) holds the house style the words follow. The [vocabulary](vocabulary.md) supplies every word a message uses for an action or a part.
 
 ## Readers
 

@@ -71,7 +71,10 @@ def composeRefusal(
 
 
 def composeWithheldRefusal(refusal: str, notDone: str) -> str:
-    """Return a refusal a check composed, ending in what the call did not do."""
+    """Return a refusal a value's check composed, ended by what the call did not do.
+
+    The one place a call that cannot word its own refusal adds what was not done.
+    """
     return f"{refusal} {formatSentence(notDone)}"
 
 
