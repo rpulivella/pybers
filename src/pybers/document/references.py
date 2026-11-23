@@ -7,7 +7,7 @@ inside them. A reference is one node of a postfix array, so nothing shorter than
 a cell and a node position identifies which one a caller means when a formula
 holds four.
 
-**A location is a view, not a copy.** It names a cell and a node position and reads
+**A location is a view, not a copy.** It specifies a cell and a node position and reads
 the reference through them, so shifting one writes back to the cell that holds it
 and a second location on the same formula sees the result. Copying the reference out
 would give a caller something to edit that nothing would ever store.
@@ -17,6 +17,7 @@ Reporting `None` for the local case would put an `if` in every loop that filters
 by table, and the answer it would be hiding is one this already knows.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-08  Written for #13.
 """
 from __future__ import annotations
@@ -34,6 +35,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from pybers.document.sheets import Document, SelectionError, Sheet
+from pybers.errors import composeRefusal
 from pybers.formula.formatting import findShortestNames, formatAddress
 from pybers.formula.nodes import (
     Formula,
@@ -68,7 +70,7 @@ class ReferenceLocation:
 
     @property
     def node(self) -> FormulaNode:
-        """The formula node this location names, raising when it no longer holds one."""
+        """The formula node this location views, raising when it no longer holds one."""
         formula = self.cell.formula
         node = (
             None
@@ -78,11 +80,11 @@ class ReferenceLocation:
         if node is None or not isinstance(
             node.content, FormulaReference | FormulaRange
         ):
-            raise FormulaError(
-                f"Node {self.index} of {self.cell.address} is no longer the "
-                "reference this location names. A location views a formula rather than "
-                "holding one, so replacing that formula invalidates it."
-            )
+            raise FormulaError(composeRefusal(
+                f"Node {self.index} of {self.cell.address}", "is no longer the "
+                "reference this location views, since replacing a formula invalidates "
+                "every location in it", "Iterate the document's references again",
+            ))
         return node
 
     @property
@@ -127,7 +129,7 @@ class ReferenceLocation:
 
 
 def indexTablesByIdentity(document: Document) -> dict[str, Table]:
-    """Return every table in a document, keyed by what a formula names it by.
+    """Return every table in a document, keyed by the identity a formula reaches it by.
 
     A table a script constructs has no identity until a document gives it one, and one
     that has none is left out rather than filed under the empty string.
@@ -150,10 +152,10 @@ def resolveReferenceTarget(
         return host
     target = tables.get(content.tableId)
     if target is None:
-        raise SelectionError(
-            f"A formula in {host.name!r} reaches into table {content.tableId}, "
-            "which this document does not hold."
-        )
+        raise SelectionError(composeRefusal(
+            f"A formula in {host.name!r}", f"reaches into table {content.tableId}, "
+            "which this document does not hold",
+        ))
     return target
 
 

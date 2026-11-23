@@ -8,6 +8,7 @@ A dash is a list of lengths in multiples of the width, as `43-stroke-dashes` and
 `100b-lines` measured. See findings-04-text.md and findings-06-styles.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  Written for PYB-266.
 """
 from __future__ import annotations
@@ -34,7 +35,7 @@ from pybers.color.colors import (
     findNearestFloat32,
     findShortestDecimal,
 )
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeRefusal
 
 # The six lengths `TSD.StrokePatternArchive` holds, of which `count` are live.
 strokeDashSlots: int = 6
@@ -47,13 +48,19 @@ class StrokeError(PybersError, ValueError):
 def readStrokeNumber(name: str, number: object) -> Decimal:
     """Return a number as the Decimal specifying the float32 a stroke stores."""
     if isinstance(number, bool) or not isinstance(number, int | float | Decimal):
-        raise StrokeError(f"A stroke's {name} is a number, and is {number!r}.")
+        raise StrokeError(
+            composeRefusal(f"The stroke {name} {number!r}", "is not a number")
+        )
     if not math.isfinite(number):
-        raise StrokeError(f"A stroke's {name} is finite, and is {number}.")
+        raise StrokeError(
+            composeRefusal(f"The stroke {name} {number}", "is not finite")
+        )
     try:
         return findShortestDecimal(findNearestFloat32(float(number)))
     except ColorError as exc:
-        raise StrokeError(f"A stroke's {name} of {number} is too large.") from exc
+        raise StrokeError(composeRefusal(
+            f"The stroke {name} {number}", "is too large for Numbers to store"
+        )) from exc
 
 
 class StrokeCap(StrEnum):
@@ -84,7 +91,7 @@ class StrokePatternType(StrEnum):
 
 
 class StrokePatternBase(FamilyMember, ABC):
-    """How a stroke lays its color along its line, named by its `patternType`."""
+    """How a stroke lays its color along its line, identified by its `patternType`."""
 
     __slots__ = ()
     patternType: ClassVar[StrokePatternType]
@@ -112,18 +119,18 @@ class StrokeDash(StrokePatternBase):
 
     def __post_init__(self) -> None:
         if not 1 <= len(self.lengths) <= strokeDashSlots:
-            raise StrokeError(
-                f"A dash holds from 1 to {strokeDashSlots} lengths, and this one "
-                f"holds {len(self.lengths)}."
-            )
+            raise StrokeError(composeRefusal(
+                f"A dash of {len(self.lengths)} lengths", "is not supported, since "
+                f"Numbers stores from 1 to {strokeDashSlots}",
+            ))
         lengths = tuple(
             readStrokeNumber("dash length", each) for each in self.lengths
         )
         if any(each < 0 for each in lengths):
-            raise StrokeError(
-                f"A dash length cannot be negative, and this one holds "
-                f"{', '.join(map(str, lengths))}."
-            )
+            raise StrokeError(composeRefusal(
+                f"The dash lengths {', '.join(map(str, lengths))}",
+                "hold a negative length, and a length is 0 or more",
+            ))
         object.__setattr__(self, "lengths", lengths)
         object.__setattr__(self, "phase", readStrokeNumber("dash phase", self.phase))
 
@@ -188,23 +195,25 @@ class Stroke:
     def __post_init__(self) -> None:
         width = readStrokeNumber("width", self.width)
         if width < 0:
-            raise StrokeError(f"A stroke's width cannot be negative, and is {width}.")
+            raise StrokeError(composeRefusal(
+                f"A stroke width of {width}", "is negative, and a width is 0 or more"
+            ))
         if not isinstance(self.color, Color):
-            raise StrokeError(
-                f"A stroke's color is a Color, and is {type(self.color).__name__}."
-            )
+            raise StrokeError(composeRefusal(
+                f"The stroke color {type(self.color).__name__}", "is not a Color"
+            ))
         if not isinstance(self.pattern, StrokePatternBase):
-            raise StrokeError(
-                f"A stroke's pattern is a StrokePattern, and is "
-                f"{type(self.pattern).__name__}."
-            )
+            raise StrokeError(composeRefusal(
+                f"The stroke pattern {type(self.pattern).__name__}",
+                "is not a StrokePattern",
+            ))
         for name, kind in (("cap", StrokeCap), ("join", StrokeJoin)):
             if not isinstance(getattr(self, name), kind):
                 choices = ", ".join(each.value for each in kind)
-                raise StrokeError(
-                    f"A stroke's {name} is one of {choices}, and is "
-                    f"{getattr(self, name)!r}."
-                )
+                raise StrokeError(composeRefusal(
+                    f"The stroke {name} {getattr(self, name)!r}",
+                    f"is not a {kind.__name__}", f"Give one of {choices}",
+                ))
         object.__setattr__(self, "width", width)
         object.__setattr__(
             self, "miterLimit", readStrokeNumber("miter limit", self.miterLimit)

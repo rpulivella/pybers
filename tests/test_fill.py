@@ -235,13 +235,13 @@ def testAFillSkipsWhatAMergeCoversAndCountsWhatItFilled() -> None:
         (lambda table: table.cellsFill(
             "B5:C5", "B6:C7", references=relative, values=repeat), "a fill copies no"),
         (lambda table: table.cellsFill(
-            "A:A", "B1:B3", references=relative, values=repeat), "unbounded"),
+            "A:A", "B1:B3", references=relative, values=repeat), "is open on an axis"),
         (lambda table: table.cellsFill(
             "D3", "D4", references="sideways", values=repeat), "not a reference rule"),
         (lambda table: table.cellsFill(
             "D3", "D4", references=relative, values="upward"), "not a value rule"),
         (lambda table: table.cellsFill(
-            "A2:A3", "A4:B4", references=relative, values=series), "asks for both"),
+            "A2:A3", "A4:B4", references=relative, values=series), "both along"),
     ],
 )
 def testARefusedFillLeavesTheTableAsItWas(
@@ -368,7 +368,7 @@ def testAFillWhoseSourceWasRemovedIsRefusedAtSave(tmp_path: Path) -> None:
     table.cellsFill("A11", "A12", references=relative, values=repeat)
     table.rowRemove(11)
     target = tmp_path / "orphaned.numbers"
-    with pytest.raises(pybers.WriteError, match="no longer in"):
+    with pytest.raises(pybers.WriteError, match="its table no longer holds"):
         document.save(target)
     assert not target.exists()
 
@@ -448,7 +448,7 @@ def testCopyingARecordNamingAnUnidentifiedEntryIsRefused(tmp_path: Path) -> None
     document, table = openTable("46-formula-rare-functions")
     table.cellsFill("B10", "C10", references=relative, values=repeat)
     target = tmp_path / "unidentified.numbers"
-    with pytest.raises(pybers.WriteError, match="not identified"):
+    with pytest.raises(pybers.WriteError, match="which pybers does not identify"):
         document.save(target)
     assert not target.exists()
 

@@ -5,10 +5,11 @@ Create the calculation engine a document's first table registers its owner in.
 A document holding no table holds no engine, as a created one does, and Numbers builds
 one on save. A table pybers adds registers an owner, so the engine is created first: a
 dependency tracker holding no owner, the dirty list a recalculation request writes, and
-the document root naming it. Numbers builds every owner beside the table's own.
+the document root specifying it. Numbers builds every owner beside the table's own.
 Measured 2026-11-02 in findings-10-creation.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  Written for PYB-261.
 """
 from __future__ import annotations

@@ -6,6 +6,7 @@ Each test changes a copy of `95-region-base`, a document under `en_US`, and the
 measurements derived from it record what Numbers writes for each region.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  `set --locale` in place of the `locale` command, for PYB-301.
 2026-11-03  The region prints as `show` prints it, read or changed, and the
             regions offered are no longer listed, for PYB-223.
@@ -88,7 +89,7 @@ def testARegionPybersDoesNotOfferIsRefused(working: Path) -> None:
     assert result.exit_code == 1
     assert result.stdout == ""
     assert result.stderr.startswith(
-        "pybers set: No region pybers offers is named 'de_XX'. The closest of the "
+        "pybers set: 'de_XX' is not a region pybers offers. The closest is de_LU."
     )
     assert pybers.open(working).localeIdentifier == "en_US"
 
@@ -98,8 +99,8 @@ def testANewFileThatExistsIsRefusedLeavingIt(working: Path, tmp_path: Path) -> N
     before = existing.read_bytes()
     result = runLocaleCommand(working, "de_DE", "-o", existing)
     assert result.exit_code == 2
-    assert "already exists. Name a new file, or leave out -o" in readPlainText(
-        result.stderr
+    assert "specifies a file that exists, and -o writes only a new one" in (
+        readPlainText(result.stderr)
     )
     assert existing.read_bytes() == before
 
@@ -133,4 +134,6 @@ def testALocaleGivenWithASelectorIsRefusedWritingNothing(
 def testSetGivenNeitherASelectorNorALocaleIsRefused(working: Path) -> None:
     result = runner.invoke(app, ["set", str(working)])
     assert result.exit_code == 2
-    assert "Give a SELECTOR, or a --locale." in readPlainText(result.stderr)
+    assert "SELECTOR is missing. Give a SELECTOR, or --locale." in readPlainText(
+        result.stderr
+    )

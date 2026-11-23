@@ -17,11 +17,12 @@ message, because pybers's own read path names archives by identifier. Any other
 error keeps only its type and where pybers raised it.
 
 UPDATES
+2026-11-23  A missing part states why it is missing, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, their names withheld
             unless asked for, for PYB-223.
 2026-10-13  Six archive types a Numbers 15.4 template holds count as tested, for
             PYB-139.
-2026-10-12  Each missing part of a check names why it is missing, for PYB-190.
+2026-10-12  Each missing part of a check states why it is missing, for PYB-190.
 2026-10-11  Type counts are built as frozendict, for PYB-189.
 2026-10-07  Written for PYB-169.
 """

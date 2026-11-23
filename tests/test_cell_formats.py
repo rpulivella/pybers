@@ -171,10 +171,10 @@ def testAutomaticAloneNamesAFormatTheSaveChooses() -> None:
 
 
 @pytest.mark.parametrize(("text", "refusal"), [
-    ("percentage", "'percentage' is no format family. Use one of: automatic, number"),
-    ("unknown", "'unknown' is no format family"),
+    ("percentage", "'percentage' is not a format family. The closest is percent."),
+    ("unknown", "'unknown' is not a format family."),
     ("percent; fraction-digits: 1",
-     "percent has no setting 'fraction-digits'; it takes no settings"),
+     "'fraction-digits' is not a setting of percent, which takes none."),
 ])
 def testATextFormNamingNoFamilyOrSettingIsRefusedSayingWhich(
     text: str, refusal: str

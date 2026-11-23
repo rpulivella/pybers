@@ -15,6 +15,7 @@ member of which file holds the target, so resolving one means having the whole
 package indexed up front, which is why the index is built eagerly and in full.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  A UUID's four words assigned here, for PYB-276.
 2026-10-28  `findRootIdentifier`, so a save can write the root, for PYB-272.
 2026-09-22  A random UUID is generated here, where both creators find it, for PYB-113.
@@ -45,7 +46,13 @@ from google.protobuf.message import Message
 from .._generated import TNArchives_pb2 as tn
 from .._generated import TSPMessages_pb2 as tsp
 from .._generated import TSTArchives_pb2 as tst
-from ..errors import ReadError
+from ..errors import (
+    ReadError,
+    composeFault,
+    composeRefusal,
+    nothingRead,
+    nothingWritten,
+)
 from .container import NumbersPackage
 from .iwa import Archive, IWAFile
 from .types import findArchiveTypeId, parseArchive, readArchiveTypeId
@@ -98,12 +105,14 @@ class ArchiveIndex:
         found = self.byIdentifier.get(identifier)
         if found is None:
             if identifier in self.removed:
-                raise ReadError(
-                    f"Reference to archive {identifier}, which this save removed."
-                )
-            raise ReadError(
-                f"Reference to archive {identifier}, which is not in this document."
-            )
+                raise ReadError(composeFault(
+                    f"A reference to archive {identifier}", "remains after the save "
+                    "removed that archive", nothingWritten,
+                ))
+            raise ReadError(composeRefusal(
+                f"A reference to archive {identifier}", "points at an archive the "
+                "document does not hold", notDone=nothingRead,
+            ))
         return found
 
     def identifierResolve[ArchiveT: Message](
@@ -115,14 +124,14 @@ class ArchiveIndex:
             message = parseArchive(self.archive(identifier))
             self.parsed[identifier] = message
         if not isinstance(message, expected):
-            raise ReadError(
-                f"Archive {identifier} is a "
-                f"{type(message).DESCRIPTOR.full_name}, but a "
-                f"{expected.DESCRIPTOR.full_name} was expected here."
-            )
+            raise ReadError(composeRefusal(
+                f"Archive {identifier}", "holds a different kind of record than the "
+                f"document places here ({type(message).DESCRIPTOR.full_name} where "
+                f"{expected.DESCRIPTOR.full_name} belongs)", notDone=nothingRead,
+            ))
         return message
 
-    # Every resolve names the archive class it expects, so the expectation is
+    # Every resolve specifies the archive class it expects, so the expectation is
     # checked rather than assumed, and Message bounds it because only a generated
     # class can be the target of a reference.
     def resolve[ArchiveT: Message](
@@ -219,9 +228,10 @@ def findRootIdentifier(index: ArchiveIndex) -> int:
         if readArchiveTypeId(archive) == findArchiveTypeId(tn.DocumentArchive)
     ]
     if len(roots) != 1:
-        raise ReadError(
-            f"Expected exactly one TN.DocumentArchive, found {len(roots)}."
-        )
+        raise ReadError(composeRefusal(
+            "The document", f"holds {len(roots)} document roots rather than one "
+            "(TN.DocumentArchive)", notDone=nothingRead,
+        ))
     identifier: int = roots[0].identifier
     return identifier
 
@@ -241,9 +251,10 @@ def readDataList(
     """
     dataList = index.resolve(reference, tst.TableDataList)
     if dataList.listType != listType:
-        raise ReadError(
-            f"Expected data list type {listType}, got {dataList.listType}."
-        )
+        raise ReadError(composeRefusal(
+            "A table data list", f"holds list type {dataList.listType} where type "
+            f"{listType} belongs", notDone=nothingRead,
+        ))
     return {entry.key: entry for entry in dataList.entries}
 
 

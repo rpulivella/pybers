@@ -6,6 +6,7 @@ Its own module so that copying, filling and moving import it at the top: the tab
 needs these too, and reaching them through `cells` made each a cycle.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  `findCellsMiss`, the one rule for whether a table holds a cell or a
             range, for PYB-223.
 2026-10-27  A whole row or column is checked on its bounded axis, and a range
@@ -27,6 +28,7 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import CellAddress
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeRefusal
 
 if TYPE_CHECKING:
     from pybers.table.cells import Table
@@ -62,12 +64,14 @@ def findCellsMiss(table: Table, cells: CellAddress | CellRange) -> str | None:
     size = f"{table.rowCount} {rows} by {table.colCount} {columns}"
     if isinstance(cells, CellAddress):
         if extent is None or not extent.covers(cells):
-            return f"{cells} is outside {table.name!r}, which is {size}."
+            return composeRefusal(
+                str(cells), f"is outside {table.name}, which is {size}"
+            )
         merge = table.mergeFind(cells)
         if merge is not None and merge.anchor != cells:
-            return (
-                f"{cells} is covered by the merge {merge.extent}, whose anchor is "
-                f"{merge.anchor}."
+            return composeRefusal(
+                str(cells), f"is covered by the merge {merge.extent}",
+                f"Select its anchor, {merge.anchor}",
             )
         return None
     bounded = cells if extent is None else cells.resolve(extent)
@@ -75,7 +79,9 @@ def findCellsMiss(table: Table, cells: CellAddress | CellRange) -> str | None:
         corner is not None and extent.covers(corner)
         for corner in (bounded.start, bounded.end)
     ):
-        return f"{cells} reaches outside {table.name!r}, which is {size}."
+        return composeRefusal(
+            str(cells), f"reaches outside {table.name}, which is {size}"
+        )
     return None
 
 

@@ -6,6 +6,7 @@ Each test edits a copy of `100-lines-base`, whose `Table 1` is two rows by seven
 columns of labeled cells awaiting a border.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  Written for PYB-266.
 """
 from __future__ import annotations
@@ -94,7 +95,8 @@ def testAPreviewWritesNothing(working: Path) -> None:
     ("arguments", "message"),
     [
         (["--border-style", "dashed"], "describe a --border"),
-        (["--border", "outer", "--border-style", "brush"], "--border-style is one of"),
+        (["--border", "outer", "--border-style", "brush"],
+         "'brush' is not a border style"),
         (["--border", "outline"], "outline"),
         (["--border", "outer", "--border-width", "thick"], "a length in points"),
         (["--border", "outer", "--border-style", "hidden", "--border-width", "1pt"],

@@ -26,6 +26,7 @@ to a member sets, so an edit cannot reach `originalBytes` and be written back as
 though it had never happened.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-22  A replaced archive is returned, for the index to hold, for PYB-109.
 2026-09-21  An archive nothing points at any more is removed, for PYB-17.
 2026-09-14  An archive can be created and added to a member, for PYB-63.
@@ -47,7 +48,13 @@ __date__ = "2026/08/16"
 from dataclasses import dataclass, field, replace
 
 from .._generated import TSPArchiveMessages_pb2 as archiveMessages
-from ..errors import PybersError
+from ..errors import (
+    PybersError,
+    composeFault,
+    composeRefusal,
+    nothingRead,
+    nothingWritten,
+)
 from .compression import compressRaw, decompressRaw
 from .varint import readVarint, writeVarint
 
@@ -145,11 +152,11 @@ class IWAFile:
             if archive.identifier != identifier:
                 continue
             if not 0 <= index < len(archive.messages):
-                raise IWAError(
-                    f"Archive {identifier} in {self.name} has "
-                    f"{len(archive.messages)} messages, so index {index} is out "
-                    "of range."
-                )
+                raise IWAError(composeFault(
+                    f"Archive {identifier} in {self.name}", f"has "
+                    f"{len(archive.messages)} messages, so index {index} is out of "
+                    "range", nothingWritten,
+                ))
             messages = list(archive.messages)
             messages[index] = replace(messages[index], data=data)
             infoBytes = archive.infoBytes
@@ -163,7 +170,9 @@ class IWAFile:
             self.archives[position] = placed
             self.modified = True
             return placed
-        raise IWAError(f"{self.name} holds no archive with identifier {identifier}.")
+        raise IWAError(composeFault(
+            self.name, f"holds no archive with identifier {identifier}", nothingWritten
+        ))
 
     def archiveAdd(self, archive: Archive) -> None:
         """Append an archive this member did not hold, and mark the member rewritten.
@@ -172,10 +181,10 @@ class IWAFile:
         table's archives follow every existing one in `CalculationEngine.iwa`.
         """
         if any(held.identifier == archive.identifier for held in self.archives):
-            raise IWAError(
-                f"{self.name} already holds archive {archive.identifier}, and two "
-                "archives cannot share an identifier."
-            )
+            raise IWAError(composeFault(
+                self.name, f"already holds archive {archive.identifier}, and two "
+                "archives cannot share an identifier", nothingWritten,
+            ))
         self.archives.append(archive)
         self.modified = True
 
@@ -187,9 +196,10 @@ class IWAFile:
         """
         kept = [held for held in self.archives if held.identifier != identifier]
         if len(kept) == len(self.archives):
-            raise IWAError(
-                f"{self.name} holds no archive with identifier {identifier}."
-            )
+            raise IWAError(composeFault(
+                self.name, f"holds no archive with identifier {identifier}",
+                nothingWritten,
+            ))
         self.archives = kept
         self.modified = True
 
@@ -203,10 +213,10 @@ def createArchive(
     references record which references are weak, and no schema says so.
     """
     if len(info.message_infos) != len(bodies):
-        raise IWAError(
-            f"Archive {info.identifier} declares {len(info.message_infos)} messages "
-            f"and was given {len(bodies)} bodies."
-        )
+        raise IWAError(composeFault(
+            f"Archive {info.identifier}", f"declares {len(info.message_infos)} "
+            f"messages and was given {len(bodies)} bodies", nothingWritten,
+        ))
     for declared, body in zip(info.message_infos, bodies, strict=True):
         declared.length = len(body)
     return Archive(
@@ -232,23 +242,24 @@ def splitFrames(data: bytes) -> list[bytes]:
     offset = 0
     while offset < len(data):
         if offset + frameHeaderLength > len(data):
-            raise IWAError(
-                f"Truncated frame header at byte {offset} of {len(data)}."
-            )
+            raise IWAError(composeRefusal(
+                f"The frame header at byte {offset}", f"is cut short by the end of "
+                f"the archive member, {len(data)} bytes long", notDone=nothingRead,
+            ))
         flag = data[offset]
         if flag != compressedFrameFlag:
-            raise IWAError(
-                f"Frame at byte {offset} has flag 0x{flag:02x}, which no Numbers file "
-                "has been seen to use."
-            )
+            raise IWAError(composeRefusal(
+                f"The frame at byte {offset}", f"has flag 0x{flag:02x}, which no "
+                "Numbers document has been seen to use", notDone=nothingRead,
+            ))
         compressedLength = int.from_bytes(data[offset + 1:offset + 4], "little")
         start = offset + frameHeaderLength
         end = start + compressedLength
         if end > len(data):
-            raise IWAError(
-                f"Frame at byte {offset} declares {compressedLength} bytes but only "
-                f"{len(data) - start} remain."
-            )
+            raise IWAError(composeRefusal(
+                f"The frame at byte {offset}", f"declares {compressedLength} bytes, "
+                f"and only {len(data) - start} remain", notDone=nothingRead,
+            ))
         frames.append(data[start:end])
         offset = end
     return frames
@@ -278,19 +289,21 @@ def readArchives(payload: bytes) -> list[Archive]:
         try:
             info.ParseFromString(infoBytes)
         except Exception as exc:
-            raise IWAError(
-                f"Could not parse ArchiveInfo of {infoLength} bytes at {offset}."
-            ) from exc
+            raise IWAError(composeRefusal(
+                f"The archive header at byte {offset}", f"holds {infoLength} bytes "
+                "that do not parse as an ArchiveInfo", notDone=nothingRead,
+            )) from exc
         offset += infoLength
 
         messages: list[ArchiveMessage] = []
         for messageInfo in info.message_infos:
             body = payload[offset:offset + messageInfo.length]
             if len(body) != messageInfo.length:
-                raise IWAError(
-                    f"Archive {info.identifier} declares a {messageInfo.length}-byte "
-                    f"message but only {len(body)} bytes remain."
-                )
+                raise IWAError(composeRefusal(
+                    f"Archive {info.identifier}", f"declares a "
+                    f"{messageInfo.length}-byte message, and only {len(body)} bytes "
+                    "remain", notDone=nothingRead,
+                ))
             messages.append(
                 ArchiveMessage(
                     typeId=messageInfo.type,
@@ -309,9 +322,10 @@ def readArchives(payload: bytes) -> list[Archive]:
         )
 
     if offset != len(payload):
-        raise IWAError(
-            f"Archive stream ended at {offset} of {len(payload)} bytes."
-        )
+        raise IWAError(composeRefusal(
+            "The archive stream", f"ends at byte {offset} of {len(payload)}, leaving "
+            "bytes no archive accounts for", notDone=nothingRead,
+        ))
     return archives
 
 
@@ -333,19 +347,17 @@ def writeArchiveInfo(archive: Archive) -> bytes:
     then only the `length` fields are altered.
     """
     if not archive.infoBytes:
-        raise IWAError(
-            f"Archive {archive.identifier} carries no ArchiveInfo, so it cannot be "
-            "written. Only an archive read from a file or built by `createArchive` "
-            "carries one."
-        )
+        raise IWAError(composeFault(
+            f"Archive {archive.identifier}", "carries no ArchiveInfo, so it cannot be "
+            "written", nothingWritten,
+        ))
     info = archiveMessages.ArchiveInfo()
     info.ParseFromString(archive.infoBytes)
     if len(info.message_infos) != len(archive.messages):
-        raise IWAError(
-            f"Archive {archive.identifier} declares {len(info.message_infos)} "
-            f"messages but holds {len(archive.messages)}. Adding or removing a "
-            "message is not supported."
-        )
+        raise IWAError(composeFault(
+            f"Archive {archive.identifier}", f"declares {len(info.message_infos)} "
+            f"messages and holds {len(archive.messages)}", nothingWritten,
+        ))
     lengths = [len(message.data) for message in archive.messages]
     if all(
         declared.length == actual
@@ -385,10 +397,10 @@ def compressPayload(payload: bytes) -> bytes:
     for start in range(0, max(len(payload), 1), uncompressedChunkLength):
         block = compressRaw(payload[start:start + uncompressedChunkLength])
         if len(block) >= 1 << 24:
-            raise IWAError(
-                f"A frame compressed to {len(block)} bytes, which will not fit the "
-                "three-byte length in its header."
-            )
+            raise IWAError(composeFault(
+                "A compressed frame", f"is {len(block)} bytes, too long for the "
+                "three-byte length in its header", nothingWritten,
+            ))
         out.append(compressedFrameFlag)
         out += len(block).to_bytes(3, "little")
         out += block
@@ -405,9 +417,9 @@ def writeIWAFile(iwaFile: IWAFile) -> bytes:
     """
     if not iwaFile.modified:
         if not iwaFile.originalBytes:
-            raise IWAError(
-                f"{iwaFile.name} has neither original bytes nor any recorded edit, "
-                "so there is nothing to write."
-            )
+            raise IWAError(composeFault(
+                iwaFile.name, "has neither original bytes nor any recorded edit, so "
+                "there is nothing to write", nothingWritten,
+            ))
         return iwaFile.originalBytes
     return compressPayload(writeArchives(iwaFile.archives))

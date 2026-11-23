@@ -2,7 +2,7 @@
 """\
 A table and its cells as the JSON form holds them, and the form built back into both.
 
-The table feature owns which names a cell shows, so `CellForm` holds exactly the
+The table feature owns which fields a cell shows, so `CellForm` holds exactly the
 public names of `Cell`, and rebuilding a cell sets the same private state the archive
 reader sets. A formula is written as its text, and as its nodes too when the text
 would not parse back to them, such as one holding typed whitespace. A formula whose
@@ -12,6 +12,7 @@ table names it was written with, so the cell's own names decide.
 Private. The JSON form's half of the table feature, beside `_read` and `_write`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  A cell carries `cellStyleComputed`, read-only, for PYB-291.
 2026-11-17  A cell's borders and a table's style, for PYB-266.
 2026-11-12  A cell's own cell style, one its save writes, for PYB-265.
@@ -38,11 +39,11 @@ from typing import ClassVar
 from pybers.absence import WITHHELD
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeRefusal
 from pybers.format.formats import CellFormatBase
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
-from pybers.interchange._leaves import JsonFormError
+from pybers.interchange._leaves import JsonFormError, composeFormRefusal
 from pybers.interchange._tree import jsonFormReadOnly
 from pybers.style.cells import CellStyle
 from pybers.style.strokes import Stroke
@@ -206,20 +207,25 @@ def addCell(table: Table, form: CellForm, path: str) -> None:
     """Give a table the cell a form describes, as the archive reader gives one."""
     backed = form.formulaText is not None
     if form.valueCached is not None and form.valueCached is not backed:
-        raise JsonFormError(
-            f"{path}.valueCached is {str(form.valueCached).lower()}, and the cell "
-            f"{'holds' if backed else 'holds no'} formula."
-        )
+        raise JsonFormError(composeRefusal(
+            f"{path}.valueCached", f"is {str(form.valueCached).lower()}, and the "
+            f"cell {'holds' if backed else 'holds no'} formula",
+        ))
     if form.value is None and not backed and form.kind not in valuelessKinds:
-        raise JsonFormError(f"{path} is a {form.kind} cell holding no value.")
-    if form.unrecognizedTypeCode is not None and form.kind is not CellKind.UNKNOWN:
         raise JsonFormError(
-            f"{path} names an unrecognized type code, and its kind is {form.kind}."
+            composeRefusal(path, f"is a {form.kind} cell holding no value")
         )
+    if form.unrecognizedTypeCode is not None and form.kind is not CellKind.UNKNOWN:
+        raise JsonFormError(composeRefusal(
+            path, "holds an unrecognized type code, and its kind is "
+            f"{form.kind}, not unknown",
+        ))
     try:
         cell = table.cell(form.address)
     except PybersError as exc:
-        raise JsonFormError(f"{path}: {exc}") from exc
+        raise composeFormRefusal(
+            path, f"does not read: {str(exc).removesuffix('.')}"
+        ) from exc
     cell._stored = CellStorage(
         form.kind, form.presentation, form.unrecognizedTypeCode, form.cellStyle
     )
@@ -244,24 +250,29 @@ def assignFormulas(table: Table, form: TableForm, path: str) -> None:
         text, formula = cellForm.formulaText, cellForm.formula
         if text is None:
             if isinstance(formula, Formula):
-                raise JsonFormError(
-                    f"{where} carries formula nodes and no formulaText."
-                )
+                raise JsonFormError(composeRefusal(
+                    where, "carries formula nodes and no formulaText",
+                    "Give the formulaText the nodes show",
+                ))
             continue
         if formula is None:
-            raise JsonFormError(f"{where} has formulaText and a formula of null.")
+            raise JsonFormError(
+                composeRefusal(where, "has formulaText and a formula of null")
+            )
         if isinstance(formula, Formula):
             cell.formula = formula
             if cell.formulaText != text:
-                raise JsonFormError(
-                    f"{where}: its nodes show {cell.formulaText!r}, and its "
-                    f"formulaText is {text!r}."
-                )
+                raise JsonFormError(composeRefusal(
+                    f"{where}.formulaText {text!r}", "differs from what its nodes "
+                    f"show, {cell.formulaText!r}",
+                ))
             continue
         try:
             cell.formulaSet(text)
         except PybersError as exc:
-            raise JsonFormError(f"{where}.formulaText: {exc}") from exc
+            raise composeFormRefusal(
+                f"{where}.formulaText", f"does not read: {str(exc).removesuffix('.')}"
+            ) from exc
 
 
 __all__ = [

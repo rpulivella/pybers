@@ -7,6 +7,7 @@ property is None while the cell inherits it from its table. Frozen, because Numb
 shares one style among every cell styled alike.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  `CellStyleProperty`, each property by its CSS name, and
             `updateCellStyles`, moved from the table's archive half, and
             `findUnwritablePart`, for PYB-290.
@@ -27,6 +28,7 @@ from decimal import Decimal
 from enum import StrEnum
 
 from pybers.color.colors import Color
+from pybers.errors import composeRefusal
 from pybers.style.fills import Fill, FillGradient, FillImage, FillNone
 
 # One length per side, in CSS order: top, right, bottom, left.
@@ -105,32 +107,48 @@ def findUnwritablePart(cellStyle: CellStyle) -> str | None:
     return "uneven padding" if isinstance(cellStyle.padding, tuple) else None
 
 
-def findCellStyleRefusal(cellStyle: CellStyle) -> str | None:
+def findCellStyleRefusal(
+    cellStyle: CellStyle, notDone: str | None = None
+) -> str | None:
     """Return why pybers cannot write a cell style, or None when it can."""
     background = cellStyle.background
     if isinstance(background, FillGradient | FillImage):
-        return (f"A {background.fillType} fill is read and carried, and pybers does "
-                "not yet write one.")
+        return composeRefusal(
+            f"A {background.fillType} fill", "is read and carried, and writing one is "
+            "not supported", notDone=notDone,
+        )
     if background is not None and not isinstance(background, Color | FillNone):
-        return (f"A cell's background is a Color or FillNone, and was given "
-                f"{type(background).__name__}.")
+        return composeRefusal(
+            f"The background {type(background).__name__}", "is not a Color or FillNone",
+            notDone=notDone,
+        )
     padding = cellStyle.padding
     if isinstance(padding, tuple):
-        return ("A cell's padding is one length for every side, the one value Numbers "
-                f"offers, and was given {len(padding)}.")
+        return composeRefusal(
+            f"A padding of {len(padding)} sides", "is not supported, since Numbers "
+            "offers one length for every side", "Give one length", notDone,
+        )
     if padding is not None and (
         isinstance(padding, bool) or not isinstance(padding, Decimal | int)
     ):
-        return (f"A cell's padding is a Decimal or an int number of points, and was "
-                f"given {type(padding).__name__}.")
+        return composeRefusal(
+            f"The padding {type(padding).__name__}",
+            "is not a Decimal or an int number of points", notDone=notDone,
+        )
     if padding is not None and padding < 0:
-        return f"A cell's padding cannot be negative, and was given {padding}."
+        return composeRefusal(
+            f"A padding of {padding}", "is negative, and a padding is 0 or more",
+            notDone=notDone,
+        )
     for name, kind in (("verticalAlign", CellStyleVerticalAlign),
                        ("textWrap", CellStyleTextWrap)):
         value = getattr(cellStyle, name)
         if value is not None and not isinstance(value, kind):
             choices = ", ".join(each.value for each in kind)
-            return f"A cell's {name} is one of {choices}, and was given {value!r}."
+            return composeRefusal(
+                f"The {name} {value!r}", f"is not a {kind.__name__}",
+                f"Give one of {choices}", notDone,
+            )
     return None
 
 

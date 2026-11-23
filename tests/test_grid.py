@@ -265,7 +265,7 @@ def testACellNamedWrongIsRefusedAndCreatesNothing(named: dict[str, object]) -> N
 
 
 def testACoveredPositionIsRefusedByNumberAsByAddress() -> None:
-    with pytest.raises(ReferenceError, match="anchor is A2"):
+    with pytest.raises(ReferenceError, match="Select its anchor, A2"):
         openMergedTable().cell(row=3, col=1)
 
 

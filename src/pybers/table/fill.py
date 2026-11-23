@@ -6,12 +6,13 @@ block in any direction takes the source cell at the matching position, and the
 block itself keeps what it holds. Everything is checked before any cell changes,
 so a refused fill leaves the table exactly as it was.
 
-Each filled cell names the record of the cell it copied, which a save duplicates
+Each filled cell refers to the record of the cell it copied, which a save duplicates
 whole, so a record's style, format and highlighting fill with its value. Numbers'
 drag repeats the same way except where a column continues a series, the case
 `CONTINUE_SERIES` covers, in any one direction. See findings-03-structure.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  A copy no longer says whether borders go with it, since the table's
             borders follow a paste and ignore a fill, for PYB-266.
 2026-11-13  A copy takes the cell style its source asked for, for PYB-265.
@@ -40,6 +41,7 @@ from typing import TYPE_CHECKING
 from pybers.addressing.ranges import CellRange, CellRangeLike
 from pybers.addressing.reference import CellAddress
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeChoiceRefusal, composeRefusal, nothingWritten
 from pybers.formula.relocation import FormulaReferenceRelocation, relocateFormula
 from pybers.table.bounds import listRangePositions
 from pybers.table.kinds import CellKind
@@ -65,13 +67,13 @@ class CellValueFill(StrEnum):
 
 
 def toValueRule(values: str) -> CellValueFill:
-    """Return the value rule a caller named, refusing one not yet supported."""
+    """Return the value rule a caller specified, refusing one pybers lacks."""
     try:
         rule = CellValueFill(values)
     except ValueError as exc:
-        spelled = ", ".join(repr(rule.value) for rule in CellValueFill)
-        raise ReferenceError(
-            f"{values!r} is not a value rule. A fill names one of {spelled}."
+        raise composeChoiceRefusal(
+            ReferenceError, values, "a value rule",
+            [each.value for each in CellValueFill], nothingWritten,
         ) from exc
     return rule
 
@@ -80,10 +82,10 @@ def refuseMergeInBlock(table: Table, extent: CellRange) -> None:
     """Refuse a source block holding any part of a merge, which a fill cannot copy."""
     for merge in table.mergeRanges:
         if any(extent.covers(reference) for reference in merge.extent):
-            raise ReferenceError(
-                f"{extent} holds part of the merge {merge.extent}, and a fill copies "
-                "no merge."
-            )
+            raise ReferenceError(composeRefusal(
+                str(extent), f"holds part of the merge {merge.extent}, and a fill "
+                "copies no merge", notDone=nothingWritten,
+            ))
 
 
 def findSourcePosition(extent: CellRange, target: CellAddress) -> CellAddress:
@@ -107,10 +109,11 @@ def findSeriesValues(
     down = all(left <= target.col <= right for target in targets)
     across = all(top <= target.row <= bottom for target in targets)
     if not (down or across):
-        raise ReferenceError(
-            f"A series continues down or up the columns of {extent}, or along its "
-            "rows, and the range asks for both."
-        )
+        raise ReferenceError(composeRefusal(
+            f"A series from {extent}", "would continue both along its rows and down "
+            "its columns, and a series continues one way",
+            "Fill in line with the block", nothingWritten,
+        ))
     lines = (
         [[CellAddress(row, column) for row in range(top, bottom + 1)]
          for column in range(left, right + 1)]
@@ -138,7 +141,7 @@ def findSeriesValues(
 
 
 def copyCellContent(target: Cell, source: Cell, namedCell: bool) -> None:
-    """Give a cell everything another holds, its formulas under the rule named."""
+    """Give a cell everything another holds, its formulas under the rule specified."""
     from pybers.table.cell import CellCopy
 
     target._value = source._value

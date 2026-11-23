@@ -21,6 +21,7 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  `cellStyleUpdate` and `cellStylePropertyRemove` change part of a cell's
             style, sharing `cellSet`'s write, for PYB-290.
 2026-11-19  `cellSet` writes through `_cellsWrite`, which composes each cell's style,
@@ -39,7 +40,7 @@ UPDATES
 2026-10-28  `localeSet`, a change of language and region, for PYB-272.
 2026-10-27  `localeIdentifier`, the language and region a document shows its
             values in, for PYB-272.
-2026-10-27  `partSelect`, the sheet, table, range or cell a selector names, and
+2026-10-27  `partSelect`, the sheet, table, range or cell a selector selects, and
             every refusal listing names quoting each, for PYB-260.
 2026-10-24  The unread `graphicalObjects` scaffold removed, and the table naming
             rule a function the JSON form shares, and `_ownersLink` the one
@@ -101,6 +102,8 @@ from pybers.errors import (
     PybersError,
     WriteError,
     composeChoiceRefusal,
+    composeRefusal,
+    composeWithheldRefusal,
     nothingWritten,
 )
 from pybers.format._check import (
@@ -173,23 +176,15 @@ class Named(Protocol):
     name: str
 
 
-def listPresent(kind: str, names: Sequence[str]) -> str:
-    """Return the sentence ending a refusal with the names present, to ask for one."""
-    if not names:
-        return f"It holds no {kind}s."
-    quoted = ", ".join(quoteReferenceText(name) for name in names)
-    return f"The {kind}s are {quoted}."
-
-
 def selectByPosition[NamedT: Named](
     items: Sequence[NamedT], position: int, kind: str, within: str
 ) -> NamedT:
     """Return the item at a one-based position in the file's own order."""
     if position < firstPosition or position > len(items) + firstPosition - 1:
-        raise SelectionError(
-            f"Position {position} is outside {within}, which holds {len(items)} "
-            f"{kind}s. Positions count from {firstPosition}."
-        )
+        raise SelectionError(composeRefusal(
+            f"Position {position}", f"is outside {within}, which holds {len(items)} "
+            f"{kind}s, counted from one",
+        ))
     return items[position - firstPosition]
 
 
@@ -199,10 +194,10 @@ def refuseUnnamed(nameOrPosition: object, kind: str) -> None:
         return
     if isinstance(nameOrPosition, int) and not isinstance(nameOrPosition, bool):
         return
-    raise SelectionError(
-        f"A {kind} is reached by its name or by its position, and "
-        f"{nameOrPosition!r} is neither."
-    )
+    raise SelectionError(composeRefusal(
+        repr(nameOrPosition), f"is neither a {kind}'s name nor its position",
+        "Give a name as text, or a position as a whole number from one",
+    ))
 
 
 def findTableIdentities(
@@ -285,24 +280,27 @@ class Sheet:
         sheet carries, ignoring case, takes the first free `-1`, `-2` suffix.
         """
         if not isinstance(name, str) or not name:
-            raise SelectionError(
-                f"A table is added under a name, and {name!r} is none."
-            )
-        for axis, count, limit in (("rows", rows, lastRow), ("cols", cols, lastColumn)):
+            raise SelectionError(composeRefusal(
+                repr(name), "is not a table name", "Give a name of one character or "
+                "more", nothingWritten,
+            ))
+        for axis, count, limit in (
+            ("rows", rows, lastRow), ("columns", cols, lastColumn)
+        ):
             if (
                 not isinstance(count, int)
                 or isinstance(count, bool)
                 or not firstPosition <= count <= limit
             ):
-                raise SelectionError(
-                    f"A table holds from {firstPosition} to {limit} {axis}, and "
-                    f"{count!r} is not a count in that range."
-                )
+                raise SelectionError(composeRefusal(
+                    f"A count of {count!r} {axis}", f"is outside the one to {limit} "
+                    "a table holds", notDone=nothingWritten,
+                ))
         if position is not None and not isinstance(position, Position):
-            raise SelectionError(
-                f"A table is placed at a `pybers.Position`, and {position!r} is "
-                "not one."
-            )
+            raise SelectionError(composeRefusal(
+                repr(position), "is not a place on a sheet",
+                "Give a `pybers.Position`", nothingWritten,
+            ))
         taken = {table.name.casefold() for table in self.tables}
         unique = name
         suffix = 0
@@ -452,9 +450,10 @@ class Document:
         sheet reaches the file when the document is saved.
         """
         if not isinstance(name, str) or not name:
-            raise SelectionError(
-                f"A sheet is added under a name, and {name!r} is none."
-            )
+            raise SelectionError(composeRefusal(
+                repr(name), "is not a sheet name", "Give a name of one character or "
+                "more", nothingWritten,
+            ))
         last = len(self.sheets) + firstPosition
         if position is None:
             position = last
@@ -463,10 +462,10 @@ class Document:
             or isinstance(position, bool)
             or not firstPosition <= position <= last
         ):
-            raise SelectionError(
-                f"A sheet is added at a position from {firstPosition} to {last}, and "
-                f"{position!r} is not one."
-            )
+            raise SelectionError(composeRefusal(
+                f"Position {position!r}", f"is outside the one to {last} a sheet is "
+                "added at", notDone=nothingWritten,
+            ))
         sheet = Sheet(name=name, document=self)
         self.sheets.insert(position - firstPosition, sheet)
         return sheet
@@ -490,18 +489,19 @@ class Document:
         falls back to Automatic for that cell and says so.
         """
         if all(part is UNCHANGED for part in (value, format, control, cellStyle)):
-            raise WriteError(
-                "cellSet was given no value, format, control or cell style to set."
-            )
+            raise WriteError(composeRefusal(
+                "The write", "sets no value, format, control or cell style",
+                "Give at least one", nothingWritten,
+            ))
         if cellStyle is not UNCHANGED and cellStyle is not None:
             if not isinstance(cellStyle, CellStyle):
-                raise WriteError(
-                    f"A cell style is a CellStyle or None, and cellSet was given "
-                    f"{type(cellStyle).__name__}. Nothing was written."
-                )
-            refusal = findCellStyleRefusal(cellStyle)
+                raise WriteError(composeRefusal(
+                    f"A {type(cellStyle).__name__}", "is not a cell style",
+                    "Give a `CellStyle`, or None to remove one", nothingWritten,
+                ))
+            refusal = findCellStyleRefusal(cellStyle, nothingWritten)
             if refusal is not None:
-                raise WriteError(f"{refusal} Nothing was written.")
+                raise WriteError(refusal)
         return self._cellsWrite(
             selector, value, format=format, control=control,
             cellStyleCompose=(
@@ -545,10 +545,7 @@ class Document:
             )
             where = CellReference(address.row, address.col, table=table.reference)
             if control is not UNCHANGED and control is not None:
-                raise WriteError(
-                    f"{findControlRefusal(cell, where, control, asked, after)} Nothing "
-                    "was written."
-                )
+                raise WriteError(findControlRefusal(cell, where, control, asked, after))
             controlAfter = (
                 (None if cell is None else cell.presentation.control)
                 if control is UNCHANGED else control
@@ -556,7 +553,7 @@ class Document:
             if asked is not UNCHANGED:
                 misfit = findFormatMisfit(cell, where, asked, after)
                 if misfit is not None and conflict is CellFormatConflict.REFUSE:
-                    raise WriteError(f"{misfit} Nothing was written.")
+                    raise WriteError(misfit)
                 if misfit is not None:
                     asked = CellFormatAutomatic()
                     skipped.append(CellSkip(
@@ -565,15 +562,15 @@ class Document:
                     ))
                 refusal = findFormatRefusal(cell, where, asked, after, controlAfter)
                 if refusal is not None:
-                    raise WriteError(f"{refusal} Nothing was written.")
+                    raise WriteError(refusal)
             if cellStyleCompose is not UNCHANGED:
                 composed = cellStyleCompose(None if cell is None else cell.cellStyle)
                 part = None if composed is None else findUnwritablePart(composed)
                 if part is not None:
-                    raise WriteError(
-                        f"{where} has {part}, which pybers cannot write, so set its "
-                        "whole style instead. Nothing was written."
-                    )
+                    raise WriteError(composeRefusal(
+                        str(where), f"holds {part}, and writing it is not supported",
+                        "Set its whole style instead", nothingWritten,
+                    ))
             writing.append((table, address, asked))
         changes: list[CellChange] = []
         for table, address, asked in writing:
@@ -616,18 +613,18 @@ class Document:
         each cell states, as `dict.update` keeps a key it is not given.
         """
         if not isinstance(cellStyle, CellStyle):
-            raise WriteError(
-                f"cellStyleUpdate takes a CellStyle, and was given "
-                f"{type(cellStyle).__name__}. Nothing was written."
-            )
+            raise WriteError(composeRefusal(
+                f"A {type(cellStyle).__name__}", "is not a cell style",
+                "Give a `CellStyle`", nothingWritten,
+            ))
         if cellStyle == CellStyle():
-            raise WriteError(
-                "cellStyleUpdate was given a style stating no property, so it has "
-                "nothing to change. Nothing was written."
-            )
-        refusal = findCellStyleRefusal(cellStyle)
+            raise WriteError(composeRefusal(
+                "The cell style given", "states no property, so it changes nothing",
+                "State at least one property", nothingWritten,
+            ))
+        refusal = findCellStyleRefusal(cellStyle, nothingWritten)
         if refusal is not None:
-            raise WriteError(f"{refusal} Nothing was written.")
+            raise WriteError(refusal)
         return self._cellsWrite(
             selector, UNCHANGED, format=UNCHANGED, control=UNCHANGED,
             cellStyleCompose=lambda own: (
@@ -680,24 +677,23 @@ class Document:
                 [each.value for each in CellBorderPosition], nothingWritten,
             )
         if style is not None and not isinstance(style, CellBorderStyle):
-            choices = ", ".join(each.value for each in CellBorderStyle)
-            raise WriteError(
-                f"A cell border's style is one of {choices}, or None to remove it, and "
-                f"cellBordersSet was given {style!r}. Nothing was written."
+            raise composeChoiceRefusal(
+                WriteError, style, "a border style",
+                [each.value for each in CellBorderStyle], nothingWritten,
             )
         if style in (None, CellBorderStyle.HIDDEN) and (
             width is not None or color is not None
         ):
             effect = "removes the borders" if style is None else "draws no line"
-            raise WriteError(
-                f"A style of {style} {effect}, so it takes no width or color. Nothing "
-                "was written."
-            )
+            raise WriteError(composeRefusal(
+                f"A style of {style}", f"{effect}, so it takes no width or color",
+                "Leave out the width and the color", nothingWritten,
+            ))
         if isinstance(width, bool) or not isinstance(width, Decimal | int | None):
-            raise WriteError(
-                f"A border's width is a Decimal or an int number of points, and "
-                f"cellBordersSet was given {width!r}. Nothing was written."
-            )
+            raise WriteError(composeRefusal(
+                repr(width), "is not a border width",
+                "Give a number of points as a `Decimal` or an `int`", nothingWritten,
+            ))
         if style is not None:
             try:
                 stroke = buildBorderStroke(
@@ -705,7 +701,9 @@ class Document:
                     Color.black if color is None else color,
                 )
             except StrokeError as exc:
-                raise WriteError(f"{exc} Nothing was written.") from exc
+                raise WriteError(
+                    composeWithheldRefusal(str(exc), nothingWritten)
+                ) from exc
         table, block = findBlockTarget(self, selector, "border")
         block = findMergedBlock(table, block)
         before = {
@@ -729,7 +727,7 @@ class Document:
         return CellChanges(tuple(changes))
 
     def tableFind(self, identity: str) -> Table:
-        """Return the table a formula names by identity, or raise saying which.
+        """Return the table a formula reaches by identity, or raise saying which.
 
         The reverse of `Sheet.tableIdentities`, and the reason renaming a table cannot
         break a formula pointing into it: the archive stores this, never the name.
@@ -740,9 +738,9 @@ class Document:
 
         table = indexTablesByIdentity(self).get(identity)
         if table is None:
-            raise SelectionError(
-                f"No table in this document carries the identity {identity!r}."
-            )
+            raise SelectionError(composeRefusal(
+                f"The identity {identity!r}", "belongs to no table in this document"
+            ))
         return table
 
     def _ownersLink(self) -> None:

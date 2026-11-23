@@ -87,7 +87,7 @@ def testASharedTableNameIsRefusedWithTheNamesThatMatch(
 ) -> None:
     with pytest.raises(pybers.SelectionError) as raised:
         document.table("Table 1")
-    assert "'Sheet 1::Table 1', 'Sheet 2::Table 1'" in str(raised.value)
+    assert "'Sheet 1::Table 1' and 'Sheet 2::Table 1'" in str(raised.value)
 
 
 def testEachTableTheSharedNameRefusalOffersIsReachedByItsText(
@@ -122,7 +122,7 @@ def testAnUnknownTableIsRefusedWithTheTablesThatExist(
 ) -> None:
     with pytest.raises(pybers.SelectionError) as raised:
         document.table("Ledger")
-    assert str(raised.value).startswith("No table in this document is named 'Ledger'.")
+    assert str(raised.value).startswith("'Ledger' selects no table in this document.")
     assert "'Sheet 1::Table 2'" in str(raised.value)
 
 
@@ -130,8 +130,8 @@ def testNoSheetNamedIsRefusedWhenThereAreSeveral(document: pybers.Document) -> N
     with pytest.raises(pybers.SelectionError) as raised:
         document.sheet()
     assert str(raised.value) == (
-        "No sheet was named, and this document holds 2. Name one. The sheets are "
-        "'Sheet 1', 'Sheet 2'."
+        "This document holds 2 sheets, and no sheet was named. Name one of the "
+        "sheets, 'Sheet 1' and 'Sheet 2'."
     )
 
 
@@ -149,7 +149,7 @@ def testNoNameReachesTheOnlySheetAndTheOnlyTable() -> None:
 
 
 def testASheetWithNoTableRefusesNoNameSayingSo() -> None:
-    with pytest.raises(pybers.SelectionError, match="holds none"):
+    with pytest.raises(pybers.SelectionError, match="holds no table"):
         pybers.create("en_US").sheet().table()
 
 
@@ -162,7 +162,7 @@ def testASheetRefusesATableItDoesNotHold(document: pybers.Document) -> None:
     with pytest.raises(pybers.SelectionError) as raised:
         document.sheet("Sheet 2").table("Table 2")
     assert str(raised.value) == (
-        "No table in 'Sheet 2' is named 'Table 2'. The tables are 'Table 1'."
+        "'Table 2' selects no table in 'Sheet 2'. The tables are 'Table 1'."
     )
 
 
@@ -177,7 +177,7 @@ def testATableTakesItsOwnQualifiedReference(document: pybers.Document) -> None:
 
 
 def testATableRefusesAReferenceNamingAnotherTable(document: pybers.Document) -> None:
-    with pytest.raises(pybers.ReferenceError, match="names another table"):
+    with pytest.raises(pybers.ReferenceError, match="selects a table other than"):
         document.sheet("Sheet 1").table("Table 2").cell("Table 1::A1")
 
 

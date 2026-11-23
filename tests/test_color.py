@@ -3,6 +3,7 @@
 A color: its fields, its text form, its JSON form, and every color the documents hold.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-06  Written for PYB-264.
 """
 from __future__ import annotations
@@ -413,13 +414,14 @@ def testACommandReadsAColorFromItsText() -> None:
 def testAModelNumbersStoresNoneOfIsRefusedNamingWhatItStores(
     text: str, model: str
 ) -> None:
-    with pytest.raises(ColorError, match=f"no {model} color") as caught:
+    refusal = f"is in {model}, which Numbers does not store"
+    with pytest.raises(ColorError, match=refusal) as caught:
         Color.parse(text)
     assert "RGB" in str(caught.value)
 
 
 def testColorFunctionRefusesASpaceOnlyTheDeviceFormsSpecify() -> None:
-    with pytest.raises(ColorError, match="srgb or display-p3"):
+    with pytest.raises(ColorError, match="srgb and display-p3"):
         Color.parse("color(device-gray 0.5 / 1)")
 
 

@@ -5,7 +5,7 @@ claimed and released.
 
 A format, a style, a pooled string, a formula, a control and a rich-text payload
 each sit in a `TST.TableDataList` whose entries carry a refcount of the records
-naming them. Numbers points every cell holding the same value at ONE entry, so a
+specifying them. Numbers points every cell holding the same value at ONE entry, so a
 shared entry is never overwritten: changing one cell that shares an entry with six
 others must not rewrite all seven, the same aliasing hazard the frozen model closes
 on the read side.
@@ -13,6 +13,7 @@ on the read side.
 Private. Used by the table and formula features' archive halves.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  Written for PYB-278, from the string, formula, format and style pools.
 """
 from __future__ import annotations
@@ -29,7 +30,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
 from .._generated import TSTArchives_pb2 as tst
-from ..errors import WriteError
+from ..errors import WriteError, composeRefusal, nothingWritten
 from .cells import CellRecord
 from .rows import StoredTiles
 
@@ -38,9 +39,9 @@ type ListEntry = tst.TableDataList.ListEntry
 
 @dataclass(slots=True)
 class EntryPool[Value]:
-    """A table's list of one kind of entry, each claimed by the records naming it.
+    """A table's list of one kind of entry, each claimed by the records specifying it.
 
-    `stored` holds the value each live key names, for sharing, and `write` puts a
+    `stored` holds the value each live key specifies, for sharing, and `write` puts a
     value into an entry, None for a list pybers only counts. `spend` empties an
     entry released to 0 at once, where a list without one keeps the entry for
     `spentRemove` to decide at the end of the save, so a value written later in the
@@ -89,8 +90,8 @@ class EntryPool[Value]:
         **Sharing is the only path, and that is what makes filling a column correct.**
         A relative formula resolves against whichever cell holds it, so one entry
         serves every cell into which it was dragged. `previous` is the key the cell
-        names now, released when it stops naming it, and rewritten in place only when
-        no other cell names it.
+        specifies now, released when it stops specifying it, and rewritten in place
+        only when no other cell specifies it.
         """
         self.touched = True
         key = self.keyFind(value)
@@ -114,9 +115,10 @@ class EntryPool[Value]:
         """Add claims on a stored entry, refusing one the list does not hold."""
         entry = self.entryFind(key)
         if entry is None:
-            raise WriteError(
-                f"{where} would name {self.noun} {key}, which its table does not hold."
-            )
+            raise WriteError(composeRefusal(
+                where, f"refers to {self.noun} {key}, which its table does not hold",
+                notDone=nothingWritten,
+            ))
         self.touched = True
         entry.refcount += count
 
@@ -135,12 +137,12 @@ class EntryPool[Value]:
     def spentRemove(
         self, tiles: StoredTiles, claims: Callable[[CellRecord], Iterable[int]]
     ) -> set[int]:
-        """Remove each entry this save released to 0 that no record still names.
+        """Remove each entry this save released to 0 that no record still specifies.
 
         Numbers removes such an entry on save, measured for a format in
         `54c-format-star-rating-cleared` and a string in `54b`. A count Numbers wrote
         can already undercount its cells, so the records are read rather than the
-        count trusted: removing an entry a cell still names would orphan it.
+        count trusted: removing an entry a cell still specifies would orphan it.
         Returns the keys removed.
         """
         spent = {

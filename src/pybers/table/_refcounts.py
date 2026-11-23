@@ -11,6 +11,7 @@ an `EntryPool`, which keys, claims and releases its entries.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-12  `claimStyles`, the styles a record from a borrowed shape names, for
             PYB-265.
 2026-10-29  Every list is an `EntryPool`, for PYB-278.
@@ -45,7 +46,7 @@ from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from .._persistence.pool import EntryPool, ListEntry
 from .._persistence.rows import StoredTiles
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, nothingWritten
 from ._read import readStringTable
 
 # A pooled string cell holds a four-byte key where a number holds sixteen bytes of
@@ -183,10 +184,10 @@ def copyRichText(registry: PackageRegistry, pool: EntryPool[int], key: int) -> i
     index = registry.index
     source = pool.entryFind(key)
     if source is None:
-        raise WriteError(
-            f"A copied record would name rich text {key}, which its table does not "
-            "hold."
-        )
+        raise WriteError(composeFault(
+            "A copied record", f"refers to rich text {key}, which its table does not "
+            "hold", nothingWritten,
+        ))
     payload = tst.RichTextPayloadArchive()
     payload.CopyFrom(
         index.resolve(source.rich_text_payload, tst.RichTextPayloadArchive)

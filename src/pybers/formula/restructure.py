@@ -12,6 +12,7 @@ its first rows when a row goes in at 10. A reference whose lines are all removed
 becomes `#REF!` and records the lines it lost, as Numbers does.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  A restructure walks the nodes through `mapFormulaNodes`, for PYB-278.
 2026-09-21  Both axes follow a mapping, so several edits combined are followed
             too, which is what the archive half holds, for PYB-17.
@@ -32,6 +33,7 @@ from dataclasses import dataclass
 
 from pybers.addressing.lines import LineMapping
 from pybers.addressing.reference import CellAddress
+from pybers.errors import composeFault
 from pybers.formula.nodes import (
     Coordinate,
     Formula,
@@ -51,7 +53,7 @@ class FormulaRestructure:
 
     `rows` and `columns` say where each line of the edited table lands, one edit
     or several combined. `hostEdited` says the formula lives in that table, and
-    `targetTable` names it the way a reference does, so a local reference matches
+    `targetTable` specifies it the way a reference does, so a local reference matches
     it only from inside. The identities are its lines before the change, which is
     what a broken reference records.
     """
@@ -65,7 +67,7 @@ class FormulaRestructure:
     columnIdentities: Sequence[int]
 
     def targets(self, tableId: str | None) -> bool:
-        """Report whether a reference naming this table reaches the edited one."""
+        """Report whether a reference specifying this table reaches the edited one."""
         if tableId is None:
             return self.hostEdited
         return tableId == self.targetTable
@@ -118,9 +120,9 @@ def mapHostLine(line: int, lines: LineMapping, change: FormulaRestructure) -> in
         return line
     moved = lines.lineMap(line)
     if moved is None:
-        raise RuntimeError(
-            f"Line {line} is removed, and a removed cell has no formula to move."
-        )
+        raise RuntimeError(composeFault(
+            f"Line {line}", "is removed, and a removed cell has no formula to move"
+        ))
     return moved
 
 
@@ -206,10 +208,10 @@ def findReferenceLoss(
     host: CellAddress,
     change: FormulaRestructure,
 ) -> FormulaReference:
-    """Return the broken reference a lost one becomes, naming every line it covered.
+    """Return the broken reference a lost one becomes, specifying every line it covered.
 
-    A broken range names its own table even from inside it, as `56c` wrote one. An
-    axis the reference never named breaks as locked, as a whole-column rule's row
+    A broken range specifies its own table even from inside it, as `56c` wrote one. An
+    axis the reference never specified breaks as locked, as a whole-column rule's row
     did in `59-conditions-relative-column-a-deleted`.
     """
     if isinstance(content, FormulaRange):
@@ -232,7 +234,7 @@ def findReferenceLoss(
     return FormulaReference(tableId=content.tableId, broken=True, loss=loss)
 
 
-# The identity a broken reference records for an axis it never named, as a
+# The identity a broken reference records for an axis it never specified, as a
 # whole-column highlighting rule recorded its row in
 # `59-conditions-relative-column-a-deleted`.
 unnamedLineIdentity: int = 0
@@ -241,7 +243,7 @@ unnamedLineIdentity: int = 0
 def findLineIdentity(
     coordinate: Coordinate | None, hostLine: int, identities: Sequence[int]
 ) -> tuple[int, ...]:
-    """Return the identity of the line a coordinate names, or a zero when unbounded."""
+    """Return the identity of the line a coordinate selects, or zero when unbounded."""
     if coordinate is None:
         return (unnamedLineIdentity,)
     return (identities[coordinate.resolve(hostLine) - 1],)

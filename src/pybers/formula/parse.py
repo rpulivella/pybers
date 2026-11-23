@@ -21,6 +21,7 @@ the first of the four functions that evaluate lazily, and a person types none of
 that. See `thunkingFunctionIndices`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-13  TRUE and FALSE without brackets are boolean literals, for PYB-139.
 2026-09-11  A bracket becomes the node Numbers stores for one, for #67.
 2026-09-08  Written for #45.
@@ -143,10 +144,12 @@ class Parser:
             return None
         return self.take()
 
-    def fail(self, message: str, token: Token | None = None) -> FormulaSyntaxError:
+    def fail(
+        self, cause: str, token: Token | None = None, fix: str | None = None
+    ) -> FormulaSyntaxError:
         """Return the error to raise, pointing at the token that could not be used."""
         return FormulaSyntaxError(
-            message, self.text, (token or self.peek()).position
+            cause, self.text, (token or self.peek()).position, fix
         )
 
     def emit(self, nodeType: int, content: NodeContent = None) -> None:
@@ -156,10 +159,12 @@ class Parser:
     def parse(self) -> Formula:
         """Parse the whole text, refusing anything left over at the end."""
         if self.peek().kind == "end":
-            raise self.fail("The formula is empty.")
+            raise self.fail("is empty", fix="Write an expression after the equals sign")
         self.parseExpression()
         if self.peek().kind != "end":
-            raise self.fail("This is left over after a complete formula.")
+            raise self.fail(
+                "continues past a complete formula", fix="Remove what follows it"
+            )
         return Formula(nodes=tuple(self.nodes))
 
     def parseExpression(self) -> None:
@@ -171,8 +176,7 @@ class Parser:
         """
         if self.depth >= nestingLimit:
             raise self.fail(
-                f"This nests more than {nestingLimit} levels deep, which is "
-                "further than this parser goes."
+                f"nests more than {nestingLimit} levels deep, which is not supported"
             )
         self.depth += 1
         self.parseComparison()
@@ -253,7 +257,9 @@ class Parser:
             try:
                 self.emit(numberNodeType, Decimal(token.text))
             except InvalidOperation as exc:
-                raise self.fail("This is not a number.", token) from exc
+                raise self.fail(
+                    f"holds {token.text!r}, which is not a number", token
+                ) from exc
             return
         if token.kind == "string":
             self.emit(stringNodeType, unquote(token.text))
@@ -267,7 +273,9 @@ class Parser:
         if token.kind == "open":
             self.parseExpression()
             if self.accept("close") is None:
-                raise self.fail("This bracket is opened and never closed.", token)
+                raise self.fail(
+                    "opens a bracket that is never closed", token, "Close it with `)`"
+                )
             # Recorded rather than discarded, because Numbers records it: a bracket
             # precedence does not need survives a round trip through Numbers itself.
             self.emit(listNodeType, FormulaGroup())
@@ -275,7 +283,7 @@ class Parser:
         if token.kind in ("name", "address"):
             self.parseNamed(token)
             return
-        raise self.fail("A value belongs here.", token)
+        raise self.fail("is missing a value", token)
 
     def parseNamed(self, token: Token) -> None:
         """Parse what a word introduced: a call, a bound value, or an address."""
@@ -301,9 +309,10 @@ class Parser:
         if piece is None:
             offered = ", ".join(sorted(repr(name) for name in self.pieces))
             raise self.fail(
-                f"No address was given for {token.text!r}. "
-                f"Given: {offered or 'nothing'}.",
+                f"holds the placeholder {token.text!r}, and no address was given "
+                "for it",
                 token,
+                f"The placeholders given are {offered}" if offered else None,
             )
         if isinstance(piece, CellReference):
             self.emit(
@@ -320,16 +329,19 @@ class Parser:
         )
 
     def emitAddress(self, token: Token) -> None:
-        """Emit the reference or the range an address names, from where it sits.
+        """Emit the reference or the range an address selects, from where it sits.
 
         The addressing error travels out with its own words: it already says that
-        `A0` names row zero and that rows count from one, and replacing that with
+        `A0` selects row zero and that rows count from one, and replacing that with
         a summary would hide the one thing the writer needs to know.
         """
         try:
             extent = CellRange.parse(token.text)
         except ReferenceError as exc:
-            raise self.fail(str(exc), token) from exc
+            raise self.fail(
+                f"holds an address that does not read: {str(exc).removesuffix('.')}",
+                token,
+            ) from exc
         tableId = resolveQualifierIdentity(token, self.tables, self.text)
         # A colon is what tells a range from a reference, rather than the shape it
         # covers: Numbers writes a tract for `A1:A1` and a coordinate for `A1`.
@@ -344,7 +356,10 @@ class Parser:
     def parseCall(self, token: Token) -> None:
         """Parse a call, dispatching the two the format stores as node types."""
         if token.qualifier:
-            raise self.fail("A function is not reached through a table.", token)
+            raise self.fail(
+                "calls a function through a table, which no function is", token,
+                f"Remove {token.qualifier!r}",
+            )
         name = token.text.upper()
         if name == letName:
             self.parseLet(token)
@@ -405,7 +420,9 @@ class Parser:
     ) -> int:
         """Parse a bracketed argument list and return how many arguments it held."""
         if self.accept("open") is None:
-            raise self.fail("A call opens with a bracket.", token)
+            raise self.fail(
+                f"calls {token.text} with no bracket", token, "Write `(` after it"
+            )
         if self.accept("close") is not None:
             return 0
         count = 0
@@ -416,7 +433,10 @@ class Parser:
                 continue
             if self.accept("close") is not None:
                 return count
-            raise self.fail("An argument list wants a comma or a bracket.")
+            raise self.fail(
+                "continues an argument list with neither a comma nor a bracket",
+                fix="Separate the arguments with `,` and close the list with `)`",
+            )
 
     def bind(self, name: str) -> int:
         """Give a name its number, which is what every use of it carries.
@@ -436,15 +456,23 @@ class Parser:
         it is about to bind reads the outer one, which is what a scope means.
         """
         if self.accept("open") is None:
-            raise self.fail("A call opens with a bracket.", token)
+            raise self.fail(
+                f"calls {token.text} with no bracket", token, "Write `(` after it"
+            )
         outer = dict(self.bound)
         first = True
         while True:
             name = self.accept("name")
             if name is None:
-                raise self.fail("`LET` names a value before it gives it one.")
+                raise self.fail(
+                    "is missing the name `LET` binds",
+                    fix="Write a name before each value",
+                )
             if self.accept("comma") is None:
-                raise self.fail("`LET` wants a value after the name it binds.")
+                raise self.fail(
+                    "is missing the value `LET` binds",
+                    fix="Write `,` and a value after the name",
+                )
             self.parseExpression()
             # Bound after its own value is parsed, so a value naming the name it
             # is about to bind reads the outer one.
@@ -458,7 +486,10 @@ class Parser:
             )
             first = False
             if self.accept("comma") is None:
-                raise self.fail("`LET` wants a body after the values it binds.")
+                raise self.fail(
+                    "is missing the body of `LET`",
+                    fix="Write `,` and an expression after the last value",
+                )
             # A name where the body belongs is another pair, since `LET` takes as
             # many as it is given and only the last argument is the body.
             if self.peek().kind == "name" and self.tokens[
@@ -468,14 +499,18 @@ class Parser:
             break
         self.parseExpression()
         if self.accept("close") is None:
-            raise self.fail("`LET` is opened and never closed.", token)
+            raise self.fail(
+                "opens `LET` and never closes it", token, "Close it with `)`"
+            )
         self.emit(endScopeNodeType)
         self.bound = outer
 
     def parseLambda(self, token: Token) -> None:
         """Parse `LAMBDA(name, ..., body)`, whose parameters precede its body."""
         if self.accept("open") is None:
-            raise self.fail("A call opens with a bracket.", token)
+            raise self.fail(
+                f"calls {token.text} with no bracket", token, "Write `(` after it"
+            )
         outer = dict(self.bound)
         names: list[str] = []
         firstSymbol = 0
@@ -495,7 +530,9 @@ class Parser:
         else:
             self.parseExpression()
         if self.accept("close") is None:
-            raise self.fail("`LAMBDA` is opened and never closed.", token)
+            raise self.fail(
+                "opens `LAMBDA` and never closes it", token, "Close it with `)`"
+            )
         self.emit(endLambdaThunkNodeType)
         self.emit(
             lambdaNodeType,

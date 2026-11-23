@@ -247,7 +247,7 @@ def test_savingIsRepeatableAndLeavesTheDocumentUsable(tmp_path: Path) -> None:
 
 def test_savingADocumentBuiltInMemoryWithNoPathIsRefused() -> None:
     """A document built in memory is created on save, which needs a path to land at."""
-    with pytest.raises(WriteError, match="nowhere to save"):
+    with pytest.raises(WriteError, match="was not read from a file"):
         Document().save()
 
 
@@ -256,7 +256,7 @@ def test_savingInPlaceWithNoSourcePathIsRefused() -> None:
     document = pybers.open(findDocumentPath("00-baseline"))
     document._sourcePath = None
 
-    with pytest.raises(WriteError, match="nowhere to save"):
+    with pytest.raises(WriteError, match="was not read from a file"):
         document.save()
 
 
@@ -457,7 +457,7 @@ def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
 
     cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
-    with pytest.raises(WriteError, match="backed by a formula"):
+    with pytest.raises(WriteError, match="holds a formula, so a value written there"):
         cell.value = Decimal("999")
 
 
@@ -485,7 +485,7 @@ def test_writingSomethingNeitherTextNorANumberIsStillRefused(
     working = copyDocument("11-value-types-noformats", tmp_path)
     cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
-    with pytest.raises(WriteError, match="A cell holds a Decimal"):
+    with pytest.raises(WriteError, match="cannot hold a list. Give a Decimal"):
         cell.value = [1, 2]  # type: ignore[assignment]
 
 

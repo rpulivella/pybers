@@ -159,7 +159,7 @@ def testLiteralTextOverAFormulaIsRefusedAndLeavesTheCellAlone() -> None:
     cell = openFirstTableCell("18-formula-literals", "A1")
     before = (cell.value, cell.formula, checkFormatChosen(cell))
 
-    with pytest.raises(pybers.WriteError, match="A1 is backed by a formula"):
+    with pytest.raises(pybers.WriteError, match="A1 holds a formula"):
         cell.textLiteralSet("=1+1")
     assert (cell.value, cell.formula, checkFormatChosen(cell)) == before
 
@@ -167,7 +167,7 @@ def testLiteralTextOverAFormulaIsRefusedAndLeavesTheCellAlone() -> None:
 def testLiteralTextThatIsNotTextIsRefused() -> None:
     cell = openFirstTableCell("01-text-plain", "A1")
 
-    with pytest.raises(pybers.WriteError, match="was given Decimal"):
+    with pytest.raises(pybers.WriteError, match="is not a str"):
         cell.textLiteralSet(Decimal("1"))  # type: ignore[arg-type]
     assert not checkFormatChosen(cell)
 

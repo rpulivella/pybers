@@ -16,6 +16,7 @@ error, which is why each is handled here and not left to a caller:
   ordinary numbers they name a cell far outside the table and raise nothing.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-13  A boolean literal, and a range axis reaching every line, for PYB-139.
 2026-09-18  A broken reference reads the lines it lost, for PYB-17.
 2026-09-11  The list node's one field is read, for #67.
@@ -50,7 +51,7 @@ from .._persistence.index import (
     readUuidValue,
 )
 from ..addressing.reference import originOffset
-from ..errors import ReadError
+from ..errors import ReadError, composeRefusal, nothingRead
 from .nodes import (
     Coordinate,
     Formula,
@@ -100,7 +101,7 @@ type ColonTractAxis = (
 def readUuid(archive: tsp.CFUUIDArchive) -> str:
     """Return a `TSP.CFUUIDArchive` as a canonical hexadecimal identity.
 
-    A table is named by identity rather than by name or position, which is why
+    A table is specified by identity rather than by name or position, which is why
     renaming a table cannot break a formula pointing into it. The archive spells
     that identity either as raw bytes or as four 32-bit words, so both are read
     and only the string form travels into the model.
@@ -166,7 +167,7 @@ def readFormulaReference(
     )
     # Node type 46 is the archive's own statement that this reference points
     # nowhere, and the coordinates beside it are sentinels rather than a cell.
-    # They are checked as well, because reading them as real coordinates names a
+    # They are checked as well, because reading them as real coordinates selects a
     # cell far outside any table and raises nothing.
     broken = node.AST_node_type == brokenReferenceNodeType or (
         node.HasField("AST_column")
@@ -184,7 +185,7 @@ def readFormulaReference(
 def readReferenceLoss(
     node: tsce.ASTNodeArrayArchive.ASTNodeArchive,
 ) -> FormulaReferenceLoss | None:
-    """Return the lines a broken reference lost, or None unless it names one tract.
+    """Return the lines a broken reference lost, or None unless it specifies one tract.
 
     Every broken reference measured carries exactly one. Any other count is left
     to the node's bytes, which carry it through a rewrite untouched.
@@ -211,7 +212,7 @@ def readRangeAxis(
     """Return one axis of a range tract, or None when the range reaches every line.
 
     Every line is an absolute axis holding `unboundedValue` and no end, which is
-    how Numbers writes `B:C` and `2:3`. Read as a line it names one far past any
+    how Numbers writes `B:C` and `2:3`. Read as a line it selects one far past any
     table, and rendering that range fails.
     """
     if relative:
@@ -342,7 +343,7 @@ def resolveFormula(
 ) -> Formula | None:
     """Return the formula behind a cell, or None when the cell has none.
 
-    **A record naming a formula the pool does not hold is refused, not dropped.**
+    **A record specifying a formula the pool does not hold is refused, not dropped.**
     Returning None there left the cell looking as though it never held one, and a
     save then removed the formula from the file: six of the eight in
     47-formula-cell-attributes, and 416 across one real document. Refusing to read
@@ -352,17 +353,16 @@ def resolveFormula(
         return None
     slot = findFormulaKeySlot(record)
     if len(record.references) <= slot:
-        raise ReadError(
-            f"The cell record at column {record.column} names a formula at "
-            f"trailing reference {slot} and carries only {len(record.references)}."
-        )
+        raise ReadError(composeRefusal(
+            f"The cell in column {record.column}", "is marked as holding a formula "
+            "and carries no key for it", notDone=nothingRead,
+        ))
     key = record.references[slot]
     if key not in formulas:
-        raise ReadError(
-            f"The cell record at column {record.column} names formula {key}, "
-            f"which its table's pool does not hold. The pool holds "
-            f"{sorted(formulas) or 'nothing'}."
-        )
+        raise ReadError(composeRefusal(
+            f"The cell in column {record.column}", f"refers to formula {key}, which "
+            "its table does not hold", notDone=nothingRead,
+        ))
     return formulas[key]
 
 

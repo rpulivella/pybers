@@ -7,6 +7,8 @@ The root callback stores `CommandSettings` on Typer's context object, which is
 how Typer hands a group's options down to its commands.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
+            `composeUsageRefusal` builds a command line's own refusal.
 2026-11-17  A report's value is a phrase, `previewing only`, for PYB-266.
 2026-10-28  Where a write goes, its two options and its report, shared by `set`
             and `locale`, FILE itself unless `-o` names a new one, for PYB-272.
@@ -22,7 +24,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/07"
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,7 +69,32 @@ def formatRefusalText(error: pybers.PybersError, command: str) -> str:
     """Return a refusal as a command shows it, saying where choices it omits are."""
     if not error.choices:
         return str(error)
-    return f"{error} `pybers {command} --help` lists every one."
+    pointer = f"`pybers {command} --help` lists every one."
+    if error.notDone is None:
+        return f"{error} {pointer}"
+    notDone = f" {error.notDone}."
+    return f"{str(error).removesuffix(notDone)} {pointer}{notDone}"
+
+
+def composeUsageRefusal(
+    place: str, cause: str, fix: str | None = None, notDone: str | None = None
+) -> typer.BadParameter:
+    """Return a command line's own refusal, the one place one is built.
+
+    Shown only at a shell, so its words may specify options and arguments.
+    """
+    return typer.BadParameter(pybers.composeRefusal(place, cause, fix, notDone))
+
+
+def composeUsageChoiceRefusal(
+    given: str, noun: str, choices: Sequence[str], command: str,
+    notDone: str | None = None,
+) -> typer.BadParameter:
+    """Return a command line's refusal of a choice, as a library one is shown."""
+    refused = pybers.composeChoiceRefusal(
+        pybers.PybersError, given, noun, choices, notDone
+    )
+    return typer.BadParameter(formatRefusalText(refused, command))
 
 
 OutputOption = Annotated[
@@ -86,15 +113,19 @@ def findSaveTarget(
 ) -> Path | None:
     """Return where a writing verb writes, None for a preview, or refuse the flags.
 
-    A writing verb changes FILE itself, since the verb is the act. `-o` names a new
-    document instead, and never one that exists, whatever it is.
+    A writing verb changes FILE itself, since the verb is the act. `-o` specifies a
+    new document instead, and never one that exists, whatever it is.
     """
     if preview and output is not None:
-        raise typer.BadParameter("Give -o or --preview, not both.")
+        raise composeUsageRefusal(
+            "-o and --preview", "cannot be given together", "Give one of them",
+            pybers.nothingWritten,
+        )
     if output is not None and output.exists():
-        raise typer.BadParameter(
-            f"{output} already exists. Name a new file, or leave out -o to change "
-            f"{documentPath} itself."
+        raise composeUsageRefusal(
+            f"-o {output}", "specifies a file that exists, and -o writes only a new "
+            "one", f"Specify a new path, or leave out -o to change {documentPath} "
+            "itself", pybers.nothingWritten,
         )
     if preview:
         return None
@@ -117,6 +148,8 @@ __all__ = [
     "CommandSettings",
     "OutputOption",
     "PreviewOption",
+    "composeUsageChoiceRefusal",
+    "composeUsageRefusal",
     "findCommandSettings",
     "findSaveTarget",
     "formatRefusalText",

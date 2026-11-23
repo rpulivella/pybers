@@ -21,6 +21,7 @@ would surface as a lookup failure at parse time without saying which entry was
 wrong. A misspelled symbol fails at import and names itself.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  The version of a stroke sidecar and layer, for PYB-266.
 2026-11-02  Every style and preset a created theme holds, and the version of each
             type a created document holds, for PYB-261.
@@ -61,7 +62,7 @@ from .._generated import TSSArchives_pb2 as tss
 from .._generated import TSTArchives_pb2 as tst
 from .._generated import TSTStylePropertyArchiving_pb2 as tstStyles
 from .._generated import TSWPArchives_pb2 as tswp
-from ..errors import PybersError
+from ..errors import PybersError, composeFault, composeRefusal, nothingRead
 from .iwa import Archive
 
 # typeId to generated class, for every type pybers resolves on a read path.
@@ -177,7 +178,7 @@ class ArchiveTypeError(PybersError, RuntimeError):
     """An archive whose type is not in the registry, or which failed to parse."""
 
 
-# The registry read the other way, so a module names a type by its class alone.
+# The registry read the other way, so a module specifies a type by its class alone.
 archiveTypeIds: frozendict[type[Message], int] = frozendict({
     messageClass: typeId for typeId, messageClass in archiveTypes.items()
 })
@@ -187,10 +188,10 @@ def findArchiveTypeId(messageClass: type[Message]) -> int:
     """Return the type identifier the registry holds for one generated class."""
     typeId = archiveTypeIds.get(messageClass)
     if typeId is None:
-        raise ArchiveTypeError(
-            f"{messageClass.DESCRIPTOR.full_name} is not in the registry, so no "
-            "type identifier is known for it."
-        )
+        raise ArchiveTypeError(composeFault(
+            messageClass.DESCRIPTOR.full_name, "is missing from the archive type "
+            "registry, so its type identifier is unknown",
+        ))
     return typeId
 
 
@@ -204,10 +205,10 @@ def readArchiveTypeId(archive: Archive) -> int:
     first message is always the one that says what the archive is.
     """
     if not archive.messages:
-        raise ArchiveTypeError(
-            f"Archive {archive.identifier} carries no messages, so nothing "
-            "identifies what it is."
-        )
+        raise ArchiveTypeError(composeRefusal(
+            f"Archive {archive.identifier}", "carries no messages, so nothing "
+            "identifies what it is", notDone=nothingRead,
+        ))
     return archive.messages[0].typeId
 
 
@@ -222,18 +223,17 @@ def parseArchive(archive: Archive) -> Message:
     typeId = readArchiveTypeId(archive)
     messageClass = archiveTypes.get(typeId)
     if messageClass is None:
-        raise ArchiveTypeError(
-            f"Archive {archive.identifier} has type {typeId}, which is not in "
-            "the registry. Add it to archiveTypes with the ticket that needs it."
-        )
+        raise ArchiveTypeError(composeFault(
+            f"Archive {archive.identifier}", f"has type {typeId}, which is missing "
+            "from the archive type registry", nothingRead,
+        ))
     message = messageClass()
     try:
         message.ParseFromString(archive.messages[0].data)
     except Exception as exc:
-        raise ArchiveTypeError(
-            f"Archive {archive.identifier} declares type {typeId} "
-            f"({messageClass.DESCRIPTOR.full_name}) but its "
-            f"{len(archive.messages[0].data)} "
-            "bytes did not parse as one."
-        ) from exc
+        raise ArchiveTypeError(composeRefusal(
+            f"Archive {archive.identifier}", f"declares type {typeId}, and its "
+            f"{len(archive.messages[0].data)} bytes do not parse as one "
+            f"({messageClass.DESCRIPTOR.full_name})", notDone=nothingRead,
+        )) from exc
     return message

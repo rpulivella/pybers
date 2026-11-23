@@ -7,6 +7,7 @@ macOS's own ICU by `tools/local/locales_extract.py`, so a region pybers offers i
 it can write as Numbers writes it. See findings-12-language-and-region.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-28  Written for PYB-272.
 """
 from __future__ import annotations
@@ -19,16 +20,12 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/28"
 
-import difflib
 from dataclasses import dataclass
 
 from pybers._generated.locales import locales as localeTable
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeChoiceRefusal, nothingWritten
 
 locales: tuple[str, ...] = tuple(sorted(localeTable))
-
-# How many offered regions a refusal suggests, closest first.
-suggestionCount: int = 4
 
 
 class LocaleError(PybersError, ValueError):
@@ -51,16 +48,12 @@ class LocaleChange:
 def findLocaleSymbols(identifier: object) -> frozendict[str, object]:
     """Return a region's formatting symbols, refusing one pybers does not offer."""
     if not isinstance(identifier, str) or identifier not in localeTable:
-        shown = identifier if isinstance(identifier, str) else repr(identifier)
         # A region sharing the language asked for is the likeliest one meant.
         language = f"{str(identifier).partition('_')[0]}_"
         candidates = [each for each in locales if each.startswith(language)] or locales
-        closest = difflib.get_close_matches(
-            str(identifier), candidates, n=suggestionCount, cutoff=0
-        )
-        raise LocaleError(
-            f"No region pybers offers is named {shown!r}. The closest of the "
-            f"{len(locales)} it offers are {', '.join(repr(each) for each in closest)}."
+        raise composeChoiceRefusal(
+            LocaleError, identifier, "a region pybers offers", candidates,
+            nothingWritten,
         )
     symbols: frozendict[str, object] = localeTable[identifier]
     return symbols

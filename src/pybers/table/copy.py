@@ -2,7 +2,7 @@
 """A block of cells copied to a new anchor in its table, carrying its merges.
 
 Everything is checked before anything is copied, so a refused copy leaves the
-table exactly as it was. Each copied cell names the record of the cell it copies,
+table exactly as it was. Each copied cell refers to the record of the cell it copies,
 which a save duplicates whole, and each position of the block takes its source's
 borders exactly, as Numbers' paste did in `64b` and `64d`.
 No formula outside the copy changes, under either rule. See findings-03-structure.md.
@@ -11,6 +11,7 @@ No formula outside the copy changes, under either rule. See findings-03-structur
 afterward exactly as it did before.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  Each position takes its source's borders in the model, for PYB-266.
 2026-10-14  Writes the table's own store, `cells` being read-only, and checks a
             range against the grid through `bounds`, for PYB-193.
@@ -33,6 +34,7 @@ from pybers.addressing.reference import (
     CellReferenceLike,
 )
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeRefusal, nothingWritten
 from pybers.formula.relocation import FormulaReferenceRelocation, clampFormulaRanges
 from pybers.table.bounds import refuseRangeOutside
 from pybers.table.fill import copyCellContent
@@ -67,10 +69,10 @@ def copyCells(
     destination = copy.destination
     refuseRangeOutside(table, destination)
     if any(extent.covers(reference) for reference in destination):
-        raise ReferenceError(
-            f"{destination} overlaps {extent}, and a copy never overwrites its own "
-            "source."
-        )
+        raise ReferenceError(composeRefusal(
+            str(destination), f"overlaps {extent}, and a copy never overwrites its "
+            "own source", notDone=nothingWritten,
+        ))
     refuseMergeCut(table, copy, "copy")
     refuseOccupied(table, copy, "copy")
 

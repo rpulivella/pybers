@@ -141,9 +141,9 @@ def test_a_created_table_starts_from_the_reset_and_keeps_what_is_set(
 
 
 @pytest.mark.parametrize(("lines", "message"), [
-    ({"tableBorder": TableLine(True, dashed)}, "is not one"),
-    ({"tableOutline": "1pt solid black"}, "is a TableLine"),
-    ({"tableOutlineTitle": "yes"}, "is a bool"),
+    ({"tableBorder": TableLine(True, dashed)}, "is not a table style field"),
+    ({"tableOutline": "1pt solid black"}, "is not a TableLine"),
+    ({"tableOutlineTitle": "yes"}, "'yes' is not a bool"),
 ])
 def test_a_line_pybers_cannot_hold_is_refused(
     lines: dict[str, object], message: str
@@ -174,9 +174,12 @@ def test_a_longhand_changes_one_part_of_a_line() -> None:
         "is not a table style property. The closest is table-outline",
     ),
     ("table-outline: thick", "a width, a style and a color"),
-    ("table-outline: 1pt brush black", "is one of solid, dashed, dotted or none"),
-    ("table-outline-title: maybe", "yes or no"),
-    ("table-outline: none; table-outline: none", "once, and twice"),
+    (
+        "table-outline: 1pt brush black",
+        "'brush' is not a line style. The choices are solid, dashed, dotted and none",
+    ),
+    ("table-outline-title: maybe", "'maybe' is not a table-outline-title value"),
+    ("table-outline: none; table-outline: none", "table-outline is stated twice"),
 ])
 def test_text_a_table_style_lacks_is_refused(text: str, message: str) -> None:
     with pytest.raises(TableStyleError, match=message):
@@ -270,7 +273,7 @@ def test_an_edge_between_two_lines_of_a_band_shows_that_bands_line(
 ])
 def test_a_line_no_control_hides_takes_a_stroke_but_not_none(field: str) -> None:
     table = pybers.create("en_US").sheet().tableAdd("Lines", rows=4, cols=4)
-    with pytest.raises(TableStyleError, match="no Numbers control hides it"):
+    with pytest.raises(TableStyleError, match="cannot be hidden, since they show"):
         table.tableStyleSet(**{field: TableLine(False, gridline)})
     assert table.tableStyleSet(**{field: TableLine(True, redLine)}).changed
 

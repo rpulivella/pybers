@@ -7,6 +7,7 @@ index, where the defect lived: a write replaced the member's archive while the
 index kept the old one, and every resolve parsed its own copy.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-22  Written for PYB-109.
 """
 from __future__ import annotations
@@ -175,9 +176,9 @@ def testReadingAnArchiveThisSaveRemovedRaisesNamingIt() -> None:
 
     registry.archiveRemove(identifier)
 
-    with pytest.raises(ReadError, match=f"archive {identifier}, which this save"):
+    with pytest.raises(ReadError, match=f"{identifier} remains after the save"):
         index.resolve(tsp.Reference(identifier=identifier), tst.Tile)
-    with pytest.raises(ReadError, match=f"archive {identifier}, which this save"):
+    with pytest.raises(ReadError, match=f"{identifier} remains after the save"):
         index.typeOf(tsp.Reference(identifier=identifier))
 
 
@@ -188,14 +189,14 @@ def testWritingAnArchiveThisSaveRemovedRaisesNamingIt() -> None:
     body = index.resolve(tsp.Reference(identifier=identifier), tst.Tile)
     registry.archiveRemove(identifier)
 
-    with pytest.raises(ReadError, match=f"archive {identifier}, which this save"):
+    with pytest.raises(ReadError, match=f"{identifier} remains after the save"):
         index.archiveWrite(identifier, body)
 
 
 def testReadingAnArchiveTheDocumentNeverHeldStillSaysSo() -> None:
     index = ArchiveIndex(readPackage(findDocumentPath("00-baseline")))
 
-    with pytest.raises(ReadError, match="999999999, which is not in this document"):
+    with pytest.raises(ReadError, match="999999999 points at an archive the document"):
         index.archive(999_999_999)
 
 

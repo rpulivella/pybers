@@ -3,6 +3,7 @@
 What a formula reads, in the engine's own terms: an owner id and a stored coordinate.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-22  Split out of the engine module for PYB-113.
 """
 from __future__ import annotations
@@ -20,7 +21,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class CellEdge:
-    """One cell a formula reads, its owner named only when it is another table."""
+    """One cell a formula reads, its owner specified only when it is another table."""
 
     row: int
     column: int

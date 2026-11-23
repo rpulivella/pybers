@@ -8,6 +8,7 @@ prevails over all of them at its edge. Banded rows paint every second body row
 beneath any fill a cell states. See findings-06-styles.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  The text form moved to `tablestyletext`, for PYB-291.
 2026-11-20  A table style carries the box each section's cells inherit, the Blank
             theme's and the reset's, for PYB-291.
@@ -34,7 +35,12 @@ from typing import TYPE_CHECKING, Any
 from pybers.absence import MIXED
 from pybers.addressing.reference import TableReference
 from pybers.color.colors import Color, ColorSpace
-from pybers.errors import PybersError
+from pybers.errors import (
+    PybersError,
+    composeChoiceRefusal,
+    composeRefusal,
+    nothingWritten,
+)
 from pybers.style.cells import (
     CellStyle,
     CellStyleProperty,
@@ -52,7 +58,7 @@ from pybers.style.strokes import (
     StrokePresets,
     StrokeSolid,
 )
-from pybers.table.headers import TableHeaders, TableSection
+from pybers.table.headers import TableHeaders, TableSection, formatHeaderName
 
 if TYPE_CHECKING:
     from pybers.addressing.reference import CellAddress
@@ -146,51 +152,49 @@ class TableStyleChange:
 def buildTableStyle(
     base: TableStyle, parts: Mapping[str, object], held: TableStyle
 ) -> TableStyle:
-    """Return a table style with the parts named by field replaced, refusing any other.
+    """Return a table style with the parts given by field replaced, refusing any other.
 
     The one place a requested table style is checked, so nothing invalid is held.
     `held` is the style the table holds, whose band may be one pybers only carries.
     """
     if not isinstance(base, TableStyle):
-        raise TableStyleError(
-            f"A table style is a TableStyle, and was given {type(base).__name__}. "
-            "Nothing was written."
-        )
+        raise TableStyleError(composeRefusal(
+            f"The table style {type(base).__name__}", "is not a TableStyle",
+            notDone=nothingWritten,
+        ))
     names = [each.name for each in fields(TableStyle)]
     for name, value in parts.items():
         if name not in names:
-            raise TableStyleError(
-                f"A table style holds {', '.join(names)}, and {name!r} is not one. "
-                "Nothing was written."
+            raise composeChoiceRefusal(
+                TableStyleError, name, "a table style field", names, nothingWritten
             )
         if name == "bandedRows" or name in sectionCellStyleFields.values():
             continue
         if name in flagNames.values():
             if not isinstance(value, bool):
-                raise TableStyleError(
-                    f"{name} is a bool, and was given {value!r}. Nothing was "
-                    "written."
-                )
+                raise TableStyleError(composeRefusal(
+                    f"The {name} {value!r}", "is not a bool", notDone=nothingWritten
+                ))
             continue
         if not isinstance(value, TableLine) or not isinstance(value.visible, bool) or (
             not isinstance(value.stroke, Stroke)
             and value.stroke is not getattr(base, name).stroke
         ):
-            raise TableStyleError(
-                f"{name} is a TableLine of a visibility and a Stroke, and was given "
-                f"{value!r}. Nothing was written."
-            )
+            raise TableStyleError(composeRefusal(
+                f"The {name} {value!r}", "is not a TableLine of a visibility and a "
+                "Stroke", notDone=nothingWritten,
+            ))
     update: dict[str, Any] = dict(parts)
     built = replace(base, **update)
     refuseBand(built.bandedRows, held.bandedRows)
     refuseSectionBoxes(built, held)
     hidden = sorted(name for name in alwaysShown if not getattr(built, name).visible)
     if hidden:
-        raise TableStyleError(
-            f"{hidden[0]} shows wherever its band has two lines, and no Numbers "
-            "control hides it, so it takes a stroke but not none. Nothing was "
-            "written."
-        )
+        raise TableStyleError(composeRefusal(
+            f"The {formatHeaderName(hidden[0])}", "cannot be hidden, since they show "
+            "wherever their band has two lines and no Numbers control hides them",
+            "Give them a stroke", nothingWritten,
+        ))
     return built
 
 
@@ -207,13 +211,13 @@ def refuseSectionBoxes(built: TableStyle, held: TableStyle) -> None:
         if not isinstance(box, CellStyle) or None in (
             getattr(box, each.fieldName) for each in CellStyleProperty
         ):
-            raise TableStyleError(
-                f"{field} is a CellStyle stating every property, and was given "
-                f"{box!r}. Nothing was written."
-            )
-        refusal = findCellStyleRefusal(box)
+            raise TableStyleError(composeRefusal(
+                f"The {field} {box!r}", "is not a CellStyle stating every property",
+                notDone=nothingWritten,
+            ))
+        refusal = findCellStyleRefusal(box, nothingWritten)
         if refusal is not None:
-            raise TableStyleError(f"{field}: {refusal} Nothing was written.")
+            raise TableStyleError(refusal)
 
 
 def refuseBand(value: object, held: TableBand) -> None:
@@ -223,23 +227,29 @@ def refuseBand(value: object, held: TableBand) -> None:
     carried where a document holds one and refused anywhere else.
     """
     if not isinstance(value, TableBand) or not isinstance(value.visible, bool):
-        raise TableStyleError(
-            f"bandedRows is a TableBand of a visibility and a fill, and was given "
-            f"{value!r}. Nothing was written."
-        )
+        raise TableStyleError(composeRefusal(
+            f"The bandedRows {value!r}", "is not a TableBand of a visibility and a "
+            "fill", notDone=nothingWritten,
+        ))
     if isinstance(value.fill, Color) or value.fill == held.fill:
         return
-    raise TableStyleError(f"{composeBandRefusal(value.fill)} Nothing was written.")
+    raise TableStyleError(composeBandRefusal(value.fill, nothingWritten))
 
 
-def composeBandRefusal(fill: Fill) -> str:
-    """Return the sentence refusing a band of a fill other than a color.
+def composeBandRefusal(fill: Fill, notDone: str | None = None) -> str:
+    """Return the refusal of a band of a fill other than a color.
 
     The one place it is worded, for a script and a command alike.
     """
-    phrase = {"gradient": "a gradient", "image": "an image", "none": "no fill"}
+    place = {
+        "gradient": "A gradient band", "image": "An image band",
+        "none": "A band with no fill",
+    }
     kind = str(getattr(fill, "fillType", ""))
-    return f"Numbers cannot band rows with {phrase.get(kind, kind)}."
+    return composeRefusal(
+        place.get(kind, f"A band of {kind}"), "is not one Numbers draws, since it "
+        "bands rows with a color alone", "Give the band a color", notDone,
+    )
 
 
 def findComputedCellStyle(table: Table, where: CellAddress) -> CellStyle:

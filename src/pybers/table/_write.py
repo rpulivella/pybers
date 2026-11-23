@@ -14,6 +14,7 @@ Private. The table feature offers `Table` and `Cell`, not the machinery that sav
 one.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  Each changed section box written before the cells that copy it, for
             PYB-291.
 2026-11-17  The lines a table draws written as its table style, for PYB-266.
@@ -73,7 +74,7 @@ from .._generated import TSTArchives_pb2 as tst
 from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
 from ..addressing.reference import originOffset
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, nothingWritten
 from ..formula._dependencies import resolveFormulaDependencies
 from ._borders import writeTableBorders
 from ._cellstyles import writeSectionCellStyles
@@ -127,10 +128,10 @@ def collectFormulaDependencies(
     for row, column in added:
         cell = table.cell(row=row + originOffset, col=column + originOffset)
         if cell.formula is None:
-            raise WriteError(
-                f"{table.name!r} reports a formula at row {row + originOffset}, "
-                f"column {column + originOffset} that the model does not hold."
-            )
+            raise WriteError(composeFault(
+                str(cell.reference), "is listed as holding a new formula, and holds "
+                "none", nothingWritten,
+            ))
         dependencies[(row, column)] = resolveFormulaDependencies(
             cell.formula, cell.address, hostOwner, ownerIds, table.name, extents
         )
@@ -169,7 +170,7 @@ class TableSave:
         # A cell read from the file or copied keeps its record and all it holds.
         for cell in table.cells.values():
             if cell._origin is None and cell._copiedFrom is None:
-                refuseUncreatableCell(cell, table.name)
+                refuseUncreatableCell(cell)
         self.saved.append((table, reference))
 
         # Before the merges are compared, since a merge the edit only moved must

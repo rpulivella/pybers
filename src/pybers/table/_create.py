@@ -11,6 +11,7 @@ states among them. Found one group at a time, 2026-11-02, findings-10-creation.m
 Its styles are the reset in docs/decisions.md, created by `_reset`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  `formatIdentityText` takes format's verb, for PYB-309.
 2026-11-02  Composed field by field to the least Numbers needs, rather than copied
             from a template, for PYB-276.
@@ -49,7 +50,7 @@ from .._persistence.index import (
 )
 from .._persistence.metadata import PackageRegistry, composeArchive
 from .._persistence.types import bncDataListVersion, findArchiveTypeId
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from ..geometry import Position
 from ._lines import assignUids
 from ._reset import (
@@ -329,7 +330,9 @@ def findPendingTables(
     pending: list[tuple[Sheet, tn.SheetArchive, list[Table]]] = []
     for sheet in document.sheets:
         if sheet._identifier is None:
-            raise WriteError(f"{sheet.name!r} has no archive to hold its tables.")
+            raise WriteError(composeFault(
+                sheet.name, "has no archive to hold its tables", nothingWritten
+            ))
         sheetArchive = index.resolve(
             tsp.Reference(identifier=sheet._identifier), tn.SheetArchive
         )
@@ -342,24 +345,24 @@ def findPendingTables(
             if table._identifier is not None
         ]
         if kept != stored:
-            raise WriteError(
-                f"The tables of {sheet.name!r} are not the document's tables in the "
-                "document's order. Removing or reordering a table is not supported."
-            )
+            raise WriteError(composeRefusal(
+                f"The tables of {sheet.name}", "are not the document's tables in "
+                "its order, and removing or reordering a table is not supported",
+                notDone=nothingWritten,
+            ))
         created = sheet.tables[len(kept):]
         if any(table._identifier is not None for table in created):
-            raise WriteError(
-                f"A new table on {sheet.name!r} sits before a table already in the "
-                "document. A created table is placed after the existing ones, so it "
-                "has to be added after them."
-            )
+            raise WriteError(composeRefusal(
+                f"A new table on {sheet.name}", "sits before a table already in the "
+                "document", "Add it after the existing tables", nothingWritten,
+            ))
         for table in created:
             if table.extent is None:
-                raise WriteError(
-                    f"{table.name!r} on {sheet.name!r} declares {table.rowCount} rows "
-                    f"by {table.colCount} columns, and a table holds at least one of "
-                    "each."
-                )
+                raise WriteError(composeRefusal(
+                    str(table.reference), f"declares {table.rowCount} rows by "
+                    f"{table.colCount} columns, and a table holds at least one of each",
+                    notDone=nothingWritten,
+                ))
         if created:
             pending.append((sheet, sheetArchive, created))
     return pending
@@ -415,7 +418,9 @@ def createTables(document: Document, registry: PackageRegistry) -> None:
 def readSheetIdentifier(sheet: Sheet) -> int:
     """Return a sheet's archive identifier, which every sheet has once created."""
     if sheet._identifier is None:
-        raise WriteError(f"{sheet.name!r} has no archive to hold its tables.")
+        raise WriteError(composeFault(
+            sheet.name, "has no archive to hold its tables", nothingWritten
+        ))
     return sheet._identifier
 
 

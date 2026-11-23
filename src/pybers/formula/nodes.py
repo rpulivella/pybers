@@ -34,6 +34,7 @@ row of `None` means the whole column rather than row zero. The same rule
 as a sentinel line, read here as `None`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  `FormulaFunctionCall.fromName` takes the `from` form, for PYB-301.
 2026-10-29  `mapFormulaNodes`, the one walk a rewrite makes, for PYB-278.
 2026-10-24  A node's raw bytes kept in the JSON form, for PYB-259.
@@ -68,7 +69,7 @@ from decimal import Decimal
 
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress, CellReference
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeRefusal
 from pybers.formula.functions import (
     ArgumentCountError,
     NumbersFunction,
@@ -158,7 +159,7 @@ lambdaNodeTypes: tuple[int, ...] = (
 )
 
 # Both bind a variable, and Numbers' own authoring class calls the node that
-# names one `letOrLambdaVar`, which is why it belongs to neither alone.
+# specifies one `letOrLambdaVar`, which is why it belongs to neither alone.
 variableNodeType: int = 53
 
 # The four functions whose arguments Numbers wraps in thunks, read from
@@ -198,7 +199,7 @@ class Coordinate:
     absolute: bool = False
 
     def resolve(self, host: int) -> int:
-        """Return the row or column this axis names, for a formula living at `host`.
+        """Return the row or column this axis selects, for a formula living at `host`.
 
         `host` is the corresponding axis of the cell holding the formula, counted
         from one. An absolute axis ignores it, which is exactly what locking means.
@@ -264,7 +265,7 @@ class Span:
 
 @dataclass(frozen=True, slots=True)
 class FormulaReferenceLoss:
-    """The rows and columns a broken reference named before they were removed.
+    """The rows and columns a broken reference selected before they were removed.
 
     Numbers writes these beside the `#REF!` sentinels, as each line's UUID value,
     in all three references measured breaking. `range` records whether a range
@@ -283,7 +284,7 @@ class FormulaReference:
     """A reference to one cell from inside a formula.
 
     An axis of `None` is unbounded rather than zero, so no row means the whole
-    column. `tableId` names another table by identity, never by name or position,
+    column. `tableId` specifies another table by identity, never by name or position,
     which is why renaming a table cannot break a formula pointing into it.
     """
 
@@ -299,21 +300,21 @@ class FormulaReference:
         return self.tableId is not None
 
     def resolve(self, host: CellAddress) -> CellReference:
-        """Return the cell this reference names, for a formula living at `host`.
+        """Return the cell this reference selects, for a formula living at `host`.
 
         Refuses rather than guessing on the two cases that have no single cell to
         name: a broken reference, whose coordinates point nowhere by design, and
-        an unbounded one, which names a whole column or row.
+        an unbounded one, which selects a whole column or row.
         """
         if self.broken:
             raise FormulaError(
-                "This reference is broken and names no cell."
+                composeRefusal("The reference", "is broken and selects no cell")
             )
         if self.column is None or self.row is None:
-            raise FormulaError(
-                "This reference is unbounded on one axis, so it names a whole "
-                "column or row rather than a cell."
-            )
+            raise FormulaError(composeRefusal(
+                "The reference", "is unbounded on one axis, so it selects a whole "
+                "column or row rather than a cell",
+            ))
         return CellReference(
             self.row.resolve(host.row),
             self.column.resolve(host.col),
@@ -326,7 +327,7 @@ class FormulaReference:
 
         A broken reference comes back untouched: Numbers records `#REF` as
         coordinates deliberately pointing nowhere, and moving them would repair one
-        into a working cell. An unbounded axis names a whole column or row and has
+        into a working cell. An unbounded axis selects a whole column or row and has
         no line to move either.
         """
         if self.broken:
@@ -340,7 +341,7 @@ class FormulaReference:
 
 @dataclass(frozen=True, slots=True)
 class FormulaRange:
-    """A rectangle of cells named from inside a formula.
+    """A rectangle of cells selected from inside a formula.
 
     Carried separately from `FormulaReference` because a range is its own node
     type with its own anchoring, which is what makes adjusting one range in a
@@ -395,7 +396,7 @@ class FormulaRange:
 class FormulaFunctionCall:
     """A call to one of Apple's built-in functions, stored as its index.
 
-    The index is what the archive holds, so `named` is a way of writing one down
+    The index is what the archive holds, so `fromName` is a way of writing one down
     rather than a second representation. `name` is None for a function the map
     does not carry, which leaves the call intact rather than refusing it.
     """
@@ -423,17 +424,16 @@ class FormulaFunctionCall:
         """
         function = findFunctionNamed(name)
         if not function.offered:
-            raise ArgumentCountError(
-                f"{function.name} is {function.availability} rather than offered, "
-                "so Numbers does not take it by name. Construct with its index "
-                "if you mean to write one anyway."
-            )
+            raise ArgumentCountError(composeRefusal(
+                function.name, f"is {function.availability} rather than offered, so "
+                "Numbers does not take it by name",
+            ))
         if not function.accepts(argumentCount):
             bound = "any number" if function.unbounded else function.maximumArguments
-            raise ArgumentCountError(
-                f"{function.name} takes {function.minimumArguments} to {bound} "
-                f"arguments, not {argumentCount}."
-            )
+            raise ArgumentCountError(composeRefusal(
+                function.name, f"takes {function.minimumArguments} to {bound} "
+                f"arguments, not {argumentCount}",
+            ))
         return cls(index=findFunctionIndex(name), argumentCount=argumentCount)
 
 

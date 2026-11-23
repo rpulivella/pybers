@@ -11,6 +11,7 @@ the tree gives them, so one document always writes the same bytes.
 Private. Part of the JSON form's mechanism, and the only JSON text pybers writes.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -26,8 +27,9 @@ __date__ = "2026/10/24"
 import json
 from decimal import Decimal
 
+from pybers.errors import composeFault, composeRefusal
 from pybers.interchange._leaves import JsonFormError, Tree
-from pybers.interchange._tree import JsonFormDefinitionError
+from pybers.interchange._tree import JsonFormDefinitionError, composeDefinitionFault
 
 indentUnit: str = "  "
 
@@ -50,7 +52,9 @@ def listJsonParts(tree: Tree, depth: int) -> list[str]:
             return [str(tree)]
         case Decimal():
             if not tree.is_finite():
-                raise JsonFormDefinitionError(f"JSON has no number for {tree}.")
+                raise JsonFormDefinitionError(
+                    composeFault(f"The number {tree}", "has no JSON form")
+                )
             return [str(tree)]
         case list():
             return listContainerParts(
@@ -62,7 +66,7 @@ def listJsonParts(tree: Tree, depth: int) -> list[str]:
                  *listJsonParts(each, depth + 1)]
                 for key, each in tree.items()
             ], depth)
-    raise JsonFormDefinitionError(f"JSON has no form for {type(tree).__name__}.")
+    raise composeDefinitionFault(type(tree))
 
 
 def listContainerParts(
@@ -86,13 +90,18 @@ def readJsonText(text: str) -> Tree:
             parse_constant=refuseConstant, object_pairs_hook=refuseRepeatedKeys,
         )
     except json.JSONDecodeError as exc:
-        raise JsonFormError(f"The text is not JSON: {exc}") from exc
+        raise JsonFormError(composeRefusal(
+            f"The text at line {exc.lineno}, column {exc.colno}",
+            f"is not JSON ({exc.msg})",
+        )) from exc
     return tree
 
 
 def refuseConstant(name: str) -> Decimal:
     """Refuse NaN and the infinities, which JSON does not define."""
-    raise JsonFormError(f"JSON has no number {name}, and the text holds one.")
+    raise JsonFormError(composeRefusal(
+        name, "is not a number JSON defines", "Write a finite number"
+    ))
 
 
 def refuseRepeatedKeys(pairs: list[tuple[str, Tree]]) -> dict[str, Tree]:
@@ -100,7 +109,9 @@ def refuseRepeatedKeys(pairs: list[tuple[str, Tree]]) -> dict[str, Tree]:
     read: dict[str, Tree] = {}
     for key, each in pairs:
         if key in read:
-            raise JsonFormError(f"The key {key!r} appears twice in one object.")
+            raise JsonFormError(composeRefusal(
+                f"The key {key!r}", "appears twice in one object", "Remove one of them"
+            ))
         read[key] = each
     return read
 

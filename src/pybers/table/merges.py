@@ -5,6 +5,7 @@ The model half of a merge. How one is stored, as a formula in the merge store,
 is `_merges`, and what it discards is `Table.mergeAdd`'s to say.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-29  Moved out of `cells` for PYB-136, which took that module past its limit.
 """
 from __future__ import annotations
@@ -25,6 +26,7 @@ from pybers.addressing.reference import (
     CellReferenceLike,
 )
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeRefusal
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,9 +43,10 @@ class MergeRange:
         """Reject an unbounded extent, and drop the locking markers of a bounded one."""
         extent = self.extent
         if extent.rowsUnbounded or extent.colsUnbounded:
-            raise ReferenceError(
-                f"A merge covers a fixed block of cells, and {extent} is unbounded."
-            )
+            raise ReferenceError(composeRefusal(
+                str(extent), "is open on an axis, and a merge covers a fixed block of "
+                "cells", "Bound its rows and its columns",
+            ))
         # A merge is a block of positions, and a position carries no lock.
         object.__setattr__(
             self,
@@ -62,7 +65,7 @@ class MergeRange:
         """Return the top-left cell, the one that holds the merge's value."""
         anchor = self.extent.start
         if anchor is None:
-            raise ReferenceError(f"{self.extent} has no anchor cell.")
+            raise ReferenceError(composeRefusal(str(self.extent), "has no anchor cell"))
         return anchor.address
 
     @property
@@ -76,7 +79,9 @@ class MergeRange:
         startRow, startCol = self.extent.startRow, self.extent.startCol
         endRow, endCol = self.extent.endRow, self.extent.endCol
         if startRow is None or startCol is None or endRow is None or endCol is None:
-            raise ReferenceError(f"{self.extent} is unbounded and bounds no merge.")
+            raise ReferenceError(composeRefusal(
+                str(self.extent), "is open on an axis, so it bounds no merge"
+            ))
         return (startRow, startCol, endRow, endCol)
 
     def covers(self, address: CellReferenceLike) -> bool:

@@ -154,7 +154,7 @@ def testEveryPrintedDeclarationReadsBackUnchanged() -> None:
 
 
 @pytest.mark.parametrize(("text", "reason"), [
-    ("body-padding: 6", "body-padding: padding is a length in points"),
+    ("body-padding: 6", "The padding '6' is not a length in points"),
     ("body-margin: 6pt", "The closest is body-padding"),
 ])
 def testADeclarationPybersCannotReadIsRefused(text: str, reason: str) -> None:

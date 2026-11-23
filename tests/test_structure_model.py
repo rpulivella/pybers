@@ -115,8 +115,8 @@ def testRemovingAReferencedColumnBreaksAFormulaInAnotherTable() -> None:
     [
         (lambda table: table.rowAdd(0), "from 1 to 13"),
         (lambda table: table.rowAdd(14), "from 1 to 13"),
-        (lambda table: table.rowAdd(3, 0), "one or more rows"),
-        (lambda table: table.rowAdd(True), "named by a number"),
+        (lambda table: table.rowAdd(3, 0), "is not a whole number 1 or more"),
+        (lambda table: table.rowAdd(True), "is not a row number"),
         (lambda table: table.rowRemove(12, 2), "cannot be removed"),
         (lambda table: table.rowRemove(1, 12), "would leave none"),
         (lambda table: table.columnAdd("LEDGER"), "past column"),

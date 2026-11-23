@@ -11,6 +11,7 @@ Node arrays are asserted as `(nodeType, content)` pairs, because `FormulaNode`
 excludes its archive bytes from equality and a parsed node has none to carry.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-22  The goldens' writes and comparisons moved to the golden builders, for
             PYB-255.
 2026-09-11  Brackets, which are a node rather than a derivation, for #67.
@@ -619,7 +620,7 @@ def testASingleCellPieceBecomesACoordinateRatherThanARange() -> None:
 
 def testAPlaceholderWithNoAddressGivenIsRefusedByName() -> None:
     """Naming what was expected, since a silent empty would parse as nonsense."""
-    with pytest.raises(FormulaSyntaxError, match="No address was given"):
+    with pytest.raises(FormulaSyntaxError, match="no address was given"):
         parseFormula("=SUM({sales})", "A1")
 
 

@@ -8,6 +8,7 @@ is the most important: every archive in every document is reached by reading a
 varint, so a bad decode desynchronizes the whole stream rather than raising.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-01  Split out of the Snappy codec's tests with the code they cover.
 """
 from __future__ import annotations
@@ -62,7 +63,7 @@ def test_aNegativeValueIsRefusedRatherThanWrapped() -> None:
 
 def test_aVarintRunningPastTheBufferIsRefused() -> None:
     """Every byte sets the continuation flag, so the value never terminates."""
-    with pytest.raises(VarintError, match="ran past the end"):
+    with pytest.raises(VarintError, match="runs past the end"):
         readVarint(b"\x80\x80\x80", 0)
 
 

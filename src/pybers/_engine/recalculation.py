@@ -2,12 +2,13 @@
 """\
 The dirty set: the cells that moved, so Numbers recalculates what depends on them.
 
-**Numbers does not recalculate on open**, so an edited cell has to be named in
-`refs_to_dirty` or its dependents keep showing what they last computed. Naming only
+**Numbers does not recalculate on open**, so an edited cell has to be listed in
+`refs_to_dirty` or its dependents keep showing what they last computed. Listing only
 the cells that changed is enough: Numbers walks its own dependency graph from
 there, across tables and across sheets.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-22  Split out of the engine module for PYB-113.
 """
 from __future__ import annotations
@@ -22,14 +23,14 @@ __date__ = "2026/09/22"
 
 from .._generated import TSCEArchives_pb2 as tsce
 from .._persistence.index import ArchiveIndex
-from ..errors import WriteError
+from ..errors import WriteError, composeRefusal, nothingWritten
 from .owners import findCalculationEngine, readTableOwnerIds
 
 
 def buildDirtySet(
     edits: dict[int, list[tuple[int, int]]]
 ) -> tsce.ReferencesToDirtyArchive:
-    """Return the archive naming every cell that moved, grouped as Numbers groups them.
+    """Return the archive listing every cell that moved, grouped as Numbers groups them.
 
     Owners hold columns, columns hold a set of row ranges. Contiguous rows collapse
     into one range, which is how Numbers writes its own, and a run of one omits
@@ -74,22 +75,24 @@ def requestRecalculation(
         return 0
     engine = findCalculationEngine(index)
     if not engine.HasField("refs_to_dirty"):
-        raise WriteError(
-            "The calculation engine carries no refs_to_dirty reference, so the cells "
-            "that changed cannot be marked and the saved file would display stale "
-            "formula results."
-        )
+        raise WriteError(composeRefusal(
+            "The calculation engine", "carries no list of cells awaiting "
+            "recalculation, so the cells that changed cannot be marked and the saved "
+            "file would show stale formula results (refs_to_dirty)",
+            notDone=nothingWritten,
+        ))
 
     ownerIds = readTableOwnerIds(index, engine)
     edits: dict[int, list[tuple[int, int]]] = {}
     for tableIdentifier, cells in written.items():
         ownerId = ownerIds.get(tableIdentifier)
         if ownerId is None:
-            raise WriteError(
-                f"The table in archive {tableIdentifier} has no calculation-engine "
-                "owner id, so the cells edited in it cannot be marked for "
-                "recalculation and the saved file would display stale results."
-            )
+            raise WriteError(composeRefusal(
+                f"The table in archive {tableIdentifier}", "has no entry in the "
+                "calculation engine, so the cells edited in it cannot be marked for "
+                "recalculation and the saved file would show stale results",
+                notDone=nothingWritten,
+            ))
         edits.setdefault(ownerId, []).extend(cells)
 
     index.archiveWrite(engine.refs_to_dirty.identifier, buildDirtySet(edits))

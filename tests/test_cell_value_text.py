@@ -58,7 +58,7 @@ def testTextThatIsNotTheKindNamedIsRefused() -> None:
 
 def testAKindNoParserReadsIsRefusedListingThoseThatDo() -> None:
     with pytest.raises(
-        pybers.WriteError, match="Use number, currency, boolean, date, duration, text"
+        pybers.WriteError, match="'rich-text' is not a kind read from text"
     ):
         parseCellValue("x", "rich-text")
 

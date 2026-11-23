@@ -10,6 +10,7 @@ on without asking, measured 2026-09-23 in `60e-move-overwrite`, and pybers refus
 instead, since that discards a value nobody asked to lose.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  Every position of the block carries its borders in the model, and
             the facing side pybers wrote beside it, for PYB-266.
 2026-10-14  Writes the table's own store, `cells` being read-only, and checks a
@@ -39,6 +40,7 @@ from pybers.addressing.reference import (
     CellReferenceLike,
 )
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeChoiceRefusal, composeRefusal, nothingWritten
 from pybers.formula.nodes import Formula, FormulaRange, FormulaReference
 from pybers.formula.relocation import (
     FormulaBlockMove,
@@ -58,7 +60,10 @@ def findBlockCorners(extent: CellRange) -> tuple[int, int, int, int]:
     startRow, startCol = extent.startRow, extent.startCol
     endRow, endCol = extent.endRow, extent.endCol
     if startRow is None or startCol is None or endRow is None or endCol is None:
-        raise ReferenceError(f"{extent} is unbounded and moves no block.")
+        raise ReferenceError(composeRefusal(
+            str(extent), "is open on an axis, so it is no block",
+            "Bound its rows and its columns", nothingWritten,
+        ))
     return (startRow, startCol, endRow, endCol)
 
 
@@ -94,14 +99,13 @@ class CellsMove:
 
 
 def toRelocationRule(references: str) -> FormulaReferenceRelocation:
-    """Return the rule a caller named, accepting its spelling as text."""
+    """Return the rule a caller specified, accepting its spelling as text."""
     try:
         return FormulaReferenceRelocation(references)
     except ValueError as exc:
-        spelled = ", ".join(repr(rule.value) for rule in FormulaReferenceRelocation)
-        raise ReferenceError(
-            f"{references!r} is not a reference rule. A relocation names one of "
-            f"{spelled}."
+        raise composeChoiceRefusal(
+            ReferenceError, references, "a reference rule",
+            [each.value for each in FormulaReferenceRelocation], nothingWritten,
         ) from exc
 
 
@@ -119,15 +123,15 @@ def refuseMergeCut(table: Table, move: CellsMove, action: str) -> None:
         covered = list(merge.extent)
         inside = sum(1 for reference in covered if source.covers(reference))
         if 0 < inside < len(covered):
-            raise ReferenceError(
-                f"{source} cuts the merge {merge.extent} in two. A {action} takes the "
-                "whole merge or none of it."
-            )
+            raise ReferenceError(composeRefusal(
+                str(source), f"cuts the merge {merge.extent} in two, and a {action} "
+                "takes the whole merge or none of it", notDone=nothingWritten,
+            ))
         if inside == 0 and any(destination.covers(reference) for reference in covered):
-            raise ReferenceError(
-                f"{destination} lands on the merge {merge.extent}, which the {action} "
-                "would overwrite."
-            )
+            raise ReferenceError(composeRefusal(
+                str(destination), f"lands on the merge {merge.extent}, which the "
+                f"{action} would overwrite", notDone=nothingWritten,
+            ))
 
 
 def refuseOccupied(table: Table, move: CellsMove, action: str) -> None:
@@ -137,10 +141,10 @@ def refuseOccupied(table: Table, move: CellsMove, action: str) -> None:
             continue
         cell = table.cells.get(reference)
         if cell is not None and isCellOccupied(cell):
-            raise ReferenceError(
-                f"{reference} is occupied, and a {action} of {move.source} onto "
-                f"{move.destination} would overwrite it."
-            )
+            raise ReferenceError(composeRefusal(
+                str(reference), f"is occupied, and a {action} of {move.source} onto "
+                f"{move.destination} would overwrite it", notDone=nothingWritten,
+            ))
 
 
 def findNamedCellRewrites(

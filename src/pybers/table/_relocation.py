@@ -18,6 +18,7 @@ count is refused rather than guessed.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  Borders are written from the table's own, so neither a move nor a
             copy carries them here, for PYB-266.
 2026-11-02  A table with no stroke sidecar, as a created one is, moves and copies
@@ -68,7 +69,7 @@ from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry
 from .._persistence.rows import readStoredTiles
 from ..addressing.reference import CellAddress, originOffset
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from ..formula._read import readFormula
 from ._conditions import readConditionalPlan, writeConditionalCounts
 from ._lines import GridMaps
@@ -160,7 +161,7 @@ def listCoveredOffsets(cell: Cell) -> list[tuple[int, int]]:
 def findCellCopies(table: Table) -> CellCopies:
     """Return every filled cell and where the record of the cell it copied now sits.
 
-    Named by where each source sits in the model, which is where its record sits
+    Keyed by where each source sits in the model, which is where its record sits
     once any move is carried, and copies are carried after moves.
     """
     records: dict[tuple[int, int], tuple[int, int] | None] = {}
@@ -171,10 +172,11 @@ def findCellCopies(table: Table) -> CellCopies:
             continue
         source = copy.source
         if table.cells.get(source.address) is not source:
-            raise WriteError(
-                f"{reference} was copied from a cell no longer in {table.name!r}, "
-                "so there is no record to copy."
-            )
+            raise WriteError(composeRefusal(
+                str(cell.reference), "was copied from a "
+                "cell its table no longer holds, so there is no record to copy",
+                notDone=nothingWritten,
+            ))
         stored = source.address
         row, column = reference.row - originOffset, reference.col - originOffset
         top, left = stored.row - originOffset, stored.col - originOffset
@@ -213,10 +215,11 @@ def placeRecords(
         slots = len(rowInfo.cell_offsets) // offsetWidth
         beyond = [column for column in placed if column >= slots]
         if beyond:
-            raise WriteError(
-                f"A record would land in column {min(beyond) + originOffset}, past "
-                f"the {slots} offset slots row {row + originOffset} carries."
-            )
+            raise WriteError(composeFault(
+                "A record", f"would land in column {min(beyond) + originOffset}, "
+                f"past the {slots} offset slots row {row + originOffset} carries",
+                nothingWritten,
+            ))
         rowInfo.cell_offsets, rowInfo.cell_storage_buffer = rewriteRow(
             rowInfo.cell_offsets, rowInfo.cell_storage_buffer, target.unit, placed,
             frozenset(removals.get(row, set()) - placed.keys()),
@@ -282,13 +285,14 @@ class RecordCopies:
 
 
 def refuseUncopyableRecord(record: CellRecord, where: CellAddress) -> None:
-    """Refuse a record whose duplicate would name an entry nobody counted."""
+    """Refuse a record whose duplicate would refer to an entry nobody counted."""
     for at, bit in listReferenceSlots(record.raw):
         if (at, bit) not in copyableSlots:
-            raise WriteError(
-                f"{where} names an entry through byte {at} bit {bit:#04x}, which is "
-                "not identified, so a copy of it could not be counted."
-            )
+            raise WriteError(composeRefusal(
+                str(where), f"refers to an entry through byte {at} bit {bit:#04x}, "
+                "which pybers does not identify, so copying it is not supported",
+                notDone=nothingWritten,
+            ))
 
 
 def copyCellRecords(
@@ -320,11 +324,11 @@ def copyCellRecords(
     ]
     if missing:
         row, column = min(missing)
-        raise WriteError(
-            f"A copy names the record at "
+        raise WriteError(composeFault(
+            "A copy", "reads the record at "
             f"{CellAddress(row + originOffset, column + originOffset)}, and the file "
-            "holds none there."
-        )
+            "holds none there", nothingWritten,
+        ))
     placed = {
         landed: found[stored] for landed, stored in records.items()
         if stored is not None and stored in found
@@ -355,7 +359,7 @@ def applyConditionChanges(
 
     A cell holding no conditions keeps whatever rule its record names, since the
     model says nothing about it. Used after a move, where a condition that keeps its
-    named cell has to change while the rule it came from stays for other cells.
+    referenced cell has to change while the rule it came from stays for other cells.
     """
     plan = readConditionalPlan(index, registry, store)
     if plan is None or not plan.rules:

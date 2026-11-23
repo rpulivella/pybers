@@ -6,6 +6,7 @@ Each unfamiliar document is made by retyping one archive or one cell record of a
 real fixture, so a test names exactly what pybers has not met.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, names withheld unless
             asked for, for PYB-223.
 2026-10-12  Missing parts are asserted by the sentinel naming why, for PYB-190.
@@ -240,7 +241,10 @@ def testADocumentPybersCannotOpenReportsWhy(tmp_path: Path) -> None:
     failure = pybers.checkDocument(writePackageCopy(package, tmp_path)).failure
     assert failure is not None
     assert failure.errorType == "ReadError"
-    assert failure.message == "Expected exactly one TN.DocumentArchive, found 0."
+    assert failure.message == (
+        "The document holds 0 document roots rather than one (TN.DocumentArchive). "
+        "Nothing was read."
+    )
     assert any(frame.startswith("document/_read.py:") for frame in failure.frames)
 
 

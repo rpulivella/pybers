@@ -3,6 +3,7 @@
 `pybers check`, run the way a person reporting a bug runs it.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, names withheld unless
             asked for, for PYB-223.
 2026-10-27  A size of one row reads `1 row`, and `renderPlain` shared from
@@ -190,7 +191,7 @@ def writeZipWithoutDocument(tmp_path: Path) -> Path:
         (findAbsentPath, "does not exist"),
         (findDirectoryPath, "is a directory"),
         (writeTextFile, "not a zip archive"),
-        (writeZipWithoutDocument, "holds no Index/*.iwa member"),
+        (writeZipWithoutDocument, "holds none of the archives every Numbers document"),
     ],
 )
 def testCheckRefusesAFileItCannotCheckByNameAndReason(
@@ -215,7 +216,7 @@ def testCheckRefusesAnUnreadableFileByNameAndReason(tmp_path: Path) -> None:
     finally:
         locked.chmod(0o600)
     assert result.exit_code == 1
-    assert f"{locked} could not be read: Permission denied." in result.stderr
+    assert f"{locked} cannot be read (Permission denied)." in result.stderr
 
 
 def testPythonDashMPybersRunsTheSameCommand(

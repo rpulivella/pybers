@@ -19,6 +19,7 @@ Numbers opens with its charts, conditional formats and print settings quietly
 gone, rather than as an error.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  A document built in memory is created on save, for PYB-261.
 2026-11-02  A created document saves, for PYB-261.
 2026-10-28  A changed region is written, marking every formula for
@@ -68,7 +69,7 @@ from .._persistence import (
 )
 from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
-from ..errors import WriteError
+from ..errors import WriteError, composeRefusal, nothingWritten
 from ..table._write import TableSave, openTableSave
 from ..table.cells import Table
 from ._create import composeModelPackage, createSheets
@@ -100,11 +101,11 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave
             if index.typeOf(drawable) == tableInfoTypeId
         ]
         if len(sheet.tables) != len(tableReferences):
-            raise WriteError(
-                f"{sheet.name!r} holds {len(tableReferences)} tables and the model "
-                f"holds {len(sheet.tables)}. Adding or removing a table is not "
-                "supported."
-            )
+            raise WriteError(composeRefusal(
+                f"The sheet {sheet.name!r}", f"holds {len(tableReferences)} tables in "
+                f"its file and {len(sheet.tables)} in the model, and adding or "
+                "removing a table this way is not supported", notDone=nothingWritten,
+            ))
         for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
             tables.tableWrite(table, tableReference)
             written.append((table, tableReference.identifier))
@@ -126,10 +127,10 @@ def resolveSaveTarget(document: Document, path: Path | str | None) -> Path:
     if path is not None:
         return Path(path)
     if document._sourcePath is None:
-        raise WriteError(
-            "This document was not read from a file, so there is nowhere to save "
-            "it in place. Pass a path to save."
-        )
+        raise WriteError(composeRefusal(
+            "This document", "was not read from a file, so it has no place to be "
+            "saved in", "Give a path to save it to", nothingWritten,
+        ))
     return document._sourcePath
 
 
@@ -143,9 +144,10 @@ def writeAtomically(package: NumbersPackage, target: Path) -> None:
     """
     directory = target.parent
     if not directory.is_dir():
-        raise WriteError(
-            f"{target} cannot be saved, because {directory} is not a directory."
-        )
+        raise WriteError(composeRefusal(
+            str(directory), f"is not a directory, so {target.name} cannot be saved in "
+            "it", "Give a path in a directory that exists", nothingWritten,
+        ))
 
     # Opened only to reserve a unique name in the target's own directory, so that
     # the replace below is atomic on the same filesystem. `delete=False` keeps the

@@ -8,6 +8,7 @@ their lines. Of two facing strokes that disagree, Numbers draws the one with the
 higher `order`. See findings-06-styles.md and findings-03-structure.md.
 
 UPDATES
+2026-11-23  A part is selected or specified, never named, for PYB-307.
 2026-11-20  `edgeComputedFind`, for PYB-291.
 2026-11-17  Written for PYB-266, taking over the rules `_strokes` applied to the
             archive at save time. Drawing and reading on a table is in
@@ -238,7 +239,7 @@ class TableBorders:
         self, rowIdentities: Sequence[int], columnIdentities: Sequence[int],
         sides: Iterable[tuple[int, int, CellBorderSide]], stroke: Stroke | None,
     ) -> bool:
-        """Draw a stroke on each side named and the neighbor's side facing it.
+        """Draw a stroke on each side specified and the neighbor's side facing it.
 
         Rows and columns count from one, and None removes both. Every side takes
         one new order, so it prevails over anything drawn before. Returns whether

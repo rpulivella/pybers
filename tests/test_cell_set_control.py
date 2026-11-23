@@ -87,14 +87,15 @@ def testRemovingNoControlChangesNothing(working: Path) -> None:
 def testAControlBesideAFormatItCannotUseIsRefusedNamingBoth(working: Path) -> None:
     refusal = (
         "A2 shows its value through a text format, which a slider control cannot use. "
-        "It uses currency, fraction, number, numeral-system, percent, scientific."
+        "The formats it uses are currency, fraction, number, numeral-system, percent "
+        "and scientific. Nothing was written."
     )
     with pytest.raises(pybers.WriteError, match=re.escape(refusal)):
         pybers.open(working).cellSet("::Table 1::A2", control=slider)
 
 
 def testAControlPybersCannotYetWriteIsRefused(working: Path) -> None:
-    with pytest.raises(pybers.WriteError, match="cannot yet write a slider control"):
+    with pytest.raises(pybers.WriteError, match="writing one is not supported"):
         pybers.open(working).cellSet("::Table 1::A1", control=slider)
 
 
@@ -121,11 +122,11 @@ def testNoneNamesNoControl() -> None:
 
 
 @pytest.mark.parametrize(("text", "refusal"), [
-    ("knob", "'knob' is no control. Use one of: none, checkbox"),
-    ("slider; minimum: 0", "slider needs maximum, increment."),
+    ("knob", "'knob' is not a control."),
+    ("slider; minimum: 0", "A slider control needs maximum and increment."),
     ("slider; minimum: x; maximum: 1; increment: 1",
-     "slider minimum is 'x', not a number"),
-    ("checkbox; size: 2", "checkbox has no setting 'size'; it takes no settings."),
+     "'x' is not a number, and slider minimum takes one."),
+    ("checkbox; size: 2", "'size' is not a setting of checkbox, which takes none."),
     ("pop-up-menu; items: a; starts-with-first-item: no", "not a list of quoted items"),
 ])
 def testATextFormNamingNoControlOrSettingIsRefusedSayingWhich(
@@ -144,4 +145,4 @@ def testACommandRemovesAControl(working: Path) -> None:
 def testACommandRefusesAControlNamingNone(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::G1", "--cell-control", "knob")
     assert result.exit_code == 1
-    assert "'knob' is no control" in readPlainText(result.output)
+    assert "'knob' is not a control" in readPlainText(result.output)

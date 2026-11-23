@@ -14,6 +14,7 @@ not create two table names differing only in case on one sheet, and enforces not
 about sheet names, so folding them would invent a collision the file does not have.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  A typed lookup parses a reference rather than one literal name, and a
             refusal quotes reference text verbatim, for PYB-267.
 2026-11-17  `findBlockTarget`, the one block a border is drawn on, for PYB-266.
@@ -49,7 +50,13 @@ from pybers.addressing.text import (
     quoteReferenceText,
     readEscapedText,
 )
-from pybers.document.sheets import Document, SelectionError, Sheet, listPresent
+from pybers.document.sheets import Document, SelectionError, Sheet
+from pybers.errors import (
+    composeRefusal,
+    composeTextRefusal,
+    formatChoiceList,
+    nothingWritten,
+)
 from pybers.selection.conditions import matchPseudoClass, selectorAttributes
 from pybers.selection.selector import (
     SelectorAttribute,
@@ -60,7 +67,6 @@ from pybers.selection.selector import (
     SelectorLike,
     SelectorNegation,
     SelectorPseudoClass,
-    formatPlace,
     positionNames,
     toSelector,
 )
@@ -108,6 +114,18 @@ def formatMatches(matches: Sequence[SelectionMatch]) -> str:
     return shown if rest <= 0 else f"{shown} and {rest} more"
 
 
+def listPresent(kind: str, names: Sequence[str]) -> str:
+    """Return the part of a refusal listing the names present, to ask for one."""
+    if not names:
+        return f"It holds no {kind}s"
+    return f"The {kind}s are {quoteChoices(names)}"
+
+
+def quoteChoices(names: Sequence[str]) -> str:
+    """Return names as prose, each quoted as reference text."""
+    return formatChoiceList([quoteReferenceText(each) for each in names])
+
+
 def findPositions(owner: SelectionOwner) -> int:
     """Return how many positions a selector given to an owner fills."""
     if isinstance(owner, Document):
@@ -125,11 +143,11 @@ def placeComponents(
     if len(components) > positions:
         kind = type(owner).__name__.lower()
         reached = positionNames[first:]
-        raise SelectorError(
-            f"`{group}` names {len(components)} positions, and a selector given to a "
-            f"{kind} names at most {positions}: {', '.join(reached)}. Select from "
-            "the document to name more."
-        )
+        raise SelectorError(composeRefusal(
+            f"`{group}`", f"fills {len(components)} positions, and a selector given "
+            f"to a {kind} fills at most {positions}, {formatChoiceList(reached)}",
+            "Select from the document to reach more",
+        ))
     placed: list[SelectorComponent | None] = [None] * len(positionNames)
     last = len(positionNames) - 1
     if group.fromRight:
@@ -184,16 +202,16 @@ def refuseExactMiss(
     """Refuse a component naming one thing exactly that nothing searched carries."""
     if component is None or not component.exact:
         return
-    raise SelectionError(
-        f"No {kind} in {within} is named {quoteReferenceText(component.pattern)}. "
-        f"{listPresent(kind, names)}"
-    )
+    raise SelectionError(composeRefusal(
+        quoteReferenceText(component.pattern), f"selects no {kind} in {within}",
+        listPresent(kind, names),
+    ))
 
 
 def readCellsComponent(
     component: SelectorComponent, group: SelectorGroup
 ) -> CellAddress | CellRange | None:
-    """Return the cell or range a cells component names, None for any cell."""
+    """Return the cell or range a cells component selects, None for any cell."""
     text = readEscapedText(component.pattern)
     if text in ("", "*"):
         return None
@@ -204,11 +222,10 @@ def readCellsComponent(
     except ReferenceError as exc:
         written = str(group)
         where = max(written.find(component.pattern), 0)
-        raise SelectorError(
-            f"{formatPlace(written, where)} `{text}` is in the cells position, and is "
-            "not an address, a range, a column or a row such as `B3`, `B2:D9`, `B` "
-            f"or `3`. {exc}"
-        ) from exc
+        raise SelectorError(composeTextRefusal(
+            written, where, "is not a cell, a range, a column or a row",
+            "Write it as `B3`, `B2:D9`, `B` or `3`, counting rows from one",
+        )) from exc
 
 
 def matchConditions(
@@ -261,7 +278,7 @@ def matchCells(
     group: SelectorGroup,
 ) -> list[PartMatch]:
     """Return what a cells component and a group's conditions match in each table."""
-    named = None if component is None else readCellsComponent(component, group)
+    selected = None if component is None else readCellsComponent(component, group)
     exclusions = [] if component is None else [
         found for each in component.exclusions
         if (found := readCellsComponent(SelectorComponent(each), group)) is not None
@@ -271,16 +288,16 @@ def matchCells(
     misses: list[str] = []
     for sheet, table in tables:
         extent = table.extent
-        if named is None:
+        if selected is None:
             if extent is None:
                 continue
             area: CellRange | CellAddress = extent
         else:
-            miss = findCellsMiss(table, named)
+            miss = findCellsMiss(table, selected)
             if miss is not None:
                 misses.append(miss)
                 continue
-            area = named
+            area = selected
         if not expand:
             matches.append(PartMatch(sheet, table, area))
             continue
@@ -293,12 +310,12 @@ def matchCells(
             PartMatch(sheet, table, address)
             for address in listCells(table, bounded, group, exclusions)
         ]
-    if named is not None and misses and len(misses) == len(tables):
+    if selected is not None and misses and len(misses) == len(tables):
         if len(misses) == 1:
             raise ReferenceError(misses[0])
-        raise ReferenceError(
-            f"{named} names no cell in the tables selected. {' '.join(misses)}"
-        )
+        raise ReferenceError(composeRefusal(
+            f"`{selected}`", f"is outside each of the {len(tables)} tables selected"
+        ))
     return matches
 
 
@@ -360,11 +377,11 @@ def refuseSharedSheetName(
         str(position) for position, each in enumerate(document.sheets, start=1)
         if any(each is sheet for sheet in sheets)
     )
-    raise SelectionError(
-        f"{len(sheets)} sheets in this document are named "
-        f"{quoteReferenceText(str(SheetReference(sheets[0].name)))}, at "
-        f"positions {positions}. {remedy}"
-    )
+    raise SelectionError(composeRefusal(
+        quoteReferenceText(str(SheetReference(sheets[0].name))),
+        f"names {len(sheets)} sheets in this document, at positions {positions}",
+        remedy,
+    ))
 
 
 def selectParts(owner: SelectionOwner, selector: SelectorLike) -> list[PartMatch]:
@@ -381,7 +398,7 @@ def selectParts(owner: SelectionOwner, selector: SelectorLike) -> list[PartMatch
                 assert held.sheet is not None and part.sheet is not None
                 refuseSharedSheetName(
                     owner, [held.sheet, part.sheet],
-                    "A selector reaches a sheet by its name, so rename one.",
+                    "Rename one, since a selector reaches a sheet by its name",
                 )
     return list(matches.values())
 
@@ -404,13 +421,17 @@ def findSheet(document: Document, name: str | SheetReference | None) -> Sheet:
                   if part.sheet is not None]
     if len(sheets) == 1:
         return sheets[0]
+    if name is None and not sheets:
+        raise SelectionError(
+            composeRefusal("This document", "holds no sheet", "Add one first")
+        )
     if name is None:
         present = [str(SheetReference(each.name)) for each in document.sheets]
-        raise SelectionError(
-            f"No sheet was named, and this document holds {len(sheets)}. Name one. "
-            f"{listPresent('sheet', present)}"
-        )
-    refuseSharedSheetName(document, sheets, "Reach one by position instead.")
+        raise SelectionError(composeRefusal(
+            "This document", f"holds {len(sheets)} sheets, and no sheet was named",
+            f"Name one of the sheets, {quoteChoices(present)}",
+        ))
+    refuseSharedSheetName(document, sheets, "Reach one by its position instead")
 
 
 def buildTableGroup(
@@ -423,11 +444,13 @@ def buildTableGroup(
     name = SelectorComponent(escapeSelectorName(reference.name))
     if isinstance(owner, Sheet):
         if reference.sheet is not None and reference.sheet.name != owner.name:
-            raise SelectionError(
-                f"{quoteReferenceText(str(reference))} names a table on sheet "
-                f"{quoteReferenceText(str(reference.sheet))}, and this is sheet "
-                f"{quoteReferenceText(str(SheetReference(owner.name)))}."
-            )
+            raise SelectionError(composeRefusal(
+                quoteReferenceText(str(reference)),
+                f"selects a table on sheet {quoteReferenceText(str(reference.sheet))}, "
+                "and this is sheet "
+                f"{quoteReferenceText(str(SheetReference(owner.name)))}",
+                f"Look it up on {quoteReferenceText(str(reference.sheet))} instead",
+            ))
         return SelectorGroup((name,))
     if reference.sheet is None:
         return SelectorGroup((SelectorComponent(""), name))
@@ -452,21 +475,22 @@ def findTable(owner: Document | Sheet, name: str | TableReference | None) -> Tab
         for part in found if part.table is not None
     ]
     within = (
-        "this document" if isinstance(owner, Document)
+        "This document" if isinstance(owner, Document)
         else quoteReferenceText(str(SheetReference(owner.name)))
     )
     if name is None:
         if not found:
-            raise SelectionError(f"No table was named, and {within} holds none.")
-        raise SelectionError(
-            f"No table was named, and {within} holds {len(found)}. Name one. "
-            f"{listPresent('table', qualified)}"
-        )
-    shared = ", ".join(quoteReferenceText(each) for each in qualified)
-    raise SelectionError(
-        f"{quoteReferenceText(str(name))} names a table on more than one sheet. Name "
-        f"its sheet as well: {shared}."
-    )
+            raise SelectionError(
+                composeRefusal(within, "holds no table", "Add one first")
+            )
+        raise SelectionError(composeRefusal(
+            within, f"holds {len(found)} tables, and no table was named",
+            f"Name one of the tables, {quoteChoices(qualified)}",
+        ))
+    raise SelectionError(composeRefusal(
+        quoteReferenceText(str(name)), "selects a table on more than one sheet",
+        f"Name its sheet as well, as {quoteChoices(qualified)} do",
+    ))
 
 
 def findCellTargets(
@@ -482,7 +506,7 @@ def findCellTargets(
         table, cells = part.table, part.cells
         if table is None or cells is None:
             kind = "sheet" if table is None else "table"
-            skipped.append(CellSkip(part.reference, f"a {kind}, not cells"))
+            skipped.append(CellSkip(part.reference, f"is a {kind}, not a cell"))
             continue
         addresses = (
             [cells] if isinstance(cells, CellAddress)
@@ -498,16 +522,18 @@ def findCellTargets(
 def findBlockTarget(
     document: Document, selector: SelectorLike, action: str
 ) -> tuple[Table, CellRange]:
-    """Return the one bounded block of one table a selector names, or refuse.
+    """Return the one bounded block of one table a selector selects, or refuse.
 
     Refused before anything is written, listing what the selector matched.
     """
     parts = selectParts(document, selector)
     if len(parts) != 1 or parts[0].table is None or parts[0].cells is None:
-        raise SelectionError(
-            f"A {action} draws on one block of cells in one table, and the selector "
-            f"matched {formatMatches([part.reference for part in parts])}."
-        )
+        raise SelectionError(composeRefusal(
+            f"`{selector}`",
+            f"matches {formatMatches([part.reference for part in parts])}, and a "
+            f"{action} is drawn on one block of cells in one table",
+            "Select one block, such as `Q3::B2:D9`", nothingWritten,
+        ))
     table, cells = parts[0].table, parts[0].cells
     block = (
         CellRange.fromReferences(cells, cells) if isinstance(cells, CellAddress)
@@ -521,7 +547,7 @@ def findExtendTarget(
 ) -> tuple[Table, CellAddress]:
     """Return the one table and address a write growing its table writes.
 
-    The selector names one address in one table, which may lie past the table's end.
+    The selector selects one cell in one table, which may lie past the table's end.
     """
     found = toSelector(selector)
     group = found.groups[0]
@@ -533,19 +559,21 @@ def findExtendTarget(
         else readCellsComponent(component, group)
     )
     if not isinstance(address, CellAddress):
-        raise SelectionError(
-            f"`{found}` names more than one address, and growing a table to hold "
-            "a cell takes one, such as `Sheet 1::Table 1::B30`."
-        )
+        raise SelectionError(composeRefusal(
+            f"`{found}`", "selects more than one cell, and growing a table to hold "
+            "a cell takes one", "Select one cell, such as `Sheet 1::Table 1::B30`",
+            nothingWritten,
+        ))
     tables = matchGroup(document, SelectorGroup(
         tuple(SelectorComponent("") if each is None else each for each in placed[:2])
     ))
     table = tables[0].table if len(tables) == 1 else None
     if table is None:
-        raise SelectionError(
-            f"`{found}` matches {len(tables)} tables, and growing a table to hold "
-            f"a cell grows one: {formatMatches([each.reference for each in tables])}."
-        )
+        matched = formatMatches([each.reference for each in tables])
+        raise SelectionError(composeRefusal(
+            f"`{found}`", f"matches {matched}, and growing a table to hold a cell "
+            "grows one table", "Select one table", nothingWritten,
+        ))
     if not table.isAddressable(address):
         raise ReferenceError(str(findCellsMiss(table, address)))
     return table, address

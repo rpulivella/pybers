@@ -7,6 +7,7 @@ a date, a duration, a checkbox, a star rating, a slider, a stepper and a pop-up 
 and whose `J1` has no record at all.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-22  The goldens' writes and their comparison moved to the golden
             builders, for PYB-255.
 2026-10-22  A number written into a currency cell keeps its currency, for
@@ -202,10 +203,10 @@ def testAnUnrecognizedRecordElsewhereSurvivesAWrite(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(("value", "reason"), [
-    (1.5, "Write Decimal"),
-    (Decimal("NaN"), "not a finite number"),
-    (Decimal("1." + "1" * 40), "decimal128 holds 34"),
-    (datetime.time(9, 30), "A cell holds a Decimal"),
+    (1.5, r"Give Decimal\('1.5'\)"),
+    (Decimal("NaN"), "cannot hold NaN, since decimal128 holds a finite"),
+    (Decimal("1." + "1" * 40), "at most 34 significant digits"),
+    (datetime.time(9, 30), "cannot hold a time. Give a Decimal"),
 ])
 def testAValueThatCannotBeStoredIsRefusedAndTheTableKept(
     value: object, reason: str, tmp_path: Path
@@ -237,7 +238,8 @@ def testAValueOverAnUnrecognizedRecordIsRefusedAndTheFileKept(tmp_path: Path) ->
         document.save()
     assert str(refused.value) == (
         f"The cell in column {column} holds a value of a type pybers does not "
-        f"recognize, {unmeasuredTypeByte}, so pybers cannot tell where its value ends."
+        f"recognize, {unmeasuredTypeByte}, so pybers cannot tell where its value ends. "
+        "Nothing was written."
     )
     assert working.read_bytes() == unchanged
 

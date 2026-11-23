@@ -11,6 +11,7 @@ eight-tile table and raises nothing. See findings-03-structure.md.
 Private. Used by the table feature's reader and writer alike.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  Written for PYB-278, from the walks the reader and the writer each kept.
 """
 from __future__ import annotations
@@ -62,7 +63,7 @@ def iterateTileRows(tileid: int, tile: tst.Tile, tileSize: int) -> Iterator[Tile
 
 @dataclass(frozen=True, slots=True)
 class StoredTiles:
-    """A table's tiles in the order its tile list names them, walked row by row."""
+    """A table's tiles in the order its tile list specifies them, walked row by row."""
 
     tileSize: int
     tiles: tuple[tuple[int, tst.Tile], ...]
@@ -74,7 +75,7 @@ class StoredTiles:
 
 
 def readStoredTiles(index: ArchiveIndex, store: tst.DataStore) -> StoredTiles:
-    """Return a table's tiles, resolved in the order its tile list names them."""
+    """Return a table's tiles, resolved in the order its tile list specifies them."""
     return StoredTiles(
         store.tiles.tile_size,
         tuple(

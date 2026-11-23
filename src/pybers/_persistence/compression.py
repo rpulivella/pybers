@@ -26,6 +26,7 @@ try to. Snappy has many valid encodings of the same input, the format carries no
 canonical form, and the unchanged round trip never reaches this code.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-08-16  Written. Validated against all 213 frames of empty-1/2/3.numbers:
             every frame decoded to exactly its declared uncompressed length.
 2026-09-01  Added the encoder for #2, so a rewritten frame can be stored.
@@ -42,7 +43,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/16"
 
-from ..errors import PybersError
+from ..errors import PybersError, composeRefusal
 from .varint import readVarint, writeVarint
 
 
@@ -93,10 +94,10 @@ def decompressRaw(block: bytes) -> bytes:
             offset += 5
 
         if copyOffset == 0 or copyOffset > len(out):
-            raise SnappyError(
-                f"Copy offset {copyOffset} reaches outside the {len(out)} bytes "
-                "decoded so far."
-            )
+            raise SnappyError(composeRefusal(
+                f"Copy offset {copyOffset}", f"reaches outside the {len(out)} bytes "
+                "decoded so far",
+            ))
 
         start = len(out) - copyOffset
         if copyOffset >= length:
@@ -110,9 +111,10 @@ def decompressRaw(block: bytes) -> bytes:
                 out.append(out[start + index])
 
     if len(out) != expectedLength:
-        raise SnappyError(
-            f"Block declared {expectedLength} bytes but decoded to {len(out)}."
-        )
+        raise SnappyError(composeRefusal(
+            "The Snappy block", f"declares {expectedLength} bytes and decodes to "
+            f"{len(out)}",
+        ))
     return bytes(out)
 
 

@@ -13,6 +13,7 @@ output, committed, and a test fails when the two differ.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-06  The form's description names a color, for PYB-264.
 2026-10-24  Written for PYB-259.
 """
@@ -37,7 +38,7 @@ from pybers._family import findFamilyDiscriminator
 from pybers.interchange._envelope import JsonForm
 from pybers.interchange._leaves import findLeafRule
 from pybers.interchange._tree import (
-    JsonFormDefinitionError,
+    composeDefinitionFault,
     encodeTree,
     findFieldTypes,
     findJsonFormChoices,
@@ -93,7 +94,7 @@ def buildTypeSchema(declared: object, definitions: dict[str, Any]) -> dict[str, 
             described["propertyNames"] = {"pattern": "^-?[0-9]+$"}
         return described
     if not isinstance(declared, type):
-        raise JsonFormDefinitionError(f"pybers has no JSON schema for {declared!r}.")
+        raise composeDefinitionFault(declared)
     return buildConcreteSchema(declared, definitions)
 
 
@@ -120,7 +121,7 @@ def buildConcreteSchema(declared: type, definitions: dict[str, Any]) -> dict[str
         definitions[declared.__name__] = {}
         definitions[declared.__name__] = buildDataclassSchema(declared, definitions)
         return reference
-    raise JsonFormDefinitionError(f"pybers has no JSON schema for {declared.__name__}.")
+    raise composeDefinitionFault(declared)
 
 
 def buildDataclassSchema(form: type, definitions: dict[str, Any]) -> dict[str, Any]:

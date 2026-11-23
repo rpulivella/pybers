@@ -250,10 +250,13 @@ def testACommandClearsACellsBoxWithNone(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(("declared", "reason"), [
-    ("padding: 6", "padding is a length in points such as 6pt"),
+    ("padding: 6", "The padding '6' is not a length in points. Write it as `6pt`"),
     ("background: gradient", "A gradient fill is read and carried"),
     ("padding: 0pt 2pt 2pt 2pt", "one length for every side"),
-    ("vertical-align: center", "vertical-align is one of top, middle, bottom"),
+    (
+        "vertical-align: center",
+        "'center' is not a vertical-align value. The choices are top, middle and",
+    ),
 ])
 def testACommandRefusesAStyleItCannotWriteAndWritesNothing(
     tmp_path: Path, declared: str, reason: str

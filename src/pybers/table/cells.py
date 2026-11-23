@@ -2,10 +2,11 @@
 """A table's grid, the cells in it, and the merges across it.
 
 Addressing lives in `pybers.addressing`. Nothing
-here takes a bare row and column pair: a cell is named by an address, or by `row=`
+here takes a bare row and column pair: a cell is selected by an address, or by `row=`
 and `col=` spelled out, so the two axes cannot be passed in the wrong order.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  `cellStyleComputed`, the box a cell displays, beside `cellFillComputed` and
             `cellBorderComputed`, each named as CSS computes a value, for PYB-291.
 2026-11-18  `mergeFind`, `isAddressable`, a private `_rangeSingle` and a table's
@@ -86,6 +87,7 @@ from pybers.absence import MIXED
 from pybers.addressing.ranges import CellRange, CellRangeLike, toCellRanges
 from pybers.addressing.reference import (
     CellAddress,
+    CellReference,
     CellReferenceLike,
     SheetReference,
     TableReference,
@@ -95,6 +97,7 @@ from pybers.addressing.reference import (
     toCellReferenceNamed,
 )
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeRefusal, nothingWritten
 from pybers.formula.relocation import FormulaReferenceRelocation
 from pybers.geometry import Position
 from pybers.style.cells import CellStyle
@@ -179,14 +182,14 @@ class Table:
     _origin: Position | None = field(
         default=None, repr=False, compare=False, kw_only=True
     )
-    # The document this belongs to, so a formula naming another table can be written
+    # The document this belongs to, so a formula reaching another table can be written
     # as the text Numbers shows without the caller supplying the names. Excluded from
     # equality and `repr`, the same as `Cell.table`.
     document: Document | None = field(
         default=None, repr=False, compare=False, kw_only=True
     )
     # Each row's and column's identity, in order, which Numbers keys hidden state by
-    # and a broken reference names. Fresh for a table built rather than read.
+    # and a broken reference records. Fresh for a table built rather than read.
     _rowIdentities: list[int] = field(
         default_factory=list, repr=False, compare=False, kw_only=True
     )
@@ -398,9 +401,9 @@ class Table:
         )
 
     def _addressResolve(self, reference: CellReferenceLike) -> CellAddress:
-        """Return where a reference points in this table, refusing one naming another.
+        """Return where a reference points in this table, refusing another table's.
 
-        A reference naming no table is taken as this table's, the way a relative path
+        A reference selecting no table is taken as this table's, the way a relative path
         is taken from the directory it is used in.
         """
         found = toCellReference(reference)
@@ -408,12 +411,12 @@ class Table:
         return found.address
 
     def _rangeResolve(self, item: CellRange) -> CellRange:
-        """Return a range as this table's own, refusing one naming another table."""
+        """Return a range as this table's own, refusing one selecting another table."""
         self._tableNamedCheck(item.table, item)
         return replace(item, table=None)
 
     def _tableNamedCheck(self, named: TableReference | None, found: object) -> None:
-        """Refuse a reference or a range naming a table other than this one."""
+        """Refuse a reference or a range selecting a table other than this one."""
         if named is None:
             return
         sheet = self.sheet
@@ -422,12 +425,12 @@ class Table:
             or (sheet is not None and named.sheet.name == sheet.name)
         ):
             return
-        raise ReferenceError(
-            f"{found} names another table, and this is {self.reference}."
-        )
+        raise ReferenceError(composeRefusal(
+            str(found), f"selects a table other than {self.reference}"
+        ))
 
     def isAddressable(self, address: CellReferenceLike) -> bool:
-        """Report whether an address names a cell this table can hand over.
+        """Report whether an address selects a cell this table can hand over.
 
         False for a position swallowed by a merge, which is why a range over a
         merged block yields the anchor once rather than one cell per position.
@@ -483,17 +486,19 @@ class Table:
         extent = self._rangeSingle(address, "merge")
         # Numbers offers no merge of one cell, so none is written unconfirmed.
         if extent.start == extent.end:
-            raise ReferenceError(
-                f"{extent} is one cell, and a merge joins two or more."
-            )
+            raise ReferenceError(composeRefusal(
+                str(extent), "is one cell, and a merge joins two or more",
+                notDone=nothingWritten,
+            ))
         merge = MergeRange(extent)
         # Checked before anything is discarded, so a refused merge changes nothing.
         for existing in self.mergeRanges:
             if any(existing.covers(reference) for reference in merge.extent):
-                raise ReferenceError(
-                    f"{merge.extent} overlaps the merge {existing.extent}, and two "
-                    "merges cannot claim the same cell. Remove that one first."
-                )
+                raise ReferenceError(composeRefusal(
+                    str(merge.extent), f"overlaps the merge {existing.extent}, and "
+                    "two merges cannot claim the same cell", "Remove that merge first",
+                    nothingWritten,
+                ))
         self.mergeRanges.append(merge)
         for reference in merge.extent:
             if reference != merge.anchor:
@@ -509,29 +514,32 @@ class Table:
         """
         merge = self.mergeFind(address)
         if merge is None:
-            raise ReferenceError(
-                f"No merge in {self.name!r} covers "
-                f"{self._addressResolve(address)}."
-            )
+            found = self._addressResolve(address)
+            raise ReferenceError(composeRefusal(
+                str(CellReference(found.row, found.col, table=self.reference)),
+                "is covered by no merge", notDone=nothingWritten,
+            ))
         self.mergeRanges.remove(merge)
         return merge
 
     def _rangeSingle(self, address: CellRangeLike, action: str) -> CellRange:
-        """Return the one bounded rectangle an address names, inside this table.
+        """Return the one bounded rectangle an address selects, inside this table.
 
         An unbounded range is refused rather than bounded by the table, because a block
         that follows the grid as it grows is not a block.
         """
         ranges = toCellRanges(address)
         if len(ranges) != 1:
-            raise ReferenceError(
-                f"A {action} covers one block, and {address} names {len(ranges)}."
-            )
+            raise ReferenceError(composeRefusal(
+                str(address), f"selects {len(ranges)} blocks, and a {action} covers "
+                "one", notDone=nothingWritten,
+            ))
         item = self._rangeResolve(ranges[0])
         if item.rowsUnbounded or item.colsUnbounded:
-            raise ReferenceError(
-                f"{item} is unbounded, and a {action} covers a fixed block of cells."
-            )
+            raise ReferenceError(composeRefusal(
+                str(item), f"is open on an axis, and a {action} covers a fixed block "
+                "of cells", "Bound its rows and its columns", nothingWritten,
+            ))
         refuseRangeOutside(self, item)
         return item
 

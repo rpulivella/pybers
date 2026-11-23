@@ -282,7 +282,7 @@ def test_aConditionSelectsEachCellARangeCovers() -> None:
 
 def test_aSelectorGivenToATableNamesItsCellsAlone() -> None:
     table = buildSampleTable()
-    with pytest.raises(pybers.SelectorError, match="at most 1: cells"):
+    with pytest.raises(pybers.SelectorError, match="fills at most 1, cells"):
         table.select("Table 1::A1:B1")
 
 

@@ -77,7 +77,7 @@ def testEachOwnerReadsASelectorRelativeToItself(ledger: pybers.Document) -> None
 
 
 def testASelectorGivenToATableNeverNamesItsSheet(ledger: pybers.Document) -> None:
-    with pytest.raises(pybers.SelectorError, match="at most 1: cells"):
+    with pytest.raises(pybers.SelectorError, match="fills at most 1, cells"):
         ledger.table(pybers.TableReference(
             sheet=pybers.SheetReference("Budget"), name="Q3"
         )).select("Q3::B2")
@@ -94,7 +94,7 @@ def testALeadingSeparatorFillsThePositionsFromTheRight(
 
 
 def testAPositionAlwaysNamesTheSamePart(ledger: pybers.Document) -> None:
-    with pytest.raises(pybers.ReferenceError, match="^Q3 names no cell"):
+    with pytest.raises(pybers.ReferenceError, match="^`Q3` is outside each"):
         ledger.select("::Q3")
     assert listWritten(ledger.select("*::Q3")) == ["Budget::Q3", "Summary::Q3"]
 
@@ -270,11 +270,11 @@ def testTheLibraryTakesTheSelectorTypeAndItsTextAlike(ledger: pybers.Document) -
 # AC 15
 
 @pytest.mark.parametrize(("selector", "message"), [
-    ("Ledger", "No sheet in this document is named 'Ledger'. The sheets are "
-               "'Budget', 'Summary'."),
-    ("Budget::Q4", "No table in 'Budget' is named 'Q4'. The tables are 'Q1', 'Q2', "
-                   "'Q3', 'Notes'."),
-    ("Budget::Notes::Z9", "Z9 is outside 'Notes', which is 2 rows by 2 columns."),
+    ("Ledger", "'Ledger' selects no sheet in this document. The sheets are "
+               "'Budget' and 'Summary'."),
+    ("Budget::Q4", "'Q4' selects no table in 'Budget'. The tables are 'Q1', 'Q2', "
+                   "'Q3' and 'Notes'."),
+    ("Budget::Notes::Z9", "Z9 is outside Notes, which is 2 rows by 2 columns."),
 ])
 def testAnExactNameNothingCarriesIsRefusedListingWhatIsThere(
     ledger: pybers.Document, selector: str, message: str
@@ -304,20 +304,21 @@ def testACellSomeTablesLackIsReturnedFromThoseHoldingIt(
 # AC 16, 17
 
 @pytest.mark.parametrize(("text", "message"), [
-    ("", "``, column 1: A selector names something, and this one is empty."),
-    ("a::b::c::d", "`a::b::c::d`, column 10: A selector names at most 3 positions"),
-    ("[kind=nmber]", "`[kind=nmber]`, column 1: `nmber` is no value of `[kind]`. "
-                     "It takes empty, number,"),
-    ("[colour]", "`[colour]`, column 1: `[colour]` is no condition pybers knows. "
-                 "The conditions are [kind], [format], [control], [conditional]."),
-    ("a[kind]::b", "`a[kind]::b`, column 8: Conditions follow every component"),
-    ("a,,b", "`a,,b`, column 3: A selector group is empty."),
-    ("a(", "`a(`, column 2: `(` is not part of a name. Write `\\(`."),
-    ("[kind", "`[kind`, column 1: This `[` is never closed."),
-    (":nth-row(x)", "`:nth-row(x)`, column 10: `x` is not a position pattern."),
-    ("[kind]:emty", "`[kind]:emty`, column 7: `:emty` is no condition pybers knows."),
-    ("[conditional=yes]", "`[conditional=yes]`, column 1: `[conditional]` takes no "
-                          "value."),
+    ("", "The selector is empty. Write one, such as `Q3::B3`."),
+    ("a::b::c::d", "`a::b::c::d`, column 10, begins a fourth position"),
+    ("[kind=nmber]", "'nmber' is not a value of `[kind]`. The closest is number."),
+    ("[colour]", "'[colour]' is not a selector condition. The choices are [kind], "
+                 "[format], [control] and [conditional]."),
+    ("a[kind]::b", "`a[kind]::b`, column 8, holds a `::` after a condition"),
+    ("a,,b", "`a,,b`, column 3, is an empty group. Remove the extra comma."),
+    ("a(", "`a(`, column 2, holds `(`, which is not part of a name. Write it as "
+           "`\\(`."),
+    ("[kind", "`[kind`, column 1, opens a `[` that is never closed."),
+    (":nth-row(x)", "`:nth-row(x)`, column 10, holds `x`, which is not a position "
+                    "pattern."),
+    ("[kind]:emty", "':emty' is not a selector condition. The closest is :empty."),
+    ("[conditional=yes]", "`[conditional=yes]`, column 1, gives `[conditional]` a "
+                          "value, and it takes none."),
 ])
 def testAMalformedSelectorIsRefusedNamingThePartAndWhereItSits(
     text: str, message: str
@@ -333,8 +334,7 @@ def testACellsPositionThatIsNoAddressIsRefusedWhereItSits(
     with pytest.raises(pybers.SelectorError) as raised:
         ledger.select("Budget::Q1::B0")
     assert str(raised.value).startswith(
-        "`Budget::Q1::B0`, column 13: `B0` is in the cells position, and is not an "
-        "address, a range, a column or a row"
+        "`Budget::Q1::B0`, column 13, is not a cell, a range, a column or a row."
     )
 
 
@@ -353,7 +353,7 @@ def testAWriteSetsEveryCellMatchedAndSkipsWhatItCannot(
     changes = ledger.cellSet("Budget::Q1::B3:B4, Budget::Notes", 7)
     assert [str(each.reference) for each in changes.changes] == ["Budget::Q1::B3"]
     assert [(str(each.reference), each.reason) for each in changes.skipped] == [
-        ("Budget::Notes", "a table, not cells"),
+        ("Budget::Notes", "is a table, not a cell"),
         ("Budget::Q1::B4", "holds a formula"),
     ]
     assert ledger.sheet("Budget").table("Q1").cell("B3").value == Decimal(7)
@@ -382,9 +382,9 @@ def testAValueNoCellHoldsIsRefusedBeforeAnyIsWritten(
 
 
 def testGrowingATableTakesOneCellInOneTable(ledger: pybers.Document) -> None:
-    with pytest.raises(pybers.SelectionError, match="matches 3 tables"):
+    with pytest.raises(pybers.SelectionError, match="matches `Budget::Q1`, `Budget"):
         ledger.cellSet("Budget::Q*::B9", 1, extend=True)
-    with pytest.raises(pybers.SelectionError, match="names more than one address"):
+    with pytest.raises(pybers.SelectionError, match="selects more than one cell"):
         ledger.cellSet("Budget::Q1::B2:B3", 1, extend=True)
 
 
@@ -441,8 +441,8 @@ def testTwoSheetsOfOneNameAreRefusedRatherThanMerged() -> None:
     with pytest.raises(pybers.SelectionError) as raised:
         document.select("Sheet 1")
     assert str(raised.value) == (
-        "2 sheets in this document are named 'Sheet 1', at positions 1, 2. A "
-        "selector reaches a sheet by its name, so rename one."
+        "'Sheet 1' names 2 sheets in this document, at positions 1, 2. Rename one, "
+        "since a selector reaches a sheet by its name."
     )
 
 

@@ -15,6 +15,7 @@ stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  A created archive is composed from its body alone, for PYB-276.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
@@ -41,7 +42,7 @@ from google.protobuf.message import Message
 
 from .._generated import TSPArchiveMessages_pb2 as tspArchive
 from .._generated import TSPMessages_pb2 as tsp
-from ..errors import PybersError
+from ..errors import PybersError, composeFault, composeRefusal, nothingWritten
 from .container import indexPrefix, iwaSuffix
 from .index import ArchiveIndex
 from .iwa import Archive, IWAFile, createArchive
@@ -57,7 +58,7 @@ class MetadataError(PybersError, RuntimeError):
 
 
 def findMemberName(locator: str) -> str:
-    """Return the zip member a component locator names."""
+    """Return the zip member a component locator specifies."""
     return f"{indexPrefix}{locator}{iwaSuffix}"
 
 
@@ -80,10 +81,11 @@ class PackageRegistry:
             == findArchiveTypeId(tspArchive.PackageMetadata)
         ]
         if len(found) != 1:
-            raise MetadataError(
-                f"Expected exactly one TSP.PackageMetadata, found {len(found)}, so a "
-                "created archive would have no component to belong to."
-            )
+            raise MetadataError(composeRefusal(
+                "The document", f"holds {len(found)} package records rather than one, "
+                "so an archive it gains would belong to no component "
+                "(TSP.PackageMetadata)", notDone=nothingWritten,
+            ))
         self.metadataIdentifier = found[0].identifier
         self.metadata = index.identifierResolve(
             self.metadataIdentifier, tspArchive.PackageMetadata
@@ -110,10 +112,12 @@ class PackageRegistry:
         return None if member is None else self.componentsByMember.get(member.name)
 
     def componentRequire(self, identifier: int) -> int:
-        """Return the component holding an archive, or refuse naming it."""
+        """Return the component holding an archive, or refuse."""
         componentId = self.componentFind(identifier)
         if componentId is None:
-            raise MetadataError(f"Archive {identifier} belongs to no component.")
+            raise MetadataError(composeFault(
+                f"Archive {identifier}", "belongs to no component", nothingWritten
+            ))
         return componentId
 
     def identifierAllocate(self) -> int:
@@ -127,7 +131,9 @@ class PackageRegistry:
         """Return the IWA member holding a component."""
         component = self.components.get(identifier)
         if component is None:
-            raise MetadataError(f"No component {identifier} in this package.")
+            raise MetadataError(composeFault(
+                "The document", f"holds no component {identifier}", nothingWritten
+            ))
         return self.package.iwaFile(
             findMemberName(component.locator or component.preferred_locator)
         )
@@ -142,7 +148,10 @@ class PackageRegistry:
         """
         document = self.components.get(documentComponentId)
         if document is None:
-            raise MetadataError("This package registers no document component.")
+            raise MetadataError(composeRefusal(
+                "The document", "registers no document component",
+                notDone=nothingWritten,
+            ))
         locator = f"{preferredLocator}-{root.identifier}"
         component = self.metadata.components.add()
         component.identifier = root.identifier
@@ -174,16 +183,16 @@ class PackageRegistry:
         self.changed = True
 
     def componentNamed(self, preferredLocator: str) -> int:
-        """Return the one component a preferred locator names, or refuse."""
+        """Return the one component a preferred locator specifies, or refuse."""
         found = [
             identifier for identifier, component in self.components.items()
             if component.preferred_locator == preferredLocator
         ]
         if len(found) != 1:
-            raise MetadataError(
-                f"Expected one component named {preferredLocator!r}, found "
-                f"{len(found)}."
-            )
+            raise MetadataError(composeRefusal(
+                "The document", f"holds {len(found)} components at "
+                f"{preferredLocator!r} rather than one", notDone=nothingWritten,
+            ))
         return found[0]
 
     def archiveReplace(
@@ -260,13 +269,13 @@ class PackageRegistry:
         return {pair for pair in derived if pair[0] != componentId}
 
     def externalFor(self, target: int) -> tuple[int, int]:
-        """Return how another component names an object, as (component, object)."""
+        """Return how another component specifies an object, as (component, object)."""
         targetComponent = self.componentFind(target)
         if targetComponent is None:
-            raise MetadataError(
-                f"Object {target} belongs to no component, so a reference to it "
-                "cannot be registered."
-            )
+            raise MetadataError(composeFault(
+                f"Object {target}", "belongs to no component, so a reference to it "
+                "cannot be registered", nothingWritten,
+            ))
         return (targetComponent, 0 if target == targetComponent else target)
 
     def referenceRecord(self, componentId: int, target: int, weak: bool) -> None:

@@ -4,6 +4,7 @@ The engine's cell-keyed records a structural edit or a moved block carries, whic
 registration rewrites.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  `StoredLineMapping`, named apart from the map counted from one, for
             PYB-267.
 2026-11-02  An owner carrying no extent, as a created table's does, keeps none,
@@ -26,7 +27,7 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from .._generated import TSCEArchives_pb2 as tsce
-from ..errors import WriteError
+from ..errors import WriteError, composeRefusal, nothingWritten
 
 
 class StoredLineMapping(Protocol):
@@ -54,10 +55,10 @@ def refuseUnmovableEngineState(
 ) -> None:
     """Refuse engine state keyed by cell that a structural edit does not move."""
     if dependencies.whole_owner_dependencies.dependent_cells.ByteSize():
-        raise WriteError(
-            f"{name!r} holds a formula the engine records as reading the whole "
-            "table, and moving that record is not supported."
-        )
+        raise WriteError(composeRefusal(
+            repr(name), "holds a formula the engine records as reading the whole "
+            "table, and moving that record is not supported", notDone=nothingWritten,
+        ))
 
 
 # Where a stored (row, column) lands, or None when its cell is gone.
@@ -70,7 +71,7 @@ type SpillCut = Callable[[int, int, int, int], bool]
 def remapCoordinateSet(
     coordinates: tsce.CellCoordSetArchive, cellMap: CellMapping
 ) -> None:
-    """Move every cell a set names, dropping those whose cell is gone.
+    """Move every cell a set lists, dropping those whose cell is gone.
 
     The set is columns, each holding row ranges, which is how `NOW()` and `RAND()`
     are recorded in `57-structure-refusals-base`.
@@ -111,10 +112,11 @@ def remapSpills(
             spill.coordinate.row, spill.coordinate.column,
             spill.spill_size.num_rows or 1, spill.spill_size.num_columns or 1,
         ):
-            raise WriteError(
-                f"{name!r} has an edit landing inside a formula's spill. Numbers "
-                "re-flows a spill by evaluating its formula, which is not supported."
-            )
+            raise WriteError(composeRefusal(
+                repr(name), "has an edit landing inside a formula's spill, and "
+                "re-flowing a spill, which Numbers does by evaluating its formula, is "
+                "not supported", notDone=nothingWritten,
+            ))
     # A moved spill is listed first, as Numbers listed it in both measurements
     # where one moved and one stayed.
     moved: list[tsce.CellSpillSizesArchive.SpillForCell] = []

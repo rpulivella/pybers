@@ -9,6 +9,7 @@ chose the color, so a stored CMYK or grayscale color reads and survives but pybe
 creates none in a document. See findings-06-styles.md and `docs/decisions.md`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-06  Written for PYB-264.
 """
 from __future__ import annotations
@@ -31,7 +32,7 @@ from enum import StrEnum
 from functools import cache
 from typing import ClassVar
 
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeChoiceRefusal, composeRefusal
 
 # The fewest significant digits that always read back to the same float32.
 float32Digits: int = 9
@@ -61,7 +62,7 @@ type ColorNumber = Decimal | float | int
 
 
 class ColorError(PybersError, ValueError):
-    """A color Numbers cannot store, or text that is not one, naming why."""
+    """A color Numbers cannot store, or text that is not one, saying why."""
 
 
 class ColorSpace(StrEnum):
@@ -87,9 +88,9 @@ def findNearestFloat32(number: float) -> float:
     try:
         packed = struct.pack("<f", number)
     except OverflowError as exc:
-        raise ColorError(
-            f"{number} is too large for the float32 a color stores."
-        ) from exc
+        raise ColorError(composeRefusal(
+            str(number), "is too large for the float32 a color stores"
+        )) from exc
     rounded: float = struct.unpack("<f", packed)[0]
     return rounded
 
@@ -115,11 +116,13 @@ def findHexChannels() -> frozendict[Decimal, int]:
 def readChannel(name: str, number: object) -> Decimal:
     """Return one number as the Decimal specifying its float32, or refuse it."""
     if isinstance(number, bool) or not isinstance(number, int | float | Decimal):
-        raise ColorError(f"A color's {name} is a number, and this one is {number!r}.")
-    if isinstance(number, Decimal) and not number.is_finite():
-        raise ColorError(f"A color's {name} is finite, and this one is {number}.")
-    if not math.isfinite(number):
-        raise ColorError(f"A color's {name} is finite, and this one is {number}.")
+        raise ColorError(
+            composeRefusal(f"The {name} {number!r}", "is not a number")
+        )
+    if (isinstance(number, Decimal) and not number.is_finite()) or not math.isfinite(
+        number
+    ):
+        raise ColorError(composeRefusal(f"The {name} {number}", "is not finite"))
     return findShortestDecimal(findNearestFloat32(float(number)))
 
 
@@ -128,10 +131,10 @@ def parseNumbers(text: str, count: int, form: str) -> tuple[Decimal, ...]:
     words = text.split()
     plain = all(re.fullmatch(numberPattern, each) for each in words)
     if len(words) != count or not plain:
-        raise ColorError(
-            f"{form} takes {count} plain {'number' if count == 1 else 'numbers'} "
-            f"here, and is given {text.strip()!r}."
-        )
+        noun = "number" if count == 1 else "numbers"
+        raise ColorError(composeRefusal(
+            repr(text.strip()), f"is not the {count} plain {noun} {form} takes here"
+        ))
     return tuple(Decimal(each) for each in words)
 
 
@@ -141,10 +144,10 @@ def parseAlphaBody(
     """Return a function's components and alpha, refusing a body omitting the alpha."""
     before, slash, after = body.partition("/")
     if not slash:
-        raise ColorError(
-            f"Every color states its alpha, and {body.strip()!r} leaves it out. "
-            f"Write it as {form}."
-        )
+        raise ColorError(composeRefusal(
+            repr(body.strip()), "leaves out the alpha every color states",
+            f"Write it as {form}",
+        ))
     return parseNumbers(before, count, form), parseNumbers(after, 1, form)[0]
 
 
@@ -152,11 +155,13 @@ def parseHexColor(text: str) -> Color:
     """Return the sRGB color `#rrggbbaa` specifies, refusing every shorter hex form."""
     if hexPattern.fullmatch(text) is None or len(text) != 9:
         if hexPattern.fullmatch(text) is not None and len(text) in (4, 7):
-            raise ColorError(
-                f"Every color states its alpha, and {text!r} leaves it out. "
-                "Write it as #rrggbbaa."
-            )
-        raise ColorError(f"{text!r} is not a color. Write a hex color as #rrggbbaa.")
+            raise ColorError(composeRefusal(
+                repr(text), "leaves out the alpha every color states",
+                "Write it as #rrggbbaa",
+            ))
+        raise ColorError(composeRefusal(
+            repr(text), "is not a color", "Write a hex color as #rrggbbaa"
+        ))
     red, green, blue, alpha = (
         int(text[start:start + 2], 16) / hexChannelMaximum for start in (1, 3, 5, 7)
     )
@@ -167,7 +172,7 @@ def parseFunctionColor(name: str, body: str, text: str) -> Color:
     """Return the color a CSS function specifies, refusing a model Numbers lacks."""
     match name:
         case "color":
-            return parseColorFunction(body)
+            return parseColorFunction(body, text)
         case "device-cmyk":
             components, alpha = parseAlphaBody(body, 4, "device-cmyk(c m y k / a)")
             return Color(ColorSpace.DEVICE_CMYK, components, alpha)
@@ -175,37 +180,35 @@ def parseFunctionColor(name: str, body: str, text: str) -> Color:
             components, alpha = parseAlphaBody(body, 1, "device-gray(w / a)")
             return Color.gray(components[0], alpha)
         case "rgb" | "rgba":
-            raise ColorError(
-                f"{text!r} is not a form pybers reads. Write an sRGB color as "
-                "#rrggbbaa or color(srgb r g b / a)."
-            )
+            raise ColorError(composeRefusal(
+                repr(text), f"uses {name}(), which is not supported",
+                "Write an sRGB color as #rrggbbaa or color(srgb r g b / a)",
+            ))
     if name in unstoredModels:
-        raise composeUnstoredModelRefusal(unstoredModels[name])
-    raise ColorError(f"{text!r} is not a color. Write it as {carryingForms}.")
+        raise composeUnstoredRefusal(text, unstoredModels[name])
+    raise ColorError(composeRefusal(
+        repr(text), "is not a color", f"Write it as {carryingForms}"
+    ))
 
 
-def composeUnstoredModelRefusal(model: str) -> ColorError:
-    """Return the refusal of a model Numbers does not store."""
-    return ColorError(
-        f"Numbers stores no {model} color, and pybers converts no color. Numbers "
-        "stores RGB, in sRGB or Display P3."
-    )
+def composeUnstoredRefusal(text: str, space: str) -> ColorError:
+    """Return the refusal of a color in a model or space Numbers does not store."""
+    return ColorError(composeRefusal(
+        repr(text), f"is in {space}, which Numbers does not store and pybers does "
+        "not convert", "Write it in RGB, as srgb or display-p3",
+    ))
 
 
-def parseColorFunction(body: str) -> Color:
+def parseColorFunction(body: str, text: str) -> Color:
     """Return the RGB color `color(space r g b / a)` specifies, its space Numbers'."""
     spaceName, _, rest = body.strip().partition(" ")
     if spaceName in unstoredModels:
-        raise composeUnstoredModelRefusal(unstoredModels[spaceName])
+        raise composeUnstoredRefusal(text, unstoredModels[spaceName])
     if spaceName in unstoredSpaces:
-        raise ColorError(
-            f"Numbers stores no color in {spaceName}, and pybers converts no color. "
-            "Numbers stores RGB in srgb or display-p3."
-        )
+        raise composeUnstoredRefusal(text, spaceName)
     if spaceName not in rgbSpaces:
-        raise ColorError(
-            f"color() takes srgb or display-p3 as its space, and is given "
-            f"{spaceName!r}."
+        raise composeChoiceRefusal(
+            ColorError, spaceName, "a color() space", tuple(rgbSpaces)
         )
     form = f"color({spaceName} r g b / a)"
     components, alpha = parseAlphaBody(rest, 3, form)
@@ -236,30 +239,32 @@ class Color:
         alpha: ColorNumber, headroom: ColorNumber = 1,
     ) -> None:
         if not isinstance(colorSpace, ColorSpace):
-            raise ColorError(f"A color's space is a ColorSpace, and is {colorSpace!r}.")
+            raise ColorError(
+                composeRefusal(f"The space {colorSpace!r}", "is not a ColorSpace")
+            )
         count = componentCounts[colorSpace]
         if len(components) != count:
-            raise ColorError(
-                f"A {colorSpace} color holds {count} components, and this one holds "
-                f"{len(components)}."
-            )
+            raise ColorError(composeRefusal(
+                f"{len(components)} components", f"do not fit color space "
+                f"{colorSpace}, which takes {count}",
+            ))
         alpha = readChannel("alpha", alpha)
         if not 0 <= alpha <= 1:
             raise ColorError(
-                f"A color's alpha is from 0 to 1, and this one is {alpha}."
+                composeRefusal(f"An alpha of {alpha}", "is outside 0 to 1")
             )
         headroom = readChannel("headroom", headroom)
         if headroom <= 0:
             raise ColorError(
-                f"A color's headroom is above 0, and this one is {headroom}."
+                composeRefusal(f"A headroom of {headroom}", "is not above 0")
             )
         held = tuple(readChannel("component", each) for each in components)
         if not all(0 <= each <= headroom for each in held):
             shown = ", ".join(map(str, held))
-            raise ColorError(
-                f"A color's components are from 0 to its headroom of {headroom}, and "
-                f"this one holds {shown}."
-            )
+            raise ColorError(composeRefusal(
+                f"The components {shown}", "fall outside 0 to the headroom of "
+                f"{headroom}",
+            ))
         object.__setattr__(self, "colorSpace", colorSpace)
         object.__setattr__(self, "components", held)
         object.__setattr__(self, "alpha", alpha)
@@ -291,19 +296,19 @@ class Color:
             return parseHexColor(form)
         found = functionPattern.fullmatch(form)
         if found is None:
-            raise ColorError(
-                f"{text!r} is not a color. Write it as {carryingForms}, or name black "
-                "or white."
-            )
+            raise ColorError(composeRefusal(
+                repr(text), "is not a color",
+                f"Write it as {carryingForms}, or write black or white",
+            ))
         return parseFunctionColor(found[1], found[2], text)
 
     def __str__(self) -> str:
         if self.headroom != 1:
-            raise ColorError(
-                f"This color has a headroom of {self.headroom}, and CSS "
-                "has no syntax for one, so it has no text form. Its JSON form carries "
-                "it."
-            )
+            raise ColorError(composeRefusal(
+                f"A color with a headroom of {self.headroom}", "has no text form, "
+                "since CSS has no syntax for headroom", "Write it in its JSON form, "
+                "which carries headroom",
+            ))
         numbers = " ".join(map(str, self.components))
         match self.colorSpace:
             case ColorSpace.DEVICE_CMYK | ColorSpace.DEVICE_GRAY:

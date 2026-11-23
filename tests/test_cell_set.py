@@ -64,7 +64,7 @@ def testAFloatIsRefusedNamingTheDecimalMeant(working: Path) -> None:
 
 
 def testAValueNoCellHoldsIsRefused(working: Path) -> None:
-    with pytest.raises(pybers.WriteError, match="was given a list"):
+    with pytest.raises(pybers.WriteError, match="cannot hold a list"):
         pybers.open(working).cellSet("::Table 2::B2", [1])
 
 
@@ -133,7 +133,7 @@ def testAssigningOverAFormulaIsRefusedAtOnce(working: Path) -> None:
         cell for _, _, cell in document.cellsIterate() if cell.formula is not None
     )
     cached = formulaCell.value
-    with pytest.raises(pybers.WriteError, match="backed by a formula"):
+    with pytest.raises(pybers.WriteError, match="holds a formula"):
         formulaCell.value = 1
     assert formulaCell.value == cached
 

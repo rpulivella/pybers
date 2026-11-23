@@ -12,6 +12,7 @@ stops the import.
 Private. Infrastructure the model families share.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-09  A union may hold another family alias, as `CellFormat` holds
             `CellFormatShown`, for PYB-145.
 2026-10-24  A family names its members by a discriminator, for PYB-259.
@@ -30,6 +31,8 @@ __date__ = "2026/10/22"
 from enum import StrEnum
 from typing import TypeAliasType, get_args
 
+from pybers.errors import composeRefusal
+
 # Each family's base and the attribute its members name themselves by.
 familyDiscriminators: dict[type[FamilyMember], str] = {}
 
@@ -46,10 +49,10 @@ class FamilyMember:
                     and issubclass(base, FamilyMember)
                     and FamilyMember not in base.__bases__]
         if extended:
-            raise TypeError(
-                f"{cls.__name__} extends {extended[0].__name__}, a member of a closed "
-                "family; add a member to the family instead"
-            )
+            raise TypeError(composeRefusal(
+                cls.__name__, f"extends {extended[0].__name__}, a member of a closed "
+                "family", "Add a member to the family instead",
+            ))
 
 
 def listFamilyMembers(declared: object) -> tuple[type, ...]:
@@ -73,18 +76,26 @@ def checkFamily(
     subclassed = {each.__qualname__ for each in base.__subclasses__()}
     if named != subclassed:
         disagreeing = sorted(named ^ subclassed)
-        raise TypeError(
-            f"{union.__name__} and {base.__name__} disagree on {disagreeing}")
+        raise TypeError(composeRefusal(
+            f"{union.__name__} and {base.__name__}", f"disagree on {disagreeing}"
+        ))
     for member in members:
         parameters = getattr(member, "__dataclass_params__", None)
         slotted = "__slots__" in vars(member)
         if parameters is None or not parameters.frozen or not slotted:
-            raise TypeError(f"{member.__name__} is not a frozen, slotted dataclass")
+            raise TypeError(
+                composeRefusal(member.__name__, "is not a frozen, slotted dataclass")
+            )
     names = [getattr(member, discriminator, None) for member in members]
     if not all(isinstance(name, StrEnum) for name in names):
-        raise TypeError(f"Every member of {union.__name__} must set {discriminator}")
+        raise TypeError(composeRefusal(
+            f"A member of {union.__name__}", f"leaves {discriminator} unset",
+            f"Set {discriminator} on every member",
+        ))
     if len(set(names)) != len(names):
-        raise TypeError(f"Two members of {union.__name__} share a {discriminator}")
+        raise TypeError(composeRefusal(
+            f"Two members of {union.__name__}", f"share a {discriminator}"
+        ))
     familyDiscriminators[base] = discriminator
 
 

@@ -7,6 +7,7 @@ first alone, and its `A11` holds `=SUM(A1:A10)`. `81-control-formats` holds a ce
 for each control, a slider in `A1` and a pop-up menu in `I1`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  A cell prints its computed box beneath its own, for PYB-291.
 2026-11-12  A cell's cell style prints on its own line, for PYB-265.
 2026-11-03  A selector read by its positions, each match printed as it prints
@@ -295,13 +296,13 @@ def testAPatternMatchingNothingPrintsNothing() -> None:
     assert result.stdout == ""
 
 
-def testASelectorNamingNothingIsRefusedWithWhatTheDocumentHolds() -> None:
+def testASelectorSelectingNothingIsRefusedWithWhatTheDocumentHolds() -> None:
     result = runShowCommand(shapesPath, "Ledger")
     assert result.exit_code == 1
     assert result.stdout == ""
     assert result.stderr.splitlines() == [
-        "pybers show: No sheet in this document is named 'Ledger'. The sheets are "
-        "'Sheet 1', 'Sheet 2'.",
+        "pybers show: 'Ledger' selects no sheet in this document. The sheets are "
+        "'Sheet 1' and 'Sheet 2'.",
     ]
 
 
@@ -309,8 +310,7 @@ def testAMalformedSelectorIsRefusedAtTheColumnItGoesWrong() -> None:
     result = runShowCommand(shapesPath, "Sheet 1::Table 1[kind=nmber]")
     assert result.exit_code == 1
     assert result.stderr.startswith(
-        "pybers show: `Sheet 1::Table 1[kind=nmber]`, column 17: `nmber` is no "
-        "value of `[kind]`. It takes empty, number,"
+        "pybers show: 'nmber' is not a value of `[kind]`. The closest is number."
     )
 
 
@@ -318,7 +318,7 @@ def testACellOutsideItsTableIsRefusedWithTheTablesSize() -> None:
     result = runShowCommand(shapesPath, "::Table 2::F1")
     assert result.exit_code == 1
     assert result.stderr.splitlines() == [
-        "pybers show: F1 is outside 'Table 2', which is 10 rows by 5 columns.",
+        "pybers show: F1 is outside Table 2, which is 10 rows by 5 columns.",
     ]
 
 
@@ -326,7 +326,9 @@ def testAMissingDocumentIsRefused(tmp_path: Path) -> None:
     missing = tmp_path / "missing.numbers"
     result = runShowCommand(missing)
     assert result.exit_code == 1
-    assert result.stderr.splitlines() == [f"pybers show: {missing} does not exist."]
+    assert result.stderr.splitlines() == [
+        f"pybers show: {missing} does not exist. Nothing was read."
+    ]
 
 
 @pytest.mark.parametrize("selector", [
