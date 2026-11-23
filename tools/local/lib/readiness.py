@@ -11,6 +11,8 @@ Every function here returns a result and prints nothing, so a check is testable
 without a token, a network or a pull request.
 
 UPDATES
+2026-11-23  Every ticket it names takes the key from `formatTicketRef`, for
+            PYB-307.
 2026-11-16  `readDeclaredPackages` and the PyPI address move to
             `tools/workflow/lib/dependencies.py`, for PYB-295.
 2026-11-05  Reports the coverage the preflight measured against `develop`,
@@ -308,7 +310,7 @@ def checkChangelog(facts: BranchFacts, body: str = "") -> CheckResult:
     if facts.ticket in facts.changelogTickets:
         return CheckResult(
             changelogCheckName, passed,
-            f"The Unreleased list names PYB-{facts.ticket}",
+            f"The Unreleased list names {github.formatTicketRef(int(facts.ticket))}",
         )
     excepted = readChangelogException(body)
     if excepted:
@@ -318,8 +320,8 @@ def checkChangelog(facts: BranchFacts, body: str = "") -> CheckResult:
         )
     return CheckResult(
         changelogCheckName, failed,
-        f"The Unreleased list names no entry for PYB-{facts.ticket}, and this PR "
-        "gives no reason",
+        f"The Unreleased list names no entry for "
+        f"{github.formatTicketRef(int(facts.ticket))}, and this PR gives no reason",
     )
 
 
@@ -336,27 +338,30 @@ def checkTicketAgreement(facts: BranchFacts, title: str) -> CheckResult:
     }
     strangers = sorted(subjects - {facts.ticket})
     if strangers:
-        named = formatList([f"PYB-{number}" for number in strangers])
+        named = formatList([github.formatTicketRef(int(n)) for n in strangers])
         disagreeing.append(f"the commits name {named}")
     # Only a line this branch added can disagree: the list accumulates every other
     # ticket, and an absent entry belongs to the Changelog check.
     others = sorted(set(facts.changelogTicketsAdded) - {facts.ticket})
     if others:
-        named = formatList([f"PYB-{number}" for number in others])
+        named = formatList([github.formatTicketRef(int(number)) for number in others])
         disagreeing.append(f"this branch adds a CHANGELOG line for {named}")
     titleMatch = re.match(r"^\[[A-Z]{3}-(\d+)\]", title)
     if titleMatch is None:
         disagreeing.append("the title names no ticket")
     elif titleMatch.group(1) != facts.ticket:
-        disagreeing.append(f"the title names PYB-{titleMatch.group(1)}")
+        named = github.formatTicketRef(int(titleMatch.group(1)))
+        disagreeing.append(f"the title names {named}")
     if disagreeing:
         return CheckResult(
             ticketCheckName, failed,
-            f"The branch names PYB-{facts.ticket}, but " + formatList(disagreeing),
+            f"The branch names {github.formatTicketRef(int(facts.ticket))}, but "
+            + formatList(disagreeing),
         )
     return CheckResult(
         ticketCheckName, passed,
-        f"PYB-{facts.ticket} names the branch, every commit subject and the title",
+        f"{github.formatTicketRef(int(facts.ticket))} names the branch, every commit "
+        "subject and the title",
     )
 
 

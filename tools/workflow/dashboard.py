@@ -15,6 +15,7 @@ Usage:
     .venv/bin/python3 -m tools.workflow.dashboard merged PYB-193 210
 
 UPDATES
+2026-11-23  The help takes the ticket key from `formatTicketRef`, for PYB-307.
 2026-11-05  `merged` reads every form the pull request tools print.
 2026-10-23  `--preview` names what was `--dry-run`, as the command-line design does,
             for PYB-156.
@@ -110,11 +111,15 @@ def buildParser() -> argparse.ArgumentParser:
     sync.set_defaults(handler=runSync)
     focus = subparsers.add_parser("focus", help="name the ticket in focus")
     focus.add_argument(
-        "key", type=parseFocusKey, help="the ticket, such as PYB-156, or none"
+        "key", type=parseFocusKey,
+        help=f"the ticket, such as {github.formatTicketRef(156)}, or none",
     )
     focus.set_defaults(handler=runFocus)
     merged = subparsers.add_parser("merged", help="record a ticket that merged")
-    merged.add_argument("key", type=parseTicketKey, help="the ticket, such as PYB-193")
+    merged.add_argument(
+        "key", type=parseTicketKey,
+        help=f"the ticket, such as {github.formatTicketRef(193)}",
+    )
     merged.add_argument(
         "pullRequest", type=parsePullRequestNumber,
         help="its pull request, such as PR #38, #38, 38 or the URL",
