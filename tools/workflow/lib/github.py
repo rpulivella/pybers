@@ -345,7 +345,7 @@ def requestJson(
     request.add_header("User-Agent", "pybers-ticket-tool")
     if apiVersion:
         # Only the newer endpoints ask for this, and pinning it globally would opt every
-        # other call into a version they were not written against.
+        # other call into a version for which they were not written.
         request.add_header("X-GitHub-Api-Version", apiVersion)
 
     try:
@@ -809,7 +809,7 @@ def postComment(token: str, number: int, body: str) -> CommentSummary:
 def updateComment(token: str, commentId: int, body: str) -> CommentSummary:
     """Replace one comment's body in place, keeping its id and its place in the thread.
 
-    Editing rather than deleting and re-posting is what lets a review that runs
+    Editing rather than deleting and re-posting is what enables a review that runs
     twice correct itself without losing the record that the first run happened.
     """
     url = (

@@ -6,7 +6,7 @@ description: Proofread prose against the repo's writing standards, in two passes
 
 Proofread written prose. This is the rubocop equivalent for **writing**, and the
 only thing it does is check words. Execution lives in
-`tools/workflow/standards_check.py`, one deterministic Python pass; this skill invokes
+`tools/workflow/standards_check.py`, one deterministic Python pass, and this skill invokes
 it, then performs the second pass itself, and relays both.
 
 ## ⚠ /standards IS TWO PASSES. ALWAYS BOTH. NO EXCEPTIONS.
@@ -15,7 +15,7 @@ it, then performs the second pass itself, and relays both.
 **2. The judgment read**, the inlined rubric at the end of this file.
 
 **Every invocation. No conditions.** Not "the change was small", not "it was only
-a docstring", not "the script came back clean". The script cannot see slop; it
+a docstring", not "the script came back clean". The script cannot see slop, because it
 matches patterns. **Reporting the script result alone is not a `/standards` run
 and must never be presented as one.**
 
@@ -47,7 +47,7 @@ fresh violation. Naming a path bypasses the auto-exclusions, which is how a `wor
 note gets checked on demand. `--text` is the fastest way to check a sentence before it
 goes into a ticket, a PR body or a commit message.
 
-Needs `rich`. Exit 1 on any FAILURE, so it gates cleanly. Relay the report; if there are
+Needs `rich`. Exit 1 on any FAILURE, so it gates cleanly. Relay the report. If there are
 FAILURES, do not call the prose ready.
 
 ## What it checks
@@ -66,7 +66,7 @@ Two things neither tells you:
 ## ⚠ This is NOT a code linter
 
 The line is whether a rule is about **words**. A docstring saying "colour" is this
-gate's business; whether the function above it is named in camelCase is not. Naming,
+gate's business, and whether the function above it is named in camelCase is not. Naming,
 imports, type hints and error handling belong to ruff and mypy.
 
 ## Suppressing a deliberate exception
@@ -80,7 +80,7 @@ The upstream field is named `colour`.  <!-- standards-ok: third-party identifier
 Line-scoped, never file-scoped: a file-level opt-out silently covers violations added
 long after the exception was justified. File-level findings report line 0 and cannot be
 suppressed at all, by design. Use it for quoted third-party copy and upstream
-identifiers; `rg standards-ok` audits every one.
+identifiers. `rg standards-ok` audits every one.
 
 ## The second pass: the judgment read
 
@@ -94,14 +94,14 @@ So the second pass is inlined, versioned with this repository, and shorter. What
 loses in breadth it gains in never being absent.
 
 **Read the whole piece, then answer these.** Every one is a judgment the script cannot
-make. Report what you find; do not rewrite unasked.
+make. Report what you find, and do not rewrite unasked.
 
 1. **Fragments used for drama.** "Every time." "No exceptions." Complete sentences is
    the rule, and this is the most common tell.
 2. **Prose that builds to a turn of phrase.** If a paragraph is arranged so the last
    line lands, the arrangement is the problem.
 3. **Marketing register.** `robust`, `seamless`, `powerful`, `elegant`. Occasionally
-   earned in an engineering claim; usually filler.
+   earned in an engineering claim, and usually filler.
 4. **The same point twice.** Restatement reads as emphasis and works as padding.
 5. **Announcing instead of stating.** "It is worth noting that X" is longer than "X".
    Same for "importantly", "crucially", "the key insight is".

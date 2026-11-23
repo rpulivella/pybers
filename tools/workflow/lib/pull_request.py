@@ -291,7 +291,7 @@ def readCurrentBranch() -> str:
 
 
 def summarizePullRequest(payload: dict[str, Any]) -> PullRequestSummary:
-    """Reduce GitHub's pull request payload to the fields this tool reports on."""
+    """Reduce GitHub's pull request payload to the fields this tool reports."""
     return PullRequestSummary(
         number=int(payload["number"]),
         title=payload["title"],
@@ -390,7 +390,7 @@ def findOpenPullRequest(
     Filtered by base as well as head, and it must be. GitHub permits several open
     pull requests from one head branch to different bases, and returns them newest
     first, so taking the first of an unfiltered list picks whichever was opened
-    most recently rather than the one being asked about. `/pr-review-code` feeds
+    most recently rather than the one in question. `/pr-review-code` feeds
     that number straight into `ready` and `merge`, so guessing here would promote
     and merge the wrong pull request.
 
@@ -745,7 +745,7 @@ def markReadyForReview(token: str, nodeId: str) -> bool:
     """Take a pull request out of draft and return whether it is now ready.
 
     REST does not expose this transition at all, so it is the one operation here
-    that has to go through GraphQL, which is why the node id is carried around.
+    that has to go through GraphQL, which is why the node id is kept.
     The mutation already returns `isDraft`, so reading it costs nothing and closes
     the path where a 200 with no errors reports a promotion that did not happen.
     """

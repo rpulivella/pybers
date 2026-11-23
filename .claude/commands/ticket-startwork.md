@@ -19,10 +19,10 @@ into `workarea/dashboard.md`.
 3. Display to the user, exactly as written (do not paraphrase): title + label,
    acceptance criteria (preserve numbering/nesting), constraints. Sub-criteria are an
    indented list of `1.` markers that GitHub renders `i.`, `ii.`, so cite `4.ii`.
-   Tickets filed before 2026-09-02 carry the superseded `4.a` form; cite those as
+   Tickets filed before 2026-09-02 carry the superseded `4.a` form. Cite those as
    written.
 4. **Branch.** Every ticket gets its own branch. First check for an existing one
-   (`git branch -a | grep -E "/<N>-"`); if one exists, stop and tell the user.
+   (`git branch -a | grep -E "/<N>-"`). If one exists, stop and tell the user.
 
    **Get current with `develop` before branching:**
    ```
@@ -32,7 +32,7 @@ into `workarea/dashboard.md`.
    The remote and branch are named rather than left to tracking configuration. A
    bare `git pull` on a branch with no upstream prints an error, changes nothing, and
    leaves a stale base behind. **Read what the pull printed** rather than assuming it
-   worked; branching from a stale `develop` earns a branch conflicts it never caused.
+   worked, because branching from a stale `develop` earns a branch conflicts it never caused.
 
    Only then create `<type>/<N>-<kebab-title>` from it.
 
@@ -49,7 +49,7 @@ into `workarea/dashboard.md`.
    | `chore`    | `chore`         |
 
    The commit inside still carries the Conventional prefix, so a `feature/12-...` branch
-   holds `feat:` commits. Those are two different axes; see `CONTRIBUTING.md`.
+   holds `feat:` commits. Those are two different axes, as `CONTRIBUTING.md` explains.
 5. **Set Status In Progress and assign:**
    ```
    .venv/bin/python3 -m tools.workflow.ticket start <N>
@@ -63,9 +63,9 @@ into `workarea/dashboard.md`.
 
 ## Hard rules
 
-- Write no code. Always fetch before acting; never guess ACs or constraints.
+- Write no code. Always fetch before acting, and never guess ACs or constraints.
 - Branch from a current `develop`. Never guess the branch name, and never use the raw
-  label as `<type>`; run it through the mapping in step 4.
+  label as `<type>`. Run it through the mapping in step 4.
 
 ## Moving the card afterward
 

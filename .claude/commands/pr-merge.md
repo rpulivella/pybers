@@ -1,6 +1,6 @@
 ---
 description: Merge a reviewed pull request and get develop current. The only skill that runs pr.py merge.
-argument-hint: <optional PR number; resolved from the current branch if omitted>
+argument-hint: <optional PR number, resolved from the current branch if omitted>
 ---
 
 # /pr-merge
@@ -18,7 +18,7 @@ trigger sitting on it.
    them is "no pull request".
 2. **Refuse on an unclean state.** Run `git status --short --branch` and stop if either is
    true, saying which:
-   - the working tree is dirty;
+   - the working tree is dirty
    - the branch is `ahead` of its remote.
 
    Both merge a tree that differs from the one that was reviewed. Neither is waivable:

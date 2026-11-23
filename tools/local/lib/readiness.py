@@ -383,7 +383,7 @@ def checkGoldenConfirmations(facts: BranchFacts) -> CheckResult:
 
 
 def checkBranchCurrent(behind: int, base: str) -> CheckResult:
-    """Report whether the branch has fallen behind the base it will merge into."""
+    """Report whether the branch has fallen behind the base into which it will merge."""
     if behind == 0:
         current = f"This branch is up to date with {base}"
         return CheckResult(baseCheckName, passed, current)

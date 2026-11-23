@@ -69,7 +69,7 @@ def buildParser(breaks: bool) -> MarkdownIt:
 
 
 def renderHtml(text: str, breaks: bool) -> str:
-    """Return the HTML a body renders to, with whitespace a browser ignores evened out.
+    """Return the HTML a body renders to, the whitespace a browser ignores made uniform.
 
     Inside `<pre>` whitespace is content and is kept exactly.
     """

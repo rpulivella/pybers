@@ -69,9 +69,9 @@ UPDATES
 2026-08-17  `edit` now reads the ticket back and compares body, title and label against
             what was sent. `edit` replaces the WHOLE body and GitHub has no conflict
             detection, so a revision drafted against a copy exported minutes earlier
-            silently discarded whatever changed in between. This cannot prevent a lost
-            update; it makes one visible immediately, and it is what makes deleting the
-            local draft safe.
+            silently discarded whatever changed in the meantime. This cannot prevent a
+            lost update; it makes one visible immediately, and it is what makes
+            deleting the local draft safe.
 2026-08-16  Added GitHubHttpError so requestJson carries the HTTP status as a number.
             pr.py's unpushed-branch guard was recovering it by searching the message
             for "404", which reported an expired token as an unpushed branch: a
@@ -528,7 +528,7 @@ def runList(arguments: argparse.Namespace) -> int:
 
 
 def runBlock(arguments: argparse.Namespace) -> int:
-    """Record, drop, or list what a ticket is waiting on."""
+    """Record, drop, or list the work a ticket awaits."""
     token = github.resolveToken()
     number = arguments.number
 

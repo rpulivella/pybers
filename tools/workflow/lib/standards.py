@@ -102,8 +102,8 @@ UPDATES
 2026-08-27  Removed a Python house-style half that had no business here. The
             first version of this file also checked camelCase, module headers,
             pathlib, f-strings and error handling. All of that is code linting,
-            it duplicates ruff and mypy, and it made a writing gate answerable
-            for things writing has nothing to do with. What survived is the one
+            it duplicates ruff and mypy, and it made a writing gate answer
+            for matters unrelated to writing. What survived is the one
             docstring rule that is genuinely about prose: no Args/Returns
             sections. NOTE, because removing this leaves a real gap: ruff and
             mypy are configured in pyproject.toml as exclude stanzas ONLY, with
@@ -193,7 +193,7 @@ checkExtensions: tuple[str, ...] = (".py", ".md")
 # and it needs it only for the checks that read those words.
 ruleDocPaths: tuple[str, ...] = (".claude/commands/",)
 
-# The only checks a rule doc is exempt from. Everything else applies in full,
+# The only checks from which a rule doc is exempt. Everything else applies in full,
 # because quoting a banned word is no reason to stop counting em dashes.
 ruleDocExemptChecks: tuple[str, ...] = ("banned", "british", "weakLet")
 
@@ -220,7 +220,7 @@ contractionRe = re.compile(
 # Curated word by word: deliberately NO blanket -ise/-our rule, which would
 # trip promise, exercise, our and four.  A match preceded by an identifier
 # separator (/ @ . - _) is skipped: that is a third-party identifier, which the
-# global rule explicitly carves out.
+# global rule explicitly exempts.
 britishSpellings: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bcolour\w*", re.I), "color"),
     (re.compile(r"\bbehaviour\w*", re.I), "behavior"),
@@ -586,7 +586,7 @@ def checkBannedPhrases(path: Path, prose: str, findings: list[Finding]) -> None:
 
 
 def checkSentenceOpener(path: Path, prose: str, findings: list[Finding]) -> None:
-    """A sentence opens on its subject, never on And, But, So, Allow me or Let us."""
+    """A sentence opens on its subject, never on a conjunction or a preamble."""
     if isRuleDoc(path, "banned"):
         return
     for match in sentenceOpenerRe.finditer(prose):
@@ -596,7 +596,7 @@ def checkSentenceOpener(path: Path, prose: str, findings: list[Finding]) -> None
 
 
 def checkWeakLet(path: Path, prose: str, findings: list[Finding]) -> None:
-    """A product enables or gives the ability; it does not 'let'."""
+    """A product enables or gives the ability, never the weaker verb."""
     if isRuleDoc(path, "weakLet"):
         return
     for match in weakLetRe.finditer(prose):

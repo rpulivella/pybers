@@ -33,7 +33,7 @@ queueHeading: str = "## Tickets Queue"
 completedHeading: str = "## Tickets Recently Completed"
 recentLimit: int = 20
 noTicket: str = "None"
-# A ticket's stage, three characters each so every title lines up.
+# A ticket's stage, three characters each so every title aligns.
 workCode: str = "WiP"
 draftCode: str = "dPR"
 reviewCode: str = "REV"
