@@ -733,6 +733,37 @@ constrains it.
 
 ---
 
+## The command line is built on Click, decided 23 November 2026
+
+`pybers` began on Typer, chosen on 8 October 2026 for PYB-169 without a recorded
+comparison. PYB-304 weighed it against Click, Cyclopts, and argparse with rich_argparse,
+and moved to Click.
+
+**Typer had stopped matching the design it was overridden toward.** Since 0.27.0 (15 July
+2026, its PR #1863) Typer writes a required argument in braces, `{FILE}`, where POSIX and
+man pages write it bare and use braces for a choice. Typer carries a private copy of Click
+as `typer._click` rather than depending on Click, so `PybersGroup` subclassed a copy that
+no extension reaches, and Typer requires pydantic, a heavy install for a command line.
+pybers already replaced Typer's help panels to remove their borders, so a third override
+for the usage line would have worked against where Typer is heading.
+
+**Click writes POSIX usage and leaves help to pybers.** A required argument prints bare
+and an optional one in brackets. Click writes plain help with no argument help, so one
+renderer in `pybers.cli._help` draws every help screen in the layout
+`docs/cli-design.md` specifies, and the borders are never drawn rather than removed.
+Click has no dependencies, completes a parameter through `shell_complete`, and keeps
+`Group.resolve_command`, which routes `pybers FILE` to `check --names`.
+
+**argparse with rich_argparse has no completion.** It would put the command line on the
+stack `tools/` uses, but completing SELECTOR to a document's sheets and tables needs the
+`argcomplete` package, and `tools/` never ships, so the two stacks never meet a user.
+
+**Cyclopts keeps parameters declared by type hint**, which Click gives up for decorators.
+Cyclopts draws its own help, so matching `docs/cli-design.md` means configuring or
+replacing that renderer, and it brings four dependencies where Click brings none.
+
+---
+
 ## Deliberately not here
 
 **The protobuf-extraction and named-styles rationale was deleted, not moved**, on
