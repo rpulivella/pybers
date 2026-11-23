@@ -55,7 +55,7 @@ UPDATES
             What answers 404 on a private repository is a VALID token lacking `repo`
             scope, or a wrong owner/name, so the old wording sent a reader hunting a
             dead credential when the fault was a scope or a typo. requestJson now adds a
-            404 hint naming the two real causes. Also fixed an indentation bug in
+            404 hint stating the two real causes. Also fixed an indentation bug in
             `edit --dry-run`: the body preview sat OUTSIDE its `if body is not None`
             guard, so `edit --title X --dry-run` printed a bare `None`. Introduced
             here while applying the markup fix; the predecessor never had it.

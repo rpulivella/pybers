@@ -177,7 +177,7 @@ def readCustomCurrencyCodes(index: ArchiveIndex) -> dict[tuple[int, int], str]:
 
 
 def readCurrencyCodes(index: ArchiveIndex, dataStore: tst.DataStore) -> dict[int, str]:
-    """Return the currency code of each format entry that names one, by its key.
+    """Return the currency code of each format entry that specifies one, by its key.
 
     A Currency format holds its code itself, and a custom format holding a Currency
     token holds it in the document's custom format list, as findings-11 records.
@@ -208,7 +208,7 @@ def readCellValue(
 ) -> CellValue:
     """Return a cell's value, a currency amount carrying the code its format holds.
 
-    A currency record whose format names no code it can follow keeps its `Decimal`,
+    A currency record whose format specifies no code it can follow keeps its `Decimal`,
     carried through rather than given a currency it may not have.
     """
     value = resolveValue(record, strings, richText)
@@ -285,7 +285,7 @@ def readLineIdentities(
     """Return each row's and column's identity, in the table's own order.
 
     `*_uid_for_index` is a permutation into the sorted list, so reading that list
-    positionally names the wrong line. See findings-03-structure.md.
+    positionally selects the wrong line. See findings-03-structure.md.
     """
     uids = index.resolve(model.base_column_row_uids, tst.ColumnRowUIDMapArchive)
     rows = [readUuidValue(uids.sorted_row_uids[at]) for at in uids.row_uid_for_index]

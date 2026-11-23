@@ -26,7 +26,7 @@ UPDATES
 2026-10-20  Any value is written over any value, each kind's record shape held in
             one table, for PYB-144. A new cell's shape is a sibling's style alone.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
-2026-10-09  A refused write names what the cell holds in words, for PYB-168.
+2026-10-09  A refused write states what the cell holds in words, for PYB-168.
 2026-10-01  The format slots moved to `_persistence.cells`, and a cell's chosen
             format is read from its description, for PYB-141.
 2026-09-30  A date is written over a date and a duration over a duration, for
@@ -98,7 +98,7 @@ from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
 
-# How a refusal names what a cell holds, in the words a person would use.
+# How a refusal states what a cell holds, in the words a person would use.
 kindPhrases: frozendict[CellKind, str] = frozendict({
     CellKind.NUMBER: "a number",
     CellKind.CURRENCY: "a currency amount",
@@ -113,7 +113,7 @@ kindPhrases: frozendict[CellKind, str] = frozendict({
 
 @dataclass(frozen=True, slots=True)
 class RecordShape:
-    """How a record type holds its value: the bits naming it, its width, its format.
+    """How a record type holds its value: the bits specifying it, its width, its format.
 
     `valueBits` is byte 8's low five bits, one value per type across 73,445 records.
     See findings-01-values.md.
@@ -286,7 +286,7 @@ def buildWrittenRecord(
 
     **`borrowed` says the record belongs to another cell** and is here only for its
     style. Without it, the template's pooled key is read as this cell's previous
-    claim, and a pool entry nothing else names is then rewritten in place: writing
+    claim, and a pool entry nothing else refers to is then rewritten in place: writing
     into an empty `J1` changed `I1` from `Item 1` to the new text, with nothing
     raised. Found by the golden on 2026-09-14.
     """
@@ -321,7 +321,7 @@ def patchCurrencyCode(
     formatFor: Callable[[tsk.FormatStructArchive], int | None],
     formatOf: Callable[[int], tsk.FormatStructArchive | None],
 ) -> bytes:
-    """Return a currency record naming its new currency, every other setting kept.
+    """Return a currency record specifying its new currency, every other setting kept.
 
     A custom format holds its currency in the document's list, which PYB-245 edits.
     """
@@ -386,7 +386,7 @@ def patchValue(record: CellRecord, encoded: bytes) -> bytes:
 def findFormatKey(
     pool: EntryPool[tsk.FormatStructArchive], wanted: tsk.FormatStructArchive
 ) -> int:
-    """Return a key naming exactly this format, creating an entry when none does.
+    """Return a key specifying exactly this format, creating an entry when none does.
 
     Counts nothing: `moveFormatReferences` counts the record that names the key, so
     looking a format up once for many cells counts every cell.
@@ -482,7 +482,7 @@ def retypeRecord(
 ) -> bytes:
     """Return a record holding a value of another kind, in its Automatic format.
 
-    The old kind's format slot and any control go, and the new kind's slot names
+    The old kind's format slot and any control go, and the new kind's slot specifies
     `formatKey`. One bit leaves and one arrives, so the count the reference rule
     derives is unchanged. Every other reference keeps its slot and its value, which
     is what carries a cell's style across.

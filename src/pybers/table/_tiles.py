@@ -270,9 +270,9 @@ def addInheritedRecords(
 ) -> None:
     """Give each added line the highlighting of the line it displaced.
 
-    The added cells take empty records naming the displaced cells' rules, which is
+    The added cells take empty records specifying the displaced cells' rules, which is
     what `57-conditions-row-inserted` and `-column-inserted` hold. A cell whose
-    displaced neighbor names no rule receives nothing.
+    displaced neighbor specifies no rule receives nothing.
     """
     inherited: dict[tuple[int, int], bytes] = {}
     for row in listAddedLines(maps.rows):

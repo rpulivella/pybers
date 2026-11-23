@@ -51,9 +51,9 @@ automaticTextFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
 automaticBooleanFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
     format_type=1
 )
-# A date has no Automatic, since Numbers names a pattern for every date it stores, so
-# pybers writes ISO 8601 order, the same in every region. Numbers stores `yyyy-MM-dd`
-# in `66-series-horizontal-base`; PYB-145 sets any other.
+# A date has no Automatic, since Numbers specifies a pattern for every date it stores,
+# so pybers writes ISO 8601 order, the same in every region. Numbers stores
+# `yyyy-MM-dd` in `66-series-horizontal-base`; PYB-145 sets any other.
 dateOnlyFormat: tsk.FormatStructArchive = tsk.FormatStructArchive(
     format_type=261, date_time_format="yyyy-MM-dd"
 )

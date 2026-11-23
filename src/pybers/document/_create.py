@@ -140,7 +140,7 @@ def composeStorage(styles: SheetStyles) -> tswp.StorageArchive:
 def composeSheet(
     name: str, styles: SheetStyles, headers: list[int], footers: list[int]
 ) -> tn.SheetArchive:
-    """Return a sheet in the reset's page setup, naming its headers and footers.
+    """Return a sheet in the reset's page setup, specifying its headers and footers.
 
     `is_autofit_on` and `show_page_numbers` are stated although false, since Numbers
     reads either absent as true. Measured 2026-11-02, findings-10-creation.md.

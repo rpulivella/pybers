@@ -2,7 +2,7 @@
 """\
 The format a cell shows its value with, a closed family with one member per family.
 
-A cell's record names a format entry, and a person either chose that format or left
+A cell's record specifies a format entry, and a person either chose that format or left
 Numbers' Automatic to choose it. The two are independent in the file, since a chosen
 format can equal the one Automatic picks, so `CellFormatAutomatic` wraps the format
 Numbers chose in `computed` rather than standing in for it. See findings-11-formats.md.
@@ -173,7 +173,7 @@ class CellFormatStarRating(CellFormatBase):
 @final
 @dataclass(frozen=True, slots=True)
 class CellFormatUnknown(CellFormatBase):
-    """A format pybers cannot follow, by its entry's type when the record names one."""
+    """A format pybers cannot follow, by the type of the entry a record specifies."""
 
     formatFamily: ClassVar[CellFormatFamily] = CellFormatFamily.UNKNOWN
 

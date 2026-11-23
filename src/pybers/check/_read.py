@@ -13,7 +13,7 @@ of any record it does not recognize, so nothing is decoded twice. A document tha
 cannot be opened therefore leaves both unknown.
 
 **A failure is reported without the document's words.** A `PybersError` keeps its
-message, because pybers's own read path names archives by identifier. Any other
+message, because pybers's own read path refers to archives by identifier. Any other
 error keeps only its type and where pybers raised it.
 
 UPDATES
@@ -73,7 +73,7 @@ testedArchiveTypes: frozenset[int] = frozenset({
     10024, 11006, 11008, 11011, 11014, 11015, 12006, 12009, 12026, 12028, 12050,
 })
 
-# Numbers appends one entry per build that saves; a template or an import names
+# Numbers appends one entry per build that saves; a template or an import records
 # its origin instead, so only an `M` entry is a version.
 buildHistoryMember: str = "Metadata/BuildVersionHistory.plist"
 savedBuildPattern: re.Pattern[str] = re.compile(r"M(\d+(?:\.\d+)*)-(.+)")

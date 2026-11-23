@@ -12,7 +12,7 @@ and each line's header counts the records it holds, dropped when it holds none a
 carries nothing else, as Numbers left them in `61b-move-styles-cut-pasted`.
 
 **A copied record is duplicated whole** and claims every entry it names, and rich
-text is given an entry of its own. A record naming an entry this library cannot
+text is given an entry of its own. A record referring to an entry this library cannot
 count is refused rather than guessed.
 
 Private. Part of the table feature's archive half.
@@ -105,7 +105,7 @@ class CellCopies:
         """Report whether anything is copied."""
         return bool(self.records)
 
-# Each slot a duplicated record may carry: counted on copy, or naming no entry.
+# Each slot a duplicated record may carry: counted on copy, or referring to no entry.
 copyableSlots: frozenset[tuple[int, int]] = frozenset({
     *countedStyleSlots, *countedFormatSlots, conditionalSlot, matchSlot,
     (formulaFlagOffset, formulaFlagBit), displayedKindSlot, controlSlot,

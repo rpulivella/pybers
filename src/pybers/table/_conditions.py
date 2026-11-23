@@ -4,16 +4,16 @@ Conditional highlighting carried through rows and columns added or removed.
 
 **Numbers rewrites a rule rather than moving it**, measured 2026-09-21 across the
 four `57-conditions-*` documents. A rule is a `TST.ConditionalStyleSetArchive` a
-cell names by key, holding a predicate whose operands are cell references, and
+cell refers to by key, holding a predicate whose operands are cell references, and
 three things happen to it under an edit:
 
 - **A rule reading a cell that moves becomes a new rule**, under a new key, and
-  every cell naming the old one names the new one. The old entry goes.
+  every cell referring to the old one refers to the new one. The old entry goes.
 - **A rule reading a cell that is removed breaks, once per cell.** Six cells
   sharing one rule came out holding six identical rules at refcount 1, each
   reference written as `#REF!` carrying the lines it lost.
 - **A line added takes the rules of the line it displaced**, as empty records
-  naming the rule and caching no match.
+  specifying the rule and caching no match.
 
 A rule's condition is a formula whose host is the cell it colors, so it is mapped
 by the same machinery as a cell's formula, and each operand then takes the
@@ -326,14 +326,14 @@ def buildInheritedRecord(key: int) -> bytes:
 def rewriteConditionalRecord(
     record: CellRecord, row: int, plan: ConditionalPlan
 ) -> bytes | None:
-    """Return a record naming the rule its old one became, or None when unchanged.
+    """Return a record specifying the rule its old one became, or None when unchanged.
 
     `row` is where the record was stored. A cell whose rule broke caches no match,
     as every one did in the measurements; one whose rule moved keeps its cache.
     """
     key = findSlotValue(record, conditionalSlot)
     assert plan.maps is not None
-    # A record on a removed column goes with it, so it names no rule afterward.
+    # A record on a removed column goes with it, so it specifies no rule afterward.
     if key is None or plan.maps.columns.storedLineMap(record.column) is None:
         return None
     moved, broken = plan.keyFor(key, row, record.column)
@@ -349,7 +349,7 @@ def writeConditionalCounts(plan: ConditionalPlan, tiles: StoredTiles) -> None:
     """Set every rule's refcount from the cells naming it, and drop the unnamed ones.
 
     Counted rather than tracked, since the records are the truth and a rule a cell
-    stopped naming is exactly the one Numbers removed when its reference moved.
+    stopped specifying is exactly the one Numbers removed when its reference moved.
     """
     claims: Counter[int] = Counter()
     for stored in tiles:

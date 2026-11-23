@@ -5,12 +5,12 @@ Formulas read as the tree the file stores, asserted against measurements 18 to 2
 Every expectation here comes from a document whose formulas are known
 independently, which is the only reason these assertions mean anything. This
 format answers a wrong offset with a plausible wrong reference rather than an
-exception: a relative offset read as an absolute coordinate still names a real
-cell, and a sentinel read as a coordinate names one far outside the table.
+exception: a relative offset read as an absolute coordinate still selects a real
+cell, and a sentinel read as a coordinate selects one far outside the table.
 
 Two facts these tests depend on were measured against every document on
 2026-09-03 rather than read off the schema, which permits far more than Numbers
-writes. A formula-backed cell names its formula in the FIRST of its trailing
+writes. A formula-backed cell refers to its formula in the FIRST of its trailing
 references, established by reproducing every declared refcount in all nine tables
 that declare formulas. `ASTStickyBits` never accompanies a single-cell
 reference, 0 of 21 in the documents, so anchoring for one is read from the coordinate
@@ -463,7 +463,7 @@ def testChangedFormulaIsWrittenAndReadsBackChanged(tmp_path: Path) -> None:
         Decimal(1), Decimal(5), None
     ]
     # The cached result is deliberately left stale. This library never evaluates
-    # a formula; it names the changed cell and Numbers does the arithmetic.
+    # a formula; it refers to the changed cell and Numbers does the arithmetic.
     assert after.value == Decimal(2)
 
 

@@ -24,7 +24,7 @@ UPDATES
             table refused, for PYB-260.
 2026-10-20  `Cell` moved to `cell`, keeping this module within its limit, for
             PYB-217.
-2026-10-20  A cell sits at a `CellAddress`, and `cell.reference` names it from
+2026-10-20  A cell sits at a `CellAddress`, and `cell.reference` selects it from
             anywhere; a table finds its sheet, for PYB-217.
 2026-10-14  `cells` is a read-only view of the table's own store, for PYB-193.
 2026-10-14  A range is checked against the grid in `bounds`, for PYB-193.
@@ -38,7 +38,7 @@ UPDATES
 2026-09-29  A block of cells is copied to a new anchor, and a copied cell says
             whether its borders go with it (PYB-136).
 2026-09-29  A block fills a range under the rules its caller names, replacing
-            `formulaFill`, and a filled cell names the cell it copies (PYB-118).
+            `formulaFill`, and a filled cell refers to the cell it copies (PYB-118).
 2026-09-23  A block of cells moves to a new anchor, and a cell remembers where
             its record sits so a save can tell (PYB-18).
 2026-09-22  A range reaching outside the grid is refused in one place (PYB-113).

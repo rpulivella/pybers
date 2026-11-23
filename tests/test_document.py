@@ -125,7 +125,7 @@ def test_anAbsentCellReadsAsEmptyRatherThanRaising() -> None:
 
 def test_aCellOutsideTheDeclaredGridIsRefused() -> None:
     """A Numbers table is a fixed number of rows and columns, unlike a sheet in
-    Excel, so an address beyond it names nothing rather than naming an empty cell."""
+    Excel, so an address beyond it selects nothing rather than an empty cell."""
     table = openOnlyTable("11-value-types-noformats")
     assert table.extent is not None
     with pytest.raises(ReferenceError):

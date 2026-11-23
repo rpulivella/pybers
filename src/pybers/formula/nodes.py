@@ -39,7 +39,7 @@ UPDATES
 2026-10-29  `mapFormulaNodes`, the one walk a rewrite makes, for PYB-278.
 2026-10-24  A node's raw bytes kept in the JSON form, for PYB-259.
 2026-10-13  A boolean literal and a range reaching every row or column, for PYB-139.
-2026-09-18  A broken reference names the rows and columns it lost, for PYB-17.
+2026-09-18  A broken reference states the rows and columns it lost, for PYB-17.
 2026-09-11  Apple's list node is a bracket the author typed, for #67. It
             enclosed one value in all 4364 instances measured.
 2026-09-08  A reference and a range follow a target that moved, for #13. A

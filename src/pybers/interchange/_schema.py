@@ -71,7 +71,7 @@ def buildJsonFormSchema() -> dict[str, Any]:
 
 
 def buildTypeSchema(declared: object, definitions: dict[str, Any]) -> dict[str, Any]:
-    """Return the schema of one declared type, adding what it names to `definitions`."""
+    """Return one declared type's schema, adding its references to `definitions`."""
     members = listUnionMembers(declared)
     if len(members) > 1:
         return {"anyOf": [buildTypeSchema(each, definitions) for each in members]}

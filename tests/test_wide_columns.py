@@ -9,7 +9,7 @@ four-byte words, which keeps every offset a uint16 while a row grows to the
 ignores the unit, because a wrong offset in this format yields a wrong value
 rather than an exception.
 
-`45-columns-over-255` is 300 columns by 7 rows, every cell naming its own
+`45-columns-over-255` is 300 columns by 7 rows, every cell stating its own
 address, with four cells cleared from the last row so an empty slot in the wide
 form is covered too.
 
@@ -167,7 +167,7 @@ def testARowWhoseOffsetsFallOutsideItsBufferNamesWhereItIs(tmp_path: Path) -> No
 
 
 def testRewritingAWideRowScalesTheOffsetsItWrites() -> None:
-    """A rebuilt wide row names positions in words, as the row it replaced did."""
+    """A rebuilt wide row states positions in words, as the row it replaced did."""
     offsets = b"\x00\x00\x03\x00"
     buffer = alignedRecord * 2
     rebuiltOffsets, rebuiltBuffer = rewriteRow(offsets, buffer, offsetUnitWord, {})

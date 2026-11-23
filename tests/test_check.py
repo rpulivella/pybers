@@ -9,7 +9,7 @@ UPDATES
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, names withheld unless
             asked for, for PYB-223.
-2026-10-12  Missing parts are asserted by the sentinel naming why, for PYB-190.
+2026-10-12  Missing parts are asserted by the sentinel stating why, for PYB-190.
 2026-10-07  Written for PYB-169.
 """
 from __future__ import annotations

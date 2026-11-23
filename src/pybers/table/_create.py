@@ -92,8 +92,8 @@ formulasPerTable: int = 4
 
 type ListKind = tst.TableDataList.ListType.ValueType
 
-# The six lists a created data store names: four the schema requires, the control
-# specs without which Numbers drops every formula, and the format list pybers names
+# The six lists a created data store refers to: four the schema requires, the control
+# specs without which Numbers drops every formula, and the format list pybers specifies
 # a value's Automatic format in. The last two are the BNC lists.
 storeLists: tuple[tuple[str, ListKind, bool], ...] = (
     ("stringTable", tst.TableDataList.STRING, False),

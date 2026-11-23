@@ -275,7 +275,7 @@ def writeTableStyle(
     index: ArchiveIndex, registry: PackageRegistry, modelId: int,
     model: tst.TableModelArchive, wanted: TableStyle,
 ) -> None:
-    """Point a table at the style drawing what it wants, when what it names differs."""
+    """Point a table at the style drawing what it wants, when it specifies another."""
     if readTableStyle(index, model) == wanted:
         return
     # Written only when it changes, so a table whose title never showed keeps no flag.

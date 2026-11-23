@@ -197,7 +197,7 @@ def readBodyFile(path: Path) -> github_body.PostedBody | None:
     """Read a drafted body and format it for GitHub, or say why it cannot be posted.
 
     Read with `newline=""`, so a line ending the author chose reaches the formatter
-    untranslated. None after printing the refusal, which names the lines whose
+    untranslated. None after printing the refusal, which lists the lines whose
     rendering would change.
     """
     if not isFormatterPresent():

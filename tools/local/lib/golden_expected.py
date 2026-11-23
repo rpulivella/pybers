@@ -15,7 +15,7 @@ UPDATES
 2026-11-16  The horizontal alignment every cell's paragraph style states, read from
             the archive since pybers does not model it yet, for PYB-292.
 2026-11-13  The fill a cell's own style states, for PYB-265.
-2026-11-09  A format is the cell's `CellFormat`, Automatic naming the one it chose,
+2026-11-09  A format is the cell's `CellFormat`, Automatic specifying the one it chose,
             for PYB-145.
 2026-10-24  Generated from the golden's JSON form, its machine form that form
             itself, and every value and control written by its rules, for PYB-259.

@@ -101,7 +101,7 @@ class ArchiveIndex:
                 self.owners[archive.identifier] = iwaFile
 
     def archive(self, identifier: int) -> Archive:
-        """Return the archive with this identifier, or raise naming it."""
+        """Return the archive with this identifier, or raise identifying it."""
         found = self.byIdentifier.get(identifier)
         if found is None:
             if identifier in self.removed:
@@ -181,7 +181,7 @@ class ArchiveIndex:
             self.parsed[archive.identifier] = body
 
     def archiveRemove(self, identifier: int) -> None:
-        """Drop an archive from its member, so a later read raises naming it."""
+        """Drop an archive from its member, so a later read raises identifying it."""
         self.archive(identifier)
         self.owners.pop(identifier).archiveRemove(identifier)
         del self.byIdentifier[identifier]

@@ -3,9 +3,9 @@
 The refcounts a table's lists keep: which records claim which entry, and how many.
 
 A format, a style, a pooled string and a rich-text payload each carry a refcount of
-the records naming them. A record written moves the counts its slots changed, a
-record removed releases what it named, and an entry released to 0 that no record
-still names is removed at the end of the save, as Numbers removes it. Each list is
+the records referring to them. A record written moves the counts its slots changed, a
+record removed releases what it referred to, and an entry released to 0 that no record
+still refers to is removed at the end of the save, as Numbers removes it. Each list is
 an `EntryPool`, which keys, claims and releases its entries.
 
 Private. Part of the table feature's archive half.
@@ -54,8 +54,8 @@ from ._read import readStringTable
 stringTypeByte: int = 3
 
 
-# A rich-text cell names its payload by key, and an entry's refcount is how many such
-# records name it, which reproduces all 16 rich-text lists in the documents.
+# A rich-text cell refers to its payload by key, and an entry's refcount is how many
+# such records name it, which reproduces all 16 rich-text lists in the documents.
 richTextTypeByte: int = 9
 
 
@@ -95,7 +95,7 @@ def readCountedPool(
 
 
 def countFormatClaims(raw: bytes) -> Counter[int]:
-    """Return how often one record names each format, counted as refcounts count."""
+    """Return how often one record refers to each format, counted as refcounts count."""
     references = decodeRecord(0, raw).references
     return Counter(
         key
@@ -204,7 +204,7 @@ def copyRichText(registry: PackageRegistry, pool: EntryPool[int], key: int) -> i
 
 
 def readRichTextPool(index: ArchiveIndex, store: tst.DataStore) -> EntryPool[int]:
-    """Return the table's rich-text list, each entry naming its payload archive."""
+    """Return the table's rich-text list, each entry referring to its payload."""
     return EntryPool(
         dataList=index.resolve(store.rich_text_table, tst.TableDataList),
         noun="rich text",

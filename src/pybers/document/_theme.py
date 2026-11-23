@@ -105,7 +105,7 @@ class ComposedTheme:
 
 
 def composeStyle[StyleT: Message](styleClass: type[StyleT], stylesheet: int) -> StyleT:
-    """Return a style naming its stylesheet and nothing else, at any depth."""
+    """Return a style referring to its stylesheet and nothing else, at any depth."""
     style = styleClass()
     holder: Message = style
     while holder.DESCRIPTOR.full_name != "TSS.StyleArchive":
@@ -177,7 +177,7 @@ def composeKeyedStyle(
 def composeChartText(stylesheet: int, listStyle: int) -> tswp.ParagraphStyleArchive:
     """Return the reset's text centered, out of bookmarks, as Numbers sets chart text.
 
-    Numbers rewrites the text style a chart preset names on opening a document, so a
+    Numbers rewrites the text style a chart preset refers to on opening a document, so a
     chart sharing `pybers-base` centered every table, findings-10-creation.md.
     """
     style = composeResetText(stylesheet, listStyle)
@@ -211,7 +211,7 @@ def composeColorSlots(theme: tn.ThemeArchive) -> None:
 def composeTableNetwork(
     tableStyle: int, cellStyle: int, textStyle: int, nameShapeStyle: int
 ) -> tst.TableStyleNetworkArchive:
-    """Return a network naming one table, one cell and one text style in every slot."""
+    """Return a network referring to one table, cell and text style in every slot."""
     network = tst.TableStyleNetworkArchive(preset_id=0)
     for slot in tst.TableStyleNetworkArchive.DESCRIPTOR.fields:
         if slot.message_type is None:

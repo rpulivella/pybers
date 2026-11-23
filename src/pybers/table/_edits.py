@@ -9,7 +9,7 @@ records in one pass.
 Private. Part of the table feature's archive half.
 
 UPDATES
-2026-11-12  A record names the cell style its cell asked for, for PYB-265.
+2026-11-12  A record specifies the cell style its cell asked for, for PYB-265.
 2026-11-02  A value or formula in a block of rows no tile stores gains its tile,
             rather than being dropped or refused, and a first row over 255 columns
             is written wide, for PYB-276.
@@ -33,13 +33,13 @@ UPDATES
 2026-09-16  A formula swapped for another is reported as added, so the engine
             hears what the cell reads now, for PYB-86.
 2026-09-15  A merge releases the formulas, rich text, strings and styles of the
-            records it removes, and a string nothing names is removed, for
+            records it removes, and a string nothing refers to is removed, for
             PYB-92.
-2026-09-15  A format's refcount follows the cells naming it, for PYB-89. Each
+2026-09-15  A format's refcount follows the cells referring to it, for PYB-89. Each
             written record moves the counts its format slots changed, and a
             borrowed shape keeps only the format slot of its own kind. Byte 9
             `0x10` stores the kind a cell displays with rather than a key. A
-            format nothing names is removed, and a merge releases the formats
+            format nothing refers to is removed, and a merge releases the formats
             of the records it removes.
 2026-09-14  Text is written and pooled, and a cell changes between text and
             a number, for #61. A format sits in the slot its kind uses, so a
@@ -176,7 +176,7 @@ class TableEdits:
 
     **A formula swapped for another is `formulaAdded`**, since the register also
     carries what each formula reads, and the cell now reads something else.
-    `tilesCreated` says the model now names tiles it did not, so it has to be written.
+    `tilesCreated` says the model now refers to tiles it did not, so it must be written.
     """
 
     written: list[tuple[int, int]]
@@ -191,7 +191,7 @@ def applyFormulaEdit(
     """Carry out one cell's formula change against the record and the pool together.
 
     The two always move as a pair: a key written into a record that the pool does
-    not carry names nothing, and an entry the pool holds that no record names is
+    not carry refers to nothing, and an entry the pool holds that no record refers to is
     dead weight that `refcount` then lies about.
     """
     if edit == "attach":
@@ -257,7 +257,7 @@ def applyTableEdits(
     controls = readControls(index, store)
 
     def formatFor(wanted: tsk.FormatStructArchive) -> int | None:
-        """Return the key naming exactly this format, caching the lookup."""
+        """Return the key specifying exactly this format, caching the lookup."""
         if formatPool is None:
             return None
         cached = wanted.SerializeToString(deterministic=True)
@@ -287,7 +287,7 @@ def applyTableEdits(
         )
 
     def styleFinish(raw: bytes, cell: Cell) -> bytes:
-        """Return a record naming the cell style its cell asked for, or as it was."""
+        """Return a record specifying the cell style its cell wants, or as it was."""
         return writeAskedCellStyle(index, stylePool, variations, table, raw, cell)
 
     def releaseRecord(record: CellRecord, reference: CellAddress) -> bool:
@@ -370,7 +370,7 @@ def applyTableEdits(
         carried = applyCellMoves(index, registry, model, moves)
         applyConditionChanges(index, registry, store, table)
         # A structural edit registers every formula afresh, so only a move alone
-        # names the formulas it carried.
+        # lists the formulas it carried.
         if not restructured:
             formulaRemoved.extend(stored for stored, _ in carried.formulas)
             formulaAdded.extend(landed for _, landed in carried.formulas)

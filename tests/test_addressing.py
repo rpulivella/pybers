@@ -3,7 +3,7 @@
 
 The round trips here are the point. This format's characteristic failure is a
 plausible wrong answer rather than an exception, and an off-by-one in the base-26
-conversion or a dropped locking marker both produce a real address that names the
+conversion or a dropped locking marker both produce a real address that selects the
 wrong cell. Parsing what each type emits and comparing is what catches that.
 
 UPDATES
@@ -305,7 +305,7 @@ def test_anUnboundedRangeIsBoundedByTheTablesOwnExtent() -> None:
 
 
 def test_aRangeReachingPastTheGridIsRefusedByItsOwnName() -> None:
-    """The refusal names the range the caller wrote, rather than the first cell
+    """The refusal states the range the caller wrote, rather than the first cell
     past the edge, which is an interior address nobody asked for."""
     table = buildSampleTable()
     with pytest.raises(pybers.ReferenceError) as raised:

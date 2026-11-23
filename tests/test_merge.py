@@ -130,7 +130,7 @@ def test_aCoveredValueDoesNotComeBack() -> None:
 
 
 def test_unmergingTakesAnyCellOfTheBlock() -> None:
-    """Two merges can never claim one cell, so any of them names the merge."""
+    """Two merges can never claim one cell, so any of them identifies the merge."""
     for reference in ("A1", "B1"):
         table = openUnmergedTable()
         table.mergeAdd("A1:B1")

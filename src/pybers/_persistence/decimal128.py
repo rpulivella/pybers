@@ -100,7 +100,7 @@ class Decimal128:
         return sign, digits, exponent
 
     def __post_init__(self) -> None:
-        """Refuse anything decimal128 cannot hold, naming which limit was passed."""
+        """Refuse anything decimal128 cannot hold, stating which limit was passed."""
         _, digits, exponent = self.finiteParts()
         if len(digits) > maximumSignificantDigits:
             raise Decimal128Error(composeRefusal(

@@ -106,7 +106,7 @@ def composeChoiceRefusal[ErrorType: PybersError](
     choices: Sequence[str],
     notDone: str | None = None,
 ) -> ErrorType:
-    """Return the refusal of a value not among its choices, naming the closest.
+    """Return the refusal of a value not among its choices, stating the closest.
 
     Where none is close and too many to list, the error carries its choices and what
     was not done, so a consumer can say where the choices are before that.

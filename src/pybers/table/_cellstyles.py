@@ -122,7 +122,7 @@ def readOwnCellStyles(
     """Return each section's cell styles less what they copy from its variation.
 
     A section whose style is no variation hands back the very styles read, so every
-    cell naming one archive keeps one object.
+    cell referring to one archive keeps one object.
     """
     return frozendict({
         section: cellStyles if variation.copied == CellStyle() else {
@@ -138,7 +138,7 @@ def writeAskedCellStyle(
     variations: Mapping[TableSection, SectionVariation], table: Table, raw: bytes,
     cell: Cell,
 ) -> bytes:
-    """Return a record naming the cell style its cell asked for, or as it was."""
+    """Return a record specifying the cell style its cell asked for, or as it was."""
     asked = cell._cellStyleAsked
     if asked is UNCHANGED:
         return raw

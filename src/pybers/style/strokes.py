@@ -42,7 +42,7 @@ strokeDashSlots: int = 6
 
 
 class StrokeError(PybersError, ValueError):
-    """A stroke Numbers cannot store, naming why."""
+    """A stroke Numbers cannot store, stating why."""
 
 
 def readStrokeNumber(name: str, number: object) -> Decimal:

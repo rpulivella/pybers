@@ -113,7 +113,7 @@ def findLocationAt(document: pybers.Document, name: str) -> pybers.ReferenceLoca
     )
 
 
-# ── AC 1: a reference names its target, and the target resolves ──────────────
+# ── AC 1: a reference selects its target, and the target resolves ─────────────
 
 
 def testACrossTableReferenceResolvesToTheTableObjectItNames() -> None:

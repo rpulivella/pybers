@@ -781,7 +781,7 @@
     },
     "CellFormatUnknown": {
       "type": "object",
-      "description": "A format pybers cannot follow, by its entry's type when the record names one.",
+      "description": "A format pybers cannot follow, by the type of the entry a record specifies.",
       "properties": {
         "formatFamily": {
           "const": "unknown"

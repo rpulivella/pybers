@@ -188,7 +188,7 @@ def runGit(arguments: list[str]) -> str:
 def readUnreleasedSection(text: str) -> str:
     """Return the CHANGELOG's Unreleased section, matched as a heading, not as text.
 
-    The file explains itself above the list and names `## Unreleased` while doing so,
+    The file explains itself above the list and mentions `## Unreleased` while doing so,
     so a plain search finds the sentence and reads the section as empty.
     """
     found = re.search(

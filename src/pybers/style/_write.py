@@ -263,10 +263,10 @@ def applyCellStyle(
     index: ArchiveIndex, pool: EntryPool[CellStyleKey], raw: bytes,
     asked: CellStyle | None, parent: int,
 ) -> bytes:
-    """Return a record naming a variation of `parent` for the box asked, or none.
+    """Return a record specifying a variation of `parent` for the box asked, or none.
 
     The box replaces the one the record's style holds, every other property carried.
-    A record left stating nothing names no style.
+    A record left stating nothing specifies no style.
     """
     previous = findSlotValue(decodeRecord(0, raw), cellStyleSlot)
     entry = None if previous is None else pool.entryFind(previous)

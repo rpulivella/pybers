@@ -99,9 +99,9 @@ def readWaitingFormat(
 def readRecordFormat(
     record: CellRecord, formatTypes: dict[int, int]
 ) -> CellFormat | None:
-    """Return the format a record shows its value with, or None when it names none.
+    """Return the format a record shows its value with, or None when it specifies none.
 
-    The displayed slot holds a kind, 1 to 6, naming the per-kind slot whose key is
+    The displayed slot holds a kind, 1 to 6, specifying the per-kind slot whose key is
     the format. A kind or key this cannot follow is unknown, never a guess, and a
     format no person chose is Numbers' Automatic, holding the one it chose.
     """

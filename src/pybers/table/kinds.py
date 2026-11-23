@@ -69,7 +69,7 @@ class CellKind(StrEnum):
 class CellPresentation:
     """How a cell shows its value: its format and its control.
 
-    `format` is None when the record names none, and UNDETERMINED once an edit
+    `format` is None when the record specifies none, and UNDETERMINED once an edit
     changed the kind or dropped the control, since the save then chooses it. A
     control is kept only while it can show the cell's value, as the save keeps it.
     """

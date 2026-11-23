@@ -90,7 +90,7 @@ class RangeEndpoint:
 
 
 def parseEndpoint(text: str, whole: str) -> RangeEndpoint:
-    """Return one endpoint of a written range, naming the whole range on failure.
+    """Return one endpoint of a written range, stating the whole range on failure.
 
     The original is carried through so that the bad half of `A1:C` reports what the
     caller actually wrote rather than the fragment it was split into.
@@ -308,9 +308,9 @@ class CellRange:
         """Return the rectangle a written range addresses.
 
         Accepts one cell (`B2`), a rectangle (`A1:C3`), a whole column (`A`), a
-        whole row (`1`), and a span of either (`A:C`, `1:3`), each named by its
+        whole row (`1`), and a span of either (`A:C`, `1:3`), each qualified by its
         table as far as the text names it, `Q3::B2:D5`. Both endpoints of a span
-        have to be the same kind, since `A1:C` names no rectangle.
+        have to be the same kind, since `A1:C` selects no rectangle.
         """
         table, text = splitTableName(reference)
         parts = text.strip().split(rangeSeparator)
@@ -429,7 +429,7 @@ class CellRangeList:
     ranges: tuple[CellRange, ...]
 
     def __post_init__(self) -> None:
-        """Reject an empty list, which names nothing and reads as an oversight."""
+        """Reject an empty list, which selects nothing and reads as an oversight."""
         if not self.ranges:
             raise ReferenceError(
                 composeRefusal("A range list", "is empty, and holds at least one range")

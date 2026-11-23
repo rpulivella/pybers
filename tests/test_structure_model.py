@@ -60,7 +60,7 @@ def testAReferenceWhollyBeforeTheInsertionIsNotRewritten() -> None:
 
 
 def testAMovedFormulaStillReadsTheCellBeforeTheInsertion() -> None:
-    """`B4` moves to `B5` and its offset grows, so it still names `A1`."""
+    """`B4` moves to `B5` and its offset grows, so it still refers to `A1`."""
     document = openBase()
     table = document.sheets[0].table("Table 1")
     table.rowAdd(3)

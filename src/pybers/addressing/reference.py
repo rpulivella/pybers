@@ -9,7 +9,7 @@ Two things here return a valid-looking wrong answer rather than raising, which i
 why each carries its own guard:
 
 - **Column labels are base-26 with no zero digit.** Z is 26 and AA is 27, so an
-  ordinary base conversion is off by one at every 26 boundary and names a real
+  ordinary base conversion is off by one at every 26 boundary and selects a real
   column, simply not the requested one.
 - **The dollar sign is a per-axis fact.** `$A1` locks the column and leaves the row
   free, and one formula holds an absolute column beside a relative row and then the
@@ -349,7 +349,7 @@ class CellReference:
     """How something points at a cell: its address, a lock per axis, and a table.
 
     The table is named only when the context needs it, as a path is relative or
-    absolute. Frozen because a reference is a value: two callers naming B2 hold the
+    absolute. Frozen because a reference is a value: two callers specifying B2 hold the
     same reference, and neither may change what the other points at.
     """
 

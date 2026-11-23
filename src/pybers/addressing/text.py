@@ -97,7 +97,7 @@ def splitReferenceText(text: str) -> list[str]:
 def readReferenceName(written: str, text: str) -> str:
     """Return the name one part of reference text spells, refusing an unescaped special.
 
-    A reference names one thing, so a wildcard or a comma in it is a mistake to
+    A reference selects one thing, so a wildcard or a comma in it is a mistake to
     point at rather than a pattern to honor.
     """
     trimmed = normalizeWrittenText(written)

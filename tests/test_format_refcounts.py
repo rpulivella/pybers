@@ -317,7 +317,7 @@ def test_aFormatNoWrittenCellNamesKeepsTheCountItHad(tmp_path: Path) -> None:
 
 
 def test_aCellNamingAFormatItsTableDoesNotHoldIsRefused(tmp_path: Path) -> None:
-    """A copied text record names the text format, so its absence stops the save."""
+    """A copied text record refers to the text format, so its absence stops the save."""
     working = copyDocument("11-value-types-noformats", tmp_path)
     textKey = findFormatKeyOfType(working, "Table 1", textFormatType)
 

@@ -15,10 +15,10 @@ UPDATES
 2026-11-19  `00-created-cell-boxes-updated-by-pybers`, part of a cell's style
             changed or cleared, for PYB-290.
 2026-11-18  `00-created-rows-banded-by-pybers`, a table's banded rows, for PYB-267.
-2026-11-10  A label names a format or control a golden changed over the same value,
+2026-11-10  A label states a format or control a golden changed over the same value,
             for PYB-145.
 2026-11-03  A golden setting a created table's headers, for PYB-223.
-2026-11-02  A golden starting from a fixture or measurement names why, for PYB-261.
+2026-11-02  A golden starting from a fixture or measurement states why, for PYB-261.
 2026-11-02  A golden can start from a created document, for PYB-261.
 2026-10-29  A golden for each measured region, for PYB-272.
 2026-10-22  Written for PYB-255, gathering the builders the tests held.
@@ -950,7 +950,7 @@ def setSectionBoxes(document: pybers.Document) -> None:
     buildTableCases(document, sectionBoxCases)
 
 
-# Each color case of a fill, the text naming it, in a column of its own.
+# Each color case of a fill, the text describing it, in a column of its own.
 fillColors: tuple[tuple[pybers.Color, str], ...] = (
     (pybers.Color.parse("#ff8000ff"), "sRGB 255 128 0, #ff8000ff"),
     (pybers.Color.parse("color(display-p3 1 0.5019608 0 / 1)"),

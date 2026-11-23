@@ -66,7 +66,7 @@ if TYPE_CHECKING:
 
 
 class TableStyleError(PybersError, ValueError):
-    """A table style's text form names a line or a value a table lacks."""
+    """A table style's text form specifies a line or a value a table lacks."""
 
 
 # The Table Outline menu's lines, as `100b-lines` stores them: dotted has a miter join.
@@ -301,7 +301,7 @@ def findTableLine(
 
     `row` and `column` count from one and name the line before the edge, 0 for the
     table's top or left. A horizontal line follows the column it runs through and a
-    vertical one its row, as each Gridlines tooltip names it, and a separator takes
+    vertical one its row, as each Gridlines tooltip labels it, and a separator takes
     the edge where a header or footer meets the body, as
     `00-created-table-lines-set-by-pybers` and `-deep-bands-` show in Numbers 15.4.
     """

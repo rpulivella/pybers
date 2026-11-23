@@ -2,7 +2,7 @@
 """\
 Walking a table's declared grid, row by row or whole, and reaching a cell by number.
 
-`22d-merge-multi-row` is the merge document because its text names each position,
+`22d-merge-multi-row` is the merge document because its text states each position,
 so a covered position is recognizable in the anchor's joined value, and its three
 merges span rows as well as columns. `20-formula-shapes` carries the measurement
 the ticket quotes, 26 stored cells in a declared grid of 96.

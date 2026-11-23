@@ -110,7 +110,7 @@ archiveTypes: frozendict[int, type[Message]] = frozendict({
     6206: tst.PopUpMenuModel,     # a pop-up menu's items
     6218: tst.RichTextPayloadArchive,
     6220: tst.FilterSetArchive,     # the filters a table's rows can be hidden by
-    6247: tst.TableStyleNetworkArchive,  # the styles a table style preset names
+    6247: tst.TableStyleNetworkArchive,  # the styles a table style preset refers to
     6267: tst.ColumnRowUIDMapArchive,  # row and column UIDs, and their order
     6305: tst.StrokeSidecarArchive,  # the table's stroke layers
     6306: tst.StrokeLayerArchive,   # one row's or column's borders, as runs

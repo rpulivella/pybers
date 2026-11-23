@@ -11,7 +11,7 @@ UPDATES
             paragraph style states, for PYB-292.
 2026-11-13  Each fill a cell's own style states is read from Numbers and checked
             through the conversion its scripting applies, for PYB-265.
-2026-11-10  Each cell Numbers changed on saving fails, naming what changed, and each
+2026-11-10  Each cell Numbers changed on saving fails, stating what changed, and each
             blue corner chip Numbers drew fails with its close-up, for PYB-145.
 2026-11-09  A format Numbers names is read from the format family, Automatic its own
             member, for PYB-145.
@@ -203,7 +203,7 @@ openAttempts: int = 2
 
 
 class GoldenConfirmError(RuntimeError):
-    """A run that cannot continue, with a message naming what to do about it."""
+    """A run that cannot continue, with a message stating what to do about it."""
 
 
 @dataclass(frozen=True)
@@ -877,7 +877,7 @@ def readSavedCopyDifferences(golden: Path, saved: Path) -> list[str]:
 
 
 def checkSavedCells(golden: Path, saved: Path) -> list[Check]:
-    """Fail each cell Numbers changed on saving, naming what it changed, or pass all."""
+    """Fail each cell Numbers changed on saving, stating the change, or pass all."""
     changes = readSavedCellChanges(golden, saved)
     if not changes:
         return [Check("passed", "saved copy",

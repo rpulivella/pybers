@@ -9,7 +9,7 @@ either list is an object Numbers cannot place, so creating one goes through here
 
 **A strong external reference is derived, never chosen.** Measured across all 51
 documents on 2026-09-14: every component's strong external references are exactly
-the cross-component targets of its archives' `object_references`, naming the
+the cross-component targets of its archives' `object_references`, identifying the
 object as 0 when it is the target component's own root. Only weak references are
 stored beyond that, and no schema marks a reference weak, so those are stated by
 the caller. See findings-10-creation.md.

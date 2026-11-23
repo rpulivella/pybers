@@ -537,7 +537,7 @@ def checkBritish(path: Path, prose: str, findings: list[Finding]) -> None:
     """US English is absolute, with one carve-out for upstream identifiers.
 
     Rule docs are exempt for the same reason they are exempt from every other
-    check here: a file that names a banned spelling in order to ban it is not
+    check here: a file that mentions a banned spelling in order to ban it is not
     committing the offense. Upstream exempts only this script by name, which
     left its own skill file failing on the word it exists to forbid.
     """

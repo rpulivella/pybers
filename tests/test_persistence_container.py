@@ -221,7 +221,7 @@ def testRejectsAnUnknownFrameFlag() -> None:
     """An unrecognized flag byte stops the read loudly instead of being decoded.
 
     The uncompressed-frame shape has never been observed, so there is no tested
-    branch for it. Failing here is the honest outcome, it names the byte so the
+    branch for it. Failing here is the honest outcome, it identifies the byte so the
     format can be studied against a real example.
     """
     with pytest.raises(IWAError, match="0x01"):
