@@ -25,11 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version-file: pyproject.toml
 
@@ -39,7 +39,7 @@ jobs:
 
       - name: Take what the checking job rendered
         id: rendered
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           name: merge-readiness

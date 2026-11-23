@@ -20,9 +20,9 @@ dependencies = [
     # oldest version the suite has actually been run against, which is higher, and
     # re-running tools/local/protos_extract.py with a newer protoc can only raise the
     # mechanical minimum toward it. The development environment and a clean install
-    # both run 7.36.1, so one number covers both rather than the manifest allowing
+    # both run 7.36.2, so one number covers both rather than the manifest allowing
     # a version nobody exercises.
-    "protobuf>=7.36.1",
+    "protobuf>=7.36.2",
 ]
 
 # PEP 639 SPDX expression rather than a "License ::" classifier, which that PEP
@@ -36,7 +36,7 @@ pybers = "pybers.cli:main"
 
 [project.optional-dependencies]
 # The command line's own extra, so a script importing pybers never installs Typer.
-cli = ["typer>=0.29.1"]
+cli = ["typer>=0.29.2"]
 # rich and rich_argparse are for tools/, not for the library. pybers itself must
 # never import them, which the library-purity check enforces. Declared here so that
 # one `pip install -e ".[dev]"` equips the venv for both the test suite and the repo
@@ -56,9 +56,9 @@ dev = [
     "mdformat-gfm>=1.0.0",
     "markdown-it-py>=4.3.0",
     "mdit-py-plugins>=0.7.0",
-    "ruff>=0.17.5",
+    "ruff>=0.17.6",
     "mypy>=2.4.1",
-    "types-protobuf>=7.35.1.20260827",
+    "types-protobuf>=7.35.1.20261122",
     # Validates every test document's JSON form against the committed schema.
     "jsonschema>=4.26.0",
     # Orders versions for the dependency report in tools/.
@@ -67,7 +67,7 @@ dev = [
     # where pip installs it into an isolated environment on its own. This is the
     # front end that drives it, and without it `python3 -m build --wheel` depends on
     # whatever the machine happens to carry.
-    "build>=1.6.0",
+    "build>=1.6.1",
 ]
 
 [tool.pybers]
