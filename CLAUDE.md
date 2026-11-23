@@ -193,9 +193,9 @@ called. A name is approved by the maintainer before a ticket relies on it.
 pybers in a terminal. Read it before writing a command, and add a convention there
 before a second command needs it.
 
-**The Rust compiler's diagnostics are the standard every message is measured
-against**: a message that stands on its own, the place it points at, and a fix
-offered apart from the fault. Its guide is in the inspirations of `docs/cli-design.md`.
+**Every message pybers writes follows `docs/message-design.md`**: an error, a
+refusal, a skipped part and the help a command gives, each built by its shape's
+composer. Read it before writing one.
 
 ## Comments and docstrings
 

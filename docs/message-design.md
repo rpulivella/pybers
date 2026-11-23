@@ -113,3 +113,9 @@ A command line that cannot run, shown only at a shell, so it names options freel
 
 - **A command's help is one imperative sentence**, its docstring: `Show a document, or every part a selector matches.`
 - **An option's or an argument's help is one sentence**, in the imperative for an option that acts, `Show the change and write nothing.`, and a noun phrase for a value it takes, `The .numbers document.`
+
+## Inspiration
+
+| Project | What pybers took |
+| ------- | ---------------- |
+| [The Rust compiler](https://rustc-dev-guide.rust-lang.org/diagnostics.html) | The standard for every message: one that stands on its own, the place it points at, and a fix offered apart from the fault |

@@ -72,7 +72,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
 - **A value is a phrase, never a sentence, and takes no period**: `Nothing written: previewing only`, `Nothing written: already set`, `Nothing written: already de_DE`.
-- **A part a write skipped prints its reference, then two spaces and a phrase saying why**: `Skipped: Sheet 1::Table 1::B4  holds a formula`. A `CellSkip` carries that phrase, so a script reads the same words.
+- **A part a write skipped prints its reference, then two spaces and its `CellSkip` phrase**: `Skipped: Sheet 1::Table 1::B4  holds a formula`, worded as [the message design](message-design.md) sets out for a skipped part.
 - **A count names its noun in the number it agrees with**: `1 row`, `10 rows`, through `formatCount` in `pybers.cli._report`, which holds every line more than one command prints.
 - **A flag reads `yes` or `no`.**
 - **Several parts print one after another, a blank line between each**, and each opens with a line specifying it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
@@ -91,8 +91,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 ## Errors
 
 - **A refusal is one line on stderr**, the command and then the reason the library's error gives, which names the file only where the file is at fault: `pybers check: /tmp/a.numbers does not exist.`, `pybers set: Numbers cannot band rows with a gradient.`
-- **A refused choice names the closest valid one**, `'table-border' is not a table style property. The closest is table-outline.`, and where none is close, says where every choice is: `` `pybers set --help` provides a complete list.`` A message lists its choices only when there are five or fewer, and `--help` lists every one. `pybers.composeChoiceRefusal` writes every such message.
-- **A message the command writes itself** follows the library's rule for wording an error.
+- **Every message follows [the message design](message-design.md)**, a usage error included, which `composeUsageRefusal` in `pybers.cli._common` builds. Where a refused choice names no choice, `formatRefusalText` appends `` `pybers set --help` lists every one.``, since `--help` lists every choice.
 - **`--debug`, or `PYBERS_DEBUG=1`, replaces that line with the full traceback.** Tracebacks never show local variables, because one can hold a cell's value.
 
 ## Exit status
@@ -155,7 +154,7 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 ## Help
 
 - **Typer renders help with Rich**, in its default colors and without borders. Typer hard-codes a rounded box around each help and error panel, so `pybers.cli._app` draws each one as its title over its table, both one column in, as Typer indents its usage line.
-- **A command's help is its docstring**, one imperative sentence, which Typer prints.
+- **A command's help is its docstring**, which Typer prints, and its options' help is each `help=`, both worded by the rules of [the message design](message-design.md).
 
 ## Terminal interface
 
@@ -174,4 +173,3 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 | [jq and yq](https://jqlang.org/manual/) | A path syntax, and a lossless round trip, which yq's in-place mode lacks |
 | [VisiData](https://www.visidata.org/docs/api/) | A browser over the same engine, opening at a given cell |
 | [ruff](https://docs.astral.sh/ruff/linter/), [git diff](https://git-scm.com/docs/git-diff) | Exit status 1 for a finding, 2 for a usage error |
-| [The Rust compiler](https://rustc-dev-guide.rust-lang.org/diagnostics.html) | The standard for every message: one that stands on its own, the place it points at, and a fix offered apart from the fault |
