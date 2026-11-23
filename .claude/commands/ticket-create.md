@@ -85,6 +85,9 @@ the **CHANGELOG entry**, so it must be short and useful in all three.
    **Docs are ACs too**, under the rule in `.github/ticket_template.md`.
    **A name an AC proposes uses the words in `docs/vocabulary.md`**, and a new word is
    an AC adding it there.
+   **An AC quoting a message follows `docs/message-design.md`**: the place first, the
+   cause in the present tense, any fix in the imperative, and what was not done in the
+   past tense, as the composer for its shape builds it.
 3. **Design** (optional), under a `## Design` heading: CLI, TUI or GUI specifications,
    Figma links, screenshots or wireframes. Reference for the outcome, never
    implementation, and never in place of an AC.

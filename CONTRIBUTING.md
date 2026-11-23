@@ -63,7 +63,7 @@ A pull request opens as a draft, filled from [the template](.github/pull_request
 
 ### 4. Review
 
-`/pr-review-code` moves the ticket to `Code Review`, runs the preflight, then reads the change against [the review rubric](docs/code-review-rubric.md), six questions asked of the change and never of the code around it. A clean review takes the pull request out of draft, and GitHub then runs two checks:
+`/pr-review-code` moves the ticket to `Code Review`, runs the preflight, then reads the change against [the review rubric](docs/code-review-rubric.md), seven questions asked of the change and never of the code around it. A clean review takes the pull request out of draft, and GitHub then runs two checks:
 
 - **`preflight`**, the same four gates the local command runs: pytest, the prose gate, ruff and mypy.
 - **`readiness`**, what exists only on a pull request: the template and its checklist, the CHANGELOG line, the ticket identifier, currency with `develop`, dependency advisories, and a confirmation date for every golden touched. Its report is posted as one comment, replaced on every run.

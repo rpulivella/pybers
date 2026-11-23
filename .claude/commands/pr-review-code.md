@@ -66,7 +66,7 @@ repeating its checks or assuming nobody made them.
    git diff develop...HEAD
    .venv/bin/python3 -m tools.workflow.ticket show <ticket>
    ```
-5. **Review against the rubric.** Read `docs/code-review-rubric.md` and answer its six
+5. **Review against the rubric.** Read `docs/code-review-rubric.md` and answer its seven
    questions for this change, yourself. **The delegation below is suspended pending PYB-12**,
    and is kept because the selection rule it encodes is the part worth preserving, not
    because it should be run. Do not launch these agents without the user asking.
