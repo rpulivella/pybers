@@ -19,7 +19,7 @@ import json
 from decimal import Decimal
 from pathlib import Path
 
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
 import pybers
 from conftest import copyDocument, findDocumentPath

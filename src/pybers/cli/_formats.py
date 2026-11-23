@@ -8,6 +8,7 @@ serializer, so a command's JSON and a script's are the same text. See
 `docs/cli-design.md`.
 
 UPDATES
+2026-11-23  The option a Click decorator, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-27  A table printed narrowed to a range, for PYB-260.
 2026-10-24  JSON written by `pybers.formatJsonForm`, keeping only the choice of
@@ -29,13 +30,13 @@ __date__ = "2026/10/12"
 
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Annotated
 
-import typer
+import click
 from rich.console import RenderableType
 
 import pybers
 from pybers.cli._console import console
+from pybers.cli._help import ChoiceOfValues
 
 
 class OutputFormat(StrEnum):
@@ -45,12 +46,11 @@ class OutputFormat(StrEnum):
     JSON = "json"
 
 
-FormatOption = Annotated[
-    OutputFormat,
-    typer.Option(
-        "--output-format", help="The format of the printed result.", show_default=True
-    ),
-]
+outputFormatOption = click.option(
+    "--output-format", "outputFormat", type=ChoiceOfValues(OutputFormat),
+    default=OutputFormat.TEXT, show_default=True,
+    help="The format of the printed result.",
+)
 
 
 def printResult[T](
@@ -70,4 +70,4 @@ def printResult[T](
         console.print(renderText(result))
 
 
-__all__ = ["FormatOption", "OutputFormat", "printResult"]
+__all__ = ["OutputFormat", "outputFormatOption", "printResult"]

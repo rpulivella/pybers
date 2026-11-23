@@ -3,10 +3,11 @@
 What every command shares: the root options, where a write goes, and how a pybers
 error reaches a person.
 
-The root callback stores `CommandSettings` on Typer's context object, which is
-how Typer hands a group's options down to its commands.
+The root callback stores `CommandSettings` on Click's context object, which is
+how Click hands a group's options down to its commands.
 
 UPDATES
+2026-11-23  Click rather than Typer, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
             `composeUsageRefusal` builds a command line's own refusal.
 2026-11-17  A report's value is a phrase, `previewing only`, for PYB-266.
@@ -28,9 +29,8 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
 
-import typer
+import click
 from rich.text import Text
 
 import pybers
@@ -44,14 +44,14 @@ class CommandSettings:
     debug: bool = False
 
 
-def findCommandSettings(context: typer.Context) -> CommandSettings:
+def findCommandSettings(context: click.Context) -> CommandSettings:
     """Return the root options, or the defaults for a command invoked alone."""
     settings = context.find_object(CommandSettings)
     return settings if settings is not None else CommandSettings()
 
 
 @contextmanager
-def reportPybersErrors(context: typer.Context) -> Generator[None]:
+def reportPybersErrors(context: click.Context) -> Generator[None]:
     """Turn a pybers error into one line on stderr and status 1, unless debugging."""
     try:
         yield
@@ -62,7 +62,7 @@ def reportPybersErrors(context: typer.Context) -> Generator[None]:
             (f"pybers {context.info_name}: ", "failure"),
             formatRefusalText(exc, str(context.info_name)),
         ))
-        raise typer.Exit(1) from exc
+        raise click.exceptions.Exit(1) from exc
 
 
 def formatRefusalText(error: pybers.PybersError, command: str) -> str:
@@ -78,34 +78,33 @@ def formatRefusalText(error: pybers.PybersError, command: str) -> str:
 
 def composeUsageRefusal(
     place: str, cause: str, fix: str | None = None, notDone: str | None = None
-) -> typer.BadParameter:
+) -> click.BadParameter:
     """Return a command line's own refusal, the one place one is built.
 
     Shown only at a shell, so its words may specify options and arguments.
     """
-    return typer.BadParameter(pybers.composeRefusal(place, cause, fix, notDone))
+    return click.BadParameter(pybers.composeRefusal(place, cause, fix, notDone))
 
 
 def composeUsageChoiceRefusal(
     given: str, noun: str, choices: Sequence[str], command: str,
     notDone: str | None = None,
-) -> typer.BadParameter:
+) -> click.BadParameter:
     """Return a command line's refusal of a choice, as a library one is shown."""
     refused = pybers.composeChoiceRefusal(
         pybers.PybersError, given, noun, choices, notDone
     )
-    return typer.BadParameter(formatRefusalText(refused, command))
+    return click.BadParameter(formatRefusalText(refused, command))
 
 
-OutputOption = Annotated[
-    Path | None,
-    typer.Option(
-        "-o", metavar="NEW", help="Write the changed document to NEW, not to FILE."
-    ),
-]
-PreviewOption = Annotated[
-    bool, typer.Option("--preview", help="Show the change and write nothing.")
-]
+outputOption = click.option(
+    "-o", "output", metavar="NEW", type=click.Path(path_type=Path),
+    help="Write the changed document to NEW, not to FILE.",
+)
+previewOption = click.option(
+    "--preview", is_flag=True, help="Show the change and write nothing."
+)
+
 
 
 def findSaveTarget(
@@ -146,13 +145,13 @@ def reportWrite(changed: bool, target: Path | None, unchanged: str) -> None:
 
 __all__ = [
     "CommandSettings",
-    "OutputOption",
-    "PreviewOption",
     "composeUsageChoiceRefusal",
     "composeUsageRefusal",
     "findCommandSettings",
     "findSaveTarget",
     "formatRefusalText",
+    "outputOption",
+    "previewOption",
     "reportPybersErrors",
     "reportWrite",
 ]

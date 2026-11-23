@@ -22,7 +22,7 @@ __date__ = "2026/11/17"
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner, Result
+from click.testing import CliRunner, Result
 
 import pybers
 from conftest import copyDocument, findDocumentPath, listShownFields, readPlainText

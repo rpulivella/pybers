@@ -10,6 +10,7 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-23  Declared for Click, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  A cell prints its computed box beside its own, for PYB-291.
 2026-11-17  A table's lines, as CSS declarations under its own line, for PYB-266.
@@ -38,15 +39,15 @@ __date__ = "2026/10/27"
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated
 
-import typer
+import click
 from rich.console import Group, RenderableType
 from rich.text import Text
 
 import pybers
 from pybers.cli._common import reportPybersErrors
-from pybers.cli._formats import FormatOption, OutputFormat, printResult
+from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
+from pybers.cli._help import PybersArgument, PybersCommand
 from pybers.cli._report import formatCount, formatLine
 
 type DocumentPart = pybers.Document | pybers.Sheet | pybers.Table | pybers.Cell
@@ -254,31 +255,24 @@ def formatShownParts(parts: list[ShownPart]) -> Group:
     return Group(*shown)
 
 
+@click.command("show", cls=PybersCommand)
+@click.argument(
+    "file", cls=PybersArgument, type=click.Path(path_type=Path),
+    help="The .numbers document.",
+)
+@click.argument(
+    "selector", cls=PybersArgument, required=False,
+    help="What to show: `Budget`, `Budget::Q3`, `::Q3::B2:D5`, `::B4` or "
+    "`Budget::Q*[kind=number]`, each match as it shows alone.",
+)
+@outputFormatOption
+@click.pass_context
 def runShow(
-    context: typer.Context,
-    documentPath: Annotated[
-        Path,
-        typer.Argument(
-            metavar="FILE", help="The .numbers document.", show_default=False
-        ),
-    ],
-    selector: Annotated[
-        str | None,
-        typer.Argument(
-            metavar="SELECTOR",
-            # A backslash keeps Rich from reading a condition as markup.
-            help=(
-                "What to show: `Budget`, `Budget::Q3`, `::Q3::B2:D5`, `::B4` or "
-                "`Budget::Q*\\[kind=number]`, each match as it shows alone."
-            ),
-            show_default=False,
-        ),
-    ] = None,
-    outputFormat: FormatOption = OutputFormat.TEXT,
+    context: click.Context, file: Path, selector: str | None, outputFormat: OutputFormat
 ) -> None:
     """Show a whole document, or every part SELECTOR matches."""
     with reportPybersErrors(context):
-        document = pybers.open(documentPath)
+        document = pybers.open(file)
         if selector is None:
             printResult(document, outputFormat, formatPart)
             return

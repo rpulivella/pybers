@@ -30,8 +30,8 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 from google.protobuf.message import Message
-from typer.testing import CliRunner
 
 import pybers
 from conftest import findDocumentPath

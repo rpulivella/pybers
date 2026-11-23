@@ -9,6 +9,7 @@ means pybers opened the document, and 1 means it could not, or that the file cou
 be checked.
 
 UPDATES
+2026-11-23  Declared for Click, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every check shows the sheets and tables as one tree, each unrecognized
             cell badged under its table, `--names` naming them, for PYB-223.
@@ -31,16 +32,16 @@ __status__ = "Development"
 __date__ = "2026/10/07"
 
 from pathlib import Path
-from typing import Annotated
 
-import typer
+import click
 from rich.console import Group, RenderableType
 from rich.text import Text
 
 import pybers
 from pybers.cli._common import findCommandSettings, reportPybersErrors
 from pybers.cli._console import TreeCompact, statusConsole
-from pybers.cli._formats import FormatOption, OutputFormat, printResult
+from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
+from pybers.cli._help import PybersArgument, PybersCommand
 from pybers.cli._report import BadgeLevel, formatBadge, formatCount, formatLine
 
 
@@ -140,38 +141,30 @@ def formatCheck(check: pybers.Check) -> Group:
     return Group(*shown)
 
 
+@click.command("check", cls=PybersCommand)
+# Not `readable`, so pybers alone refuses a file, with one message and status.
+@click.argument(
+    "file", cls=PybersArgument, type=click.Path(path_type=Path, readable=False),
+    help="The .numbers document to check.",
+)
+@click.option(
+    "--names", is_flag=True,
+    help="Show each sheet's and table's name, and where each unrecognized cell sits, "
+    "in output not meant for posting publicly.",
+)
+@outputFormatOption
+@click.pass_context
 def runCheck(
-    context: typer.Context,
-    documentPath: Annotated[
-        Path,
-        # Not `readable`, so pybers alone refuses a file, with one message and status.
-        typer.Argument(
-            metavar="FILE",
-            help="The .numbers document to check.",
-            readable=False,
-            show_default=False,
-        ),
-    ],
-    names: Annotated[
-        bool,
-        typer.Option(
-            "--names",
-            help="Show each sheet's and table's name, and where each unrecognized "
-            "cell sits, in output not meant for posting publicly.",
-        ),
-    ] = False,
-    outputFormat: FormatOption = OutputFormat.TEXT,
+    context: click.Context, file: Path, names: bool, outputFormat: OutputFormat
 ) -> None:
     """Report whether pybers can read a document, and what it is running on."""
     with reportPybersErrors(context), statusConsole.status("") as status:
-        check = pybers.checkDocument(
-            documentPath, names=names, onProgress=status.update
-        )
+        check = pybers.checkDocument(file, names=names, onProgress=status.update)
     printResult(check, outputFormat, formatCheck)
     if check.failure is not None:
         if findCommandSettings(context).debug and check.failure.error is not None:
             raise check.failure.error
-        raise typer.Exit(1)
+        raise click.exceptions.Exit(1)
 
 
 __all__ = ["formatCheck", "runCheck"]
