@@ -9,6 +9,7 @@ A position a merge swallowed is not in its row, which is `Table.isAddressable`
 answering, so indexing a row counts the cells in it rather than its columns.
 
 UPDATES
+2026-11-23  A part is selected or specified, never named, for PYB-307.
 2026-11-19  `TableRow.addresses`, a property, for PYB-301.
 2026-09-14  Written for PYB-62.
 """
@@ -63,7 +64,7 @@ class TableRows(Sequence["TableRow"]):
         return len(self.rowNumbers)
 
     def __eq__(self, other: object) -> bool:
-        """Report whether both name the same rows of the same table."""
+        """Report whether both select the same rows of the same table."""
         if not isinstance(other, TableRows):
             return NotImplemented
         return other.table is self.table and other.rowNumbers == self.rowNumbers
@@ -79,7 +80,7 @@ class TableRow(Sequence["Cell"]):
     """The cells of one row in order, indexed and sliced from zero.
 
     A merged block is in its anchor's row once and absent from the rest, so `row[3]`
-    is the fourth cell and not column D. `Table.cell(row=, col=)` names a column.
+    is the fourth cell and not column D. `Table.cell(row=, col=)` selects a column.
     """
 
     __slots__ = ("columnNumbers", "rowNumber", "table")
@@ -135,7 +136,7 @@ class TableRow(Sequence["Cell"]):
         )
 
     def __eq__(self, other: object) -> bool:
-        """Report whether both name the same cells of the same table."""
+        """Report whether both select the same cells of the same table."""
         if not isinstance(other, TableRow):
             return NotImplemented
         return (

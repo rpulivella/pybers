@@ -5,6 +5,7 @@ Numbers stores a date as wall-clock time with no zone, so a zone matters only wh
 caller writes a `datetime` that carries one. See findings-01-values.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-20  Written for PYB-144.
 """
 from __future__ import annotations
@@ -21,7 +22,7 @@ import datetime
 import time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeRefusal
 
 unixEpoch: datetime.datetime = datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC)
 oneSecond: datetime.timedelta = datetime.timedelta(seconds=1)
@@ -88,10 +89,10 @@ def toTimeZone(zone: TimeZoneLike) -> datetime.tzinfo:
     try:
         return ZoneInfo(zone)
     except (ZoneInfoNotFoundError, ValueError) as exc:
-        raise TimeZoneError(
-            f"{zone!r} specifies no time zone Python knows. Specify one as "
-            "'America/New_York' does."
-        ) from exc
+        raise TimeZoneError(composeRefusal(
+            repr(zone), "specifies no time zone Python knows",
+            "Specify one as 'America/New_York' does",
+        )) from exc
 
 
 def toWallClockTime(

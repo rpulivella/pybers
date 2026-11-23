@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """\
-Which calculation-engine owner is which table, and the identity a formula names it by.
+Which calculation-engine owner is which table, and the identity a formula knows it by.
 
 A table records neither its internal owner id nor the identity a formula in another
-table names it by. Both live on the engine's dependency entry for it, so finding
+table specifies it by. Both live on the engine's dependency entry for it, so finding
 either means walking the tracker rather than reading the table, and reading the
 table the obvious way finds nothing at all.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  A document holding no table may hold no engine, for PYB-261.
 2026-09-22  Split out of the engine module for PYB-113, and the engine archive is
             found by its class.
@@ -28,7 +29,13 @@ from .._generated import TSCEArchives_pb2 as tsce
 from .._generated import TSPMessages_pb2 as tsp
 from .._persistence.index import ArchiveIndex, wordBits, wordMask
 from .._persistence.types import findArchiveTypeId, readArchiveTypeId
-from ..errors import ReadError, WriteError
+from ..errors import (
+    ReadError,
+    WriteError,
+    composeRefusal,
+    nothingRead,
+    nothingWritten,
+)
 
 # The `owner_kind` a table's dependency entry carries, as against the other owners
 # the calculation engine tracks.
@@ -49,10 +56,11 @@ def findCalculationEngineHeld(
         == findArchiveTypeId(tsce.CalculationEngineArchive)
     ]
     if len(found) > 1:
-        raise ReadError(
-            f"Expected at most one TSCE.CalculationEngineArchive, found {len(found)}, "
-            "so which one holds the tables' identities cannot be told."
-        )
+        raise ReadError(composeRefusal(
+            "The document", f"holds {len(found)} calculation engines rather than one, "
+            "so which holds the tables' identities cannot be told "
+            "(TSCE.CalculationEngineArchive)", notDone=nothingRead,
+        ))
     if not found:
         return None
     return index.identifierResolve(
@@ -64,11 +72,12 @@ def findCalculationEngine(index: ArchiveIndex) -> tsce.CalculationEngineArchive:
     """Return the document's one calculation engine, or refuse and say why."""
     engine = findCalculationEngineHeld(index)
     if engine is None:
-        raise ReadError(
-            "This document holds no TSCE.CalculationEngineArchive. Without it a "
-            "table has no identity, and neither a merge nor a recalculation request "
-            "can be written."
-        )
+        raise ReadError(composeRefusal(
+            "The document", "holds no calculation engine, so its tables have no "
+            "identity and neither a merge nor a recalculation request can be written "
+            "(TSCE.CalculationEngineArchive)", "Open it in Numbers and save it again",
+            nothingWritten,
+        ))
     return engine
 
 
@@ -110,7 +119,7 @@ def readTableOwnerEntries(
 
 
 def readOwnerUuid(uid: tsp.UUID) -> str:
-    """Return a table's owner uid as the hexadecimal a formula names it by.
+    """Return a table's owner uid as the hexadecimal a formula specifies it by.
 
     A formula spells the identity as four 32-bit words and the owner entry spells
     it as two 64-bit halves, low half first. The two are the same value, matched
@@ -145,11 +154,11 @@ def findOwnerEntry(
     """Return one table's dependency entry, or refuse naming the table."""
     entry = entries.get(identifier)
     if entry is None:
-        raise WriteError(
-            f"{name!r} has no calculation-engine owner entry, so neither its merges "
-            "nor its edited cells can be written. Every table in the documents "
-            "has one."
-        )
+        raise WriteError(composeRefusal(
+            repr(name), "has no entry in the calculation engine, which every table "
+            "Numbers writes carries, so neither its merges nor its edited cells can "
+            "be written", "Open it in Numbers and save it again", nothingWritten,
+        ))
     return entry
 
 

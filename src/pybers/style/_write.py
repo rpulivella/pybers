@@ -10,6 +10,7 @@ findings-09-cell-records.md.
 Private. The archive half of the style feature.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  A stroke composed as `TSD.StrokeArchive`, for PYB-266.
 2026-11-12  Written for PYB-265.
 """
@@ -41,7 +42,7 @@ from pybers._persistence.pool import EntryPool
 from pybers._persistence.types import findArchiveTypeId
 from pybers.color._archive import composeColor
 from pybers.color.colors import Color
-from pybers.errors import WriteError
+from pybers.errors import WriteError, composeRefusal, nothingWritten
 from pybers.style.cells import (
     CellStyle,
     CellStyleTextWrap,
@@ -100,10 +101,10 @@ def composeStroke(stroke: Stroke) -> tsd.StrokeArchive:
             pattern.phase = float(phase)
             pattern.count = len(lengths)
         case other:
-            raise WriteError(
-                f"A {other.patternType} stroke is read and carried, and pybers does "
-                "not write one."
-            )
+            raise WriteError(composeRefusal(
+                f"A {other.patternType} stroke", "is read and carried, and writing "
+                "one is not supported", notDone=nothingWritten,
+            ))
     lengths = stroke.pattern.lengths if isinstance(stroke.pattern, StrokeDash) else ()
     pattern.pattern.extend(
         [float(each) for each in lengths] + [0.0] * (strokeDashSlots - len(lengths))
@@ -164,16 +165,16 @@ def composeCellProperties(
         case FillNone():
             properties.cell_fill.SetInParent()
         case other:
-            raise WriteError(
-                f"pybers cannot write a {other.fillType} fill, which it reads and "
-                "carries but does not yet compose. Nothing was written."
-            )
+            raise WriteError(composeRefusal(
+                f"A {other.fillType} fill", "is read and carried, and writing one is "
+                "not supported", notDone=nothingWritten,
+            ))
     padding = cellStyle.padding
     if isinstance(padding, tuple):
-        raise WriteError(
-            "A cell's padding is one length for every side, as Numbers offers it, "
-            f"and was given {len(padding)} sides. Nothing was written."
-        )
+        raise WriteError(composeRefusal(
+            f"A padding of {len(padding)} sides", "is not supported, since Numbers "
+            "offers one length for every side", "Give one length", nothingWritten,
+        ))
     if padding is not None:
         # Numbers omits a side of zero, as `31-style-inset-2pt` stores 0pt.
         side = float(padding)
@@ -262,10 +263,10 @@ def applyCellStyle(
     index: ArchiveIndex, pool: EntryPool[CellStyleKey], raw: bytes,
     asked: CellStyle | None, parent: int,
 ) -> bytes:
-    """Return a record naming a variation of `parent` for the box asked, or none.
+    """Return a record specifying a variation of `parent` for the box asked, or none.
 
     The box replaces the one the record's style holds, every other property carried.
-    A record left stating nothing names no style.
+    A record left stating nothing specifies no style.
     """
     previous = findSlotValue(decodeRecord(0, raw), cellStyleSlot)
     entry = None if previous is None else pool.entryFind(previous)

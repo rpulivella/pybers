@@ -57,7 +57,7 @@ byte  0      storage version (5 in every file seen)
 byte  1      value TYPE (below)
 bytes 6-7    flags: one bit per kind whose format was chosen, and currency at byte
              7 0x08. See findings-11-formats.md
-bytes 8-10   byte 8's low nibble names the value's width; byte 8's 0xE0 and every
+bytes 8-10   byte 8's low nibble specifies the value's width; byte 8's 0xE0 and every
              bit of bytes 9 and 10 each add one trailing reference (below)
 bytes 12+    the value, then the trailing references
 bytes 2-5 and 11 carry nothing this reader uses
@@ -116,7 +116,7 @@ open, which recorded that bytes 8 and 9 do not fully determine the count and tha
 one more gate lived somewhere else. **Byte 10 is that gate.** Grouping every record by
 byte 8 and byte 9 alone leaves 2 of 41 shapes ambiguous; adding byte 10 leaves 0 of 43.
 
-### Byte 8's low nibble names the value
+### Byte 8's low nibble specifies the value
 
 One value per cell type, with no exceptions:
 
@@ -138,21 +138,21 @@ why the `0xE0` mask `findings-09` uses for the formula key slot is correct here 
 
 ### Which list each reference-bearing bit points into
 
-Measured for PYB-61 across the documents. A bit is named by the `format_type` its key
+Measured for PYB-61 across the documents. A bit is identified by the `format_type` its key
 resolves to, since a format entry states its own kind and a small key is otherwise a
 plausible entry in several lists at once.
 
 | bit | what its reference is | evidence |
 | --- | --- | --- |
-| byte 8 `0x20` | a `styleTable` key naming a cell style | 349 of 349 unambiguous; the kind from `98b-cell-box-styles` |
-| byte 8 `0x40` | a `styleTable` key naming a paragraph style | 395 of 395 unambiguous; the kind from `98b-cell-box-styles` |
+| byte 8 `0x20` | a `styleTable` key specifying a cell style | 349 of 349 unambiguous; the kind from `98b-cell-box-styles` |
+| byte 8 `0x40` | a `styleTable` key specifying a paragraph style | 395 of 395 unambiguous; the kind from `98b-cell-box-styles` |
 | byte 9 `0x02` | a `formula_table` key | 63 of 63 unambiguous |
 | byte 9 `0x20` | the **number** format | 6105 name `256`, the rest `258`, `259`, `269`, `270` |
 | byte 9 `0x40` | the **currency** format | 34 of 34 name `257` and nothing else |
 | byte 9 `0x80` | the **date** format | 24 of 24 name `261` and nothing else |
 | byte 10 `0x01` | the **duration** format | 19 of 19 name `268` and nothing else |
 | byte 10 `0x02` | the **text** format | 5427 of 5427 name `260` and nothing else |
-| byte 10 `0x04` | the **checkbox** format | the one checkbox in `11-value-types-noformats` names `263`; found by the refcounts below |
+| byte 10 `0x04` | the **checkbox** format | the one checkbox in `11-value-types-noformats` specifies `263`; found by the refcounts below |
 
 **The slots are per format kind, not per cell.** A cell carries the slot its display
 needs, which is why a number and a string of the same table put their format reference
@@ -165,15 +165,15 @@ The format types themselves: `256` number, `257` currency, `258` percent, `260` 
 `261` date, `263` checkbox, `267` star rating, `268` duration. A text format entry
 carries nothing but its `format_type`, so one can be created where a table has none.
 
-**Byte 9 bit `0x10` names the kind of format the cell displays with**, as against the
+**Byte 9 bit `0x10` specifies the kind of format the cell displays with**, as against the
 per-kind slots above, which remember one format per kind so that switching a cell back
 restores what it had. Its value is the position of a per-kind slot, counted from 1 in slot
 order: 1 number, 2 currency, 3 date, 4 duration, 5 text, 6 checkbox. Across 73,445 records
-in 142 documents, measured 1 October 2026, it always names a kind slot the record holds. A golden of
+in 142 documents, measured 1 October 2026, it always specifies a kind slot the record holds. A golden of
 14 September 2026 showed it is what the Data Format inspector reads: two text cells with
 identical slots showed `Text` with 5 here and `Automatic` with 1.
 
-**It is a kind, never a key, and the fixture that names it hides that.**
+**It is a kind, never a key, and the fixture that labels it hides that.**
 `11-value-types-noformats` keys its number format 1 and its text format 5, the same
 numbers as the kinds, so reading this slot as a format key passes there.
 `54-format-star-rating` refutes it: its text cell stores 5 and no list in that table holds
@@ -182,11 +182,11 @@ a key 5.
 ### The family of the format a cell displays with
 
 Measured 1 October 2026 for PYB-141 across 73,445 records in 142 documents. The displayed
-kind names a per-kind slot, that slot's key names a format list entry, and the entry's
+kind specifies a per-kind slot, that slot's key specifies a format list entry, and the entry's
 `format_type` is the family. Every one of the twelve families the documents carry is
-named by a fixture whose label states it:
+labeled by a fixture whose label states it:
 
-| `format_type` | family | records | named by |
+| `format_type` | family | records | labeled by |
 |---|---|---|---|
 | 256 | number | 49,719 | `13-number-percent` `A1`, "plain number" |
 | 257 | currency | 23 | `12-number-currency` `B1` to `I1` |
@@ -201,7 +201,7 @@ named by a fixture whose label states it:
 | 269 | numeral system | 6 | `16-number-scientific-numeralsystems` `E1` to `J1` |
 | 270 | custom number | 6 | `17-number-custom` `B1` to `G1` |
 
-259, 262, 269 and 270 are named here for the first time; the slot table above saw them
+259, 262, 269 and 270 are identified here for the first time; the slot table above saw them
 in number slots without saying what they were. 264 to 266 are not seen, and neither is
 any custom format for text, dates, currency or durations.
 
@@ -212,7 +212,7 @@ menu are all numbers. The slider, stepper and pop-up menu in `11-value-types-nof
 display with family 256; what makes them controls is byte 9 `0x04`, not their format.
 
 **2,103 records carry no displayed kind**: 2,061 of type 0 and all 42 of type 8. Every
-other record carries one, and every displayed kind names a slot the record holds whose
+other record carries one, and every displayed kind specifies a slot the record holds whose
 key the format list holds. pybers reports a family it cannot follow, by kind, key or
 type, as `UNKNOWN` rather than guessing one.
 
@@ -248,7 +248,7 @@ as a star rating.
 A value of the kind a record already holds replaces the value bytes alone, so the record
 keeps its format, its style and any control. A value of another kind retypes the record:
 byte 1 and byte 8's value bits change, the old kind's format slot and any control go, the
-new kind's slot names that kind's Automatic format, the displayed kind names that slot,
+new kind's slot specifies that kind's Automatic format, the displayed kind specifies that slot,
 and bytes 6 and 7 clear, since a value typed into a fresh cell stores no flags there. Every
 other reference keeps its slot and its value, which carries the style across. Numbers
 accepted the number and text retypes in Numbers 15.3.1 on 14 September 2026, where a cell
@@ -258,7 +258,7 @@ The Automatic format of each kind is taken from what Numbers stored: `256` with 
 decimal places for a number, a bare `260` for text, `268` with automatic units for the
 duration in `11-value-types-noformats` `D1`, and a bare format type `1` for the boolean a
 formula returned in `69-functions-added-in-15-4` and a typed TRUE in
-`73-values-typed-over-controls`. A date has no Automatic, since Numbers names a pattern for every date: pybers
+`73-values-typed-over-controls`. A date has no Automatic, since Numbers specifies a pattern for every date: pybers
 writes ISO 8601 order, `yyyy-MM-dd` for one at midnight, as `66-series-horizontal-base`
 holds, and `yyyy-MM-dd HH:mm` for one with a time.
 
@@ -267,7 +267,7 @@ holds, and `yyyy-MM-dd HH:mm` for one with a time.
 Measured 15 September 2026 for PYB-89 across all 89 tables in the fixtures that carry a format
 list. **A format entry's `refcount` is the number of times its key appears in the six
 per-kind slots**: number, currency, date, duration, text and checkbox. Each occurrence
-counts once, so a cell naming one format in two kind slots would count twice. That rule
+counts once, so a cell specifying one format in two kind slots would count twice. That rule
 reproduces every declared refcount in every table.
 
 **Byte 9 `0x10` is not counted**, and cannot be: it holds a kind rather than a key, as
@@ -282,15 +282,15 @@ An earlier audit, recorded in PYB-89, concluded that `11-value-types-noformats` 
 Under this rule neither does. That audit read fewer slots than Numbers counts.
 
 What pybers does with it: a written record moves counts by the difference between the
-format slots it held and those it holds now, so an entry no written record names keeps
+format slots it held and those it holds now, so an entry no written record specifies keeps
 the count Numbers wrote, even one that disagrees with its cells. A shape borrowed from a
 sibling holds no claim before the write, and it keeps none of the sibling's format slots.
 
-### What Numbers does with a format nothing names
+### What Numbers does with a format nothing specifies
 
 **Numbers removes it on save.** Measured 15 September 2026 against
 `54c-format-star-rating-cleared`, made from `54` by Clear All on `A1:A2`, which were the
-only two cells naming the star-rating format. Key 2 is absent from the saved format list,
+only two cells specifying the star-rating format. Key 2 is absent from the saved format list,
 and `nextListID` stays at 3.
 
 The rest of the fixtures agree. None of their 4,899 data-list entries has a refcount of
@@ -314,7 +314,7 @@ which is what releases the count, and Numbers accepted that in
 
 **pybers removes an entry whose count reaches 0**, as Numbers does, and leaves
 `nextListID` alone. An entry whose count Numbers wrote too low can reach 0 while cells
-still name it, so the table's records are read before an entry goes, and one still named
+still specify it, so the table's records are read before an entry goes, and one still specified
 stays. The string pool follows the same rule with the same guard once the save ends, so
 text written later in that save can still share an entry. A merge releases the strings,
 styles, formulas and rich text of the records it removes, and reports each removed
@@ -399,13 +399,13 @@ one set to America/Los_Angeles stores the same value, 814,179,600 seconds, where
 would differ by 10,800. Reopened in Los Angeles, the New York cell still shows 09:00.
 
 **The stored seconds count the wall-clock time as if it were UTC**, from 2001-01-01 00:00,
-and nothing in the record or the document names a zone. Changing the document's language and
+and nothing in the record or the document specifies a zone. Changing the document's language and
 region to English (Italy) leaves both values as they were. Text typed with a zone,
 `2026-10-20 09:00 PST`, stays text, and a date-time format applied afterward does not
 convert it. Apple Community reports that a zone typed in a longer form, such as
 `Jan 30, 2023 6:23:04 AM PST`, is converted on entry, which no fixture here measures.
 
-None of the 389 functions Numbers offers names or converts a zone. `NOW()` and `TODAY()` read
+None of the 389 functions Numbers offers specifies or converts a zone. `NOW()` and `TODAY()` read
 the clock of the Mac that recalculates, so their cached value is that Mac's wall-clock time,
 which is inferred rather than measured.
 

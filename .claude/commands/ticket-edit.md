@@ -17,8 +17,8 @@ means fetching the current body, changing part of it, and writing the whole thin
 1. Get the ticket from `$ARGUMENTS`: `PYB-42`, `42`, `#42` or the URL. If missing, ask.
 2. **Pull the ticket fresh, immediately before drafting, every time, no exceptions.**
    `edit` replaces the WHOLE body and GitHub offers no conflict detection, so a revision
-   drafted against a copy fetched earlier silently discards anything that changed in
-   between. There is no error and no conflict marker; the other edit is simply gone. Never
+   drafted against a copy fetched earlier silently discards anything that changed in the
+   meantime. There is no error and no conflict marker, and the other edit is simply gone. Never
    reuse an export from earlier in the session, and never work from a file you did not
    fetch in this step. "Pull first" as a habit is not enough, the window is small, and a
    rule that depends on a small window eventually loses.
@@ -41,7 +41,7 @@ means fetching the current body, changing part of it, and writing the whole thin
    `export-as-source` exists as a separate command rather than a flag on this one.
 
    It does **not** eat `[bracketed]` words, `showTicket` escapes the title and prints the
-   body with `markup=False`, so brackets survive. That fault was real once and was fixed;
+   body with `markup=False`, so brackets survive. That fault was real once and was fixed,
    the warning about it outlived it. Corrected here so nobody re-derives a bug that is
    already gone.
 3. Draft the revision. Preserve everything not being changed, **verbatim**, a revision
@@ -50,7 +50,7 @@ means fetching the current body, changing part of it, and writing the whole thin
 4. **Run `/standards` on the revised draft, both passes, and fix what it finds.** `edit`
    replaces the WHOLE body, so an unproofread revision overwrites a clean one.
 5. **Show the user what changes and wait for explicit approval.** This is the same
-   spec-in touchpoint `/ticket-create` has; a revision re-opens it.
+   spec-in touchpoint `/ticket-create` has, and a revision re-opens it.
 6. On approval, apply it:
    ```
    .venv/bin/python3 -m tools.workflow.ticket edit <N> --body-file <draft>
@@ -62,8 +62,8 @@ means fetching the current body, changing part of it, and writing the whole thin
    fails loudly instead of passing silently.
 7. **Delete the local copy as soon as the edit reports the write verified.** A ticket's
    contents live in the Project, never on disk. The lingering export is the actual hazard.
-   It is a second source of truth that goes stale in minutes and is exactly what a later
-   revision gets drafted against. Draft in `$TMPDIR`, never in the repository and not even
+   It is a second source of truth that goes stale in minutes and is exactly the text a later
+   revision copies. Draft in `$TMPDIR`, never in the repository and not even
    under `workarea/`, and remove it once the verification line appears. Once step 5
    confirms the write landed, the local copy is provably redundant.
 8. Report what changed.
@@ -71,7 +71,7 @@ means fetching the current body, changing part of it, and writing the whole thin
 ## What a revision can break
 
 - **Whether numbering is frozen depends on the ticket's Status, and nothing else.**
-  Check the Status first; it decides which of these two applies.
+  Check the Status first, because it decides which of these two applies.
   - **Concept or Todo, work has not begun.** Renumber, reorder, rewrite, split and
     delete freely. Nothing references these ACs yet, so the only goal is the clearest
     possible spec, and fixing a bad structure now beats carrying it forever.
@@ -93,7 +93,7 @@ means fetching the current body, changing part of it, and writing the whole thin
   it is: `4. ~~The old requirement.~~` A deleted AC leaves every existing reference
   pointing at nothing, or worse, at whatever slid into its place.
 - **Nesting is one level deep and labels never repeat.** `4.i` and `4.ii` under `4` are
-  fine; a third level means the parent was really two tickets. A ticket already carrying
+  fine, and a third level means the parent was really two tickets. A ticket already carrying
   the superseded `4.a` form keeps it, since renumbering orphans every reference to it.
 - **The title is the branch slug, the PR title, and the CHANGELOG entry.** Retitling a
   ticket that is already `In Progress` orphans its branch name.
@@ -103,13 +103,13 @@ means fetching the current body, changing part of it, and writing the whole thin
 
 ## Hard rules
 
-- Never `edit` to move a ticket between statuses; that is `status` and `close`.
+- Never `edit` to move a ticket between statuses, which is the work of `status` and `close`.
 - Never draft from an export fetched before this invocation, and never keep one on disk
   after the edit verifies.
 - **Once a ticket is `In Progress` or later:** never renumber or reorder existing
   acceptance criteria, and never delete one, strike it through and leave the number in
   place. Rewriting one in place is always allowed. Before work begins, none of this
-  applies; see the Status gate above.
+  applies, as the Status gate above says.
 - Never use `[ ]` checkbox syntax in the ACs, numbered lists only.
 - One label per issue.
 - Never hand-run the GitHub API outside `tools/workflow/ticket.py` without the user's permission.

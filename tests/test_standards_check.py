@@ -6,6 +6,8 @@ A code span at the start of a line, blanked to spaces, once made the line read a
 indented code block, so the whole sentence escaped every check.
 
 UPDATES
+2026-11-23  A preposition whose object is a code span is not stranded, for
+            PYB-307.
 2026-10-26  A split verb warns on a time adverb alone.
 2026-10-21  Every phrase the writing rules added, and a sentence opening on a
             conjunction or a preamble, each on one line and across a wrap, for
@@ -177,3 +179,21 @@ def testATimeAdverbInsideAVerbWarns(sentence: str) -> None:
 def testAnyOtherAdverbInsideAVerbPasses(sentence: str) -> None:
     warnings = findWarnings(sentence)
     assert not any(warning.startswith("split verb") for warning in warnings)
+
+
+@pytest.mark.parametrize("sentence", [
+    "It carries its line in `CHANGELOG.md`.\n",
+    "The repository works on `develop`.\n",
+])
+def testAPrepositionWhoseObjectIsACodeSpanPasses(sentence: str) -> None:
+    warnings = findWarnings(sentence)
+    assert not any(warning.startswith("stranded preposition") for warning in warnings)
+
+
+@pytest.mark.parametrize("sentence", [
+    "Pick the file it came from.\n",
+    "The license it is released under.\n",
+])
+def testASentenceEndingOnAPrepositionWarns(sentence: str) -> None:
+    warnings = findWarnings(sentence)
+    assert any(warning.startswith("stranded preposition") for warning in warnings)

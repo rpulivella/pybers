@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rows and columns added to and removed from a table, with everything naming them.
+"""Rows and columns added to and removed from a table, with every reference to them.
 
 One edit moves four things together: the cells past the edit, the merges, every
 formula in the document that reaches into the table, and the identity each line
@@ -20,6 +20,7 @@ single selected cell does, which is what `56f` and `56g` were made from.
 is unmerged rather than kept, both measured in `57-anchors-*` and `57-collapse-*`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  An edit carries the table's borders as Numbers does, for PYB-266.
 2026-11-05  An edit leaving a header or footer count past five, or no line
             outside them, is refused, for PYB-223.
@@ -52,6 +53,7 @@ from pybers.addressing.reference import (
     toColumnNumber,
 )
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeFault, composeRefusal, nothingWritten
 from pybers.formula.nodes import Formula
 from pybers.formula.restructure import FormulaRestructure, mapFormula
 from pybers.table.headers import mapHeaders, refuseHeadersUnfit
@@ -74,7 +76,9 @@ def toLineNumber(line: int | str, rows: bool) -> int:
     if isinstance(line, int) and not isinstance(line, bool):
         return line
     axis = "row" if rows else "column"
-    raise ReferenceError(f"A {axis} is named by a number, and {line!r} is not one.")
+    raise ReferenceError(composeRefusal(
+        f"The {axis} {line!r}", f"is not a {axis} number", notDone=nothingWritten
+    ))
 
 
 def buildGridEdit(
@@ -91,32 +95,33 @@ def buildGridEdit(
     held = table.rowCount if rows else table.colCount
     limit = lastRow if rows else lastColumn
     if not isinstance(count, int) or isinstance(count, bool) or count < 1:
-        raise ReferenceError(
-            f"A structural edit adds or removes one or more {axis}, and {count!r} "
-            "is not such a count."
-        )
+        raise ReferenceError(composeRefusal(
+            f"A count of {count!r} {axis}", "is not a whole number 1 or more",
+            notDone=nothingWritten,
+        ))
     if removing:
         if at < 1 or at + count - 1 > held:
-            raise ReferenceError(
-                f"{table.name!r} holds {held} {axis}, so {count} starting at {at} "
-                "cannot be removed."
-            )
+            raise ReferenceError(composeRefusal(
+                str(table.reference), f"holds {held} {axis}, so {count} starting at "
+                f"{at} cannot be removed", notDone=nothingWritten,
+            ))
         if count >= held:
-            raise ReferenceError(
-                f"Removing {count} of the {held} {axis} in {table.name!r} would leave "
-                "none, and a Numbers table always keeps at least one."
-            )
+            raise ReferenceError(composeRefusal(
+                f"Removing {count} of the {held} {axis} in {table.reference}",
+                "would leave none, and a Numbers table always keeps at least one",
+                notDone=nothingWritten,
+            ))
     else:
         if not 1 <= at <= held + 1:
-            raise ReferenceError(
-                f"{table.name!r} holds {held} {axis}, so new ones go in from 1 to "
-                f"{held + 1}, and {at} is outside that."
-            )
+            raise ReferenceError(composeRefusal(
+                str(table.reference), f"holds {held} {axis}, so new ones go in from 1 "
+                f"to {held + 1}, and {at} is outside that", notDone=nothingWritten,
+            ))
         if held + count > limit:
-            raise ReferenceError(
-                f"{table.name!r} would hold {held + count} {axis}, past the {limit} a "
-                "Numbers table can hold."
-            )
+            raise ReferenceError(composeRefusal(
+                str(table.reference), f"would hold {held + count} {axis}, past the "
+                f"{limit} a Numbers table holds", notDone=nothingWritten,
+            ))
     edit = GridEdit(rows=rows, at=at, count=count, removing=removing)
     after = held - count if removing else held + count
     lines = axis[:-1] if count == 1 else axis
@@ -208,10 +213,11 @@ def editGrid(table: Table, edit: GridEdit) -> list[Cell]:
     held = table.rowCount if edit.rows else table.colCount
     identities = rowIdentities if edit.rows else columnIdentities
     if len(identities) != held:
-        raise ReferenceError(
-            f"{table.name!r} declares {held} {'rows' if edit.rows else 'columns'} and "
-            f"identifies {len(identities)}, so which line is which cannot be told."
-        )
+        raise ReferenceError(composeFault(
+            str(table.reference), f"declares {held} "
+            f"{'rows' if edit.rows else 'columns'} and identifies {len(identities)}, "
+            "so which line is which cannot be told", nothingWritten,
+        ))
 
     merges: list[MergeRange] = []
     for merge in table.mergeRanges:

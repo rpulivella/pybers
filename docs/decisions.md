@@ -175,7 +175,7 @@ open. Whatever serves one of them has to read the same way to the other two.
 
 **A value's kind follows its Python type.** `Decimal` is a number, `str` text, `bool` a
 boolean, `datetime` a date and time, and `timedelta` a duration. An `int` is accepted as the
-exact number it names, and a `date` as midnight, which is how Numbers stores a date typed
+exact number it holds, and a `date` as midnight, which is how Numbers stores a date typed
 without a time. A `float` is refused with a message naming `Decimal`, because Numbers keeps
 numbers as decimal128 and a binary float carries rounding error into a document that never
 had any.
@@ -232,7 +232,7 @@ list. Every format has one text form tagged by its family, which `pybers set
 names as an object, so a machine reads one grammar and a person another.
 
 **A value's kind and format always agree.** A write that would leave a format on a value it
-cannot show, such as a duration format on text, is refused, naming both, unless the caller
+cannot show, such as a duration format on text, is refused, specifying both, unless the caller
 passes `CellFormatConflict.AUTOMATIC`, which falls back to the Automatic format and reports
 it. The policy is a parameter of the library and of an agent's calls, and other writes can
 take it later, an import or a fill among them. A formula and an empty cell are not judged:
@@ -242,7 +242,7 @@ findings-11-formats.md measures.
 
 **A write reports each cell whose kind or format it changed**, before and after, and a
 preview reports the same without writing. Nothing about a column or a row is special:
-a write touches the cells it names, and a caller reads any pattern across them from the
+a write touches the cells it selects, and a caller reads any pattern across them from the
 cells themselves.
 
 **One call sets every part of a cell, and each part alone.**
@@ -251,7 +251,7 @@ format and control on every cell the selector matches, a part not given `UNCHANG
 a control of `None` removing one, and the style tickets add a cell's styles to the same
 call. A control is its own part rather than a format, as a control family beside the
 format records, and each of PYB-240 to PYB-244 teaches the writer one. Setting only a format is that call given no value, so no second call does it. The call
-sits on the document because its selector names the tables, writes every cell the
+sits on the document because its selector selects the tables, writes every cell the
 selector matches, and returns each change it made and each part it skipped, and why.
 
 **A custom number format is a structured value** holding its positive, negative and zero
@@ -272,7 +272,7 @@ and flag bits, and the format work splits by family on its findings.
 first would leave `diff A B`, `import` and `export -o` without a consistent place, and the
 bare `pybers FILE` already covers looking at one document. `set` infers a value's kind and
 `--as` overrides the inference; should inference prove unreliable, `set` falls back to text
-unless `--as` names a kind. The inference is one table of parsers built on the standard
+unless `--as` specifies a kind. The inference is one table of parsers built on the standard
 library, tried in order, rather than a chain of conditions. `set --cell-format` sets a
 format by its text form, with or without a value, since `--output-format` chooses every command's
 output. A writing verb changes FILE itself, since the verb names the act, as a
@@ -287,7 +287,7 @@ exists, so no option changes its meaning with the file it is given.
 Three types, each one idea. **`CellAddress`** is where a cell sits in any table: a row and a
 column counted from one, bounded by the largest table Numbers holds, with no table and no
 `$`. **`CellReference`** is how something points at a cell: an address, a lock on each axis,
-and the table it names when its context needs one. **`CellOffset`** is a signed distance in
+and the table it specifies when its context needs one. **`CellOffset`** is a signed distance in
 rows and columns.
 
 **A lock belongs to the reference, never to the address.** `B3`, `$B3`, `B$3` and `$B$3` all
@@ -299,7 +299,7 @@ of one position are always one key.
 **A reference is qualified only as far as its context needs**, the model of a path or a
 URL. `B3`, `Q3::B3` and `Budget::Q3::B3` are one type, its table and that table's sheet
 given by `TableReference` and `SheetReference`, typed rather than bare strings. A
-reference's text is the cell it names, and finding that cell from a document is a
+reference's text is the cell it selects, and finding that cell from a document is a
 selection, which reads text by its positions as the next decision records. `table.cell`
 takes `B3` alone or a qualifier naming that table. A qualified and an unqualified
 reference compare unequal, as two paths do. Merging position and qualification into one
@@ -325,7 +325,7 @@ text syntax, never an alias.
 
 ## A reference is a path, and a selector is CSS, decided 20 October 2026
 
-Selecting cells borrows two models a developer already knows, one for naming a single
+Selecting cells borrows two models a developer already knows, one for specifying a single
 cell and one for matching many.
 
 **A reference follows `pathlib.Path`.** It is qualified only as far as its context needs,
@@ -422,7 +422,7 @@ formula holding typed whitespace or a broken reference, `formula` carries the no
 their type codes, and otherwise `"WITHHELD"`. A reader uses the nodes only when they show
 as the text, and refuses the cell otherwise.
 
-**A part carries its document's table directory.** A sheet, table, range or cell names
+**A part carries its document's table directory.** A sheet, table, range or cell lists
 every table of its document, with its sheet and size, and reading the part back rebuilds
 the rest as empty stand-ins. Whether Numbers writes a table's name bare or with its sheet
 depends on every table in the document, so a part read alone parses its formulas exactly
@@ -460,7 +460,7 @@ A document is changed to a language and region as Numbers changes it, for PYB-27
 **Formula text stays in its English, `en_US` form** whatever the document's language and
 region. Numbers stores the same formula nodes in every locale and only displays them with
 the region's separators and the language's function names, so the text pybers reads and
-writes names the formula exactly, and one form serves every document.
+writes specifies the formula exactly, and one form serves every document.
 
 **A region's locale fields are composed from macOS's locale data, never copied.** Numbers
 takes them from macOS's ICU, so a local extractor reads that data on a Mac into a table
@@ -495,7 +495,7 @@ dispatch, and mypy checks that encoding's `match` covers every kind of content.
 **The rewrites share one walk, `mapFormulaNodes`.** Restructuring, relocating and
 clamping a pasted range to its table's edge each rewrite a node's reference or range and
 leave every other node alone. The walk returns the formula it was given when no node
-changed, which is how a caller tells that nothing moved. Each rewrite then names only
+changed, which is how a caller tells that nothing moved. Each rewrite then describes only
 what it does to one node.
 
 ---
@@ -543,7 +543,7 @@ equal components, as Numbers stores one.
 one, and so does reading a JSON form, so the save gives it a created package in its own
 region, its first sheet the created one, and writes the rest as a script's additions.
 There is one creation path. The table writer refuses a cell whose new record would lose
-part of what it holds, naming it before anything is written: the format it keeps is the
+part of what it holds, specifying it before anything is written: the format it keeps is the
 one its record builder writes for the value, so a format the builder learns to write is
 accepted without the check changing, and rich text and controls are refused until pybers
 creates them. A test saves all 188 fixtures and measurements through their JSON form, and
@@ -620,7 +620,7 @@ family: `StrokeSolid`, `StrokeDash` carrying its lengths in multiples of the wid
 stored. A dash carries its array rather than a name, because Numbers 15.4 stores the cell
 menu's dashed line as `[2, 2]` where an earlier save stored `[1, 1]`.
 
-**A border position names the part of a range it draws, and is never stored.** Numbers
+**A border position specifies the part of a range it draws, and is never stored.** Numbers
 keeps four strokes per cell, and its nine Border buttons only choose which edges the next
 stroke lands on. pybers names the nine for what they draw, `all`, `outer`, `outer-top`,
 `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` and

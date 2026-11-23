@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """\
 A document read from its JSON form saves as a created document holding what the form
-describes, or is refused, naming what pybers cannot yet create.
+describes, or is refused, stating what pybers cannot create.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-12  A cell's style is kept through its JSON form and a save, for PYB-265.
 2026-11-03  Written for PYB-261.
 """
@@ -153,7 +154,7 @@ def testADocumentHoldingAControlIsRefusedNamingTheCell(tmp_path: Path) -> None:
     assert isinstance(document, pybers.Document)
     path = tmp_path / "refused.numbers"
 
-    refusal = r"control, which pybers cannot yet create\. Nothing was written"
+    refusal = r"control, and creating it is not supported\. Nothing was written"
     with pytest.raises(pybers.WriteError, match=refusal):
         document.save(path)
 
@@ -170,34 +171,34 @@ def findFixtureCell(stem: str, sheet: str, table: str, address: str) -> pybers.C
 def testACellHoldingRichTextIsRefused() -> None:
     cell = findFixtureCell("22c-merge-overpaints", "Sheet 1", "Table 1", "A3")
 
-    with pytest.raises(pybers.WriteError, match="'T' A3 holds rich text"):
-        refuseUncreatableCell(cell, "T")
+    with pytest.raises(pybers.WriteError, match="Sheet 1::Table 1::A3 holds rich text"):
+        refuseUncreatableCell(cell)
 
 
 def testACellHoldingAFormatAndNoValueIsAccepted() -> None:
     cell = findFixtureCell("22c-merge-overpaints", "Sheet 1", "Table 1", "I5")
 
-    refuseUncreatableCell(cell, "T")
+    refuseUncreatableCell(cell)
 
 
 def testACellHoldingAFormatTheBuilderDoesNotWriteIsRefused() -> None:
     cell = findFixtureCell("68-series-kinds-base", "Sheet1", "Table 1", "A2")
 
     with pytest.raises(pybers.WriteError, match="holds a percent format"):
-        refuseUncreatableCell(cell, "T")
+        refuseUncreatableCell(cell)
 
 
 def testACellHoldingTheFormatTheBuilderWritesIsAccepted(tmp_path: Path) -> None:
     document = pybers.open(saveCreated(tmp_path))
     cell = document.sheet(1).table(1).cell("A1")
 
-    refuseUncreatableCell(cell, "T")
+    refuseUncreatableCell(cell)
 
 
 def testADocumentNamingNoRegionIsRefused(tmp_path: Path) -> None:
     document = pybers.Document(sheets=[pybers.Sheet(name="Only")])
 
-    with pytest.raises(pybers.WriteError, match="names no language and region"):
+    with pytest.raises(pybers.WriteError, match="specifies no language and region"):
         document.save(tmp_path / "refused.numbers")
 
 

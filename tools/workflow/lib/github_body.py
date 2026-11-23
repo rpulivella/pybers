@@ -40,7 +40,7 @@ from mdit_py_plugins.tasklists import tasklists_plugin
 formatOptions: dict[str, object] = {"wrap": "no", "number": True}
 formatExtensions: tuple[str, ...] = ("gfm",)
 
-# How many changed lines a refusal names before it stops listing them.
+# How many changed lines a refusal lists before it stops listing them.
 refusalLineLimit: int = 8
 
 
@@ -69,7 +69,7 @@ def buildParser(breaks: bool) -> MarkdownIt:
 
 
 def renderHtml(text: str, breaks: bool) -> str:
-    """Return the HTML a body renders to, with whitespace a browser ignores evened out.
+    """Return the HTML a body renders to, the whitespace a browser ignores made uniform.
 
     Inside `<pre>` whitespace is content and is kept exactly.
     """
@@ -92,7 +92,7 @@ def findRenderingChanges(before: str, after: str) -> list[str]:
 
 
 def refuseRenderingChange(before: str, after: str, action: str) -> None:
-    """Raise, naming the lines, when two renderings of one body disagree."""
+    """Raise, listing the lines, when two renderings of one body disagree."""
     changes = findRenderingChanges(before, after)
     if not changes:
         return
@@ -143,7 +143,7 @@ def formatBodyForPosting(text: str) -> PostedBody:
     """Return a file's body as GitHub has to receive it to render what the file means.
 
     Every wrap is joined, every break is kept, runs of blank lines become one, and
-    the body ends with a single newline. Refused, naming the lines, when GitHub
+    the body ends with a single newline. Refused, listing the lines, when GitHub
     would render the result differently from the file.
     """
     formatted = mdformat.text(

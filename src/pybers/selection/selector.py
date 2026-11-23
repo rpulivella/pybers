@@ -13,6 +13,7 @@ written `Q3\\, draft`. A colon begins a condition only when a condition's name
 follows it, which is why `B2:D9` stays a range.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  A name's escapes are read through `addressing.text`, the one reference
             grammar, for PYB-267.
 2026-11-03  Written for PYB-223.
@@ -35,7 +36,12 @@ from pybers.addressing.text import (
     normalizeWrittenText,
     referenceSeparator,
 )
-from pybers.errors import PybersError
+from pybers.errors import (
+    PybersError,
+    composeChoiceRefusal,
+    composeRefusal,
+    composeTextRefusal,
+)
 from pybers.selection.conditions import (
     nthPattern,
     pseudoClasses,
@@ -50,7 +56,7 @@ pseudoName: re.Pattern[str] = re.compile(r"[a-z][a-z-]*")
 
 
 class SelectorError(PybersError, ValueError):
-    """A selector that does not parse, naming the part that is wrong and where."""
+    """A selector that does not parse, saying which part is wrong and where."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +71,7 @@ class SelectorComponent:
 
     @property
     def exact(self) -> bool:
-        """Report whether this names one thing, with no wildcard and no exclusion."""
+        """Report whether this selects one thing, with no wildcard and no exclusion."""
         return (
             bool(self.pattern) and not findWildcard(self.pattern)
             and not self.exclusions
@@ -142,13 +148,22 @@ class Selector:
 
     def __post_init__(self) -> None:
         if not self.groups:
-            raise SelectorError("A selector holds at least one group.")
+            raise SelectorError(composeRefusal(
+                "A selector", "holds no group", "Write at least one, such as `Q3::B3`"
+            ))
 
     @classmethod
     def parse(cls, text: str) -> Selector:
-        """Return the selector text writes, refusing it naming the part and place."""
+        """Return the selector text writes, refusing it with the part and place."""
         if not isinstance(text, str):
-            raise SelectorError(f"A selector is text, and {text!r} is not.")
+            raise SelectorError(composeRefusal(
+                repr(text), "is not a selector, since a selector is text",
+                "Write it as a string, such as 'Q3::B3'",
+            ))
+        if not text.strip():
+            raise SelectorError(composeRefusal(
+                "The selector", "is empty", "Write one, such as `Q3::B3`"
+            ))
         groups = tuple(
             SelectorParser(text, start, end).groupParse()
             for start, end in splitTopLevel(text, 0, len(text))
@@ -202,11 +217,6 @@ def splitTopLevel(text: str, start: int, end: int) -> list[tuple[int, int]]:
     return spans
 
 
-def formatPlace(text: str, index: int) -> str:
-    """Return where a fault sits, `Q3::B0`, column 5, as a refusal opens."""
-    return f"`{text}`, column {index + 1}:"
-
-
 class SelectorParser:
     """Reads one group of a selector's text, keeping where each part sits."""
 
@@ -215,10 +225,12 @@ class SelectorParser:
         self.index = start
         self.end = end
 
-    def fault(self, message: str, index: int | None = None) -> SelectorError:
-        """Return the refusal of the part at an index, the text marked under it."""
+    def fault(
+        self, cause: str, fix: str | None = None, index: int | None = None
+    ) -> SelectorError:
+        """Return the refusal of the part at an index, here unless given."""
         where = self.index if index is None else index
-        return SelectorError(f"{formatPlace(self.text, where)} {message}")
+        return SelectorError(composeTextRefusal(self.text, where, cause, fix))
 
     def skipSpaces(self) -> None:
         while self.index < self.end and self.text[self.index] == " ":
@@ -242,9 +254,7 @@ class SelectorParser:
         """Return the group between this parser's start and end."""
         self.skipSpaces()
         if self.index >= self.end:
-            if not self.text.strip():
-                raise self.fault("A selector names something, and this one is empty.")
-            raise self.fault("A selector group is empty.")
+            raise self.fault("is an empty group", "Remove the extra comma")
         fromRight = self.startsWith(referenceSeparator)
         if fromRight:
             self.index += len(referenceSeparator)
@@ -253,8 +263,9 @@ class SelectorParser:
         while True:
             if len(components) == len(positionNames):
                 raise self.fault(
-                    f"A selector names at most {len(positionNames)} positions, "
-                    f"{', '.join(positionNames)}, and this names a fourth."
+                    "begins a fourth position, and a selector holds only sheet, "
+                    "table and cells",
+                    "Write it as `sheet::table::cells`",
                 )
             component = self.componentParse()
             components.append(component)
@@ -267,7 +278,10 @@ class SelectorParser:
         if fromRight and not any(each.pattern for each in components):
             components = []
         if not components and not conditions:
-            raise self.fault("A selector names something after its leading `::`.")
+            raise self.fault(
+                "selects nothing after its leading `::`",
+                "Write a part after it, such as `::B3`",
+            )
         return SelectorGroup(tuple(components), fromRight, conditions)
 
     def componentParse(self) -> SelectorComponent:
@@ -279,7 +293,10 @@ class SelectorParser:
             character = self.text[self.index]
             if character == escapeMarker:
                 if self.index + 1 >= self.end:
-                    raise self.fault("A backslash ends the text, escaping nothing.")
+                    raise self.fault(
+                        "ends in a backslash, which escapes nothing",
+                        "Remove it, or write `\\\\` for a backslash",
+                    )
                 written += self.text[self.index:self.index + 2]
                 self.index += 2
                 continue
@@ -293,13 +310,17 @@ class SelectorParser:
                 break
             if character in "]()":
                 raise self.fault(
-                    f"`{character}` is not part of a name. Write `\\{character}`."
+                    f"holds `{character}`, which is not part of a name",
+                    f"Write it as `\\{character}`",
                 )
             written += character
             self.index += 1
         pattern = normalizeWrittenText(written)
         if not pattern and exclusions:
-            raise self.fault("A `:not()` follows a name it removes from.", start)
+            raise self.fault(
+                "holds a `:not()` that follows no name",
+                "Write the name it removes from first, such as `Q*:not(Q4)`", start,
+            )
         return SelectorComponent(pattern, tuple(exclusions))
 
     def negatesConditions(self) -> bool:
@@ -312,7 +333,7 @@ class SelectorParser:
     def parenthesesRead(self) -> tuple[int, int]:
         """Return the span inside the parentheses opening here, and move past them."""
         if not self.startsWith("("):
-            raise self.fault("Expected `(` here.")
+            raise self.fault("lacks the `(` that opens a condition's argument")
         depth = 0
         index = self.index
         while index < self.end:
@@ -329,7 +350,7 @@ class SelectorParser:
                     self.index = index + 1
                     return span
             index += 1
-        raise self.fault("This `(` is never closed.")
+        raise self.fault("opens a `(` that is never closed", "Close it with `)`")
 
     def exclusionsParse(self) -> list[str]:
         """Return the patterns a component's `:not(...)` removes."""
@@ -339,7 +360,10 @@ class SelectorParser:
         for begin, finish in splitTopLevel(self.text, start, end):
             pattern = self.text[begin:finish].strip()
             if not pattern:
-                raise self.fault("A `:not()` names something to remove.", begin)
+                raise self.fault(
+                    "holds a `:not()` that removes nothing",
+                    "Write a name inside it, such as `:not(Q4)`", begin,
+                )
             patterns.append(pattern)
         return patterns
 
@@ -352,8 +376,9 @@ class SelectorParser:
                 return tuple(conditions)
             if self.startsWith(referenceSeparator):
                 raise self.fault(
-                    "Conditions follow every component, and a `::` follows a "
-                    "condition here."
+                    "holds a `::` after a condition, and conditions follow every "
+                    "component",
+                    "Move the conditions to the end",
                 )
             if self.startsWith("["):
                 conditions.append(self.attributeParse())
@@ -361,8 +386,8 @@ class SelectorParser:
                 conditions.append(self.pseudoClassParse())
             else:
                 raise self.fault(
-                    "Conditions follow every component, and this is not one. A "
-                    "condition reads `[kind=number]` or `:empty`."
+                    "holds text after its components that is not a condition",
+                    "Write a condition as `[kind=number]` or `:empty`",
                 )
 
     def attributeParse(self) -> SelectorAttribute:
@@ -370,26 +395,26 @@ class SelectorParser:
         start = self.index
         close = self.text.find("]", self.index, self.end)
         if close < 0:
-            raise self.fault("This `[` is never closed.")
+            raise self.fault("opens a `[` that is never closed", "Close it with `]`")
         name, separator, value = self.text[self.index + 1:close].partition("=")
         name, value = name.strip(), value.strip()
         self.index = close + 1
         attribute = selectorAttributes.get(name)
         if attribute is None:
-            raise self.fault(
-                f"`[{name}]` is no condition pybers knows. The conditions are "
-                f"{', '.join(f'[{each}]' for each in selectorAttributes)}.",
-                start,
+            raise composeChoiceRefusal(
+                SelectorError, f"[{name}]", "a selector condition",
+                [f"[{each}]" for each in selectorAttributes],
             )
         if not separator:
             return SelectorAttribute(name)
         if attribute.values is None:
-            raise self.fault(f"`[{name}]` takes no value.", start)
-        if value not in attribute.values:
             raise self.fault(
-                f"`{value}` is no value of `[{name}]`. It takes "
-                f"{', '.join(attribute.values)}.",
-                start,
+                f"gives `[{name}]` a value, and it takes none",
+                f"Write it as `[{name}]`", start,
+            )
+        if value not in attribute.values:
+            raise composeChoiceRefusal(
+                SelectorError, value, f"a value of `[{name}]`", attribute.values
             )
         return SelectorAttribute(name, value)
 
@@ -407,15 +432,17 @@ class SelectorParser:
                 for each, last in splitTopLevel(self.text, begin, finish)
             )
             if not all(alternatives):
-                raise self.fault("A `:not()` holds a condition.", start)
+                raise self.fault(
+                    "holds a `:not()` with no condition",
+                    "Write one inside it, such as `:not(:empty)`", start,
+                )
             return SelectorNegation(alternatives)
         takes = pseudoClasses.get(name)
         pseudoNames = (*pseudoClasses, pseudoNegation)
         if takes is None:
-            raise self.fault(
-                f"`:{name}` is no condition pybers knows. The conditions are "
-                f"{', '.join(f':{each}' for each in pseudoNames)}.",
-                start,
+            raise composeChoiceRefusal(
+                SelectorError, f":{name}", "a selector condition",
+                [f":{each}" for each in pseudoNames],
             )
         self.index = start + 1 + len(name)
         if not takes:
@@ -424,8 +451,8 @@ class SelectorParser:
         argument = self.text[begin:finish].replace(" ", "")
         if nthPattern.fullmatch(argument) is None:
             raise self.fault(
-                f"`{argument}` is not a position pattern. `:{name}` takes `2n`, "
-                "`2n+1`, `3`, `odd` or `even`, counted from one.",
+                f"holds `{argument}`, which is not a position pattern",
+                f"Give `:{name}` `2n`, `2n+1`, `3`, `odd` or `even`, counted from one",
                 begin,
             )
         return SelectorPseudoClass(name, argument)

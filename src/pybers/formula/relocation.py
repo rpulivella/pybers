@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The rule a caller names for what every reference keeps when cells change address.
+"""The rule a caller specifies for what every reference keeps when cells change address.
 
 **Numbers performs both rules**, measured 2026-09-23 in `60-move-*`. Dragging a
-block keeps each reference on the cell it named, and cut and paste keeps each
+block keeps each reference on the cell it selected, and cut and paste keeps each
 reference's offset from its formula. Neither is a default, so every operation
 relocating cells takes one from its caller.
 
@@ -12,6 +12,7 @@ was stored as `SUM(E7:E12)`, not `SUM(E7:E18)`. A single reference past the edge
 kept, and shows an error.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  Relocating and clamping walk the nodes through `mapFormulaNodes`,
             for PYB-278.
 2026-09-29  A formula keeps its named cells from a new host with no block moved,
@@ -44,7 +45,7 @@ from pybers.formula.nodes import (
 
 
 class FormulaReferenceRelocation(StrEnum):
-    """What each reference a relocation touches keeps: its named cell or its offset."""
+    """What each reference a relocation touches keeps: its cell or its offset."""
 
     PRESERVE_NAMED_CELL = "named-cell"
     PRESERVE_RELATIVE_POSITION = "relative-position"
@@ -54,7 +55,7 @@ class FormulaReferenceRelocation(StrEnum):
 class FormulaBlockMove:
     """A block of one table moved, as a formula anywhere has to see it.
 
-    `targetTable` names that table as a reference does, so a local reference
+    `targetTable` specifies that table as a reference does, so a local reference
     reaches it only from a formula inside it. Corners count from one.
     """
 
@@ -71,14 +72,14 @@ class FormulaBlockMove:
         return self.top <= row <= self.bottom and self.left <= column <= self.right
 
     def reaches(self, tableId: str | None, hostInTarget: bool) -> bool:
-        """Report whether a reference naming this table reaches the moved one."""
+        """Report whether a reference specifying this table reaches the moved one."""
         return hostInTarget if tableId is None else tableId == self.targetTable
 
 
 def placeCoordinate(
     coordinate: Coordinate, target: int, host: int
 ) -> Coordinate:
-    """Return an axis naming `target` from a formula at `host`, in its own form."""
+    """Return an axis selecting `target` from a formula at `host`, in its own form."""
     value = target if coordinate.absolute else target - host
     if value == coordinate.value:
         return coordinate
@@ -100,7 +101,7 @@ def relocateReference(
     move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> FormulaReference:
-    """Return a reference naming the cell it named, from a formula now at `landed`."""
+    """Return a reference to the cell it selected, from a formula now at `landed`."""
     if reference.broken:
         return reference
     row = None if reference.row is None else reference.row.resolve(host.row)
@@ -158,12 +159,12 @@ def relocateFormula(
     move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> Formula:
-    """Return a formula whose references name the cells they named before the move.
+    """Return a formula whose references select the cells they selected before the move.
 
     `host` is where the formula sat and `landed` where it sits now. A reference
     into the block follows it, and a range follows only when wholly inside, as
     `60c-move-dragged` left `SUM(B1:B6)` where it was. With no `move`, every
-    reference keeps the cell it named.
+    reference keeps the cell it selected.
     """
     return mapFormulaNodes(
         formula, lambda node: relocateNode(node, host, landed, move, hostInTarget)
@@ -177,7 +178,7 @@ def relocateNode(
     move: FormulaBlockMove | None,
     hostInTarget: bool,
 ) -> FormulaNode:
-    """Return one node naming the cells it named, or the same node when none moved."""
+    """Return one node selecting the cells it selected, or itself when none moved."""
     content = node.content
     moved: FormulaReference | FormulaRange
     if isinstance(content, FormulaReference):

@@ -14,6 +14,7 @@ a value typed into a fresh cell takes it, and drops the control the old value ha
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-12  A borrowed shape drops the sibling's cell style, for PYB-265.
 2026-11-03  A cell whose new record would lose part of it is refused, for PYB-261.
 2026-10-29  A format keyed through the format pool, and a template found
@@ -25,7 +26,7 @@ UPDATES
 2026-10-20  Any value is written over any value, each kind's record shape held in
             one table, for PYB-144. A new cell's shape is a sibling's style alone.
 2026-10-11  Fixed tables are frozendict, for PYB-189.
-2026-10-09  A refused write names what the cell holds in words, for PYB-168.
+2026-10-09  A refused write states what the cell holds in words, for PYB-168.
 2026-10-01  The format slots moved to `_persistence.cells`, and a cell's chosen
             format is read from its description, for PYB-141.
 2026-09-30  A date is written over a date and a duration over a duration, for
@@ -83,7 +84,7 @@ from .._persistence.rows import readStoredTiles
 from ..absence import UNDETERMINED
 from ..addressing.reference import originOffset
 from ..currency import CurrencyAmount
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from ..format._read import currencyFormatType, findFormatOfType
 from ..format._write import (
     buildCurrencyFormat,
@@ -97,7 +98,7 @@ from ._refcounts import stringTypeByte
 from .cell import Cell, CellValue, refuseValueOverFormula
 from .kinds import CellKind
 
-# How a refusal names what a cell holds, in the words a person would use.
+# How a refusal states what a cell holds, in the words a person would use.
 kindPhrases: frozendict[CellKind, str] = frozendict({
     CellKind.NUMBER: "a number",
     CellKind.CURRENCY: "a currency amount",
@@ -112,7 +113,7 @@ kindPhrases: frozendict[CellKind, str] = frozendict({
 
 @dataclass(frozen=True, slots=True)
 class RecordShape:
-    """How a record type holds its value: the bits naming it, its width, its format.
+    """How a record type holds its value: the bits specifying it, its width, its format.
 
     `valueBits` is byte 8's low five bits, one value per type across 73,445 records.
     See findings-01-values.md.
@@ -164,39 +165,31 @@ currencyCellOffset: int = 7
 currencyCellBit: int = 0x08
 
 
-def refuseUncreatableCell(cell: Cell, tableName: str) -> None:
+def refuseUncreatableCell(cell: Cell) -> None:
     """Refuse a cell whose record pybers would build without part of what it holds.
 
     The one place a new record's presentation is decided: a format is kept only when
     `findFormatEntry` has an entry for it, so a family the writer learns to write is
     accepted without this changing.
     """
-    where = f"{tableName!r} {cell.address}"
+    presentation, part = cell.presentation, None
     if cell.kind is CellKind.RICH_TEXT:
-        raise WriteError(
-            f"{where} holds rich text, which pybers cannot yet create. Nothing was "
-            "written."
-        )
-    presentation = cell.presentation
-    if presentation.control is not None:
-        raise WriteError(
-            f"{where} holds a {presentation.control.controlType} control, which "
-            "pybers cannot yet create. Nothing was written."
-        )
-    stated = presentation.format
-    if stated is None or stated is UNDETERMINED:
-        return
-    asked = findFormatShown(stated)
-    if asked is UNDETERMINED or findFormatEntry(asked, cell.value) is not None:
-        return
-    raise WriteError(
-        f"{where} holds a {asked.formatFamily} format, which pybers cannot yet "
-        "create. Nothing was written."
-    )
+        part = "rich text"
+    elif presentation.control is not None:
+        part = f"a {presentation.control.controlType} control"
+    elif presentation.format is not None and presentation.format is not UNDETERMINED:
+        asked = findFormatShown(presentation.format)
+        if asked is not UNDETERMINED and findFormatEntry(asked, cell.value) is None:
+            part = f"a {asked.formatFamily} format"
+    if part is not None:
+        raise WriteError(composeRefusal(
+            str(cell.reference), f"holds {part}, and creating it is not supported",
+            None, nothingWritten,
+        ))
 
 
 def patchRichTextKey(raw: bytes, key: int) -> bytes:
-    """Return a rich-text record naming a different rich-text entry."""
+    """Return a rich-text record referring to a different rich-text entry."""
     encoded = key.to_bytes(recordShapes[richTextTypeByte].width, "little")
     return raw[:valueOffset] + encoded + raw[valueOffset + len(encoded):]
 
@@ -209,7 +202,7 @@ def refuseFormulaOverwrite(cell: Cell, record: CellRecord) -> None:
     recalculated, which is a silent loss wearing the shape of a success.
     """
     if carriesFormula(record):
-        refuseValueOverFormula(cell.address)
+        refuseValueOverFormula(cell.reference)
 
 
 def formatStoredValue(record: CellRecord) -> str:
@@ -249,10 +242,10 @@ def encodeCellValue(
     value = cell.value
     if isinstance(value, str):
         if pool is None:
-            raise WriteError(
-                f"{cell.address} was set to text and its table carries no string "
-                "list to pool it in. A table that has never held text has none."
-            )
+            raise WriteError(composeRefusal(
+                str(cell.reference), "holds text, and writing text into a table "
+                "that has never held any is not supported", notDone=nothingWritten,
+            ))
         own = record.typeByte == stringTypeByte and not borrowed
         key = pool.keyFor(
             value, record.value if own and isinstance(record.value, int) else None
@@ -274,10 +267,10 @@ def encodeCellValue(
         return dateTypeByte, encodeSeconds((value - appleEpoch).total_seconds())
     if isinstance(value, datetime.timedelta):
         return durationTypeByte, encodeSeconds(value.total_seconds())
-    raise WriteError(
-        f"{cell.address} was given a {type(value).__name__}, and pybers writes a "
-        "Decimal, a CurrencyAmount, a str, a bool, a datetime or a timedelta."
-    )
+    raise WriteError(composeFault(
+        str(cell.reference), f"holds a {type(value).__name__}, which no record "
+        "stores", nothingWritten,
+    ))
 
 
 def buildWrittenRecord(
@@ -293,7 +286,7 @@ def buildWrittenRecord(
 
     **`borrowed` says the record belongs to another cell** and is here only for its
     style. Without it, the template's pooled key is read as this cell's previous
-    claim, and a pool entry nothing else names is then rewritten in place: writing
+    claim, and a pool entry nothing else refers to is then rewritten in place: writing
     into an empty `J1` changed `I1` from `Item 1` to the new text, with nothing
     raised. Found by the golden on 2026-09-14.
     """
@@ -328,7 +321,7 @@ def patchCurrencyCode(
     formatFor: Callable[[tsk.FormatStructArchive], int | None],
     formatOf: Callable[[int], tsk.FormatStructArchive | None],
 ) -> bytes:
-    """Return a currency record naming its new currency, every other setting kept.
+    """Return a currency record specifying its new currency, every other setting kept.
 
     A custom format holds its currency in the document's list, which PYB-245 edits.
     """
@@ -338,20 +331,21 @@ def patchCurrencyCode(
     if current is not None and current.currency_code == cell.value.currency:
         return raw
     if current is not None and current.format_type != currencyFormatType:
-        raise WriteError(
-            f"{cell.address} shows its currency through a custom format, and pybers "
-            f"cannot change it to {cell.value.currency} yet."
-        )
+        raise WriteError(composeRefusal(
+            str(cell.reference), "shows its currency through a custom format, and "
+            f"changing it to {cell.value.currency} is not supported", None,
+            nothingWritten,
+        ))
     wanted = buildCurrencyFormat(cell.value.currency)
     if current is not None:
         wanted.CopyFrom(current)
         wanted.currency_code = cell.value.currency
     fresh = formatFor(wanted)
     if fresh is None or key is None:
-        raise WriteError(
-            f"{cell.address} names no currency format to change to "
-            f"{cell.value.currency}."
-        )
+        raise WriteError(composeFault(
+            str(cell.reference), "holds no currency format to change to "
+            f"{cell.value.currency}", nothingWritten,
+        ))
     return patchSlotValue(raw, currencyFormatSlot, fresh)
 
 
@@ -370,15 +364,16 @@ def findRecordShape(record: CellRecord) -> RecordShape:
     """Return how a record holds its value, refusing a type pybers cannot replace."""
     shape = recordShapes.get(record.typeByte)
     if shape is None:
-        raise WriteError(
-            f"The cell in column {record.column + originOffset} "
-            f"{formatStoredValue(record)}, so pybers cannot tell where its value ends."
-        )
+        raise WriteError(composeRefusal(
+            f"The cell in column {record.column + originOffset}",
+            f"{formatStoredValue(record)}, so pybers cannot tell where its value ends",
+            None, nothingWritten,
+        ))
     if len(record.raw) < valueOffset + shape.width:
-        raise WriteError(
-            f"The record for column {record.column + originOffset} is "
-            f"{len(record.raw)} bytes, too short to hold the value it declares."
-        )
+        raise WriteError(composeFault(
+            f"The record for column {record.column + originOffset}", f"is "
+            f"{len(record.raw)} bytes, too short for its value", nothingWritten,
+        ))
     return shape
 
 
@@ -391,7 +386,7 @@ def patchValue(record: CellRecord, encoded: bytes) -> bytes:
 def findFormatKey(
     pool: EntryPool[tsk.FormatStructArchive], wanted: tsk.FormatStructArchive
 ) -> int:
-    """Return a key naming exactly this format, creating an entry when none does.
+    """Return a key specifying exactly this format, creating an entry when none does.
 
     Counts nothing: `moveFormatReferences` counts the record that names the key, so
     looking a format up once for many cells counts every cell.
@@ -487,16 +482,17 @@ def retypeRecord(
 ) -> bytes:
     """Return a record holding a value of another kind, in its Automatic format.
 
-    The old kind's format slot and any control go, and the new kind's slot names
+    The old kind's format slot and any control go, and the new kind's slot specifies
     `formatKey`. One bit leaves and one arrives, so the count the reference rule
     derives is unchanged. Every other reference keeps its slot and its value, which
     is what carries a cell's style across.
     """
     if formatKey is None:
-        raise WriteError(
-            f"The cell in column {record.column + originOffset} would change kind, "
-            "and its table carries no format list to name the new kind's format in."
-        )
+        raise WriteError(composeFault(
+            f"The cell in column {record.column + originOffset}", "would change "
+            "kind, and its table carries no format list to hold the new kind's "
+            "format", nothingWritten,
+        ))
     leaving = findRecordShape(record)
     arriving = recordShapes[typeByte]
     assert arriving.formatSlot is not None
@@ -568,7 +564,10 @@ def applyAskedFormat(
         entry = findFormatEntry(asked, value)
         key = None if entry is None else formatFor(entry)
         if key is None:
-            raise WriteError(f"pybers cannot write a {asked.formatFamily} format here.")
+            raise WriteError(composeFault(
+                f"A {asked.formatFamily} format", "has no entry pybers can write",
+                nothingWritten,
+            ))
         held[slot] = key
     if shows:
         held[displayedKindSlot] = findSlotKind(slot)

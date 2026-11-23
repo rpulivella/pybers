@@ -6,7 +6,7 @@ Writing follows the value's own type. Reading follows the type a field declares,
 union is resolved by what the tree holds: a sentinel by its name, an enum by its
 value, a closed family by its discriminator, and any other dataclass by the exact
 keys it writes. A union whose members read alike from a string, a date beside text,
-is resolved by the enclosing form's `jsonFormChoices`, which names the key whose
+is resolved by the enclosing form's `jsonFormChoices`, which specifies the key whose
 value decides the field's type, so the schema states the same choice.
 
 A dataclass writes its public fields that take part in equality, and a field marked
@@ -15,6 +15,7 @@ A dataclass writes its public fields that take part in equality, and a field mar
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-24  Written for PYB-259.
 """
 from __future__ import annotations
@@ -37,10 +38,10 @@ from functools import cache
 from typing import Any, TypeAliasType, Union
 
 from pybers._family import findFamilyDiscriminator
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeFault
 from pybers.interchange._leaves import (
-    JsonFormError,
     Tree,
+    composeFormRefusal,
     findLeafRule,
     formatTreeKind,
 )
@@ -55,6 +56,14 @@ jsonFormConst: str = "const"
 
 class JsonFormDefinitionError(PybersError, RuntimeError):
     """A model type the JSON form cannot express, which is a defect in pybers."""
+
+
+def composeDefinitionFault(declared: object) -> JsonFormDefinitionError:
+    """Return the fault of a type the JSON form cannot express."""
+    shown = declared.__name__ if isinstance(declared, type) else repr(declared)
+    return JsonFormDefinitionError(
+        composeFault(f"The type {shown}", "has no JSON form in pybers")
+    )
 
 
 def unwrapAlias(declared: object) -> object:
@@ -118,9 +127,7 @@ def encodeTree(value: object) -> Tree:
         return [encodeTree(each) for each in value]
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return encodeDataclass(value)
-    raise JsonFormDefinitionError(
-        f"pybers has no JSON form for {type(value).__name__}."
-    )
+    raise composeDefinitionFault(type(value))
 
 
 def encodeDataclass(value: object) -> dict[str, Tree]:
@@ -143,11 +150,13 @@ def decodeTree(tree: Tree, declared: object, path: str) -> Any:
     declared = members[0]
     if declared is type(None):
         if tree is not None:
-            raise JsonFormError(f"{path} must be null, and is {formatTreeKind(tree)}.")
+            raise composeFormRefusal(
+                path, f"is {formatTreeKind(tree)}, and must be null"
+            )
         return None
     if isinstance(declared, sentinel):
         if tree != repr(declared):
-            raise JsonFormError(f"{path} must be {repr(declared)!r}.")
+            raise composeFormRefusal(path, f"must be {repr(declared)!r}")
         return declared
     origin = typing.get_origin(declared)
     if origin in (tuple, list):
@@ -155,7 +164,7 @@ def decodeTree(tree: Tree, declared: object, path: str) -> Any:
     if origin in (frozendict, dict, Mapping):
         return decodeMapping(tree, declared, path)
     if not isinstance(declared, type):
-        raise JsonFormDefinitionError(f"pybers has no JSON form for {declared!r}.")
+        raise composeDefinitionFault(declared)
     return decodeType(tree, declared, path)
 
 
@@ -166,11 +175,13 @@ def decodeType(tree: Tree, declared: type, path: str) -> Any:
             return declared(tree)
         except ValueError as exc:
             choices = ", ".join(repr(each.value) for each in declared)
-            raise JsonFormError(f"{path} must be one of {choices}.") from exc
+            raise composeFormRefusal(
+                path, f"holds {tree!r}, and must be one of {choices}"
+            ) from exc
     if declared is bool:
         if not isinstance(tree, bool):
-            raise JsonFormError(
-                f"{path} must be a boolean, and is {formatTreeKind(tree)}."
+            raise composeFormRefusal(
+                path, f"is {formatTreeKind(tree)}, and must be a boolean"
             )
         return tree
     if declared is int:
@@ -178,12 +189,12 @@ def decodeType(tree: Tree, declared: type, path: str) -> Any:
         assert number is not None
         whole = number.decode(tree, path)
         if whole != whole.to_integral_value():
-            raise JsonFormError(f"{path} must be a whole number, and is {whole}.")
+            raise composeFormRefusal(path, f"is {whole}, and must be a whole number")
         return int(whole)
     if declared is str:
         if not isinstance(tree, str):
-            raise JsonFormError(
-                f"{path} must be a string, and is {formatTreeKind(tree)}."
+            raise composeFormRefusal(
+                path, f"is {formatTreeKind(tree)}, and must be a string"
             )
         return tree
     rule = findLeafRule(declared)
@@ -191,13 +202,15 @@ def decodeType(tree: Tree, declared: type, path: str) -> Any:
         return rule.decode(tree, path)
     if dataclasses.is_dataclass(declared):
         return decodeDataclass(tree, declared, path)
-    raise JsonFormDefinitionError(f"pybers has no JSON form for {declared.__name__}.")
+    raise composeDefinitionFault(declared)
 
 
 def decodeSequence(tree: Tree, declared: object, origin: type, path: str) -> Any:
     """Return an array read as a tuple or a list of the declared item type."""
     if not isinstance(tree, list):
-        raise JsonFormError(f"{path} must be an array, and is {formatTreeKind(tree)}.")
+        raise composeFormRefusal(
+            path, f"is {formatTreeKind(tree)}, and must be an array"
+        )
     arguments = typing.get_args(declared)
     item = arguments[0]
     items = [decodeTree(each, item, f"{path}[{index}]")
@@ -208,7 +221,9 @@ def decodeSequence(tree: Tree, declared: object, origin: type, path: str) -> Any
 def decodeMapping(tree: Tree, declared: object, path: str) -> Any:
     """Return an object read as a mapping, its keys read back to the declared type."""
     if not isinstance(tree, dict):
-        raise JsonFormError(f"{path} must be an object, and is {formatTreeKind(tree)}.")
+        raise composeFormRefusal(
+            path, f"is {formatTreeKind(tree)}, and must be an object"
+        )
     keyType, valueType = typing.get_args(declared)
     read = {
         decodeKey(key, keyType, f"{path}.{key}"):
@@ -222,7 +237,9 @@ def decodeKey(key: str, keyType: object, path: str) -> Any:
     """Return an object's key as its declared type, an integer read from its text."""
     if keyType is int:
         if not key.lstrip("-").isdigit():
-            raise JsonFormError(f"{path} must be keyed by a whole number.")
+            raise composeFormRefusal(
+                path, "is not a whole number, which each key must be"
+            )
         return int(key)
     return decodeTree(key, keyType, path)
 
@@ -230,17 +247,22 @@ def decodeKey(key: str, keyType: object, path: str) -> Any:
 def decodeDataclass(tree: Tree, form: type, path: str) -> Any:
     """Return an object read as a dataclass, refusing a key it does not write."""
     if not isinstance(tree, dict):
-        raise JsonFormError(f"{path} must be an object, and is {formatTreeKind(tree)}.")
+        raise composeFormRefusal(
+            path, f"is {formatTreeKind(tree)}, and must be an object"
+        )
     discriminator = findFamilyDiscriminator(form)
     known: set[str | None] = {each.name for each in listFormFields(form)}
     if discriminator is not None:
         expected = encodeTree(getattr(form, discriminator))
         if tree.get(discriminator) != expected:
-            raise JsonFormError(f"{path}.{discriminator} must be {expected!r}.")
+            raise composeFormRefusal(f"{path}.{discriminator}", f"must be {expected!r}")
         known.add(discriminator)
     unknown = sorted(set(tree) - known)
     if unknown:
-        raise JsonFormError(f"{path} has no key {unknown[0]!r}.")
+        raise composeFormRefusal(
+            path, f"holds the key {unknown[0]!r}, which its form does not define",
+            "Remove it",
+        )
     fieldTypes = findFieldTypes(form)
     choices = findJsonFormChoices(form)
     values: dict[str, Any] = {}
@@ -248,11 +270,13 @@ def decodeDataclass(tree: Tree, form: type, path: str) -> Any:
         where = f"{path}.{each.name}"
         if each.name not in tree:
             if isRequired(each):
-                raise JsonFormError(f"{where} is missing.")
+                raise composeFormRefusal(
+                    path, f"lacks the key {each.name!r}, which its form requires"
+                )
             continue
         required = each.metadata.get(jsonFormConst)
         if required is not None and tree[each.name] != required:
-            raise JsonFormError(f"{where} must be {required!r}.")
+            raise composeFormRefusal(where, f"must be {required!r}")
         declared = fieldTypes[each.name]
         if each.name in choices:
             declared = chooseFieldType(tree, *choices[each.name], where)
@@ -271,8 +295,8 @@ def chooseFieldType(
     """Return the type a field is read as, which another key's value decides."""
     chosen = next((kind for kind in types if encodeTree(kind) == tree.get(key)), None)
     if chosen is None:
-        raise JsonFormError(
-            f"{path} is read by its {key}, which is missing or unknown."
+        raise composeFormRefusal(
+            path, f"is read by the key {key!r} beside it, which is missing or unknown"
         )
     return types[chosen] | None
 
@@ -292,12 +316,12 @@ def decodeUnion(tree: Tree, members: tuple[object, ...], path: str) -> Any:
         return decodeTree(tree, candidates[0], path)
     if not candidates:
         accepted = " or ".join(dict.fromkeys(map(formatMemberKind, members)))
-        raise JsonFormError(
-            f"{path} must be {accepted}, and is {formatTreeKind(tree)}."
+        raise composeFormRefusal(
+            path, f"is {formatTreeKind(tree)}, and must be {accepted}"
         )
-    raise JsonFormDefinitionError(
-        f"{path} could be any of {candidates}, and its form names none."
-    )
+    raise JsonFormDefinitionError(composeFault(
+        f"`{path}`", f"reads as any of {candidates}, and its form specifies none"
+    ))
 
 
 def formatMemberKind(member: object) -> str:
@@ -359,6 +383,7 @@ def selectDataclasses(tree: dict[str, Tree], candidates: list[object]) -> list[o
 
 __all__ = [
     "JsonFormDefinitionError",
+    "composeDefinitionFault",
     "decodeTree",
     "encodeTree",
     "chooseFieldType",

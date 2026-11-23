@@ -208,7 +208,7 @@ def runMeasure(arguments: argparse.Namespace) -> int:
 
 
 def runDamageCheck(arguments: argparse.Namespace) -> int:
-    """Show that a damaged golden fails the run and names what Numbers did."""
+    """Show that a damaged golden fails the run and states what Numbers did."""
     checks = checkDamagedCopies(findGolden(arguments.golden))
     for check in checks:
         color = "green" if check.status == "passed" else "red"

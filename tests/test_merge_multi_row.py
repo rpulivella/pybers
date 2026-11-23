@@ -6,7 +6,7 @@ All 35 merges measured on 2026-09-06 were one row tall, so the
 vertical axis of an extent had never been read, while the example documents hold
 twenty-seven vertical merges in a single table.
 
-`22d-merge-multi-row` is seven columns by five rows, every cell naming its own
+`22d-merge-multi-row` is seven columns by five rows, every cell stating its own
 address, carrying a two-row merge at `A2:A3`, a two-by-two at `C2:D3` and a
 three-row at `F2:F4`. Each was made over cells that already held their labels,
 so the fixture also records what Numbers does with the content it swallows.
@@ -47,7 +47,7 @@ extents: tuple[tuple[str, str], ...] = (
 coveredPositions: tuple[str, ...] = ("A3", "D2", "C3", "D3", "F3", "F4")
 
 # Every cell sharing an edge with a merge. An extent read one row too tall or one
-# column too wide lands on one of these, and each names the address it truly is.
+# column too wide lands on one of these, and each states the address it truly is.
 neighbors: tuple[str, ...] = (
     "A1", "A4", "B2", "B3",
     "C1", "D1", "C4", "D4", "E2", "E3",

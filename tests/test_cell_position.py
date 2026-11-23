@@ -55,7 +55,7 @@ def testAnAddressReadsAndWritesItsText() -> None:
 
 
 def testAnAddressRefusesALockAndNamesTheAddressMeant() -> None:
-    with pytest.raises(pybers.ReferenceError, match=r"carries a lock.*B3"):
+    with pytest.raises(pybers.ReferenceError, match=r"lock.*Write it as B3"):
         CellAddress.parse("$B$3")
 
 
@@ -91,7 +91,7 @@ def testAReferenceWithNoTableNamesNoSheet() -> None:
     lambda: TableReference(name=""),
 ])
 def testAnOwnerRefusesAnEmptyName(make: object) -> None:
-    with pytest.raises(pybers.ReferenceError, match="is no name"):
+    with pytest.raises(pybers.ReferenceError, match="is not a (sheet|table) name"):
         make()  # type: ignore[operator]
 
 
@@ -155,7 +155,7 @@ def testAnOffsetMayBeZeroOrNegative() -> None:
 
 
 def testAnOffsetPastTheEdgeOfEveryTableIsRefused() -> None:
-    with pytest.raises(pybers.ReferenceError, match="before row 1"):
+    with pytest.raises(pybers.ReferenceError, match="Row 0 does not exist"):
         CellAddress(1, 1) + CellOffset(-1, 0)
 
 

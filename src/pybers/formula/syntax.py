@@ -20,6 +20,7 @@ conversion here takes that cell. Passing the wrong one is not an error, it is a
 wrong answer.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  `formulaQualifierSeparator`, Numbers' own, apart from a reference's, for
             PYB-267.
 2026-10-13  A span of whole rows reads as an address, and TRUE and FALSE as
@@ -45,6 +46,7 @@ from dataclasses import dataclass
 
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress
+from pybers.errors import composeTextRefusal
 from pybers.formula.nodes import (
     Coordinate,
     FormulaError,
@@ -223,17 +225,22 @@ identifierPattern: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 
 
 class FormulaSyntaxError(FormulaError):
-    """Text that is not a formula, reported with the offset that failed.
+    """Text that is not a formula, reported with the column that failed.
 
-    `position` is an index into the text as given, so a caller can point at the
-    character rather than guess which of three `SUM(` the message meant.
+    `position` is an index into `text`, the formula without its equals sign, so a
+    caller can point at the character rather than guess which of three `SUM(` the
+    message meant. The message shows the equals sign, as the formula bar does.
     """
 
-    def __init__(self, message: str, text: str, position: int) -> None:
-        """Build the error, quoting the text from the offset that failed."""
+    def __init__(
+        self, cause: str, text: str, position: int, fix: str | None = None
+    ) -> None:
+        """Build the error, its place the formula and the column that failed."""
         self.position = position
         self.text = text
-        super().__init__(f"{message} At offset {position}: {text[position:][:24]!r}")
+        super().__init__(composeTextRefusal(
+            f"{formulaMarker}{text}", position + len(formulaMarker), cause, fix
+        ))
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,7 +295,8 @@ def tokenize(text: str, tables: Sequence[str] = ()) -> list[Token]:
             match = stringPattern.match(text, position)
             if match is None:
                 raise FormulaSyntaxError(
-                    "A string literal is opened and never closed.", text, position
+                    "opens a string that is never closed", text, position,
+                    'Close it with `"`',
                 )
             tokens.append(
                 Token("string", match.group(), position, len(match.group()))
@@ -329,7 +337,7 @@ def tokenize(text: str, tables: Sequence[str] = ()) -> list[Token]:
             position += len(symbol)
             continue
         raise FormulaSyntaxError(
-            "This is not part of a formula.", text, position
+            f"holds {character!r}, which is not part of a formula", text, position
         )
     tokens.append(Token("end", "", len(text), 0))
     return tokens
@@ -342,7 +350,7 @@ def readQualifier(text: str, position: int, known: Sequence[str]) -> str:
     way to read `Sales (EU)::A1` or `2026::A1`: no rule over characters can say
     where a name Numbers permits ends. The pattern is the fallback, so a caller
     with no names still parses the ordinary spellings and still gets told which
-    table it named.
+    table it specified.
 
     **A guessed prefix carrying an operator is refused when the document named its
     tables**, because the pattern stops only at a comma, a bracket or a quote, so
@@ -354,7 +362,7 @@ def readQualifier(text: str, position: int, known: Sequence[str]) -> str:
 
     What this exposes is caught one layer down. `Ledger-Two::A1` now reads `Ledger`
     on its own, and six letters are a valid base-26 column label, so it would have
-    become column 144,936,576. `toColumnNumber` refuses that, and the refusal names
+    become column 144,936,576. `toColumnNumber` refuses that, and the refusal states
     the impossible column rather than a table nobody typed.
     """
     for name in known:
@@ -423,9 +431,9 @@ def readValueToken(
 def resolveQualifierIdentity(
     token: Token, tables: Mapping[str, str], text: str
 ) -> str | None:
-    """Return the identity a `Table 2::` prefix names, or None when there is none.
+    """Return the identity a `Table 2::` prefix specifies, or None when there is none.
 
-    A table is named in a formula by identity and never by name, so a name this
+    A table is specified in a formula by identity and never by name, so a name this
     document does not carry is refused here rather than written as a reference
     into nothing.
     """
@@ -434,13 +442,12 @@ def resolveQualifierIdentity(
     name = token.qualifier[: -len(formulaQualifierSeparator)]
     identity = tables.get(name)
     if identity is None:
-        offered = ", ".join(sorted(repr(key) for key in tables)) or "nothing"
+        offered = ", ".join(sorted(repr(key) for key in tables))
         raise FormulaSyntaxError(
-            f"{name!r} is not a table this document carries. A formula names a "
-            f"table by identity, so a name it does not know cannot be written. "
-            f"Known: {offered}.",
+            f"refers to {name!r}, which is not a table this document carries",
             text,
             token.position,
+            f"The tables are {offered}" if offered else None,
         )
     return identity
 
@@ -468,7 +475,7 @@ def buildSpan(
 def buildReference(
     extent: CellRange, host: CellAddress, tableId: str | None
 ) -> FormulaReference:
-    """Return the single-cell reference an address names, from the cell holding it.
+    """Return the single-cell reference an address selects, from the cell holding it.
 
     An axis the address left out stays out, which is how `SUM(A)` stores a column
     and no row at all.
@@ -488,7 +495,7 @@ def buildRange(
     extent: CellRange, host: CellAddress, tableId: str | None, text: str,
     position: int,
 ) -> FormulaRange:
-    """Return the range an address names, refusing one locked at a single end.
+    """Return the range an address selects, refusing one locked at a single end.
 
     The file keeps an axis in either its relative field or its absolute one and
     has no third place to say that one end of it is fixed, so `$A1:B1` is a thing
@@ -500,11 +507,11 @@ def buildRange(
     ):
         if first != last:
             raise FormulaSyntaxError(
-                f"This range locks one end of its {axis} and not the other, and "
-                "the file keeps a whole axis in either its relative field or its "
-                "absolute one. Lock both ends or neither.",
+                f"locks one end of its range's {axis} and not the other, which "
+                "Numbers cannot store",
                 text,
                 position,
+                "Lock both ends or neither",
             )
     columns = (
         None if extent.startCol is None or extent.endCol is None

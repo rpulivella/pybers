@@ -15,6 +15,7 @@ sheet without one. Numbers rebuilds its guides. See docs/decisions.md and
 findings-10-creation.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  A document created from nothing, for PYB-261.
 2026-11-02  Composed field by field rather than copied from a template, and the
             guides left for Numbers to rebuild, for PYB-276.
@@ -54,7 +55,7 @@ from .._persistence.metadata import (
     findMemberName,
 )
 from .._persistence.types import findArchiveTypeId
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from ._locale import composeLocale
 from ._theme import composeTheme
 from .locale import findLocaleSymbols
@@ -92,17 +93,22 @@ class SheetStyles:
 def findSheetStyles(index: ArchiveIndex, root: tn.DocumentArchive) -> SheetStyles:
     """Return the styles the first sheet already uses, which a created sheet shares."""
     if not root.sheets:
-        raise WriteError("This document holds no sheet to take styles from.")
+        raise WriteError(composeRefusal(
+            "This document", "holds no sheet for a new sheet to share styles with",
+            notDone=nothingWritten,
+        ))
     first = index.resolve(root.sheets[0], tn.SheetArchive)
     if not first.headers:
-        raise WriteError(
-            f"{first.name!r} carries no header storage to take text styles from."
-        )
+        raise WriteError(composeRefusal(
+            f"The sheet {first.name!r}", "holds no header text for a new sheet to "
+            "share text styles with", notDone=nothingWritten,
+        ))
     header = index.resolve(first.headers[0], tswp.StorageArchive)
     if not header.table_para_style.entries or not header.table_list_style.entries:
-        raise WriteError(
-            f"The header storage of {first.name!r} names no paragraph or list style."
-        )
+        raise WriteError(composeRefusal(
+            f"The sheet {first.name!r}", "holds no paragraph or list style for a new "
+            "sheet to share", notDone=nothingWritten,
+        ))
     return SheetStyles(
         sheet=first.style.identifier,
         stylesheet=header.style_sheet.identifier,
@@ -134,7 +140,7 @@ def composeStorage(styles: SheetStyles) -> tswp.StorageArchive:
 def composeSheet(
     name: str, styles: SheetStyles, headers: list[int], footers: list[int]
 ) -> tn.SheetArchive:
-    """Return a sheet in the reset's page setup, naming its headers and footers.
+    """Return a sheet in the reset's page setup, specifying its headers and footers.
 
     `is_autofit_on` and `show_page_numbers` are stated although false, since Numbers
     reads either absent as true. Measured 2026-11-02, findings-10-creation.md.
@@ -206,10 +212,11 @@ def createSheets(document: Document, registry: PackageRegistry) -> None:
         if sheet._identifier is not None
     ]
     if kept != stored:
-        raise WriteError(
-            "The model's existing sheets are not the document's sheets in the "
-            "document's order. Removing or reordering a sheet is not supported."
-        )
+        raise WriteError(composeRefusal(
+            "This document's sheets", "differ from those it was read with, or from "
+            "their order, and removing or reordering a sheet is not supported",
+            notDone=nothingWritten,
+        ))
     created = [sheet for sheet in document.sheets if sheet._identifier is None]
     if not created:
         return
@@ -221,10 +228,11 @@ def createSheets(document: Document, registry: PackageRegistry) -> None:
         for node in nodes
     }
     if sorted(nodeFor) != sorted(stored):
-        raise WriteError(
-            "The sidebar does not list exactly this document's sheets, so a sheet "
-            "cannot be placed in it without disturbing what else it lists."
-        )
+        raise WriteError(composeRefusal(
+            "This document's sidebar", "lists more or fewer than its sheets, so a new "
+            "sheet cannot be placed in it without disturbing what else it lists",
+            notDone=nothingWritten,
+        ))
     for sheet in created:
         identifier = createSheet(registry, sheet, styles)
         nodeFor[identifier] = createSidebarNode(registry, identifier)
@@ -233,7 +241,10 @@ def createSheets(document: Document, registry: PackageRegistry) -> None:
     order: list[int] = []
     for sheet in document.sheets:
         if sheet._identifier is None:
-            raise WriteError(f"{sheet.name!r} was left without an archive.")
+            raise WriteError(composeFault(
+                f"The sheet {sheet.name!r}", "holds no archive after its creation",
+                nothingWritten,
+            ))
         order.append(sheet._identifier)
     del root.sheets[:]
     for identifier in order:
@@ -359,15 +370,15 @@ def composeModelPackage(document: Document) -> NumbersPackage:
     """
     locale = document.localeIdentifier
     if locale is None:
-        raise WriteError(
-            "This document names no language and region, so it cannot be created. "
-            "Set one with `localeSet`, such as `en_US`."
-        )
+        raise WriteError(composeRefusal(
+            "This document", "specifies no language and region, so it cannot be "
+            "created", "Set one, such as en_US", nothingWritten,
+        ))
     if not document.sheets:
-        raise WriteError(
-            "This document holds no sheet, and a document holds at least one. Add one "
-            "with `sheetAdd`."
-        )
+        raise WriteError(composeRefusal(
+            "This document", "holds no sheet, and a document holds at least one",
+            "Add one first", nothingWritten,
+        ))
     findLocaleSymbols(locale)
     first = document.sheets[0]
     package = composePackage(locale, first.name)

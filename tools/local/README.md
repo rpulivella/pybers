@@ -87,8 +87,8 @@ the inspector too, since only the inspector shows its settings.
 
 `golden_confirm.py measure <name>` makes `tests/measurements/<name>.numbers` in Numbers
 from `<name>.recipe.toml` beside it: a copy of `base` and any `documents`, then each
-`[[step]]` in order. Every step names its `document`, counted from 0, and the cell it
-acts on by `sheet`, `table` and `range`, which a recipe may name once at its top for every
+`[[step]]` in order. Every step specifies its `document`, counted from 0, and the cell it
+acts on by `sheet`, `table` and `range`, which a recipe may specify once at its top for every
 step. A `dataFormatSet`, `customFormatEdit`, `cellFillSet`, `tableBandSet` or
 `tableHeadersSet` step, and a `labelSet` step's wrap, read back what it changed, so a
 control Numbers did not take stops the run.

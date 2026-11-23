@@ -105,18 +105,19 @@ def testSettingTheBandATableHoldsReportsNoChange() -> None:
 
 
 @pytest.mark.parametrize(("fill", "named"), [
-    (FillGradient(), "a gradient"), (FillImage(), "an image"), (FillNone(), "no fill"),
+    (FillGradient(), "A gradient band"), (FillImage(), "An image band"),
+    (FillNone(), "A band with no fill"),
 ])
 def testABandOtherThanAColorIsRefusedNamingItsType(fill: Fill, named: str) -> None:
     table = pybers.create("en_US").sheet().tableAdd("Bands", rows=4, cols=2)
-    with pytest.raises(TableStyleError, match=f"cannot band rows with {named}."):
+    with pytest.raises(TableStyleError, match=f"{named} is not one Numbers draws"):
         table.tableStyleSet(bandedRows=TableBand(True, fill))
     assert table.tableStyle.bandedRows == TableBand(False, bandGray)
 
 
 def testABandThatIsNoBandIsRefused() -> None:
     table = pybers.create("en_US").sheet().tableAdd("Bands", rows=4, cols=2)
-    with pytest.raises(TableStyleError, match="is a TableBand"):
+    with pytest.raises(TableStyleError, match="is not a TableBand"):
         table.tableStyleSet(bandedRows=True)
 
 
@@ -202,8 +203,9 @@ def testACommandBandsATableAndShowsIt(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(("declaration", "named"), [
-    ("banded-rows: gradient", "a gradient"), ("banded-rows: hidden image", "an image"),
-    ("banded-rows-background: none", "no fill"),
+    ("banded-rows: gradient", "A gradient band"),
+    ("banded-rows: hidden image", "An image band"),
+    ("banded-rows-background: none", "A band with no fill"),
 ])
 def testACommandRefusesABandNumbersCannotDraw(
     declaration: str, named: str, tmp_path: Path
@@ -212,7 +214,10 @@ def testACommandRefusesABandNumbersCannotDraw(
     result = CliRunner().invoke(app, [
         "set", str(path), "Sheet 1::Table 1", "--table-style", declaration,
     ])
-    assert result.stderr == f"pybers set: Numbers cannot band rows with {named}.\n"
+    assert result.stderr == (
+        f"pybers set: {named} is not one Numbers draws, since it bands rows with a "
+        "color alone. Give the band a color.\n"
+    )
 
 
 def testACommandSettingTheBandATableHoldsWritesNothing(tmp_path: Path) -> None:

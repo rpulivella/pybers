@@ -46,7 +46,7 @@ def readRegistry(name: str = "00-baseline") -> PackageRegistry:
 
 
 def buildTileInfo(identifier: int, references: list[int]) -> tspArchive.ArchiveInfo:
-    """Return an `ArchiveInfo` for one tile message naming the given references."""
+    """Return an `ArchiveInfo` for one tile message listing the given references."""
     info = tspArchive.ArchiveInfo(identifier=identifier)
     message = info.message_infos.add(type=tileTypeId, length=0)
     message.version.extend([1, 0, 5])

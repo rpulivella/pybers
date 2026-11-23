@@ -12,6 +12,7 @@ written here holds for writing, reading and validating alike.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  The duration leaf named for ISO 8601, for PYB-278.
 2026-10-24  Written for PYB-259.
 """
@@ -36,7 +37,7 @@ from typing import Any
 
 from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress, CellReference
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeRefusal
 
 # What the JSON text holds once read: numbers arrive as Decimal, never float.
 type Tree = None | bool | str | int | Decimal | list[Tree] | dict[str, Tree]
@@ -55,7 +56,12 @@ dateTimePattern: str = (
 
 
 class JsonFormError(PybersError, ValueError):
-    """Text that is not the JSON form of anything pybers holds, naming where."""
+    """Text that is not the JSON form of anything pybers holds, saying where."""
+
+
+def composeFormRefusal(path: str, cause: str, fix: str | None = None) -> JsonFormError:
+    """Return the refusal of a form, the one place a path within it is shown."""
+    return JsonFormError(composeRefusal(f"`{path}`", cause, fix))
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +77,9 @@ class LeafRule:
 def readString(tree: Tree, path: str, what: str) -> str:
     """Return a tree known to be a string, refusing anything else by its path."""
     if not isinstance(tree, str):
-        raise JsonFormError(f"{path} must be {what}, and is {formatTreeKind(tree)}.")
+        raise composeFormRefusal(
+            path, f"is {formatTreeKind(tree)}, and must be {what}"
+        )
     return tree
 
 
@@ -129,9 +137,9 @@ def parseIsoDurationLeaf(tree: Tree, path: str) -> datetime.timedelta:
     try:
         return parseIsoDuration(text)
     except ValueError as exc:
-        raise JsonFormError(
-            f"{path} must be an ISO 8601 duration in days, hours, minutes and seconds, "
-            f"such as P1DT2H30M, and is {text!r}."
+        raise composeFormRefusal(
+            path, f"holds {text!r}, which is not an ISO 8601 duration in days, hours, "
+            "minutes and seconds", "Write it as P1DT2H30M",
         ) from exc
 
 
@@ -139,10 +147,10 @@ def parseDateTime(tree: Tree, path: str) -> datetime.datetime:
     """Return the wall-clock time an ISO 8601 text gives, refusing an offset."""
     text = readString(tree, path, "an ISO 8601 date and time")
     if re.fullmatch(dateTimePattern, text) is None:
-        raise JsonFormError(
-            f"{path} must be an ISO 8601 date and time with no offset, such as "
-            f"2026-10-24T13:45:00, since a cell stores wall-clock time, and is "
-            f"{text!r}."
+        raise composeFormRefusal(
+            path, f"holds {text!r}, which is not an ISO 8601 date and time with no "
+            "offset, and a cell stores wall-clock time",
+            "Write it as 2026-10-24T13:45:00",
         )
     return datetime.datetime.fromisoformat(text)
 
@@ -150,7 +158,9 @@ def parseDateTime(tree: Tree, path: str) -> datetime.datetime:
 def parseDecimal(tree: Tree, path: str) -> Decimal:
     """Return a JSON number read as a Decimal, refusing every other kind of tree."""
     if isinstance(tree, bool) or not isinstance(tree, Decimal | int):
-        raise JsonFormError(f"{path} must be a number, and is {formatTreeKind(tree)}.")
+        raise composeFormRefusal(
+            path, f"is {formatTreeKind(tree)}, and must be a number"
+        )
     return Decimal(tree)
 
 
@@ -160,7 +170,7 @@ def parseBytes(tree: Tree, path: str) -> bytes:
     try:
         return base64.b64decode(text, validate=True)
     except binascii.Error as exc:
-        raise JsonFormError(f"{path} must be base64 text: {exc}") from exc
+        raise composeFormRefusal(path, f"is not base64 text ({exc})") from exc
 
 
 def buildAddressRule(
@@ -172,7 +182,10 @@ def buildAddressRule(
         try:
             return addressType.parse(text)
         except PybersError as exc:
-            raise JsonFormError(f"{path}: {exc}") from exc
+            raise composeFormRefusal(
+                path, f"holds {text!r}, which is not an address",
+                f"Write it as {example}",
+            ) from exc
 
     return LeafRule(addressType, str, decode, {"type": "string", "examples": [example]})
 
@@ -207,6 +220,7 @@ def findLeafRule(leafType: object) -> LeafRule | None:
 __all__ = [
     "JsonFormError",
     "LeafRule",
+    "composeFormRefusal",
     "Tree",
     "formatTreeKind",
     "findLeafRule",

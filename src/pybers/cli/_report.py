@@ -2,10 +2,11 @@
 """\
 The report lines more than one command prints, so the same fact always reads alike.
 
-A line is `label: value`, and a count names its noun in the number it agrees with.
+A line is `label: value`, and a count states its noun in the number it agrees with.
 See `docs/cli-design.md`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  `formatBadge`, a word set apart by its meaning, for PYB-223.
 2026-11-03  The sheet tree moved to `check`, its one caller, for PYB-223.
 2026-10-27  Written for PYB-260, out of `check`, which `show` shares.

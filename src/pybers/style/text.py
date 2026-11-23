@@ -7,6 +7,7 @@ what `pybers show` prints and `pybers set --cell-style` reads, each name the CSS
 and `none` sets no style.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  Each property's name read from `CellStyleProperty`, for PYB-290.
 2026-11-17  `parseLength`, one length in points, which a border's width shares, for
             PYB-266.
@@ -26,7 +27,7 @@ import re
 from decimal import Decimal
 
 from pybers.color.colors import Color, ColorError
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeChoiceRefusal, composeRefusal
 from pybers.format.text import splitDeclarations
 from pybers.style.cells import (
     CellStyle,
@@ -45,7 +46,7 @@ otherFills: frozendict[str, Fill] = frozendict({
 
 
 class CellStyleError(PybersError, ValueError):
-    """A cell style's text form names a property or a value a cell style lacks."""
+    """A cell style's text form states a property or a value a cell style lacks."""
 
 
 def formatFill(fill: Fill) -> str:
@@ -80,16 +81,16 @@ def parseFill(text: str, name: str = "background") -> Fill:
     try:
         return Color.parse(text)
     except ColorError as exc:
-        raise CellStyleError(f"{name}: {exc}") from exc
+        raise CellStyleError(str(exc)) from exc
 
 
 def parseLength(text: str, name: str) -> Decimal:
     """Return a length in points from `6pt`, or `0`, refusing anything else."""
     found = lengthPattern.fullmatch(text.strip())
     if found is None:
-        raise CellStyleError(
-            f"{name} is a length in points such as 6pt, and {text!r} is not one."
-        )
+        raise CellStyleError(composeRefusal(
+            f"The {name} {text!r}", "is not a length in points", "Write it as `6pt`"
+        ))
     return Decimal(found[1] or 0)
 
 
@@ -99,9 +100,10 @@ def parsePadding(text: str) -> Decimal | CellStylePaddingSides:
     if len(lengths) == 1:
         return lengths[0]
     if len(lengths) != 4:
-        raise CellStyleError(
-            f"padding is one length, or four in CSS order, and is {len(lengths)}."
-        )
+        raise CellStyleError(composeRefusal(
+            f"The padding {text!r}", f"gives {len(lengths)} lengths",
+            "Give one, or four in CSS order",
+        ))
     top, right, bottom, left = lengths
     return top, right, bottom, left
 
@@ -109,12 +111,13 @@ def parsePadding(text: str) -> Decimal | CellStylePaddingSides:
 def parseKeyword[Keyword: (CellStyleVerticalAlign, CellStyleTextWrap)](
     name: str, text: str, keywords: type[Keyword]
 ) -> Keyword:
-    """Return the keyword a property's value names, refusing one it does not offer."""
+    """Return the keyword a property's value specifies, refusing one it lacks."""
     try:
         return keywords(text)
     except ValueError as exc:
-        choices = ", ".join(each.value for each in keywords)
-        raise CellStyleError(f"{name} is one of {choices}, and is {text!r}.") from exc
+        raise composeChoiceRefusal(
+            CellStyleError, text, f"a {name} value", [each.value for each in keywords]
+        ) from exc
 
 
 def parseCellStyle(text: str) -> CellStyle | None:
@@ -129,11 +132,13 @@ def parseCellStyle(text: str) -> CellStyle | None:
     stated: dict[str, str] = {}
     for name, value in [(firstName.strip(), firstValue.strip()), *declarations]:
         if name not in properties:
-            raise CellStyleError(
-                f"A cell style states {', '.join(properties)}, and {name!r} is not one."
+            raise composeChoiceRefusal(
+                CellStyleError, name, "a cell style property", properties
             )
         if name in stated:
-            raise CellStyleError(f"A cell style states {name} once, and twice here.")
+            raise CellStyleError(composeRefusal(
+                f"The property {name}", "is stated twice", "State it once"
+            ))
         stated[name] = value
     background, padding = stated.get("background"), stated.get("padding")
     verticalAlign, textWrap = stated.get("vertical-align"), stated.get("text-wrap")

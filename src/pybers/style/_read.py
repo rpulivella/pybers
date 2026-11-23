@@ -9,6 +9,7 @@ findings-09-cell-records.md.
 Private. The archive half of the style feature.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  A stroke read from `TSD.StrokeArchive`, for PYB-266.
 2026-11-12  Written for PYB-265.
 """
@@ -31,7 +32,7 @@ from pybers._persistence.index import ArchiveIndex
 from pybers._persistence.types import findArchiveTypeId
 from pybers.color._archive import readColor
 from pybers.color.colors import findShortestDecimal
-from pybers.errors import ReadError
+from pybers.errors import ReadError, composeFault, nothingRead
 from pybers.style.cells import (
     CellStyle,
     CellStylePaddingSides,
@@ -107,20 +108,25 @@ def readStrokePattern(archive: tsd.StrokeArchive) -> StrokePattern:
                 ),
                 phase=findShortestDecimal(pattern.phase),
             )
-    raise ReadError(
-        f"A stroke holds pattern type {pattern.type} with {pattern.count} of "
-        f"{len(pattern.pattern)} dash lengths live, which pybers does not recognize."
-    )
+    raise ReadError(composeFault(
+        "A stroke", f"holds pattern type {pattern.type} with {pattern.count} of "
+        f"{len(pattern.pattern)} dash lengths live, which pybers does not recognize",
+        nothingRead,
+    ))
 
 
 def readStroke(archive: tsd.StrokeArchive) -> Stroke:
     """Return the line a stroke archive holds."""
     if not 0 <= archive.cap < len(strokeCaps):
-        raise ReadError(f"A stroke holds line cap {archive.cap}, which pybers does "
-                        "not recognize.")
+        raise ReadError(composeFault(
+            "A stroke", f"holds line cap {archive.cap}, which pybers does not "
+            "recognize", nothingRead,
+        ))
     if not 0 <= archive.join < len(strokeJoins):
-        raise ReadError(f"A stroke holds line join {archive.join}, which pybers does "
-                        "not recognize.")
+        raise ReadError(composeFault(
+            "A stroke", f"holds line join {archive.join}, which pybers does not "
+            "recognize", nothingRead,
+        ))
     return Stroke(
         width=findShortestDecimal(archive.width),
         color=readColor(archive.color),
@@ -150,8 +156,10 @@ def readCellStyle(archive: tst.CellStyleArchive) -> CellStyle:
     if properties.HasField("vertical_alignment"):
         stored = properties.vertical_alignment
         if not 0 <= stored < len(verticalAligns):
-            raise ReadError(f"A cell style holds vertical alignment {stored}, and a "
-                            f"cell aligns only top, middle or bottom.")
+            raise ReadError(composeFault(
+                "A cell style", f"holds vertical alignment {stored}, and a cell "
+                "aligns only top, middle or bottom", nothingRead,
+            ))
         verticalAlign = verticalAligns[stored]
     textWrap = None
     if properties.HasField("text_wrap"):

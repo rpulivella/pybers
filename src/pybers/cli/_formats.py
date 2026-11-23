@@ -8,6 +8,7 @@ serializer, so a command's JSON and a script's are the same text. See
 `docs/cli-design.md`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-27  A table printed narrowed to a range, for PYB-260.
 2026-10-24  JSON written by `pybers.formatJsonForm`, keeping only the choice of
             format here, for PYB-259.
@@ -47,7 +48,7 @@ class OutputFormat(StrEnum):
 FormatOption = Annotated[
     OutputFormat,
     typer.Option(
-        "--output-format", help="How to print the result.", show_default=True
+        "--output-format", help="The format of the printed result.", show_default=True
     ),
 ]
 

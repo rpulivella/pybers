@@ -16,7 +16,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | Command | What it does |
 | ------- | ------------ |
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
-| `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` naming each |
+| `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
 | `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
 | `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional. `set FILE --locale LOCALE` changes a document's language and region instead |
@@ -44,12 +44,12 @@ A command parses its arguments, calls the library once, formats what comes back,
 ## Writing
 
 - **A writing verb changes FILE itself**, since the verb is the act, as `sqlite-utils insert` and `git commit` are. `-o NEW` writes a new document beside it instead and refuses a file that already exists, any file, and `--preview` writes nothing. The two together are refused. `pybers.cli._common` owns the rule, both options and the report of what was written, so no command decides it.
-- **`import` changes FILE in place, writes the changed document to `-o`, or creates a new document when given no FILE.** A new document is made by `pybers.create` in the region `--locale` names, the data is written into it, and it is saved to `-o`, as every new document starts there. `import` never needs a document Numbers made.
+- **`import` changes FILE in place, writes the changed document to `-o`, or creates a new document when given no FILE.** A new document is made by `pybers.create` in the region `--locale` specifies, the data is written into it, and it is saved to `-o`, as every new document starts there. `import` never needs a document Numbers made.
 - **`export` never changes the document it reads.** It reads FILE and writes elsewhere, a new `.numbers` document included, so no `export` changes FILE.
 - **`--preview`** shows the change and writes nothing, and a change that alters nothing writes nothing and says so.
 - **`set` infers a value's kind** from the text given, and `--as KIND` overrides the inference. A value that does not parse as the kind specified is refused.
-- **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--output-format` stays the output format every command offers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and prints why on stderr. A format applies to every cell a range holds, an empty one included. A formula takes its format whatever its result, which Numbers shows once the result is of the format's kind.
-- **`set --border POSITION`** draws borders on one block of cells, POSITION naming the part drawn: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed`, `dotted` or `hidden`, `--border-width` a length such as `1pt`, and `--border-color` a color's text form, each a separate option, and a style given alone draws 0.35pt black. `hidden` draws nothing and hides the table's line there, and `none` removes the borders so the table's line shows, as CSS names the two for a table's borders.
+- **`set --cell-format FORMAT`** sets how the cells show their value, FORMAT being a format's text form, tagged by its family, with or without a VALUE. `--output-format` stays the output format every command offers. A format that cannot show a cell's value is refused, specifying both, unless `--conflict automatic` gives that cell the Automatic format and prints why on stderr. A format applies to every cell a range holds, an empty one included. A formula takes its format whatever its result, which Numbers shows once the result is of the format's kind.
+- **`set --border POSITION`** draws borders on one block of cells, POSITION specifying the part drawn: `all`, `outer`, `outer-top`, `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` or `between-columns`. `--border-style` is `solid`, `dashed`, `dotted` or `hidden`, `--border-width` a length such as `1pt`, and `--border-color` a color's text form, each a separate option, and a style given alone draws 0.35pt black. `hidden` draws nothing and hides the table's line there, and `none` removes the borders so the table's line shows, as CSS names the two for a table's borders.
 
   ```bash
   pybers set budget.numbers 'Budget::Q3::B2:D9' --border outer --border-style dashed --border-width 1pt --border-color black
@@ -68,16 +68,16 @@ A command shows a formula as the library returns it, stored and never recalculat
 
 ## Report lines
 
-- **Each line opens with the shortest label that names its value**, then `: ` and the value: `Readable: yes`, `OS: macOS-26.6.1`.
+- **Each line opens with the shortest label that specifies its value**, then `: ` and the value: `Readable: yes`, `OS: macOS-26.6.1`.
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
 - **A value is a phrase, never a sentence, and takes no period**: `Nothing written: previewing only`, `Nothing written: already set`, `Nothing written: already de_DE`.
-- **A part a write skipped names the part, then two spaces and a phrase saying why**: `Skipped: Sheet 1::Table 1::B4  holds a formula`. A `CellSkip` carries that phrase, so a script reads the same words.
+- **A part a write skipped prints its reference, then two spaces and its `CellSkip` phrase**: `Skipped: Sheet 1::Table 1::B4  holds a formula`, worded as [the message design](message-design.md) sets out for a skipped part.
 - **A count names its noun in the number it agrees with**: `1 row`, `10 rows`, through `formatCount` in `pybers.cli._report`, which holds every line more than one command prints.
 - **A flag reads `yes` or `no`.**
-- **Several parts print one after another, a blank line between each**, and each opens with a line naming it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
+- **Several parts print one after another, a blank line between each**, and each opens with a line specifying it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
 - **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is left out. A size reads `5 rows × 3 columns`, in a tree as on a line.
-- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its cell style, then its borders, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. A cell style prints as CSS declarations, `background: #ffd60aff; padding: 6pt`, so it pastes into `set --cell-style`, and `none` removes one. Borders print as CSS, `border: 1pt dashed #000000ff` where all four sides agree and a longhand per side otherwise, `border-top: 1pt dashed #000000ff; border-left: hidden`, leaving out a side that stores none, and a side whose neighbor stores another stroke names that cell and its stroke in parentheses. **Wherever CSS has a shorthand for what prints, it is used.** A color prints exactly as stored, so a value pastes back as the same color, which is why one off the 255 grid prints in `color()` rather than hex. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
+- **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its cell style, then its borders, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. A cell style prints as CSS declarations, `background: #ffd60aff; padding: 6pt`, so it pastes into `set --cell-style`, and `none` removes one. Borders print as CSS, `border: 1pt dashed #000000ff` where all four sides agree and a longhand per side otherwise, `border-top: 1pt dashed #000000ff; border-left: hidden`, leaving out a side that stores none, and a side whose neighbor stores another stroke specifies that cell and its stroke in parentheses. **Wherever CSS has a shorthand for what prints, it is used.** A color prints exactly as stored, so a value pastes back as the same color, which is why one off the 255 grid prints in `color()` rather than hex. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
   ```
@@ -91,8 +91,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 ## Errors
 
 - **A refusal is one line on stderr**, the command and then the reason the library's error gives, which names the file only where the file is at fault: `pybers check: /tmp/a.numbers does not exist.`, `pybers set: Numbers cannot band rows with a gradient.`
-- **A refused choice names the closest valid one**, `'table-border' is not a table style property. The closest is table-outline.`, and where none is close, says where every choice is: `` `pybers set --help` provides a complete list.`` A message lists its choices only when there are five or fewer, and `--help` lists every one. `pybers.composeChoiceRefusal` writes every such message.
-- **A message the command writes itself** follows the library's rule for wording an error.
+- **Every message follows [the message design](message-design.md)**, a usage error included, which `composeUsageRefusal` in `pybers.cli._common` builds. Where a refused choice names no choice, `formatRefusalText` appends `` `pybers set --help` lists every one.``, since `--help` lists every choice.
 - **`--debug`, or `PYBERS_DEBUG=1`, replaces that line with the full traceback.** Tracebacks never show local variables, because one can hold a cell's value.
 
 ## Exit status
@@ -155,7 +154,7 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 ## Help
 
 - **Typer renders help with Rich**, in its default colors and without borders. Typer hard-codes a rounded box around each help and error panel, so `pybers.cli._app` draws each one as its title over its table, both one column in, as Typer indents its usage line.
-- **A command's help is its docstring**, one imperative sentence, which Typer prints.
+- **A command's help is its docstring**, which Typer prints, and its options' help is each `help=`, both worded by the rules of [the message design](message-design.md).
 
 ## Terminal interface
 
@@ -174,4 +173,3 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 | [jq and yq](https://jqlang.org/manual/) | A path syntax, and a lossless round trip, which yq's in-place mode lacks |
 | [VisiData](https://www.visidata.org/docs/api/) | A browser over the same engine, opening at a given cell |
 | [ruff](https://docs.astral.sh/ruff/linter/), [git diff](https://git-scm.com/docs/git-diff) | Exit status 1 for a finding, 2 for a usage error |
-| [The Rust compiler](https://rustc-dev-guide.rust-lang.org/diagnostics.html) | The standard for every message: one that stands on its own, the place it points at, and a fix offered apart from the fault |

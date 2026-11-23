@@ -24,7 +24,7 @@ and the one Numbers marked as an error is the one the table rejects.
 declares is carried and `availability` says how it may be used. Reading names
 all of them; only an offered one may be written by name.
 
-    offered    in the function browser, and the only kind `named` will build
+    offered    in the function browser, and the only kind `fromName` will build
     reserved   declared with an index and no argument spec, so Numbers refuses
                the name: LATITUDE, LONGITUDE, BEARING and ALTITUDE, 281 to 284
     internal   real and used by Numbers itself, never offered. `SPILL` is one,
@@ -36,6 +36,7 @@ answers "isn't a valid function name" for each reserved one and where a
 `MAKEARRAY` spill fills three cells with `SPILL`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-11  The function tables are frozendict, not read-only views, for PYB-189.
 2026-09-04  Argument counts added for #44, and the source moved to the
             Objective-C metadata, which names 22 functions the authoring
@@ -56,7 +57,7 @@ from enum import StrEnum
 from typing import Final
 
 from pybers._generated.functions import functions as generatedFunctions
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeChoiceRefusal, composeRefusal
 
 
 class FunctionAvailability(StrEnum):
@@ -72,7 +73,7 @@ class UnknownFunctionError(PybersError, ValueError):
 
 
 class ArgumentCountError(PybersError, ValueError):
-    """A call whose argument count the function it names does not accept."""
+    """A call whose argument count the function it specifies does not accept."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,7 +141,7 @@ functionsByIndex: Final[frozendict[int, NumbersFunction]] = frozendict({
 
 
 def findFunction(index: int) -> NumbersFunction | None:
-    """Return the function an index names, or None when the table lacks it."""
+    """Return the function an index specifies, or None when the table lacks it."""
     return functionsByIndex.get(index)
 
 
@@ -161,11 +162,9 @@ def findFunctionNamed(name: str) -> NumbersFunction:
     trimmed = name.strip()
     function = functionsByName.get(trimmed) or functionsByName.get(trimmed.upper())
     if function is None:
-        raise UnknownFunctionError(
-            f"{name!r} is not a function this table names. Either Numbers does "
-            "not have it, or it is one of the few it declares nothing about; "
-            "run tools/local/functions_extract.py --gaps to see which. Construct "
-            "FormulaFunctionCall with the index directly if you know it."
+        raise composeChoiceRefusal(
+            UnknownFunctionError, name, "a function Numbers declares",
+            sorted(functionsByName),
         )
     return function
 
@@ -179,8 +178,8 @@ def findFunctionIndex(name: str) -> int:
     """
     function = findFunctionNamed(name)
     if function.index is None:
-        raise UnknownFunctionError(
-            f"{function.name} is stored as its own node types rather than as an "
-            "indexed call, so it has no function index."
-        )
+        raise UnknownFunctionError(composeRefusal(
+            function.name, "is stored as node types of its own rather than as a "
+            "call, so it has no function index",
+        ))
     return function.index

@@ -9,6 +9,7 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-22  `--table-style` lists each section's box, for PYB-291.
 2026-11-19  `--cell-style-update` and `--cell-style-remove` change part of a
             cell's box, for PYB-290.
@@ -55,6 +56,8 @@ import pybers
 from pybers.cli._common import (
     OutputOption,
     PreviewOption,
+    composeUsageChoiceRefusal,
+    composeUsageRefusal,
     findSaveTarget,
     reportPybersErrors,
     reportWrite,
@@ -100,9 +103,9 @@ def runSet(
             metavar="[SELECTOR]",
             # A backslash keeps Rich from reading a condition as markup.
             help=(
-                "The cells to set: `Budget::Q3::B4`, `::Q3::B4` for B4 of every table "
-                "named Q3, or `Budget::Q*::B2:B9\\[kind=number]`. Left out with "
-                "--locale."
+                "The cells to set, such as `Budget::Q3::B4`, `::Q3::B4` for B4 of "
+                "every table named Q3, or `Budget::Q*::B2:B9\\[kind=number]`, left "
+                "out with --locale."
             ),
             show_default=False,
         ),
@@ -112,8 +115,8 @@ def runSet(
         typer.Argument(
             metavar="[VALUE]",
             help=(
-                "The value as text: 42, 42 EUR, TRUE, 2026-10-20 09:00, 1h 30m, or any "
-                "text. Left out, each cell keeps its value."
+                "The value as text, such as 42, 42 EUR, TRUE, 2026-10-20 09:00, 1h 30m "
+                "or any text, each cell keeping its value when it is left out."
             ),
             show_default=False,
         ),
@@ -124,8 +127,8 @@ def runSet(
             "--as",
             metavar="KIND",
             help=(
-                "Read VALUE as this kind rather than inferring it. One of: number, "
-                "currency, boolean, date, duration, text."
+                "Read VALUE as this kind rather than inferring it: number, currency, "
+                "boolean, date, duration or text."
             ),
         ),
     ] = None,
@@ -168,9 +171,9 @@ def runSet(
             "--cell-style",
             metavar="STYLE",
             help=(
-                "The box each cell is drawn in, as `pybers show` prints one: "
-                "background, padding, vertical-align and text-wrap as CSS, or none to "
-                "remove it. The style given replaces the whole box."
+                "The box each cell is drawn in, replacing its whole box, as `pybers "
+                "show` prints one: background, padding, vertical-align and text-wrap "
+                "as CSS, or none to remove it."
             ),
         ),
     ] = None,
@@ -203,7 +206,7 @@ def runSet(
             "--border",
             metavar="POSITION",
             help=(
-                "Draw borders on the one block SELECTOR names, at this part of it: "
+                "Draw borders on the one block SELECTOR selects, at this part of it: "
                 "all, outer, outer-top, outer-right, outer-bottom, outer-left, "
                 "between, between-rows or between-columns."
             ),
@@ -215,9 +218,9 @@ def runSet(
             "--border-style",
             metavar="STYLE",
             help=(
-                "The --border line: solid, dashed, dotted, hidden to draw nothing and "
-                "hide the table's line, or none to remove the borders. Solid when "
-                "left out."
+                "The --border line, solid when left out: solid, dashed, dotted, hidden "
+                "to draw nothing and hide the table's line, or none to remove the "
+                "borders."
             ),
         ),
     ] = None,
@@ -226,7 +229,7 @@ def runSet(
         typer.Option(
             "--border-width",
             metavar="LENGTH",
-            help="The --border line's width, such as 1pt. 0.35pt when left out.",
+            help="The --border line's width, such as 1pt, and 0.35pt when left out.",
         ),
     ] = None,
     borderColor: Annotated[
@@ -236,7 +239,7 @@ def runSet(
             metavar="COLOR",
             help=(
                 "The --border line's color, as `pybers show` prints one, such as "
-                "#ff0000ff. Black when left out."
+                "#ff0000ff, and black when left out."
             ),
         ),
     ] = None,
@@ -247,7 +250,8 @@ def runSet(
             metavar="STYLE",
             help=(
                 "The lines each table SELECTOR matches draws, as `pybers show` prints "
-                "them, each `width style color` or none: table-outline, "
+                "them: each `width style color` or none, its -width, -style or -color "
+                "changing one part, for table-outline, "
                 "body-horizontal-gridlines, body-vertical-gridlines, "
                 "header-rows-horizontal-gridlines, header-rows-vertical-gridlines, "
                 "header-columns-horizontal-gridlines, "
@@ -255,11 +259,10 @@ def runSet(
                 "footer-rows-horizontal-gridlines, footer-rows-vertical-gridlines, "
                 "header-rows-separator, header-columns-separator and "
                 "footer-rows-separator; table-title and table-outline-title, yes "
-                "or no; and banded-rows, a color or none, with "
-                "banded-rows-background its color alone. A line's -width, -style "
-                "or -color changes one part. body, header-rows, header-columns and "
-                "footer-rows each take -background, -padding, -vertical-align and "
-                "-text-wrap, the box its cells inherit."
+                "or no; banded-rows, a color or none, with banded-rows-background "
+                "its color alone; and the -background, -padding, -vertical-align and "
+                "-text-wrap of body, header-rows, header-columns and footer-rows, the "
+                "box their cells inherit."
             ),
         ),
     ] = None,
@@ -290,7 +293,7 @@ def runSet(
         bool,
         typer.Option(
             "--extend",
-            help="Grow the table when SELECTOR names one cell lying outside it.",
+            help="Grow the table when SELECTOR selects one cell lying outside it.",
         ),
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,
@@ -301,44 +304,53 @@ def runSet(
     everyPart = (*cellParts, cellStyleUpdate, cellStyleRemove, border, tableStyle)
     if locale is not None:
         if selector is not None or any(part is not None for part in everyPart):
-            raise typer.BadParameter(
-                "--locale sets the whole document, so give it without a SELECTOR."
+            raise composeUsageRefusal(
+                "--locale", "sets the whole document, so it takes no SELECTOR and "
+                "nothing else to set", "Give --locale alone", pybers.nothingWritten,
             )
         setLocale(context, documentPath, locale, output, preview, outputFormat)
         return
     if selector is None:
-        raise typer.BadParameter("Give a SELECTOR, or a --locale.")
+        raise composeUsageRefusal(
+            "SELECTOR", "is missing", "Give a SELECTOR, or --locale",
+            pybers.nothingWritten,
+        )
     if border is None and any(
         part is not None for part in (borderStyle, borderWidth, borderColor)
     ):
-        raise typer.BadParameter(
-            "--border-style, --border-width and --border-color describe a --border, "
-            "so give its POSITION."
+        raise composeUsageRefusal(
+            "--border-style, --border-width and --border-color", "describe a "
+            "--border, and none is given", "Give --border POSITION",
+            pybers.nothingWritten,
         )
     if all(part is None for part in everyPart):
-        raise typer.BadParameter(
-            "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
-            "--cell-style-update, a --cell-style-remove, a --border or a "
-            "--table-style."
+        raise composeUsageRefusal(
+            "SELECTOR", "is given with nothing to set", "Give a VALUE, a "
+            "--cell-format, a --cell-control, a --cell-style, a --cell-style-update, "
+            "a --cell-style-remove, a --border or a --table-style",
+            pybers.nothingWritten,
         )
     if sum(part is not None for part in styleParts) > 1:
-        raise typer.BadParameter(
-            "--cell-style replaces the whole box, --cell-style-update changes part "
-            "of it and --cell-style-remove clears one property, so give one of them."
+        raise composeUsageRefusal(
+            "--cell-style, --cell-style-update and --cell-style-remove", "cannot be "
+            "given together, since the first replaces the whole box, the second "
+            "changes part of it and the third clears one property", "Give one of them",
+            pybers.nothingWritten,
         )
     styleProperties = [each.value for each in pybers.CellStyleProperty]
     if cellStyleRemove is not None and cellStyleRemove not in styleProperties:
-        raise typer.BadParameter(pybers.composeChoiceRefusal(
-            cellStyleRemove, "a cell style property", styleProperties
-        ))
+        raise composeUsageChoiceRefusal(
+            cellStyleRemove, "a cell style property", styleProperties, "set",
+            pybers.nothingWritten,
+        )
     if border is not None and border not in borderPositions:
-        raise typer.BadParameter(
-            pybers.composeChoiceRefusal(border, "a border position", borderPositions)
+        raise composeUsageChoiceRefusal(
+            border, "a border position", borderPositions, "set", pybers.nothingWritten
         )
     if borderStyle is not None and borderStyle not in ("none", *borderStyles):
-        choices = ", ".join(borderStyles)
-        raise typer.BadParameter(
-            f"--border-style is one of {choices} or none, and is {borderStyle!r}."
+        raise composeUsageChoiceRefusal(
+            borderStyle, "a border style", (*borderStyles, "none"), "set",
+            pybers.nothingWritten,
         )
     target = findSaveTarget(documentPath, output, preview)
     with reportPybersErrors(context):
@@ -371,10 +383,11 @@ def runSet(
         if cellStyleUpdate is not None:
             stated = pybers.parseCellStyle(cellStyleUpdate)
             if stated is None:
-                raise pybers.CellStyleError(
-                    "--cell-style-update changes properties, so it takes no none. "
-                    "Give --cell-style none to remove the whole box."
-                )
+                raise pybers.CellStyleError(pybers.composeRefusal(
+                    "--cell-style-update", "changes properties, so it takes no none",
+                    "Give --cell-style none to remove the whole box",
+                    pybers.nothingWritten,
+                ))
             partStyled = document.cellStyleUpdate(selector, stated, extend=extend)
         if cellStyleRemove is not None:
             partStyled = document.cellStylePropertyRemove(

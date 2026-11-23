@@ -1,6 +1,6 @@
 # Code review rubric
 
-Six questions, asked of **the change**, never of the repository around it. A problem in
+Seven questions, asked of **the change**, never of the repository around it. A problem in
 a file this pull request did not touch is a ticket, not a review comment.
 
 This file holds the **mindset**, deliberately not the rules. The laws live in
@@ -40,3 +40,10 @@ live, and `cieX1931` beats `cieX` because it names the observer. Does every publ
 command take its words from `docs/vocabulary.md`, and does a new word join that page in
 the same pull request? Bytes in uncompiled code are the cheapest thing we have. Name
 things so they can be read in twenty-four months.
+
+**Messages**. Is each new or changed message, an error, a refusal, a skipped part or a
+command's help, built by the composer for its shape, and does it read as
+`docs/message-design.md` says: the place first, the cause in the present tense, any fix
+in the imperative, and what was not done in the past tense? Does it select or specify a
+part rather than name it, promise no future work, and name no call or option only one
+consumer has?

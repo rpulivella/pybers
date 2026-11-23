@@ -8,6 +8,7 @@ section's box is one declaration per property, such as `header-rows-padding`, ea
 value written as `--cell-style` writes it.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  Written for PYB-291, moved from `tablestyle`, with each section's box.
 """
 from __future__ import annotations
@@ -27,7 +28,7 @@ from typing import Any
 
 from pybers.absence import MIXED
 from pybers.color.colors import Color, ColorError
-from pybers.errors import composeChoiceRefusal
+from pybers.errors import composeChoiceRefusal, composeRefusal
 from pybers.format.text import splitDeclarations
 from pybers.style.cells import CellStyle, CellStyleProperty, updateCellStyles
 from pybers.style.fills import Fill
@@ -167,13 +168,14 @@ def parseLineStyle(text: str, line: TableLine, name: str) -> TableLine:
     if text == "none":
         return replace(line, visible=False)
     if text not in tableStrokePresets:
-        choices = ", ".join(tableStrokePresets)
-        raise TableStyleError(f"{name} is one of {choices} or none, and is {text!r}.")
-    if line.stroke is MIXED:
-        raise TableStyleError(
-            f"{name} stores a different stroke in each band, so give its width, "
-            "style and color together."
+        raise composeChoiceRefusal(
+            TableStyleError, text, "a line style", [*tableStrokePresets, "none"]
         )
+    if line.stroke is MIXED:
+        raise TableStyleError(composeRefusal(
+            f"The {name}", "stores a different stroke in each band",
+            "Give its width, style and color together",
+        ))
     pattern, cap, join = tableStrokePresets[text]
     return TableLine(True, replace(line.stroke, pattern=pattern, cap=cap, join=join))
 
@@ -192,10 +194,10 @@ def parseLineShorthand(text: str, line: TableLine, name: str) -> TableLine:
     if stroke == ["mixed"] and line.stroke is MIXED:
         return TableLine(visible, MIXED)
     if len(stroke) != 3:
-        raise TableStyleError(
-            f"{name} is none, or a width, a style and a color such as 1pt solid "
-            f"black, and is {text!r}."
-        )
+        raise TableStyleError(composeRefusal(
+            f"The {name} {text!r}", "is not none, or a width, a style and a color",
+            "Write it as `1pt solid black`",
+        ))
     width, style, color = stroke
     shown = parseLineStyle(style, TableLine(True, Stroke(
         width=parseLineWidth(width, name), color=parseLineColor(color, name),
@@ -217,7 +219,7 @@ def parseLineColor(text: str, name: str) -> Color:
     try:
         return Color.parse(text)
     except ColorError as exc:
-        raise TableStyleError(f"{name}: {exc}") from exc
+        raise TableStyleError(str(exc)) from exc
 
 
 def parseLonghand(
@@ -227,17 +229,17 @@ def parseLonghand(
     if part == "style":
         return parseLineStyle(text, line, name)
     if line.stroke is MIXED:
-        raise TableStyleError(
-            f"{name} stores a different stroke in each band, so give its width, "
-            "style and color together."
-        )
+        raise TableStyleError(composeRefusal(
+            f"The {name}", "stores a different stroke in each band",
+            "Give its width, style and color together",
+        ))
     try:
         stroke = (
             replace(line.stroke, width=parseLineWidth(text, name)) if part == "width"
             else replace(line.stroke, color=parseLineColor(text, name))
         )
     except StrokeError as exc:
-        raise TableStyleError(f"{name}: {exc}") from exc
+        raise TableStyleError(str(exc)) from exc
     return TableLine(line.visible, stroke)
 
 
@@ -253,11 +255,15 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
     seen: set[str] = set()
     for name, value in [(firstName.strip(), firstValue.strip()), *declarations]:
         if name in seen:
-            raise TableStyleError(f"A table style states {name} once, and twice here.")
+            raise TableStyleError(composeRefusal(
+                f"The property {name}", "is stated twice", "State it once"
+            ))
         seen.add(name)
         if name in flagNames:
             if value not in ("yes", "no"):
-                raise TableStyleError(f"{name} is yes or no, and is {value!r}.")
+                raise composeChoiceRefusal(
+                    TableStyleError, value, f"a {name} value", ["yes", "no"]
+                )
             flag: dict[str, Any] = {flagNames[name]: value == "yes"}
             changed = replace(changed, **flag)
             continue
@@ -273,7 +279,7 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             try:
                 stated = parseCellStyle(f"{styleProperty.value}: {value}")
             except CellStyleError as exc:
-                raise TableStyleError(f"{name}: {exc}") from exc
+                raise TableStyleError(str(exc)) from exc
             box = updateCellStyles(stated or CellStyle(), getattr(changed, field))
             section: dict[str, Any] = {field: box}
             changed = replace(changed, **section)
@@ -286,11 +292,14 @@ def parseTableStyle(text: str, tableStyle: TableStyle) -> TableStyle:
             field = lineNames[longhand[1]]
             line = parseLonghand(longhand[2], value, getattr(changed, field), name)
         else:
-            raise TableStyleError(composeChoiceRefusal(name, "a table style property", [
-                *lineNames, *flagNames, bandName, bandFillName, *sectionDeclarations,
-                *(f"{line}-{part}" for line in lineNames
-                  for part in ("width", "style", "color")),
-            ]))
+            raise composeChoiceRefusal(
+                TableStyleError, name, "a table style property", [
+                    *lineNames, *flagNames, bandName, bandFillName,
+                    *sectionDeclarations,
+                    *(f"{line}-{part}" for line in lineNames
+                      for part in ("width", "style", "color")),
+                ],
+            )
         update: dict[str, Any] = {field: line}
         changed = replace(changed, **update)
     return changed

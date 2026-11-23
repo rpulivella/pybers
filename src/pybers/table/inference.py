@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """\
-A cell value read from text, its kind inferred or named, and the text it reads from.
+A cell value read from text, its kind inferred or specified, and the text it reads from.
 
 One ordered table of parsers decides the kind: inference tries each in turn and the
 first that accepts the text wins, so text, which accepts anything, comes last. A kind
-named outright uses its own parser and refuses text that parser cannot read.
+specified outright uses its own parser and refuses text that parser cannot read.
 
 `formatCellValue` writes the one text form each kind reads back from, so a value
 printed by the command line is written again as the same value and kind.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  The duration parser and formatter named for the units a person
             types, for PYB-278.
 2026-10-24  A duration read from ISO 8601 as well, as the JSON form writes it, for
@@ -35,7 +36,7 @@ from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
 
 from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
-from pybers.errors import WriteError
+from pybers.errors import WriteError, composeChoiceRefusal, composeRefusal
 from pybers.interchange._leaves import parseIsoDuration
 from pybers.table.cell import CellValue
 from pybers.table.kinds import CellKind
@@ -52,7 +53,7 @@ durationPart: re.Pattern[str] = re.compile(r"(\d+(?:\.\d+)?)\s*(ms|[wdhms])")
 durationWhole: re.Pattern[str] = re.compile(
     r"([+-]?)\s*((?:\d+(?:\.\d+)?\s*(?:ms|[wdhms])\s*)+)"
 )
-# A clock duration, `1:30` or `1:30:15.5`, read only when a duration is named.
+# A clock duration, `1:30` or `1:30:15.5`, read only when a duration is specified.
 durationClock: re.Pattern[str] = re.compile(
     r"([+-]?)(\d+):([0-5]\d)(?::([0-5]\d(?:\.\d+)?))?"
 )
@@ -75,7 +76,7 @@ currencyWhole: re.Pattern[str] = re.compile(r"(\S+)\s+([A-Z]{3})")
 
 
 def parseCurrency(text: str) -> CurrencyAmount:
-    """Return the amount and currency text names, `1234.5 EUR`, as `str` prints one."""
+    """Return the amount and currency text writes, `1234.5 EUR`, as `str` prints one."""
     found = currencyWhole.fullmatch(text.strip())
     if found is None:
         raise ValueError(text)
@@ -83,7 +84,7 @@ def parseCurrency(text: str) -> CurrencyAmount:
     try:
         findCurrency(code)
     except CurrencyError as exc:
-        raise ValueError(str(exc)) from exc
+        raise ValueError(text) from exc
     return CurrencyAmount(parseNumber(amount), code)
 
 
@@ -93,7 +94,7 @@ def parseText(text: str) -> str:
 
 
 def parseBoolean(text: str) -> bool:
-    """Return the boolean `TRUE` or `FALSE` names, in any case."""
+    """Return the boolean `TRUE` or `FALSE` specifies, in any case."""
     try:
         return booleanWords[text.strip().casefold()]
     except KeyError as exc:
@@ -101,7 +102,7 @@ def parseBoolean(text: str) -> bool:
 
 
 def parseDateTime(text: str) -> datetime.datetime:
-    """Return the date and time ISO 8601 text names, a date alone as midnight."""
+    """Return the date and time ISO 8601 text specifies, a date alone as midnight."""
     return datetime.datetime.fromisoformat(text.strip())
 
 
@@ -114,7 +115,7 @@ def toMicroseconds(amount: str, unit: int) -> int:
 
 
 def parseUnitDuration(text: str) -> datetime.timedelta:
-    """Return the duration units name, `1h 30m` or `-2d 4h`, or ISO 8601, `PT1H30M`.
+    """Return the duration units specify, `1h 30m` or `-2d 4h`, or ISO 8601, `PT1H30M`.
 
     ISO 8601 is how the JSON form writes a duration, so what `--output-format json`
     prints is written back as the same duration rather than as text.
@@ -134,7 +135,7 @@ def parseUnitDuration(text: str) -> datetime.timedelta:
 
 
 def parseDurationNamed(text: str) -> datetime.timedelta:
-    """Return the duration units or a clock name, `1h 30m` or `1:30`."""
+    """Return the duration units or a clock specify, `1h 30m` or `1:30`."""
     found = durationClock.fullmatch(text.strip())
     if found is None:
         return parseUnitDuration(text)
@@ -147,7 +148,7 @@ def parseDurationNamed(text: str) -> datetime.timedelta:
     return datetime.timedelta(microseconds=-total if sign == "-" else total)
 
 
-# Tried in this order when no kind is named, text last because it accepts anything.
+# Tried in this order when no kind is specified, text last because it accepts anything.
 # A clock such as `1:30` is not inferred, since it reads as a time of day as well.
 valueParsers: frozendict[CellKind, Callable[[str], CellValue]] = frozendict({
     CellKind.NUMBER: parseNumber,
@@ -160,6 +161,15 @@ valueParsers: frozendict[CellKind, Callable[[str], CellValue]] = frozendict({
 namedParsers: frozendict[CellKind, Callable[[str], CellValue]] = frozendict({
     **valueParsers, CellKind.DURATION: parseDurationNamed,
 })
+# How each kind is written, offered when text does not read as the kind specified.
+kindForms: frozendict[CellKind, str] = frozendict({
+    CellKind.NUMBER: "`1234.5`",
+    CellKind.CURRENCY: "`1234.5 EUR`, with a currency Numbers offers",
+    CellKind.BOOLEAN: "`TRUE` or `FALSE`",
+    CellKind.DATE_TIME: "`2026-11-23` or `2026-11-23T14:30`",
+    CellKind.DURATION: "`1h 30m`, `1:30` or `PT1H30M`",
+    CellKind.TEXT: "any text",
+})
 # What `--as` calls each kind; a kind's own value specifies it as well.
 kindNames: frozendict[str, CellKind] = frozendict({
     "number": CellKind.NUMBER, "currency": CellKind.CURRENCY,
@@ -169,30 +179,32 @@ kindNames: frozendict[str, CellKind] = frozendict({
 
 
 def parseCellValue(text: str, kind: CellKind | str | None = None) -> CellValue:
-    """Return the value text writes, as the kind named or the first it reads as."""
+    """Return the value text writes, as the kind specified or the first it reads as."""
     if kind is None:
         for parser in valueParsers.values():
             try:
                 return parser(text)
             except ValueError:
                 continue
-        raise WriteError(f"{text!r} reads as no kind of value.")
+        raise WriteError(composeRefusal(repr(text), "reads as no kind of value"))
     named = toValueKind(kind)
     try:
         return namedParsers[named](text)
     except ValueError as exc:
-        detail = "" if str(exc) == text else f" {exc}"
-        raise WriteError(f"{text!r} is not a {named.value}.{detail}") from exc
+        raise WriteError(composeRefusal(
+            repr(text), f"is not a {named.value}", f"Write it as {kindForms[named]}"
+        )) from exc
 
 
 def toValueKind(kind: CellKind | str) -> CellKind:
-    """Return the kind named, refusing one no parser reads, listing those that do."""
+    """Return the kind specified, refusing one no parser reads."""
     named = kind if isinstance(kind, CellKind) else kindNames.get(kind)
     if named is None and kind in CellKind:
         named = CellKind(kind)
     if named not in valueParsers:
-        known = ", ".join(kindNames)
-        raise WriteError(f"{kind!r} is not a kind read from text. Use {known}.")
+        raise composeChoiceRefusal(
+            WriteError, kind, "a kind read from text", list(kindNames)
+        )
     return named
 
 

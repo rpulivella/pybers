@@ -113,7 +113,7 @@ def findLocationAt(document: pybers.Document, name: str) -> pybers.ReferenceLoca
     )
 
 
-# ── AC 1: a reference names its target, and the target resolves ──────────────
+# ── AC 1: a reference selects its target, and the target resolves ─────────────
 
 
 def testACrossTableReferenceResolvesToTheTableObjectItNames() -> None:
@@ -168,12 +168,12 @@ def testTheWalkRefusesAReferenceIntoATableTheDocumentDoesNotHold() -> None:
         list(document.referencesIterate())
 
 
-def testACellAddressNeverNamesATable() -> None:
+def testACellAddressNeverSelectsATable() -> None:
     """AC 1.ii. A position stays table-local: a row and a column, nothing more."""
     assert [field.name for field in dataclasses.fields(pybers.CellAddress)] == [
         "row", "col",
     ]
-    with pytest.raises(pybers.ReferenceError, match="names a table"):
+    with pytest.raises(pybers.ReferenceError, match="selects a table"):
         pybers.CellAddress.parse("Table 2::A1")
 
 

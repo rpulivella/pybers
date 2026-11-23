@@ -141,7 +141,7 @@ def readLedger(path: Path, tableName: str) -> Ledger:
 
 
 def assertClaimsCounted(before: Ledger, after: Ledger) -> None:
-    """Assert every refcount moved by exactly as much as the cells naming it moved."""
+    """Assert every refcount moved by as much as the cells referring to it moved."""
     for name, (declaredAfter, namedAfter) in after.items():
         declaredBefore, namedBefore = before[name]
         for key in set(declaredAfter) | set(declaredBefore):
@@ -235,13 +235,13 @@ def testAFillSkipsWhatAMergeCoversAndCountsWhatItFilled() -> None:
         (lambda table: table.cellsFill(
             "B5:C5", "B6:C7", references=relative, values=repeat), "a fill copies no"),
         (lambda table: table.cellsFill(
-            "A:A", "B1:B3", references=relative, values=repeat), "unbounded"),
+            "A:A", "B1:B3", references=relative, values=repeat), "is open on an axis"),
         (lambda table: table.cellsFill(
             "D3", "D4", references="sideways", values=repeat), "not a reference rule"),
         (lambda table: table.cellsFill(
             "D3", "D4", references=relative, values="upward"), "not a value rule"),
         (lambda table: table.cellsFill(
-            "A2:A3", "A4:B4", references=relative, values=series), "asks for both"),
+            "A2:A3", "A4:B4", references=relative, values=series), "both along"),
     ],
 )
 def testARefusedFillLeavesTheTableAsItWas(
@@ -368,7 +368,7 @@ def testAFillWhoseSourceWasRemovedIsRefusedAtSave(tmp_path: Path) -> None:
     table.cellsFill("A11", "A12", references=relative, values=repeat)
     table.rowRemove(11)
     target = tmp_path / "orphaned.numbers"
-    with pytest.raises(pybers.WriteError, match="no longer in"):
+    with pytest.raises(pybers.WriteError, match="its table no longer holds"):
         document.save(target)
     assert not target.exists()
 
@@ -437,18 +437,18 @@ def testACopiedRichTextCellHasAPayloadOfItsOwn(tmp_path: Path) -> None:
 
 
 def testAFillOverACheckboxReleasesItsControl(tmp_path: Path) -> None:
-    """`D3` is the one cell naming its control, so Numbers removes it, as in `63b`."""
+    """`D3` alone specifies its control, so Numbers removes it, as in `63b`."""
     target = tmp_path / "unchecked.numbers"
     fillAndSave("63-fill-base", "D2", "D2:D3", relative, target)
     assert readListCounts(target, "control_cell_spec_table") == []
 
 
 def testCopyingARecordNamingAnUnidentifiedEntryIsRefused(tmp_path: Path) -> None:
-    """`B10` names an entry through byte 9 bit 0x08, whose count nobody knows."""
+    """`B10` refers to an entry through byte 9 bit 0x08, whose count nobody knows."""
     document, table = openTable("46-formula-rare-functions")
     table.cellsFill("B10", "C10", references=relative, values=repeat)
     target = tmp_path / "unidentified.numbers"
-    with pytest.raises(pybers.WriteError, match="not identified"):
+    with pytest.raises(pybers.WriteError, match="which pybers does not identify"):
         document.save(target)
     assert not target.exists()
 
@@ -568,7 +568,7 @@ def testAFormulaInASeriesSourceFillsAsItDoesWhenRepeated() -> None:
 
 
 def testAScriptContinuesRowNumbersDownAColumn() -> None:
-    """A script numbering rows names the rule as a string, as a command line would."""
+    """A script numbering rows specifies its rule as text, as a command line would."""
     document = pybers.open(findDocumentPath("65-series-base"))
     table = document.sheets[0].tables[0]
     filled = table.cellsFill(

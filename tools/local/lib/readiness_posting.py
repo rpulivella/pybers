@@ -95,7 +95,7 @@ def renderStoredReport(stored: dict[str, Any], headSha: str) -> tuple[int, str]:
     """
     facts = checks.BranchFacts.fromDictionary(stored)
     if not isinstance(facts.pullRequest, int) or facts.pullRequest <= 0:
-        raise ValueError("The stored report names no pull request.")
+        raise ValueError("The stored report specifies no pull request.")
     results = checks.readStoredResults(stored)
     moment = datetime.fromisoformat(str(stored.get("checkedAt", "")))
     facts.headSha = headSha

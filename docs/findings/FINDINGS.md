@@ -36,7 +36,7 @@ any, so `Cell.value` uses `Decimal`., [values](findings-01-values.md)
 formula text, and `$` is a per-axis boolean rather than punctuation. The regex-based range
 shifting recorded as a defect in `docs/decisions.md` was treating structure as text. A move
 rewrites references under one of two rules: Numbers' cut and paste rewrites nothing, and
-dragging a block keeps every reference on the cell it named, which rewrites offsets.
+dragging a block keeps every reference on the cell it selected, which rewrites offsets.
 [formulas](findings-02-formulas.md), [structure](findings-03-structure.md)
 
 **Merges are stored as formulas**, in a formula store beside the cells, and **Numbers rewrites

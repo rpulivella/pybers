@@ -12,7 +12,7 @@ A first-time contributor keeps at most one pull request open, and work that show
 
 ## Prerequisites
 
-- **A virtual environment at `.venv`**, holding pybers installed editable with its `dev` extra, on the Python that `requires-python` in `pyproject.toml` names. After a pull, `.venv/bin/python3 -m pip install -e ".[dev]" --upgrade` brings it current.
+- **A virtual environment at `.venv`**, holding pybers installed editable with its `dev` extra, on the Python that `requires-python` in `pyproject.toml` specifies. After a pull, `.venv/bin/python3 -m pip install -e ".[dev]" --upgrade` brings it current.
 - **A classic personal access token** with the `repo` and `project` scopes, in a git-ignored `.dev.vars` as `GITHUB_TOKEN=`. The ticket and pull request tools refuse to run without it, as [their README](tools/workflow/README.md#github-authentication) explains.
 - **Claude Code, optionally.** Each step below names the skill in `.claude/commands/` that carries it out. A skill is a written procedure, so it can be followed by hand as well.
 
@@ -63,7 +63,7 @@ A pull request opens as a draft, filled from [the template](.github/pull_request
 
 ### 4. Review
 
-`/pr-review-code` moves the ticket to `Code Review`, runs the preflight, then reads the change against [the review rubric](docs/code-review-rubric.md), six questions asked of the change and never of the code around it. A clean review takes the pull request out of draft, and GitHub then runs two checks:
+`/pr-review-code` moves the ticket to `Code Review`, runs the preflight, then reads the change against [the review rubric](docs/code-review-rubric.md), seven questions asked of the change and never of the code around it. A clean review takes the pull request out of draft, and GitHub then runs two checks:
 
 - **`preflight`**, the same four gates the local command runs: pytest, the prose gate, ruff and mypy.
 - **`readiness`**, what exists only on a pull request: the template and its checklist, the CHANGELOG line, the ticket identifier, currency with `develop`, dependency advisories, and a confirmation date for every golden touched. Its report is posted as one comment, replaced on every run.

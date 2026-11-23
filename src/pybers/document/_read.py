@@ -106,7 +106,7 @@ def open(  # noqa: A001
     """Read a `.numbers` file into a `Document`, writing aware dates in `timeZone`.
 
     Shadows the builtin deliberately, so the entry point reads as it should. The
-    zone defaults to the one pybers is running in, and naming one makes a script's
+    zone defaults to the one pybers is running in, and specifying one makes a script's
     result the same wherever it runs.
     """
     zone = toTimeZone(timeZone)

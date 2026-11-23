@@ -60,8 +60,8 @@ G11  reference into another table       42  ->   1042
 H11  reference into another sheet       53  ->   1053
 ```
 
-Two measurements, not one. A **broad** set naming the ten edited operands *and* the eight
-dependent formula cells recalculated all eight. A **minimal** set naming only the twelve
+Two measurements, not one. A **broad** set listing the ten edited operands *and* the eight
+dependent formula cells recalculated all eight. A **minimal** set listing only the twelve
 edited cells across three tables, never mentioning row 11, produced byte-for-byte the same
 eight results. **So Numbers walks its own dependency graph from the cells it is told
 about**, and a writer needs to know only what it wrote. `E11` depends on `A11` rather than
@@ -158,7 +158,7 @@ text something the format never stored as text. What remains is a walk over node
 unrecognized node type is carried through untouched rather than interpreted, since a
 formula is shared state that other cells depend on.
 
-**A move rewrites references under one of two rules**, which the caller names, and neither
+**A move rewrites references under one of two rules**, which the caller specifies, and neither
 is a default. `PRESERVE_RELATIVE_POSITION` rewrites nothing but a range reaching past its
 table, clamped to the edge, because a locked axis stores an index.
 `PRESERVE_NAMED_CELL` rewrites every relative offset that leaves the block, and every
@@ -176,7 +176,7 @@ row:   -10, absolute: false
 cross_table_reference_extra_info { table_id: <128-bit UUID> }
 ```
 
-**The table is named by identity, never by name or position.** Renaming a table, moving it,
+**The table is specified by identity, never by name or position.** Renaming a table, moving it,
 or reordering sheets cannot break a formula pointing into it. Same principle as relative
 offsets: address by identity, not by location.
 
@@ -208,7 +208,7 @@ A range does not. Typed into Numbers 15.4 for `71-whole-axis-ranges-and-booleans
 `SUM(5:6)` and `SUM(Table 1::2:3)` an **absolute column of 32767 with no end**. These are
 the values a broken reference uses (node type 46), so the node type decides which they
 mean. The sticky bits leave the unbounded axis unlocked though the tract holds it
-absolute, and `$B:$C` locks only the bounded axis. Read as a line, the sentinel names one
+absolute, and `$B:$C` locks only the bounded axis. Read as a line, the sentinel specifies one
 far past any table and the range cannot be rendered, which is how the Retirement
 template's `VLOOKUP(Life Plans::B1,Data::B:E,4,FALSE)` surfaced it.
 
@@ -278,7 +278,7 @@ whole lines  spanning_column_dependencies.coord_refers_to_spans, or the row
 ```
 
 Coordinates are absolute and count from zero, never the offsets the formula itself
-stores. A call naming one range twice, as `SUMIFS` does in `20-formula-shapes`, is one
+stores. A call specifying one range twice, as `SUMIFS` does in `20-formula-shapes`, is one
 entry. A rectangle of one line omits that axis of its size, as the default is 1.
 
 **A formula swapped for another has to re-declare what it reads**, which is a third

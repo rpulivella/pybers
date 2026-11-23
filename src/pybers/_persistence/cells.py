@@ -20,6 +20,7 @@ decimal128, so `1234.5` is exact; routing it through a binary float would introd
 rounding error into a document that never had any. See `pybers.table.cells`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-12  `cellStyleSlot` and `applySlotValue`, which fills, replaces or empties
             one slot, for PYB-265.
 2026-10-22  A record's chosen format is the bit of the slot it displays with, for
@@ -56,7 +57,7 @@ import datetime
 import struct
 from dataclasses import dataclass
 
-from ..errors import PybersError
+from ..errors import PybersError, composeRefusal
 from .decimal128 import Decimal128
 
 # A date counts wall-clock seconds from 2001-01-01 in no zone, as PYB-218 measured.
@@ -166,10 +167,10 @@ def decodeCellValue(typeByte: int, body: bytes) -> tuple[object, int]:
 def decodeRecord(column: int, record: bytes) -> CellRecord:
     """Decode one cell record from a row's storage buffer."""
     if len(record) < valueOffset:
-        raise CellDecodeError(
-            f"Cell record for column {column} is {len(record)} bytes, shorter than "
-            f"the {valueOffset}-byte header."
-        )
+        raise CellDecodeError(composeRefusal(
+            f"The cell in column {column}", f"has a record of {len(record)} bytes, "
+            f"shorter than its {valueOffset}-byte header",
+        ))
     typeByte = record[1]
     flags = int.from_bytes(record[6:8], "little")
     value, width = decodeCellValue(typeByte, record[valueOffset:])
@@ -226,7 +227,7 @@ def carriesFormula(record: CellRecord) -> bool:
 
 
 def findChosenBit(raw: bytes) -> int:
-    """Return byte 6's bit for the slot a record shows, Text's when it names none.
+    """Return byte 6's bit for the slot a record shows, Text's when it specifies none.
 
     One bit per format slot, measured across 74,304 records in findings-11-formats.md.
     """
@@ -248,17 +249,17 @@ def carriesChosenFormat(record: CellRecord) -> bool:
 referenceWidth: int = 4
 
 # Every bit that contributes one trailing reference, in the order the references
-# appear. Byte 8's low nibble names the value and carries none.
+# appear. Byte 8's low nibble specifies the value and carries none.
 slotOrder: tuple[tuple[int, int], ...] = (
     *((8, bit) for bit in (0x20, 0x40, 0x80)),
     *((9, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
     *((10, bit) for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)),
 )
 
-# The slot naming a cell's own cell style, a `styleTable` key, measured in 98b.
+# The slot specifying a cell's own cell style, a `styleTable` key, measured in 98b.
 cellStyleSlot: tuple[int, int] = (8, 0x20)
 
-# The slot naming a cell's conditional highlighting, and the slot caching which of
+# The slot specifying a cell's conditional highlighting, and the slot caching which of
 # its rules matched: the rule's index, or 15 when none did. Measured against the
 # values every highlighted cell of `57-structure-refusals-base` holds.
 conditionalSlot: tuple[int, int] = (8, 0x80)
@@ -287,8 +288,8 @@ countedFormatSlots: tuple[tuple[int, int], ...] = (
 
 
 # Which per-kind slot a cell displays with, as a kind rather than a key: 1 number
-# through 6 checkbox. In all 11,581 records the documents carry, it names a kind slot
-# the record holds, and no refcount counts it. Read as a format key until
+# through 6 checkbox. In all 11,581 records the documents carry, it specifies a kind
+# slot the record holds, and no refcount counts it. Read as a format key until
 # `54-format-star-rating` stored 5 where no list holds a key 5.
 displayedKindSlot: tuple[int, int] = (9, 0x10)
 
@@ -352,7 +353,7 @@ def chooseOffsetUnit(hasWideOffsets: bool, tileUsesWideRows: bool) -> int:
     grown to 65,536 rows had it set on a tile whose rows kept byte offsets,
     measured 2026-09-21 in `58-buckets-at-limit`, and reading those as words put
     every record past the end of its buffer. The tile's flag is kept in the call
-    so that every caller still names both.
+    so that every caller still specifies both.
     """
     del tileUsesWideRows
     return offsetUnitWord if hasWideOffsets else offsetUnitByte
@@ -381,11 +382,11 @@ def decodeRow(
 
     beyond = [column for column, at in populated if at >= len(storageBuffer)]
     if beyond:
-        raise CellDecodeError(
-            f"{len(beyond)} of {len(populated)} cell offsets fall outside the "
+        raise CellDecodeError(composeRefusal(
+            f"{len(beyond)} of {len(populated)} cell offsets", f"fall outside the "
             f"{len(storageBuffer)}-byte storage buffer, the first at column "
-            f"{beyond[0]}. Offsets counted in units of {offsetUnit} byte(s)."
-        )
+            f"{beyond[0]}, counted in units of {offsetUnit} bytes",
+        ))
 
     records: list[CellRecord] = []
     for index, (column, at) in enumerate(populated):

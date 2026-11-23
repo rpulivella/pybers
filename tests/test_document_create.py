@@ -397,12 +397,12 @@ def testACreatedDocumentReadBackWritesBackUnchanged(tmp_path: Path) -> None:
 def testACreatedDocumentSavesOnlyToAPathItIsGiven() -> None:
     document = pybers.create("en_US")
 
-    with pytest.raises(pybers.WriteError, match="Pass a path to save"):
+    with pytest.raises(pybers.WriteError, match="Give a path to save it to"):
         document.save()
 
 
 def testCreateRefusesARegionPybersDoesNotOffer() -> None:
-    with pytest.raises(pybers.LocaleError, match="No region pybers offers"):
+    with pytest.raises(pybers.LocaleError, match="is not a region pybers offers"):
         pybers.create("xx_YY")
 
 

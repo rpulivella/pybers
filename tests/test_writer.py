@@ -20,7 +20,7 @@ UPDATES
 2026-10-22  The goldens' writes and comparisons moved to the golden builders, for
             PYB-255.
 2026-10-20  The refusals of a value of another kind went with them, for PYB-144.
-2026-10-09  A refused write names what the cell holds in words, for PYB-168.
+2026-10-09  A refused write states what the cell holds in words, for PYB-168.
 2026-09-14  Text, pooling and a cell that changes type, for #61.
 2026-09-14  A formula written into a row with no storage, for #78.
 2026-09-01  Written for #2, AC 1: the unchanged round trip.
@@ -247,7 +247,7 @@ def test_savingIsRepeatableAndLeavesTheDocumentUsable(tmp_path: Path) -> None:
 
 def test_savingADocumentBuiltInMemoryWithNoPathIsRefused() -> None:
     """A document built in memory is created on save, which needs a path to land at."""
-    with pytest.raises(WriteError, match="nowhere to save"):
+    with pytest.raises(WriteError, match="was not read from a file"):
         Document().save()
 
 
@@ -256,7 +256,7 @@ def test_savingInPlaceWithNoSourcePathIsRefused() -> None:
     document = pybers.open(findDocumentPath("00-baseline"))
     document._sourcePath = None
 
-    with pytest.raises(WriteError, match="nowhere to save"):
+    with pytest.raises(WriteError, match="was not read from a file"):
         document.save()
 
 
@@ -457,7 +457,7 @@ def test_writingOverAFormulaIsRefused(tmp_path: Path) -> None:
 
     cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
-    with pytest.raises(WriteError, match="backed by a formula"):
+    with pytest.raises(WriteError, match="holds a formula, so a value written there"):
         cell.value = Decimal("999")
 
 
@@ -481,11 +481,11 @@ def test_textWrittenOverANumberIsSavedAndReadsBack(tmp_path: Path) -> None:
 def test_writingSomethingNeitherTextNorANumberIsStillRefused(
     tmp_path: Path,
 ) -> None:
-    """A value no cell holds is refused as it is assigned, naming what a cell holds."""
+    """A value no cell holds is refused as it is assigned, stating what a cell holds."""
     working = copyDocument("11-value-types-noformats", tmp_path)
     cell = pybers.open(working).sheets[0].tables[0].cell("A1")
 
-    with pytest.raises(WriteError, match="A cell holds a Decimal"):
+    with pytest.raises(WriteError, match="cannot hold a list. Give a Decimal"):
         cell.value = [1, 2]  # type: ignore[assignment]
 
 
@@ -549,7 +549,7 @@ def test_theGoldenAsksNumbersToRecalculateTheCellsThatMoved() -> None:
     """The dirty set is the whole mechanism, so assert its contents, not its size.
 
     A golden that merely differed by some bytes in the calculation engine would pass
-    while naming the wrong cells, and the failure would only show as a wrong number
+    while selecting the wrong cells, and the failure would only show as a wrong number
     on someone's screen months later.
     """
     index = ArchiveIndex(
@@ -1053,9 +1053,10 @@ def test_aTypeChangeMovesTheFormatIntoTheSlotItsKindUses(tmp_path: Path) -> None
     """AC 5, asserted on the bytes rather than on what reads back.
 
     A format reference sits in the slot its kind uses, so a cell becoming text moves
-    its format out of byte 9's `0x20` and into byte 10's `0x02`, naming a text format
-    rather than the number format it displayed with. One bit leaves and one arrives,
-    so the count the reference rule derives is unchanged. See findings-01-values.md.
+    its format out of byte 9's `0x20` and into byte 10's `0x02`, specifying a text
+    format rather than the number format it displayed with. One bit leaves and one
+    arrives, so the count the reference rule derives is unchanged. See
+    findings-01-values.md.
     """
     working = copyDocument("11-value-types-noformats", tmp_path)
     before = readRecordAt(working, "A1")
@@ -1065,7 +1066,7 @@ def test_aTypeChangeMovesTheFormatIntoTheSlotItsKindUses(tmp_path: Path) -> None
     after = readRecordAt(working, "A1")
 
     assert after.typeByte == 3, "the cell became text"
-    assert after.raw[8] & 0x0F == 0x08, "byte 8's low nibble names a pooled key"
+    assert after.raw[8] & 0x0F == 0x08, "byte 8's low nibble specifies a pooled key"
     assert before.raw[9] & 0x20 and not after.raw[9] & 0x20, "the number slot cleared"
     assert not before.raw[10] & 0x02 and after.raw[10] & 0x02, "the text slot set"
     assert len(after.references) == len(before.references), "the count is unchanged"

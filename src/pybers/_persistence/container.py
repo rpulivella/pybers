@@ -20,6 +20,7 @@ support, and a reader that carries it survives a file this developer has not
 seen yet. Record what varies; refuse what cannot be verified.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  A member's zip header composed as Numbers writes one, for PYB-261.
 2026-10-07  A directory, an unreadable file and a zip holding no IWA member are
             refused by name, for PYB-169.
@@ -41,7 +42,14 @@ import zipfile
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from ..errors import PybersError
+from ..errors import (
+    PybersError,
+    composeFault,
+    composeReadRefusal,
+    composeRefusal,
+    nothingRead,
+    nothingWritten,
+)
 from .iwa import Archive, IWAFile, readIWAFile, writeIWAFile
 
 # Members under this prefix, with this suffix, are the document. Everything else
@@ -119,7 +127,9 @@ class NumbersPackage:
         for candidate in self.iwaFiles:
             if candidate.name == name:
                 return candidate
-        raise ContainerError(f"No IWA member named {name!r} in this document.")
+        raise ContainerError(composeRefusal(
+            "The document", f"holds no archive member {name!r}", notDone=nothingRead
+        ))
 
     def snapshot(self) -> PackageSnapshot:
         """Return what `restore` needs to undo every change made after this call.
@@ -150,17 +160,22 @@ class NumbersPackage:
         same system, version and timestamp fields as the ones Numbers wrote.
         """
         if not isDocumentMember(name):
-            raise ContainerError(f"{name!r} is not an IWA member name.")
+            raise ContainerError(composeFault(
+                repr(name), "is not the name of an archive member", nothingWritten
+            ))
         if any(member.name == name for member in self.members):
-            raise ContainerError(f"This document already holds a member {name!r}.")
+            raise ContainerError(composeFault(
+                "The document", f"already holds a member {name!r}", nothingWritten
+            ))
         positions = [
             position for position, member in enumerate(self.members)
             if isDocumentMember(member.name)
         ]
         if not positions:
-            raise ContainerError(
-                "This document holds no IWA member to copy a zip header from."
-            )
+            raise ContainerError(composeFault(
+                "The document", "holds no archive member to copy a zip header from",
+                nothingWritten,
+            ))
         last = positions[-1]
         self.members.insert(last + 1, replace(self.members[last], name=name))
         created = IWAFile(name=name, modified=True)
@@ -206,12 +221,12 @@ def readPackage(path: Path) -> NumbersPackage:
     because reproducing it is part of writing the file back unchanged.
     """
     if path.is_dir():
-        raise ContainerError(
-            f"{path} is a directory, and pybers reads a .numbers document saved as "
-            "a single file."
-        )
+        raise ContainerError(composeReadRefusal(
+            path, "is a directory, and pybers reads a document saved as a single file",
+            "Save it in Numbers as a single file",
+        ))
     if not path.is_file():
-        raise ContainerError(f"{path} does not exist.")
+        raise ContainerError(composeReadRefusal(path, "does not exist"))
 
     package = NumbersPackage()
     try:
@@ -239,16 +254,18 @@ def readPackage(path: Path) -> NumbersPackage:
                         StoredMember(name=info.filename, data=data)
                     )
     except zipfile.BadZipFile as exc:
-        raise ContainerError(
-            f"{path} is not a Numbers document, because it is not a zip archive."
-        ) from exc
+        raise ContainerError(composeReadRefusal(
+            path, "is not a zip archive, so it is not a Numbers document"
+        )) from exc
     except OSError as exc:
-        raise ContainerError(f"{path} could not be read: {exc.strerror}.") from exc
-    if not package.iwaFiles:
         raise ContainerError(
-            f"{path} is not a Numbers document, because it holds no "
-            f"{indexPrefix}*{iwaSuffix} member."
-        )
+            composeReadRefusal(path, f"cannot be read ({exc.strerror})")
+        ) from exc
+    if not package.iwaFiles:
+        raise ContainerError(composeReadRefusal(
+            path, "holds none of the archives every Numbers document carries, so it "
+            "is not a Numbers document",
+        ))
     return package
 
 
@@ -289,10 +306,12 @@ def writePackage(package: NumbersPackage, path: Path) -> None:
                 elif info.name in otherByName:
                     data = otherByName[info.name].data
                 else:
-                    raise ContainerError(
-                        f"{info.name!r} is listed among the members but is held as "
-                        "neither an IWA file nor a stored member."
-                    )
+                    raise ContainerError(composeFault(
+                        f"The member {info.name!r}", "is listed and held as neither "
+                        "an archive nor a stored file", nothingWritten,
+                    ))
                 archive.writestr(toZipInfo(info), data)
     except OSError as exc:
-        raise ContainerError(f"{path} could not be written: {exc.strerror}.") from exc
+        raise ContainerError(composeRefusal(
+            str(path), f"cannot be written ({exc.strerror})", notDone=nothingWritten
+        )) from exc

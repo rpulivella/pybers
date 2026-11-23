@@ -14,6 +14,7 @@ The encoding is protobuf's own, seven bits of payload per byte with the top bit
 marking continuation, little-endian.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-01  Split out of pybers._persistence.compression, for #2.
 """
 from __future__ import annotations
@@ -26,7 +27,7 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/09/01"
 
-from ..errors import PybersError
+from ..errors import PybersError, composeRefusal
 
 # A varint carrying more than this many value bits is a misread rather than a large
 # number, since nothing in this format needs a 64-bit length.
@@ -47,7 +48,9 @@ def readVarint(data: bytes, offset: int) -> tuple[int, int]:
     shift = 0
     while True:
         if offset >= len(data):
-            raise VarintError("Varint ran past the end of the buffer.")
+            raise VarintError(
+                composeRefusal("The varint", "runs past the end of the buffer")
+            )
         byte = data[offset]
         offset += 1
         value |= (byte & 0x7F) << shift
@@ -55,7 +58,7 @@ def readVarint(data: bytes, offset: int) -> tuple[int, int]:
             return value, offset
         shift += 7
         if shift > maximumShift:
-            raise VarintError("Varint is longer than 64 bits.")
+            raise VarintError(composeRefusal("The varint", "is longer than 64 bits"))
 
 
 def writeVarint(value: int) -> bytes:
@@ -64,7 +67,9 @@ def writeVarint(value: int) -> bytes:
     The inverse of `readVarint`, and kept beside it so the two cannot drift.
     """
     if value < 0:
-        raise VarintError(f"A varint cannot carry the negative value {value}.")
+        raise VarintError(composeRefusal(
+            f"The value {value}", "is negative, and a varint carries none"
+        ))
     out = bytearray()
     while True:
         byte = value & 0x7F

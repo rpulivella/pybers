@@ -62,8 +62,8 @@ def testAHeaderIsRemovedBySettingItToNone() -> None:
 
 @pytest.mark.parametrize(("counts", "message"), [
     ({"headerRows": 6}, "would make 6 header rows, and Numbers allows at most 5"),
-    ({"footerRows": -1}, "footer rows -1 is not one"),
-    ({"headerColumns": True}, "header columns True is not one"),
+    ({"footerRows": -1}, "footer rows -1 is not a count of lines"),
+    ({"headerColumns": True}, "header columns True is not a count of lines"),
     ({"headerRows": 3, "footerRows": 3}, "would leave no row outside the headers"),
     ({"headerColumns": 4}, "would leave no column outside the headers"),
 ])
@@ -81,8 +81,8 @@ def testACellReadFromTheFileIsNotMovedIntoTheHeaders() -> None:
     with pytest.raises(pybers.ReferenceError) as raised:
         table.headersSet(headerRows=1)
     assert str(raised.value).startswith(
-        "Sheet 1::Table 2::A1 would move into or out of the headers, and it holds a "
-        "record read from the file"
+        "Sheet 1::Table 2::A1 would move into or out of the headers, and "
+        "re-parenting the style of a cell read from the file is not supported"
     )
     assert table.headers == TableHeaders()
 
@@ -152,7 +152,7 @@ def testRemovingTheLastRowOutsideTheBandsIsRefused() -> None:
         table.rowRemove(2)
     assert str(raised.value) == (
         "Removing 1 row at 2 from 'Headers' would leave no row outside the headers "
-        "and footers, and Numbers keeps at least one."
+        "and footers, and Numbers keeps at least one. Nothing was written."
     )
     assert table.rowCount == 4
 
@@ -164,7 +164,7 @@ def testAnEditGrowingABandPastFiveIsRefusedAsNumbersRefusesIt() -> None:
         table.rowAdd(2)
     assert str(raised.value) == (
         "Adding 1 row at 2 to 'Headers' would make 6 header rows, and Numbers allows "
-        "at most 5."
+        "at most 5. Nothing was written."
     )
     assert (table.rowCount, table.headers) == (8, TableHeaders(headerRows=5))
 

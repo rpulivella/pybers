@@ -10,6 +10,7 @@ per document and found again by name. See docs/decisions.md.
 Private. Part of the table feature's archive half, reached by table creation.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  The reset's table style composed from the model's reset over the theme,
             for PYB-266.
 2026-11-16  A variation stating only what its parent states is not written, since
@@ -51,7 +52,7 @@ from .._persistence.metadata import PackageRegistry
 from .._persistence.types import findArchiveTypeId, readArchiveTypeId
 from ..color._archive import composeColor
 from ..color.colors import Color
-from ..errors import WriteError
+from ..errors import WriteError, composeRefusal, nothingWritten
 from ..style._write import addStyles, composeCellProperties, composeCellStyleArchive
 from ..style.cells import resetCellStyle
 from ._tablestyle import composeTableStyleVariation, readThemeTableStyle
@@ -95,7 +96,10 @@ def findDocumentStyles(index: ArchiveIndex) -> DocumentStyles:
     _, theme = findTheme(index)
     presets = theme.super.Extensions[tstStyles.ThemePresetsArchive.extension]
     if not presets.table_style_presets:
-        raise WriteError("This document's theme carries no table style preset.")
+        raise WriteError(composeRefusal(
+            "The document's theme", "carries no table style preset, so a new table "
+            "has no style to take", notDone=nothingWritten,
+        ))
     presetReference = presets.table_style_presets[0]
     preset = index.resolve(presetReference, tstStyles.TableStylePresetArchive)
     network = index.resolve(preset.style_network, tst.TableStyleNetworkArchive)

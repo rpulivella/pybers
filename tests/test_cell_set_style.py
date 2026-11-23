@@ -3,8 +3,8 @@
 Setting a cell's style: its whole box replaced, a default dropped, a match shared.
 
 UPDATES
-2026-11-16  A created table's fill is checked against Numbers' fill of a table naming
-            the theme's root cell style, for PYB-292.
+2026-11-16  A created table's fill is checked against Numbers' fill of a table
+            referring to the theme's root cell style, for PYB-292.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -250,10 +250,13 @@ def testACommandClearsACellsBoxWithNone(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(("declared", "reason"), [
-    ("padding: 6", "padding is a length in points such as 6pt"),
+    ("padding: 6", "The padding '6' is not a length in points. Write it as `6pt`"),
     ("background: gradient", "A gradient fill is read and carried"),
     ("padding: 0pt 2pt 2pt 2pt", "one length for every side"),
-    ("vertical-align: center", "vertical-align is one of top, middle, bottom"),
+    (
+        "vertical-align: center",
+        "'center' is not a vertical-align value. The choices are top, middle and",
+    ),
 ])
 def testACommandRefusesAStyleItCannotWriteAndWritesNothing(
     tmp_path: Path, declared: str, reason: str
@@ -275,7 +278,7 @@ def testEveryCellStyleReadsBackFromItsTextForm(stem: str) -> None:
 
 
 def listStyleCountMismatches(path: Path) -> list[tuple[int, int, int]]:
-    """Return each style entry whose refcount differs from the records naming it."""
+    """Return each style entry whose refcount differs from the records using it."""
     index = ArchiveIndex(readPackage(path))
     mismatched = []
     for sheet in findRoot(index).sheets:
@@ -366,7 +369,7 @@ def testAScriptStylesACellsBoxAndReadsItBack(tmp_path: Path) -> None:
 
 
 def readFillVariation(path: Path, address: str, table: str) -> tst.CellStyleArchive:
-    """Return the cell style variation a cell's record names."""
+    """Return the cell style variation a cell's record specifies."""
     index = ArchiveIndex(readPackage(path))
     key = findSlotValue(readRecordAt(path, address, table), cellStyleSlot)
     for sheet in findRoot(index).sheets:

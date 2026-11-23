@@ -33,14 +33,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # The facts read this branch's log and its diff against the base, and a
           # full checkout fetches every branch, the base included.
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version-file: pyproject.toml
 
@@ -75,7 +75,7 @@ jobs:
         # Always, because a red report is the one most worth posting. Data only: the
         # posting half renders the comment itself.
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: merge-readiness
           path: merge-readiness.json

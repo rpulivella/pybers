@@ -2,7 +2,7 @@
 """\
 How a cell and a rectangle of cells are named, which every feature reaches for.
 
-Public, and below the features rather than inside one: a formula names a cell, a
+Public, and below the features rather than inside one: a formula refers to a cell, a
 table is indexed by one, and a merge covers a rectangle of them, so addressing
 belongs to none of the three and is used by all of them.
 
@@ -14,7 +14,7 @@ Two things here return a valid-looking wrong answer rather than raising, which i
 why each carries its own guard in the module that owns it:
 
 - **Column labels are base-26 with no zero digit.** Z is 26 and AA is 27, so an
-  ordinary base conversion is off by one at every 26 boundary and names a real
+  ordinary base conversion is off by one at every 26 boundary and selects a real
   column, simply not the requested one.
 - **The dollar sign is a per-axis fact.** One formula holds an absolute column
   beside a relative row and then the reverse, so a single flag per reference

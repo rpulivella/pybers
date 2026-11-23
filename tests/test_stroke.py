@@ -173,13 +173,13 @@ def test_a_brush_is_carried_and_never_composed() -> None:
 @pytest.mark.parametrize(
     ("arguments", "message"),
     [
-        ({"width": Decimal(-1)}, "width cannot be negative"),
-        ({"width": True}, "width is a number"),
-        ({"width": Decimal("NaN")}, "width is finite"),
-        ({"color": "#000000ff"}, "color is a Color"),
-        ({"pattern": "dashed"}, "pattern is a StrokePattern"),
-        ({"cap": "round"}, "cap is one of butt, round, square"),
-        ({"join": StrokeCap.ROUND}, "join is one of miter, round, bevel"),
+        ({"width": Decimal(-1)}, "width of -1 is negative"),
+        ({"width": True}, "width True is not a number"),
+        ({"width": Decimal("NaN")}, "width NaN is not finite"),
+        ({"color": "#000000ff"}, "color str is not a Color"),
+        ({"pattern": "dashed"}, "pattern str is not a StrokePattern"),
+        ({"cap": "round"}, "cap 'round' is not a StrokeCap. Give one of butt"),
+        ({"join": StrokeCap.ROUND}, "is not a StrokeJoin"),
     ],
 )
 def test_a_stroke_numbers_cannot_store_is_refused(
@@ -195,9 +195,9 @@ def test_a_stroke_numbers_cannot_store_is_refused(
 @pytest.mark.parametrize(
     ("lengths", "message"),
     [
-        ((), "from 1 to 6 lengths"),
-        (tuple(Decimal(1) for _ in range(7)), "from 1 to 6 lengths"),
-        ((Decimal(1), Decimal(-1)), "cannot be negative"),
+        ((), "0 lengths is not supported, since Numbers stores from 1 to 6"),
+        (tuple(Decimal(1) for _ in range(7)), "7 lengths is not supported"),
+        ((Decimal(1), Decimal(-1)), "1, -1 hold a negative length"),
     ],
 )
 def test_a_dash_numbers_cannot_store_is_refused(

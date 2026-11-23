@@ -130,7 +130,7 @@ def test_aCoveredValueDoesNotComeBack() -> None:
 
 
 def test_unmergingTakesAnyCellOfTheBlock() -> None:
-    """Two merges can never claim one cell, so any of them names the merge."""
+    """Two merges can never claim one cell, so any of them identifies the merge."""
     for reference in ("A1", "B1"):
         table = openUnmergedTable()
         table.mergeAdd("A1:B1")
@@ -139,7 +139,7 @@ def test_unmergingTakesAnyCellOfTheBlock() -> None:
 
 def test_unmergingWhereThereIsNoMergeIsRefused() -> None:
     table = openUnmergedTable()
-    with pytest.raises(ReferenceError, match="No merge"):
+    with pytest.raises(ReferenceError, match="is covered by no merge"):
         table.mergeRemove("A1")
 
 
@@ -181,11 +181,11 @@ def test_twoMergesThatDoNotTouchAreBothKept() -> None:
 @pytest.mark.parametrize(
     "address, reason",
     [
-        ("A:B", "unbounded"),
-        ("1:2", "unbounded"),
+        ("A:B", "is open on an axis"),
+        ("1:2", "is open on an axis"),
         ("A1:Z1", "reaches outside"),
         ("A1:A9", "reaches outside"),
-        ("A1:B1,C1:D1", "names 2"),
+        ("A1:B1,C1:D1", "selects 2 blocks"),
         ("A1:A1", "one cell"),
         ("A1", "one cell"),
     ],

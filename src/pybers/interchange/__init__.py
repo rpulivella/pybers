@@ -14,6 +14,7 @@ and this package owns only the mechanism, so a feature adding a field adds no co
 here.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-06  A color writes its form and reads back, for PYB-264.
 2026-11-03  A list of parts writes an array of their forms, and an array reads
             back as each part, for PYB-223.
@@ -43,6 +44,7 @@ lazy from pybers.document._form import (
     listTableEntries,
 )
 lazy from pybers.document.sheets import Document, Sheet
+lazy from pybers.errors import composeRefusal
 lazy from pybers.interchange._envelope import (
     CellJsonForm,
     ColorJsonForm,
@@ -54,7 +56,7 @@ lazy from pybers.interchange._envelope import (
     jsonFormVersion,
 )
 lazy from pybers.interchange._jsontext import readJsonText, writeJsonText
-lazy from pybers.interchange._leaves import JsonFormError, Tree
+lazy from pybers.interchange._leaves import JsonFormError, Tree, composeFormRefusal
 lazy from pybers.interchange._tree import decodeTree, encodeTree
 lazy from pybers.table._form import buildTableForm
 lazy from pybers.table.cell import Cell
@@ -85,12 +87,12 @@ def parseJsonForm(text: str) -> JsonFormPart | list[JsonFormPart]:
 
 
 def buildFormPart(tree: Tree, path: str) -> JsonFormPart:
-    """Return the part one form describes, its path naming where it sits."""
+    """Return the part one form describes, its path saying where it sits."""
     version = tree.get("jsonFormVersion") if isinstance(tree, dict) else None
     if version != jsonFormVersion:
-        raise JsonFormError(
-            f"The text is not version {jsonFormVersion} of the JSON form pybers "
-            f"reads, its jsonFormVersion being {writeJsonText(version)}."
+        raise composeFormRefusal(
+            f"{path}.jsonFormVersion", f"is {writeJsonText(version)}, and pybers "
+            f"reads version {jsonFormVersion} of the JSON form",
         )
     match decodeTree(tree, JsonForm, path):
         case DocumentJsonForm(document=document):
@@ -106,27 +108,30 @@ def buildFormPart(tree: Tree, path: str) -> JsonFormPart:
             outside = [each.address for each in table.cells
                        if not extent.covers(each.address)]
             if outside:
-                raise JsonFormError(
-                    f"{path}.table holds {outside[0]}, outside {extent}."
+                raise composeFormRefusal(
+                    f"{path}.table", f"holds {outside[0]}, outside {extent}"
                 )
             return tuple(built.cells[each.address] for each in table.cells)
         case CellJsonForm(
             sheetName=sheetName, cell=cell, table=table, documentTables=entries
         ):
             if [each.address for each in table.cells] != [cell]:
-                raise JsonFormError(
-                    f"{path}.table must hold the cell {cell} and no other."
+                raise composeFormRefusal(
+                    f"{path}.table", f"must hold the cell {cell} and no other"
                 )
             return buildPart(table, sheetName, entries, f"{path}.table").cells[cell]
         case ColorJsonForm(color=color):
             return color
-    raise JsonFormError("The text holds no part of a document.")
+    raise composeFormRefusal(path, "holds no part of a document")
 
 
 def buildJsonForm(subject: object, extent: CellRangeLike | None) -> object:
     """Return the form a subject is written as, or the subject when it is a value."""
     if extent is not None and not isinstance(subject, Table):
-        raise JsonFormError("Only a table is narrowed to a range of its cells.")
+        raise JsonFormError(composeRefusal(
+            f"The extent {extent}", "narrows only a table, and the part given is a "
+            f"{type(subject).__name__}",
+        ))
     match subject:
         case Color():
             return ColorJsonForm(jsonFormVersion, subject)
@@ -151,10 +156,10 @@ def buildJsonForm(subject: object, extent: CellRangeLike | None) -> object:
             table = buildTableForm(subject, narrowed)
             return RangeJsonForm(jsonFormVersion, sheetName, narrowed, table, entries)
         case Cell(table=None):
-            raise JsonFormError(
-                f"The cell at {subject.address} belongs to no table, and a cell's "
-                "form is written inside its table."
-            )
+            raise JsonFormError(composeRefusal(
+                f"The cell at {subject.address}", "belongs to no table, and a cell's "
+                "form is written inside its table",
+            ))
         case Cell(table=owner) if owner is not None:
             sheetName = None if owner.sheet is None else owner.sheet.name
             only = CellRange.parse(str(subject.address))
@@ -170,9 +175,10 @@ def findOneRange(extent: CellRangeLike) -> CellRange:
     """Return the one range a table is narrowed to, refusing a list of several."""
     ranges = toCellRanges(extent)
     if len(ranges) != 1:
-        raise JsonFormError(
-            f"A table is narrowed to one range, and {extent} names {len(ranges)}."
-        )
+        raise JsonFormError(composeRefusal(
+            f"The extent {extent}", f"selects {len(ranges)} ranges, and a table is "
+            "narrowed to one", "Give one range",
+        ))
     return ranges[0]
 
 

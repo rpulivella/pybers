@@ -70,7 +70,7 @@ snapshot's `currency_symbols`:
 
 `en_AU` lists five symbols, none of them for these codes, so Numbers shows the code.
 
-No cell's format changes, read through pybers in all nine. A cell's format names an ISO
+No cell's format changes, read through pybers in all nine. A cell's format specifies an ISO
 code and a pattern, never a symbol or a separator, so it renders through the snapshot.
 
 ## Formula text: the region sets the separators, the language the names

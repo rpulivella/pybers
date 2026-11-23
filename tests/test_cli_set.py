@@ -6,6 +6,7 @@ Each test edits a copy of `20-formula-shapes`, whose `Table 2` is ten rows by fi
 columns and named on one sheet only, while `Table 1` is named on two.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every cell a selector matches is written and printed as `show` prints
             it, and a cell it cannot write skipped on stderr, for PYB-223.
 2026-10-28  A write changes FILE itself unless `-o` names a new one, for
@@ -38,6 +39,10 @@ from typer.testing import CliRunner, Result
 import pybers
 from conftest import copyDocument, listShownFields, readPlainText
 from pybers.cli._app import app
+from pybers.cli._common import (
+    composeUsageChoiceRefusal,
+    composeUsageRefusal,
+)
 
 runner: CliRunner = CliRunner()
 
@@ -118,7 +123,32 @@ def testAPreviewAndANewFileTogetherAreRefused(working: Path) -> None:
         str(working), "::Table 2::B2", "1", "--preview", "-o", "elsewhere.numbers"
     )
     assert result.exit_code == 2
-    assert "Give -o or --preview, not both." in readPlainText(result.stderr)
+    assert (
+        "-o and --preview cannot be given together. Give one of them. Nothing was "
+        "written." in readPlainText(result.stderr)
+    )
+
+
+def testAUsageRefusalReadsPlaceCauseFixThenWhatWasNotDone() -> None:
+    refusal = composeUsageRefusal(
+        "-o and --preview", "cannot be given together", "Give one of them",
+        pybers.nothingWritten,
+    )
+    assert refusal.message == (
+        "-o and --preview cannot be given together. Give one of them. Nothing was "
+        "written."
+    )
+
+
+def testAUsageChoiceRefusalPointsAtHelpBeforeWhatWasNotDone() -> None:
+    choices = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"]
+    refusal = composeUsageChoiceRefusal(
+        "zzz", "a letter", choices, "set", pybers.nothingWritten
+    )
+    assert refusal.message == (
+        "'zzz' is not a letter. `pybers set --help` lists every one. Nothing was "
+        "written."
+    )
 
 
 def testAnOutputThatExistsIsRefused(working: Path, tmp_path: Path) -> None:
@@ -251,8 +281,9 @@ def testGrowingATableTakesOneCellAndIsRefusedBeforeWriting(working: Path) -> Non
     result = runSetCommand(str(working), "::Table 1::Z99", "1", "--extend")
     assert result.exit_code == 1
     assert result.stderr.splitlines() == [
-        "pybers set: `::Table 1::Z99` matches 2 tables, and growing a table to hold a "
-        "cell grows one: `Sheet 1::Table 1`, `Sheet 2::Table 1`.",
+        "pybers set: `::Table 1::Z99` matches `Sheet 1::Table 1`, `Sheet 2::Table 1`, "
+        "and growing a table to hold a cell grows one table. Select one table. "
+        "Nothing was written.",
     ]
     assert working.read_bytes() == before
 
@@ -260,3 +291,14 @@ def testGrowingATableTakesOneCellAndIsRefusedBeforeWriting(working: Path) -> Non
 def testTheHelpShowsAConditionInItsExampleSelector() -> None:
     result = runner.invoke(app, ["set", "--help"], terminal_width=200)
     assert "[kind=number]" in result.stdout
+
+
+def testARefusedChoiceNoneIsCloseToSaysWhereEveryChoiceIs(working: Path) -> None:
+    result = runSetCommand(
+        str(working), "Sheet 1::Table 2", "--table-style", "zzzz: none"
+    )
+    assert result.exit_code == 1
+    assert readPlainText(result.stderr) == (
+        "pybers set: 'zzzz' is not a table style property. `pybers set --help` "
+        "lists every one."
+    )

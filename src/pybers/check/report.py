@@ -4,14 +4,15 @@ What a check of a document found, holding nothing the document contains unless a
 
 A report is meant to be posted publicly when the document cannot be, so every
 field of `Check` is a version, a type identifier, a count, a size, or a location in
-pybers's own source. Every sheet, table and cell name is WITHHELD unless a caller
-asks for names, which are never meant for posting.
+pybers's own source. Every sheet and table name is WITHHELD unless a caller asks
+for names, which are never meant for posting.
 
 UPDATES
+2026-11-23  Only a sheet or a table has a name, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, each table its unrecognized
             cells, names withheld unless asked for, replacing `CheckNames`, for
             PYB-223.
-2026-10-12  A missing part names why it is missing, for PYB-190.
+2026-10-12  A missing part states why it is missing, for PYB-190.
 2026-10-11  Both type tables are frozendict, so a Check cannot change, for PYB-189.
 2026-10-07  Written for PYB-169.
 """

@@ -13,6 +13,7 @@ computed later caches the error that cell still held. Measured 2026-09-16 for
 PYB-86, see findings-02-formulas.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-18  A range of one cell reads as that cell, for PYB-17.
 2026-09-16  Written for PYB-86.
 """
@@ -34,7 +35,7 @@ from pybers.formula.nodes import Formula, FormulaRange, FormulaReference
 
 @dataclass(frozen=True, slots=True)
 class CellPrecedent:
-    """One cell a formula reads, counted from zero, in the table it names."""
+    """One cell a formula reads, counted from zero, in the table it specifies."""
 
     row: int
     column: int
@@ -56,7 +57,7 @@ class RangePrecedent:
 class SpanPrecedent:
     """Whole columns or whole rows a formula reads, counted from zero.
 
-    An axis without bounds is what `SUM(A)` names, and the engine keeps it apart
+    An axis without bounds is what `SUM(A)` selects, and the engine keeps it apart
     from a rectangle because it grows with the table rather than staying put.
     """
 
@@ -78,7 +79,7 @@ class Precedents:
 def resolveFormulaPrecedents(formula: Formula, host: CellAddress) -> Precedents:
     """Return what a formula reads, resolved against the cell holding it.
 
-    Duplicates are dropped and order is kept, since a call naming one range twice
+    Duplicates are dropped and order is kept, since a call selecting one range twice
     is one dependency to the engine, as `SUMIFS` shows in `20-formula-shapes`.
     """
     cells: dict[CellPrecedent, None] = {}
@@ -137,7 +138,7 @@ def resolveFormulaPrecedents(formula: Formula, host: CellAddress) -> Precedents:
 def expandReferenceSpans(
     reference: FormulaReference, host: CellAddress
 ) -> list[SpanPrecedent]:
-    """Return the whole column or row one unbounded reference names."""
+    """Return the whole column or row one unbounded reference selects."""
     if reference.column is not None:
         line = reference.column.resolve(host.col) - originOffset
         return [SpanPrecedent(line, line, True, reference.tableId)]
@@ -150,7 +151,7 @@ def expandReferenceSpans(
 def expandRangeSpans(
     begin: int | None, end: int | None, columns: bool, tableId: str | None
 ) -> list[SpanPrecedent]:
-    """Return the whole columns or rows one half-unbounded range names."""
+    """Return the whole columns or rows one half-unbounded range selects."""
     if begin is None or end is None:
         return []
     return [

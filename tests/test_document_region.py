@@ -140,7 +140,7 @@ def testTheRegionADocumentHoldsIsNoChange(tmp_path: Path) -> None:
 @pytest.mark.parametrize("identifier", ["de_XX", "", "en-GB", 5])
 def testARegionPybersDoesNotOfferIsRefusedNamingTheClosest(identifier: object) -> None:
     document = pybers.open(findDocumentPath("95-region-base"))
-    with pytest.raises(pybers.LocaleError, match="No region pybers offers is named"):
+    with pytest.raises(pybers.LocaleError, match="is not a region pybers offers"):
         document.localeSet(identifier)  # type: ignore[arg-type]
     assert document.localeIdentifier == "en_US"
 
@@ -149,8 +149,7 @@ def testARefusalSuggestsRegionsOfTheLanguageAskedFor() -> None:
     document = pybers.open(findDocumentPath("95-region-base"))
     with pytest.raises(pybers.LocaleError) as raised:
         document.localeSet("de_XX")
-    assert "'de_" in str(raised.value)
-    assert f"of the {len(pybers.locales)} it offers" in str(raised.value)
+    assert "The closest is de_" in str(raised.value)
 
 
 def testADocumentBuiltInMemoryTakesARegion() -> None:

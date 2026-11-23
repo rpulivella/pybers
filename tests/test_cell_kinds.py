@@ -290,7 +290,7 @@ def testACurrencyAmountChangedStaysCurrency() -> None:
 
 
 def testAChangedKindsFormatIsUndeterminedUntilTheSaveChoosesOne() -> None:
-    """The format the record names belongs to the old kind, so it is not reported."""
+    """The record's format belongs to the old kind, so it is not reported."""
     cell = openFirstTable("11-value-types-noformats").cell("A1")
     cell.value = "words"
     assert cell.presentation.format == pybers.CellFormatAutomatic(pybers.UNDETERMINED)

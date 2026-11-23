@@ -13,6 +13,7 @@ re-parents when it changes, so `headersSet` refuses to move one.
 See findings-03-structure.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  `sectionsFind`, every section a cell lies in, for PYB-301.
 2026-11-19  `TableSection` and `sectionFind`, named for HTML's table sections, for
             PYB-301.
@@ -40,6 +41,7 @@ from typing import TYPE_CHECKING
 from pybers.addressing.lines import GridEdit
 from pybers.addressing.reference import CellAddress
 from pybers.addressing.text import ReferenceError
+from pybers.errors import composeRefusal, nothingWritten
 
 if TYPE_CHECKING:
     from pybers.table.cells import Table
@@ -69,10 +71,10 @@ class TableHeaders:
         for each in fields(self):
             count = getattr(self, each.name)
             if not isinstance(count, int) or isinstance(count, bool) or count < 0:
-                raise ReferenceError(
-                    f"A header or footer holds a count of lines, and "
-                    f"{formatHeaderName(each.name)} {count!r} is not one."
-                )
+                raise ReferenceError(composeRefusal(
+                    f"The {formatHeaderName(each.name)} {count!r}",
+                    "is not a count of lines, a whole number 0 or more",
+                ))
 
     def sectionsFind(
         self, address: CellAddress, rowCount: int
@@ -109,7 +111,7 @@ def formatHeaderName(field: str) -> str:
 def refuseHeadersUnfit(
     headers: TableHeaders, rowCount: int, colCount: int, action: str
 ) -> None:
-    """Refuse headers Numbers would not allow in a grid this size, naming the action.
+    """Refuse headers Numbers would not allow in a grid this size, stating the action.
 
     Each count holds at most five lines, and at least one row and one column stay
     outside the headers and footers. Numbers disables every control and action that
@@ -119,19 +121,19 @@ def refuseHeadersUnfit(
     for each in fields(headers):
         count = getattr(headers, each.name)
         if count > headerLimit:
-            raise ReferenceError(
-                f"{action} would make {count} {formatHeaderName(each.name)}, and "
-                f"Numbers allows at most {headerLimit}."
-            )
+            raise ReferenceError(composeRefusal(
+                action, f"would make {count} {formatHeaderName(each.name)}, and "
+                f"Numbers allows at most {headerLimit}", notDone=nothingWritten,
+            ))
     for counted, held, axis in (
         (headers.headerRows + headers.footerRows, rowCount, "row"),
         (headers.headerColumns, colCount, "column"),
     ):
         if counted >= held:
-            raise ReferenceError(
-                f"{action} would leave no {axis} outside the headers and footers, and "
-                "Numbers keeps at least one."
-            )
+            raise ReferenceError(composeRefusal(
+                action, f"would leave no {axis} outside the headers and footers, and "
+                "Numbers keeps at least one", notDone=nothingWritten,
+            ))
 
 
 def checkHeadersFit(table: Table, headers: TableHeaders) -> None:
@@ -151,12 +153,11 @@ def checkHeadersFit(table: Table, headers: TableHeaders) -> None:
             headers.sectionsFind(address, table.rowCount)
         )
         if recorded and moved:
-            raise ReferenceError(
-                f"{cell.reference} would move into or out of the headers, and it "
-                "holds a record read from the file, whose style Numbers re-parents "
-                "and pybers does not. Changing the headers of a table Numbers saved "
-                "with cells in them is not supported."
-            )
+            raise ReferenceError(composeRefusal(
+                str(cell.reference), "would move into or out of the headers, and "
+                "re-parenting the style of a cell read from the file is not supported",
+                notDone=nothingWritten,
+            ))
 
 
 def mapHeaders(headers: TableHeaders, edit: GridEdit, held: int) -> TableHeaders:

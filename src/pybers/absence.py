@@ -3,13 +3,14 @@
 The reasons a value can be missing, beyond there being nothing to hold.
 
 `None` means nothing exists. A sentinel here means something exists, or will, and
-pybers does not have it, and names why. Each one earns its place only where a caller
+pybers does not have it, and states why. Each one earns its place only where a caller
 acts differently on that reason, which is why there are four and not one per case.
 
 Defined once and compared by identity, so a second definition anywhere would never
 match the first. Every feature imports them from here.
 
 UPDATES
+2026-11-23  A sentinel states why a value is missing, for PYB-307.
 2026-11-17  MIXED, values that exist and do not agree, for PYB-266.
 2026-11-10  UNCHANGED, a part of a write the caller left as it was, for PYB-145.
 2026-11-03  NOT_REQUESTED removed with its one user, `Check.names`, for PYB-223.

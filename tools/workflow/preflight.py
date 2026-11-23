@@ -23,7 +23,7 @@ suite, and the standards checker is given its own `--all` scope rather than its
 default of whatever git reports as changed. That default serves the habit run
 before a commit and fails here twice over: a preflight runs when the tree is
 clean, so it would examine nothing and pass, and a clone of a single branch has
-no base to diff against. Needing neither is why this runs unchanged in CI on a
+no base for a diff. Needing neither is why this runs unchanged in CI on a
 default shallow checkout.
 
 UPDATES

@@ -6,6 +6,7 @@ Private. Part of the formula feature's archive half, reached by the table save
 that registers each formula with the engine.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-23  A range is clamped to the table it reads, for PYB-18.
 2026-09-22  Moved out of the document writer for PYB-113.
 """
@@ -23,7 +24,7 @@ from collections.abc import Mapping
 
 from .._engine import CellEdge, FormulaDependencies, RangeEdge, SpanEdge
 from ..addressing.reference import CellAddress
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from .nodes import Formula
 from .precedents import resolveFormulaPrecedents
 
@@ -52,21 +53,22 @@ def resolveFormulaDependencies(
             return hostOwner
         found = ownerIds.get(identity)
         if found is None:
-            raise WriteError(
-                f"A formula in {tableName!r} reads table {identity}, which this "
-                "document's calculation engine does not register, so what the "
-                "formula depends on cannot be recorded."
-            )
+            raise WriteError(composeRefusal(
+                f"A formula in {tableName!r}", f"reads table {identity}, which the "
+                "document's calculation engine does not register, so what it depends "
+                "on cannot be recorded", notDone=nothingWritten,
+            ))
         return found
 
     def size(identity: str | None) -> tuple[int, int]:
         owner(identity)
         found = extents.get(identity)
         if found is None:
-            raise WriteError(
-                f"A formula in {tableName!r} reads table {identity}, whose size this "
-                "save does not know, so the range it reads cannot be bounded."
-            )
+            raise WriteError(composeFault(
+                f"A formula in {tableName!r}", f"reads table {identity}, whose size "
+                "the save does not know, so the range it reads cannot be bounded",
+                nothingWritten,
+            ))
         return found
 
     reads = resolveFormulaPrecedents(formula, host)

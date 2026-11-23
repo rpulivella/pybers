@@ -54,9 +54,15 @@ def testTheThirtySevenCurrenciesNumbersOffersAreListedOnce() -> None:
     assert findCurrency("EUR").name == "Euro"
 
 
-def testACurrencyNumbersDoesNotOfferIsRefusedNamingThoseItDoes() -> None:
-    with pytest.raises(CurrencyError, match="It offers AED, ARS"):
+def testACurrencyNumbersDoesNotOfferIsRefusedCarryingThoseItDoes() -> None:
+    with pytest.raises(CurrencyError, match="not a currency Numbers offers") as raised:
         findCurrency("XYZ")
+    assert raised.value.choices[:2] == ("AED", "ARS")
+
+
+def testACurrencyCloseToOneOfferedIsRefusedNamingIt() -> None:
+    with pytest.raises(CurrencyError, match="The closest is USD"):
+        findCurrency("USX")
 
 
 # ── AC 4 and 6: no second table, and no rates ───────────────────────────────
@@ -104,7 +110,7 @@ def testMixingTwoCurrenciesIsRefusedNamingBoth(operation: str) -> None:
     dollars = CurrencyAmount(Decimal(5), "USD")
     act = {"add": lambda: euros + dollars, "subtract": lambda: euros - dollars,
            "compare": lambda: euros < dollars}[operation]
-    with pytest.raises(CurrencyError, match="EUR and USD"):
+    with pytest.raises(CurrencyError, match="5 EUR and 5 USD are in two currencies"):
         act()
 
 

@@ -4,16 +4,16 @@ Conditional highlighting carried through rows and columns added or removed.
 
 **Numbers rewrites a rule rather than moving it**, measured 2026-09-21 across the
 four `57-conditions-*` documents. A rule is a `TST.ConditionalStyleSetArchive` a
-cell names by key, holding a predicate whose operands are cell references, and
+cell refers to by key, holding a predicate whose operands are cell references, and
 three things happen to it under an edit:
 
 - **A rule reading a cell that moves becomes a new rule**, under a new key, and
-  every cell naming the old one names the new one. The old entry goes.
+  every cell referring to the old one refers to the new one. The old entry goes.
 - **A rule reading a cell that is removed breaks, once per cell.** Six cells
   sharing one rule came out holding six identical rules at refcount 1, each
   reference written as `#REF!` carrying the lines it lost.
 - **A line added takes the rules of the line it displaced**, as empty records
-  naming the rule and caching no match.
+  specifying the rule and caching no match.
 
 A rule's condition is a formula whose host is the cell it colors, so it is mapped
 by the same machinery as a cell's formula, and each operand then takes the
@@ -23,6 +23,7 @@ Private. Reached from the structural pass in `_structure` and the tile pass in
 `_edits`.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  Rule counts walk the rows through `StoredTiles`, for PYB-278.
 2026-09-24  A rule is rebuilt from the conditions its cell holds after a move,
             for PYB-18.
@@ -59,7 +60,7 @@ from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from .._persistence.rows import StoredTiles
 from ..addressing.reference import CellAddress, originOffset
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, nothingWritten
 from ..formula._read import readFormula
 from ..formula._write import encodeFormula
 from ..formula.nodes import Formula, FormulaNode, brokenReferenceNodeType
@@ -99,7 +100,7 @@ class ConditionalPlan:
     shared: dict[tuple[int, bytes], int] = field(default_factory=dict)
 
     def keyFor(self, key: int, row: int, column: int) -> tuple[int, bool]:
-        """Return the key the cell stored at `row` and `column` names after the edit.
+        """Return the key the cell stored at `row` and `column` holds after the edit.
 
         Also says whether its rule broke, since a broken rule caches no match.
         """
@@ -121,10 +122,10 @@ class ConditionalPlan:
         changed = tst.ConditionalStyleSetArchive()
         changed.CopyFrom(self.rules[key])
         if len(conditions) != len(changed.rules.rule):
-            raise WriteError(
-                f"A cell names {len(changed.rules.rule)} highlighting rules and "
-                f"holds {len(conditions)} conditions for them."
-            )
+            raise WriteError(composeFault(
+                "A cell", f"holds {len(changed.rules.rule)} highlighting rules and "
+                f"{len(conditions)} conditions for them", nothingWritten,
+            ))
         for number, condition in enumerate(conditions):
             copies = [changed.rules.rule[number].predicate.formula]
             if number < len(changed.rules_prepivot):
@@ -132,10 +133,10 @@ class ConditionalPlan:
             for formula in copies:
                 stored = readFormula(formula)
                 if len(stored) != len(condition):
-                    raise WriteError(
-                        "A highlighting condition changed shape in a move, which "
-                        "rewrites only where its references point."
-                    )
+                    raise WriteError(composeFault(
+                        "A highlighting condition", "changed shape in a move, which "
+                        "rewrites only where its references point", nothingWritten,
+                    ))
                 placed = Formula(tuple(
                     FormulaNode(old.nodeType, new.content, old.raw)
                     for old, new in zip(stored.nodes, condition.nodes, strict=True)
@@ -215,17 +216,17 @@ def copyBrokenLocks(formula: tsce.FormulaArchive) -> None:
 def rewriteRuleOperands(rules: tst.ConditionalStyleSetArchive) -> None:
     """Give each cell operand of every rule the coordinates of the node it indexes.
 
-    The pre-pivot copy of a rule names, for each operand, the formula node that
+    The pre-pivot copy of a rule indexes, for each operand, the formula node that
     spells it. A broken node turns its operand into the broken form: the lost lines
     as a tract, the operand's own lock dropped, and its reference marked preserved
     on both axes, locked or not.
     """
     for number, rule in enumerate(rules.rules.rule):
         if number >= len(rules.rules_prepivot):
-            raise WriteError(
-                "A highlighting rule carries no pre-pivot copy naming its operands' "
-                "nodes, which no measured rule lacks."
-            )
+            raise WriteError(composeFault(
+                "A highlighting rule", "carries no pre-pivot copy indexing its "
+                "operands' nodes, which no measured rule lacks", nothingWritten,
+            ))
         indices = rules.rules_prepivot[number].predicate
         nodes = rule.predicate.formula.AST_node_array.AST_node
         for operand, at in (
@@ -325,14 +326,14 @@ def buildInheritedRecord(key: int) -> bytes:
 def rewriteConditionalRecord(
     record: CellRecord, row: int, plan: ConditionalPlan
 ) -> bytes | None:
-    """Return a record naming the rule its old one became, or None when unchanged.
+    """Return a record specifying the rule its old one became, or None when unchanged.
 
     `row` is where the record was stored. A cell whose rule broke caches no match,
     as every one did in the measurements; one whose rule moved keeps its cache.
     """
     key = findSlotValue(record, conditionalSlot)
     assert plan.maps is not None
-    # A record on a removed column goes with it, so it names no rule afterward.
+    # A record on a removed column goes with it, so it specifies no rule afterward.
     if key is None or plan.maps.columns.storedLineMap(record.column) is None:
         return None
     moved, broken = plan.keyFor(key, row, record.column)
@@ -348,7 +349,7 @@ def writeConditionalCounts(plan: ConditionalPlan, tiles: StoredTiles) -> None:
     """Set every rule's refcount from the cells naming it, and drop the unnamed ones.
 
     Counted rather than tracked, since the records are the truth and a rule a cell
-    stopped naming is exactly the one Numbers removed when its reference moved.
+    stopped specifying is exactly the one Numbers removed when its reference moved.
     """
     claims: Counter[int] = Counter()
     for stored in tiles:

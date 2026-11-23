@@ -91,4 +91,14 @@ Each noun below keeps one meaning across the library, the command line and the d
 | locale | The language and region whose conventions govern how a document writes its values | Numbers' Language & Region |
 | region | The country or area a locale specifies, `DE` in `de_DE` | `Intl.Locale.region` |
 
+## Name, select and specify
+
+Only a part a person can give a name in Numbers has one: a sheet, a table and a named style. Every other part is reached by where it sits, so a cell, a range, a row and a column are selected or specified, and never named.
+
+| Word | Meaning | Example |
+| ---- | ------- | ------- |
+| name | The text a sheet, a table or a named style is known by | a table named Q3 |
+| select | What a selector or a reference does to each part it reaches | `Q3::B3` selects cell B3 of table Q3 |
+| specify | What an argument or a setting does to the value it gives | `--locale de_DE` specifies a region |
+
 A noun can share its spelling with a verb, and the name's position tells them apart: `formatCellFormat` writes a format as text, and `cellsFill` repeats a block where `cellFillComputed` returns a fill.

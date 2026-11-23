@@ -6,6 +6,7 @@ currency in the format the cell names, never in the value. A `CurrencyAmount` jo
 two for a caller. See findings-11-formats.md.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-22  Written for PYB-220.
 """
 from __future__ import annotations
@@ -23,7 +24,7 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal
 
-from pybers.errors import PybersError
+from pybers.errors import PybersError, composeChoiceRefusal, composeRefusal
 
 
 class CurrencyError(PybersError, ValueError):
@@ -90,9 +91,8 @@ def findCurrency(code: str) -> Currency:
     for each in currencies:
         if each.code == code:
             return each
-    raise CurrencyError(
-        f"{code!r} is not a currency Numbers offers. It offers "
-        f"{', '.join(sorted(currencyCodes))}."
+    raise composeChoiceRefusal(
+        CurrencyError, code, "a currency Numbers offers", sorted(currencyCodes)
     )
 
 
@@ -109,16 +109,17 @@ class CurrencyAmount:
 
     def __post_init__(self) -> None:
         if isinstance(self.amount, bool) or not isinstance(self.amount, Decimal | int):
-            raise CurrencyError(
-                f"An amount is a Decimal, and {self.amount!r} is a "
-                f"{type(self.amount).__name__}."
-            )
+            raise CurrencyError(composeRefusal(
+                repr(self.amount), f"is a {type(self.amount).__name__}, not an exact "
+                "amount", "Give a `Decimal` or an `int`",
+            ))
         object.__setattr__(self, "amount", Decimal(self.amount))
         code = self.currency
         if not isinstance(code, str) or not isoCodePattern.fullmatch(code):
-            raise CurrencyError(
-                f"A currency is an ISO 4217 code such as 'EUR', not {code!r}."
-            )
+            raise CurrencyError(composeRefusal(
+                repr(code), "is not an ISO 4217 currency code",
+                "Write it as three capital letters, such as 'EUR'",
+            ))
 
     def __str__(self) -> str:
         return f"{self.amount} {self.currency}"
@@ -126,21 +127,21 @@ class CurrencyAmount:
     def _currencyMatchCheck(self, other: CurrencyAmount, operation: str) -> None:
         """Refuse to combine two currencies, since no rate converts between them."""
         if other.currency != self.currency:
-            raise CurrencyError(
-                f"Cannot {operation} {self} and {other}: {self.currency} and "
-                f"{other.currency} are different currencies."
-            )
+            raise CurrencyError(composeRefusal(
+                f"{self} and {other}", f"are in two currencies, so they cannot be "
+                f"{operation}, since no rate converts between them",
+            ))
 
     def __add__(self, other: object) -> CurrencyAmount:
         if not isinstance(other, CurrencyAmount):
             return NotImplemented
-        self._currencyMatchCheck(other, "add")
+        self._currencyMatchCheck(other, "added")
         return CurrencyAmount(self.amount + other.amount, self.currency)
 
     def __sub__(self, other: object) -> CurrencyAmount:
         if not isinstance(other, CurrencyAmount):
             return NotImplemented
-        self._currencyMatchCheck(other, "subtract")
+        self._currencyMatchCheck(other, "subtracted")
         return CurrencyAmount(self.amount - other.amount, self.currency)
 
     def __mul__(self, factor: object) -> CurrencyAmount:
@@ -164,7 +165,7 @@ class CurrencyAmount:
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, CurrencyAmount):
             return NotImplemented
-        self._currencyMatchCheck(other, "compare")
+        self._currencyMatchCheck(other, "compared")
         return self.amount < other.amount
 
 

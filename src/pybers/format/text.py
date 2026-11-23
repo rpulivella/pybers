@@ -8,6 +8,7 @@ maximum: 100; increment: 1` what `--cell-control` reads. The JSON form carries t
 setting names as an object, so the two say the same thing in two notations.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-10  A control's text form, `formatCellControl` and `parseCellControl`.
 2026-11-10  Written for PYB-145.
 """
@@ -30,7 +31,12 @@ from typing import cast
 
 from pybers._family import listFamilyMembers
 from pybers.absence import UNDETERMINED
-from pybers.errors import PybersError
+from pybers.errors import (
+    PybersError,
+    composeChoiceRefusal,
+    composeRefusal,
+    formatChoiceList,
+)
 from pybers.format.controls import (
     CellControl,
     CellControlBase,
@@ -47,7 +53,7 @@ from pybers.format.formats import (
 )
 
 automaticSuffix: str = " (automatic)"
-# Each shown format a text form can name, by its family, every one pybers can build.
+# Each shown format a text form can specify, by its family, every one pybers builds.
 type CellFormatBuild = Callable[[], CellFormatShown]
 shownMembers: tuple[type[CellFormatBase], ...] = cast(
     tuple[type[CellFormatBase], ...], listFamilyMembers(CellFormatShown)
@@ -68,11 +74,11 @@ quotedItems: re.Pattern[str] = re.compile(r'\s*"((?:[^"\\]|\\.)*)"\s*(?:,|$)')
 
 
 class CellFormatError(PybersError, ValueError):
-    """A format's text form names no family or setting a format has."""
+    """A format's text form specifies no family or setting a format has."""
 
 
 class CellControlError(PybersError, ValueError):
-    """A control's text form names no control or setting a control has."""
+    """A control's text form specifies no control or setting a control has."""
 
 
 def splitDeclarations(text: str) -> tuple[str, list[tuple[str, str]]]:
@@ -97,6 +103,17 @@ def splitDeclarations(text: str) -> tuple[str, list[tuple[str, str]]]:
     ]
 
 
+def refuseSetting[ErrorType: PybersError](
+    errorType: type[ErrorType], given: str, owner: str, settings: list[str]
+) -> ErrorType:
+    """Return the refusal of a setting a format or a control does not take."""
+    if not settings:
+        return errorType(composeRefusal(
+            repr(given), f"is not a setting of {owner}, which takes none", "Remove it"
+        ))
+    return composeChoiceRefusal(errorType, given, f"a setting of {owner}", settings)
+
+
 def formatSettingName(field: str) -> str:
     """Return a setting's field as the text form writes it, `fraction-digits`."""
     return camelBoundary.sub("-", field).lower()
@@ -117,26 +134,25 @@ def formatCellFormat(cellFormat: CellFormat | UNDETERMINED) -> str:
 
 
 def parseCellFormatShown(text: str) -> CellFormatShown:
-    """Return the shown format a text form names, refusing what it cannot build."""
+    """Return the shown format a text form specifies, refusing what it cannot build."""
     family, declarations = splitDeclarations(text)
     member = next(
         (each for named, each in formatsByFamily.items() if named.value == family), None
     )
     if member is None:
-        known = ", ".join(["automatic", *(each.value for each in formatsByFamily)])
-        raise CellFormatError(f"{family!r} is no format family. Use one of: {known}.")
+        raise composeChoiceRefusal(
+            CellFormatError, family, "a format family",
+            ["automatic", *(each.value for each in formatsByFamily)],
+        )
     shown = member()
     if declarations:
         settings = [formatSettingName(each.name) for each in dataclasses.fields(shown)]
-        takes = f"takes {', '.join(settings)}" if settings else "takes no settings"
-        raise CellFormatError(
-            f"{family} has no setting {declarations[0][0]!r}; it {takes}."
-        )
+        raise refuseSetting(CellFormatError, declarations[0][0], family, settings)
     return shown
 
 
 def parseCellFormat(text: str) -> CellFormat:
-    """Return the format a text form names, `automatic` or a family and its settings.
+    """Return the format a text form specifies, `automatic` or a family and settings.
 
     A format Automatic chose, as `pybers show` prints it, reads back as that Automatic,
     and `unknown (automatic)` as one whose pick a save has yet to make.
@@ -180,18 +196,25 @@ def parseControlSetting(where: str, declared: object, text: str) -> object:
         try:
             return Decimal(text)
         except InvalidOperation as exc:
-            raise CellControlError(f"{where} is {text!r}, not a number.") from exc
+            raise CellControlError(composeRefusal(
+                repr(text), f"is not a number, and {where} takes one"
+            )) from exc
     if typing.get_origin(declared) is tuple:
         items = quotedItems.findall(text)
         if "".join(quotedItems.split(text)[::2]).strip() == "" and items:
             return tuple(re.sub(r"\\(.)", r"\1", item) for item in items)
-        raise CellControlError(f"{where} is {text!r}, not a list of quoted items.")
+        raise CellControlError(composeRefusal(
+            repr(text), f"is not a list of quoted items, and {where} takes one",
+            'Write it as `"Low", "High"`',
+        ))
     kind = "yes or no" if declared is bool else "a value"
-    raise CellControlError(f"{where} is {text!r}, not {kind}.")
+    raise CellControlError(
+        composeRefusal(repr(text), f"is not {kind}, and {where} takes {kind}")
+    )
 
 
 def parseCellControl(text: str) -> CellControl | None:
-    """Return the control a text form names, or None for `none`, no control at all."""
+    """Return the control a text form specifies, or None for `none`, no control."""
     name, declarations = splitDeclarations(text)
     if name == "none" and not declarations:
         return None
@@ -199,8 +222,10 @@ def parseCellControl(text: str) -> CellControl | None:
         (each for kind, each in controlsByType.items() if kind.value == name), None
     )
     if member is None:
-        known = ", ".join(["none", *(kind.value for kind in controlsByType)])
-        raise CellControlError(f"{name!r} is no control. Use one of: {known}.")
+        raise composeChoiceRefusal(
+            CellControlError, name, "a control",
+            ["none", *(kind.value for kind in controlsByType)],
+        )
     assert dataclasses.is_dataclass(member)
     hints = typing.get_type_hints(member)
     settings = {
@@ -211,14 +236,14 @@ def parseCellControl(text: str) -> CellControl | None:
     for setting, value in declarations:
         field = settings.get(setting)
         if field is None:
-            takes = ", ".join(settings) or "no settings"
-            raise CellControlError(
-                f"{name} has no setting {setting!r}; it takes {takes}."
-            )
+            raise refuseSetting(CellControlError, setting, name, list(settings))
         given[field] = parseControlSetting(f"{name} {setting}", hints[field], value)
     missing = [setting for setting, field in settings.items() if field not in given]
     if missing:
-        raise CellControlError(f"{name} needs {', '.join(missing)}.")
+        raise CellControlError(composeRefusal(
+            f"A {name} control", f"needs {formatChoiceList(missing)}",
+            f"Write each as `{missing[0]}: value`",
+        ))
     return cast(CellControl, member(**given))
 
 

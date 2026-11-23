@@ -21,6 +21,7 @@ person pressed the space bar, which retyping the formula in Numbers drops too, a
 the thunk brackets are structure the parser puts back from the function.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  Named for the text it writes, which `parseFormula` reads back: the
             module `formatting`, `FormulaFormatter` and `formatFormulaNumber`, for
             PYB-309.
@@ -58,6 +59,7 @@ from pybers.addressing.reference import (
     CellReferenceLike,
     toCellReference,
 )
+from pybers.errors import composeFault, composeRefusal
 from pybers.formula.nodes import (
     Formula,
     FormulaBinding,
@@ -173,7 +175,9 @@ def formatAddress(
         )
         return qualifyAddress(body, content.tableId, names)
     if not isinstance(content, FormulaRange):
-        raise FormulaError(f"Node type {node.nodeType} names no address.")
+        raise FormulaError(
+            composeRefusal(f"Node type {node.nodeType}", "specifies no address")
+        )
     extent = content.resolve(host)
     first = formatEndpoint(
         RangeEndpoint(
@@ -200,10 +204,10 @@ def qualifyAddress(
         return body
     name = names.get(tableId)
     if name is None:
-        raise FormulaError(
-            f"This formula reaches into table {tableId}, and no name was given "
-            "for it. Pass `tables=sheet.tableIdentities` to name it."
-        )
+        raise FormulaError(composeRefusal(
+            "The formula", f"refers to table {tableId}, and no name was given for it",
+            "Give the name of every table the formula refers to",
+        ))
     return f"{name}{formulaQualifierSeparator}{body}"
 
 
@@ -240,10 +244,10 @@ class FormulaFormatter:
     def pop(self, count: int) -> list[FormulaTextPart]:
         """Return the last `count` pieces, in the order they were pushed."""
         if len(self.stack) < count:
-            raise FormulaError(
-                f"This formula asks for {count} values with {len(self.stack)} on "
-                "the stack, so its nodes do not form one expression."
-            )
+            raise FormulaError(composeRefusal(
+                "The formula", f"takes {count} values where {len(self.stack)} "
+                "precede it, so its nodes do not form one expression",
+            ))
         taken = self.stack[len(self.stack) - count:]
         del self.stack[len(self.stack) - count:]
         return taken
@@ -254,10 +258,10 @@ class FormulaFormatter:
         for node in self.formula:
             self.step(node)
         if len(self.stack) != 1:
-            raise FormulaError(
-                f"This formula leaves {len(self.stack)} values rather than one, "
-                "so it is not a single expression."
-            )
+            raise FormulaError(composeRefusal(
+                "The formula", f"leaves {len(self.stack)} values rather than one, so "
+                "it is not a single expression",
+            ))
         return f"{formulaMarker}{self.stack[0].text}"
 
     def step(self, node: FormulaNode) -> None:
@@ -313,10 +317,10 @@ class FormulaFormatter:
         elif kind in operatorPrecedence:
             self.stepOperator(kind)
         else:
-            raise FormulaError(
-                f"Node type {kind} has no written form. A formula holding one can "
-                "be read and written back, and cannot be written as text."
-            )
+            raise FormulaError(composeRefusal(
+                f"Node type {kind}", "has no written form, so a formula holding it "
+                "is kept as it is and cannot be shown as text",
+            ))
 
     def stepGroup(self, group: FormulaGroup) -> None:
         """Bracket the piece on top of the stack, as the author bracketed it.
@@ -327,31 +331,30 @@ class FormulaFormatter:
         documents do not support.
         """
         if group.argumentCount != 1:
-            raise FormulaError(
-                f"This list node encloses {group.argumentCount} values, and every "
-                "one measured encloses a single value. A formula holding it can "
-                "be read and written back, and cannot be written as text."
-            )
+            raise FormulaError(composeRefusal(
+                "The bracket node", f"encloses {group.argumentCount} values where "
+                "every one Numbers writes encloses one, so a formula holding it "
+                "cannot be shown as text",
+            ))
         self.stack.append(FormulaTextPart(f"({self.pop(1)[0].text})"))
 
     def stepCall(self, call: FormulaFunctionCall) -> None:
         """Write one indexed call, refusing an index nothing names."""
         if call.name is None:
-            raise FormulaError(
-                f"Function {call.index} is not in the table this build carries, so "
-                "there is no name to write. Regenerate it with "
-                "tools/local/functions_extract.py."
-            )
+            raise FormulaError(composeFault(
+                f"Function {call.index}", "is missing from the function table pybers "
+                "carries, so it has no name to write",
+            ))
         self.stack.append(formatFormulaCall(call.name, self.pop(call.argumentCount)))
 
     def stepVariable(self, variable: FormulaVariable) -> None:
         """Write one use of a bound name, refusing a number nothing bound."""
         name = self.symbols.get(variable.symbol)
         if name is None:
-            raise FormulaError(
-                f"This formula uses value {variable.symbol} and binds no name to "
-                "it, so there is nothing to write."
-            )
+            raise FormulaError(composeRefusal(
+                "The formula", f"uses value {variable.symbol} and binds no name to it, "
+                "so it has no text to write",
+            ))
         self.stack.append(FormulaTextPart(name))
 
     def stepEndScope(self) -> None:
@@ -364,7 +367,9 @@ class FormulaFormatter:
             if not binding[2]:
                 break
         if not taken:
-            raise FormulaError("A scope ends here having bound nothing.")
+            raise FormulaError(
+                composeRefusal("The formula", "ends a `LET` that binds nothing")
+            )
         pieces = [part for name, value, _ in taken for part in (name, value)]
         pieces.append(body.text)
         self.stack.append(FormulaTextPart(f"{letName}({argumentSeparator.join(pieces)})"))
@@ -422,8 +427,9 @@ def formatFormula(
 
     `host` is the cell holding it, because an unlocked reference is an offset from
     there and one archive shows differently in each cell it was dragged into.
-    `tables` names the tables a formula reaches into, from `Sheet.tableIdentities`,
-    and `sizes` gives each its rows and columns, under None for the host's own.
+    `tables` gives the names of the tables a formula reaches into, from
+    `Sheet.tableIdentities`, and `sizes` gives each its rows and columns, under None
+    for the host's own.
     """
     return FormulaFormatter(
         formula=formula,

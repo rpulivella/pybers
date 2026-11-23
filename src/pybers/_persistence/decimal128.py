@@ -18,6 +18,7 @@ layout Apple never published, and this is a published international standard tha
 happens to be used there.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-01  Extracted from pybers._persistence.cells and given a type, for #2.
 """
 from __future__ import annotations
@@ -33,7 +34,7 @@ __date__ = "2026/09/01"
 from dataclasses import dataclass
 from decimal import Decimal, IEEEContext
 
-from ..errors import PybersError
+from ..errors import PybersError, composeRefusal
 
 # The format's own arithmetic rules, from the standard library rather than restated.
 # `prec` is 34 significant digits, `Emax` 6144 and `Emin` -6143.
@@ -92,26 +93,27 @@ class Decimal128:
         """
         sign, digits, exponent = self.value.as_tuple()
         if not isinstance(exponent, int):
-            raise Decimal128Error(
-                f"{self.value} is not a finite number, and decimal128 as Numbers "
-                "uses it has no representation for a NaN or an infinity."
-            )
+            raise Decimal128Error(composeRefusal(
+                str(self.value), "is not a finite number, and Numbers stores only "
+                "finite numbers",
+            ))
         return sign, digits, exponent
 
     def __post_init__(self) -> None:
-        """Refuse anything decimal128 cannot hold, naming which limit was passed."""
+        """Refuse anything decimal128 cannot hold, stating which limit was passed."""
         _, digits, exponent = self.finiteParts()
         if len(digits) > maximumSignificantDigits:
-            raise Decimal128Error(
-                f"{self.value} carries {len(digits)} significant digits, and "
-                f"decimal128 holds {maximumSignificantDigits}. Round it first if that "
-                "is what you intend."
-            )
+            raise Decimal128Error(composeRefusal(
+                str(self.value), f"carries {len(digits)} significant digits, and "
+                f"Numbers stores at most {maximumSignificantDigits}",
+                f"Round it to {maximumSignificantDigits} significant digits first",
+            ))
         if not 0 <= exponent + exponentBias <= maximumBiasedExponent:
-            raise Decimal128Error(
-                f"{self.value} has exponent {exponent}, outside the {-exponentBias} "
-                f"to {maximumBiasedExponent - exponentBias} decimal128 can carry."
-            )
+            raise Decimal128Error(composeRefusal(
+                str(self.value), f"has exponent {exponent}, and Numbers stores "
+                f"exponents from {-exponentBias} to "
+                f"{maximumBiasedExponent - exponentBias}",
+            ))
 
     @classmethod
     def fromBytes(cls, raw: bytes) -> Decimal128:
@@ -129,9 +131,10 @@ class Decimal128:
         beyond the maximum is non-canonical with a value of zero.
         """
         if len(raw) < encodedLength:
-            raise Decimal128Error(
-                f"decimal128 needs {encodedLength} bytes, got {len(raw)}."
-            )
+            raise Decimal128Error(composeRefusal(
+                "The decimal128 value", f"is {len(raw)} bytes long, short of the "
+                f"{encodedLength} bytes it takes",
+            ))
         low = int.from_bytes(raw[:8], "little")
         high = int.from_bytes(raw[8:16], "little")
         negative = (high >> 63) & 1

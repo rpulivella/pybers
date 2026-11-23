@@ -16,6 +16,7 @@ one, which is the write-path half of the contract the frozen model keeps on the
 read path.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  The formula pool is the shared `EntryPool`, for PYB-278.
 2026-10-13  Every range tract holds `preserve_rectangular`, for PYB-200.
 2026-10-13  A node's content is written by matching it, checked exhaustive by
@@ -60,7 +61,7 @@ from .._persistence.decimal128 import Decimal128
 from .._persistence.index import ArchiveIndex, assignUuid
 from .._persistence.pool import EntryPool
 from ..addressing.reference import originOffset
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from ._read import ColonTractAxis, decimalHalfFormat, readFormulaTable
 from .nodes import (
     Coordinate,
@@ -197,10 +198,11 @@ def encodeTableIdentity(
         archive.ClearField("AST_cross_table_reference_extra_info")
         return
     if len(identity) != uuidHexLength:
-        raise WriteError(
-            f"A table identity is {uuidHexLength} hexadecimal characters and "
-            f"{identity!r} is {len(identity)}."
-        )
+        raise WriteError(composeRefusal(
+            f"The table identity {identity!r}", f"is {len(identity)} characters, "
+            f"where a table identity is {uuidHexLength} hexadecimal characters",
+            notDone=nothingWritten,
+        ))
     words = archive.AST_cross_table_reference_extra_info.table_id
     # Four 32-bit words in the order `readOwnerUuid` spelled them, which is the
     # low half of the owner uid first. See findings-08-formula-text.md.
@@ -376,12 +378,12 @@ def buildFormulaRecord(key: int) -> bytes:
 
 
 def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
-    """Return a record that had no formula, now naming one.
+    """Return a record that had no formula, now specifying one.
 
     Measured in every document 2026-09-04: a formula-backed record is the plain
     record for the same result type with byte 9 bit `0x02` set and ONE more trailing
-    reference, the key, placed at the slot `findFormulaKeySlot` names rather than always
-    first.
+    reference, the key, placed at the slot `findFormulaKeySlot` specifies rather than
+    always first.
     Byte 8 never moves, being fixed by the type and by what else the cell carries.
 
     Derived from matched pairs rather than synthesized, because the rest of byte 9
@@ -390,10 +392,10 @@ def attachFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     """
     at = findFormulaKeyOffset(record)
     if len(raw) < at:
-        raise WriteError(
-            f"Column {record.column} is {len(raw)} bytes and its formula key would "
-            f"sit at {at}, past the end."
-        )
+        raise WriteError(composeFault(
+            f"The cell in column {record.column}", f"has a record of {len(raw)} "
+            f"bytes, too short for a formula key at byte {at}", nothingWritten,
+        ))
     patched = bytearray(raw)
     patched[formulaFlagOffset] |= formulaFlagBit
     return (
@@ -412,10 +414,11 @@ def detachFormulaKey(raw: bytes, record: CellRecord) -> bytes:
     """
     at = findFormulaKeyOffset(record)
     if len(raw) < at + referenceWidth:
-        raise WriteError(
-            f"Column {record.column} is marked as carrying a formula, but its record "
-            f"is {len(raw)} bytes and the key would sit at {at}."
-        )
+        raise WriteError(composeFault(
+            f"The cell in column {record.column}", f"is marked as holding a formula, "
+            f"and its record of {len(raw)} bytes ends before the key at byte {at}",
+            nothingWritten,
+        ))
     patched = bytearray(raw)
     patched[formulaFlagOffset] &= ~formulaFlagBit & 0xFF
     return bytes(patched[:at]) + bytes(patched[at + referenceWidth:])
@@ -430,10 +433,11 @@ def patchFormulaKey(raw: bytes, record: CellRecord, key: int) -> bytes:
     """
     at = findFormulaKeyOffset(record)
     if len(raw) < at + referenceWidth:
-        raise WriteError(
-            f"Column {record.column} is marked as carrying a formula, but its record "
-            f"is {len(raw)} bytes and the key would sit at {at}."
-        )
+        raise WriteError(composeFault(
+            f"The cell in column {record.column}", f"is marked as holding a formula, "
+            f"and its record of {len(raw)} bytes ends before the key at byte {at}",
+            nothingWritten,
+        ))
     return raw[:at] + key.to_bytes(referenceWidth, "little") + raw[at + referenceWidth:]
 
 

@@ -9,6 +9,7 @@ means pybers opened the document, and 1 means it could not, or that the file cou
 be checked.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every check shows the sheets and tables as one tree, each unrecognized
             cell badged under its table, `--names` naming them, for PYB-223.
 2026-10-27  Report lines and the sheet outline shared with `show`, a size of one
@@ -155,8 +156,8 @@ def runCheck(
         bool,
         typer.Option(
             "--names",
-            help="Name each sheet and table, and say where each unrecognized cell "
-            "sits. Not for posting publicly.",
+            help="Show each sheet's and table's name, and where each unrecognized "
+            "cell sits, in output not meant for posting publicly.",
         ),
     ] = False,
     outputFormat: FormatOption = OutputFormat.TEXT,

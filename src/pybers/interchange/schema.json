@@ -781,7 +781,7 @@
     },
     "CellFormatUnknown": {
       "type": "object",
-      "description": "A format pybers cannot follow, by its entry's type when the record names one.",
+      "description": "A format pybers cannot follow, by the type of the entry a record specifies.",
       "properties": {
         "formatFamily": {
           "const": "unknown"
@@ -1334,7 +1334,7 @@
     },
     "FormulaRange": {
       "type": "object",
-      "description": "A rectangle of cells named from inside a formula.",
+      "description": "A rectangle of cells selected from inside a formula.",
       "properties": {
         "columns": {
           "anyOf": [
@@ -1423,7 +1423,7 @@
     },
     "FormulaReferenceLoss": {
       "type": "object",
-      "description": "The rows and columns a broken reference named before they were removed.",
+      "description": "The rows and columns a broken reference selected before they were removed.",
       "properties": {
         "columns": {
           "type": "array",

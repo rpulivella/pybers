@@ -2,7 +2,7 @@
 """Where each row or column of a table lands after lines are added or removed.
 
 A structural edit is one mapping from old lines to new ones, and everything that
-names a line by its number follows it: cells, merges and every formula reference.
+refers to a line by its number follows it: cells, merges and every formula reference.
 Holding the mapping here keeps those three from each deriving their own.
 
 **A removed line takes a range's end with it, never the whole range.** Measured

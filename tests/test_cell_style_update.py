@@ -3,6 +3,7 @@
 Changing part of a cell's style: properties updated or one cleared, the rest kept.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  An update keeping a fill pybers cannot write is refused before any
             change, for PYB-290.
 2026-11-19  A document Numbers saved, and every stored style counted, for PYB-290.
@@ -94,13 +95,13 @@ def testAnUpdateACellAlreadyStatesChangesNothing(tmp_path: Path) -> None:
 
 def testAnUpdateStatingNoPropertyIsRefused(tmp_path: Path) -> None:
     document, _ = createStyled(tmp_path)
-    with pytest.raises(pybers.WriteError, match="stating no property"):
+    with pytest.raises(pybers.WriteError, match="states no property"):
         document.cellStyleUpdate(cells, CellStyle())
 
 
 @pytest.mark.parametrize(("given", "reason"), [
     (CellStyle(background=FillGradient()), "gradient fill is read and carried"),
-    ("background: #0a84ffff", "takes a CellStyle, and was given str"),
+    ("background: #0a84ffff", "A str is not a cell style"),
 ])
 def testAnUpdatePybersCannotWriteIsRefusedChangingNothing(
     tmp_path: Path, given: object, reason: str
@@ -192,7 +193,7 @@ def testAnUpdateKeepingAFillPybersCannotWriteIsRefusedBeforeAnyChange(
 ) -> None:
     working = copyDocument("28-style-fills", tmp_path)
     document = pybers.open(working)
-    with pytest.raises(pybers.WriteError, match="has a gradient fill, which pybers"):
+    with pytest.raises(pybers.WriteError, match="gradient fill, and writing it"):
         document.cellStyleUpdate("Sheet 1::Table 1::E1", CellStyle(padding=Decimal(12)))
     document.save()
     reopened = pybers.open(working).sheets[0].tables[0].cell("E1")
@@ -209,8 +210,8 @@ def testACommandUpdatingAFillPybersCannotWriteRefusesWritingNothing(
     )
     assert result.exit_code == 1
     assert result.stderr == (
-        "pybers set: Sheet 1::Table 1::E1 has a gradient fill, which pybers cannot "
-        "write, so set its whole style instead. Nothing was written.\n"
+        "pybers set: Sheet 1::Table 1::E1 holds a gradient fill, and writing it is "
+        "not supported. Set its whole style instead. Nothing was written.\n"
     )
     assert working.read_bytes() == before
 
@@ -282,7 +283,7 @@ def testACommandChangingNothingWritesNothing(
 
 
 @pytest.mark.parametrize(("arguments", "reason"), [
-    (("--cell-style", "none", "--cell-style-remove", "padding"), "give one of them"),
+    (("--cell-style", "none", "--cell-style-remove", "padding"), "Give one of them"),
     (("--cell-style-remove", "bakground"), "The closest is background"),
 ])
 def testACommandRefusesAStyleRequestBeforeReadingTheFile(

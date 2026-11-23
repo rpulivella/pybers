@@ -10,6 +10,7 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  A cell prints its computed box beside its own, for PYB-291.
 2026-11-17  A table's lines, as CSS declarations under its own line, for PYB-266.
 2026-11-17  A cell's borders, after its cell style, for PYB-266.
@@ -235,7 +236,7 @@ def findPart(document: pybers.Document, match: pybers.SelectionMatch) -> ShownPa
             return document.table(table).cell(match)
         case pybers.CellRange(table=table) if table is not None:
             return (document.table(table), match)
-    raise AssertionError(f"A selection returned {match!r}, which names no table.")
+    raise AssertionError(f"The match {match!r} belongs to no table.")
 
 
 def formatShownPart(part: ShownPart) -> RenderableType:

@@ -182,7 +182,7 @@ def testAMemberNamingNoTypeStopsTheImport() -> None:
         side: int
 
     type ShapeAny = Square
-    with pytest.raises(TypeError, match="must set shapeType"):
+    with pytest.raises(TypeError, match="leaves shapeType unset"):
         checkFamily(Shape, ShapeAny, "shapeType")
 
 

@@ -2,12 +2,12 @@
 """\
 What Numbers changed in each cell of a golden when it opened and saved a copy.
 
-A cell Numbers corrects on opening, such as a duration format whose units disagree
-with its value, keeps the correction when the copy is saved, so reading both files
-cell by cell names it where the archive count alone cannot. Each cell is compared on
-what pybers models and on the format entry and control behind it, since an entry can
-change in a field no model holds yet. A formula's value, kind and format are left to
-Numbers, which recalculates them.
+A cell Numbers corrects on opening, such as a duration format whose units disagree with
+its value, keeps the correction when the copy is saved, so reading both files cell by
+cell identifies it where the archive count alone cannot. Each cell is compared on what
+pybers models and on the format entry and control behind it, since an entry can change
+in a field no model holds yet. A formula's value, kind and format are left to Numbers,
+which recalculates them.
 
 UPDATES
 2026-11-10  Written for PYB-145, after a chip Numbers drew on a golden went unreported.

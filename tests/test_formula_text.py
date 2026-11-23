@@ -11,6 +11,7 @@ Node arrays are asserted as `(nodeType, content)` pairs, because `FormulaNode`
 excludes its archive bytes from equality and a parsed node has none to carry.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-22  The goldens' writes and comparisons moved to the golden builders, for
             PYB-255.
 2026-09-11  Brackets, which are a node rather than a derivation, for #67.
@@ -93,7 +94,7 @@ def dropTypedWhitespace(formula: Formula) -> list[tuple[int, object]]:
     Types 32 and 33 carry where the space bar was pressed, which no reading of the
     text recovers and which retyping the formula in Numbers drops as well. See
     findings-08-formula-text.md. A broken reference keeps only what `#REF!` says,
-    since the text names neither its table nor the lines it lost.
+    since the text states neither its table nor the lines it lost.
     """
     return [
         (nodeType, FormulaReference(broken=True))
@@ -342,7 +343,7 @@ def testAnchoringIsPerAxisAndSurvivesBeingWritten(
 
     An absolute axis is a line counted from one and a relative one is a signed
     offset, so the two are compared as pairs rather than as numbers: reading one
-    as the other names a real cell and raises nothing.
+    as the other selects a real cell and raises nothing.
     """
     reference = parseFormula(text, "G2").references[0]
     assert reference.column is not None and reference.row is not None
@@ -515,7 +516,7 @@ def testAnOperatorInAnUnknownTableNameIsRefusedByTheColumnBound(text: str) -> No
 
     `Ledger` is now read on its own rather than as part of a table name, and six
     letters are a valid base-26 label, so it would have become column 144,936,576.
-    The bound catches it and names the column, which is the thing actually wrong.
+    The bound catches it and states the column, which is the thing actually wrong.
     Both spellings are covered, one where the tail is a real table and one where
     nothing resolves at all.
     """
@@ -563,14 +564,14 @@ def testTextThatIsNotAFormulaIsRefusedWithTheOffsetThatFailed(
 
 
 def testAnAddressBelowTheOriginRefusesInTheAddressingLayersOwnWords() -> None:
-    """`A0` says it names row zero, rather than that it addresses nothing.
+    """`A0` says it selects row zero, rather than that it addresses nothing.
 
     The reason travels out of `CellRange.parse` intact. Row zero and column zero
     are the two mistakes a zero-based instinct makes, and the message has to name
     which one it was rather than summarize both away.
     """
     for text, offset in (("=A0", 0), ("=SUM(A0:A5)", 4), ("=A1+B0", 3)):
-        with pytest.raises(FormulaSyntaxError, match="rows count from 1") as raised:
+        with pytest.raises(FormulaSyntaxError, match="rows count from one") as raised:
             parseFormula(text, "B2")
         assert raised.value.position == offset
 
@@ -609,7 +610,7 @@ def testAnAddressMayBePassedAsAPieceRatherThanSplicedIntoTheText() -> None:
 
 
 def testASingleCellPieceBecomesACoordinateRatherThanARange() -> None:
-    """A `CellReference` names one cell, and the file has a node kind for that."""
+    """A `CellReference` selects one cell, and the file has a node kind for that."""
     formula = parseFormula(
         "={anchor}*2", "B2", pieces={"anchor": CellReference.parse("$A$1")}
     )
@@ -619,7 +620,7 @@ def testASingleCellPieceBecomesACoordinateRatherThanARange() -> None:
 
 def testAPlaceholderWithNoAddressGivenIsRefusedByName() -> None:
     """Naming what was expected, since a silent empty would parse as nonsense."""
-    with pytest.raises(FormulaSyntaxError, match="No address was given"):
+    with pytest.raises(FormulaSyntaxError, match="no address was given"):
         parseFormula("=SUM({sales})", "A1")
 
 
@@ -655,7 +656,7 @@ def testALambdaBindsItsParametersOnlyInsideItself() -> None:
     inside = parseFormula("=LAMBDA(x,x+1)", "A1")
     assert not inside.references, "x names the parameter, not column X"
     outside = parseFormula("=SUM(x)", "A1")
-    assert outside.references, "the same name outside names a column"
+    assert outside.references, "the same name outside selects a column"
 
 
 # ── AC 10: a name Numbers does not accept keeps its spelling ─────────────────

@@ -7,6 +7,7 @@ compares what the file declares with what its cells actually reference rather th
 asking the model, which would agree with itself while both halves were wrong.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-22  The goldens' comparisons moved to the golden builders, for PYB-255.
 2026-10-20  A borrowed shape keeps no format, and a copy reaches the guard, for PYB-144.
 2026-10-09  Nested sequences flattened by comprehension unpacking, for PYB-181.
@@ -316,7 +317,7 @@ def test_aFormatNoWrittenCellNamesKeepsTheCountItHad(tmp_path: Path) -> None:
 
 
 def test_aCellNamingAFormatItsTableDoesNotHoldIsRefused(tmp_path: Path) -> None:
-    """A copied text record names the text format, so its absence stops the save."""
+    """A copied text record refers to the text format, so its absence stops the save."""
     working = copyDocument("11-value-types-noformats", tmp_path)
     textKey = findFormatKeyOfType(working, "Table 1", textFormatType)
 
@@ -333,7 +334,7 @@ def test_aCellNamingAFormatItsTableDoesNotHoldIsRefused(tmp_path: Path) -> None:
         references=pybers.FormulaReferenceRelocation.PRESERVE_RELATIVE_POSITION,
     )
 
-    with pytest.raises(WriteError, match=f"J1 would name format {textKey}"):
+    with pytest.raises(WriteError, match=f"J1 refers to format {textKey}"):
         document.save()
     assert working.read_bytes() == unchanged
 

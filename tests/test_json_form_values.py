@@ -3,6 +3,7 @@
 The rule each value follows in the JSON form, and what reading one refuses.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  A malformed form states the current version, for PYB-267.
 2026-11-06  Version 4, for PYB-264.
 2026-10-28  Version 2, whose document names its locale, for PYB-272.
@@ -165,7 +166,7 @@ def testACellPositionIsWrittenAsItsText() -> None:
 
 
 def testAValueWithNoJsonFormIsRefusedByName() -> None:
-    with pytest.raises(JsonFormDefinitionError, match="no JSON form for complex"):
+    with pytest.raises(JsonFormDefinitionError, match="type complex has no JSON form"):
         pybers.formatJsonForm(1j)
 
 
@@ -222,14 +223,14 @@ def testAValueOfTheWrongKindIsRefusedNamingWhatItMustBe() -> None:
 @pytest.mark.parametrize(("text", "refusal"), [
     ("not json", "not JSON"),
     ('{"jsonFormVersion": 1, "jsonFormVersion": 1}', "appears twice"),
-    ('{"jsonFormVersion": NaN}', "no number NaN"),
-    ('{"jsonFormVersion": 99, "document": {"sheets": []}}', "jsonFormVersion being 99"),
+    ('{"jsonFormVersion": NaN}', "NaN is not a number JSON defines"),
+    ('{"jsonFormVersion": 99, "document": {"sheets": []}}', "jsonFormVersion` is 99"),
     (f'{{"jsonFormVersion": {pybers.jsonFormVersion}, "document": '
-     '{"localeIdentifier": null, "sheets": [], "extra": 1}}', "no key 'extra'"),
+     '{"localeIdentifier": null, "sheets": [], "extra": 1}}', "the key 'extra'"),
     (f'{{"jsonFormVersion": {pybers.jsonFormVersion}, "document": '
-     '{"localeIdentifier": null}}', "sheets is missing"),
+     '{"localeIdentifier": null}}', "lacks the key 'sheets'"),
     (f'{{"jsonFormVersion": {pybers.jsonFormVersion}, "document": {{"sheets": []}}}}',
-     "localeIdentifier is missing"),
+     "lacks the key 'localeIdentifier'"),
 ])
 def testTextThatIsNotTheFormIsRefusedSayingWhy(text: str, refusal: str) -> None:
     with pytest.raises(pybers.JsonFormError, match=refusal):
@@ -238,12 +239,12 @@ def testTextThatIsNotTheFormIsRefusedSayingWhy(text: str, refusal: str) -> None:
 
 def testOnlyATableIsNarrowedToARange() -> None:
     sheet = pybers.Sheet(name="Sheet 1")
-    with pytest.raises(pybers.JsonFormError, match="Only a table"):
+    with pytest.raises(pybers.JsonFormError, match="narrows only a table"):
         pybers.formatJsonForm(sheet, "A1:B2")
 
 
 def testATableIsNarrowedToOneRangeAlone() -> None:
-    with pytest.raises(pybers.JsonFormError, match="names 2"):
+    with pytest.raises(pybers.JsonFormError, match="selects 2 ranges"):
         pybers.formatJsonForm(buildTable(Decimal(1)), "A1, B2")
 
 
@@ -253,7 +254,7 @@ def testATableIsNarrowedByARangeNamingIt() -> None:
 
 
 def testATableIsNotNarrowedByARangeNamingAnother() -> None:
-    with pytest.raises(pybers.ReferenceError, match="names another table"):
+    with pytest.raises(pybers.ReferenceError, match="selects a table other than"):
         pybers.formatJsonForm(buildTable(Decimal(1)), "Elsewhere::A1")
 
 

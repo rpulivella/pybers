@@ -2,11 +2,12 @@
 """\
 What paints an area: a `Color`, a gradient, an image, or an explicit absence of fill.
 
-A gradient and an image read and survive a round trip, and are named by their type
-alone until PYB-287 models them. `FillNone` is stored, and differs from inheriting a
-fill, because a header cell cleared of its gray must say so.
+A gradient and an image read and survive a round trip, and are identified by their
+type alone until PYB-287 models them. `FillNone` is stored, and differs from
+inheriting a fill, because a header cell cleared of its gray must say so.
 
 UPDATES
+2026-11-23  A fill identified by its type, never named, for PYB-307.
 2026-11-12  Written for PYB-265.
 """
 from __future__ import annotations
@@ -37,7 +38,7 @@ class FillType(StrEnum):
 
 
 class FillBase(FamilyMember, ABC):
-    """A fill other than a `Color`, named by its `fillType`."""
+    """A fill other than a `Color`, identified by its `fillType`."""
 
     __slots__ = ()
     fillType: ClassVar[FillType]

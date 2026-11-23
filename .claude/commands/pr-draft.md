@@ -1,6 +1,6 @@
 ---
 description: Create a draft pull request for the current ticket branch, or revise a filed one's body, filling the repo's mandatory PR template.
-argument-hint: [edit] <optional issue number; inferred from the branch if omitted>
+argument-hint: [edit] <optional issue number, inferred from the branch if omitted>
 ---
 
 # /pr-draft
@@ -16,7 +16,7 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
    the branch.
 3. **Put the CHANGELOG entry in the PR, then push.** If the `## Unreleased` list has no
    line for this work, run `/changelog-add` and commit it. Then push (`git push`). The
-   entry is `- [PYB-<N>] <title>` for ticketed work; `/changelog-add` also handles the
+   entry is `- [PYB-<N>] <title>` for ticketed work. `/changelog-add` also handles the
    ticketless case with `[init]` or `[hotfix]`, and a bare bullet is never correct.
 
    A golden row this branch confirms records the Numbers version, never asked for:
@@ -27,12 +27,12 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
 5. **Read `.github/pull_request_template.md`** and fill it, writing the result to
    `$TMPDIR/pybers-pr-body-<N>.md`, the OS temp directory, which is per-user and cleaned
    by the system. **Never write a PR body inside the repository**, not even into
-   `workarea/`; it is transient tool input, not scratch worth keeping. Rules:
+   `workarea/`, because it is transient tool input, not scratch worth keeping. Rules:
    - **Title**: `[PYB-<N>] <issue title verbatim>`. Do not paraphrase.
    - **Ticket**: the body opens with `[PYB-<N>](url)` and ends with `_Closes #<N>_` in
      italic, the one place a `#` is correct since GitHub parses no other form.
    - **Intro**: 2-3 sentences on what the PR achieves.
-   - **Detail your changes**: keep only the checkboxes that apply; remove the rest.
+   - **Detail your changes**: keep only the checkboxes that apply, and remove the rest.
    - **Breaking Changes**: `None` after each heading, or a short list.
    - **Checklist**: check what is genuinely true. Unchecked means **not done**, so an
      item that cannot apply moves to the end of the list with `NA` in place of its
@@ -69,7 +69,7 @@ filed one. The PR is the **PR-out** touchpoint, both directions of it.
 - Base branch is always `develop`. Do not guess the description, fetch the issue first.
 - **A draft may be opened at any point, including mid-work.** Green is required to
   *leave* draft, not to enter it, `/pr-review-code` enforces that. Being feature complete
-  with tests still being written is exactly what draft is for. See
+  with tests still being written is exactly the purpose of a draft. See
   [Open a Pull Request](../../CONTRIBUTING.md#3-open-a-pull-request) in `CONTRIBUTING.md` for the three conditions.
 
 ## `edit`: revising a filed body
@@ -84,8 +84,8 @@ gates it.
 ```
 
 Fetch immediately before drafting and never from memory: `edit` replaces the WHOLE body and
-GitHub has no conflict detection, so anything that changed in between is discarded
-silently. Same rule and same reasoning as `/ticket-edit`, which spells it out. Delete the
+GitHub has no conflict detection, so anything that changed in the meantime is discarded
+silently. Same rule and same reasoning as `/ticket-edit`, which explains it in full. Delete the
 copy once the write reports verified.
 
 ## After approval

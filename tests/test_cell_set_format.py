@@ -6,6 +6,7 @@ Each test edits a copy of `13-number-percent`, whose `A1` is a number Automatic
 formats and whose `B1` is the same number in a percent format a person chose.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  The refusal lists the cell style update options, for PYB-290.
 2026-11-10  A format that cannot show the value is refused unless Automatic is asked
             for, for PYB-145 AC 10.
@@ -127,7 +128,7 @@ def testAFormatTheCellShowsAlreadyChangesNothing(working: Path) -> None:
 
 def testAFormatPybersCannotYetWriteIsRefusedAndNothingChanges(working: Path) -> None:
     document = pybers.open(working)
-    with pytest.raises(pybers.WriteError, match="cannot yet write a percent format"):
+    with pytest.raises(pybers.WriteError, match="would take a percent format"):
         document.cellSet("::Table 1::A1:B1", format=CellFormatPercent())
     assert document.sheets[0].tables[0].cell("A1").presentation.format == (
         CellFormatAutomatic(CellFormatNumber())
@@ -175,7 +176,7 @@ def testAnEmptyCellRefusesAFormatPybersCannotWriteYet(tmp_path: Path) -> None:
     document.sheet().tableAdd("Blank", rows=1, cols=1)
     working = tmp_path / "blank.numbers"
     document.save(working)
-    with pytest.raises(pybers.WriteError, match="cannot yet write a percent format"):
+    with pytest.raises(pybers.WriteError, match="would take a percent format"):
         pybers.open(working).cellSet("::Blank::A1", format=CellFormatPercent())
 
 
@@ -202,7 +203,7 @@ def testAFormulaWithNoResultRefusesAFormatPybersCannotWriteForIt(
     document.sheet().tableAdd("Calc", rows=1, cols=1).cell("A1").formulaText = "=1"
     working = tmp_path / "calc.numbers"
     document.save(working)
-    with pytest.raises(pybers.WriteError, match="cannot yet write a currency format"):
+    with pytest.raises(pybers.WriteError, match="would take a currency format"):
         pybers.open(working).cellSet("::Calc::A1", format=pybers.CellFormatCurrency())
 
 
@@ -230,7 +231,9 @@ def testACommandSetsAValueAndAFormatTogether(working: Path) -> None:
 def testACommandRefusesAFormatNamingNoFamily(working: Path) -> None:
     result = runSetCommand(str(working), "::Table 1::A1", "--cell-format", "percentage")
     assert result.exit_code == 1
-    assert "'percentage' is no format family" in readPlainText(result.output)
+    assert "'percentage' is not a format family. The closest is percent." in (
+        readPlainText(result.output)
+    )
 
 
 def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
@@ -239,8 +242,8 @@ def testACommandGivenNeitherPartIsRefused(working: Path) -> None:
     shown = readPlainText(result.output)
     assert (
         "Give a VALUE, a --cell-format, a --cell-control, a --cell-style, a "
-        "--cell-style-update, a --cell-style-remove, a --border or a --table-style."
-        in shown
+        "--cell-style-update, a --cell-style-remove, a --border or a --table-style. "
+        "Nothing was written." in shown
     )
 
 
@@ -329,7 +332,7 @@ def testACommandRefusesAFormatThatCannotShowTheValue(working: Path) -> None:
 
 def testABooleanFormatNoMenuOffersIsRefused(tmp_path: Path) -> None:
     working = copyDocument("90-values-for-booleans", tmp_path)
-    with pytest.raises(pybers.WriteError, match="offers no boolean format to choose"):
+    with pytest.raises(pybers.WriteError, match="cannot take a boolean format"):
         pybers.open(working).cellSet(
             "::Table 1::A1", True, format=pybers.CellFormatBoolean()
         )

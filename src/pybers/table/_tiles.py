@@ -14,6 +14,7 @@ when it empties.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  A wide row grows to its last record and an empty tile takes a wide
             first row, where a record past the end was dropped, for PYB-276.
 2026-10-29  `TileRange.rows` and `rowFor`, the walk and the row a placement
@@ -49,7 +50,7 @@ from .._persistence.index import ArchiveIndex
 from .._persistence.metadata import PackageRegistry, createSiblingArchive
 from .._persistence.rows import StoredTiles, TileRow
 from ..addressing.reference import CellAddress, originOffset
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from ._conditions import (
     ConditionalPlan,
     buildInheritedRecord,
@@ -134,10 +135,11 @@ def rewriteRow(
     slots = len(offsets) // offsetWidth
     beyond = [column for column in replacements if column >= slots]
     if beyond and offsetUnit != offsetUnitWord:
-        raise WriteError(
-            f"Column {max(beyond) + originOffset} is past the {slots} offset slots a "
-            "narrow row carries, and widening a narrow row is not supported."
-        )
+        raise WriteError(composeRefusal(
+            f"Column {max(beyond) + originOffset}", f"is past the {slots} offset "
+            "slots a narrow row carries, and widening a narrow row is not supported",
+            notDone=nothingWritten,
+        ))
     # A wide row carries one slot per column through its last record, as Numbers
     # writes one, so it grows to hold a record past its end.
     slots = max([slots, *(column + 1 for column in beyond)])
@@ -162,11 +164,11 @@ def rewriteRow(
         # divides, so a record of any other length would silently move every
         # record after it. Refuse rather than write a row that reads back wrong.
         if len(rebuiltBuffer) % offsetUnit:
-            raise WriteError(
-                f"Column {column} would start at byte {len(rebuiltBuffer)} of the "
-                f"row buffer, which is not a multiple of the {offsetUnit}-byte "
-                "unit this row counts its offsets in."
-            )
+            raise WriteError(composeFault(
+                f"Column {column}", f"would start at byte {len(rebuiltBuffer)} of "
+                f"the row buffer, which is not a multiple of the {offsetUnit}-byte "
+                "unit this row counts its offsets in", nothingWritten,
+            ))
         rebuiltOffsets += (len(rebuiltBuffer) // offsetUnit).to_bytes(
             offsetWidth, "little"
         )
@@ -268,9 +270,9 @@ def addInheritedRecords(
 ) -> None:
     """Give each added line the highlighting of the line it displaced.
 
-    The added cells take empty records naming the displaced cells' rules, which is
+    The added cells take empty records specifying the displaced cells' rules, which is
     what `57-conditions-row-inserted` and `-column-inserted` hold. A cell whose
-    displaced neighbor names no rule receives nothing.
+    displaced neighbor specifies no rule receives nothing.
     """
     inherited: dict[tuple[int, int], bytes] = {}
     for row in listAddedLines(maps.rows):
@@ -428,10 +430,10 @@ def rewriteRowColumns(
         if column is None:
             continue
         if column >= slots:
-            raise WriteError(
-                f"A record would move to column {column + originOffset}, past the "
-                f"{slots} offset slots its row carries."
-            )
+            raise WriteError(composeFault(
+                "A record", f"would move to column {column + originOffset}, past the "
+                f"{slots} offset slots its row carries", nothingWritten,
+            ))
         placed[column] = record.raw
     empty = emptyOffset.to_bytes(offsetWidth, "little") * slots
     return rewriteRow(empty, b"", unit, placed)

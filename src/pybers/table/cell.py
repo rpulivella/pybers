@@ -3,9 +3,10 @@
 
 A cell's value is a `CellValue`, never a `float`, because Numbers stores numbers as
 decimal128. A cell knows the table holding it, so reading or writing its formula as
-text, and naming it from anywhere, needs nothing passed in.
+text, and pointing at it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  `borders`, each side's stroke and its neighbor's, and a copy no
             longer says whether borders go with it, for PYB-266.
 2026-11-12  `cellStyle`, what the cell's own style states about its box, for
@@ -51,7 +52,7 @@ from pybers.absence import UNCHANGED, UNDETERMINED
 from pybers.addressing.ranges import CellRange, SelectionMatch
 from pybers.addressing.reference import CellAddress, CellReference
 from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
-from pybers.errors import WriteError
+from pybers.errors import WriteError, composeRefusal, nothingWritten
 from pybers.format.controls import CellControl
 from pybers.format.formats import (
     CellFormat,
@@ -137,10 +138,10 @@ def toCellValue(
     if isinstance(value, int):
         return Decimal(value)
     if isinstance(value, float):
-        raise WriteError(
-            f"{address} was given the float {value!r}, which carries binary rounding "
-            f"error. Write Decimal({str(value)!r}) instead."
-        )
+        raise WriteError(composeRefusal(
+            f"The float {value!r} given for {address}", "carries binary rounding "
+            "error", f"Give Decimal({str(value)!r}) instead", nothingWritten,
+        ))
     if isinstance(value, datetime.datetime):
         return toWallClockTime(value, zone)
     if isinstance(value, datetime.date):
@@ -152,22 +153,28 @@ def toCellValue(
         try:
             Decimal128(value)
         except Decimal128Error as exc:
-            raise WriteError(f"{address} cannot hold it: {exc}") from exc
+            raise WriteError(composeRefusal(
+                str(address), f"cannot hold {value}, since Numbers stores a finite "
+                "number of at most 34 significant digits", notDone=nothingWritten,
+            )) from exc
         return value
     if isinstance(value, CurrencyAmount):
         try:
             findCurrency(value.currency)
         except CurrencyError as exc:
-            raise WriteError(f"{address} cannot hold {value}: {exc}") from exc
+            raise WriteError(composeRefusal(
+                str(address), f"cannot hold {value}, since {value.currency!r} is not "
+                "a currency Numbers offers", notDone=nothingWritten,
+            )) from exc
         toCellValue(value.amount, address, zone)
         return value
     if isinstance(value, str | datetime.timedelta):
         return value
-    raise WriteError(
-        f"{address} was given a {type(value).__name__}. A cell holds a Decimal, a "
+    raise WriteError(composeRefusal(
+        str(address), f"cannot hold a {type(value).__name__}", "Give a Decimal, a "
         "CurrencyAmount, an int, a str, a bool, a datetime, a date, a timedelta or "
-        "None."
-    )
+        "None", nothingWritten,
+    ))
 
 
 
@@ -193,12 +200,12 @@ def isSameValue(before: CellValue, after: CellValue) -> bool:
     return before == after
 
 
-def refuseValueOverFormula(address: CellAddress) -> NoReturn:
+def refuseValueOverFormula(where: CellReference | CellAddress) -> NoReturn:
     """Refuse a value written over a cell a formula backs, which would discard it."""
-    raise WriteError(
-        f"{address} is backed by a formula, so writing a value would discard it. "
-        "Replace the formula instead, or clear it first."
-    )
+    raise WriteError(composeRefusal(
+        str(where), "holds a formula, so a value written there would discard it",
+        "Replace the formula, or clear it first", nothingWritten,
+    ))
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,7 +319,7 @@ class Cell:
 
         Assignable: `cell.formulaText = "=SUM(B1:B5)"` parses against this cell,
         which is what an unlocked reference is an offset from, so the wrong host
-        cannot be passed. Use `formulaSet` to name an address rather than write it.
+        cannot be passed. Use `formulaSet` to select an address rather than write it.
         """
         if self.formula is None:
             return None
@@ -392,7 +399,7 @@ class Cell:
         """
         written = findWrittenValue(value, self.address, self.timeZone, self._value)
         if self.formula is not None:
-            refuseValueOverFormula(self.address)
+            refuseValueOverFormula(self.reference)
         valueBefore, before = self._value, self.kind
         shownBefore = self.presentation
         formatBefore, controlBefore = shownBefore.format, shownBefore.control
@@ -539,15 +546,11 @@ class Cell:
         cell holding a formula, which this would discard.
         """
         if not isinstance(text, str):
-            raise WriteError(
-                f"Literal text for {self.address} must be a str, and was given "
-                f"{type(text).__name__}."
-            )
+            raise WriteError(composeRefusal(
+                f"The literal text {text!r}", "is not a str", None, nothingWritten
+            ))
         if self.formula is not None:
-            raise WriteError(
-                f"{self.address} is backed by a formula, so holding literal text "
-                "would discard it. Clear the formula first."
-            )
+            refuseValueOverFormula(self.reference)
         self._value = text
         self._formatRequest(CellFormatText())
 

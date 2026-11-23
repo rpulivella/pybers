@@ -9,6 +9,7 @@ comparing the two gives the whole mapping from stored lines to new ones.
 Private. Part of the table feature's archive half.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  A stored map's methods name their counting, so mypy refuses one where a
             map counted from one belongs, for PYB-267.
 2026-09-22  The UID map is written here, by creation and by a structural edit alike, for
@@ -31,7 +32,7 @@ from dataclasses import dataclass
 from .._generated import TSTArchives_pb2 as tst
 from .._persistence.index import ArchiveIndex, assignUuid
 from ..addressing.reference import originOffset
-from ..errors import WriteError
+from ..errors import WriteError, composeFault, composeRefusal, nothingWritten
 from ._read import readLineIdentities
 from .cells import Table
 
@@ -127,10 +128,10 @@ def buildLineMap(
     lines = tuple(position.get(identity) for identity in stored)
     kept = [line for line in lines if line is not None]
     if kept != sorted(kept):
-        raise WriteError(
-            f"The {axis} of {name!r} are in a different order from the file's, and "
-            "reordering them is not supported."
-        )
+        raise WriteError(composeRefusal(
+            f"The {axis} of {name!r}", "are in a different order from the file's, "
+            "and reordering them is not supported", notDone=nothingWritten,
+        ))
     return LineMap(lines, len(wanted))
 
 
@@ -140,11 +141,11 @@ def buildGridMaps(
     """Return how the model's rows and columns relate to the stored ones."""
     rows, columns = readLineIdentities(index, model)
     if len(rows) != model.number_of_rows or len(columns) != model.number_of_columns:
-        raise WriteError(
-            f"{table.name!r} declares {model.number_of_rows} by "
-            f"{model.number_of_columns} and its UID map holds {len(rows)} by "
-            f"{len(columns)}, so which line is which cannot be told."
-        )
+        raise WriteError(composeFault(
+            str(table.reference), f"declares {model.number_of_rows} by "
+            f"{model.number_of_columns} and identifies {len(rows)} by "
+            f"{len(columns)}, so which line is which cannot be told", nothingWritten,
+        ))
     return GridMaps(
         buildLineMap(rows, table._rowIdentities, "rows", table.name),
         buildLineMap(columns, table._columnIdentities, "columns", table.name),

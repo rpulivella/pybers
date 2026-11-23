@@ -275,7 +275,7 @@ def testRemovingASheetIsRefused(tmp_path: Path) -> None:
     document = openShapes()
     del document.sheets[1]
 
-    with pytest.raises(WriteError, match="Removing or reordering"):
+    with pytest.raises(WriteError, match="removing or reordering a sheet"):
         document.save(tmp_path / "removed.numbers")
 
 
@@ -283,7 +283,7 @@ def testReorderingSheetsIsRefused(tmp_path: Path) -> None:
     document = openShapes()
     document.sheets.reverse()
 
-    with pytest.raises(WriteError, match="Removing or reordering"):
+    with pytest.raises(WriteError, match="removing or reordering a sheet"):
         document.save(tmp_path / "reordered.numbers")
 
 

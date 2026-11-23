@@ -5,8 +5,8 @@ pybers pull request tool
 The single sanctioned path to GitHub pull requests. `/pr-draft` and
 `/pr-review-code` call this rather than `gh`, so that the workflow's invariants,
 a PR is always opened as a draft and the merge commit carries the house subject,
-hold in exactly one place. A merge deletes no branch unless asked to, and never one
-a fork's pull request merely shares a name with.
+hold in exactly one place. A merge deletes no branch unless asked to, and never
+deletes one whose name a fork's pull request merely shares.
 
 **This tool exists to replace `gh`.** `gh` resolves its own identity from an OAuth
 token in the system keyring, which can hold several accounts at once, so the
@@ -73,8 +73,8 @@ UPDATES
 2026-09-01  Added `export-as-source`, matching github.py's command of the same name
             down to the flags and the handler name. `edit` replaces the WHOLE body
             and GitHub has no conflict detection, so a revision drafted from memory
-            silently discards whatever changed in between. github.py has carried the
-            remedy since 2026-08-13 and this tool carried only the hazard, which was
+            silently discards whatever changed in the meantime. github.py has carried
+            the remedy since 2026-08-13 and this tool carried only the hazard, which was
             hit twice in one day revising pull request 15. One divergence, forced by
             the data rather than chosen: PullRequestSummary omits the body, so the
             body emitter takes a string where github.py's takes a summary.
@@ -88,7 +88,7 @@ UPDATES
             record that a branch outgrows, and because a waived preflight stage has
             to be written into the body to count.
 2026-08-17  Round two of the same review. The merge PUT is now guarded as well as the
-            branch delete: urllib lets a read-phase TimeoutError through as an OSError
+            branch delete: urllib passes a read-phase TimeoutError through as an OSError
             and a proxy error page makes json.loads raise ValueError, neither of which
             is a RuntimeError, so both escaped to exit 1, the code meaning "no pull
             request", after a merge that may have landed. main() is broadened for the
@@ -390,7 +390,7 @@ def runExportAsSource(arguments: argparse.Namespace) -> int:
     with incompatible contracts: `find` may decorate freely, and this changes nothing
     but a backslash ending each line GitHub shows as a break. `edit` replaces the
     WHOLE body and GitHub has no conflict detection, so a revision drafted from
-    memory silently discards whatever changed in between. This is what makes
+    memory silently discards whatever changed in the meantime. This is what makes
     drafting one against the current text possible.
     """
     token = github.resolveToken()
@@ -415,7 +415,7 @@ def runCommentList(arguments: argparse.Namespace) -> int:
     A command of its own here where `github.py` puts the same thing behind
     `show --comments`, because `pr.py` has no `show`: it reads by branch through
     `find` and by number through `export-as-source`, and neither is a renderer a
-    flag could hang on. Adding one for symmetry would cost more than the asymmetry.
+    flag could join. Adding one for symmetry would cost more than the asymmetry.
     """
     commands.showComments(
         github.readComments(github.resolveToken(), arguments.number)
@@ -728,7 +728,7 @@ def runMerge(arguments: argparse.Namespace) -> int:
         return 0
 
     # `except Exception`, not `except RuntimeError`, and deliberately so. urllib does
-    # not wrap every failure: a read-phase TimeoutError is an OSError it lets through
+    # not wrap every failure: a read-phase TimeoutError is an OSError it passes through
     # untouched, and a proxy's HTML error page makes json.loads raise ValueError.
     # Neither is a RuntimeError, so both escaped main()'s handler to a bare traceback
     # and exit 1, which is notFoundExitCode. A merge that may well have landed then
@@ -1010,11 +1010,12 @@ def main() -> int:
     try:
         return int(arguments.handler(arguments))
     except Exception as exc:
-        # Broader than RuntimeError deliberately. urllib lets a read-phase TimeoutError
-        # through as a bare OSError, and a proxy error page makes json.loads raise
-        # ValueError. Anything escaping to Python's own handler would exit 1, and 1 is
-        # notFoundExitCode, so an unhandled crash would announce itself as "there is no
-        # pull request". No path may reach exit 1 except a considered negative answer.
+        # Broader than RuntimeError deliberately. urllib passes a read-phase
+        # TimeoutError through as a bare OSError, and a proxy error page makes
+        # json.loads raise ValueError. Anything escaping to Python's own handler would
+        # exit 1, and 1 is notFoundExitCode, so an unhandled crash would announce itself
+        # as "there is no pull request". No path may reach exit 1 except a considered
+        # negative answer.
         console.print(f"[red]{escape(str(exc))}[/]")
         return errorExitCode
 

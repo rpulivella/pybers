@@ -1,6 +1,6 @@
 ---
 description: Review an open pull request. Run the gates first, then review the changed files against the rubric, and take the PR out of draft only if everything is clean.
-argument-hint: <optional PR number; inferred from the branch if omitted>
+argument-hint: <optional PR number, inferred from the branch if omitted>
 ---
 
 # /pr-review-code
@@ -31,9 +31,9 @@ repeating its checks or assuming nobody made them.
 1. Get the pull request from `$ARGUMENTS` (`PR #42`, `#42`, `42`, URL) or the branch
    (`.venv/bin/python3 -m tools.workflow.pr find --number-only`). **Read what it printed.** One of three
    things:
-   - a bare number. That is the PR;
-   - `no-open-pull-request`, there genuinely is none for this branch and base; stop and
-     say so;
+   - a bare number. That is the PR.
+   - `no-open-pull-request`, there genuinely is none for this branch and base. Stop and
+     say so.
    - anything else, the question could not be asked at all (no credential, a 401, GitHub
      unreachable). Report *that*. It is a different claim from "there is no pull request",
      and reporting it as one states a fact you do not have.
@@ -66,7 +66,7 @@ repeating its checks or assuming nobody made them.
    git diff develop...HEAD
    .venv/bin/python3 -m tools.workflow.ticket show <ticket>
    ```
-5. **Review against the rubric.** Read `docs/code-review-rubric.md` and answer its six
+5. **Review against the rubric.** Read `docs/code-review-rubric.md` and answer its seven
    questions for this change, yourself. **The delegation below is suspended pending PYB-12**,
    and is kept because the selection rule it encodes is the part worth preserving, not
    because it should be run. Do not launch these agents without the user asking.
@@ -137,8 +137,8 @@ more than the one stage in question.
   does not exist yet is not a green one, and saying so in the report is the whole duty.
 - **Never launch a review agent unless the user asks for one.** See PYB-12.
 - **Never edit a body to make a finding go away.** Recording a waiver puts a fact on the
-  record; rewriting a description until a gate reads green removes one.
-- **The preflight is repository-wide; the review is diff-wide.** Never narrow the
+  record, and rewriting a description until a gate reads green removes one.
+- **The preflight is repository-wide, and the review is diff-wide.** Never narrow the
   preflight to changed files, and never let the review wander outside them.
 - **A recurring violation earns a lint rule, not a longer rubric.**
 - Never reimplement what a `pr-review-toolkit` agent already does.

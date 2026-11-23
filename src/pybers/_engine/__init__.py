@@ -7,12 +7,13 @@ silent when it is wrong, which is why they live together rather than beside
 whichever feature trips over one first. One module per concern: `owners` finds
 which owner is which table, `registration` and `ranges` tell the engine what each
 formula reads, `remapping` moves what a structural edit moves, and
-`recalculation` names the cells that changed.
+`recalculation` lists the cells that changed.
 
 Private, and named so. Nothing here belongs to the surface `import pybers` offers,
 and nothing here knows a model type.
 
 UPDATES
+2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-09-22  A package of one module per concern, for PYB-113.
 2026-09-22  Every archive it writes is written through the save's index, and the
             table owner kind lives here, for PYB-109.

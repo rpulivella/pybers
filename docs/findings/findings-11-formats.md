@@ -5,7 +5,7 @@ sets in the cell record, and which fields pybers writes or carries through. Meas
 20 October 2026 and 21 October 2026 for PYB-219, and every count below is across all 74,304 records
 in 161 documents.
 
-Part of [FINDINGS.md](FINDINGS.md), which indexes every topic. How a cell names its format,
+Part of [FINDINGS.md](FINDINGS.md), which indexes every topic. How a cell specifies its format,
 through the per-kind slots and the displayed kind, is in
 [findings-01-values.md](findings-01-values.md).
 
@@ -20,7 +20,7 @@ someone set explicitly. A slot whose bit is clear holds the Automatic format Num
 inferred from what was typed. **All 74,304 records agree: no bit is ever set without
 its slot.** Bits `0x10` and `0x40` are never set.
 
-| bit | kind slot | records | named by |
+| bit | kind slot | records | labeled by |
 | --- | --- | --- | --- |
 | `0x01` | number | 809 | `13-number-percent` `B1` to `G1`, beside `A1` "plain number" clear |
 | `0x02` | currency | 319 | every currency cell of `12-number-currency` |
@@ -60,7 +60,7 @@ seven documents, and on none of the other 74,218 records.
 
 Set on one record, `15-number-duration-formats` `J1`, `I1+10`, which Numbers marks with
 a corner indicator reading that the duration format was removed. `K1` converts the same
-duration on purpose with `DUR2MINUTES` and leaves it clear. One record names the bit and
+duration on purpose with `DUR2MINUTES` and leaves it clear. One record sets the bit and
 does not settle it.
 
 ### Byte 4 `0x01` is not a format bit
@@ -78,7 +78,7 @@ family's format only as Numbers stores it, so an absent field stays absent.
 
 ### Number, `256`
 
-| field | measured | named by |
+| field | measured | labeled by |
 | --- | --- | --- |
 | `decimal_places` | 253 for Automatic, 0, 1, 2, 4 and 6 | `11-value-types-noformats` `A1`, `74-number-negatives` `A1` |
 | `negative_style` | 0 to 3 | `74-number-negatives` `A1` to `D1` |
@@ -98,7 +98,7 @@ The menu titles 2 and 3 alike, so the color is the only difference between them.
 
 ### Currency, `257`
 
-| field | measured | named by |
+| field | measured | labeled by |
 | --- | --- | --- |
 | `decimal_places` | 253 for Auto, 0, 2 and 5 | `12-number-currency` `E1`, "0 digits after decimal", `82-currencies` `F1` |
 | `currency_code` | `USD`, `EUR`, `JPY`, `KRW`, `GBP`, `CHF` and `INR` | `12-number-currency` `H1`, "in Euros", `82-currencies` `A1` to `E1` |
@@ -112,12 +112,12 @@ in `A1` and a dollar amount in `B1`:
 
 | formula | stored as | shows |
 | --- | --- | --- |
-| `=A1*2`, `=SUM(A1,A1)` | type 10, naming `A1`'s euro format | €2469.00 |
+| `=A1*2`, `=SUM(A1,A1)` | type 10, specifying `A1`'s euro format | €2469.00 |
 | `=A1+10`, `=A1/B1` | type 2, the Automatic number format | 1244.5, 12.345 |
 | `=A1+B1` | type 8, a formula error | nothing |
 | `=DOLLAR(1234.5)` | type 3, text | $1,234.50 |
 
-A result that stays currency names the same format entry as the amount it came from,
+A result that stays currency specifies the same format entry as the amount it came from,
 so its code is that amount's code, and byte 6 is clear, since nobody chose it. Adding
 euros to dollars is refused by Numbers as an error. `CURRENCYCONVERT` stored a formula
 error in this run and in a second given a minute to resolve, so a converted result is
@@ -142,12 +142,12 @@ style" over 5 decimal places and style 0. The negative styles are settled by
 ### Percent, `258`
 
 The fields of a number, with the same meanings. Measured: `decimal_places` 0, 2 and 253,
-`negative_style` 0 to 3, and the separator both ways, named by `13-number-percent` `B1`
+`negative_style` 0 to 3, and the separator both ways, labeled by `13-number-percent` `B1`
 to `G1` and `74-number-negatives` `G1` and `H1`.
 
 ### Scientific, `259`
 
-Only `decimal_places` varies: 2, 0 and 253, named by `16-number-scientific-numeralsystems`
+Only `decimal_places` varies: 2, 0 and 253, labeled by `16-number-scientific-numeralsystems`
 `C1`, `D1` and `B1`. `negative_style` is 0 and the separator false in all five entries.
 
 ### Fraction, `262`
@@ -168,7 +168,7 @@ A custom number form with no fraction stores -3.
 
 ### Numeral system, `269`
 
-| field | measured | named by |
+| field | measured | labeled by |
 | --- | --- | --- |
 | `base` | 2, 3, 8, 10, 16 and 36 | `16-number-scientific-numeralsystems` `I1`, `E1` and `G1`, `80-numeral-systems` `A1` to `C1` |
 | `base_places` | 0, 4, 7, 8, 9 and 16 | the same cells, "0 places" to "16 places" |
@@ -181,9 +181,9 @@ taken. Whether a larger base is refused is not measured. The value stays the sto
 ### Custom formats, `270` to `274`
 
 Numbers' Create Custom Format dialog offers three types, Number, Date & Time and Text, and
-the table entry's `format_type` names which, with currency as a fourth:
+the table entry's `format_type` specifies which, with currency as a fourth:
 
-| table entry | `format_type_pre_bnc` | custom type | named by |
+| table entry | `format_type_pre_bnc` | custom type | labeled by |
 | --- | --- | --- | --- |
 | 270 | 270 | Number | `17-number-custom`, `76-custom-number-scales`, `78-custom-number-digits`, `87-custom-number-rules` |
 | 271 | 271 | Text | `86-custom-text-and-currency` `A1` to `C1` |
@@ -196,7 +196,7 @@ the table entry's `format_type` names which, with currency as a fourth:
 `TSK.CustomFormatArchive` in `TSA.DocumentArchive.custom_format_list`, the `super` of
 the root `TN.DocumentArchive`, whose own `custom_format_list` is unset. The list is type
 222, a `TSK.CustomFormatListArchive` whose `uuids` and `custom_formats` run in parallel.
-Measured in `17-number-custom`, whose four formats are named by `B2` to `E2`, and in
+Measured in `17-number-custom`, whose four formats are labeled by `B2` to `E2`, and in
 the custom measurements from `76` to `87`, whose labels name each format.
 
 | field | what it holds |
@@ -214,7 +214,7 @@ first condition, type 1 at 0, is `'–'#,###.0 K'g'`, the negative form. Its sec
 **A rule is a condition, a threshold and a form of its own.** Measured in
 `87-custom-number-rules`, one column per condition the rule menu offers, each at 100:
 
-| `condition_type` | menu item | named by |
+| `condition_type` | menu item | labeled by |
 | --- | --- | --- |
 | 0 | If equal to | `E1` |
 | 1 | If less than | `A1` |
@@ -347,12 +347,12 @@ to None:
 marker by U+202F**, a narrow no-break space, as in `h:mm a`. `h a` keeps a plain space,
 and the menu titles follow the same rule. A date shown without a time stores a pattern
 without one, so `suppress_date_format` and `suppress_time_format` are never set. Each
-pattern names its fields explicitly, so the document's region does not change it, as
+pattern specifies its fields explicitly, so the document's region does not change it, as
 the locale section below records.
 
 ### Duration, `268`
 
-| field | measured | named by |
+| field | measured | labeled by |
 | --- | --- | --- |
 | `duration_style` | 0 no unit, 1 abbreviated, 2 full word | `15-number-duration-formats` `I1`, `E1` and `F1` |
 | `duration_unit_largest` | a unit bit | |
@@ -360,7 +360,7 @@ the locale section below records.
 | `use_automatic_duration_units` | both | `B1` true, `E1` false |
 
 The unit bits run 1 weeks, 2 days, 4 hours, 8 minutes, 16 seconds and 32 milliseconds.
-Weeks, hours, minutes and milliseconds are named by `15-number-duration-formats` `E1`
+Weeks, hours, minutes and milliseconds are labeled by `15-number-duration-formats` `E1`
 "only weeks", `I1` "hours minutes" and `G1` "only milliseconds", and days and seconds by
 `77-duration-units` `A1` and `B1`. With automatic units the pair records the range Numbers last chose:
 the largest unit the value holds an amount of, down to the smallest, measured 10 November 2026
@@ -383,7 +383,7 @@ Measured 10 November 2026 for PYB-145 across the 190 documents in the tests, pai
 cell's kind with the family it is shown with. `kindFormatFamilies` in
 `pybers.table.kinds` is this table, and a format outside it is refused.
 
-| kind | families | named by |
+| kind | families | labeled by |
 | --- | --- | --- |
 | number | number, percent, scientific, fraction, numeral system, custom number, star rating | `13-number-percent`, `16-number-scientific-numeralsystems`, `17-number-custom`, `68b-series-kinds-dragged` `D2`, `54-format-star-rating` `A1` |
 | currency | currency | `12-number-currency` |
@@ -400,7 +400,7 @@ date or currency reads as unknown until PYB-245 to PYB-247 decode it, so it is n
 
 A cell holding nothing keeps a format too. `65b-series-dragged` `L3` and `M3` and
 `19-formula-dragged` `B2` are type 0 records holding a chosen number, date and text
-format: the entry in its family's slot, the displayed kind naming that slot, and the
+format: the entry in its family's slot, the displayed kind specifying that slot, and the
 slot's chosen bit, `B2` the bare twelve-byte header and those two references. pybers
 writes an empty cell's format the same way, as the golden
 `00-created-empty-formats-chosen-by-pybers` shows Numbers keeping.
@@ -415,14 +415,14 @@ its family's slot until a result of that kind arrives:
 | formula before | the record given | what Numbers saved |
 | --- | --- | --- |
 | `=SUM(A1:A10)` in `20-formula-shapes`, a number | the percent in its number slot, chosen | the percent kept, its entry completed with 0 decimal places, negative style 0 and no separator |
-| `=IF(SUM(A1:A5)>10,"big","small")`, text | the percent in its number slot, its text slot removed and its displayed kind left naming it | the text slot restored and shown in Automatic, the percent kept in the number slot |
+| `=IF(SUM(A1:A5)>10,"big","small")`, text | the percent in its number slot, its text slot removed and its displayed kind left specifying it | the text slot restored and shown in Automatic, the percent kept in the number slot |
 | `=A1/10` pybers created, no result yet | the percent in its number slot, not chosen, no displayed kind | calculated to 0.5, shown in percent from that slot, and marked chosen |
 
 None drew a chip or an alert. pybers therefore writes a format given to any formula into
 its family's slot, chosen, whatever the formula's result, since Numbers decides which slot
 shows once it calculates, as the goldens `00-created-formula-formats-chosen-by-pybers`
 and `20-formula-format-chosen-by-pybers` show Numbers keeping. A formula with no result
-names no displayed kind, so pybers reads its one chosen slot as its format. A chosen text
+specifies no displayed kind, so pybers reads its one chosen slot as its format. A chosen text
 format is the exception, refused, since none of the 897 formula records in the documents
 keeps one.
 
@@ -432,7 +432,7 @@ Measured 10 November 2026 for PYB-145 across the same 190 documents, pairing eac
 the family of the format beneath it. `controlFormatFamilies` in `pybers.format.controls`
 is this table, and a control beside any other format is refused.
 
-| control | families | named by |
+| control | families | labeled by |
 | --- | --- | --- |
 | checkbox | checkbox | `11-value-types-noformats` `E1`, `63-fill-base` `D3` |
 | star rating | star rating | `11-value-types-noformats` `F1`, `54-format-star-rating` `A1` |
@@ -453,9 +453,9 @@ currency cell is. The `control_*`, `slider_*` and `multiple_choice_list_*` field
 format archive are never set.
 
 The control is a `TST.CellSpecArchive` in the table's `control_cell_spec_table`, which
-byte 9 `0x04` names:
+byte 9 `0x04` specifies:
 
-| field | holds | named by |
+| field | holds | labeled by |
 | --- | --- | --- |
 | `interaction_type` | 4 stepper, 5 slider, 6 star rating, 7 pop-up menu, 8 checkbox | `81-control-formats` `B1`, `A1`, `J1`, `I1` and `K1` |
 | `range_control_min`, `_max`, `_inc` | the range and step, doubles | `A1` 0 to 200 by 5, `B1` -10 to 10 by 0.5 |
@@ -503,7 +503,7 @@ and a document made under another calendar is not measured.
 | controls | the format in its kind's slot, and the cell spec's type, range and step | a pop-up menu's `TST.PopUpMenuModel` |
 | date and time | `date_time_format` | `suppress_date_format`, `suppress_time_format` |
 | duration | every field | |
-| text, checkbox, star rating, boolean | `format_type` | the control a checkbox or a star rating names |
+| text, checkbox, star rating, boolean | `format_type` | the control a checkbox or a star rating specifies |
 
 Every family writes its kind's bit in byte 6, since a format pybers sets is chosen.
 pybers does not write byte 5 `0x02`, which only Numbers' recalculation sets, and carries

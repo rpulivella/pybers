@@ -590,7 +590,7 @@ def testRemovingATableIsRefused(tmp_path: Path) -> None:
     document = openShapes()
     del document.sheet(1).tables[1]
 
-    with pytest.raises(WriteError, match="Removing or reordering a table"):
+    with pytest.raises(WriteError, match="reordering a table is not supported"):
         document.save(tmp_path / "removed.numbers")
 
 
