@@ -9,7 +9,7 @@ Part of [FINDINGS.md](FINDINGS.md), which indexes every topic.
 
 ## The key is not at a fixed position, and reading it as though it were deletes work
 
-Byte 9 bit `0x02` says a cell is backed by a formula, and the key naming that formula is one
+Byte 9 bit `0x02` says a cell is backed by a formula, and the key specifying that formula is one
 of the record's trailing references. Three bits in byte 8 and one in byte 9 each put a
 reference **ahead** of it:
 
@@ -35,7 +35,7 @@ resolved to a column at or before zero.
 ## How the rule was validated
 
 A pooled formula carries a `refcount` recording how many cells name it. For each table,
-take the key each record names under a candidate rule, count them, and compare the histogram
+take the key each record specifies under a candidate rule, count them, and compare the histogram
 against the pool's own refcounts. A wrong rule almost never reproduces one by accident.
 
 ```
@@ -80,12 +80,12 @@ for PYB-61 on 14 September 2026: the gate is byte 10.** The count is
 `popcount(byte8 & 0xE0) + popcount(byte9) + popcount(byte10)`, with no exceptions in
 11,760 records. See [findings-01-values.md](findings-01-values.md).
 
-## Which style each of `0x20` and `0x40` names
+## Which style each of `0x20` and `0x40` specifies
 
 Measured for PYB-265 on 12 November 2026 in `98b-cell-box-styles`, ten cells each holding `1`, styled
 by hand in Numbers 15.4 with one change per column. **A table keeps its cell styles and its
 paragraph styles in one `styleTable`**, keys unique across both, so a key alone does not say
-which kind it names. The slot does, and the archive type each key resolves to confirms it:
+which kind it specifies. The slot does, and the archive type each key resolves to confirms it:
 
 ```
 cell  styled with                     byte 8  references   resolves to

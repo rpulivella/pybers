@@ -15,9 +15,9 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document, what it is running on, and the tree of its sheets and tables, each shown by its kind and size, in a form safe to paste into a public bug report. `--names` names each sheet, table and unrecognized cell, for the person holding the document.
+`pybers check FILE` says whether pybers can read a document, what it is running on, and the tree of its sheets and tables, each shown by its kind and size, in a form safe to paste into a public bug report. `--names` shows the name of each sheet and table and the address of each unrecognized cell, for the person holding the document.
 
-`pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION] [--table-style STYLE] [--locale LOCALE]` sets the value, the format, the control, the cell style and the borders of every cell a [selector](#selectors) matches, and the lines of every table it matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` names the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
+`pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION] [--table-style STYLE] [--locale LOCALE]` sets the value, the format, the control, the cell style and the borders of every cell a [selector](#selectors) matches, and the lines of every table it matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` specifies the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B4" 1250.00
@@ -29,7 +29,7 @@ pybers set budget.numbers "Summary::Costs::F4" 1:30 --as duration
 pybers set budget.numbers "Summary::Q*::B2" 0 --preview   # B2 of every quarter
 ```
 
-`--cell-format` takes a format as `pybers show` prints one: its family, then each setting as a CSS declaration, `automatic` leaving the choice to Numbers. A value of the cell's kind keeps its format, and a value of another kind takes that kind's Automatic format, as typing does in Numbers. A format that cannot show a cell's value is refused, naming both, unless `--conflict automatic` gives that cell the Automatic format and says why on stderr. `--cell-control none` removes a control:
+`--cell-format` takes a format as `pybers show` prints one: its family, then each setting as a CSS declaration, `automatic` leaving the choice to Numbers. A value of the cell's kind keeps its format, and a value of another kind takes that kind's Automatic format, as typing does in Numbers. A format that cannot show a cell's value is refused, specifying both, unless `--conflict automatic` gives that cell the Automatic format and says why on stderr. `--cell-control none` removes a control:
 
 ```bash
 pybers set budget.numbers "Summary::Costs::B4" --cell-format number      # chosen, not Automatic
@@ -101,7 +101,7 @@ A date is stored as wall-clock time, as Numbers stores it. One given with an off
 - `duration`: Numbers' own units, `1h 30m` or `2d 4h`, or a clock, `1:30`
 - `text`: anything, kept exactly as given
 
-`pybers show FILE` prints a whole document, and `pybers show FILE SELECTOR` prints every part a [selector](#selectors) matches, each in full and one after another. Each part opens with a line naming it and folding what describes it, its children indented beneath it, and a count of zero is left out. `pybers show` never writes to the document.
+`pybers show FILE` prints a whole document, and `pybers show FILE SELECTOR` prints every part a [selector](#selectors) matches, each in full and one after another. Each part opens with a line specifying it and folding what describes it, its children indented beneath it, and a count of zero is left out. `pybers show` never writes to the document.
 
 ```console
 $ pybers show shapes.numbers
@@ -346,7 +346,7 @@ pybers needs the Python that `requires-python` in `pyproject.toml` specifies, an
 pip install -e .
 ```
 
-A new document starts with `pybers.create`, naming its language and region, and holds one sheet and no table until a script adds its own. Its archives are composed when it is first saved, so it holds nothing Numbers wrote:
+A new document starts with `pybers.create`, specifying its language and region, and holds one sheet and no table until a script adds its own. Its archives are composed when it is first saved, so it holds nothing Numbers wrote:
 
 ```python
 import pybers
@@ -493,7 +493,7 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 | `black` token | `pybers.Color.black` | `black` |
 | `white` token | `pybers.Color.white` | `white` |
 
-`pybers.Color.parse(text)` reads each form and `str(color)` prints it. Text leaving out its alpha is refused, naming the form that carries it, and so is a model Numbers does not store, such as HSL or OKLCH. Components run from 0.0 to 1.0. Numbers stores every color as RGB, so a gray is three equal sRGB components, and `device-gray(0.5 / 1)` prints back as `color(srgb 0.5 0.5 0.5 / 1)`, which is what pybers stores. A document pybers creates holds RGB alone, and pybers reads and prints a CMYK color but creates none. `pybers.formatJsonForm(color)` writes a color's fields, and `pybers.parseJsonForm` reads them back equal.
+`pybers.Color.parse(text)` reads each form and `str(color)` prints it. Text leaving out its alpha is refused, specifying the form that carries it, and so is a model Numbers does not store, such as HSL or OKLCH. Components run from 0.0 to 1.0. Numbers stores every color as RGB, so a gray is three equal sRGB components, and `device-gray(0.5 / 1)` prints back as `color(srgb 0.5 0.5 0.5 / 1)`, which is what pybers stores. A document pybers creates holds RGB alone, and pybers reads and prints a CMYK color but creates none. `pybers.formatJsonForm(color)` writes a color's fields, and `pybers.parseJsonForm` reads them back equal.
 
 ### Selectors
 

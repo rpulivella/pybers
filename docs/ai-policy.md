@@ -27,4 +27,4 @@ Check your pull request against this list before opening it. Any one of these ma
 
 ## Resolution
 
-A maintainer closes an unguided pull request naming the reason. It is the contributor's responsibility to perform the rework, not the maintainer's. You are welcome to open a new pull request once the reason no longer applies.
+A maintainer closes an unguided pull request, stating the reason. It is the contributor's responsibility to perform the rework, not the maintainer's. You are welcome to open a new pull request once the reason no longer applies.

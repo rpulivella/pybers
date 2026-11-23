@@ -69,7 +69,7 @@ of the spec registry the same way `tools/local/functions_extract.py` reads the a
 
 `LAMBDA` uses a second pair, 56 and 57, around its body.
 
-## A table is named in a formula by its owner uid, which the table does not carry
+## A table is specified in a formula by its owner uid, which the table does not carry
 
 A cross-table reference holds `AST_cross_table_reference_extra_info.table_id`, four 32-bit
 words. That value is the `formula_owner_uid` on the calculation engine's dependency entry
@@ -77,7 +77,7 @@ for the target table, low half first, matched across `20-formula-shapes` on 8 Se
 
 **`TableModelArchive.haunted_owner.owner_uid` is not it**, and it looks like it is: it agrees
 in 15 of 16 bytes and differs in the low byte (`0x37` against `0x14` for `Table 2`). Reading
-it instead names no table at all, which is a plausible wrong answer rather than an error.
+it instead specifies no table at all, which is a plausible wrong answer rather than an error.
 
 `Table.identifier` is read the long way round, from the engine, exactly as
 `internal_formula_owner_id` already was.

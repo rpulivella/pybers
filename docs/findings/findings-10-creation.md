@@ -32,7 +32,7 @@ The same fixtures place every archive outside `Metadata.iwa` in exactly one comp
 and footers, and a `TSWP.NumberAttachmentArchive` holding the page number Numbers puts in the
 center footer. The document component gains a UUID for the sheet, the guides and the six
 storages. `DocumentArchive.sheets` gains the sheet at its tab position, and the sidebar tree
-gains a `TSK.TreeNode` naming it.
+gains a `TSK.TreeNode` specifying it.
 
 A sheet Numbers creates carries different page setup from the template's first sheet:
 
@@ -114,12 +114,12 @@ created in the interface, so a table-level reset has no Numbers-made example to 
 ## What registering a created table touches beyond its own archives
 
 Two of a table's references are weak, and neither shows in `object_references`:
-`TableModelArchive.table_style_preset`, naming the theme's preset, and
-`TableInfoArchive.super.parent`, naming the sheet. The calculation engine's component lists
+`TableModelArchive.table_style_preset`, specifying the theme's preset, and
+`TableInfoArchive.super.parent`, specifying the sheet. The calculation engine's component lists
 both as weak external references.
 
 The engine's owner of kind 8 records its edge to the owner of kind 35 as an integer,
-`internal_owner_id_for_edge`, and each dependency tile names its owner the same way, so an
+`internal_owner_id_for_edge`, and each dependency tile specifies its owner the same way, so an
 internal owner id appears inside archive bodies as well as in `owner_id_map`. Those
 records are identical in every fixture whatever the table's size.
 
@@ -162,10 +162,10 @@ inserted table, whose owner of kind 1 held no dependency tile. Measured for PYB-
 `CalculationEngine.iwa`, in the component already holding the owner, so no external
 reference changes. It carries the owner's `internal_owner_id`, begins at column 0 and
 row 0, and holds the same cell record as the owner's `cell_dependencies`. The owner lists
-it in `tiled_cell_dependencies` and names it as a strong object reference.
+it in `tiled_cell_dependencies` and lists it as a strong object reference.
 
 **The record carries the precedent as an edge.** `B1`'s record holds
-`edge_without_owner_rows: 0` and `edge_without_owner_columns: 0`, naming `A1`. pybers
+`edge_without_owner_rows: 0` and `edge_without_owner_columns: 0`, specifying `A1`. pybers
 writes an empty edge set, as it does for every formula. Whether Numbers then recalculates
 `B1` when `A1` is edited is what the golden `20-formulas-in-created-tables` settles.
 
@@ -197,7 +197,7 @@ header name manager's slot record for a table carries an **edge on cell (0, 0)**
 slot Numbers writes does. Neither was the cause, and both are now what pybers writes.
 
 The same save raises `number_of_formulas` from 7 to 8 and drops `owner_id_map` entry 34,
-which no owner archive names. `49` and `50` drop it too, so it is a leftover Numbers culls
+which no owner archive specifies. `49` and `50` drop it too, so it is a leftover Numbers culls
 on any save rather than part of the edit.
 
 ## The least a created table and sheet hold
@@ -220,16 +220,16 @@ Numbers raises no warning either way, so only the comparison tells them apart.
 | --- | --- |
 | `TableInfoArchive.super` and `tableModel` | required by the schema |
 | `geometry.flags` 3 and `exterior_text_wrap` | restored at 0, and with a margin of 0 rather than 12 |
-| the model's required fields, `table_name`, sizes and `table_id` | required, and `table_id` names the owner family |
+| the model's required fields, `table_name`, sizes and `table_id` | required, and `table_id` specifies the owner family |
 | `header_rows_frozen`, `header_columns_frozen` and both `repeating_header_*_enabled` | left absent, so a header row added later would neither freeze nor repeat |
 | every style slot the theme's preset fills | the category, label and pivot slots were left absent |
 | `base_column_row_uids` and its map | pybers keys every line's identity on it |
-| `table_style_preset`, weak | names the preset the reset styles vary |
+| `table_style_preset`, weak | specifies the preset the reset styles vary |
 | two header buckets and the first tile | required by the data store |
 | the string, style, formula and pre-BNC format lists | required by the data store |
 | the control-spec list | without it Numbers opened clean and dropped every formula in the table |
-| the BNC format list | pybers names a value's Automatic format in it |
-| the owner of kind 1: uid, internal id, kind and `formula_owner` | the identity `table_id` names |
+| the BNC format list | pybers specifies a value's Automatic format in it |
+| the owner of kind 1: uid, internal id, kind and `formula_owner` | the identity `table_id` specifies |
 | the three reset styles, whole | each property is the reset, and `pybers-base` without `tabs` was recounted to 56 overrides |
 
 ### What a created table leaves to Numbers
@@ -247,7 +247,7 @@ own owner base, adding no owner and changing no field pybers sent.
 | 6 | the category owner, group-by and group node, rebuilt as base + 8 onto the owner of kind 8 |
 | 7 | the hidden states at base + 4 and base + 11, their formula owners and filter sets |
 | 8 | the sort rule tracker and `sort_order` |
-| 9 to 11 | the ten owners besides kind 1, their tiles, and every model field naming them |
+| 9 to 11 | the ten owners besides kind 1, their tiles, and every model field specifying them |
 | 12 | the rich-text, comment, conditional-style, formula-error, import-warning and multiple-choice lists |
 | 13 | the title and caption standins, the title still hidden |
 | 14 | the layout cache |
@@ -405,7 +405,7 @@ newer slots, and needs neither.
 **A created document's first table creates its calculation engine.** A document holding
 no table needs none, and Numbers builds one on save. pybers writes an engine holding an
 empty dependency tracker and an empty dirty list, in a component of its own named
-`CalculationEngine`, with the document root naming it, before registering the table's
+`CalculationEngine`, with the document root specifying it, before registering the table's
 owner. Numbers opened a created document holding a table so made, kept the table's
 identity, and computed `=A1*3` as 6 and `=SUM(A1:B1)` as 8 from the 2 in `A1`,
 measured on 2 November 2026. Numbers itself names that member `CalculationEngine-<id>` in 16 of
@@ -423,7 +423,7 @@ the one member outside `Index/` that was missing, since keeping any of the three
 
 **The stylesheet lists styles it does not declare.** Its `styles` held five character
 styles that only the theme's presets declare in `object_references`, so dropping the
-presets left those entries naming nothing. Numbers opened that without complaint, which is
+presets left those entries specifying nothing. Numbers opened that without complaint, which is
 why only the comparison of every body reference found it.
 
 ## What Numbers adds or rewrites on opening a created document

@@ -95,14 +95,14 @@ default lives in the inherited style and the cell simply declines to override it
 **Setting a property back to what the cell inherits removes the override.** Measured for
 PYB-265 on 12 November 2026 in `98c-cell-box-sections`: C1, a header cell given a 6pt inset and then
 4pt again, and D1, its wrap cleared and checked again, each hold no cell style. **No Fill is stored where it overrides**: B1, a header cell
-given No Fill, names a variation of the header row style holding an empty `cell_fill`, which
+given No Fill, specifies a variation of the header row style holding an empty `cell_fill`, which
 covers the header's gray.
 
 **A variation never inherits from a variation.** None of the 275 cell style variations and
 182 paragraph style variations in the documents Numbers made has a variation as its parent,
 and a table whose section style is a variation flattens instead. Measured for PYB-265 on
 13 November 2026 in `99-cell-fill-in-a-created-table`, a table pybers created, whose body style
-is the reset's variation stating `text_wrap: false`: A1, filled by hand, names a variation
+is the reset's variation stating `text_wrap: false`: A1, filled by hand, specifies a variation
 of the theme's root cell style stating the fill and `text_wrap: false` both, with an
 `override_count` of 2. The same save dropped the five cells' styles pybers had written as
 variations of the reset's variation, and their entries, and neither Numbers nor Quick Look

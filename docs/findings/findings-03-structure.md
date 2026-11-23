@@ -67,8 +67,8 @@ text cell separated by tab characters**:
 ```
 
 `22d` completes the rule on the second axis, measured 7 September 2026. The join is **row-major,
-a tab between columns and a newline between rows**, so a two-by-two merge of cells naming
-themselves produces `'two by two, anchor\td2\nc3\td3'`. Every merge in the documents was one
+a tab between columns and a newline between rows**, so a two-by-two merge of cells holding their own addresses
+produces `'two by two, anchor\td2\nc3\td3'`. Every merge in the documents was one
 row tall until that fixture, which is why only the tab half was known.
 
 Numbers coerces to text, so merging two numeric cells destroys both numbers. `22b` proves the
@@ -178,7 +178,7 @@ deletion pulls the ends in: deleting row 3 made `SUM(A3:A4)` into `SUM(A3:A3)` a
 
 **A reference losing every line becomes node type 46 carrying the lines it lost.**
 Beside the sentinels sits an `AST_tract_list` holding the UUID of every row and column
-it named, as `21`'s deleted reference does too. A broken range names its own table
+it selected, as `21`'s deleted reference does too. A broken range specifies its own table
 even from inside it. A single cell and a whole range both break this way; a range
 losing only some lines shrinks instead.
 
@@ -245,7 +245,7 @@ longer matches what Numbers writes. A reference the body already held undeclared
 stays so, since Numbers leaves some out.
 
 **Conditional highlighting is rewritten, not moved.** A rule is a rule set a cell
-names by key, and its operands follow the formula rule axis by axis. A locked axis
+specifies by key, and its operands follow the formula rule axis by axis. A locked axis
 holds a stored line, an unlocked one holds an offset from the cell the rule colors,
 and a whole-column operand holds a column alone. Three things follow:
 
@@ -255,7 +255,7 @@ and a whole-column operand holds a column alone. Three things follow:
   becomes `#REF!` carrying the lost lines, each axis's sentinel and sticky bit
   carrying that axis's lock, and a whole-column operand recording a zero identity
   for its row. The cell's cached match becomes 15, none.
-- A line added takes empty records naming the rules of the line it displaced.
+- A line added takes empty records specifying the rules of the line it displaced.
 
 **A spill is re-flowed, not moved.** A row added inside `SEQUENCE(3)` left the
 spilled cells where they were and moved the row below them instead. Following
@@ -270,9 +270,9 @@ locked, mixed and across tables, and `61-move-styles-base`, which holds a fill, 
 face, a border and a highlighting rule in the same block. Each copy is one move made by
 hand in Numbers 15.3.1, measured 23 September 2026 for PYB-18.
 
-**Dragging preserves the cell each reference names.** A reference inside the block to
+**Dragging preserves the cell each reference selects.** A reference inside the block to
 another cell in it follows, `=B2+C2` becoming `=F8+G8`. One leaving the block keeps its
-target, `=A3` staying `=A3` and `=$B2` becoming `=$F8`. A formula elsewhere naming cells
+target, `=A3` staying `=A3` and `=$B2` becoming `=$F8`. A formula elsewhere selecting cells
 wholly inside the block follows it, from another table too: `=SUM(B2:D5)` became
 `=SUM(F8:H11)` and `Table 2::C2` became `Table 2::G8`.
 
@@ -281,7 +281,7 @@ rewrites only a moved range that would reach past its table's edge, clamping it 
 `SUM(A1:A12)` pasted six rows lower in a twelve row table was stored as `SUM(E7:E12)`,
 not `SUM(E7:E18)`, measured 24 September 2026. The engine registers every range the same way,
 bounded by the table it reads, whether or not anything moved. `=A3` became `=E9`, the locked axis of `=$B2` stayed so it
-became `=$B8`, and a formula elsewhere kept naming the address the block left, reading
+became `=$B8`, and a formula elsewhere kept selecting the address the block left, reading
 empty cells. An offset landing outside a table is stored as it is, `=I7` in an eight
 column table and `Table 2::E7` in a one column table, and shows an error.
 
@@ -326,11 +326,11 @@ block included.
 
 **A copied checkbox shares its control and keeps its own value.** Three cells name one
 `control_cell_spec_table` entry, counted 3, and unchecking `D5` in `63f` changed only
-`D5`'s record. An entry no cell names any more is removed, as `63b` shows.
+`D5`'s record. An entry no cell specifies any more is removed, as `63b` shows.
 
 **A copied rich-text cell gets an entry, a payload and a storage of its own**, each
 beside the original and sharing its style sheet and styles. An overwritten one is removed
-with its payload, its storage and the character styles only that storage named.
+with its payload, its storage and the character styles only that storage specified.
 
 **Styles are shared and counted**, as for any record: both style entries went from 1 to 3.
 
@@ -618,7 +618,7 @@ From every document, measured 1 September 2026.
 
 **`TableModelArchive.number_of_rows` and `number_of_columns` are explicitly set on all 74
 tables**, and they are the table's real size. A Numbers table is a fixed grid rather than the
-endless sheet Excel presents, so an address beyond it names nothing at all rather than naming
+endless sheet Excel presents, so an address beyond it selects nothing at all rather than selecting
 an empty cell.
 
 Deriving the size from the cells that hold something instead returns a real rectangle that is

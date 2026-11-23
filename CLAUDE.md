@@ -215,7 +215,7 @@ functions over explanation.
 - **An untrue statement is rewritten to the current fact**, in a doc, a finding or a
   comment, never left under a "Superseded" note. Only an addressed item, an AC or a
   checklist line, is struck through or marked NA, because references point at it.
-- **A statement names only the current design**, never what it replaced: no "formerly",
+- **A statement describes only the current design**, never what it replaced: no "formerly",
   "renamed from" or "was". A breaking change that tells users what to do instead is the
   one exception.
 - **A doc never states a version requirement**, a Python floor, a Numbers release or a

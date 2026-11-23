@@ -247,7 +247,7 @@ carries a `localizationKey`, which suggests some paths are template-provided and
 
 ### What the twenty-one drawables in `34` actually are
 
-The path source names the *storage* kind, not the shape. Reading the element sequences
+The path source specifies the *storage* kind, not the shape. Reading the element sequences
 identifies each one, and the fixture is deliberately varied:
 
 ```

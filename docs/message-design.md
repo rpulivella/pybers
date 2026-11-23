@@ -95,7 +95,7 @@ Sheet 1::Table 1 holds a formula key past the end of its cell record. Report thi
 
 ### Skipped part
 
-A phrase in the present tense, with no capital and no period, since the line printing it names the part first.
+A phrase in the present tense, with no capital and no period, since the line printing it specifies the part first.
 
 ```
 Skipped: Sheet 1::Table 1::B4  holds a formula
