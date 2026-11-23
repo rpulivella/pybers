@@ -48,6 +48,8 @@ neither may be hand-edited, so a finding in either is noise by construction.
 Runs on the repository's venv, which holds rich.
 
 UPDATES
+2026-11-23  A preposition whose object is a code span is not stranded, for
+            PYB-307.
 2026-10-26  The split-verb check warns on a time adverb alone.
 2026-10-26  The exemption for `standards-check.py`, which no longer exists, removed.
 2026-10-21  Comments come from the tokenizer, so a `#` inside a string is not
@@ -312,10 +314,10 @@ splitVerbRe = re.compile(
     re.IGNORECASE,
 )
 
-# Never end a sentence on a preposition.
+# No sentence ends on a preposition, where punctuation follows it with no blank span.
 strandedPrepRe = re.compile(
     r"\b(with|for|on|in|at|from|about|of|by|into|onto|over|under|through"
-    r"|after|before|between|against|toward|towards|around|off|out|up)\s*[.!?]",
+    r"|after|before|between|against|toward|towards|around|off|out|up)[.!?]",
     re.IGNORECASE,
 )
 
