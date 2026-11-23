@@ -70,6 +70,11 @@ def composeRefusal(
     return " ".join(parts)
 
 
+def composeWithheldRefusal(refusal: str, notDone: str) -> str:
+    """Return a refusal a check composed, ending in what the call did not do."""
+    return f"{refusal} {formatSentence(notDone)}"
+
+
 def composeTextRefusal(
     text: str, index: int, cause: str, fix: str | None = None
 ) -> str:
@@ -91,6 +96,7 @@ class PybersError(Exception):
     """Anything this library raises, and the one name a caller can always catch."""
 
     choices: tuple[str, ...] = ()
+    notDone: str | None = None
 
 
 def composeChoiceRefusal[ErrorType: PybersError](
@@ -102,7 +108,8 @@ def composeChoiceRefusal[ErrorType: PybersError](
 ) -> ErrorType:
     """Return the refusal of a value not among its choices, naming the closest.
 
-    Where none is close and too many to list, the error carries its choices.
+    Where none is close and too many to list, the error carries its choices and what
+    was not done, so a consumer can say where the choices are before that.
     """
     shown = given if isinstance(given, str) else repr(given)
     closest = difflib.get_close_matches(str(given), choices, n=1)
@@ -115,6 +122,7 @@ def composeChoiceRefusal[ErrorType: PybersError](
     error = errorType(composeRefusal(repr(shown), f"is not {noun}", fix, notDone))
     if fix is None:
         error.choices = tuple(choices)
+        error.notDone = notDone
     return error
 
 
@@ -139,4 +147,6 @@ __all__ = [
     "WriteError",
     "composeChoiceRefusal",
     "composeRefusal",
+    "nothingRead",
+    "nothingWritten",
 ]
