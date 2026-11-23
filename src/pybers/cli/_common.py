@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """\
-What every command shares: the root options, where a write goes, and how a pybers
-error reaches a person.
+What every command shares: the root options, where a write goes, how a pybers
+error reaches a person, and what a selector completes to.
 
 The root callback stores `CommandSettings` on Click's context object, which is
 how Click hands a group's options down to its commands.
 
 UPDATES
-2026-11-23  Click rather than Typer, for PYB-304.
+2026-11-23  Click rather than Typer, and a selector completes to the sheets and
+            tables of the document typed before it, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
             `composeUsageRefusal` builds a command line's own refusal.
 2026-11-17  A report's value is a phrase, `previewing only`, for PYB-266.
@@ -31,6 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import click
+from click.shell_completion import CompletionItem
 from rich.text import Text
 
 import pybers
@@ -106,6 +108,28 @@ previewOption = click.option(
 )
 
 
+def listSelectorCompletions(
+    context: click.Context, parameter: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """Return the sheets and tables of the document typed as FILE, as selectors."""
+    documentPath = context.params.get("file")
+    if documentPath is None:
+        return []
+    try:
+        document = pybers.open(documentPath)
+    except pybers.PybersError:
+        # A FILE that is not yet a document has nothing to offer.
+        return []
+    selectors = [
+        selector
+        for sheet in document.sheets
+        for selector in (
+            str(pybers.SheetReference(sheet.name)),
+            *(str(table.reference) for table in sheet.tables),
+        )
+    ]
+    return [CompletionItem(each) for each in selectors if each.startswith(incomplete)]
+
 
 def findSaveTarget(
     documentPath: Path, output: Path | None, preview: bool
@@ -145,6 +169,7 @@ def reportWrite(changed: bool, target: Path | None, unchanged: str) -> None:
 
 __all__ = [
     "CommandSettings",
+    "listSelectorCompletions",
     "composeUsageChoiceRefusal",
     "composeUsageRefusal",
     "findCommandSettings",

@@ -10,7 +10,8 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
-2026-11-23  Declared for Click, for PYB-304.
+2026-11-23  Declared for Click, SELECTOR completing to sheets and tables, for
+            PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-20  A cell prints its computed box beside its own, for PYB-291.
 2026-11-17  A table's lines, as CSS declarations under its own line, for PYB-266.
@@ -45,7 +46,7 @@ from rich.console import Group, RenderableType
 from rich.text import Text
 
 import pybers
-from pybers.cli._common import reportPybersErrors
+from pybers.cli._common import listSelectorCompletions, reportPybersErrors
 from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
 from pybers.cli._help import PybersArgument, PybersCommand
 from pybers.cli._report import formatCount, formatLine
@@ -262,6 +263,7 @@ def formatShownParts(parts: list[ShownPart]) -> Group:
 )
 @click.argument(
     "selector", cls=PybersArgument, required=False,
+    shell_complete=listSelectorCompletions,
     help="What to show: `Budget`, `Budget::Q3`, `::Q3::B2:D5`, `::B4` or "
     "`Budget::Q*[kind=number]`, each match as it shows alone.",
 )

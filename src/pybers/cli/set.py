@@ -9,7 +9,8 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
-2026-11-23  Declared for Click, for PYB-304.
+2026-11-23  Declared for Click, SELECTOR completing to sheets and tables, for
+            PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-22  `--table-style` lists each section's box, for PYB-291.
 2026-11-19  `--cell-style-update` and `--cell-style-remove` change part of a
@@ -57,6 +58,7 @@ from pybers.cli._common import (
     composeUsageChoiceRefusal,
     composeUsageRefusal,
     findSaveTarget,
+    listSelectorCompletions,
     outputOption,
     previewOption,
     reportPybersErrors,
@@ -97,6 +99,7 @@ def formatLocale(locale: DocumentLocale) -> Text:
 )
 @click.argument(
     "selector", cls=PybersArgument, required=False,
+    shell_complete=listSelectorCompletions,
     help=(
         "The cells to set, such as `Budget::Q3::B4`, `::Q3::B4` for B4 of "
         "every table named Q3, or `Budget::Q*::B2:B9[kind=number]`, left "
