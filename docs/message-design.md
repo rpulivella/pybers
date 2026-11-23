@@ -34,6 +34,7 @@ Nothing precedes the place, so a reader scanning a column of refusals sees the s
 - **A limit of pybers reads `is not supported`**, and a fact about Numbers names Numbers: `Numbers allows at most five header rows.`
 - **A message promises no future work.** `yet`, `not yet`, `for now` and `currently` describe a plan, and a plan belongs in a ticket. A message states what pybers does today.
 - **A message names `pybers`**, never "this library", and cuts any clause the reader does not need.
+- **A message quotes the value at fault, never the whole input around it.** The reader searches their own input for that value, so a long selector or style is not repeated, and a short message stays helpful however long the input is: `'wavy' is not a line style.`
 - **A part is selected or specified, and only a sheet, a table or a named style is named**, as [the vocabulary](vocabulary.md#name-select-and-specify) defines each word: `'Q3::B3' selects a table`, never `names a table`.
 
 ## Both consumers
