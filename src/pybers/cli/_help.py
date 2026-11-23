@@ -34,6 +34,7 @@ from rich.table import Table
 from rich.text import Text
 
 from pybers.cli._console import theme
+from pybers.cli._logo import formatLogo
 
 # How far a section's rows and a command's description sit under their title.
 rowIndent: int = 2
@@ -104,11 +105,13 @@ def formatSection(title: str, rows: list[tuple[Text, Text]]) -> list[RenderableT
 
 
 def formatHelp(command: click.Command, context: click.Context) -> Group:
-    """Return a command's help: its usage, description, arguments, options, commands."""
+    """Return a command's help: its usage, description, arguments, options, commands.
+
+    The root command's help opens with the logo, and no other command's does.
+    """
     usage = " ".join([context.command_path, *command.collect_usage_pieces(context)])
-    shown: list[RenderableType] = [
-        Text.assemble(("Usage: ", "label"), (usage, "value"))
-    ]
+    shown: list[RenderableType] = [] if context.parent else [formatLogo(), Text("")]
+    shown.append(Text.assemble(("Usage: ", "label"), (usage, "value")))
     if command.help:
         shown += [Text(""), Padding(Text(command.help), (0, 0, 0, rowIndent))]
     parameters = command.get_params(context)

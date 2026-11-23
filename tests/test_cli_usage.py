@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """\
 Every command's usage line in POSIX notation, its help drawn by the one renderer, and
-SELECTOR completing to the sheets and tables of the document typed before it.
+SELECTOR completing to the sheets and tables of the document typed before it, and the
+logo opening the root help.
 
 UPDATES
 2026-11-23  Written for PYB-304.
@@ -27,8 +28,10 @@ import pytest
 from click.testing import CliRunner
 
 import pybers
+from conftest import renderPlain
 from pybers.cli._app import PybersGroup, app
 from pybers.cli._help import PybersArgument, PybersCommand
+from pybers.cli._logo import formatLogo
 
 repositoryRoot: Path = Path(__file__).resolve().parent.parent
 runner: CliRunner = CliRunner()
@@ -119,6 +122,21 @@ def testEveryHelpTitlesItsSectionsAlikeWithNoTrailingSpace(
     assert set(titles) <= {"Arguments", "Options", "Commands"}
     assert "Options" in titles
     assert [line for line in lines if line != line.rstrip()] == []
+
+
+def testTheRootHelpAloneOpensWithTheLogo() -> None:
+    logo = renderPlain(formatLogo()).splitlines()
+    root = runner.invoke(app, ["--help"], prog_name="pybers").stdout.splitlines()
+    command = runner.invoke(app, ["show", "--help"], prog_name="pybers").stdout
+    assert root[:len(logo)] == [line.rstrip() for line in logo]
+    assert command.startswith("Usage: pybers show")
+
+
+def testTheLogoSetsTheNameBesideACaretOneColumnFromThePrompt() -> None:
+    lines = renderPlain(formatLogo()).splitlines()
+    assert len(lines) == 5
+    assert "┃ ❯❯❯ ▌ ┃   pybers" in lines[2]
+    assert len({len(line.rstrip()) for line in (lines[1], lines[3])}) == 1
 
 
 def testNoPartOfPybersDependsOnOrImportsTyper() -> None:

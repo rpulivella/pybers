@@ -40,6 +40,7 @@ from conftest import findDocumentPath, renderPlain
 from pybers._persistence import readPackage, writePackage
 from pybers.cli import main
 from pybers.cli._app import app
+from pybers.cli._logo import formatLogo
 from pybers.cli.check import formatCheck
 
 baselinePath: Path = findDocumentPath("00-baseline")
@@ -290,10 +291,12 @@ def testDebugRaisesTheFailureAReportDescribes(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("arguments", [["--help"], ["check", "--help"], ["check"]])
-def testHelpAndUsageErrorsDrawNoBorders(arguments: list[str]) -> None:
+def testHelpAndUsageErrorsDrawNoBordersBesideTheLogo(arguments: list[str]) -> None:
+    logo = {line.rstrip() for line in renderPlain(formatLogo()).splitlines()}
     output = runner.invoke(app, arguments).output
     assert output.strip()
-    assert not set(output) & set("╭╮╰╯│─━┃┏┓┗┛")
+    drawn = [line for line in output.splitlines() if line not in logo]
+    assert not set("".join(drawn)) & set("╭╮╰╯│─━┃┏┓┗┛")
 
 
 def testANameInBracketsPrintsAsWritten() -> None:
