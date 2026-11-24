@@ -17,7 +17,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | ------- | ------------ |
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
 | `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
-| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
+| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading. `show fonts [SELECTOR]` shows the faces pybers knows, and a font file as FILE shows its own |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
 | `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional. `set FILE --locale LOCALE` changes a document's language and region instead |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
@@ -64,6 +64,25 @@ A command parses its arguments, calls the library once, formats what comes back,
   ```
 - **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
+## Fonts
+
+A style names a face, and a person finds the face before writing the style, so `show` reads the fonts pybers knows as it reads a document.
+
+- **`fonts` as FILE is every face pybers knows**: the catalog pybers ships, read from the fonts macOS installs, and the fonts installed on the machine running it. A font file, `.otf`, `.ttf` or `.ttc`, as FILE is that file's faces alone, installed or not. A file named `fonts` is reached as `./fonts`, as a file named like a command is.
+- **A fonts selector has two positions, font family and face, joined by `::`**, with the wildcards, negation and grouping every selector has. `Avenir Next` selects a font family, and `Avenir Next::*Demi*` its faces whose names hold `Demi`.
+- **A name matches ignoring case, spaces and hyphens**, so `AvenirNext`, `Avenir Next` and `avenir-next` each select Avenir Next, since a font's name is spelled many ways and only its letters specify it.
+- **Conditions read what a face is**: `[weight=600]`, `[slant=italic]`, `[source=machine]` and `[postscript=AvenirNext-DemiBold]`. A weight also compares, as a CSS range query does, `[weight>=600]`.
+- **A quoted value ending in `s` matches exactly**, case, spaces and hyphens included, as the `s` flag of a CSS attribute selector does: `[postscript="AvenirNext-DemiBold" s]`. No other flag exists.
+- **The JSON is one form of the fonts shown**, every face and each font file pybers could not read, rather than an array of each face's form, so thousands of faces carry the form's version once. It reads back as a `Fonts`.
+- **The faces print as a grid**, one row each, its columns a face's font family, name, PostScript name, weight, slant and source, its file left to the JSON. The family is grouped and in the `identifier` style, the PostScript name, which a style copies, in the `code` style, and the source in the `detail` style:
+
+  ```
+  $ pybers show fonts 'avenir next::*demi*'
+  Font family  Name              PostScript name            Weight  Slant   Source
+  Avenir Next  Demi Bold         AvenirNext-DemiBold           600  normal  catalog
+               Demi Bold Italic  AvenirNext-DemiBoldItalic     600  italic  catalog
+  ```
+
 ## Formulas
 
 A command shows a formula as the library returns it, stored and never recalculated. CSV holds one thing per cell, so `export` writes the cached values to CSV unless `--formulas` asks for the formulas.
@@ -80,6 +99,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **Several parts print one after another, a blank line between each**, and each opens with a line specifying it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
 - **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is left out. A size reads `5 rows × 3 columns`, in a tree as on a line.
 - **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its cell style, then its borders, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. A cell style prints as CSS declarations, `background: #ffd60aff; padding: 6pt`, so it pastes into `set --cell-style`, and `none` removes one. Borders print as CSS, `border: 1pt dashed #000000ff` where all four sides agree and a longhand per side otherwise, `border-top: 1pt dashed #000000ff; border-left: hidden`, leaving out a side that stores none, and a side whose neighbor stores another stroke specifies that cell and its stroke in parentheses. **Wherever CSS has a shorthand for what prints, it is used.** A color prints exactly as stored, so a value pastes back as the same color, which is why one off the 255 grid prints in `color()` rather than hex. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
+- **Rows of the same fields print as a grid**, through `formatGrid` in `pybers.cli._report`: a header naming each field as its JSON key reads in words, in the `label` style, then one row each, each column in the style of its role, `value` unless set. A column is as wide as its longest value and never cut, since a value may be copied whole, a number aligns right, and a grouped column, such as a face's font family, shows its value once, on the first row of the rows sharing it.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
   ```
@@ -124,6 +144,7 @@ Named styles in one Rich `Theme`, so a command specifies a meaning and never a c
 | `warning` | `yellow` | Something to look at, such as a nonzero count of untested types | `3008 (x2)` |
 | `detail` | `dim` | Secondary lines under a value | `  at document/_read.py:103` |
 | `identifier` | `bold cyan` | A type identifier, a cell address | `B7` |
+| `code` | `cyan` | Text a person types, which help quotes in backticks and shows without them | `Budget::Q3` |
 | `badge.info` | `bold black on cyan` | A badge for a fact worth noticing | |
 | `badge.success` | `bold black on green` | A badge for a good outcome | |
 | `badge.warning` | `bold black on yellow` | A badge for something to look at | ` UNRECOGNIZED ` |
@@ -162,6 +183,7 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 - **Every usage line follows the [POSIX utility argument syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html)**: a required argument bare and in capitals, `FILE`, an optional one in single brackets, `[SELECTOR]`, and `...` after one that repeats. Braces are never used, since a man page reads `{a|b}` as a choice, and no argument is wrapped twice. An option's alternatives are written `text|json`. `pybers set --help` opens with `Usage: pybers set [OPTIONS] FILE [SELECTOR] [VALUE]`.
 - **The root command's help opens with the logo**, a selected cell between gridlines holding the Python prompt and a caret, beside the name, which `formatLogo` in `pybers.cli._logo` returns for any front end to print. The ring and prompt take the terminal's own color, so the logo reads on a light or a dark background, and only the caret keeps the logo's orange. No command's own help repeats it.
 - **One renderer draws every help screen**, the root command's and each command's, in `pybers.cli._help`, with Rich and the theme's styles. A help screen is its usage line, its description indented two columns, then the sections `Arguments`, `Options` and `Commands`, each its title over its rows with no border, the rows indented two columns. A command is a `PybersCommand` and each argument a `PybersArgument`, which carries the help Click gives only to an option.
+- **Help quotes text a person types in backticks, as Markdown does**, `` `Budget::Q3` ``. In color the renderer shows it in the `code` style without them, and where Click strips the color the backticks stay, so a pasted help still marks it.
 - **A command's help is its docstring**, and each argument's and option's help is its `help=`, both worded by the rules of [the message design](message-design.md). An option shown with its default or environment variable ends with `[default: text]` or `[env var: PYBERS_DEBUG]`.
 - **A usage error is Click's own**: the usage line, `Try 'pybers set --help' for help.`, then `Error:` and the message, with exit status 2.
 

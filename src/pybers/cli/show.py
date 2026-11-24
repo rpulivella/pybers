@@ -10,6 +10,7 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-24  `fonts` or a font file as FILE shows faces, one per line, for PYB-315.
 2026-11-23  Declared for Click, SELECTOR completing to sheets and tables, for
             PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
@@ -47,9 +48,10 @@ from rich.text import Text
 
 import pybers
 from pybers.cli._common import listSelectorCompletions, reportPybersErrors
+from pybers.cli._console import statusConsole
 from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
 from pybers.cli._help import PybersArgument, PybersCommand
-from pybers.cli._report import formatCount, formatLine
+from pybers.cli._report import GridColumn, formatCount, formatGrid, formatLine
 
 type DocumentPart = pybers.Document | pybers.Sheet | pybers.Table | pybers.Cell
 
@@ -57,6 +59,8 @@ type DocumentPart = pybers.Document | pybers.Sheet | pybers.Table | pybers.Cell
 childIndent: int = 2
 segmentGap: str = "  "
 fieldGap: str = "   "
+# The FILE showing the fonts pybers knows, so a file of that name is `./fonts`.
+fontsFile: str = "fonts"
 
 
 def formatYesNo(flag: bool) -> str:
@@ -256,25 +260,56 @@ def formatShownParts(parts: list[ShownPart]) -> Group:
     return Group(*shown)
 
 
+# A face's fields in the order and words of its JSON form, its file left to the JSON.
+faceColumns: tuple[GridColumn, ...] = (
+    GridColumn("Font family", "identifier", grouped=True), GridColumn("Name"),
+    GridColumn("PostScript name", "code"), GridColumn("Weight", "", numeric=True),
+    GridColumn("Slant", ""), GridColumn("Source", "detail"),
+)
+
+
+def formatFaces(faces: Sequence[pybers.FontFace]) -> Group:
+    """Return faces as a grid, one row each, as data rather than parts of a document."""
+    return formatGrid(faceColumns, [
+        (face.fontFamily, face.name, face.postScriptName, str(face.weight),
+         face.slant.value, face.source.value)
+        for face in faces
+    ])
+
+
+def showFonts(file: str, selector: str | None, outputFormat: OutputFormat) -> None:
+    """Print the faces a selector matches, and each unreadable font file on stderr."""
+    fonts = pybers.openFonts(None if file == fontsFile else file)
+    if selector is not None:
+        fonts = pybers.Fonts(fonts.select(selector), fonts.unreadable)
+    for reason in fonts.unreadable:
+        statusConsole.print(formatLine("Skipped", reason))
+    printResult(fonts, outputFormat, lambda shown: formatFaces(shown.faces))
+
+
 @click.command("show", cls=PybersCommand)
 @click.argument(
-    "file", cls=PybersArgument, type=click.Path(path_type=Path),
-    help="The .numbers document.",
+    "file", cls=PybersArgument, type=click.Path(),
+    help="The .numbers document, `fonts` for the fonts pybers knows, or a font file.",
 )
 @click.argument(
     "selector", cls=PybersArgument, required=False,
     shell_complete=listSelectorCompletions,
     help="What to show: `Budget`, `Budget::Q3`, `::Q3::B2:D5`, `::B4` or "
-    "`Budget::Q*[kind=number]`, each match as it shows alone.",
+    "`Budget::Q*[kind=number]`, each match as it shows alone, or for fonts "
+    "`Avenir Next::*Demi*` or `*[weight>=600]`.",
 )
 @outputFormatOption
 @click.pass_context
 def runShow(
-    context: click.Context, file: Path, selector: str | None, outputFormat: OutputFormat
+    context: click.Context, file: str, selector: str | None, outputFormat: OutputFormat
 ) -> None:
-    """Show a whole document, or every part SELECTOR matches."""
+    """Show a whole document, or every part SELECTOR matches, or the fonts."""
     with reportPybersErrors(context):
-        document = pybers.open(file)
+        if file == fontsFile or Path(file).suffix.lower() in pybers.fontSuffixes:
+            showFonts(file, selector, outputFormat)
+            return
+        document = pybers.open(Path(file))
         if selector is None:
             printResult(document, outputFormat, formatPart)
             return
