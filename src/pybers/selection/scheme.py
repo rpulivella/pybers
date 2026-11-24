@@ -2,11 +2,12 @@
 """\
 What a selector selects from: its positions, its conditions, and how it compares names.
 
-One parser and one resolver read every selector, a document's or the fonts', and a
+One parser and one resolver read every selector, a document's or the typefaces', and a
 `SelectorScheme` is all that differs between them, as a CSS selector reads the same
 whatever document it is given.
 
 UPDATES
+2026-11-24  An attribute's `takes` says what its values are, for PYB-318.
 2026-11-24  Written for PYB-315, from the attribute table `conditions` held.
 """
 from __future__ import annotations
@@ -37,9 +38,10 @@ class SelectorNameMatch(Enum):
 class SelectorAttributeField[ItemT]:
     """What one attribute reads from an item, and the values it takes.
 
-    `values` lists its choices, `parse` reads a free value, and neither means the
-    attribute takes no value, `[conditional]`. An `ordered` one also compares with
-    `<`, `<=`, `>` and `>=`, and a `text` one compares by the scheme's name rule.
+    `values` lists its choices, `parse` reads a free value, which `takes` describes in
+    words, and neither means the attribute takes no value, `[conditional]`. An
+    `ordered` one also compares with `<`, `<=`, `>` and `>=`, and a `text` one compares
+    by the scheme's name rule.
     """
 
     read: Callable[[ItemT], object]
@@ -47,6 +49,7 @@ class SelectorAttributeField[ItemT]:
     parse: Callable[[str], object] | None = None
     ordered: bool = False
     text: bool = False
+    takes: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
