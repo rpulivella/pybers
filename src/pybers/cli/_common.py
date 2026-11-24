@@ -33,10 +33,10 @@ from pathlib import Path
 
 import click
 from click.shell_completion import CompletionItem
-from rich.text import Text
 
 import pybers
 from pybers.cli._console import statusConsole
+from pybers.cli._report import formatDetail, formatLine, formatRefusal
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,10 +60,8 @@ def reportPybersErrors(context: click.Context) -> Generator[None]:
     except pybers.PybersError as exc:
         if findCommandSettings(context).debug:
             raise
-        statusConsole.print(Text.assemble(
-            (f"pybers {context.info_name}: ", "failure"),
-            formatRefusalText(exc, str(context.info_name)),
-        ))
+        command = str(context.info_name)
+        statusConsole.print(formatRefusal(command, formatRefusalText(exc, command)))
         raise click.exceptions.Exit(1) from exc
 
 
@@ -158,13 +156,11 @@ def findSaveTarget(
 def reportWrite(changed: bool, target: Path | None, unchanged: str) -> None:
     """Say on stderr whether a writing verb wrote, and where, or why it did not."""
     if not changed:
-        statusConsole.print(Text(f"Nothing written: {unchanged}", "detail"))
+        statusConsole.print(formatDetail(f"Nothing written: {unchanged}"))
     elif target is None:
-        statusConsole.print(Text("Nothing written: previewing only", "detail"))
+        statusConsole.print(formatDetail("Nothing written: previewing only"))
     else:
-        statusConsole.print(
-            Text.assemble(("Written: ", "label"), (str(target), "value"))
-        )
+        statusConsole.print(formatLine("Written", str(target)))
 
 
 __all__ = [

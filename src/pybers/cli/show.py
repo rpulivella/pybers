@@ -40,6 +40,7 @@ __status__ = "Development"
 __date__ = "2026/10/27"
 
 from collections.abc import Sequence
+from itertools import groupby
 from pathlib import Path
 
 import click
@@ -51,21 +52,24 @@ from pybers.cli._common import listSelectorCompletions, reportPybersErrors
 from pybers.cli._console import statusConsole
 from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
 from pybers.cli._help import PybersArgument, PybersCommand
-from pybers.cli._report import GridColumn, formatCount, formatGrid, formatLine
+from pybers.cli._report import (
+    childIndent,
+    fieldGap,
+    formatCount,
+    formatCountShown,
+    formatFields,
+    formatLine,
+    formatListed,
+    formatParts,
+    formatSegments,
+    formatYesNo,
+    listChildren,
+)
 
 type DocumentPart = pybers.Document | pybers.Sheet | pybers.Table | pybers.Cell
 
-# How far a part's children sit under it, and what separates what one line holds.
-childIndent: int = 2
-segmentGap: str = "  "
-fieldGap: str = "   "
 # The FILE showing the fonts pybers knows, so a file of that name is `./fonts`.
 fontsFile: str = "fonts"
-
-
-def formatYesNo(flag: bool) -> str:
-    """Return a flag as `yes` or `no`."""
-    return "yes" if flag else "no"
 
 
 def formatControl(control: pybers.CellControl | None) -> str:
@@ -82,39 +86,6 @@ def formatCellStyle(cellStyle: pybers.CellStyle | None) -> str:
 def formatFormat(cellFormat: pybers.CellFormat | pybers.UNDETERMINED | None) -> str:
     """Return a format as its text form, which `pybers set --cell-format` reads."""
     return "none" if cellFormat is None else pybers.formatCellFormat(cellFormat)
-
-
-def formatSegments(indent: int, label: str, name: str, *segments: str) -> Text:
-    """Return a part's line: its label and name, then each segment holding something.
-
-    An empty segment is left out, so a count of zero or an empty list never prints.
-    """
-    # A part's own label is full weight, as the tree in `check` draws one.
-    shown = Text.assemble(" " * indent, (f"{label}: ", "value"), (name, "identifier"))
-    for segment in segments:
-        if segment:
-            shown.append(segmentGap).append(segment, "value")
-    return shown
-
-
-def formatFields(indent: int, *fields: tuple[str, str]) -> Text:
-    """Return several labeled fields folded onto one line."""
-    shown = Text(" " * indent)
-    for index, (label, value) in enumerate(fields):
-        if index:
-            shown.append(fieldGap)
-        shown.append_text(formatLine(label, value))
-    return shown
-
-
-def formatCountShown(count: int, noun: str) -> str:
-    """Return a count with its noun, or nothing when the count is zero."""
-    return formatCount(count, noun) if count else ""
-
-
-def listChildren(children: Sequence[RenderableType]) -> list[RenderableType]:
-    """Return each child of a part, a blank line before each."""
-    return [shown for child in children for shown in (Text(""), child)]
 
 
 def formatCell(cell: pybers.Cell, indent: int = 0) -> Group:
@@ -187,13 +158,7 @@ def formatTableStyleLines(tableStyle: pybers.TableStyle, indent: int) -> Group:
 
     Each line pastes back into `pybers set --table-style`.
     """
-    return Group(
-        Text.assemble(" " * indent, ("Table style:", "label")),
-        *(
-            Text.assemble(" " * (indent + childIndent), (declaration, "value"))
-            for declaration in pybers.formatTableStyle(tableStyle)
-        ),
-    )
+    return formatListed("Table style", pybers.formatTableStyle(tableStyle), indent)
 
 
 def formatRange(table: pybers.Table, extent: pybers.CellRange) -> Group:
@@ -254,27 +219,34 @@ def formatShownPart(part: ShownPart) -> RenderableType:
 
 def formatShownParts(parts: list[ShownPart]) -> Group:
     """Return each part as it prints alone, a blank line between each."""
-    shown: list[RenderableType] = []
-    for part in parts:
-        shown += [Text(""), formatShownPart(part)] if shown else [formatShownPart(part)]
-    return Group(*shown)
+    return formatParts([formatShownPart(part) for part in parts])
 
 
-# A face's fields in the order and words of its JSON form, its file left to the JSON.
-faceColumns: tuple[GridColumn, ...] = (
-    GridColumn("Font family", "identifier", grouped=True), GridColumn("Name"),
-    GridColumn("PostScript name", "code"), GridColumn("Weight", "", numeric=True),
-    GridColumn("Slant", ""), GridColumn("Source", "detail"),
-)
+def formatFace(face: pybers.FontFace) -> Text:
+    """Return a face as a part's line, its PostScript name and then its fields."""
+    shown = formatSegments(childIndent, "Face", face.postScriptName)
+    return shown.append(fieldGap).append_text(formatFields(
+        0, ("Name", face.name), ("Weight", str(face.weight)),
+        ("Slant", face.slant.value), ("Source", face.source.value),
+    ))
 
 
 def formatFaces(faces: Sequence[pybers.FontFace]) -> Group:
-    """Return faces as a grid, one row each, as data rather than parts of a document."""
-    return formatGrid(faceColumns, [
-        (face.fontFamily, face.name, face.postScriptName, str(face.weight),
-         face.slant.value, face.source.value)
-        for face in faces
-    ])
+    """Return each font family and its face count, its faces one line each beneath."""
+    grouped = [
+        (fontFamily, list(each))
+        for fontFamily, each in groupby(faces, key=lambda face: face.fontFamily)
+    ]
+    families = [
+        Group(
+            formatSegments(
+                0, "Font family", fontFamily, formatCount(len(each), "face")
+            ),
+            *(formatFace(face) for face in each),
+        )
+        for fontFamily, each in grouped
+    ]
+    return formatParts(families)
 
 
 def showFonts(file: str, selector: str | None, outputFormat: OutputFormat) -> None:

@@ -74,13 +74,13 @@ A style names a face, and a person finds the face before writing the style, so `
 - **Conditions read what a face is**: `[weight=600]`, `[slant=italic]`, `[source=machine]` and `[postscript=AvenirNext-DemiBold]`. A weight also compares, as a CSS range query does, `[weight>=600]`.
 - **A quoted value ending in `s` matches exactly**, case, spaces and hyphens included, as the `s` flag of a CSS attribute selector does: `[postscript="AvenirNext-DemiBold" s]`. No other flag exists.
 - **The JSON is one form of the fonts shown**, every face and each font file pybers could not read, rather than an array of each face's form, so thousands of faces carry the form's version once. It reads back as a `Fonts`.
-- **The faces print as a grid**, one row each, its columns a face's font family, name, PostScript name, weight, slant and source, its file left to the JSON. The family is grouped and in the `identifier` style, the PostScript name, which a style copies, in the `code` style, and the source in the `detail` style:
+- **Each font family prints as a part, its faces beneath it**, through the components a table and its cells print with: the family's line folds its face count, and each face is a part's line, its PostScript name and then its fields on the same line, its file left to the JSON:
 
   ```
   $ pybers show fonts 'avenir next::*demi*'
-  Font family  Name              PostScript name            Weight  Slant   Source
-  Avenir Next  Demi Bold         AvenirNext-DemiBold           600  normal  catalog
-               Demi Bold Italic  AvenirNext-DemiBoldItalic     600  italic  catalog
+  Font family: Avenir Next  2 faces
+    Face: AvenirNext-DemiBold   Name: Demi Bold   Weight: 600   Slant: normal   Source: catalog
+    Face: AvenirNext-DemiBoldItalic   Name: Demi Bold Italic   Weight: 600   Slant: italic   Source: catalog
   ```
 
 ## Formulas
@@ -89,6 +89,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 
 ## Report lines
 
+- **Every command prints through the components in `pybers.cli._report`**, a part's line, a line of fields, a heading over a list, a tree and its nodes, a badge, a report line and a refusal, so everything shown has one layout, spacing and color. A command states what it shows and how much it asks of the reader, a `BadgeLevel`, and never builds Rich text or names a style, which `tests/test_cli_components.py` holds.
 - **Each line opens with the shortest label that specifies its value**, then `: ` and the value: `Readable: yes`, `OS: macOS-26.6.1`.
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
@@ -99,7 +100,6 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **Several parts print one after another, a blank line between each**, and each opens with a line specifying it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
 - **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is left out. A size reads `5 rows × 3 columns`, in a tree as on a line.
 - **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its cell style, then its borders, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. A cell style prints as CSS declarations, `background: #ffd60aff; padding: 6pt`, so it pastes into `set --cell-style`, and `none` removes one. Borders print as CSS, `border: 1pt dashed #000000ff` where all four sides agree and a longhand per side otherwise, `border-top: 1pt dashed #000000ff; border-left: hidden`, leaving out a side that stores none, and a side whose neighbor stores another stroke specifies that cell and its stroke in parentheses. **Wherever CSS has a shorthand for what prints, it is used.** A color prints exactly as stored, so a value pastes back as the same color, which is why one off the 255 grid prints in `color()` rather than hex. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
-- **Rows of the same fields print as a grid**, through `formatGrid` in `pybers.cli._report`: a header naming each field as its JSON key reads in words, in the `label` style, then one row each, each column in the style of its role, `value` unless set. A column is as wide as its longest value and never cut, since a value may be copied whole, a number aligns right, and a grouped column, such as a face's font family, shows its value once, on the first row of the rows sharing it.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
   ```

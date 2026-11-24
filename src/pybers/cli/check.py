@@ -42,7 +42,18 @@ from pybers.cli._common import findCommandSettings, reportPybersErrors
 from pybers.cli._console import TreeCompact, statusConsole
 from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
 from pybers.cli._help import PybersArgument, PybersCommand
-from pybers.cli._report import BadgeLevel, formatBadge, formatCount, formatLine
+from pybers.cli._report import (
+    BadgeLevel,
+    childIndent,
+    formatBadge,
+    formatBadgedNode,
+    formatCount,
+    formatDetail,
+    formatHeading,
+    formatLine,
+    formatTree,
+    formatTreeNode,
+)
 
 
 def formatPybersVersion(found: str | pybers.UNDETERMINED) -> str:
@@ -63,25 +74,25 @@ def formatNumbersVersion(
 
 def formatTypeCounts(
     counts: frozendict[int, int] | pybers.UNDETERMINED,
-) -> str | tuple[str, str]:
+) -> tuple[str, BadgeLevel | None]:
     """Return type identifiers with their counts, as a warning when there are any."""
     if counts is pybers.UNDETERMINED:
-        return "unknown"
+        return "unknown", None
     if not counts:
-        return "none"
+        return "none", None
     found = ", ".join(f"{typeId} (x{count})" for typeId, count in counts.items())
-    return (found, "warning")
+    return found, BadgeLevel.WARNING
 
 
 def formatReadable(failure: pybers.CheckFailure | None) -> list[Text]:
     """Return the lines saying whether pybers read the document, and if not, why."""
     if failure is None:
-        return [formatLine("Readable", ("yes", "success"))]
+        return [formatLine("Readable", "yes", BadgeLevel.SUCCESS)]
     reason = failure.errorType
     if failure.message is not pybers.WITHHELD:
         reason = f"{reason}: {failure.message}"
-    return [formatLine("Readable", (f"no, {reason}", "failure"))] + [
-        Text(f"  at {frame}", "detail") for frame in failure.frames
+    return [formatLine("Readable", f"no, {reason}", BadgeLevel.FAILURE)] + [
+        formatDetail(f"at {frame}", childIndent) for frame in failure.frames
     ]
 
 
@@ -92,21 +103,17 @@ def chooseName(name: str | pybers.WITHHELD, kind: str) -> str:
 
 def formatSheetTree(sheet: pybers.CheckSheet) -> TreeCompact:
     """Return a sheet as a tree of its tables and sizes, unrecognized cells badged."""
-    root = Text(chooseName(sheet.name, "Sheet"), "value")
-    tree = TreeCompact(root, guide_style="label")
+    tree = formatTree(formatTreeNode(chooseName(sheet.name, "Sheet")))
     for table in sheet.tables:
         size = (
             f"{formatCount(table.rowCount, 'row')} × "
             f"{formatCount(table.colCount, 'column')}"
         )
-        branch = tree.add(Text.assemble(
-            (chooseName(table.name, "Table"), "value"), (": ", "label"), (size, "value")
-        ))
+        branch = tree.add(formatTreeNode(chooseName(table.name, "Table"), size))
         for cell in table.unrecognizedCells:
-            branch.add(Text.assemble(
-                (cell.address, "identifier"), " ",
-                formatBadge("unrecognized", BadgeLevel.WARNING),
-                (f" cell type {cell.typeCode}", "detail"),
+            branch.add(formatBadgedNode(
+                cell.address, formatBadge("unrecognized", BadgeLevel.WARNING),
+                f"cell type {cell.typeCode}",
             ))
     return tree
 
@@ -117,7 +124,7 @@ def formatSheets(
     """Return the sheets heading, then one tree per sheet holding its tables."""
     if sheets is pybers.UNDETERMINED:
         return [formatLine("Sheets", "unknown")]
-    return [Text("Sheets:", "label"), *(formatSheetTree(sheet) for sheet in sheets)]
+    return [formatHeading("Sheets"), *(formatSheetTree(sheet) for sheet in sheets)]
 
 
 def formatCheck(check: pybers.Check) -> Group:
@@ -131,10 +138,10 @@ def formatCheck(check: pybers.Check) -> Group:
         formatLine("Saved with", formatNumbersVersion(check.savedBy)),
         *formatReadable(check.failure),
         formatLine(
-            "Untested archive types", formatTypeCounts(check.untestedArchiveTypes)
+            "Untested archive types", *formatTypeCounts(check.untestedArchiveTypes)
         ),
         formatLine(
-            "Unrecognized cell types", formatTypeCounts(check.unrecognizedCellTypes)
+            "Unrecognized cell types", *formatTypeCounts(check.unrecognizedCellTypes)
         ),
     ]
     shown += formatSheets(check.sheets)

@@ -42,22 +42,33 @@ def brandPath(tmp_path: Path) -> Path:
     ], tmp_path / "brand.ttc")
 
 
-def testFontFileShowsItsFacesAsAGrid(brandPath: Path) -> None:
+def testFontFileShowsItsFamilyAndEachFaceOnOneLine(brandPath: Path) -> None:
     result = runShowCommand(brandPath)
     assert result.exit_code == 0
     assert result.stdout.splitlines() == [
-        "Font family  Name               PostScript name                   Weight  "
-        "Slant   Source",
-        "Brand Sans   Regular            BrandSans-Regular                    400  "
-        "normal  file",
-        "             Extra Bold Italic  BrandSans-ExtraBoldItalicDisplay     800  "
-        "italic  file",
+        "Font family: Brand Sans  2 faces",
+        "  Face: BrandSans-Regular   Name: Regular   Weight: 400   Slant: normal   "
+        "Source: file",
+        "  Face: BrandSans-ExtraBoldItalicDisplay   Name: Extra Bold Italic   "
+        "Weight: 800   Slant: italic   Source: file",
+    ]
+
+
+def testFamiliesAreSeparatedByABlankLine(tmp_path: Path) -> None:
+    path = saveCollection([
+        buildFont("Brand Sans", "Regular", "BrandSans-Regular"),
+        buildFont("Brand Serif", "Regular", "BrandSerif-Regular"),
+    ], tmp_path / "brand.ttc")
+    lines = runShowCommand(path).stdout.splitlines()
+    assert [line for line in lines if not line.startswith("  ")] == [
+        "Font family: Brand Sans  1 face", "", "Font family: Brand Serif  1 face",
     ]
 
 
 def testSelectorNarrowsAFontFile(brandPath: Path) -> None:
     result = runShowCommand(brandPath, "*[weight>=800]")
-    assert [line.split()[-3] for line in result.stdout.splitlines()[1:]] == ["800"]
+    faces = [line for line in result.stdout.splitlines() if "Face:" in line]
+    assert len(faces) == 1 and "Weight: 800" in faces[0]
 
 
 def testJsonReadsBackAsTheFacesShown(brandPath: Path) -> None:

@@ -89,7 +89,7 @@ class DocumentLocale:
 def formatLocale(locale: DocumentLocale) -> Text:
     """Return a document's locale as `pybers show` prints it."""
     current = locale.localeIdentifier
-    return formatLine("Locale", (current, "identifier") if current else "none")
+    return formatLine("Locale", current or "none")
 
 
 @click.command("set", cls=PybersCommand)
