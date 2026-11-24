@@ -14,6 +14,8 @@ not create two table names differing only in case on one sheet, and enforces not
 about sheet names, so folding them would invent a collision the file does not have.
 
 UPDATES
+2026-11-24  Placing components, comparing names and meeting conditions moved to
+            `resolver`, which the fonts' resolver shares, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  A typed lookup parses a reference rather than one literal name, and a
             refusal quotes reference text verbatim, for PYB-267.
@@ -30,9 +32,9 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/03"
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from functools import partial
 from typing import NoReturn
 
 from pybers.addressing.ranges import CellRange, SelectionMatch
@@ -45,7 +47,6 @@ from pybers.addressing.reference import (
 )
 from pybers.addressing.text import (
     ReferenceError,
-    escapeMarker,
     escapeSelectorName,
     quoteReferenceText,
     readEscapedText,
@@ -54,24 +55,31 @@ from pybers.document.sheets import Document, SelectionError, Sheet
 from pybers.errors import (
     composeRefusal,
     composeTextRefusal,
-    formatChoiceList,
     nothingWritten,
 )
-from pybers.selection.conditions import matchPseudoClass, selectorAttributes
+from pybers.selection.conditions import (
+    documentScheme,
+    matchPseudoClass,
+    positionNames,
+)
+from pybers.selection.resolver import (
+    listPresent,
+    matchConditions,
+    matchName,
+    placeComponents,
+    quoteChoices,
+    refuseExactMiss,
+)
+from pybers.selection.scheme import SelectorNameMatch
 from pybers.selection.selector import (
-    SelectorAttribute,
     SelectorComponent,
-    SelectorCondition,
     SelectorError,
     SelectorGroup,
     SelectorLike,
-    SelectorNegation,
-    SelectorPseudoClass,
-    positionNames,
     toSelector,
 )
 from pybers.table.bounds import findCellsMiss
-from pybers.table.cell import Cell, CellSkip
+from pybers.table.cell import CellSkip
 from pybers.table.cells import Table
 
 type SelectionOwner = Document | Sheet | Table
@@ -114,18 +122,6 @@ def formatMatches(matches: Sequence[SelectionMatch]) -> str:
     return shown if rest <= 0 else f"{shown} and {rest} more"
 
 
-def listPresent(kind: str, names: Sequence[str]) -> str:
-    """Return the part of a refusal listing the names present, to ask for one."""
-    if not names:
-        return f"It holds no {kind}s"
-    return f"The {kind}s are {quoteChoices(names)}"
-
-
-def quoteChoices(names: Sequence[str]) -> str:
-    """Return names as prose, each quoted as reference text."""
-    return formatChoiceList([quoteReferenceText(each) for each in names])
-
-
 def findPositions(owner: SelectionOwner) -> int:
     """Return how many positions a selector given to an owner fills."""
     if isinstance(owner, Document):
@@ -133,79 +129,12 @@ def findPositions(owner: SelectionOwner) -> int:
     return 2 if isinstance(owner, Sheet) else 1
 
 
-def placeComponents(
-    group: SelectorGroup, owner: SelectionOwner
-) -> tuple[list[SelectorComponent | None], int]:
-    """Return a component for each of the three positions, and the deepest reached."""
-    positions = findPositions(owner)
-    first = len(positionNames) - positions
-    components = group.components
-    if len(components) > positions:
-        kind = type(owner).__name__.lower()
-        reached = positionNames[first:]
-        raise SelectorError(composeRefusal(
-            f"`{group}`", f"fills {len(components)} positions, and a selector given "
-            f"to a {kind} fills at most {positions}, {formatChoiceList(reached)}",
-            "Select from the document to reach more",
-        ))
-    placed: list[SelectorComponent | None] = [None] * len(positionNames)
-    last = len(positionNames) - 1
-    if group.fromRight:
-        start = len(positionNames) - len(components)
-        depth = last
-    else:
-        start = first
-        depth = last if group.conditions else first + len(components) - 1
-    for index, component in enumerate(components):
-        placed[start + index] = component
-    return placed, depth
-
-
-def buildPattern(pattern: str, foldCase: bool) -> re.Pattern[str]:
-    """Return a written name pattern as an expression, `*` and `?` its wildcards."""
-    parts: list[str] = []
-    index = 0
-    while index < len(pattern):
-        character = pattern[index]
-        if character == escapeMarker and index + 1 < len(pattern):
-            parts.append(re.escape(pattern[index + 1]))
-            index += 2
-            continue
-        parts.append({"*": ".*", "?": "."}.get(character, re.escape(character)))
-        index += 1
-    return re.compile("".join(parts), re.IGNORECASE if foldCase else 0)
-
-
-def matchName(component: SelectorComponent | None, name: str, foldCase: bool) -> bool:
-    """Report whether a name fits a component and none of its exclusions."""
-    if component is None:
-        return True
-    if component.pattern and not buildPattern(
-        component.pattern, foldCase
-    ).fullmatch(name):
-        return False
-    return not any(
-        buildPattern(each, foldCase).fullmatch(name) for each in component.exclusions
-    )
-
-
 def selectNamed[NamedT: Sheet | Table](
-    items: Sequence[NamedT], component: SelectorComponent | None, foldCase: bool
+    items: Sequence[NamedT], component: SelectorComponent | None,
+    nameMatch: SelectorNameMatch,
 ) -> list[NamedT]:
     """Return the items a component matches, in their order."""
-    return [item for item in items if matchName(component, item.name, foldCase)]
-
-
-def refuseExactMiss(
-    component: SelectorComponent | None, kind: str, within: str, names: list[str]
-) -> None:
-    """Refuse a component naming one thing exactly that nothing searched carries."""
-    if component is None or not component.exact:
-        return
-    raise SelectionError(composeRefusal(
-        quoteReferenceText(component.pattern), f"selects no {kind} in {within}",
-        listPresent(kind, names),
-    ))
+    return [item for item in items if matchName(component, item.name, nameMatch)]
 
 
 def readCellsComponent(
@@ -228,27 +157,6 @@ def readCellsComponent(
         )) from exc
 
 
-def matchConditions(
-    conditions: tuple[SelectorCondition, ...], table: Table, address: CellAddress,
-    cell: Cell | None,
-) -> bool:
-    """Report whether a cell at an address meets every condition."""
-    for condition in conditions:
-        match condition:
-            case SelectorAttribute(name=name, value=value):
-                found = selectorAttributes[name].read(cell)
-                met = found is not None if value is None else found == value
-            case SelectorPseudoClass(name=name, argument=argument):
-                met = matchPseudoClass(name, argument, table, address, cell)
-            case SelectorNegation(alternatives=alternatives):
-                met = not any(
-                    matchConditions(each, table, address, cell) for each in alternatives
-                )
-        if not met:
-            return False
-    return True
-
-
 def listCells(
     table: Table,
     area: CellRange,
@@ -267,7 +175,11 @@ def listCells(
             for each in exclusions
         ):
             continue
-        if matchConditions(group.conditions, table, address, cells.get(address)):
+        cell = cells.get(address)
+        if matchConditions(
+            group.conditions, documentScheme, cell,
+            partial(matchPseudoClass, table=table, address=address, cell=cell),
+        ):
             found.append(address)
     return found
 
@@ -334,35 +246,37 @@ def formatTablesPlace(
 
 def matchGroup(owner: SelectionOwner, group: SelectorGroup) -> list[PartMatch]:
     """Return what one group matches within an owner, in the owner's order."""
-    placed, depth = placeComponents(group, owner)
+    placed, depth = placeComponents(
+        group, positionNames, findPositions(owner), type(owner).__name__.lower()
+    )
     if isinstance(owner, Table):
         return matchCells([(owner.sheet, owner)], placed[2], group)
     if isinstance(owner, Sheet):
         sheets = [owner]
     else:
-        sheets = selectNamed(owner.sheets, placed[0], foldCase=False)
+        sheets = selectNamed(owner.sheets, placed[0], SelectorNameMatch.EXACT)
         if not sheets:
             refuseExactMiss(
-                placed[0], "sheet", "this document",
-                [str(SheetReference(each.name)) for each in owner.sheets],
+                placed[0], "sheet", "this document", listPresent(
+                    "sheet", [str(SheetReference(each.name)) for each in owner.sheets]
+                ),
             )
         if depth == 0:
             return [PartMatch(sheet) for sheet in sheets]
     tables = [
         (sheet, table) for sheet in sheets
-        for table in selectNamed(sheet.tables, placed[1], foldCase=True)
+        for table in selectNamed(sheet.tables, placed[1], SelectorNameMatch.CASELESS)
     ]
     if sheets and not tables:
         within = formatTablesPlace(owner, placed[0], sheets)
         refuseExactMiss(
-            placed[1], "table", within,
-            [
+            placed[1], "table", within, listPresent("table", [
                 str(TableReference(
                     sheet=None if len(sheets) == 1 else SheetReference(sheet.name),
                     name=each.name,
                 ))
                 for sheet in sheets for each in sheet.tables
-            ],
+            ]),
         )
     if depth == 1:
         return [PartMatch(sheet, table) for sheet, table in tables]
@@ -551,7 +465,9 @@ def findExtendTarget(
     """
     found = toSelector(selector)
     group = found.groups[0]
-    placed, depth = placeComponents(group, document)
+    placed, depth = placeComponents(
+        group, positionNames, len(positionNames), "document"
+    )
     component = placed[2]
     address = (
         None if len(found.groups) != 1 or group.conditions or depth != 2

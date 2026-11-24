@@ -13,6 +13,8 @@ written `Q3\\, draft`. A colon begins a condition only when a condition's name
 follows it, which is why `B2:D9` stays a range.
 
 UPDATES
+2026-11-24  Read against a `SelectorScheme`, a document's unless given, and an
+            attribute compares, quotes its value and takes the `s` flag, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  A name's escapes are read through `addressing.text`, the one reference
             grammar, for PYB-267.
@@ -29,7 +31,8 @@ __status__ = "Development"
 __date__ = "2026/11/03"
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from pybers.addressing.text import (
     escapeMarker,
@@ -41,18 +44,22 @@ from pybers.errors import (
     composeChoiceRefusal,
     composeRefusal,
     composeTextRefusal,
+    formatChoiceList,
 )
-from pybers.selection.conditions import (
-    nthPattern,
-    pseudoClasses,
-    pseudoNegation,
-    selectorAttributes,
-)
+from pybers.selection.conditions import documentScheme, nthPattern, pseudoNegation
+from pybers.selection.scheme import SelectorScheme
 
 groupSeparator: str = ","
 wildcards: str = "*?"
-positionNames: tuple[str, ...] = ("sheet", "table", "cells")
 pseudoName: re.Pattern[str] = re.compile(r"[a-z][a-z-]*")
+# `[name]`, `[name=value]`, `[weight>=600]`, or a quoted value an `s` flag ends.
+attributePattern: re.Pattern[str] = re.compile(
+    r'(?P<name>[^=<>"]*?)\s*(?:(?P<operator>>=|<=|=|>|<)\s*'
+    r'(?:"(?P<quoted>(?:[^"\\]|\\.)*)"\s*(?P<flag>s)?|(?P<bare>[^"]*?)))?\s*'
+)
+quoteEscape: re.Pattern[str] = re.compile(r'\\(.)')
+exactFlag: str = "s"
+ordinals: frozendict[int, str] = frozendict({2: "third", 3: "fourth"})
 
 
 class SelectorError(PybersError, ValueError):
@@ -84,13 +91,25 @@ class SelectorComponent:
 
 @dataclass(frozen=True, slots=True)
 class SelectorAttribute:
-    """A condition on a modeled field, `[kind=number]`, or on its presence, `[kind]`."""
+    """A condition on a modeled field, `[kind=number]`, or on its presence, `[kind]`.
+
+    `[weight>=600]` compares, and a quoted value, `[postscript="Avenir-Book" s]`,
+    may end in the `s` flag that compares it exactly, as in CSS.
+    """
 
     name: str
     value: str | None = None
+    operator: str = "="
+    exact: bool = False
+    quoted: bool = False
 
     def __str__(self) -> str:
-        return f"[{self.name}]" if self.value is None else f"[{self.name}={self.value}]"
+        if self.value is None:
+            return f"[{self.name}]"
+        value = self.value.replace("\\", "\\\\").replace('"', '\\"')
+        written = f'"{value}"' if self.quoted else self.value
+        flag = f" {exactFlag}" if self.exact else ""
+        return f"[{self.name}{self.operator}{written}{flag}]"
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,30 +164,39 @@ class Selector:
     """
 
     groups: tuple[SelectorGroup, ...]
+    scheme: SelectorScheme[Any] = field(default=documentScheme, repr=False)
 
     def __post_init__(self) -> None:
         if not self.groups:
             raise SelectorError(composeRefusal(
-                "A selector", "holds no group", "Write at least one, such as `Q3::B3`"
+                "A selector", "holds no group",
+                f"Write at least one, such as `{self.scheme.groupExample}`",
             ))
 
     @classmethod
-    def parse(cls, text: str) -> Selector:
-        """Return the selector text writes, refusing it with the part and place."""
+    def parse(
+        cls, text: str, scheme: SelectorScheme[Any] = documentScheme
+    ) -> Selector:
+        """Return the selector text writes, refusing it with the part and place.
+
+        `scheme` is what it selects from, a document's sheets, tables and cells
+        unless given.
+        """
+        example = scheme.groupExample
         if not isinstance(text, str):
             raise SelectorError(composeRefusal(
                 repr(text), "is not a selector, since a selector is text",
-                "Write it as a string, such as 'Q3::B3'",
+                f"Write it as a string, such as '{example}'",
             ))
         if not text.strip():
             raise SelectorError(composeRefusal(
-                "The selector", "is empty", "Write one, such as `Q3::B3`"
+                "The selector", "is empty", f"Write one, such as `{example}`"
             ))
         groups = tuple(
-            SelectorParser(text, start, end).groupParse()
+            SelectorParser(text, start, end, scheme).groupParse()
             for start, end in splitTopLevel(text, 0, len(text))
         )
-        return cls(groups)
+        return cls(groups, scheme)
 
     def __str__(self) -> str:
         return f"{groupSeparator} ".join(str(each) for each in self.groups)
@@ -177,9 +205,21 @@ class Selector:
 type SelectorLike = Selector | str
 
 
-def toSelector(selector: SelectorLike) -> Selector:
-    """Return a `Selector` for whichever of its forms was given."""
-    return selector if isinstance(selector, Selector) else Selector.parse(selector)
+def toSelector(
+    selector: SelectorLike, scheme: SelectorScheme[Any] = documentScheme
+) -> Selector:
+    """Return a `Selector` for whichever of its forms was given, refusing one parsed
+    for something else, whose conditions would read the wrong fields.
+    """
+    if not isinstance(selector, Selector):
+        return Selector.parse(selector, scheme)
+    if selector.scheme is not scheme:
+        raise SelectorError(composeRefusal(
+            f"`{selector}`", f"was parsed to select {formatChoiceList(
+                selector.scheme.positions)}, not {formatChoiceList(scheme.positions)}",
+            "Give it as text",
+        ))
+    return selector
 
 
 def findWildcard(pattern: str) -> bool:
@@ -220,10 +260,13 @@ def splitTopLevel(text: str, start: int, end: int) -> list[tuple[int, int]]:
 class SelectorParser:
     """Reads one group of a selector's text, keeping where each part sits."""
 
-    def __init__(self, text: str, start: int, end: int) -> None:
+    def __init__(
+        self, text: str, start: int, end: int, scheme: SelectorScheme[Any]
+    ) -> None:
         self.text = text
         self.index = start
         self.end = end
+        self.scheme = scheme
 
     def fault(
         self, cause: str, fix: str | None = None, index: int | None = None
@@ -246,7 +289,9 @@ class SelectorParser:
         if not self.startsWith(":") or self.startsWith(referenceSeparator):
             return None
         found = pseudoName.match(self.text, self.index + 1, self.end)
-        if found is None or found.group() not in {*pseudoClasses, pseudoNegation}:
+        if found is None or found.group() not in {
+            *self.scheme.pseudoClasses, pseudoNegation
+        }:
             return None
         return found.group()
 
@@ -260,12 +305,13 @@ class SelectorParser:
             self.index += len(referenceSeparator)
         components: list[SelectorComponent] = []
         conditions: tuple[SelectorCondition, ...] = ()
+        positions = self.scheme.positions
         while True:
-            if len(components) == len(positionNames):
+            if len(components) == len(positions):
                 raise self.fault(
-                    "begins a fourth position, and a selector holds only sheet, "
-                    "table and cells",
-                    "Write it as `sheet::table::cells`",
+                    f"begins a {ordinals[len(positions)]} position, and a selector "
+                    f"holds only {formatChoiceList(positions)}",
+                    f"Write it as `{referenceSeparator.join(positions)}`",
                 )
             component = self.componentParse()
             components.append(component)
@@ -280,7 +326,8 @@ class SelectorParser:
         if not components and not conditions:
             raise self.fault(
                 "selects nothing after its leading `::`",
-                "Write a part after it, such as `::B3`",
+                "Write a part after it, such as "
+                f"`::{self.scheme.groupExample.rsplit(referenceSeparator)[-1]}`",
             )
         return SelectorGroup(tuple(components), fromRight, conditions)
 
@@ -319,7 +366,8 @@ class SelectorParser:
         if not pattern and exclusions:
             raise self.fault(
                 "holds a `:not()` that follows no name",
-                "Write the name it removes from first, such as `Q*:not(Q4)`", start,
+                "Write the name it removes from first, such as "
+                f"`{self.scheme.exclusionExample}`", start,
             )
         return SelectorComponent(pattern, tuple(exclusions))
 
@@ -385,38 +433,85 @@ class SelectorParser:
             elif self.startsWith(":"):
                 conditions.append(self.pseudoClassParse())
             else:
+                examples = " or ".join(
+                    f"`{each}`" for each in self.scheme.conditionExamples
+                )
                 raise self.fault(
                     "holds text after its components that is not a condition",
-                    "Write a condition as `[kind=number]` or `:empty`",
+                    f"Write a condition as {examples}",
                 )
 
+    def attributeEndFind(self) -> int:
+        """Return where the `[` here closes, a `]` inside quotes not counting."""
+        index = self.index + 1
+        quoted = False
+        while index < self.end:
+            character = self.text[index]
+            if quoted and character == escapeMarker:
+                index += 2
+                continue
+            if character == '"':
+                quoted = not quoted
+            elif character == "]" and not quoted:
+                return index
+            index += 1
+        raise self.fault("opens a `[` that is never closed", "Close it with `]`")
+
     def attributeParse(self) -> SelectorAttribute:
-        """Return the `[name]` or `[name=value]` here, refusing one not in the table."""
+        """Return the attribute condition here, refusing one its scheme lacks."""
         start = self.index
-        close = self.text.find("]", self.index, self.end)
-        if close < 0:
-            raise self.fault("opens a `[` that is never closed", "Close it with `]`")
-        name, separator, value = self.text[self.index + 1:close].partition("=")
-        name, value = name.strip(), value.strip()
+        close = self.attributeEndFind()
+        found = attributePattern.fullmatch(self.text, start + 1, close)
         self.index = close + 1
-        attribute = selectorAttributes.get(name)
+        if found is None:
+            raise self.fault(
+                "holds a condition that is not `[name]` or `[name=value]`",
+                f"Write one as `{self.scheme.conditionExamples[0]}`", start,
+            )
+        name, operator = found["name"].strip(), found["operator"]
+        attributes = self.scheme.attributes
+        attribute = attributes.get(name)
         if attribute is None:
             raise composeChoiceRefusal(
                 SelectorError, f"[{name}]", "a selector condition",
-                [f"[{each}]" for each in selectorAttributes],
+                [f"[{each}]" for each in attributes],
             )
-        if not separator:
+        if operator is None:
             return SelectorAttribute(name)
-        if attribute.values is None:
+        if attribute.values is None and attribute.parse is None:
             raise self.fault(
                 f"gives `[{name}]` a value, and it takes none",
                 f"Write it as `[{name}]`", start,
             )
-        if value not in attribute.values:
+        if operator != "=" and not attribute.ordered:
+            raise self.fault(
+                f"compares `[{name}]` with `{operator}`, and it takes only `=`",
+                f"Write it as `[{name}=...]`", start,
+            )
+        quoted = found["quoted"] is not None
+        value = (
+            quoteEscape.sub(r"\1", found["quoted"]) if quoted
+            else found["bare"].strip()
+        )
+        exact = found["flag"] is not None
+        if exact and not attribute.text:
+            raise self.fault(
+                f"gives `[{name}]` the `{exactFlag}` flag, which only a name takes",
+                f"Remove the `{exactFlag}`", start,
+            )
+        if attribute.values is not None and value not in attribute.values:
             raise composeChoiceRefusal(
                 SelectorError, value, f"a value of `[{name}]`", attribute.values
             )
-        return SelectorAttribute(name, value)
+        if attribute.parse is not None:
+            try:
+                attribute.parse(value)
+            except ValueError as exc:
+                raise self.fault(
+                    f"gives `[{name}]` `{value}`, which is not one of its values",
+                    None, start,
+                ) from exc
+        return SelectorAttribute(name, value, operator, exact, quoted)
 
     def pseudoClassParse(self) -> SelectorCondition:
         """Return the `:name` or `:name(argument)` here."""
@@ -428,17 +523,18 @@ class SelectorParser:
             self.index = found.end()
             begin, finish = self.parenthesesRead()
             alternatives = tuple(
-                SelectorParser(self.text, each, last).conditionsParse()
+                SelectorParser(self.text, each, last, self.scheme).conditionsParse()
                 for each, last in splitTopLevel(self.text, begin, finish)
             )
             if not all(alternatives):
                 raise self.fault(
                     "holds a `:not()` with no condition",
-                    "Write one inside it, such as `:not(:empty)`", start,
+                    "Write one inside it, such as "
+                    f"`:not({self.scheme.conditionExamples[-1]})`", start,
                 )
             return SelectorNegation(alternatives)
-        takes = pseudoClasses.get(name)
-        pseudoNames = (*pseudoClasses, pseudoNegation)
+        takes = self.scheme.pseudoClasses.get(name)
+        pseudoNames = (*self.scheme.pseudoClasses, pseudoNegation)
         if takes is None:
             raise composeChoiceRefusal(
                 SelectorError, f":{name}", "a selector condition",
@@ -469,6 +565,5 @@ __all__ = [
     "SelectorNegation",
     "SelectorPseudoClass",
     "findWildcard",
-    "positionNames",
     "toSelector",
 ]
