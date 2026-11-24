@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-315] Select a font face by family, weight and slant
 - [PYB-304] Build the command line on Click rather than Typer
 - [PYB-307] Write every message to one structure and voice
 - [PYB-291] Report a cell's computed box style
