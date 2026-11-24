@@ -96,7 +96,7 @@ def checkFormatChosen(cell: pybers.Cell) -> bool:
 def readPlainText(text: str) -> str:
     """Return a command's output without terminal codes, its words joined by one space.
 
-    Typer colors and wraps a usage error to the terminal, which differs on CI, and Rich
+    Click colors and wraps a usage error to the terminal, which differs on CI, and Rich
     decodes every code it may write.
     """
     # Imported here, so a suite run without the `cli` extra still collects.

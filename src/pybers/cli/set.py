@@ -9,6 +9,8 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-23  Declared for Click, SELECTOR completing to sheets and tables, for
+            PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-22  `--table-style` lists each section's box, for PYB-291.
 2026-11-19  `--cell-style-update` and `--cell-style-remove` change part of a
@@ -47,23 +49,24 @@ __date__ = "2026/10/20"
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
 
-import typer
+import click
 from rich.text import Text
 
 import pybers
 from pybers.cli._common import (
-    OutputOption,
-    PreviewOption,
     composeUsageChoiceRefusal,
     composeUsageRefusal,
     findSaveTarget,
+    listSelectorCompletions,
+    outputOption,
+    previewOption,
     reportPybersErrors,
     reportWrite,
 )
 from pybers.cli._console import statusConsole
-from pybers.cli._formats import FormatOption, OutputFormat, printResult
+from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
+from pybers.cli._help import ChoiceOfValues, PybersArgument, PybersCommand
 from pybers.cli._report import formatLine
 from pybers.cli.show import ShownPart, formatShownParts
 
@@ -89,214 +92,184 @@ def formatLocale(locale: DocumentLocale) -> Text:
     return formatLine("Locale", (current, "identifier") if current else "none")
 
 
+@click.command("set", cls=PybersCommand)
+@click.argument(
+    "file", cls=PybersArgument, type=click.Path(path_type=Path),
+    help="The .numbers document.",
+)
+@click.argument(
+    "selector", cls=PybersArgument, required=False,
+    shell_complete=listSelectorCompletions,
+    help=(
+        "The cells to set, such as `Budget::Q3::B4`, `::Q3::B4` for B4 of "
+        "every table named Q3, or `Budget::Q*::B2:B9[kind=number]`, left "
+        "out with --locale."
+    ),
+)
+@click.argument(
+    "value", cls=PybersArgument, required=False,
+    help=(
+        "The value as text, such as 42, 42 EUR, TRUE, 2026-10-20 09:00, 1h 30m "
+        "or any text, each cell keeping its value when it is left out."
+    ),
+)
+@click.option(
+    "--as", "kind",
+    metavar="KIND",
+    help=(
+        "Read VALUE as this kind rather than inferring it: number, currency, "
+        "boolean, date, duration or text."
+    ),
+)
+@click.option(
+    "--time-zone", "timeZone",
+    metavar="ZONE",
+    help=(
+        "Write a date carrying an offset as the wall-clock time in ZONE, "
+        "such as America/New_York, rather than the zone pybers is running in."
+    ),
+)
+@click.option(
+    "--cell-format", "cellFormat",
+    metavar="FORMAT",
+    help=(
+        "The format each cell shows its value with, as `pybers show` prints "
+        "one: automatic, number or text."
+    ),
+)
+@click.option(
+    "--cell-control", "cellControl",
+    metavar="CONTROL",
+    help=(
+        "The control each cell presents its value through, as `pybers show` "
+        "prints one, or none to remove it."
+    ),
+)
+@click.option(
+    "--cell-style", "cellStyle",
+    metavar="STYLE",
+    help=(
+        "The box each cell is drawn in, replacing its whole box, as `pybers "
+        "show` prints one: background, padding, vertical-align and text-wrap "
+        "as CSS, or none to remove it."
+    ),
+)
+@click.option(
+    "--cell-style-update", "cellStyleUpdate",
+    metavar="STYLE",
+    help=(
+        "The properties of each cell's box to change, written as for "
+        "--cell-style, every property not given kept as it was."
+    ),
+)
+@click.option(
+    "--cell-style-remove", "cellStyleRemove",
+    metavar="PROPERTY",
+    help=(
+        "One property to clear from each cell's box, so the cell shows what "
+        "its table states: background, padding, vertical-align or text-wrap."
+    ),
+)
+# Text rather than the enum, so `--help` never loads the model.
+@click.option(
+    "--border",
+    metavar="POSITION",
+    help=(
+        "Draw borders on the one block SELECTOR selects, at this part of it: "
+        "all, outer, outer-top, outer-right, outer-bottom, outer-left, "
+        "between, between-rows or between-columns."
+    ),
+)
+@click.option(
+    "--border-style", "borderStyle",
+    metavar="STYLE",
+    help=(
+        "The --border line, solid when left out: solid, dashed, dotted, hidden "
+        "to draw nothing and hide the table's line, or none to remove the "
+        "borders."
+    ),
+)
+@click.option(
+    "--border-width", "borderWidth",
+    metavar="LENGTH",
+    help="The --border line's width, such as 1pt, and 0.35pt when left out.",
+)
+@click.option(
+    "--border-color", "borderColor",
+    metavar="COLOR",
+    help=(
+        "The --border line's color, as `pybers show` prints one, such as "
+        "#ff0000ff, and black when left out."
+    ),
+)
+@click.option(
+    "--table-style", "tableStyle",
+    metavar="STYLE",
+    help=(
+        "The lines each table SELECTOR matches draws, as `pybers show` prints "
+        "them: each `width style color` or none, its -width, -style or -color "
+        "changing one part, for table-outline, "
+        "body-horizontal-gridlines, body-vertical-gridlines, "
+        "header-rows-horizontal-gridlines, header-rows-vertical-gridlines, "
+        "header-columns-horizontal-gridlines, "
+        "header-columns-vertical-gridlines, "
+        "footer-rows-horizontal-gridlines, footer-rows-vertical-gridlines, "
+        "header-rows-separator, header-columns-separator and "
+        "footer-rows-separator; table-title and table-outline-title, yes "
+        "or no; banded-rows, a color or none, with banded-rows-background "
+        "its color alone; and the -background, -padding, -vertical-align and "
+        "-text-wrap of body, header-rows, header-columns and footer-rows, the "
+        "box their cells inherit."
+    ),
+)
+@click.option(
+    "--locale",
+    metavar="LOCALE",
+    help=(
+        "The document's language and region, such as de_DE or en_GB, given "
+        "with no SELECTOR."
+    ),
+)
+@click.option(
+    "--conflict",
+    type=ChoiceOfValues(pybers.CellFormatConflict),
+    default=pybers.CellFormatConflict.REFUSE, show_default=True,
+    help=(
+        "What a --cell-format that cannot show a cell's value does: refuse the "
+        "write, or give that cell the Automatic format and say so."
+    ),
+)
+@outputOption
+@previewOption
+@click.option(
+    "--extend", is_flag=True,
+    help="Grow the table when SELECTOR selects one cell lying outside it.",
+)
+@outputFormatOption
+@click.pass_context
 def runSet(
-    context: typer.Context,
-    documentPath: Annotated[
-        Path,
-        typer.Argument(
-            metavar="FILE", help="The .numbers document.", show_default=False
-        ),
-    ],
-    selector: Annotated[
-        str | None,
-        typer.Argument(
-            metavar="[SELECTOR]",
-            # A backslash keeps Rich from reading a condition as markup.
-            help=(
-                "The cells to set, such as `Budget::Q3::B4`, `::Q3::B4` for B4 of "
-                "every table named Q3, or `Budget::Q*::B2:B9\\[kind=number]`, left "
-                "out with --locale."
-            ),
-            show_default=False,
-        ),
-    ] = None,
-    value: Annotated[
-        str | None,
-        typer.Argument(
-            metavar="[VALUE]",
-            help=(
-                "The value as text, such as 42, 42 EUR, TRUE, 2026-10-20 09:00, 1h 30m "
-                "or any text, each cell keeping its value when it is left out."
-            ),
-            show_default=False,
-        ),
-    ] = None,
-    kind: Annotated[
-        str | None,
-        typer.Option(
-            "--as",
-            metavar="KIND",
-            help=(
-                "Read VALUE as this kind rather than inferring it: number, currency, "
-                "boolean, date, duration or text."
-            ),
-        ),
-    ] = None,
-    timeZone: Annotated[
-        str | None,
-        typer.Option(
-            "--time-zone",
-            metavar="ZONE",
-            help=(
-                "Write a date carrying an offset as the wall-clock time in ZONE, "
-                "such as America/New_York, rather than the zone pybers is running in."
-            ),
-        ),
-    ] = None,
-    cellFormat: Annotated[
-        str | None,
-        typer.Option(
-            "--cell-format",
-            metavar="FORMAT",
-            help=(
-                "The format each cell shows its value with, as `pybers show` prints "
-                "one: automatic, number or text."
-            ),
-        ),
-    ] = None,
-    cellControl: Annotated[
-        str | None,
-        typer.Option(
-            "--cell-control",
-            metavar="CONTROL",
-            help=(
-                "The control each cell presents its value through, as `pybers show` "
-                "prints one, or none to remove it."
-            ),
-        ),
-    ] = None,
-    cellStyle: Annotated[
-        str | None,
-        typer.Option(
-            "--cell-style",
-            metavar="STYLE",
-            help=(
-                "The box each cell is drawn in, replacing its whole box, as `pybers "
-                "show` prints one: background, padding, vertical-align and text-wrap "
-                "as CSS, or none to remove it."
-            ),
-        ),
-    ] = None,
-    cellStyleUpdate: Annotated[
-        str | None,
-        typer.Option(
-            "--cell-style-update",
-            metavar="STYLE",
-            help=(
-                "The properties of each cell's box to change, written as for "
-                "--cell-style, every property not given kept as it was."
-            ),
-        ),
-    ] = None,
-    cellStyleRemove: Annotated[
-        str | None,
-        typer.Option(
-            "--cell-style-remove",
-            metavar="PROPERTY",
-            help=(
-                "One property to clear from each cell's box, so the cell shows what "
-                "its table states: background, padding, vertical-align or text-wrap."
-            ),
-        ),
-    ] = None,
-    # Text rather than the enum, so `--help` never loads the model.
-    border: Annotated[
-        str | None,
-        typer.Option(
-            "--border",
-            metavar="POSITION",
-            help=(
-                "Draw borders on the one block SELECTOR selects, at this part of it: "
-                "all, outer, outer-top, outer-right, outer-bottom, outer-left, "
-                "between, between-rows or between-columns."
-            ),
-        ),
-    ] = None,
-    borderStyle: Annotated[
-        str | None,
-        typer.Option(
-            "--border-style",
-            metavar="STYLE",
-            help=(
-                "The --border line, solid when left out: solid, dashed, dotted, hidden "
-                "to draw nothing and hide the table's line, or none to remove the "
-                "borders."
-            ),
-        ),
-    ] = None,
-    borderWidth: Annotated[
-        str | None,
-        typer.Option(
-            "--border-width",
-            metavar="LENGTH",
-            help="The --border line's width, such as 1pt, and 0.35pt when left out.",
-        ),
-    ] = None,
-    borderColor: Annotated[
-        str | None,
-        typer.Option(
-            "--border-color",
-            metavar="COLOR",
-            help=(
-                "The --border line's color, as `pybers show` prints one, such as "
-                "#ff0000ff, and black when left out."
-            ),
-        ),
-    ] = None,
-    tableStyle: Annotated[
-        str | None,
-        typer.Option(
-            "--table-style",
-            metavar="STYLE",
-            help=(
-                "The lines each table SELECTOR matches draws, as `pybers show` prints "
-                "them: each `width style color` or none, its -width, -style or -color "
-                "changing one part, for table-outline, "
-                "body-horizontal-gridlines, body-vertical-gridlines, "
-                "header-rows-horizontal-gridlines, header-rows-vertical-gridlines, "
-                "header-columns-horizontal-gridlines, "
-                "header-columns-vertical-gridlines, "
-                "footer-rows-horizontal-gridlines, footer-rows-vertical-gridlines, "
-                "header-rows-separator, header-columns-separator and "
-                "footer-rows-separator; table-title and table-outline-title, yes "
-                "or no; banded-rows, a color or none, with banded-rows-background "
-                "its color alone; and the -background, -padding, -vertical-align and "
-                "-text-wrap of body, header-rows, header-columns and footer-rows, the "
-                "box their cells inherit."
-            ),
-        ),
-    ] = None,
-    locale: Annotated[
-        str | None,
-        typer.Option(
-            "--locale",
-            metavar="LOCALE",
-            help=(
-                "The document's language and region, such as de_DE or en_GB, given "
-                "with no SELECTOR."
-            ),
-        ),
-    ] = None,
-    conflict: Annotated[
-        pybers.CellFormatConflict,
-        typer.Option(
-            "--conflict",
-            help=(
-                "What a --cell-format that cannot show a cell's value does: refuse the "
-                "write, or give that cell the Automatic format and say so."
-            ),
-        ),
-    ] = pybers.CellFormatConflict.REFUSE,
-    output: OutputOption = None,
-    preview: PreviewOption = False,
-    extend: Annotated[
-        bool,
-        typer.Option(
-            "--extend",
-            help="Grow the table when SELECTOR selects one cell lying outside it.",
-        ),
-    ] = False,
-    outputFormat: FormatOption = OutputFormat.TEXT,
+    context: click.Context,
+    file: Path,
+    selector: str | None,
+    value: str | None,
+    kind: str | None,
+    timeZone: str | None,
+    cellFormat: str | None,
+    cellControl: str | None,
+    cellStyle: str | None,
+    cellStyleUpdate: str | None,
+    cellStyleRemove: str | None,
+    border: str | None,
+    borderStyle: str | None,
+    borderWidth: str | None,
+    borderColor: str | None,
+    tableStyle: str | None,
+    locale: str | None,
+    conflict: pybers.CellFormatConflict,
+    extend: bool,
+    output: Path | None,
+    preview: bool,
+    outputFormat: OutputFormat,
 ) -> None:
     """Set what SELECTOR matches, or with --locale the document's locale."""
     cellParts = (value, cellFormat, cellControl, cellStyle)
@@ -308,7 +281,7 @@ def runSet(
                 "--locale", "sets the whole document, so it takes no SELECTOR and "
                 "nothing else to set", "Give --locale alone", pybers.nothingWritten,
             )
-        setLocale(context, documentPath, locale, output, preview, outputFormat)
+        setLocale(context, file, locale, output, preview, outputFormat)
         return
     if selector is None:
         raise composeUsageRefusal(
@@ -352,11 +325,11 @@ def runSet(
             borderStyle, "a border style", (*borderStyles, "none"), "set",
             pybers.nothingWritten,
         )
-    target = findSaveTarget(documentPath, output, preview)
+    target = findSaveTarget(file, output, preview)
     with reportPybersErrors(context):
         document = (
-            pybers.open(documentPath) if timeZone is None
-            else pybers.open(documentPath, timeZone=timeZone)
+            pybers.open(file) if timeZone is None
+            else pybers.open(file, timeZone=timeZone)
         )
         changes = pybers.CellChanges(())
         if any(part is not None for part in cellParts):
@@ -446,7 +419,7 @@ def runSet(
 
 
 def setLocale(
-    context: typer.Context, documentPath: Path, identifier: str, output: Path | None,
+    context: click.Context, documentPath: Path, identifier: str, output: Path | None,
     preview: bool, outputFormat: OutputFormat,
 ) -> None:
     """Change a document's locale and print it, saving only a change."""

@@ -26,7 +26,8 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 
 `check`, `show`, `set` and `visinum` are committed. The rest are the agreed vocabulary, and each gains its options in its own ticket. With no arguments, `pybers` prints its help.
 
-- **The default action** comes from a `TyperGroup` subclass that routes a first argument naming no command to `check --names`. A file named like a command is reached as `./check`.
+- **The command line is built on [Click](https://click.palletsprojects.com/)**, from the `cli` extra, and `decisions.md` records why.
+- **The default action** comes from a Click `Group` subclass that routes a first argument naming no command to `check --names`. A file named like a command is reached as `./check`.
 - **`python -m pybers`** runs the same command.
 
 ## What a command adds
@@ -34,6 +35,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 A command parses its arguments, calls the library once, formats what comes back, and chooses the exit status. Nothing else, so a script and a command never disagree.
 
 - **Selectors** are positional, quoted in the shell, and parsed by the library, the one syntax `library-design.md` sets out under Addresses. A reference a command prints is that syntax, each name escaped, so it pastes back as a selector. Tab completion offers the sheet and table names of the file being typed.
+- **A shell enables completion** through the environment variable Click reads, once in its startup file: `eval "$(_PYBERS_COMPLETE=zsh_source pybers)"` for zsh, after `autoload -Uz compinit && compinit` loads zsh's completion system, and `bash_source` or `fish_source` for bash or fish.
 - **A command prints every part a selector matches, each as it prints alone.** `show` prints each part, and `set` each cell it wrote, exactly as `show` prints that part, so a part reads the same whatever reached it. A selector's JSON is always an array of those parts' forms, which `parseJsonForm` reads back.
 - **JSON on stdout reads back, and a diagnostic goes to stderr.** A part a write skipped prints `Skipped:` and its reason on stderr, as `Written:` does, so `--output-format json` never mixes a report into the data.
 - **Each command has one default format** that does not change when its output is piped. A terminal only turns color on. `--output-format` chooses another, and `-o FILE` infers it from the extension.
@@ -100,7 +102,7 @@ A command shows a formula as the library returns it, stored and never recalculat
 | ------ | ------- |
 | `0` | The command did what was asked. |
 | `1` | pybers refused the file or could not read the document, or `diff` found a difference. |
-| `2` | The command line itself was wrong, reported by Typer. |
+| `2` | The command line itself was wrong, reported by Click. |
 
 ## Rich
 
@@ -126,6 +128,10 @@ Named styles in one Rich `Theme`, so a command specifies a meaning and never a c
 | `badge.success` | `bold black on green` | A badge for a good outcome | |
 | `badge.warning` | `bold black on yellow` | A badge for something to look at | ` UNRECOGNIZED ` |
 | `badge.failure` | `bold white on red` | A badge for a fault | |
+| `logo.grid` | `dim` | The logo's gridlines | `╶─` |
+| `logo.mark` | `bold` | The logo's selection ring and prompt | `┃ ❯❯❯` |
+| `logo.caret` | `bold #ee9e10` | The logo's caret, its one brand color | `▌` |
+| `logo.name` | `bold` | The name beside the logo | `pybers` |
 
 **A badge sets one word apart** that the reader must not miss, such as a cell pybers does not recognize. Every command writes one through `formatBadge(word, BadgeLevel.WARNING)` in `pybers.cli._report`, which writes the word upper case and padded, so it stands out in a pasted report too, and styles it by its level: info, success, warning or failure.
 
@@ -153,8 +159,11 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 
 ## Help
 
-- **Typer renders help with Rich**, in its default colors and without borders. Typer hard-codes a rounded box around each help and error panel, so `pybers.cli._app` draws each one as its title over its table, both one column in, as Typer indents its usage line.
-- **A command's help is its docstring**, which Typer prints, and its options' help is each `help=`, both worded by the rules of [the message design](message-design.md).
+- **Every usage line follows the [POSIX utility argument syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html)**: a required argument bare and in capitals, `FILE`, an optional one in single brackets, `[SELECTOR]`, and `...` after one that repeats. Braces are never used, since a man page reads `{a|b}` as a choice, and no argument is wrapped twice. An option's alternatives are written `text|json`. `pybers set --help` opens with `Usage: pybers set [OPTIONS] FILE [SELECTOR] [VALUE]`.
+- **The root command's help opens with the logo**, a selected cell between gridlines holding the Python prompt and a caret, beside the name, which `formatLogo` in `pybers.cli._logo` returns for any front end to print. The ring and prompt take the terminal's own color, so the logo reads on a light or a dark background, and only the caret keeps the logo's orange. No command's own help repeats it.
+- **One renderer draws every help screen**, the root command's and each command's, in `pybers.cli._help`, with Rich and the theme's styles. A help screen is its usage line, its description indented two columns, then the sections `Arguments`, `Options` and `Commands`, each its title over its rows with no border, the rows indented two columns. A command is a `PybersCommand` and each argument a `PybersArgument`, which carries the help Click gives only to an option.
+- **A command's help is its docstring**, and each argument's and option's help is its `help=`, both worded by the rules of [the message design](message-design.md). An option shown with its default or environment variable ends with `[default: text]` or `[env var: PYBERS_DEBUG]`.
+- **A usage error is Click's own**: the usage line, `Try 'pybers set --help' for help.`, then `Error:` and the message, with exit status 2.
 
 ## Terminal interface
 

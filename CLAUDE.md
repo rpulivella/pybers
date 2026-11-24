@@ -5,7 +5,7 @@ documents. Built in deep respect for Apple Numbers itself, the goal is for editi
 `.numbers` file programmatically to be as reliable as using Numbers by hand.
 
 Two consumers, both from day one: a library (`import pybers`) and a CLI/TUI on top of
-it. The command line lives at `pybers.cli`, built on Typer from the `cli` extra, and
+it. The command line lives at `pybers.cli`, built on Click from the `cli` extra, and
 the terminal interface will live at `pybers.tui`. No other module under `src/pybers/`
 prints or imports either of them, and both reach the library through `import pybers`
 alone. `tests/test_library_boundary.py` enforces this.

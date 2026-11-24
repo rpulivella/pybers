@@ -22,7 +22,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
 from conftest import findDocumentPath
 from pybers.cli._app import app

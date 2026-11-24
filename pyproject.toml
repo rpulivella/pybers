@@ -35,8 +35,8 @@ license-files = ["LICENSE", "NOTICE"]
 pybers = "pybers.cli:main"
 
 [project.optional-dependencies]
-# The command line's own extra, so a script importing pybers never installs Typer.
-cli = ["typer>=0.29.2"]
+# The command line's own extra, so a script importing pybers never installs Click.
+cli = ["click>=8.5.1", "rich>=15.0.0"]
 # rich and rich_argparse are for tools/, not for the library. pybers itself must
 # never import them, which the library-purity check enforces. Declared here so that
 # one `pip install -e ".[dev]"` equips the venv for both the test suite and the repo
@@ -62,7 +62,7 @@ dev = [
     # Validates every test document's JSON form against the committed schema.
     "jsonschema>=4.26.0",
     # Orders versions for the dependency report in tools/.
-    "packaging>=26.3",
+    "packaging>=26.4",
     # `build` rather than `hatchling`: the backend belongs in [build-system] requires,
     # where pip installs it into an isolated environment on its own. This is the
     # front end that drives it, and without it `python3 -m build --wheel` depends on

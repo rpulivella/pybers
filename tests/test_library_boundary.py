@@ -29,7 +29,7 @@ import pybers
 pybersDirectory: Path = Path(pybers.__file__).resolve().parent
 frontEndPackages: tuple[str, ...] = ("cli", "tui")
 machineWritten: tuple[str, ...] = ("_generated", "protos")
-frontEndLibraries: tuple[str, ...] = ("typer", "click", "rich", "textual")
+frontEndLibraries: tuple[str, ...] = ("click", "rich", "textual")
 
 
 def findModulePaths() -> list[Path]:

@@ -3,6 +3,7 @@
 `pybers check`, run the way a person reporting a bug runs it.
 
 UPDATES
+2026-11-23  Run through Click, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, names withheld unless
             asked for, for PYB-223.
@@ -22,7 +23,6 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/10/07"
 
-import io
 import json
 import os
 import runpy
@@ -33,15 +33,14 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from rich.console import Console
-from rich.text import Text
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
 import pybers
 from conftest import findDocumentPath, renderPlain
 from pybers._persistence import readPackage, writePackage
 from pybers.cli import main
-from pybers.cli._app import HelpSection, app
+from pybers.cli._app import app
+from pybers.cli._logo import formatLogo
 from pybers.cli.check import formatCheck
 
 baselinePath: Path = findDocumentPath("00-baseline")
@@ -229,10 +228,10 @@ def testPythonDashMPybersRunsTheSameCommand(
     assert "Readable: yes" in capsys.readouterr().out
 
 
-def testTheCommandWithoutTyperSaysWhichExtraInstallsIt(
+def testTheCommandWithoutClickSaysWhichExtraInstallsIt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setitem(sys.modules, "typer", None)
+    monkeypatch.setitem(sys.modules, "click", None)
     monkeypatch.delitem(sys.modules, "pybers.cli._app")
     monkeypatch.delitem(sys.modules, "pybers.cli.check")
     with pytest.raises(SystemExit) as exited:
@@ -292,10 +291,12 @@ def testDebugRaisesTheFailureAReportDescribes(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("arguments", [["--help"], ["check", "--help"], ["check"]])
-def testHelpAndUsageErrorsDrawNoBorders(arguments: list[str]) -> None:
+def testHelpAndUsageErrorsDrawNoBordersBesideTheLogo(arguments: list[str]) -> None:
+    logo = {line.rstrip() for line in renderPlain(formatLogo()).splitlines()}
     output = runner.invoke(app, arguments).output
     assert output.strip()
-    assert not set(output) & set("╭╮╰╯│─━┃┏┓┗┛")
+    drawn = [line for line in output.splitlines() if line not in logo]
+    assert not set("".join(drawn)) & set("╭╮╰╯│─━┃┏┓┗┛")
 
 
 def testANameInBracketsPrintsAsWritten() -> None:
@@ -344,21 +345,6 @@ def testUnrecognizedCellsHangUnderTheirTableBadged() -> None:
         "Sheets:\nSheet\n└ Table: 10 rows × 5 columns\n"
         "  ├ B7  UNRECOGNIZED  cell type 4\n  └ C9  UNRECOGNIZED  cell type 4\n"
     )
-
-
-@pytest.mark.parametrize(
-    "section",
-    [
-        HelpSection("body", title="Options", border_style="dim"),
-        HelpSection(renderable="body", title=Text("Options"), subtitle="x"),
-        HelpSection("body"),
-    ],
-    ids=["as-typer-calls-it", "keywords-and-text-title", "no-title"],
-)
-def testAHelpSectionRendersHoweverTyperCallsIt(section: HelpSection) -> None:
-    buffer = io.StringIO()
-    Console(width=40, file=buffer).print(section)
-    assert "body" in buffer.getvalue()
 
 
 def testEveryBadgeLevelHasAStyleInTheTheme() -> None:

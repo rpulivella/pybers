@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-304] Build the command line on Click rather than Typer
 - [PYB-307] Write every message to one structure and voice
 - [PYB-291] Report a cell's computed box style
 - [PYB-309] List only internal verbs in the naming test

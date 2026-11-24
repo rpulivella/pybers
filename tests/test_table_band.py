@@ -27,7 +27,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
 import pybers
 from conftest import copyDocument, findDocumentPath, readOverrides

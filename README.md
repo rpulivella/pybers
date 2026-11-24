@@ -336,7 +336,7 @@ Locale: de_DE
 
 The document then shows its numbers, dates and currencies as Germany writes them, `1.234,50 €`, and Numbers recalculates every formula when it opens it, since a result such as `DOLLAR` follows the region. pybers builds each locale field from macOS's own locale data, read into pybers before a release, so it writes a region exactly as Numbers would, on any system pybers runs on.
 
-All three install with the `cli` extra, `pip install -e ".[cli]"`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
+All three install with the `cli` extra, `pip install -e ".[cli]"`. A selector completes to the sheets and tables of the file typed before it once a shell's startup file holds `eval "$(_PYBERS_COMPLETE=zsh_source pybers)"`, after `autoload -Uz compinit && compinit` in zsh, or the same line with `bash_source` or `fish_source`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
 
 ## Python library
 

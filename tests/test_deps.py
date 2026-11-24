@@ -97,12 +97,12 @@ def testOnlyAnOlderInstalledVersionIsReported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     patchReleases(monkeypatch, {
-        "typer": ("0.27.3", "0.29.1"),
+        "click": ("8.4.2", "8.5.1"),
         "ruff": ("0.10.0", "0.9.9"),
         "pluggy": ("1.6.0", "1.7.0"),
     })
     assert dependencies.readOutdatedPackages() == [
-        dependencies.OutdatedPackage("typer", "0.27.3", "0.29.1")
+        dependencies.OutdatedPackage("click", "8.4.2", "8.5.1")
     ]
 
 
