@@ -23,6 +23,8 @@ dependencies = [
     # both run 7.36.2, so one number covers both rather than the manifest allowing
     # a version nobody exercises.
     "protobuf>=7.36.2",
+    # Reads a font file's faces on any system, the version the suite runs against.
+    "fonttools>=4.68.0",
 ]
 
 # PEP 639 SPDX expression rather than a "License ::" classifier, which that PEP
@@ -170,6 +172,11 @@ files = ["src/pybers", "tools"]
 # modules beside them are not.
 module = "pybers._generated.*"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+# fontTools ships no stubs, so its tables are typed by the one module reading them.
+module = "fontTools.*"
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # `ruff` ships no py.typed marker, because its Python package is a shim around a
