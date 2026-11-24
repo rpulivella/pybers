@@ -34,7 +34,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `TableStyle`, `TableLine`, `TableBand` | A table's lines, each whether it shows and its stroke, whether its outline outlines its title, its banded rows, whether they show and their color, and the `CellStyle` each section's cells inherit | Frozen |
 | `TableStyleChange` | What setting a table's lines did: the lines it drew before and after | Frozen |
 | `Fonts` | The faces pybers knows, or one font file's, selected as a document's parts are | Frozen |
-| `FontFace` | One face: its font family, its name, its PostScript name, its weight, its `FontSlant` and its `FontSource`, the catalog, this machine, a font file, or the caller alone | Frozen |
+| `FontFace` | One face: its font family, its name, its PostScript name, its weight, its `FontSlant` and its `FontSource`, the catalog, this machine or a font file | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
 | `CellOffset` | A signed distance between two addresses, in rows and columns | Frozen |
@@ -126,7 +126,7 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 
 ## Fonts
 
-A style names a face by its PostScript name, and a script finds that name before it writes the style. `pybers.openFonts()` returns the faces pybers knows, the catalog it ships and the fonts installed on the machine running it, and `pybers.openFonts(path)` a font file's own. `fonts.select(selector)` returns every `FontFace` a selector matches, as `document.select` does, through the fonts selector [the command-line design](cli-design.md#fonts) sets out. `fonts.face("Avenir Next", weight=600)` returns the one face a font family, a weight and a slant specify, and refuses one the family lacks, listing the faces it has, so pybers never asks Numbers to fake a bold or an italic. `fonts.face(postScriptName="BrandSans-Semibold")` returns a face pybers knows, or one whose source is `FontSource.CALLER`, known to neither, so a server lacking a font names a face for a reader who has it.
+A style names a face by its PostScript name, and a script finds that name before it writes the style. `pybers.openFonts()` returns the faces pybers knows, the catalog it ships and the fonts installed on the machine running it, and `pybers.openFonts(path)` a font file's own. `fonts.select(selector)` returns every `FontFace` a selector matches, as `document.select` does, through the fonts selector [the command-line design](cli-design.md#fonts) sets out. `fonts.face("Avenir Next", weight=600)` returns the one face a font family, a weight and a slant specify, and refuses one the family lacks, listing the faces it has, so pybers never asks Numbers to fake a bold or an italic. `fonts.face(postScriptName="BrandSans-Semibold")` returns the face pybers knows by that name, or `None` when neither the catalog nor this machine knows it, since a style holds only the name and needs no face to write it.
 
 ## Lines
 

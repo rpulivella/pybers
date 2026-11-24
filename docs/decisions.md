@@ -793,9 +793,13 @@ ignores case. A quoted value ending in `s` matches exactly, the flag a CSS attri
 selector takes. A flag per loosening, or an option such as `--ignore-case`, was refused:
 no use for ignoring spaces alone was found, and quotes cannot carry a flag through a shell.
 
-**A face stated by its PostScript name is accepted.** A server can name a face it lacks
-for a reader who has it, which is a choice the caller makes, so pybers records that
-neither its catalog nor the machine knows the face rather than refusing it.
+**A face is a design pybers has read, and a style holds only its PostScript name.** A
+`FontFace` comes from the catalog, this machine or a font file, and a name nobody here
+knows finds no face rather than a face of unknown design. Editing a document therefore
+never needs its fonts installed: a style the file holds names its face, and applying it,
+changing its size or color, or copying a new style from it carries that name through
+unchanged. pybers needs to know a face only when a person chooses one by font family,
+weight and slant, and a server can still write a name it lacks for a reader who has it.
 
 ---
 

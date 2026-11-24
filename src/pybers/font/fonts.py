@@ -26,9 +26,10 @@ import functools
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import overload
 
 from pybers.addressing.text import quoteReferenceText
-from pybers.errors import composeRefusal, nothingRead
+from pybers.errors import composeRefusal, formatChoiceList, nothingRead
 from pybers.font._files import FontError, readFileFaces
 from pybers.font._machine import findMachineFontFiles
 from pybers.font.faces import FontFace, FontSlant, FontSource
@@ -45,8 +46,11 @@ from pybers.selection.scheme import (
     SelectorNameMatch,
     SelectorScheme,
 )
-from pybers.selection.selector import SelectorComponent, SelectorLike, toSelector
+from pybers.selection.selector import SelectorLike, toSelector
 
+# A face's weight when none is given, and the range CSS `font-weight` takes.
+regularWeight: int = 400
+weightRange: tuple[int, int] = (1, 1000)
 # Where the catalog's files sit on every Mac.
 systemFonts: PurePosixPath = PurePosixPath("/System/Library/Fonts")
 slantOrder: tuple[FontSlant, ...] = tuple(FontSlant)
@@ -98,17 +102,42 @@ def sortFaces(faces: Iterable[FontFace]) -> tuple[FontFace, ...]:
     )))
 
 
+def findWeightRefusal(weight: object) -> str | None:
+    """Return why a weight is not one CSS takes, or None when it is."""
+    if isinstance(weight, bool) or not isinstance(weight, int) or not (
+        weightRange[0] <= weight <= weightRange[1]
+    ):
+        return composeRefusal(
+            f"The weight {weight!r}", "is not a whole number from 1 to 1000",
+            "Give one such as 400 or 700",
+        )
+    return None
+
+
+def findSlantRefusal(slant: object) -> str | None:
+    """Return why a slant is not a `FontSlant`, or None when it is."""
+    if isinstance(slant, FontSlant):
+        return None
+    choices = formatChoiceList([f"FontSlant.{each.name}" for each in FontSlant])
+    return composeRefusal(
+        f"The slant {slant!r}", "is not a FontSlant", f"Give one of {choices}"
+    )
+
+
 def matchNoPseudoClass(name: str, argument: str | None) -> bool:
     """Refuse a pseudo-class, which the fonts' scheme admits none of."""
     raise AssertionError(f"The parser admitted a pseudo-class for a font, {name!r}.")
 
 
-def findClosestName(component: SelectorComponent, names: Iterable[str]) -> str:
+def normalizeFontName(name: str) -> str:
+    """Return a font's name as a fonts selector compares it, `avenirnext`."""
+    return normalizeName(name, SelectorNameMatch.LOOSE).casefold()
+
+
+def findClosestName(written: str, names: Iterable[str]) -> str:
     """Return the part of a refusal stating the closest name, compared loosely."""
-    loose = {
-        normalizeName(each, SelectorNameMatch.LOOSE).casefold(): each for each in names
-    }
-    wanted = normalizeName(component.pattern, SelectorNameMatch.LOOSE).casefold()
+    loose = {normalizeFontName(each): each for each in names}
+    wanted = normalizeFontName(written)
     closest = difflib.get_close_matches(wanted, list(loose), n=1)
     if not closest:
         return "None is close, and `pybers show fonts` lists every one"
@@ -140,7 +169,7 @@ class Fonts:
                 assert familyComponent is not None
                 refuseExactMiss(
                     familyComponent, "font family", "the fonts pybers knows",
-                    findClosestName(familyComponent, families),
+                    findClosestName(familyComponent.pattern, families),
                 )
             inFamilies = [face for face in self.faces if face.fontFamily in selected]
             faces = [
@@ -162,6 +191,76 @@ class Fonts:
                 ):
                     matches.setdefault(face.postScriptName, face)
         return tuple(matches.values())
+
+    @overload
+    def face(
+        self, fontFamily: str, weight: int = ..., slant: FontSlant = ...
+    ) -> FontFace: ...
+
+    @overload
+    def face(self, *, postScriptName: str) -> FontFace | None: ...
+
+    def face(
+        self, fontFamily: str | None = None, weight: int = regularWeight,
+        slant: FontSlant = FontSlant.NORMAL, *, postScriptName: str | None = None,
+    ) -> FontFace | None:
+        """Return the face a font family, weight and slant specify, or a name finds.
+
+        A face the family lacks is refused, listing those it has, so no bold or italic
+        is ever faked. A PostScript name pybers does not know finds None.
+        """
+        if (fontFamily is None) == (postScriptName is None):
+            raise FontError(composeRefusal(
+                "A face", "is found by a font family or by a PostScript name",
+                "Give one of them",
+            ))
+        if postScriptName is not None:
+            wanted = normalizeFontName(postScriptName)
+            return next((
+                each for each in self.faces
+                if normalizeFontName(each.postScriptName) == wanted
+            ), None)
+        assert fontFamily is not None
+        refusal = findWeightRefusal(weight) or findSlantRefusal(slant)
+        if refusal is not None:
+            raise FontError(refusal)
+        wanted = normalizeFontName(fontFamily)
+        inFamily = [
+            each for each in self.faces if normalizeFontName(each.fontFamily) == wanted
+        ]
+        if not inFamily:
+            families = dict.fromkeys(each.fontFamily for each in self.faces)
+            raise FontError(composeRefusal(
+                quoteReferenceText(fontFamily), "is not a font family pybers knows",
+                findClosestName(fontFamily, families),
+            ))
+        family = quoteReferenceText(inFamily[0].fontFamily)
+        found = [
+            each for each in inFamily if each.weight == weight and each.slant is slant
+        ]
+        if not found:
+            raise FontError(composeRefusal(
+                family, f"has no face of weight {weight} and {slant} slant",
+                f"Its faces are {formatFaceChoices(inFamily)}",
+            ))
+        if len(found) > 1:
+            names = formatChoiceList([
+                f"{quoteReferenceText(each.name)} ({each.postScriptName})"
+                for each in found
+            ])
+            raise FontError(composeRefusal(
+                family, f"has {len(found)} faces of weight {weight} and {slant} "
+                f"slant, {names}", "Choose one by its PostScript name",
+            ))
+        return found[0]
+
+
+def formatFaceChoices(faces: Iterable[FontFace]) -> str:
+    """Return faces as a refusal lists them, `'Bold' (700, normal)`."""
+    return formatChoiceList([
+        f"{quoteReferenceText(face.name)} ({face.weight}, {face.slant})"
+        for face in faces
+    ])
 
 
 def openFonts(path: Path | str | None = None) -> Fonts:

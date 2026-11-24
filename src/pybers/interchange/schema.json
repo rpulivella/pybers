@@ -1222,14 +1222,7 @@
           "$ref": "#/$defs/FontSource"
         },
         "file": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string"
         }
       },
       "required": [
@@ -1238,7 +1231,8 @@
         "postScriptName",
         "weight",
         "slant",
-        "source"
+        "source",
+        "file"
       ],
       "additionalProperties": false
     },
@@ -1253,8 +1247,7 @@
       "enum": [
         "catalog",
         "machine",
-        "file",
-        "caller"
+        "file"
       ]
     },
     "Fonts": {

@@ -16,7 +16,7 @@ __status__ = "Development"
 __date__ = "2026/11/24"
 
 import platform
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 from fontbuilders import buildFont, saveFont
@@ -32,7 +32,10 @@ def buildFace(
     slant: FontSlant = FontSlant.NORMAL, source: FontSource = FontSource.CATALOG,
 ) -> FontFace:
     """Return a face as a catalog or a machine reports one."""
-    return FontFace(family, name, postScriptName, weight, slant, source)
+    return FontFace(
+        family, name, postScriptName, weight, slant, source,
+        PurePosixPath(f"/Fonts/{postScriptName}.otf"),
+    )
 
 
 fonts = Fonts((
@@ -154,3 +157,64 @@ def testMissingFontFileIsRefused(tmp_path: Path) -> None:
 def testFaceBothKnowReportsTheCatalog() -> None:
     found = pybers.openFonts().select('*[postscript="Helvetica-Bold" s]')
     assert [each.source for each in found] == [FontSource.CATALOG]
+
+
+def testFamilyWeightAndSlantFindOneFace() -> None:
+    face = fonts.face("avenir-next", weight=600, slant=FontSlant.ITALIC)
+    assert face.postScriptName == "AvenirNext-DemiBoldItalic"
+
+
+def testFaceDefaultsToRegularUpright() -> None:
+    assert fonts.face("Avenir Next").postScriptName == "AvenirNext-Regular"
+
+
+def testWeightTheFamilyLacksIsRefusedListingItsFaces() -> None:
+    with pytest.raises(pybers.FontError, match=(
+        r"'Avenir Next' has no face of weight 700 and normal slant. Its faces are "
+        r"'Regular' \(400, normal\), 'Italic' \(400, italic\)"
+    )):
+        fonts.face("Avenir Next", weight=700)
+
+
+def testSeveralFacesOfOneDesignAreRefusedNamingEach() -> None:
+    twins = Fonts((
+        buildFace("Jenson", "Regular", "Jenson-Regular"),
+        buildFace("Jenson", "Caption", "Jenson-Caption"),
+    ))
+    with pytest.raises(pybers.FontError, match=(
+        r"has 2 faces of weight 400 and normal slant, 'Regular' \(Jenson-Regular\) "
+        r"and 'Caption' \(Jenson-Caption\). Choose one by its PostScript name"
+    )):
+        twins.face("Jenson")
+
+
+def testUnknownFamilyIsRefusedNamingTheClosest() -> None:
+    with pytest.raises(pybers.FontError, match="The closest is 'Avenir Next'"):
+        fonts.face("Avenir Nxt")
+
+
+@pytest.mark.parametrize("weight", [0, 1001, True, "600"])
+def testWeightOffTheCssScaleIsRefused(weight: object) -> None:
+    with pytest.raises(pybers.FontError, match="is not a whole number from 1 to 1000"):
+        fonts.face("Avenir Next", weight=weight)  # type: ignore[call-overload]
+
+
+def testSlantThatIsNotAFontSlantIsRefused() -> None:
+    with pytest.raises(pybers.FontError, match="'italic' is not a FontSlant"):
+        fonts.face("Avenir Next", slant="italic")  # type: ignore[call-overload]
+
+
+def testPostScriptNameFindsTheFaceLoosely() -> None:
+    face = fonts.face(postScriptName="avenirnext demibold")
+    assert face is not None and face.postScriptName == "AvenirNext-DemiBold"
+
+
+def testPostScriptNameNobodyKnowsFindsNone() -> None:
+    assert fonts.face(postScriptName="BrandSerif-Semibold") is None
+
+
+@pytest.mark.parametrize("arguments", [{}, {"fontFamily": "Avenir Next",
+                                          "postScriptName": "AvenirNext-Regular"}])
+def testFaceTakesAFamilyOrANameNeverBothOrNeither(arguments: dict[str, str]) -> None:
+    with pytest.raises(pybers.FontError, match="Give one of them"):
+        fonts.face(**arguments)  # type: ignore[call-overload]

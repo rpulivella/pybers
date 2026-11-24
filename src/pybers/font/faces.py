@@ -36,20 +36,18 @@ class FontSlant(StrEnum):
 
 
 class FontSource(StrEnum):
-    """Where pybers found a face: its catalog, this machine, a font file or a caller."""
+    """Where pybers found a face: its catalog, this machine or a font file."""
 
     CATALOG = "catalog"
     MACHINE = "machine"
     FILE = "file"
-    CALLER = "caller"
 
 
 @dataclass(frozen=True, slots=True)
 class FontFace:
     """One face: its font family, its name in it, its PostScript name and its design.
 
-    `weight` is 1 to 1000, as CSS `font-weight`, and `file` is None for a face a caller
-    stated by its PostScript name alone.
+    `weight` is 1 to 1000, as CSS `font-weight`.
     """
 
     fontFamily: str
@@ -58,7 +56,7 @@ class FontFace:
     weight: int
     slant: FontSlant
     source: FontSource
-    file: PurePath | None = None
+    file: PurePath
 
 
 __all__ = ["FontFace", "FontSlant", "FontSource", "fontSuffixes"]
