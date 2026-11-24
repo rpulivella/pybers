@@ -2,7 +2,7 @@
 """\
 Font files a test builds for itself, each holding only the names and bits it states.
 
-No system font is committed, so a test of the font reader builds the face it reads.
+No system font is committed, so a test of the font reader builds the font it reads.
 
 UPDATES
 2026-11-24  Written for PYB-315.

@@ -22,7 +22,7 @@
       "$ref": "#/$defs/ColorJsonForm"
     },
     {
-      "$ref": "#/$defs/FontsJsonForm"
+      "$ref": "#/$defs/TypefacesJsonForm"
     }
   ],
   "$defs": {
@@ -812,7 +812,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 10
+          "const": 11
         },
         "sheetName": {
           "anyOf": [
@@ -1062,7 +1062,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 10
+          "const": 11
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -1148,7 +1148,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 10
+          "const": 11
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -1196,97 +1196,6 @@
       },
       "required": [
         "fillType"
-      ],
-      "additionalProperties": false
-    },
-    "FontFace": {
-      "type": "object",
-      "description": "One face: its font family, its name in it, its PostScript name and its design.",
-      "properties": {
-        "fontFamily": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "postScriptName": {
-          "type": "string"
-        },
-        "weight": {
-          "type": "integer"
-        },
-        "slant": {
-          "$ref": "#/$defs/FontSlant"
-        },
-        "source": {
-          "$ref": "#/$defs/FontSource"
-        },
-        "file": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "fontFamily",
-        "name",
-        "postScriptName",
-        "weight",
-        "slant",
-        "source",
-        "file"
-      ],
-      "additionalProperties": false
-    },
-    "FontSlant": {
-      "enum": [
-        "normal",
-        "italic",
-        "oblique"
-      ]
-    },
-    "FontSource": {
-      "enum": [
-        "catalog",
-        "machine",
-        "file"
-      ]
-    },
-    "Fonts": {
-      "type": "object",
-      "description": "The faces pybers knows, each PostScript name once, and the files it cannot read.",
-      "properties": {
-        "faces": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/FontFace"
-          }
-        },
-        "unreadable": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "faces"
-      ],
-      "additionalProperties": false
-    },
-    "FontsJsonForm": {
-      "type": "object",
-      "description": "Faces of fonts, and each font file that could not be read.",
-      "properties": {
-        "jsonFormVersion": {
-          "type": "integer",
-          "const": 10
-        },
-        "fonts": {
-          "$ref": "#/$defs/Fonts"
-        }
-      },
-      "required": [
-        "jsonFormVersion",
-        "fonts"
       ],
       "additionalProperties": false
     },
@@ -1596,7 +1505,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 10
+          "const": 11
         },
         "sheetName": {
           "anyOf": [
@@ -1659,7 +1568,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 10
+          "const": 11
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -2002,7 +1911,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 10
+          "const": 11
         },
         "sheetName": {
           "anyOf": [
@@ -2138,6 +2047,97 @@
         "headerRowsCellStyle",
         "headerColumnsCellStyle",
         "footerRowsCellStyle"
+      ],
+      "additionalProperties": false
+    },
+    "TypefaceFont": {
+      "type": "object",
+      "description": "One font: its typeface, its name in it, its PostScript name and its design.",
+      "properties": {
+        "typeface": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postScriptName": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "integer"
+        },
+        "slant": {
+          "$ref": "#/$defs/TypefaceSlant"
+        },
+        "source": {
+          "$ref": "#/$defs/TypefaceSource"
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "typeface",
+        "name",
+        "postScriptName",
+        "weight",
+        "slant",
+        "source",
+        "file"
+      ],
+      "additionalProperties": false
+    },
+    "TypefaceSlant": {
+      "enum": [
+        "normal",
+        "italic",
+        "oblique"
+      ]
+    },
+    "TypefaceSource": {
+      "enum": [
+        "catalog",
+        "machine",
+        "file"
+      ]
+    },
+    "Typefaces": {
+      "type": "object",
+      "description": "The fonts pybers knows, each PostScript name once, and the files it cannot read.",
+      "properties": {
+        "fonts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TypefaceFont"
+          }
+        },
+        "unreadable": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "fonts"
+      ],
+      "additionalProperties": false
+    },
+    "TypefacesJsonForm": {
+      "type": "object",
+      "description": "Fonts of fonts, and each font file that could not be read.",
+      "properties": {
+        "jsonFormVersion": {
+          "type": "integer",
+          "const": 11
+        },
+        "typefaces": {
+          "$ref": "#/$defs/Typefaces"
+        }
+      },
+      "required": [
+        "jsonFormVersion",
+        "typefaces"
       ],
       "additionalProperties": false
     }

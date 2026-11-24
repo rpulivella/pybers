@@ -127,19 +127,19 @@ def formatSheets(
     return [formatHeading("Sheets"), *(formatSheetTree(sheet) for sheet in sheets)]
 
 
-def formatFaces(
-    faces: tuple[pybers.CheckFace, ...] | pybers.UNDETERMINED,
+def formatFonts(
+    fonts: tuple[pybers.CheckFont, ...] | pybers.UNDETERMINED,
 ) -> list[RenderableType]:
-    """Return the faces heading, then each face as a node, as each sheet is one."""
-    if faces is pybers.UNDETERMINED:
-        return [formatLine("Faces", "unknown")]
-    if not faces:
-        return [formatLine("Faces", "none")]
-    return [formatHeading("Faces"), *(
+    """Return the fonts heading, then each font as a node, as each sheet is one."""
+    if fonts is pybers.UNDETERMINED:
+        return [formatLine("Fonts", "unknown")]
+    if not fonts:
+        return [formatLine("Fonts", "none")]
+    return [formatHeading("Fonts"), *(
         formatTreeNode(
-            face.postScriptName, "none" if face.source is None else face.source.value
+            font.postScriptName, "none" if font.source is None else font.source.value
         )
-        for face in faces
+        for font in fonts
     )]
 
 
@@ -161,7 +161,7 @@ def formatCheck(check: pybers.Check) -> Group:
         ),
     ]
     shown += formatSheets(check.sheets)
-    shown += formatFaces(check.faces)
+    shown += formatFonts(check.fonts)
     return Group(*shown)
 
 

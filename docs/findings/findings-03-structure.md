@@ -267,7 +267,7 @@ moved spill is listed first.
 
 From `60-move-base`, which holds `B2:D5` with formulas pointing inside it, out of it,
 locked, mixed and across tables, and `61-move-styles-base`, which holds a fill, a bold
-face, a border and a highlighting rule in the same block. Each copy is one move made by
+font, a border and a highlighting rule in the same block. Each copy is one move made by
 hand in Numbers 15.3.1, measured 23 September 2026 for PYB-18.
 
 **Dragging preserves the cell each reference selects.** A reference inside the block to

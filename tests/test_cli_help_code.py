@@ -49,4 +49,4 @@ def testHelpInColorShowsNoBacktick() -> None:
 
 
 def testPlainHelpKeepsTheBackticks() -> None:
-    assert "`fonts`" in renderShowHelp(color=False)
+    assert "`typefaces`" in renderShowHelp(color=False)

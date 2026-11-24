@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-The faces a font file offers, as the one font reader reads them.
+The fonts a font file offers, as the one font reader reads them.
 
 UPDATES
 2026-11-24  Written for PYB-315.
@@ -26,10 +26,10 @@ from fontbuilders import (
     saveFont,
 )
 
-from pybers.font._files import FontError, readFileFaces
-from pybers.font.faces import FontFace, FontSlant, FontSource
+from pybers.typeface._files import TypefaceError, readFileFonts
+from pybers.typeface.fonts import TypefaceFont, TypefaceSlant, TypefaceSource
 
-source = FontSource.FILE
+source = TypefaceSource.FILE
 
 
 def testStaticFaceReadsItsNamesWeightAndSlant(tmp_path: Path) -> None:
@@ -38,10 +38,10 @@ def testStaticFaceReadsItsNamesWeightAndSlant(tmp_path: Path) -> None:
                   italicSelection),
         tmp_path / "brand.ttf",
     )
-    assert readFileFaces(path, source) == (FontFace(
-        fontFamily="Brand Sans", name="Semibold Italic",
+    assert readFileFonts(path, source) == (TypefaceFont(
+        typeface="Brand Sans", name="Semibold Italic",
         postScriptName="BrandSans-SemiboldItalic", weight=600,
-        slant=FontSlant.ITALIC, source=source, file=path,
+        slant=TypefaceSlant.ITALIC, source=source, file=path,
     ),)
 
 
@@ -50,7 +50,7 @@ def testCollectionOffersEachFaceInFileOrder(tmp_path: Path) -> None:
         buildFont("Brand Sans", "Regular", "BrandSans-Regular"),
         buildFont("Brand Sans", "Bold", "BrandSans-Bold", 700),
     ], tmp_path / "brand.ttc")
-    assert [face.postScriptName for face in readFileFaces(path, source)] == [
+    assert [font.postScriptName for font in readFileFonts(path, source)] == [
         "BrandSans-Regular", "BrandSans-Bold",
     ]
 
@@ -66,8 +66,8 @@ def testVariableFontOffersEachNamedInstance(tmp_path: Path) -> None:
             {"location": {"wght": 400}, "stylename": "Regular"},
         ],
     )
-    faces = readFileFaces(saveFont(font, tmp_path / "brand.ttf"), source)
-    assert [(face.postScriptName, face.weight) for face in faces] == [
+    fonts = readFileFonts(saveFont(font, tmp_path / "brand.ttf"), source)
+    assert [(font.postScriptName, font.weight) for font in fonts] == [
         ("BrandSans-Regular", 400), ("BrandSans-Semibold", 650),
         ("BrandSans-Regular_Extra-Black", 900),
     ]
@@ -82,38 +82,38 @@ def testInstanceOnALegacyAxisTakesItsWeightFromItsName(
         instances=[{"location": {"wght": 3.2}, "stylename": "Black",
                     "postscriptfontname": "OldSans-Black"}],
     )
-    faces = readFileFaces(saveFont(font, tmp_path / "old.ttf"), source)
-    assert faces[-1].weight == 900
+    fonts = readFileFonts(saveFont(font, tmp_path / "old.ttf"), source)
+    assert fonts[-1].weight == 900
 
 
 def testWeightBelowThinIsReadFromTheName(tmp_path: Path) -> None:
     path = saveFont(buildFont("Old Sans", "Light", "OldSans-Light", 0),
                     tmp_path / "old.ttf")
-    assert readFileFaces(path, source)[0].weight == 300
+    assert readFileFonts(path, source)[0].weight == 300
 
 
 @pytest.mark.parametrize(("style", "selection", "slant"), [
-    ("Regular", 0, FontSlant.NORMAL),
-    ("Italic", italicSelection, FontSlant.ITALIC),
-    ("Oblique", obliqueSelection, FontSlant.OBLIQUE),
-    ("Light Oblique", italicSelection, FontSlant.OBLIQUE),
-    ("Ultra Light Italic", 0, FontSlant.ITALIC),
-    ("Inclined", 0, FontSlant.ITALIC),
+    ("Regular", 0, TypefaceSlant.NORMAL),
+    ("Italic", italicSelection, TypefaceSlant.ITALIC),
+    ("Oblique", obliqueSelection, TypefaceSlant.OBLIQUE),
+    ("Light Oblique", italicSelection, TypefaceSlant.OBLIQUE),
+    ("Ultra Light Italic", 0, TypefaceSlant.ITALIC),
+    ("Inclined", 0, TypefaceSlant.ITALIC),
 ])
 def testSlantIsReadFromTheBitsOrTheName(
-    tmp_path: Path, style: str, selection: int, slant: FontSlant
+    tmp_path: Path, style: str, selection: int, slant: TypefaceSlant
 ) -> None:
     path = saveFont(buildFont("Brand Sans", style, "BrandSans-X", 400, selection),
                     tmp_path / "brand.ttf")
-    assert readFileFaces(path, source)[0].slant is slant
+    assert readFileFonts(path, source)[0].slant is slant
 
 
 def testLegacyFaceWithNoOs2ReadsHeadMacStyle(tmp_path: Path) -> None:
     font = buildFont("Old Mono", "Bold Oblique", "OldMono-BoldOblique")
     del font["OS/2"]
     font["head"].macStyle = 0b11
-    face = readFileFaces(saveFont(font, tmp_path / "old.ttf"), source)[0]
-    assert (face.weight, face.slant) == (700, FontSlant.OBLIQUE)
+    font = readFileFonts(saveFont(font, tmp_path / "old.ttf"), source)[0]
+    assert (font.weight, font.slant) == (700, TypefaceSlant.OBLIQUE)
 
 
 @pytest.mark.parametrize(("family", "postScriptName"), [
@@ -123,11 +123,22 @@ def testHiddenFaceIsLeftOut(
     tmp_path: Path, family: str, postScriptName: str
 ) -> None:
     path = saveFont(buildFont(family, "Regular", postScriptName), tmp_path / "h.ttf")
-    assert readFileFaces(path, source) == ()
+    assert readFileFonts(path, source) == ()
 
 
-def testFileThatIsNotAFontIsRefusedNamingIt(tmp_path: Path) -> None:
+def testFontFileItCannotReadIsRefusedInPybersWordsAlone(tmp_path: Path) -> None:
     path = tmp_path / "notes.ttf"
     path.write_text("not a font")
-    with pytest.raises(FontError, match="notes.ttf is not a font pybers can read"):
-        readFileFaces(path, source)
+    with pytest.raises(TypefaceError) as refused:
+        readFileFonts(path, source)
+    assert str(refused.value) == (
+        f"{path} is not a font file pybers can read. Nothing was read."
+    )
+    assert refused.value.__cause__ is not None
+
+
+def testFileWithoutAFontsSuffixIsToldWhichToGive(tmp_path: Path) -> None:
+    path = tmp_path / "notes.txt"
+    path.write_text("not a font")
+    with pytest.raises(TypefaceError, match="Give an .otf, .ttf or .ttc file"):
+        readFileFonts(path, source)

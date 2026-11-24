@@ -3,7 +3,7 @@
 The font files the machine running pybers offers, found as its system finds them.
 
 A Mac's are the ones CoreText offers, which is what Numbers offers: a folder scan on
-24 November 2026 missed 284 faces a font manager had activated and included 198 that
+24 November 2026 missed 284 fonts a font manager had activated and included 198 that
 Font Book had turned off, and it never reaches Adobe Fonts or the fonts macOS
 downloads on demand. CoreText is reached through `ctypes`, so no dependency is added.
 Elsewhere the files are those in the system's own font folders.
@@ -11,6 +11,7 @@ Elsewhere the files are those in the system's own font folders.
 Private. Part of the font feature's read half.
 
 UPDATES
+2026-11-24  Moved to the typeface feature, for PYB-318.
 2026-11-24  Written for PYB-315.
 """
 from __future__ import annotations
@@ -31,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from pybers.errors import PybersError, composeFault
-from pybers.font.faces import fontSuffixes
+from pybers.typeface.fonts import fontSuffixes
 
 coreFoundationPath: str = (
     "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"

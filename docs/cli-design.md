@@ -16,8 +16,8 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | Command | What it does |
 | ------- | ------------ |
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
-| `check FILE` | Whether pybers can read a document, the tree of its sheets and tables with each unrecognized cell badged, and each face it uses with where pybers knows it, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
-| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading. `show fonts [SELECTOR]` shows the faces pybers knows, and a font file as FILE shows its own |
+| `check FILE` | Whether pybers can read a document, the tree of its sheets and tables with each unrecognized cell badged, and each font it uses with where pybers knows it, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
+| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading. `show typefaces [SELECTOR]` shows the typefaces pybers knows, and a font file as FILE shows its own |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
 | `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional. `set FILE --locale LOCALE` changes a document's language and region instead |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
@@ -64,23 +64,23 @@ A command parses its arguments, calls the library once, formats what comes back,
   ```
 - **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
-## Fonts
+## Typefaces
 
-A style names a face, and a person finds the face before writing the style, so `show` reads the fonts pybers knows as it reads a document.
+A style names a font, and a person finds the font before writing the style, so `show` reads the typefaces pybers knows as it reads a document.
 
-- **`fonts` as FILE is every face pybers knows**: the catalog pybers ships, read from the fonts macOS installs, and the fonts installed on the machine running it. A font file, `.otf`, `.ttf` or `.ttc`, as FILE is that file's faces alone, installed or not. A file named `fonts` is reached as `./fonts`, as a file named like a command is.
-- **A fonts selector has two positions, font family and face, joined by `::`**, with the wildcards, negation and grouping every selector has. `Avenir Next` selects a font family, and `Avenir Next::*Demi*` its faces whose names hold `Demi`.
-- **A name matches ignoring case, spaces and hyphens**, so `AvenirNext`, `Avenir Next` and `avenir-next` each select Avenir Next, since a font's name is spelled many ways and only its letters specify it.
-- **Conditions read what a face is**: `[weight=600]`, `[slant=italic]`, `[source=machine]` and `[postscript=AvenirNext-DemiBold]`. A weight also compares, as a CSS range query does, `[weight>=600]`.
+- **`typefaces` as FILE is every font pybers knows**: the catalog pybers ships, read from the fonts macOS installs, and the fonts installed on the machine running it. A font file, `.otf`, `.ttf` or `.ttc`, as FILE is that file's fonts alone, installed or not. A file named `typefaces` is reached as `./typefaces`, as a file named like a command is.
+- **A typefaces selector has two positions, typeface and font, joined by `::`**, with the wildcards, negation and grouping every selector has. `Avenir Next` selects a typeface, and `Avenir Next::*Demi*` its fonts whose names hold `Demi`.
+- **A name matches ignoring case, spaces and hyphens**, so `AvenirNext`, `Avenir Next` and `avenir-next` each select Avenir Next, since a typeface's name is spelled many ways and only its letters specify it.
+- **Conditions read what a font is**: `[weight=600]`, `[slant=italic]`, `[source=machine]` and `[postscript=AvenirNext-DemiBold]`. A weight also compares, as a CSS range query does, `[weight>=600]`.
 - **A quoted value ending in `s` matches exactly**, case, spaces and hyphens included, as the `s` flag of a CSS attribute selector does: `[postscript="AvenirNext-DemiBold" s]`. No other flag exists.
-- **The JSON is one form of the fonts shown**, every face and each font file pybers could not read, rather than an array of each face's form, so thousands of faces carry the form's version once. It reads back as a `Fonts`.
-- **Each font family prints as a part, its faces beneath it**, through the components a table and its cells print with: the family's line folds its face count, and each face is a part's line, its PostScript name and then its fields on the same line, its file left to the JSON:
+- **The JSON is one form of the typefaces shown**, every font and each font file pybers could not read, rather than an array of each font's form, so thousands of fonts carry the form's version once. It reads back as a `Typefaces`.
+- **Each typeface prints as a part, its fonts beneath it**, through the components a table and its cells print with: the typeface's line folds its font count, and each font is a part's line, its PostScript name and then its fields on the same line, its file left to the JSON:
 
   ```
-  $ pybers show fonts 'avenir next::*demi*'
-  Font family: Avenir Next  2 faces
-    Face: AvenirNext-DemiBold   Name: Demi Bold   Weight: 600   Slant: normal   Source: catalog
-    Face: AvenirNext-DemiBoldItalic   Name: Demi Bold Italic   Weight: 600   Slant: italic   Source: catalog
+  $ pybers show typefaces 'avenir next::*demi*'
+  Typeface: Avenir Next  2 fonts
+    Font: AvenirNext-DemiBold   Name: Demi Bold   Weight: 600   Slant: normal   Source: catalog
+    Font: AvenirNext-DemiBoldItalic   Name: Demi Bold Italic   Weight: 600   Slant: italic   Source: catalog
   ```
 
 ## Formulas

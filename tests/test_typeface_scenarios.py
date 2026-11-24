@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-The few lines each consumer writes to find a face before naming it in a style.
+The few lines each consumer writes to find a font before naming it in a style.
 
 Both read the catalog pybers ships and a brand's own font file, so each runs alike on
 any system.
@@ -38,31 +38,31 @@ def saveBrandFont(folder: Path) -> Path:
 
 
 def testAScriptAuthorFindsTheFacesAStyleWillName(tmp_path: Path) -> None:
-    fonts = pybers.openFonts()
-    heading = fonts.face("Avenir Next", weight=600)
-    italics = fonts.select("AvenirNext[slant=italic][weight>=600]")
+    typefaces = pybers.openTypefaces()
+    heading = typefaces.font("Avenir Next", weight=600)
+    italics = typefaces.select("AvenirNext[slant=italic][weight>=600]")
 
-    brand = pybers.openFonts(saveBrandFont(tmp_path))
-    emphasis = brand.face("brand sans", weight=600, slant=pybers.FontSlant.ITALIC)
+    brand = pybers.openTypefaces(saveBrandFont(tmp_path))
+    emphasis = brand.font("brand sans", weight=600, slant=pybers.TypefaceSlant.ITALIC)
 
     assert heading.postScriptName == "AvenirNext-DemiBold"
     assert [each.postScriptName for each in italics] == [
         "AvenirNext-DemiBoldItalic", "AvenirNext-BoldItalic", "AvenirNext-HeavyItalic",
     ]
     assert emphasis.postScriptName == "BrandSans-SemiboldItalic"
-    assert brand.face(postScriptName="BrandSans-SemiboldItalic") == emphasis
+    assert brand.font(postScriptName="BrandSans-SemiboldItalic") == emphasis
 
 
 def testACommandFindsAFaceAndChecksADocumentsFaces(tmp_path: Path) -> None:
     runner = CliRunner()
     brandPath = saveBrandFont(tmp_path)
 
-    shown = runner.invoke(app, ["show", "fonts", "avenir next::demi bold"]).stdout
+    shown = runner.invoke(app, ["show", "typefaces", "avenir next::demi bold"]).stdout
     brand = runner.invoke(app, ["show", str(brandPath), "*[slant=italic]"]).stdout
     checked = runner.invoke(
         app, ["check", str(findDocumentPath("52-table-reset-styled"))]
     ).stdout
 
-    assert "Face: AvenirNext-DemiBold" in shown
-    assert "Face: BrandSans-SemiboldItalic" in brand
+    assert "Font: AvenirNext-DemiBold" in shown
+    assert "Font: BrandSans-SemiboldItalic" in brand
     assert "AvenirNext-Regular: catalog" in checked

@@ -21,8 +21,8 @@ functions_extract.py derive the table of formula functions, each with its index,
                      src/pybers/_generated/functions.py
 locales_extract.py   read each region's formatting symbols from macOS's own ICU,
                      as Numbers reads them. Writes src/pybers/_generated/locales.py
-fonts_extract.py     read every face macOS installs, as pybers reads any font file.
-                     Writes src/pybers/_generated/fonts.py
+typefaces_extract.py     read every font macOS installs, as pybers reads any font file.
+                     Writes src/pybers/_generated/typefaces.py
 themestyles_extract.py
                      read the properties Numbers states on every root style of each
                      type a created theme holds, the styles Numbers looks up by key,

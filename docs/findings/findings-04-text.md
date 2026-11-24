@@ -819,28 +819,28 @@ distinct combination in `32-named-styles`:
 
 ```
 HelveticaNeue         bold=False  italic=False
-HelveticaNeue         bold=True   italic=False     SYNTHETIC bold on a regular face
-HelveticaNeue-Bold    bold=False  italic=False     the real bold face, flag off
-HelveticaNeue-Bold    bold=True   italic=False     the real bold face AND the flag
+HelveticaNeue         bold=True   italic=False     SYNTHETIC bold on a regular font
+HelveticaNeue-Bold    bold=False  italic=False     the real bold font, flag off
+HelveticaNeue-Bold    bold=True   italic=False     the real bold font AND the flag
 HelveticaNeue-Light   bold=False  italic=False
 HelveticaNeue-Medium  bold=False  italic=False
 SkolarSansLatn-El     bold=(unset) italic=(unset)  extralight
-SkolarSansLatn-ElIt   bold=(unset) italic=True     the italic face AND the flag
+SkolarSansLatn-ElIt   bold=(unset) italic=True     the italic font AND the flag
 SkolarSansLatn-Rg     bold=False  italic=False
 ```
 
 **Weight and slant are part of `font_name`** (the PostScript name) and `bold` / `italic` are
 independent booleans layered on top, which means:
 
-- `bold=True` on a regular face is **faux bold**, the same class of defect as the synthetic
+- `bold=True` on a regular font is **faux bold**, the same class of defect as the synthetic
   superscript and scaled small caps recorded above.
-- `bold=True` on a face that is already bold is redundant at best.
+- `bold=True` on a font that is already bold is redundant at best.
 - A style may set neither flag, which is what a chosen variant like extralight looks like.
 
-**pybers must not treat `bold` as "make this bold".** Choosing a real face is a change of
+**pybers must not treat `bold` as "make this bold".** Choosing a real font is a change of
 `font_name`; setting the flag asks the renderer to synthesize. A caller wanting genuine
-weight needs the family's actual face, and the library should be able to tell the two apart
-when reading and prefer the real face when writing.
+weight needs the typeface's actual font, and the library should be able to tell the two apart
+when reading and prefer the real font when writing.
 
 ## Lists are nine-level arrays
 

@@ -248,7 +248,7 @@ def testHelpListsCheck() -> None:
 def testEveryCheckShowsTheSheetsAndTablesByKindAndSize() -> None:
     result = runner.invoke(app, ["check", str(recordsPath)])
     lines = result.stdout.splitlines()
-    assert lines[lines.index("Sheets:") + 1:lines.index("Faces:")] == [
+    assert lines[lines.index("Sheets:") + 1:lines.index("Fonts:")] == [
         "Sheet", "└ Table: 10 rows × 7 columns"
     ]
 
@@ -323,11 +323,11 @@ def testAPartPybersCouldNotDetermineReadsUnknown() -> None:
         pybers.checkDocument(baselinePath),
         unrecognizedCellTypes=pybers.UNDETERMINED,
         sheets=pybers.UNDETERMINED,
-        faces=pybers.UNDETERMINED,
+        fonts=pybers.UNDETERMINED,
     )
     printed = renderPlain(formatCheck(found))
     assert "Unrecognized cell types: unknown\n" in printed
-    assert printed.endswith("Sheets: unknown\nFaces: unknown\n")
+    assert printed.endswith("Sheets: unknown\nFonts: unknown\n")
 
 
 def testAWithheldMessageLeavesOnlyTheErrorType() -> None:
@@ -341,23 +341,23 @@ def testUnrecognizedCellsHangUnderTheirTableBadged() -> None:
     cells = (pybers.CheckCell("B7", 4), pybers.CheckCell("C9", 4))
     table = pybers.CheckTable(pybers.WITHHELD, 10, 5, cells)
     sheets = (pybers.CheckSheet(pybers.WITHHELD, (table,)),)
-    printed = renderPlain(formatCheck(replace(found, sheets=sheets, faces=())))
+    printed = renderPlain(formatCheck(replace(found, sheets=sheets, fonts=())))
     assert printed.endswith(
         "Sheets:\nSheet\n└ Table: 10 rows × 5 columns\n"
         "  ├ B7  UNRECOGNIZED  cell type 4\n  └ C9  UNRECOGNIZED  cell type 4\n"
-        "Faces: none\n"
+        "Fonts: none\n"
     )
 
 
 def testEachFacePrintsItsNameAndSourceUnderTheHeading() -> None:
-    faces = (
-        pybers.CheckFace("Helvetica-Bold", pybers.FontSource.CATALOG),
-        pybers.CheckFace("BrandSans-Bold", None),
+    fonts = (
+        pybers.CheckFont("Helvetica-Bold", pybers.TypefaceSource.CATALOG),
+        pybers.CheckFont("BrandSans-Bold", None),
     )
     printed = renderPlain(formatCheck(replace(
-        pybers.checkDocument(baselinePath), faces=faces
+        pybers.checkDocument(baselinePath), fonts=fonts
     )))
-    assert printed.endswith("Faces:\nHelvetica-Bold: catalog\nBrandSans-Bold: none\n")
+    assert printed.endswith("Fonts:\nHelvetica-Bold: catalog\nBrandSans-Bold: none\n")
 
 
 def testEveryBadgeLevelHasAStyleInTheTheme() -> None:

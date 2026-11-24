@@ -11,7 +11,7 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
-2026-11-24  `openFonts`, `Fonts` and the face types, for PYB-315.
+2026-11-24  `openTypefaces`, `Typefaces` and the font types, for PYB-315.
 2026-11-17  The stroke family, a cell's borders and a table's lines, for PYB-266.
 2026-11-13  `parseCellStyle` and `CellStyleError`, a cell style read from its text
             form, for PYB-265.
@@ -84,8 +84,8 @@ lazy from pybers.check import (
     Check,
     CheckCell,
     CheckEnvironment,
-    CheckFace,
     CheckFailure,
+    CheckFont,
     CheckSheet,
     CheckTable,
     NumbersVersion,
@@ -118,15 +118,6 @@ lazy from pybers.errors import (
     composeRefusal,
     nothingRead,
     nothingWritten,
-)
-lazy from pybers.font import (
-    FontError,
-    FontFace,
-    Fonts,
-    FontSlant,
-    FontSource,
-    fontSuffixes,
-    openFonts,
 )
 lazy from pybers.format import (
     CellControl,
@@ -265,6 +256,15 @@ lazy from pybers.table import (
     parseTableStyle,
 )
 lazy from pybers.timezone import MachineTimeZone, TimeZoneError, TimeZoneLike
+lazy from pybers.typeface import (
+    TypefaceError,
+    TypefaceFont,
+    Typefaces,
+    TypefaceSlant,
+    TypefaceSource,
+    fontSuffixes,
+    openTypefaces,
+)
 
 __all__ = [
     "MIXED",
@@ -322,11 +322,11 @@ __all__ = [
     "FillImage",
     "FillNone",
     "FillType",
-    "FontError",
-    "FontFace",
-    "FontSlant",
-    "FontSource",
-    "Fonts",
+    "TypefaceError",
+    "TypefaceFont",
+    "TypefaceSlant",
+    "TypefaceSource",
+    "Typefaces",
     "Stroke",
     "StrokeBrush",
     "StrokeCap",
@@ -355,7 +355,7 @@ __all__ = [
     "Check",
     "CheckCell",
     "CheckEnvironment",
-    "CheckFace",
+    "CheckFont",
     "CheckFailure",
     "CheckSheet",
     "CheckTable",
@@ -423,7 +423,7 @@ __all__ = [
     "toColumnNumber",
     "create",
     "open",
-    "openFonts",
+    "openTypefaces",
     "fontSuffixes",
     "toCellRanges",
     "toCellReference",
