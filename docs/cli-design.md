@@ -16,7 +16,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | Command | What it does |
 | ------- | ------------ |
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
-| `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
+| `check FILE` | Whether pybers can read a document, the tree of its sheets and tables with each unrecognized cell badged, and each face it uses with where pybers knows it, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
 | `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading. `show fonts [SELECTOR]` shows the faces pybers knows, and a font file as FILE shows its own |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
 | `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional. `set FILE --locale LOCALE` changes a document's language and region instead |

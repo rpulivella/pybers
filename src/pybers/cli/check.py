@@ -127,6 +127,22 @@ def formatSheets(
     return [formatHeading("Sheets"), *(formatSheetTree(sheet) for sheet in sheets)]
 
 
+def formatFaces(
+    faces: tuple[pybers.CheckFace, ...] | pybers.UNDETERMINED,
+) -> list[RenderableType]:
+    """Return the faces heading, then each face as a node, as each sheet is one."""
+    if faces is pybers.UNDETERMINED:
+        return [formatLine("Faces", "unknown")]
+    if not faces:
+        return [formatLine("Faces", "none")]
+    return [formatHeading("Faces"), *(
+        formatTreeNode(
+            face.postScriptName, "none" if face.source is None else face.source.value
+        )
+        for face in faces
+    )]
+
+
 def formatCheck(check: pybers.Check) -> Group:
     """Return a check as the lines a bug report pastes."""
     environment = check.environment
@@ -145,6 +161,7 @@ def formatCheck(check: pybers.Check) -> Group:
         ),
     ]
     shown += formatSheets(check.sheets)
+    shown += formatFaces(check.faces)
     return Group(*shown)
 
 
