@@ -9,6 +9,8 @@ when a cell changed and the call was not a preview. Each cell written prints as
 stderr.
 
 UPDATES
+2026-11-24  Progress shows on stderr while the document is read and saved, and
+            each outcome and skipped part is composed, for PYB-319.
 2026-11-23  Declared for Click, SELECTOR completing to sheets and tables, for
             PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
@@ -62,12 +64,11 @@ from pybers.cli._common import (
     outputOption,
     previewOption,
     reportPybersErrors,
-    reportWrite,
 )
-from pybers.cli._console import statusConsole
+from pybers.cli._console import showProgress, statusConsole
 from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
 from pybers.cli._help import ChoiceOfValues, PybersArgument, PybersCommand
-from pybers.cli._report import formatLine
+from pybers.cli._report import composeOutcome, formatLine, formatSkip
 from pybers.cli.show import ShownPart, formatShownParts
 
 # Spelled out rather than read from the enums, so `--help` never loads the model;
@@ -326,10 +327,10 @@ def runSet(
             pybers.nothingWritten,
         )
     target = findSaveTarget(file, output, preview)
-    with reportPybersErrors(context):
+    with reportPybersErrors(context), showProgress() as onProgress:
         document = (
-            pybers.open(file) if timeZone is None
-            else pybers.open(file, timeZone=timeZone)
+            pybers.open(file, onProgress=onProgress) if timeZone is None
+            else pybers.open(file, timeZone=timeZone, onProgress=onProgress)
         )
         changes = pybers.CellChanges(())
         if any(part is not None for part in cellParts):
@@ -396,12 +397,12 @@ def runSet(
             )
             if reference.table is not None
         ]
-        skipped = [(str(skip.reference), skip.reason) for skip in changes.skipped]
+        skipped = list(changes.skipped)
         restyled = False
         if tableStyle is not None:
             for match in document.select(selector):
                 if not isinstance(match, pybers.TableReference):
-                    skipped.append((str(match), "not a table"))
+                    skipped.append(pybers.PartSkip(str(match), "is not a table"))
                     continue
                 table = document.table(match)
                 if table.tableStyleSet(
@@ -411,11 +412,11 @@ def runSet(
                     shown.append(table)
         changed = changes.changed or restyled
         if target is not None and changed:
-            document.save(target)
+            document.save(target, onProgress=onProgress)
     printResult(shown, outputFormat, formatShownParts)
-    for reference, reason in skipped:
-        statusConsole.print(formatLine("Skipped", f"{reference}  {reason}"))
-    reportWrite(changed, target, "already set")
+    for skip in skipped:
+        statusConsole.print(formatSkip(skip))
+    statusConsole.print(composeOutcome(changed, target, "already set"))
 
 
 def setLocale(
@@ -424,13 +425,15 @@ def setLocale(
 ) -> None:
     """Change a document's locale and print it, saving only a change."""
     target = findSaveTarget(documentPath, output, preview)
-    with reportPybersErrors(context):
-        document = pybers.open(documentPath)
+    with reportPybersErrors(context), showProgress() as onProgress:
+        document = pybers.open(documentPath, onProgress=onProgress)
         changed = document.localeSet(identifier).changed
         if target is not None and changed:
-            document.save(target)
+            document.save(target, onProgress=onProgress)
     printResult(DocumentLocale(document.localeIdentifier), outputFormat, formatLocale)
-    reportWrite(changed, target, f"already {document.localeIdentifier}")
+    statusConsole.print(
+        composeOutcome(changed, target, f"already {document.localeIdentifier}")
+    )
 
 
 __all__ = ["runSet"]

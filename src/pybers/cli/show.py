@@ -10,6 +10,8 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-24  Progress shows on stderr while a document or the typefaces are read,
+            and each font file skipped is composed, for PYB-319.
 2026-11-24  `typefaces` as FILE shows the typefaces pybers knows, for PYB-318.
 2026-11-24  `fonts` or a font file as FILE shows fonts, one per line, for PYB-315.
 2026-11-23  Declared for Click, SELECTOR completing to sheets and tables, for
@@ -50,7 +52,7 @@ from rich.text import Text
 
 import pybers
 from pybers.cli._common import listSelectorCompletions, reportPybersErrors
-from pybers.cli._console import statusConsole
+from pybers.cli._console import showProgress, statusConsole
 from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
 from pybers.cli._help import PybersArgument, PybersCommand
 from pybers.cli._report import (
@@ -63,6 +65,7 @@ from pybers.cli._report import (
     formatListed,
     formatParts,
     formatSegments,
+    formatSkip,
     formatYesNo,
     listChildren,
 )
@@ -251,12 +254,15 @@ def formatFonts(fonts: Sequence[pybers.TypefaceFont]) -> Group:
 
 
 def showTypefaces(file: str, selector: str | None, outputFormat: OutputFormat) -> None:
-    """Print the fonts a selector matches, and each unreadable font file on stderr."""
-    typefaces = pybers.openTypefaces(None if file == typefacesFile else file)
+    """Print the fonts a selector matches, and each font file skipped on stderr."""
+    with showProgress() as onProgress:
+        typefaces = pybers.openTypefaces(
+            None if file == typefacesFile else file, onProgress=onProgress
+        )
     if selector is not None:
-        typefaces = pybers.Typefaces(typefaces.select(selector), typefaces.unreadable)
-    for reason in typefaces.unreadable:
-        statusConsole.print(formatLine("Skipped", reason))
+        typefaces = pybers.Typefaces(typefaces.select(selector), typefaces.skipped)
+    for skip in typefaces.skipped:
+        statusConsole.print(formatSkip(skip))
     printResult(typefaces, outputFormat, lambda shown: formatFonts(shown.fonts))
 
 
@@ -283,7 +289,8 @@ def runShow(
         if file == typefacesFile or Path(file).suffix.lower() in pybers.fontSuffixes:
             showTypefaces(file, selector, outputFormat)
             return
-        document = pybers.open(Path(file))
+        with showProgress() as onProgress:
+            document = pybers.open(Path(file), onProgress=onProgress)
         if selector is None:
             printResult(document, outputFormat, formatPart)
             return

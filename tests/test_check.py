@@ -318,10 +318,11 @@ def testAFileThatIsNotADocumentRaisesAPybersError(tmp_path: Path) -> None:
 
 
 def testProgressHearsEachStepInOrder() -> None:
-    heard: list[str] = []
+    heard: list[pybers.ProgressStep] = []
     pybers.checkDocument(baselinePath, names=True, onProgress=heard.append)
-    assert heard == [
-        "reading the document…", "opening it…", "reading the fonts it uses…",
+    assert list(dict.fromkeys(step.message for step in heard)) == [
+        "unpacking the document…", "reading the tables…", "reading the catalog…",
+        "finding the fonts on this machine…", "reading the fonts on this machine…",
     ]
 
 

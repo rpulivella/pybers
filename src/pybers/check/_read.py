@@ -17,6 +17,8 @@ message, because pybers's own read path refers to archives by identifier. Any ot
 error keeps only its type and where pybers raised it.
 
 UPDATES
+2026-11-24  `onProgress` hears a `ProgressStep`, each member, table and font file
+            counted, for PYB-319.
 2026-11-23  A missing part states why it is missing, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, their names withheld
             unless asked for, for PYB-223.
@@ -40,7 +42,6 @@ import plistlib
 import re
 import traceback
 from collections import Counter
-from collections.abc import Callable
 from pathlib import Path
 
 from .._persistence import NumbersPackage, readPackage
@@ -50,6 +51,7 @@ from ..absence import UNDETERMINED, WITHHELD
 from ..document._read import readDocument
 from ..document.sheets import Document
 from ..errors import PybersError
+from ..status import ProgressListener, dropProgress
 from ..table.cells import Table
 from ..typeface._read import listFontNames
 from ..typeface.typefaces import openTypefaces
@@ -152,9 +154,11 @@ def readCheckSheets(document: Document, names: bool) -> tuple[CheckSheet, ...]:
     )
 
 
-def readCheckFonts(package: NumbersPackage) -> tuple[CheckFont, ...]:
+def readCheckFonts(
+    package: NumbersPackage, onProgress: ProgressListener
+) -> tuple[CheckFont, ...]:
     """Return each font a document uses, and where pybers knows it."""
-    typefaces = openTypefaces()
+    typefaces = openTypefaces(onProgress=onProgress)
     fonts = []
     for name in listFontNames(ArchiveIndex(package)):
         found = typefaces.font(postScriptName=name)
@@ -174,11 +178,11 @@ def listPybersFrames(error: BaseException) -> tuple[str, ...]:
 
 
 def openForCheck(
-    package: NumbersPackage, source: Path
+    package: NumbersPackage, source: Path, onProgress: ProgressListener
 ) -> Document | CheckFailure:
     """Open a package as `pybers.open` would, or return why it could not be."""
     try:
-        return readDocument(package, source)
+        return readDocument(package, source, onProgress)
     except PybersError as exc:
         return CheckFailure(
             type(exc).__name__, str(exc), listPybersFrames(exc), error=exc
@@ -194,25 +198,21 @@ def checkDocument(
     path: Path | str,
     *,
     names: bool = False,
-    onProgress: Callable[[str], None] | None = None,
+    onProgress: ProgressListener | None = None,
 ) -> Check:
     """Report whether pybers can read a document, and what a bug report needs.
 
     `names` adds the document's own names, which a public report must not hold, and
-    `onProgress` hears each step as it starts. Raises `ContainerError` for a file
+    `onProgress` hears each step. Raises `ContainerError` for a file
     that is missing, unreadable or not a Numbers document.
     """
-    report = onProgress or (lambda _: None)
+    report = onProgress or dropProgress
     source = Path(path)
-    report("reading the document…")
-    package = readPackage(source)
-    report("opening it…")
-    opened = openForCheck(package, source)
+    package = readPackage(source, report)
+    opened = openForCheck(package, source, report)
     document = opened if isinstance(opened, Document) else None
     sheets = None if document is None else readCheckSheets(document, names)
-    if document is not None:
-        report("reading the fonts it uses…")
-    fonts = None if document is None else readCheckFonts(package)
+    fonts = None if document is None else readCheckFonts(package, report)
     return Check(
         environment=readCheckEnvironment(),
         savedBy=readSavedVersion(package),

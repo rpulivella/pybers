@@ -57,7 +57,7 @@ from pybers.table.borders import (
     CellBorderStyle,
 )
 from pybers.table.bordersdraw import formatCellBorders
-from pybers.table.cell import Cell, CellChange, CellChanges, CellSkip, CellValue
+from pybers.table.cell import Cell, CellChange, CellChanges, CellValue
 from pybers.table.cells import Table
 from pybers.table.fill import CellValueFill
 from pybers.table.headers import TableHeaders
@@ -85,7 +85,6 @@ __all__ = [
     "CellKind",
     "CellChange",
     "CellChanges",
-    "CellSkip",
     "CellValue",
     "CellValueFill",
     "MergeRange",

@@ -9,6 +9,7 @@ means pybers opened the document, and 1 means it could not, or that the file cou
 be checked.
 
 UPDATES
+2026-11-24  Progress shows as a spinner or a bar, for PYB-319.
 2026-11-23  Declared for Click, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  Every check shows the sheets and tables as one tree, each unrecognized
@@ -39,7 +40,7 @@ from rich.text import Text
 
 import pybers
 from pybers.cli._common import findCommandSettings, reportPybersErrors
-from pybers.cli._console import TreeCompact, statusConsole
+from pybers.cli._console import TreeCompact, showProgress
 from pybers.cli._formats import OutputFormat, outputFormatOption, printResult
 from pybers.cli._help import PybersArgument, PybersCommand
 from pybers.cli._report import (
@@ -182,8 +183,8 @@ def runCheck(
     context: click.Context, file: Path, names: bool, outputFormat: OutputFormat
 ) -> None:
     """Report whether pybers can read a document, and what it is running on."""
-    with reportPybersErrors(context), statusConsole.status("") as status:
-        check = pybers.checkDocument(file, names=names, onProgress=status.update)
+    with reportPybersErrors(context), showProgress() as onProgress:
+        check = pybers.checkDocument(file, names=names, onProgress=onProgress)
     printResult(check, outputFormat, formatCheck)
     if check.failure is not None:
         if findCommandSettings(context).debug and check.failure.error is not None:

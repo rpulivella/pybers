@@ -352,7 +352,7 @@ def testAWriteSetsEveryCellMatchedAndSkipsWhatItCannot(
 ) -> None:
     changes = ledger.cellSet("Budget::Q1::B3:B4, Budget::Notes", 7)
     assert [str(each.reference) for each in changes.changes] == ["Budget::Q1::B3"]
-    assert [(str(each.reference), each.reason) for each in changes.skipped] == [
+    assert [(each.place, each.reason) for each in changes.skipped] == [
         ("Budget::Notes", "is a table, not a cell"),
         ("Budget::Q1::B4", "holds a formula"),
     ]

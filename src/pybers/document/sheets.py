@@ -21,6 +21,8 @@ learn by being wrong:
   is handled rather than assumed away.
 
 UPDATES
+2026-11-24  `save` takes `onProgress`, and a skipped cell is a `PartSkip`, for
+            PYB-319.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-19  `cellStyleUpdate` and `cellStylePropertyRemove` change part of a cell's
             style, sharing `cellSet`'s write, for PYB-290.
@@ -115,6 +117,7 @@ from pybers.format.controls import CellControl
 from pybers.format.formats import CellFormat, CellFormatAutomatic, CellFormatConflict
 from pybers.formula.syntax import formulaQualifierSeparator
 from pybers.geometry import Position
+from pybers.status import PartSkip, ProgressListener, dropProgress
 from pybers.style.cells import (
     CellStyle,
     CellStyleProperty,
@@ -138,7 +141,6 @@ from pybers.table.cell import (
     Cell,
     CellChange,
     CellChanges,
-    CellSkip,
     findWrittenValue,
 )
 from pybers.table.cells import Table, generateOwnerIdentity
@@ -536,7 +538,7 @@ class Document:
         for table, address in targets:
             cell = table.cells.get(address)
             if value is not UNCHANGED and cell is not None and cell.formula is not None:
-                skipped.append(CellSkip(cell.reference, "holds a formula"))
+                skipped.append(PartSkip(str(cell.reference), "holds a formula"))
                 continue
             asked = format
             current = None if cell is None else cell.value
@@ -556,9 +558,9 @@ class Document:
                     raise WriteError(misfit)
                 if misfit is not None:
                     asked = CellFormatAutomatic()
-                    skipped.append(CellSkip(
-                        where, "takes automatic, as the format given cannot show its "
-                        "value",
+                    skipped.append(PartSkip(
+                        str(where), "takes automatic, as the format given cannot show "
+                        "its value",
                     ))
                 refusal = findFormatRefusal(cell, where, asked, after, controlAfter)
                 if refusal is not None:
@@ -781,15 +783,19 @@ class Document:
 
         yield from iterateReferences(self)
 
-    def save(self, path: Path | str | None = None) -> None:
+    def save(
+        self,
+        path: Path | str | None = None,
+        *,
+        onProgress: ProgressListener | None = None,
+    ) -> None:
         """Write this document back to a `.numbers` package, in place by default.
 
-        Repeatable, and the object stays usable, so there is no `close`. **pybers never
-        evaluates a formula**: saving marks the edited cells and Numbers recalculates on
-        open, so a dependent formula reads stale here and correct there.
+        Repeatable, so there is no `close`, and `onProgress` hears each table and member
+        written. **pybers never evaluates a formula**: Numbers recalculates on open.
         """
         # Imported here rather than at module scope, because the writer reaches into
         # `pybers._persistence` and the model layer must stay importable without it.
         from pybers.document._write import writeDocument
 
-        writeDocument(self, path)
+        writeDocument(self, path, onProgress or dropProgress)

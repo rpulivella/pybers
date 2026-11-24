@@ -7,6 +7,8 @@ The root callback stores `CommandSettings` on Click's context object, which is
 how Click hands a group's options down to its commands.
 
 UPDATES
+2026-11-24  A write's outcome composed by `composeOutcome` in `_report`, for
+            PYB-319.
 2026-11-23  Click rather than Typer, and a selector completes to the sheets and
             tables of the document typed before it, for PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
@@ -36,7 +38,7 @@ from click.shell_completion import CompletionItem
 
 import pybers
 from pybers.cli._console import statusConsole
-from pybers.cli._report import formatDetail, formatLine, formatRefusal
+from pybers.cli._report import formatRefusal
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,16 +155,6 @@ def findSaveTarget(
     return documentPath if output is None else output
 
 
-def reportWrite(changed: bool, target: Path | None, unchanged: str) -> None:
-    """Say on stderr whether a writing verb wrote, and where, or why it did not."""
-    if not changed:
-        statusConsole.print(formatDetail(f"Nothing written: {unchanged}"))
-    elif target is None:
-        statusConsole.print(formatDetail("Nothing written: previewing only"))
-    else:
-        statusConsole.print(formatLine("Written", str(target)))
-
-
 __all__ = [
     "CommandSettings",
     "listSelectorCompletions",
@@ -174,5 +166,4 @@ __all__ = [
     "outputOption",
     "previewOption",
     "reportPybersErrors",
-    "reportWrite",
 ]

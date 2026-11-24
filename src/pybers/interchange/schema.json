@@ -812,7 +812,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 11
+          "const": 12
         },
         "sheetName": {
           "anyOf": [
@@ -1062,7 +1062,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 11
+          "const": 12
         },
         "color": {
           "$ref": "#/$defs/Color"
@@ -1148,7 +1148,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 11
+          "const": 12
         },
         "document": {
           "$ref": "#/$defs/DocumentForm"
@@ -1499,13 +1499,30 @@
       ],
       "additionalProperties": false
     },
+    "PartSkip": {
+      "type": "object",
+      "description": "A part a call matched and left as it was, and why, as a short phrase.",
+      "properties": {
+        "place": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "place",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
     "RangeJsonForm": {
       "type": "object",
       "description": "The cells of one range, inside the table holding them.",
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 11
+          "const": 12
         },
         "sheetName": {
           "anyOf": [
@@ -1568,7 +1585,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 11
+          "const": 12
         },
         "sheet": {
           "$ref": "#/$defs/SheetForm"
@@ -1911,7 +1928,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 11
+          "const": 12
         },
         "sheetName": {
           "anyOf": [
@@ -2103,7 +2120,7 @@
     },
     "Typefaces": {
       "type": "object",
-      "description": "The fonts pybers knows, each PostScript name once, and the files it cannot read.",
+      "description": "The fonts pybers knows, each PostScript name once, and each file it skipped.",
       "properties": {
         "fonts": {
           "type": "array",
@@ -2111,10 +2128,10 @@
             "$ref": "#/$defs/TypefaceFont"
           }
         },
-        "unreadable": {
+        "skipped": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/PartSkip"
           }
         }
       },
@@ -2129,7 +2146,7 @@
       "properties": {
         "jsonFormVersion": {
           "type": "integer",
-          "const": 11
+          "const": 12
         },
         "typefaces": {
           "$ref": "#/$defs/Typefaces"
