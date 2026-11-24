@@ -2,22 +2,22 @@
 """\
 pybers font catalog
 
-Read every face macOS installs, as pybers reads any font file, and report how the faces
-differ from the catalog committed at src/pybers/_generated/fonts.py.
+Read every font macOS installs, as pybers reads any font file, and report how the fonts
+differ from the catalog committed at src/pybers/_generated/typefaces.py.
 
-**Why macOS is the source.** A document opened on a Mac draws its text with a face that
-Mac has, so the catalog lists every face macOS installs, and a script on a server with
-none of them still names faces every Mac carries. The catalog is read once on a Mac and
+**Why macOS is the source.** A document opened on a Mac draws its text with a font that
+Mac has, so the catalog lists every font macOS installs, and a script on a server with
+none of them still names fonts every Mac carries. The catalog is read once on a Mac and
 committed, because `pip install pybers` has no macOS to read. See docs/decisions.md.
 
 **When to run it.** When a new major version of macOS ships, which the suite reports
-on a Mac by failing `tests/test_font_catalog.py`. Nothing is written unless --write is
-passed.
+on a Mac by failing `tests/test_typeface_catalog.py`. Nothing is written unless
+--write is passed.
 
 Usage:
-    .venv/bin/python3 -m tools.local.fonts_extract
-    .venv/bin/python3 -m tools.local.fonts_extract --write
-    .venv/bin/python3 -m tools.local.fonts_extract --write --preview
+    .venv/bin/python3 -m tools.local.typefaces_extract
+    .venv/bin/python3 -m tools.local.typefaces_extract --write
+    .venv/bin/python3 -m tools.local.typefaces_extract --write --preview
 
 macOS only.
 
@@ -33,7 +33,7 @@ __version__ = "0.1.0"
 __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/24"
-__usage__ = ".venv/bin/python3 -m tools.local.fonts_extract [options]"
+__usage__ = ".venv/bin/python3 -m tools.local.typefaces_extract [options]"
 
 import argparse
 import platform
@@ -42,20 +42,20 @@ from pathlib import Path
 from rich.console import Console
 from rich.markup import escape
 
-from tools.local.lib.fonttable import formatModule, readCommitted, readSystemRows
+from tools.local.lib.typefacetable import formatModule, readCommitted, readSystemRows
 from tools.workflow.lib.shared import RichHelpFormatter, repositoryRoot
 
 console: Console = Console()
 
-# Committed, so that naming a face never needs a local macOS.
-generatedPath: Path = repositoryRoot / "src" / "pybers" / "_generated" / "fonts.py"
+# Committed, so that naming a font never needs a local macOS.
+generatedPath: Path = repositoryRoot / "src" / "pybers" / "_generated" / "typefaces.py"
 
 
 def main() -> int:
-    """Parse arguments, read the faces, report the difference, and write when asked."""
+    """Parse arguments, read the fonts, report the difference, and write when asked."""
     parser = argparse.ArgumentParser(
         description=(
-            "Read every face macOS installs, and report how they differ from the "
+            "Read every font macOS installs, and report how they differ from the "
             "committed catalog."
         ),
         formatter_class=RichHelpFormatter,
@@ -77,7 +77,7 @@ def main() -> int:
         console.print("[red]The font catalog is read from macOS, and this is not.[/]")
         return 1
     rows = readSystemRows()
-    console.print(f"macOS {macOS}: {len(rows)} faces")
+    console.print(f"macOS {macOS}: {len(rows)} fonts")
     committed = readCommitted(generatedPath)
     if committed is None:
         console.print(
@@ -107,7 +107,7 @@ def main() -> int:
     generatedPath.write_text(source)
     console.print(
         f"\n[green]Wrote[/] {escape(str(generatedPath.relative_to(repositoryRoot)))}, "
-        f"{len(rows)} faces."
+        f"{len(rows)} fonts."
     )
     return 0
 

@@ -17,6 +17,8 @@ UPDATES
 2026-11-12  Version 6, a cell carrying `cellStyle`, for PYB-265.
 2026-11-09  Version 5, a format a member of its family, Automatic holding the one
             it chose in place of `formatChosen`, for PYB-145.
+2026-11-24  Version 11, the form of typefaces, its fonts' `typeface` naming the
+            design, for PYB-318.
 2026-11-24  Version 10, the form of fonts, for PYB-315.
 2026-11-06  Version 4, a color carrying its fields, for PYB-264.
 2026-11-03  Version 3, a table carrying its headers, for PYB-223.
@@ -40,12 +42,12 @@ from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress
 from pybers.color.colors import Color
 from pybers.document._form import DocumentForm, SheetForm, TableEntry
-from pybers.font.fonts import Fonts
 from pybers.interchange._tree import jsonFormConst
 from pybers.table._form import TableForm
+from pybers.typeface.typefaces import Typefaces
 
 # Any change to the form's shape is a new version, recorded in `docs/decisions.md`.
-jsonFormVersion: Final[int] = 10
+jsonFormVersion: Final[int] = 11
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,23 +108,23 @@ class ColorJsonForm:
 
 
 @dataclass(frozen=True, slots=True)
-class FontsJsonForm:
-    """Faces of fonts, and each font file that could not be read."""
+class TypefacesJsonForm:
+    """Fonts of fonts, and each font file that could not be read."""
 
     jsonFormVersion: int = field(metadata={jsonFormConst: jsonFormVersion})
-    fonts: Fonts
+    typefaces: Typefaces
 
 
 type JsonForm = (
     DocumentJsonForm | SheetJsonForm | TableJsonForm | RangeJsonForm | CellJsonForm
-    | ColorJsonForm | FontsJsonForm
+    | ColorJsonForm | TypefacesJsonForm
 )
 
 __all__ = [
     "CellJsonForm",
     "ColorJsonForm",
     "DocumentJsonForm",
-    "FontsJsonForm",
+    "TypefacesJsonForm",
     "JsonForm",
     "RangeJsonForm",
     "SheetJsonForm",

@@ -20,6 +20,7 @@ __status__ = "Development"
 __date__ = "2026/10/07"
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -111,3 +112,40 @@ def testAFrontEndReachesTheLibraryThroughImportPybers(path: Path) -> None:
 
 def testTheCommandLineIsAFrontEnd() -> None:
     assert frontEndPaths
+
+
+
+# A command, `pybers show`, or an option, `--names`, as a message would write one.
+commandPattern: re.Pattern[str] = re.compile(
+    r"\bpybers (show|set|check)\b|(^|\s|`)--[a-z]"
+)
+
+
+
+def listCodeStrings(tree: ast.Module) -> list[ast.Constant]:
+    """Return every string a module's code holds, its docstrings left out."""
+    docstrings = {
+        id(node.body[0].value) for node in ast.walk(tree)
+        if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef)
+        and node.body and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+    return [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        and id(node) not in docstrings
+    ]
+
+def testNoLibraryMessageNamesACommandOrAnOption() -> None:
+    """A refusal reads alike in a script and at a command line, so it names neither."""
+    found = []
+    for path in sorted(pybersDirectory.rglob("*.py")):
+        parts = path.relative_to(pybersDirectory).parts
+        if parts[0] in frontEndPackages or parts[0] in machineWritten:
+            continue
+        found += [
+            f"{'/'.join(parts)}:{each.lineno} {each.value!r}"
+            for each in listCodeStrings(ast.parse(path.read_text()))
+            if commandPattern.search(each.value)
+        ]
+    assert found == []

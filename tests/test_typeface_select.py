@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-Selecting faces with the selector a document is selected with.
+Selecting fonts with the selector a document is selected with.
 
 UPDATES
 2026-11-24  Written for PYB-315.
@@ -22,36 +22,41 @@ import pytest
 from fontbuilders import buildFont, saveFont
 
 import pybers
-from pybers import FontFace, Fonts, FontSlant, FontSource
+from pybers import TypefaceFont, Typefaces, TypefaceSlant, TypefaceSource
 from pybers.document.sheets import SelectionError
 from pybers.selection.selector import Selector, SelectorError
 
 
-def buildFace(
+def buildCatalogFont(
     family: str, name: str, postScriptName: str, weight: int = 400,
-    slant: FontSlant = FontSlant.NORMAL, source: FontSource = FontSource.CATALOG,
-) -> FontFace:
-    """Return a face as a catalog or a machine reports one."""
-    return FontFace(
+    slant: TypefaceSlant = TypefaceSlant.NORMAL,
+    source: TypefaceSource = TypefaceSource.CATALOG,
+) -> TypefaceFont:
+    """Return a font as a catalog or a machine reports one."""
+    return TypefaceFont(
         family, name, postScriptName, weight, slant, source,
         PurePosixPath(f"/Fonts/{postScriptName}.otf"),
     )
 
 
-fonts = Fonts((
-    buildFace("Avenir Next", "Regular", "AvenirNext-Regular"),
-    buildFace("Avenir Next", "Italic", "AvenirNext-Italic", slant=FontSlant.ITALIC),
-    buildFace("Avenir Next", "Demi Bold", "AvenirNext-DemiBold", 600),
-    buildFace("Avenir Next", "Demi Bold Italic", "AvenirNext-DemiBoldItalic", 600,
-              FontSlant.ITALIC),
-    buildFace("Avenir Next Condensed", "Bold", "AvenirNextCondensed-Bold", 700),
-    buildFace("Brand Sans", "Black", "BrandSans-Black", 900,
-              source=FontSource.MACHINE),
+typefaces = Typefaces((
+    buildCatalogFont("Avenir Next", "Regular", "AvenirNext-Regular"),
+    buildCatalogFont(
+        "Avenir Next", "Italic", "AvenirNext-Italic", slant=TypefaceSlant.ITALIC
+    ),
+    buildCatalogFont("Avenir Next", "Demi Bold", "AvenirNext-DemiBold", 600),
+    buildCatalogFont(
+        "Avenir Next", "Demi Bold Italic", "AvenirNext-DemiBoldItalic", 600,
+        TypefaceSlant.ITALIC,
+    ),
+    buildCatalogFont("Avenir Next Condensed", "Bold", "AvenirNextCondensed-Bold", 700),
+    buildCatalogFont("Brand Sans", "Black", "BrandSans-Black", 900,
+              source=TypefaceSource.MACHINE),
 ))
 
 
 def selectNames(selector: str) -> list[str]:
-    return [face.postScriptName for face in fonts.select(selector)]
+    return [font.postScriptName for font in typefaces.select(selector)]
 
 
 def testFontFamilySelectsEveryFaceInOrder() -> None:
@@ -104,17 +109,17 @@ def testGroupsSelectEachFaceOnce() -> None:
     assert selectNames("Brand Sans, *[weight=900], Brand*") == ["BrandSans-Black"]
 
 
-def testMisspelledFontFamilyIsRefusedNamingTheClosest() -> None:
+def testMisspelledTypefaceIsRefusedNamingTheClosest() -> None:
     with pytest.raises(SelectionError, match="The closest is 'Avenir Next'"):
-        fonts.select("Avenir Nxt")
+        typefaces.select("Avenir Nxt")
 
 
 def testMissingFaceIsRefusedListingTheFamilysFaces() -> None:
     with pytest.raises(
-        SelectionError, match="'Semibold' selects no face in 'Avenir Next'. The faces "
+        SelectionError, match="'Semibold' selects no font in 'Avenir Next'. The fonts "
         "are 'Regular', 'Italic', 'Demi Bold' and 'Demi Bold Italic'",
     ):
-        fonts.select("Avenir Next::Semibold")
+        typefaces.select("Avenir Next::Semibold")
 
 
 def testPatternMatchingNothingSelectsNothing() -> None:
@@ -123,101 +128,120 @@ def testPatternMatchingNothingSelectsNothing() -> None:
 
 @pytest.mark.parametrize(("selector", "message"), [
     ("*[slant>=italic]", "compares `[slant]` with `>=`, and it takes only `=`"),
-    ("*[weight=heavy]", "gives `[weight]` `heavy`, which is not one of its values"),
+    ("*[weight=heavy]", "gives `[weight]` `heavy`, which is not one of its values. "
+     "Give `[weight]` a whole number from 1 to 1000"),
     ('*[slant="italic" s]', "gives `[slant]` the `s` flag, which only a name takes"),
     ("*[kind=number]", "'[kind]' is not a selector condition"),
-    ("a::b::c", "begins a third position, and a selector holds only font family "
-     "and face"),
+    ("a::b::c", "begins a third position, and a selector holds only typeface "
+     "and font"),
 ])
 def testMalformedFontsSelectorIsRefused(selector: str, message: str) -> None:
     with pytest.raises(SelectorError, match=message.replace("[", r"\[")):
-        fonts.select(selector)
+        typefaces.select(selector)
 
 
-def testDocumentSelectorIsRefusedByFonts() -> None:
+def testDocumentSelectorIsRefusedByTypefaces() -> None:
     with pytest.raises(SelectorError, match="was parsed to select sheet, table"):
-        fonts.select(Selector.parse("Q3"))
+        typefaces.select(Selector.parse("Q3"))
 
 
 def testFontFileOffersItsOwnFaces(tmp_path: Path) -> None:
     path = saveFont(buildFont("Brand Sans", "Bold", "BrandSans-Bold", 700),
                     tmp_path / "brand.ttf")
-    found = pybers.openFonts(path)
-    assert [(each.postScriptName, each.source) for each in found.faces] == [
-        ("BrandSans-Bold", FontSource.FILE),
+    found = pybers.openTypefaces(path)
+    assert [(each.postScriptName, each.source) for each in found.fonts] == [
+        ("BrandSans-Bold", TypefaceSource.FILE),
     ]
 
 
 def testMissingFontFileIsRefused(tmp_path: Path) -> None:
-    with pytest.raises(pybers.FontError, match="absent.otf does not exist"):
-        pybers.openFonts(tmp_path / "absent.otf")
+    with pytest.raises(pybers.TypefaceError, match="absent.otf does not exist"):
+        pybers.openTypefaces(tmp_path / "absent.otf")
 
 
 @pytest.mark.skipif(not platform.mac_ver()[0], reason="the catalog is a Mac's")
 def testFaceBothKnowReportsTheCatalog() -> None:
-    found = pybers.openFonts().select('*[postscript="Helvetica-Bold" s]')
-    assert [each.source for each in found] == [FontSource.CATALOG]
+    found = pybers.openTypefaces().select('*[postscript="Helvetica-Bold" s]')
+    assert [each.source for each in found] == [TypefaceSource.CATALOG]
 
 
 def testFamilyWeightAndSlantFindOneFace() -> None:
-    face = fonts.face("avenir-next", weight=600, slant=FontSlant.ITALIC)
-    assert face.postScriptName == "AvenirNext-DemiBoldItalic"
+    font = typefaces.font("avenir-next", weight=600, slant=TypefaceSlant.ITALIC)
+    assert font.postScriptName == "AvenirNext-DemiBoldItalic"
 
 
 def testFaceDefaultsToRegularUpright() -> None:
-    assert fonts.face("Avenir Next").postScriptName == "AvenirNext-Regular"
+    assert typefaces.font("Avenir Next").postScriptName == "AvenirNext-Regular"
 
 
 def testWeightTheFamilyLacksIsRefusedListingItsFaces() -> None:
-    with pytest.raises(pybers.FontError, match=(
-        r"'Avenir Next' has no face of weight 700 and normal slant. Its faces are "
+    with pytest.raises(pybers.TypefaceError, match=(
+        r"'Avenir Next' has no font of weight 700 and normal slant. Its fonts are "
         r"'Regular' \(400, normal\), 'Italic' \(400, italic\)"
     )):
-        fonts.face("Avenir Next", weight=700)
+        typefaces.font("Avenir Next", weight=700)
 
 
 def testSeveralFacesOfOneDesignAreRefusedNamingEach() -> None:
-    twins = Fonts((
-        buildFace("Jenson", "Regular", "Jenson-Regular"),
-        buildFace("Jenson", "Caption", "Jenson-Caption"),
+    twins = Typefaces((
+        buildCatalogFont("Jenson", "Regular", "Jenson-Regular"),
+        buildCatalogFont("Jenson", "Caption", "Jenson-Caption"),
     ))
-    with pytest.raises(pybers.FontError, match=(
-        r"has 2 faces of weight 400 and normal slant, 'Regular' \(Jenson-Regular\) "
+    with pytest.raises(pybers.TypefaceError, match=(
+        r"has 2 fonts of weight 400 and normal slant, 'Regular' \(Jenson-Regular\) "
         r"and 'Caption' \(Jenson-Caption\). Choose one by its PostScript name"
     )):
-        twins.face("Jenson")
+        twins.font("Jenson")
 
 
-def testUnknownFamilyIsRefusedNamingTheClosest() -> None:
-    with pytest.raises(pybers.FontError, match="The closest is 'Avenir Next'"):
-        fonts.face("Avenir Nxt")
+def testUnknownTypefaceIsRefusedNamingTheClosest() -> None:
+    with pytest.raises(pybers.TypefaceError, match="The closest is 'Avenir Next'"):
+        typefaces.font("Avenir Nxt")
 
 
 @pytest.mark.parametrize("weight", [0, 1001, True, "600"])
 def testWeightOffTheCssScaleIsRefused(weight: object) -> None:
-    with pytest.raises(pybers.FontError, match="is not a whole number from 1 to 1000"):
-        fonts.face("Avenir Next", weight=weight)  # type: ignore[call-overload]
+    with pytest.raises(
+        pybers.TypefaceError, match="is not a whole number from 1 to 1000"
+    ):
+        typefaces.font("Avenir Next", weight=weight)  # type: ignore[call-overload]
 
 
 def testSlantThatIsNotAFontSlantIsRefused() -> None:
-    with pytest.raises(pybers.FontError, match="'italic' is not a FontSlant"):
-        fonts.face("Avenir Next", slant="italic")  # type: ignore[call-overload]
+    with pytest.raises(pybers.TypefaceError, match="'italic' is not a TypefaceSlant"):
+        typefaces.font("Avenir Next", slant="italic")  # type: ignore[call-overload]
 
 
 def testPostScriptNameFindsTheFaceLoosely() -> None:
-    face = fonts.face(postScriptName="avenirnext demibold")
-    assert face is not None and face.postScriptName == "AvenirNext-DemiBold"
+    font = typefaces.font(postScriptName="avenirnext demibold")
+    assert font is not None and font.postScriptName == "AvenirNext-DemiBold"
 
 
 def testPostScriptNameNobodyKnowsFindsNone() -> None:
-    assert fonts.face(postScriptName="BrandSerif-Semibold") is None
+    assert typefaces.font(postScriptName="BrandSerif-Semibold") is None
 
 
-@pytest.mark.parametrize("arguments", [{}, {"fontFamily": "Avenir Next",
-                                          "postScriptName": "AvenirNext-Regular"}])
-def testFaceTakesAFamilyOrANameNeverBothOrNeither(arguments: dict[str, str]) -> None:
-    with pytest.raises(pybers.FontError, match="Give one of them"):
-        fonts.face(**arguments)  # type: ignore[call-overload]
+@pytest.mark.parametrize(("arguments", "given"), [
+    ({}, "neither a typeface nor"),
+    ({"typeface": "Avenir Next", "postScriptName": "AvenirNext-Regular"},
+     "both a typeface and"),
+])
+def testFaceAskedForByNeitherOrBothSaysWhich(
+    arguments: dict[str, str], given: str
+) -> None:
+    with pytest.raises(pybers.TypefaceError, match=(
+        f"A font is asked for by {given} a PostScript name. Give one of them"
+    )):
+        typefaces.font(**arguments)  # type: ignore[call-overload]
+
+
+@pytest.mark.parametrize("call", [
+    lambda: typefaces.font("Zzqx Qqq"), lambda: typefaces.select("Zzqx Qqq"),
+], ids=["font", "select"])
+def testTypefaceNothingIsCloseToIsRefusedWithNoFix(call: object) -> None:
+    with pytest.raises(pybers.PybersError) as refused:
+        call()  # type: ignore[operator]
+    assert str(refused.value).endswith("pybers knows.")
 
 
 def testUnreadableMachineFontIsRecordedAndEveryOtherFaceKept(
@@ -228,9 +252,9 @@ def testUnreadableMachineFontIsRecordedAndEveryOtherFaceKept(
     broken = tmp_path / "broken.otf"
     broken.write_text("not a font")
     monkeypatch.setattr(
-        "pybers.font.fonts.findMachineFontFiles", lambda: (broken, good)
+        "pybers.typeface.typefaces.findMachineFontFiles", lambda: (broken, good)
     )
-    found = pybers.openFonts()
+    found = pybers.openTypefaces()
     assert [each.postScriptName for each in found.select("Brand Sans")] == [
         "BrandSans-Bold",
     ]

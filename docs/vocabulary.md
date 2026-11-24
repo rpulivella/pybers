@@ -43,7 +43,7 @@ A command is a verb, and an option of `set` is the part it sets. A verb with no 
 | Update | `--cell-style-update` on `pybers set` | `pybers set budget.numbers Summary::Costs::B4 --cell-style-update 'padding: 12pt'` |
 | Remove | `--cell-style-remove` on `pybers set` | `pybers set budget.numbers Summary::Costs::B4 --cell-style-remove background` |
 | select | The `SELECTOR` argument of every command taking one | `pybers show budget.numbers Summary::Costs::B2:B9` |
-| show, for fonts | `pybers show` given `fonts` or a font file as its `FILE` | `pybers show fonts 'Avenir Next::*Demi*'` |
+| show, for typefaces | `pybers show` given `typefaces` or a font file as its `FILE` | `pybers show typefaces 'Avenir Next::*Demi*'` |
 | parse | The text every option and `VALUE` argument reads | `--cell-style 'background: #ff0000ff'` |
 | format | The text `pybers show` and `pybers set` print, which `parse` reads back | `pybers show budget.numbers Summary::Costs::B4` |
 | open | The `FILE` argument of every command | `pybers check budget.numbers` |
@@ -75,12 +75,12 @@ Each noun below keeps one meaning across the library, the command line and the d
 | variation | A part's own changes to the named style beneath it | CSS inline style |
 | property | One quality a style states, such as its background or padding, by its CSS name | CSS property |
 | format | How a cell writes its value as text, such as currency or date | `Intl.NumberFormat` |
-| family | One kind of format, such as number, currency or duration. A font's family is a font family | Numbers' Format pop-up menu |
-| font | A file holding one or more faces, `.otf`, `.ttf` or `.ttc` | OpenType font |
-| font family | The faces designed together under one name, such as Avenir Next | CSS `font-family` |
-| face | One design of a font family at one weight and slant, such as Avenir Next Demi Bold, identified by its PostScript name | CSS `@font-face` |
-| weight | How heavy a face's strokes are, from 1 to 1000, 400 regular and 700 bold | CSS `font-weight` |
-| slant | Whether a face is upright, italic or oblique | OpenType `slnt` and `ital` axes |
+| family | One kind of format, such as number, currency or duration | Numbers' Format pop-up menu |
+| typeface | A design, its fonts made together under one name, such as Helvetica | A typeface in metal type |
+| font | One weight and slant of a typeface, such as Helvetica Bold, identified by its PostScript name | A font in metal type, one size and style of a typeface's sorts |
+| font file | A file holding one or more fonts, `.otf`, `.ttf` or `.ttc` | OpenType's font file and font collection |
+| weight | How heavy a font's strokes are, from 1 to 1000, 400 regular and 700 bold | CSS `font-weight` |
+| slant | Whether a font is upright, italic or oblique | OpenType `slnt` and `ital` axes |
 | control | The checkbox, slider or other device a person uses to change a cell's value | Numbers' Data Format controls |
 | kind | The sort of value a cell holds, such as number, text or date | Numbers' cell types |
 | fill | What paints an area: a color, a gradient or an image | CSS `background` |

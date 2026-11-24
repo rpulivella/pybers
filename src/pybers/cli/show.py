@@ -10,7 +10,8 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
-2026-11-24  `fonts` or a font file as FILE shows faces, one per line, for PYB-315.
+2026-11-24  `typefaces` as FILE shows the typefaces pybers knows, for PYB-318.
+2026-11-24  `fonts` or a font file as FILE shows fonts, one per line, for PYB-315.
 2026-11-23  Declared for Click, SELECTOR completing to sheets and tables, for
             PYB-304.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
@@ -68,8 +69,8 @@ from pybers.cli._report import (
 
 type DocumentPart = pybers.Document | pybers.Sheet | pybers.Table | pybers.Cell
 
-# The FILE showing the fonts pybers knows, so a file of that name is `./fonts`.
-fontsFile: str = "fonts"
+# The FILE showing the typefaces pybers knows, so a file of that name is `./typefaces`.
+typefacesFile: str = "typefaces"
 
 
 def formatControl(control: pybers.CellControl | None) -> str:
@@ -222,53 +223,54 @@ def formatShownParts(parts: list[ShownPart]) -> Group:
     return formatParts([formatShownPart(part) for part in parts])
 
 
-def formatFace(face: pybers.FontFace) -> Text:
-    """Return a face as a part's line, its PostScript name and then its fields."""
-    shown = formatSegments(childIndent, "Face", face.postScriptName)
+def formatFont(font: pybers.TypefaceFont) -> Text:
+    """Return a font as a part's line, its PostScript name and then its fields."""
+    shown = formatSegments(childIndent, "Font", font.postScriptName)
     return shown.append(fieldGap).append_text(formatFields(
-        0, ("Name", face.name), ("Weight", str(face.weight)),
-        ("Slant", face.slant.value), ("Source", face.source.value),
+        0, ("Name", font.name), ("Weight", str(font.weight)),
+        ("Slant", font.slant.value), ("Source", font.source.value),
     ))
 
 
-def formatFaces(faces: Sequence[pybers.FontFace]) -> Group:
-    """Return each font family and its face count, its faces one line each beneath."""
+def formatFonts(fonts: Sequence[pybers.TypefaceFont]) -> Group:
+    """Return each typeface and its font count, its fonts one line each beneath."""
     grouped = [
-        (fontFamily, list(each))
-        for fontFamily, each in groupby(faces, key=lambda face: face.fontFamily)
+        (typeface, list(each))
+        for typeface, each in groupby(fonts, key=lambda font: font.typeface)
     ]
     families = [
         Group(
             formatSegments(
-                0, "Font family", fontFamily, formatCount(len(each), "face")
+                0, "Typeface", typeface, formatCount(len(each), "font")
             ),
-            *(formatFace(face) for face in each),
+            *(formatFont(font) for font in each),
         )
-        for fontFamily, each in grouped
+        for typeface, each in grouped
     ]
     return formatParts(families)
 
 
-def showFonts(file: str, selector: str | None, outputFormat: OutputFormat) -> None:
-    """Print the faces a selector matches, and each unreadable font file on stderr."""
-    fonts = pybers.openFonts(None if file == fontsFile else file)
+def showTypefaces(file: str, selector: str | None, outputFormat: OutputFormat) -> None:
+    """Print the fonts a selector matches, and each unreadable font file on stderr."""
+    typefaces = pybers.openTypefaces(None if file == typefacesFile else file)
     if selector is not None:
-        fonts = pybers.Fonts(fonts.select(selector), fonts.unreadable)
-    for reason in fonts.unreadable:
+        typefaces = pybers.Typefaces(typefaces.select(selector), typefaces.unreadable)
+    for reason in typefaces.unreadable:
         statusConsole.print(formatLine("Skipped", reason))
-    printResult(fonts, outputFormat, lambda shown: formatFaces(shown.faces))
+    printResult(typefaces, outputFormat, lambda shown: formatFonts(shown.fonts))
 
 
 @click.command("show", cls=PybersCommand)
 @click.argument(
     "file", cls=PybersArgument, type=click.Path(),
-    help="The .numbers document, `fonts` for the fonts pybers knows, or a font file.",
+    help="The .numbers document, `typefaces` for the typefaces pybers knows, or a font "
+    "file.",
 )
 @click.argument(
     "selector", cls=PybersArgument, required=False,
     shell_complete=listSelectorCompletions,
     help="What to show: `Budget`, `Budget::Q3`, `::Q3::B2:D5`, `::B4` or "
-    "`Budget::Q*[kind=number]`, each match as it shows alone, or for fonts "
+    "`Budget::Q*[kind=number]`, each match as it shows alone, or for typefaces "
     "`Avenir Next::*Demi*` or `*[weight>=600]`.",
 )
 @outputFormatOption
@@ -276,10 +278,10 @@ def showFonts(file: str, selector: str | None, outputFormat: OutputFormat) -> No
 def runShow(
     context: click.Context, file: str, selector: str | None, outputFormat: OutputFormat
 ) -> None:
-    """Show a whole document, or every part SELECTOR matches, or the fonts."""
+    """Show a whole document, or every part SELECTOR matches, or the typefaces."""
     with reportPybersErrors(context):
-        if file == fontsFile or Path(file).suffix.lower() in pybers.fontSuffixes:
-            showFonts(file, selector, outputFormat)
+        if file == typefacesFile or Path(file).suffix.lower() in pybers.fontSuffixes:
+            showTypefaces(file, selector, outputFormat)
             return
         document = pybers.open(Path(file))
         if selector is None:

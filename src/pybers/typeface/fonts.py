@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """\
-A face, one design of a font family at one weight and slant, and where pybers found it.
+A font, one weight and slant of a typeface's design, and where pybers found it.
 
-A style names a face by its PostScript name, `AvenirNext-DemiBold`, which is the one
-name every system agrees on, so a `FontFace` carries it beside the names a person
+A style names a font by its PostScript name, `AvenirNext-DemiBold`, which is the one
+name every system agrees on, so a `TypefaceFont` carries it beside the names a person
 reads.
 
 UPDATES
+2026-11-24  A font's design is its `typeface`, for PYB-318.
 2026-11-24  Written for PYB-315.
 """
 from __future__ import annotations
@@ -27,16 +28,16 @@ from pathlib import PurePath
 fontSuffixes: frozenset[str] = frozenset({".otf", ".ttf", ".ttc", ".otc"})
 
 
-class FontSlant(StrEnum):
-    """Whether a face is upright, italic or oblique, as CSS `font-style` names them."""
+class TypefaceSlant(StrEnum):
+    """Whether a font is upright, italic or oblique, as CSS `font-style` names them."""
 
     NORMAL = "normal"
     ITALIC = "italic"
     OBLIQUE = "oblique"
 
 
-class FontSource(StrEnum):
-    """Where pybers found a face: its catalog, this machine or a font file."""
+class TypefaceSource(StrEnum):
+    """Where pybers found a font: its catalog, this machine or a font file."""
 
     CATALOG = "catalog"
     MACHINE = "machine"
@@ -44,19 +45,19 @@ class FontSource(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class FontFace:
-    """One face: its font family, its name in it, its PostScript name and its design.
+class TypefaceFont:
+    """One font: its typeface, its name in it, its PostScript name and its design.
 
     `weight` is 1 to 1000, as CSS `font-weight`.
     """
 
-    fontFamily: str
+    typeface: str
     name: str
     postScriptName: str
     weight: int
-    slant: FontSlant
-    source: FontSource
+    slant: TypefaceSlant
+    source: TypefaceSource
     file: PurePath
 
 
-__all__ = ["FontFace", "FontSlant", "FontSource", "fontSuffixes"]
+__all__ = ["TypefaceFont", "TypefaceSlant", "TypefaceSource", "fontSuffixes"]

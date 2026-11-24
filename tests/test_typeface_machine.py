@@ -22,15 +22,15 @@ from pathlib import Path
 import pytest
 from fontbuilders import buildFont, saveFont
 
-from pybers.font._files import readFileFaces
-from pybers.font._machine import (
+from pybers.typeface._files import readFileFonts
+from pybers.typeface._machine import (
     coreFoundationPath,
     coreTextPath,
     findFolderFontFiles,
     findMacFontFiles,
     listSystemFontFolders,
 )
-from pybers.font.faces import FontSource
+from pybers.typeface.fonts import TypefaceSource
 
 onMac = platform.system() == "Darwin"
 
@@ -64,8 +64,8 @@ def listCoreTextNames() -> set[str]:
 @pytest.mark.skipif(not onMac, reason="CoreText exists only on a Mac")
 def testEveryFaceCoreTextOffersIsReadFromItsFile() -> None:
     read = {
-        face.postScriptName for path in findMacFontFiles()
-        for face in readFileFaces(path, FontSource.MACHINE)
+        font.postScriptName for path in findMacFontFiles()
+        for font in readFileFonts(path, TypefaceSource.MACHINE)
     }
     offered = {name for name in listCoreTextNames() if not name.startswith(".")}
     assert sorted(offered - read) == []

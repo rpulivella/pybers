@@ -15,7 +15,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document, what it is running on, the tree of its sheets and tables, each shown by its kind and size, and each face the document uses with where pybers knows it, in a form safe to paste into a public bug report. `--names` shows the name of each sheet and table and the address of each unrecognized cell, for the person holding the document.
+`pybers check FILE` says whether pybers can read a document, what it is running on, the tree of its sheets and tables, each shown by its kind and size, and each font the document uses with where pybers knows it, in a form safe to paste into a public bug report. `--names` shows the name of each sheet and table and the address of each unrecognized cell, for the person holding the document.
 
 `pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION] [--table-style STYLE] [--locale LOCALE]` sets the value, the format, the control, the cell style and the borders of every cell a [selector](#selectors) matches, and the lines of every table it matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` specifies the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
@@ -327,16 +327,16 @@ $ pybers show shapes.numbers "*::Table 2" --output-format json
 
 </details>
 
-`pybers show fonts` prints every face pybers knows: the catalog of faces macOS installs, which pybers ships so a document built anywhere names faces every Mac carries, and the fonts this machine offers. `pybers show FONTFILE` prints a font file's own faces, installed or not. A [selector](#selectors) narrows either, its positions a font family and a face, every name compared ignoring case, spaces and hyphens, and a quoted value ending in `s` compared exactly. Each family prints as a part, its faces one line each beneath it, so the PostScript name a style needs is found before the style is written:
+`pybers show typefaces` prints every font pybers knows: the catalog of fonts macOS installs, which pybers ships so a document built anywhere names fonts every Mac carries, and the fonts this machine offers. `pybers show FONTFILE` prints a font file's own fonts, installed or not. A [selector](#selectors) narrows either, its positions a typeface and a font, every name compared ignoring case, spaces and hyphens, and a quoted value ending in `s` compared exactly. Each typeface prints as a part, its fonts one line each beneath it, so the PostScript name a style needs is found before the style is written:
 
 ```console
-$ pybers show fonts 'avenirnext::*demi*'
-Font family: Avenir Next  2 faces
-  Face: AvenirNext-DemiBold   Name: Demi Bold   Weight: 600   Slant: normal   Source: catalog
-  Face: AvenirNext-DemiBoldItalic   Name: Demi Bold Italic   Weight: 600   Slant: italic   Source: catalog
-$ pybers show fonts '*[weight>=800][slant=italic]'
+$ pybers show typefaces 'avenirnext::*demi*'
+Typeface: Avenir Next  2 fonts
+  Font: AvenirNext-DemiBold   Name: Demi Bold   Weight: 600   Slant: normal   Source: catalog
+  Font: AvenirNext-DemiBoldItalic   Name: Demi Bold Italic   Weight: 600   Slant: italic   Source: catalog
+$ pybers show typefaces '*[weight>=800][slant=italic]'
 $ pybers show BrandSans.otf
-$ pybers show fonts '*[postscript="AvenirNext-DemiBold" s]' --output-format json
+$ pybers show typefaces '*[postscript="AvenirNext-DemiBold" s]' --output-format json
 ```
 
 `pybers show FILE` prints a document's language and region on its first line, and `pybers set FILE --locale LOCALE` changes it as Numbers' Language & Region does, printing the locale it holds afterward:
@@ -509,19 +509,19 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 
 ### Typefaces
 
-A style names its face by a PostScript name, `AvenirNext-DemiBold`, which few people know by heart, so pybers finds it from what a designer specifies, a font family, a weight and a slant. `pybers.openFonts()` holds the faces pybers knows, the catalog of faces macOS installs and the fonts this machine offers, and `pybers.openFonts(path)` a font file's own. `fonts.select` takes the same [selector](#selectors) a document does, and `fonts.face` returns the one face a family, a weight and a slant specify:
+A style names its font by a PostScript name, `AvenirNext-DemiBold`, which few people know by heart, so pybers finds it from what a designer specifies, a typeface, a weight and a slant. `pybers.openTypefaces()` holds the typefaces pybers knows, the catalog of fonts macOS installs and the fonts this machine offers, and `pybers.openTypefaces(path)` a font file's own. `typefaces.select` takes the same [selector](#selectors) a document does, and `typefaces.font` returns the one font a typeface, a weight and a slant specify:
 
 ```python
-fonts = pybers.openFonts()
-fonts.face("Avenir Next", weight=600).postScriptName       # AvenirNext-DemiBold
-fonts.select("AvenirNext[slant=italic][weight>=600]")       # three italic faces
-fonts.face(postScriptName="BrandSans-Semibold")             # None where nobody here has it
+typefaces = pybers.openTypefaces()
+typefaces.font("Avenir Next", weight=600).postScriptName   # AvenirNext-DemiBold
+typefaces.select("AvenirNext[slant=italic][weight>=600]")   # three italic fonts
+typefaces.font(postScriptName="BrandSans-Semibold")         # None where nobody here has it
 
-brand = pybers.openFonts("BrandSans.otf")
-brand.face("Brand Sans", weight=600, slant=pybers.FontSlant.ITALIC)
+brand = pybers.openTypefaces("BrandSans.otf")
+brand.font("Brand Sans", weight=600, slant=pybers.TypefaceSlant.ITALIC)
 ```
 
-A weight or a slant the family lacks is refused, listing the faces it has, so pybers never asks Numbers to fake a bold or an italic, and several faces of one weight and slant are refused naming each, to be chosen by PostScript name. A name nobody here knows finds `None` rather than an error, since a style holds only the name, and a server lacking a font can still name a face for a reader who has it.
+A weight or a slant the typeface lacks is refused, listing the fonts it has, so pybers never asks Numbers to fake a bold or an italic, and several fonts of one weight and slant are refused naming each, to be chosen by PostScript name. A name nobody here knows finds `None` rather than an error, since a style holds only the name, and a server lacking a font can still name a font for a reader who has it.
 
 ### Selectors
 
@@ -575,7 +575,7 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Changing a document's language and region as Numbers does, in any of 335 regions
 - Writing a document or any part of one as JSON, and reading it back exactly
 - Stating a color exactly as Numbers stores it, with its color space and alpha, in CSS syntax or as its fields
-- Finding a font face by family, weight and slant, in the catalog of faces macOS installs, among this machine's fonts or in a font file, and listing the faces a document uses
+- Finding a typeface's font by weight and slant, in the catalog of fonts macOS installs, among this machine's fonts or in a font file, and listing the fonts a document uses
 
 ### Planned
 

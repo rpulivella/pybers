@@ -5,11 +5,11 @@ What a check of a document found, holding nothing the document contains unless a
 A report is meant to be posted publicly when the document cannot be, so every
 field of `Check` is a version, a type identifier, a count, a size, or a location in
 pybers's own source. Every sheet and table name is WITHHELD unless a caller asks
-for names, which are never meant for posting. A face is named, since its name is the
+for names, which are never meant for posting. A font is named, since its name is the
 font's and not the document's.
 
 UPDATES
-2026-11-24  Every face the document uses, and whether pybers knows it, for PYB-315.
+2026-11-24  Every font the document uses, and whether pybers knows it, for PYB-315.
 2026-11-23  Only a sheet or a table has a name, for PYB-307.
 2026-11-03  Every check carries the sheets and tables, each table its unrecognized
             cells, names withheld unless asked for, replacing `CheckNames`, for
@@ -31,7 +31,7 @@ __date__ = "2026/10/07"
 from dataclasses import dataclass, field
 
 from ..absence import UNDETERMINED, WITHHELD
-from ..font.faces import FontSource
+from ..typeface.fonts import TypefaceSource
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,14 +94,14 @@ class CheckSheet:
 
 
 @dataclass(frozen=True, slots=True)
-class CheckFace:
-    """One face a document uses, and where pybers knows it, or None.
+class CheckFont:
+    """One font a document uses, and where pybers knows it, or None.
 
-    `source` is None where neither the catalog nor this machine knows the face.
+    `source` is None where neither the catalog nor this machine knows the font.
     """
 
     postScriptName: str
-    source: FontSource | None
+    source: TypefaceSource | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,14 +120,14 @@ class Check:
     untestedArchiveTypes: frozendict[int, int]
     unrecognizedCellTypes: frozendict[int, int] | UNDETERMINED
     sheets: tuple[CheckSheet, ...] | UNDETERMINED
-    faces: tuple[CheckFace, ...] | UNDETERMINED
+    fonts: tuple[CheckFont, ...] | UNDETERMINED
 
 
 __all__ = [
     "Check",
     "CheckCell",
     "CheckEnvironment",
-    "CheckFace",
+    "CheckFont",
     "CheckFailure",
     "CheckSheet",
     "CheckTable",

@@ -15,7 +15,7 @@ about sheet names, so folding them would invent a collision the file does not ha
 
 UPDATES
 2026-11-24  Placing components, comparing names and meeting conditions moved to
-            `resolver`, which the fonts' resolver shares, for PYB-315.
+            `resolver`, which the typefaces' resolver shares, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-18  A typed lookup parses a reference rather than one literal name, and a
             refusal quotes reference text verbatim, for PYB-267.

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """\
-Every face macOS installs, by font family. Machine output, do not edit.
+Every font macOS installs, by typeface. Machine output, do not edit.
 
-Written by tools/local/fonts_extract.py from macOS 26.6.1.
+Written by tools/local/typefaces_extract.py from macOS 26.6.1.
 A correction made here is destroyed by the next extraction; correct the
 extractor instead.
 
-Each row is a face's PostScript name, font family, name, weight, slant, and
+Each row is a font's PostScript name, typeface, name, weight, slant, and
 its file under /System/Library/Fonts.
 
-702 faces.
+702 fonts.
 """
 
 fonts: tuple[tuple[str, str, str, int, str, str], ...] = (

@@ -13,6 +13,8 @@ written `Q3\\, draft`. A colon begins a condition only when a condition's name
 follows it, which is why `B2:D9` stays a range.
 
 UPDATES
+2026-11-24  A value an attribute cannot read is refused saying what it takes, for
+            PYB-318.
 2026-11-24  Read against a `SelectorScheme`, a document's unless given, and an
             attribute compares, quotes its value and takes the `s` flag, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
@@ -510,7 +512,8 @@ class SelectorParser:
             except ValueError as exc:
                 raise self.fault(
                     f"gives `[{name}]` `{value}`, which is not one of its values",
-                    None, start,
+                    None if attribute.takes is None
+                    else f"Give `[{name}]` {attribute.takes}", start,
                 ) from exc
         return SelectorAttribute(name, value, operator, exact, quoted)
 

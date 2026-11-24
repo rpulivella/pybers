@@ -3,10 +3,11 @@
 The steps every resolver shares: placing components, comparing names, and meeting
 conditions, whatever a selector selects from.
 
-A document's resolver and the fonts' each walk their own parts and call these, so a
+A document's resolver and the typefaces' each walk their own parts and call these, so a
 wildcard, a `:not()` or an attribute means one thing everywhere.
 
 UPDATES
+2026-11-24  An exact miss may carry no fix, for PYB-318.
 2026-11-24  Written for PYB-315, from the document resolver in `matching`.
 """
 from __future__ import annotations
@@ -180,7 +181,7 @@ def quoteChoices(names: Sequence[str]) -> str:
 
 
 def refuseExactMiss(
-    component: SelectorComponent | None, kind: str, within: str, fix: str
+    component: SelectorComponent | None, kind: str, within: str, fix: str | None
 ) -> None:
     """Refuse a component naming one thing exactly that nothing searched carries."""
     if component is None or not component.exact:
