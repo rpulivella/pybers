@@ -8,6 +8,7 @@ to. A usage line is Click's own, a required argument bare and an optional one in
 brackets, as POSIX writes them. See `docs/cli-design.md`.
 
 UPDATES
+2026-11-24  A span quoted in backticks shows as code without them, for PYB-315.
 2026-11-23  Written for PYB-304.
 """
 from __future__ import annotations
@@ -23,6 +24,7 @@ __date__ = "2026/11/23"
 import io
 import re
 import shutil
+import sys
 from collections.abc import Iterable
 from enum import Enum
 from typing import Any
@@ -41,6 +43,8 @@ rowIndent: int = 2
 # The spaces and color codes ending a line, and one color code.
 lineEnd: re.Pattern[str] = re.compile(r"(?: |\x1b\[[0-9;]*m)+$", re.MULTILINE)
 colorCode: re.Pattern[str] = re.compile(r"\x1b\[[0-9;]*m")
+# A span help quotes as code, `Budget::Q3`, as Markdown writes one.
+codeSpan: re.Pattern[str] = re.compile(r"`([^`]+)`")
 
 
 class PybersArgument(click.Argument):
@@ -81,9 +85,23 @@ def formatOptionName(option: click.Option) -> Text:
     return shown.append(f" {takes}", "label")
 
 
-def formatOptionHelp(option: click.Option) -> Text:
+def formatHelpText(text: str, colored: bool) -> Text:
+    """Return help text, each span in backticks styled as code.
+
+    The backticks are dropped only where the color survives to mark the span.
+    """
+    shown = Text()
+    end = 0
+    for found in codeSpan.finditer(text):
+        span = found[1] if colored else found[0]
+        shown.append(text[end:found.start()]).append(span, "code")
+        end = found.end()
+    return shown.append(text[end:])
+
+
+def formatOptionHelp(option: click.Option, colored: bool) -> Text:
     """Return an option's help, then its default and environment variable if shown."""
-    shown = Text(option.help or "")
+    shown = formatHelpText(option.help or "", colored)
     if option.show_default and option.default is not None:
         default = formatChoices([option.default])
         shown.append(f" [default: {default}]", "detail")
@@ -110,17 +128,25 @@ def formatHelp(command: click.Command, context: click.Context) -> Group:
     The root command's help opens with the logo, and no other command's does.
     """
     usage = " ".join([context.command_path, *command.collect_usage_pieces(context)])
+    # Click echoes help in the context's color, or in color only to a terminal.
+    colored = sys.stdout.isatty() if context.color is None else context.color
     shown: list[RenderableType] = [] if context.parent else [formatLogo(), Text("")]
     shown.append(Text.assemble(("Usage: ", "label"), (usage, "value")))
     if command.help:
-        shown += [Text(""), Padding(Text(command.help), (0, 0, 0, rowIndent))]
+        shown += [
+            Text(""),
+            Padding(formatHelpText(command.help, colored), (0, 0, 0, rowIndent)),
+        ]
     parameters = command.get_params(context)
     shown += formatSection("Arguments", [
-        (Text(each.human_readable_name, "identifier"), Text(each.help or ""))
+        (
+            Text(each.human_readable_name, "identifier"),
+            formatHelpText(each.help or "", colored),
+        )
         for each in parameters if isinstance(each, PybersArgument)
     ])
     shown += formatSection("Options", [
-        (formatOptionName(each), formatOptionHelp(each))
+        (formatOptionName(each), formatOptionHelp(each, colored))
         for each in parameters if isinstance(each, click.Option) and not each.hidden
     ])
     if isinstance(command, click.Group):
@@ -129,7 +155,10 @@ def formatHelp(command: click.Command, context: click.Context) -> Group:
             for name in command.list_commands(context)
         ]
         shown += formatSection("Commands", [
-            (Text(each.name or "", "identifier"), Text(each.get_short_help_str(10_000)))
+            (
+                Text(each.name or "", "identifier"),
+                formatHelpText(each.get_short_help_str(10_000), colored),
+            )
             for each in found if each is not None and not each.hidden
         ])
     return Group(*shown)

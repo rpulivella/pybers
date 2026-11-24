@@ -8,6 +8,7 @@ A condition selects by what pybers models, never by what a cell holds. An attrib
 is read as an empty cell, so `:empty` reaches the cells a sparse table never stored.
 
 UPDATES
+2026-11-24  `documentScheme`, what a document's selector selects from, for PYB-315.
 2026-11-19  `:header` and `:footer` read a cell's sections, for PYB-301.
 2026-11-09  `format=` matches the family a cell is shown with, the one Automatic
             chose included, for PYB-145.
@@ -25,14 +26,17 @@ __date__ = "2026/11/03"
 
 import functools
 import re
-from collections.abc import Callable
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pybers.absence import UNDETERMINED
 from pybers.addressing.reference import CellAddress
 from pybers.format.controls import CellControlType
 from pybers.format.formats import CellFormatFamily, findFormatShown
+from pybers.selection.scheme import (
+    SelectorAttributeField,
+    SelectorNameMatch,
+    SelectorScheme,
+)
 from pybers.table.headers import TableSection
 from pybers.table.kinds import CellKind
 
@@ -45,14 +49,7 @@ nthPattern: re.Pattern[str] = re.compile(
     r"(?P<odd>odd)|(?P<even>even)|(?P<a>[+-]?\d*)n(?P<b>[+-]\d+)?|(?P<only>[+-]?\d+)"
 )
 pseudoNegation: str = "not"
-
-
-@dataclass(frozen=True, slots=True)
-class SelectorAttributeField:
-    """What one attribute reads from a cell, and the values it takes, None for none."""
-
-    read: Callable[[Cell | None], object]
-    values: tuple[str, ...] | None
+positionNames: tuple[str, ...] = ("sheet", "table", "cells")
 
 
 def readKind(cell: Cell | None) -> object:
@@ -77,7 +74,7 @@ def readConditional(cell: Cell | None) -> object:
 
 
 # The one table mapping each attribute to the field it reads.
-selectorAttributes: frozendict[str, SelectorAttributeField] = frozendict(
+selectorAttributes: frozendict[str, SelectorAttributeField[Cell | None]] = frozendict(
     kind=SelectorAttributeField(readKind, tuple(each.value for each in CellKind)),
     format=SelectorAttributeField(
         readFormat, tuple(
@@ -88,7 +85,7 @@ selectorAttributes: frozendict[str, SelectorAttributeField] = frozendict(
     control=SelectorAttributeField(
         readControl, tuple(each.value for each in CellControlType)
     ),
-    conditional=SelectorAttributeField(readConditional, None),
+    conditional=SelectorAttributeField(readConditional),
 )
 
 # Each pseudo-class, and whether it takes a position pattern.
@@ -96,6 +93,14 @@ pseudoClasses: frozendict[str, bool] = frozendict({
     "empty": False, "formula": False, "merged": False, "header": False,
     "footer": False, "nth-row": True, "nth-column": True,
 })
+
+# What a document's selector selects from: its sheets, tables and cells.
+documentScheme: SelectorScheme[Cell | None] = SelectorScheme(
+    positions=positionNames, attributes=selectorAttributes,
+    pseudoClasses=pseudoClasses, nameMatch=SelectorNameMatch.EXACT,
+    groupExample="Q3::B3", conditionExamples=("[kind=number]", ":empty"),
+    exclusionExample="Q*:not(Q4)",
+)
 
 
 @functools.cache
@@ -157,10 +162,11 @@ def matchPseudoClass(
 
 
 __all__ = [
-    "SelectorAttributeField",
+    "documentScheme",
     "matchPseudoClass",
     "matchNth",
     "nthPattern",
+    "positionNames",
     "pseudoClasses",
     "pseudoNegation",
     "selectorAttributes",

@@ -44,16 +44,20 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .._persistence import NumbersPackage, readPackage
+from .._persistence.index import ArchiveIndex
 from .._persistence.types import readArchiveTypeId
 from ..absence import UNDETERMINED, WITHHELD
 from ..document._read import readDocument
 from ..document.sheets import Document
 from ..errors import PybersError
+from ..font._read import listFaceNames
+from ..font.fonts import openFonts
 from ..table.cells import Table
 from .environment import readCheckEnvironment
 from .report import (
     Check,
     CheckCell,
+    CheckFace,
     CheckFailure,
     CheckSheet,
     CheckTable,
@@ -148,6 +152,16 @@ def readCheckSheets(document: Document, names: bool) -> tuple[CheckSheet, ...]:
     )
 
 
+def readCheckFaces(package: NumbersPackage) -> tuple[CheckFace, ...]:
+    """Return each face a document uses, and where pybers knows it."""
+    fonts = openFonts()
+    faces = []
+    for name in listFaceNames(ArchiveIndex(package)):
+        found = fonts.face(postScriptName=name)
+        faces.append(CheckFace(name, None if found is None else found.source))
+    return tuple(faces)
+
+
 def listPybersFrames(error: BaseException) -> tuple[str, ...]:
     """Return where in pybers an error passed, as `module path:line in function`."""
     frames: list[str] = []
@@ -196,6 +210,9 @@ def checkDocument(
     opened = openForCheck(package, source)
     document = opened if isinstance(opened, Document) else None
     sheets = None if document is None else readCheckSheets(document, names)
+    if document is not None:
+        report("reading the faces it uses…")
+    faces = None if document is None else readCheckFaces(package)
     return Check(
         environment=readCheckEnvironment(),
         savedBy=readSavedVersion(package),
@@ -208,6 +225,7 @@ def checkDocument(
             ).items()
         )),
         sheets=UNDETERMINED if sheets is None else sheets,
+        faces=UNDETERMINED if faces is None else faces,
     )
 
 

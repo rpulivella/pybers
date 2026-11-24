@@ -12,6 +12,7 @@ written here holds for writing, reading and validating alike.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-24  A path is a leaf, written as its text, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-10-29  The duration leaf named for ISO 8601, for PYB-278.
 2026-10-24  Written for PYB-259.
@@ -33,6 +34,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import PurePath
 from typing import Any
 
 from pybers.addressing.ranges import CellRange
@@ -209,11 +211,18 @@ leafRules: tuple[LeafRule, ...] = (
     buildAddressRule(CellAddress, "B3"),
     buildAddressRule(CellReference, "Sheet 1::Table 1::$B$3"),
     buildAddressRule(CellRange, "B3:D9"),
+    LeafRule(
+        PurePath, str, lambda tree, path: PurePath(readString(tree, path, "a path")),
+        {"type": "string"},
+    ),
 )
 
 
 def findLeafRule(leafType: object) -> LeafRule | None:
     """Return the rule for a leaf type, or None when the type is not a leaf."""
+    # A path is one leaf whatever system's flavor of path it is.
+    if isinstance(leafType, type) and issubclass(leafType, PurePath):
+        leafType = PurePath
     return next((rule for rule in leafRules if rule.leafType is leafType), None)
 
 

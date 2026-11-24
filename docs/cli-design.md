@@ -16,8 +16,8 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | Command | What it does |
 | ------- | ------------ |
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
-| `check FILE` | Whether pybers can read a document, and the tree of its sheets and tables with each unrecognized cell badged, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
-| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading |
+| `check FILE` | Whether pybers can read a document, the tree of its sheets and tables with each unrecognized cell badged, and each face it uses with where pybers knows it, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
+| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading. `show fonts [SELECTOR]` shows the faces pybers knows, and a font file as FILE shows its own |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
 | `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional. `set FILE --locale LOCALE` changes a document's language and region instead |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
@@ -64,12 +64,32 @@ A command parses its arguments, calls the library once, formats what comes back,
   ```
 - **A cell outside its table** is refused, specifying the table's size, unless `--extend` grows the table to hold it.
 
+## Fonts
+
+A style names a face, and a person finds the face before writing the style, so `show` reads the fonts pybers knows as it reads a document.
+
+- **`fonts` as FILE is every face pybers knows**: the catalog pybers ships, read from the fonts macOS installs, and the fonts installed on the machine running it. A font file, `.otf`, `.ttf` or `.ttc`, as FILE is that file's faces alone, installed or not. A file named `fonts` is reached as `./fonts`, as a file named like a command is.
+- **A fonts selector has two positions, font family and face, joined by `::`**, with the wildcards, negation and grouping every selector has. `Avenir Next` selects a font family, and `Avenir Next::*Demi*` its faces whose names hold `Demi`.
+- **A name matches ignoring case, spaces and hyphens**, so `AvenirNext`, `Avenir Next` and `avenir-next` each select Avenir Next, since a font's name is spelled many ways and only its letters specify it.
+- **Conditions read what a face is**: `[weight=600]`, `[slant=italic]`, `[source=machine]` and `[postscript=AvenirNext-DemiBold]`. A weight also compares, as a CSS range query does, `[weight>=600]`.
+- **A quoted value ending in `s` matches exactly**, case, spaces and hyphens included, as the `s` flag of a CSS attribute selector does: `[postscript="AvenirNext-DemiBold" s]`. No other flag exists.
+- **The JSON is one form of the fonts shown**, every face and each font file pybers could not read, rather than an array of each face's form, so thousands of faces carry the form's version once. It reads back as a `Fonts`.
+- **Each font family prints as a part, its faces beneath it**, through the components a table and its cells print with: the family's line folds its face count, and each face is a part's line, its PostScript name and then its fields on the same line, its file left to the JSON:
+
+  ```
+  $ pybers show fonts 'avenir next::*demi*'
+  Font family: Avenir Next  2 faces
+    Face: AvenirNext-DemiBold   Name: Demi Bold   Weight: 600   Slant: normal   Source: catalog
+    Face: AvenirNext-DemiBoldItalic   Name: Demi Bold Italic   Weight: 600   Slant: italic   Source: catalog
+  ```
+
 ## Formulas
 
 A command shows a formula as the library returns it, stored and never recalculated. CSV holds one thing per cell, so `export` writes the cached values to CSV unless `--formulas` asks for the formulas.
 
 ## Report lines
 
+- **Every command prints through the components in `pybers.cli._report`**, a part's line, a line of fields, a heading over a list, a tree and its nodes, a badge, a report line and a refusal, so everything shown has one layout, spacing and color. A command states what it shows and how much it asks of the reader, a `BadgeLevel`, and never builds Rich text or names a style, which `tests/test_cli_components.py` holds.
 - **Each line opens with the shortest label that specifies its value**, then `: ` and the value: `Readable: yes`, `OS: macOS-26.6.1`.
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
@@ -124,6 +144,7 @@ Named styles in one Rich `Theme`, so a command specifies a meaning and never a c
 | `warning` | `yellow` | Something to look at, such as a nonzero count of untested types | `3008 (x2)` |
 | `detail` | `dim` | Secondary lines under a value | `  at document/_read.py:103` |
 | `identifier` | `bold cyan` | A type identifier, a cell address | `B7` |
+| `code` | `cyan` | Text a person types, which help quotes in backticks and shows without them | `Budget::Q3` |
 | `badge.info` | `bold black on cyan` | A badge for a fact worth noticing | |
 | `badge.success` | `bold black on green` | A badge for a good outcome | |
 | `badge.warning` | `bold black on yellow` | A badge for something to look at | ` UNRECOGNIZED ` |
@@ -162,6 +183,7 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 - **Every usage line follows the [POSIX utility argument syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html)**: a required argument bare and in capitals, `FILE`, an optional one in single brackets, `[SELECTOR]`, and `...` after one that repeats. Braces are never used, since a man page reads `{a|b}` as a choice, and no argument is wrapped twice. An option's alternatives are written `text|json`. `pybers set --help` opens with `Usage: pybers set [OPTIONS] FILE [SELECTOR] [VALUE]`.
 - **The root command's help opens with the logo**, a selected cell between gridlines holding the Python prompt and a caret, beside the name, which `formatLogo` in `pybers.cli._logo` returns for any front end to print. The ring and prompt take the terminal's own color, so the logo reads on a light or a dark background, and only the caret keeps the logo's orange. No command's own help repeats it.
 - **One renderer draws every help screen**, the root command's and each command's, in `pybers.cli._help`, with Rich and the theme's styles. A help screen is its usage line, its description indented two columns, then the sections `Arguments`, `Options` and `Commands`, each its title over its rows with no border, the rows indented two columns. A command is a `PybersCommand` and each argument a `PybersArgument`, which carries the help Click gives only to an option.
+- **Help quotes text a person types in backticks, as Markdown does**, `` `Budget::Q3` ``. In color the renderer shows it in the `code` style without them, and where Click strips the color the backticks stay, so a pasted help still marks it.
 - **A command's help is its docstring**, and each argument's and option's help is its `help=`, both worded by the rules of [the message design](message-design.md). An option shown with its default or environment variable ends with `[default: text]` or `[env var: PYBERS_DEBUG]`.
 - **A usage error is Click's own**: the usage line, `Try 'pybers set --help' for help.`, then `Error:` and the message, with exit status 2.
 

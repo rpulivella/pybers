@@ -35,6 +35,7 @@ themeStyles: frozendict[str, str] = frozendict({
     "warning": "yellow",
     "detail": "dim",
     "identifier": "bold cyan",
+    "code": "cyan",
     "badge.info": "bold black on cyan",
     "badge.success": "bold black on green",
     "badge.warning": "bold black on yellow",

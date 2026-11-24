@@ -15,7 +15,7 @@ Read and write Apple Numbers documents from Python, with the aim that an edit ma
 
 ## Command line
 
-`pybers check FILE` says whether pybers can read a document, what it is running on, and the tree of its sheets and tables, each shown by its kind and size, in a form safe to paste into a public bug report. `--names` shows the name of each sheet and table and the address of each unrecognized cell, for the person holding the document.
+`pybers check FILE` says whether pybers can read a document, what it is running on, the tree of its sheets and tables, each shown by its kind and size, and each face the document uses with where pybers knows it, in a form safe to paste into a public bug report. `--names` shows the name of each sheet and table and the address of each unrecognized cell, for the person holding the document.
 
 `pybers set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION] [--table-style STYLE] [--locale LOCALE]` sets the value, the format, the control, the cell style and the borders of every cell a [selector](#selectors) matches, and the lines of every table it matches, each part optional and a part not given left as it was. It skips a cell a formula backs, and reads the value as a number, a currency amount, a boolean, a date, a duration or text unless `--as` specifies the kind. It prints each cell it wrote as `pybers show` prints it, and each it skipped on stderr with the reason. It changes FILE itself, `-o NEW` writes the change to a new document instead, and `--preview` shows the change without writing it:
 
@@ -327,6 +327,18 @@ $ pybers show shapes.numbers "*::Table 2" --output-format json
 
 </details>
 
+`pybers show fonts` prints every face pybers knows: the catalog of faces macOS installs, which pybers ships so a document built anywhere names faces every Mac carries, and the fonts this machine offers. `pybers show FONTFILE` prints a font file's own faces, installed or not. A [selector](#selectors) narrows either, its positions a font family and a face, every name compared ignoring case, spaces and hyphens, and a quoted value ending in `s` compared exactly. Each family prints as a part, its faces one line each beneath it, so the PostScript name a style needs is found before the style is written:
+
+```console
+$ pybers show fonts 'avenirnext::*demi*'
+Font family: Avenir Next  2 faces
+  Face: AvenirNext-DemiBold   Name: Demi Bold   Weight: 600   Slant: normal   Source: catalog
+  Face: AvenirNext-DemiBoldItalic   Name: Demi Bold Italic   Weight: 600   Slant: italic   Source: catalog
+$ pybers show fonts '*[weight>=800][slant=italic]'
+$ pybers show BrandSans.otf
+$ pybers show fonts '*[postscript="AvenirNext-DemiBold" s]' --output-format json
+```
+
 `pybers show FILE` prints a document's language and region on its first line, and `pybers set FILE --locale LOCALE` changes it as Numbers' Language & Region does, printing the locale it holds afterward:
 
 ```console
@@ -340,7 +352,7 @@ All three install with the `cli` extra, `pip install -e ".[cli]"`. A selector co
 
 ## Python library
 
-pybers needs the Python that `requires-python` in `pyproject.toml` specifies, and its one runtime dependency is `protobuf`. Until the first release, install it from a clone:
+pybers needs the Python that `requires-python` in `pyproject.toml` specifies, and its runtime dependencies are `protobuf` and `fontTools`. Until the first release, install it from a clone:
 
 ```bash
 pip install -e .
@@ -495,6 +507,22 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 
 `pybers.Color.parse(text)` reads each form and `str(color)` prints it. Text leaving out its alpha is refused, specifying the form that carries it, and so is a model Numbers does not store, such as HSL or OKLCH. Components run from 0.0 to 1.0. Numbers stores every color as RGB, so a gray is three equal sRGB components, and `device-gray(0.5 / 1)` prints back as `color(srgb 0.5 0.5 0.5 / 1)`, which is what pybers stores. A document pybers creates holds RGB alone, and pybers reads and prints a CMYK color but creates none. `pybers.formatJsonForm(color)` writes a color's fields, and `pybers.parseJsonForm` reads them back equal.
 
+### Typefaces
+
+A style names its face by a PostScript name, `AvenirNext-DemiBold`, which few people know by heart, so pybers finds it from what a designer specifies, a font family, a weight and a slant. `pybers.openFonts()` holds the faces pybers knows, the catalog of faces macOS installs and the fonts this machine offers, and `pybers.openFonts(path)` a font file's own. `fonts.select` takes the same [selector](#selectors) a document does, and `fonts.face` returns the one face a family, a weight and a slant specify:
+
+```python
+fonts = pybers.openFonts()
+fonts.face("Avenir Next", weight=600).postScriptName       # AvenirNext-DemiBold
+fonts.select("AvenirNext[slant=italic][weight>=600]")       # three italic faces
+fonts.face(postScriptName="BrandSans-Semibold")             # None where nobody here has it
+
+brand = pybers.openFonts("BrandSans.otf")
+brand.face("Brand Sans", weight=600, slant=pybers.FontSlant.ITALIC)
+```
+
+A weight or a slant the family lacks is refused, listing the faces it has, so pybers never asks Numbers to fake a bold or an italic, and several faces of one weight and slant are refused naming each, to be chosen by PostScript name. A name nobody here knows finds `None` rather than an error, since a style holds only the name, and a server lacking a font can still name a face for a reader who has it.
+
 ### Selectors
 
 One selector syntax reaches any sheet, table, range or cell, in the library, at the command line and for an agent alike, in the manner of CSS. It has three positions, sheet, table and cells, joined by `::`, and an empty position means any:
@@ -547,6 +575,7 @@ A cell takes a value of any kind, whatever it held, and reads it back as the sam
 - Changing a document's language and region as Numbers does, in any of 335 regions
 - Writing a document or any part of one as JSON, and reading it back exactly
 - Stating a color exactly as Numbers stores it, with its color space and alpha, in CSS syntax or as its fields
+- Finding a font face by family, weight and slant, in the catalog of faces macOS installs, among this machine's fonts or in a font file, and listing the faces a document uses
 
 ### Planned
 

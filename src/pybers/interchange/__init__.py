@@ -14,6 +14,7 @@ and this package owns only the mechanism, so a feature adding a field adds no co
 here.
 
 UPDATES
+2026-11-24  Fonts write their form, the version once, and read back, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-06  A color writes its form and reads back, for PYB-264.
 2026-11-03  A list of parts writes an array of their forms, and an array reads
@@ -45,10 +46,12 @@ lazy from pybers.document._form import (
 )
 lazy from pybers.document.sheets import Document, Sheet
 lazy from pybers.errors import composeRefusal
+lazy from pybers.font.fonts import Fonts
 lazy from pybers.interchange._envelope import (
     CellJsonForm,
     ColorJsonForm,
     DocumentJsonForm,
+    FontsJsonForm,
     JsonForm,
     RangeJsonForm,
     SheetJsonForm,
@@ -72,11 +75,13 @@ def formatJsonForm(subject: object, extent: CellRangeLike | None = None) -> str:
     return writeJsonText(encodeTree(buildJsonForm(subject, extent)))
 
 
-type JsonFormPart = Document | Sheet | Table | tuple[Cell, ...] | Cell | Color
+type JsonFormPart = (
+    Document | Sheet | Table | tuple[Cell, ...] | Cell | Color | Fonts
+)
 
 
 def parseJsonForm(text: str) -> JsonFormPart | list[JsonFormPart]:
-    """Return the document, sheet, table, cells, cell or color a JSON form describes.
+    """Return the document, sheet, table, cells, cell, color or fonts a form describes.
 
     An array returns each of its forms, as `pybers show` writes several parts.
     """
@@ -122,6 +127,8 @@ def buildFormPart(tree: Tree, path: str) -> JsonFormPart:
             return buildPart(table, sheetName, entries, f"{path}.table").cells[cell]
         case ColorJsonForm(color=color):
             return color
+        case FontsJsonForm(fonts=fonts):
+            return fonts
     raise composeFormRefusal(path, "holds no part of a document")
 
 
@@ -135,6 +142,8 @@ def buildJsonForm(subject: object, extent: CellRangeLike | None) -> object:
     match subject:
         case Color():
             return ColorJsonForm(jsonFormVersion, subject)
+        case Fonts():
+            return FontsJsonForm(jsonFormVersion, subject)
         case list():
             return [
                 buildJsonForm(*each) if isinstance(each, tuple)

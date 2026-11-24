@@ -232,6 +232,7 @@ def testNamesAreUnknownWhenTheDocumentCannotBeOpened(tmp_path: Path) -> None:
     check = pybers.checkDocument(writePackageCopy(package, tmp_path), names=True)
     assert check.failure is not None
     assert check.sheets is pybers.UNDETERMINED
+    assert check.faces is pybers.UNDETERMINED
     assert check.unrecognizedCellTypes is pybers.UNDETERMINED
 
 
@@ -319,4 +320,25 @@ def testAFileThatIsNotADocumentRaisesAPybersError(tmp_path: Path) -> None:
 def testProgressHearsEachStepInOrder() -> None:
     heard: list[str] = []
     pybers.checkDocument(baselinePath, names=True, onProgress=heard.append)
-    assert heard == ["reading the document…", "opening it…"]
+    assert heard == [
+        "reading the document…", "opening it…", "reading the faces it uses…",
+    ]
+
+
+def testFacesAreEveryPostScriptNameTheStylesHoldEachOnce() -> None:
+    found = pybers.checkDocument(findDocumentPath("52-table-reset-styled"))
+    assert found.faces == tuple(
+        pybers.CheckFace(name, pybers.FontSource.CATALOG) for name in (
+            "AvenirNext-Regular", "HelveticaNeue", "HelveticaNeue-Bold",
+            "HelveticaNeue-Light", "HelveticaNeue-Medium",
+        )
+    )
+
+
+def testFaceTheCatalogLacksIsNamedWithoutBeingAsked() -> None:
+    faces = pybers.checkDocument(findDocumentPath("32-named-styles")).faces
+    assert faces is not pybers.UNDETERMINED
+    assert [each.postScriptName for each in faces
+            if each.source is not pybers.FontSource.CATALOG] == [
+        "SkolarSansLatn-El", "SkolarSansLatn-ElIt", "SkolarSansLatn-Rg",
+    ]

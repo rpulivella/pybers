@@ -379,7 +379,9 @@ reads back with the same form but compares unequal, since equality includes the 
 record a save replaces, and the form carries what a cell shows rather than that record.
 It is the only serializer pybers holds: `--output-format json` in every command, the golden
 confirmations and any script reach it, so no two of them can disagree. A `Color` writes
-its own form too and reads back equal, its fields rather than its text.
+its own form too and reads back equal, its fields rather than its text, and fonts
+write one form holding every face shown, so a list of thousands carries its version
+once.
 `src/pybers/interchange/schema.json` describes it, generated from the model.
 
 **What a command prints as JSON reads back.** A command's stdout under `--output-format json`
@@ -761,6 +763,43 @@ stack `tools/` uses, but completing SELECTOR to a document's sheets and tables n
 **Cyclopts keeps parameters declared by type hint**, which Click gives up for decorators.
 Cyclopts draws its own help, so matching `docs/cli-design.md` means configuring or
 replacing that renderer, and it brings four dependencies where Click brings none.
+
+---
+
+## A face is found before a style names it, decided 24 November 2026
+
+PYB-315 decides how a script or a person reaches the face a style names. A style stores a
+face as its PostScript name, `AvenirNext-DemiBold`, which nobody types from memory, and
+`AvenirNext`, `Avenir Next` and `Avenir-Next-Regular` each look right and reach different
+things or nothing. An error is the wrong moment to learn the right one.
+
+**Fonts are shown, as a document is.** `pybers show fonts` reads the fonts pybers knows
+as `show` reads a document, so the selector, its conditions and the JSON form serve both.
+A `find` command was refused because a command is a verb, and `font find` because a noun
+groups verbs only once a resource needs several. A file named `fonts` is reached as
+`./fonts`, a small cost beside a command and a syntax of fonts' own.
+
+**pybers ships a catalog and reads the machine.** The catalog holds every face macOS
+installs, read on a Mac before a release, so a document built on a server without those
+fonts still names faces every Mac carries. The machine's fonts are found as its system
+offers them, a Mac's through CoreText, and every face is read from its font file by
+fontTools, the same way everywhere. A scan of a Mac's font folders was refused: on
+24 November 2026 it missed 284 faces a font manager had activated and included 198 that
+CoreText did not offer, so it disagreed with Numbers' own font menu.
+
+**A name matches loosely, and `s` matches it exactly.** A font's name is spelled many
+ways, so a fonts selector ignores case, spaces and hyphens, as a table's name already
+ignores case. A quoted value ending in `s` matches exactly, the flag a CSS attribute
+selector takes. A flag per loosening, or an option such as `--ignore-case`, was refused:
+no use for ignoring spaces alone was found, and quotes cannot carry a flag through a shell.
+
+**A face is a design pybers has read, and a style holds only its PostScript name.** A
+`FontFace` comes from the catalog, this machine or a font file, and a name nobody here
+knows finds no face rather than a face of unknown design. Editing a document therefore
+never needs its fonts installed: a style the file holds names its face, and applying it,
+changing its size or color, or copying a new style from it carries that name through
+unchanged. pybers needs to know a face only when a person chooses one by font family,
+weight and slant, and a server can still write a name it lacks for a reader who has it.
 
 ---
 
