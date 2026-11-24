@@ -94,7 +94,8 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
 - **A value is a phrase, never a sentence, and takes no period**: `Nothing written: previewing only`, `Nothing written: already set`, `Nothing written: already de_DE`.
-- **A part a write skipped prints its reference, then two spaces and its `CellSkip` phrase**: `Skipped: Sheet 1::Table 1::B4  holds a formula`, worded as [the message design](message-design.md) sets out for a skipped part.
+- **A part a call skipped prints its place, then two spaces and its `PartSkip` phrase**, through `formatSkip`: `Skipped: Sheet 1::Table 1::B4  holds a formula`, worded as [the message design](message-design.md) sets out for a skipped part.
+- **A writing command ends with its outcome on stderr**, `Written: budget.numbers` or `Nothing written: already set`, which `composeOutcome` in `pybers.cli._report` builds.
 - **A count names its noun in the number it agrees with**: `1 row`, `10 rows`, through `formatCount` in `pybers.cli._report`, which holds every line more than one command prints.
 - **A flag reads `yes` or `no`.**
 - **Several parts print one after another, a blank line between each**, and each opens with a line specifying it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
@@ -160,23 +161,27 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 
 ## Spinners and progress
 
-- **A spinner is Rich's default, `dots`**, through `statusConsole.status(...)`. Its text is a lowercase gerund ending in `…`: `reading the document…`.
-- **A progress bar is used only when the total is known**, and every one is built the same way:
+- **Every command shows a call's progress on stderr while the call runs**, through `showProgress` in `pybers.cli._console`, which hands the call its `onProgress` and shows each `ProgressStep` it hears.
+- **A step shows a spinner**, Rich's `dots3`, one column wide so it fits the gutter where a section's marker sits, beside the step's message, a lowercase gerund ending in `…`: `unpacking the document…`.
+- **A step of a known total shows a progress bar**, and every one is built the same way:
 
   ```python
   Progress(
-      SpinnerColumn(),
+      SpinnerColumn("dots3", style="value"),
       TextColumn("{task.description}"),
-      BarColumn(bar_width=24),
-      MofNCompleteColumn(),
-      TimeElapsedColumn(),
+      BarColumn(
+          bar_width=24, style="label", complete_style="value",
+          finished_style="value", pulse_style="value",
+      ),
+      TextColumn("{task.completed}/{task.total}", style="value"),
       console=statusConsole,
       transient=True,
   )
   ```
 
-- **Each `onProgress` call** from the library becomes a spinner or progress update.
-- **A transient display disappears when it finishes**, so what remains on screen is the result alone.
+- **A spinner and a bar draw only in the theme's styles**, `value` for what has been done and `label` for what remains, so neither adds a color of its own.
+
+- **A transient display disappears when it finishes**, so what remains on screen is the result alone, and off a terminal nothing is drawn at all.
 
 ## Help
 

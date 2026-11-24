@@ -33,6 +33,7 @@ pybers/
   table/          Cell, Table and merges, and both archive halves
   drawable.py     things that float on a sheet   style.py  text.py  geometry.py
   errors.py       PybersError roots every error this library raises
+  status.py       a step a long call reports, and a part a call skipped
   _engine/        the calculation engine     _persistence/  the container and its index
   _generated/     protobuf                   protos/        the extracted schemas
 ```

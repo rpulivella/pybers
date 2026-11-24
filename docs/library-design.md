@@ -24,7 +24,9 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellPresentation` | How a cell shows its value: its format and its control | Frozen |
 | `CellControl` | The control a cell presents its value through, beside its format: one dataclass per control under `CellControlBase`, `CellControlUnknown` included | Frozen |
 | `CellChange` | What a write did to one cell: value and kind before and after, and how far the table grew | Frozen |
-| `CellChanges`, `CellSkip` | What a write did to every cell its selector matched, and each part it skipped, and why | Frozen |
+| `CellChanges` | What a write did to every cell its selector matched, and each part it skipped | Frozen |
+| `PartSkip` | A part a call matched and left as it was: its place as text that reads back, and why | Frozen |
+| `ProgressStep` | A step a long call has started, its message and, when its total is known, the count completed | Frozen |
 | `LocaleChange` | What a region change did to a document: its locale before and after | Frozen |
 | `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
@@ -33,7 +35,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellBorders`, `CellBorder` | A cell's four sides, in CSS order, each the stroke the cell stores and the one its neighbor stores on the same edge, or `None` where neither stores one | Frozen |
 | `TableStyle`, `TableLine`, `TableBand` | A table's lines, each whether it shows and its stroke, whether its outline outlines its title, its banded rows, whether they show and their color, and the `CellStyle` each section's cells inherit | Frozen |
 | `TableStyleChange` | What setting a table's lines did: the lines it drew before and after | Frozen |
-| `Typefaces` | The fonts of the typefaces pybers knows, or one font file's, selected as a document's parts are | Frozen |
+| `Typefaces` | The fonts of the typefaces pybers knows, or one font file's, selected as a document's parts are, and each font file it skipped | Frozen |
 | `TypefaceFont` | One font: its typeface, its name, its PostScript name, its weight, its `TypefaceSlant` and its `TypefaceSource`, the catalog, this machine or a font file | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
@@ -96,7 +98,7 @@ A table's header rows, header columns and footer rows are `table.headers`, set b
 Each command answers to one public call, and the call does the work.
 
 - **A call returns data and prints nothing.** What it returns is a frozen dataclass, or the model itself, which the caller formats however it likes. `pybers.checkDocument` is the pattern.
-- **A long call takes `onProgress`**, a callback that hears each step as it starts, so the caller decides how progress looks, if at all.
+- **Every call whose time grows with something other than what its caller passed takes `onProgress`**, a callback that hears each `ProgressStep`, so the caller decides how progress looks, if at all. A document's size decides how long `pybers.open`, `Document.save` and `checkDocument` take, and the fonts installed decide how long `pybers.openTypefaces` takes, so each takes one. A step whose total the call knows carries its count, and a call given no callback reports nothing.
 - **Nothing waits for input.** A call that cannot proceed raises.
 
 ## Writing a cell

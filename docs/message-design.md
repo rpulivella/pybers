@@ -1,13 +1,13 @@
 # Message design
 
-How every message pybers writes is built and worded: an error a call raises, a refusal a command prints, a part a write skipped, and the help a command gives. Each shape below has one composer, so a message's structure comes from the composer and its author supplies only the words. A feature that shows one place again and again wraps its shape's composer rather than writing beside it, as `composeFormRefusal` places a path within a JSON form, and `pybers.nothingWritten` and `pybers.nothingRead` are the two sentences saying what was not done. The [library design](library-design.md) says which error a call raises, the [command-line design](cli-design.md) says where a command prints a message and how it looks, and [`CLAUDE.md`](../CLAUDE.md) holds the house style the words follow. The [vocabulary](vocabulary.md) supplies every word a message uses for an action or a part.
+How every message pybers writes is built and worded: an error a call raises, a refusal a command prints, a step a long call reports, the outcome of a write, a part a call skipped, and the help a command gives. Each shape below has one composer, so a message's structure comes from the composer and its author supplies only the words. A feature that shows one place again and again wraps its shape's composer rather than writing beside it, as `composeFormRefusal` places a path within a JSON form, and `pybers.nothingWritten` and `pybers.nothingRead` are the two sentences saying what was not done. The [library design](library-design.md) says which error a call raises, the [command-line design](cli-design.md) says where a command prints a message and how it looks, and [`CLAUDE.md`](../CLAUDE.md) holds the house style the words follow. The [vocabulary](vocabulary.md) supplies every word a message uses for an action or a part.
 
 ## Readers
 
 - **A script author or an agent** reads a message as an exception, in a traceback or in `str(error)`.
 - **A person at a terminal** reads the same message as one line on stderr, after the command's name.
 
-Both read the same words, so a message serves whoever reads it without knowing the recipient.
+Both read the same words, so a message serves whoever reads it without knowing the recipient. A status message, a step, an outcome or a skipped part, is as terse as it can be, since it reports and asks nothing of its reader.
 
 ## Structure
 
@@ -30,7 +30,7 @@ Nothing precedes the place, so a reader scanning a column of refusals sees the s
 - **The cause is in the present tense**: `holds a formula`, `is not a color`, `is not supported`.
 - **The fix is in the imperative**: `Clear the formula first.`, `Write it as #rrggbbaa.` A refused choice states its closest as a fact, `The closest is table-outline.`, since the reader picks it.
 - **What was not done is in the past tense**: `Nothing was written.`, `Nothing was read.`
-- **Every part is a complete sentence ending in a period**, except a skipped part's phrase, which takes none.
+- **Every part is a complete sentence ending in a period**, except a status message, which is a phrase opening in lowercase and taking no period.
 - **A limit of pybers reads `is not supported`**, and a fact about Numbers names Numbers: `Numbers allows at most five header rows.`
 - **A message promises no future work.** `yet`, `not yet`, `for now` and `currently` describe a plan, and a plan belongs in a ticket. A message states what pybers does today.
 - **A message names `pybers`**, never "this library", and cuts any clause the reader does not need.
@@ -50,7 +50,10 @@ A message both consumers show names no call, argument or option that only one of
 | Malformed text | Text pybers parses, a selector, a formula, a format or a color, does not read | `composeTextRefusal` |
 | Unreadable document | A file is not a Numbers document pybers can read | `composeReadRefusal` |
 | Fault in pybers | pybers reaches a state it should never reach | `composeFault` |
-| Skipped part | A write matched a part and left it unwritten | `CellSkip` |
+| Progress step | A long call starts a step whose total it does not know | `composeProgressStep` |
+| Progress count | A long call counts a step whose total it knows | `composeProgressCount` |
+| Outcome | A writing command wrote, or wrote nothing and why | `composeOutcome` |
+| Skipped part | A call matched a part and left it as it was | `PartSkip` |
 | Usage error | A command line itself is wrong | `composeUsageRefusal` |
 | Help | A command or an option says what it does | the docstring, and `help=` |
 
@@ -94,12 +97,39 @@ A state pybers should never reach, so the reader cannot fix it and reports it. T
 Sheet 1::Table 1 holds a formula key past the end of its cell record. Report this at https://github.com/rpulivella/pybers/issues. Nothing was written.
 ```
 
+### Progress step
+
+A gerund phrase in lowercase, ending in `…`, which the composer adds. A call reports it as a `ProgressStep` given to its `onProgress`, and a command shows it beside a spinner.
+
+```
+reading the catalog…
+```
+
+### Progress count
+
+A progress step with the count completed and its total, which a command shows as a bar. The phrase states what is counted, so the count needs no noun.
+
+```
+reading the fonts on this machine… ━━━━━━━━━━━━╺━━━━━━━━━━━ 1204/2411
+```
+
+### Outcome
+
+A writing command's last line, saying where it wrote or, as a phrase, why it wrote nothing.
+
+```
+Written: budget.numbers
+Nothing written: previewing only
+Nothing written: already set
+```
+
 ### Skipped part
 
-A phrase in the present tense, with no capital and no period, since the line printing it specifies the part first.
+A `PartSkip`: the part's place as text that reads back, a reference or a path, and a phrase in the present tense, with no capital and no period, since the line printing it specifies the part first. A cell a write could not change and a font file a read could not parse are both skipped parts.
 
 ```
 Skipped: Sheet 1::Table 1::B4  holds a formula
+Skipped: /Library/Fonts/broken.otf  is not a font file pybers can read
 ```
 
 ### Usage error
