@@ -146,8 +146,9 @@ def findClosestName(written: str, names: Iterable[str]) -> str:
 
 @dataclass(frozen=True, slots=True)
 class Fonts:
-    """The faces pybers knows, each PostScript name once, and the files it could not
-    read, each as the reason it gives.
+    """The faces pybers knows, each PostScript name once, and the files it cannot read.
+
+    `unreadable` holds the reason each file gives.
     """
 
     faces: tuple[FontFace, ...]

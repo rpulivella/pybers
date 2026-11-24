@@ -86,8 +86,10 @@ def formatOptionName(option: click.Option) -> Text:
 
 
 def formatHelpText(text: str, colored: bool) -> Text:
-    """Return help text, each span in backticks styled as code, and without them only
-    where the color survives to mark it."""
+    """Return help text, each span in backticks styled as code.
+
+    The backticks are dropped only where the color survives to mark the span.
+    """
     shown = Text()
     end = 0
     for found in codeSpan.finditer(text):

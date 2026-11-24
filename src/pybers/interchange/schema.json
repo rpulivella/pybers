@@ -1252,7 +1252,7 @@
     },
     "Fonts": {
       "type": "object",
-      "description": "The faces pybers knows, each PostScript name once, and the files it could not",
+      "description": "The faces pybers knows, each PostScript name once, and the files it cannot read.",
       "properties": {
         "faces": {
           "type": "array",

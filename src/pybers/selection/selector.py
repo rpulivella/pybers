@@ -208,8 +208,9 @@ type SelectorLike = Selector | str
 def toSelector(
     selector: SelectorLike, scheme: SelectorScheme[Any] = documentScheme
 ) -> Selector:
-    """Return a `Selector` for whichever of its forms was given, refusing one parsed
-    for something else, whose conditions would read the wrong fields.
+    """Return a `Selector` for whichever of its forms was given.
+
+    One parsed for something else is refused, since its conditions read other fields.
     """
     if not isinstance(selector, Selector):
         return Selector.parse(selector, scheme)

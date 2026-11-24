@@ -95,8 +95,10 @@ class CheckSheet:
 
 @dataclass(frozen=True, slots=True)
 class CheckFace:
-    """One face a document uses: its PostScript name, and where pybers knows it, None
-    where neither the catalog nor this machine does."""
+    """One face a document uses, and where pybers knows it, or None.
+
+    `source` is None where neither the catalog nor this machine knows the face.
+    """
 
     postScriptName: str
     source: FontSource | None
