@@ -144,17 +144,13 @@ def testNoPartOfPybersDependsOnOrImportsTyper() -> None:
     declared = [*project["dependencies"]] + [
         each for extra in project["optional-dependencies"].values() for each in extra
     ]
-    imported = [
-        alias.name
-        for path in (repositoryRoot / "src" / "pybers").rglob("*.py")
-        for node in ast.walk(ast.parse(path.read_text()))
-        for alias in (node.names if isinstance(node, ast.Import) else [])
-    ] + [
-        node.module or ""
-        for path in (repositoryRoot / "src" / "pybers").rglob("*.py")
-        for node in ast.walk(ast.parse(path.read_text()))
-        if isinstance(node, ast.ImportFrom)
-    ]
+    imported: list[str] = []
+    for path in (repositoryRoot / "src" / "pybers").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Import):
+                imported += [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                imported.append(node.module or "")
     assert [each for each in declared if each.startswith("typer")] == []
     assert [each for each in imported if each.split(".")[0] == "typer"] == []
 

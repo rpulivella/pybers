@@ -166,6 +166,5 @@ __all__ = [
     "ChoiceOfValues",
     "PybersArgument",
     "PybersCommand",
-    "formatHelp",
     "writeHelp",
 ]
