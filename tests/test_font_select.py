@@ -218,3 +218,20 @@ def testPostScriptNameNobodyKnowsFindsNone() -> None:
 def testFaceTakesAFamilyOrANameNeverBothOrNeither(arguments: dict[str, str]) -> None:
     with pytest.raises(pybers.FontError, match="Give one of them"):
         fonts.face(**arguments)  # type: ignore[call-overload]
+
+
+def testUnreadableMachineFontIsRecordedAndEveryOtherFaceKept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    good = saveFont(buildFont("Brand Sans", "Bold", "BrandSans-Bold", 700),
+                    tmp_path / "brand.ttf")
+    broken = tmp_path / "broken.otf"
+    broken.write_text("not a font")
+    monkeypatch.setattr(
+        "pybers.font.fonts.findMachineFontFiles", lambda: (broken, good)
+    )
+    found = pybers.openFonts()
+    assert [each.postScriptName for each in found.select("Brand Sans")] == [
+        "BrandSans-Bold",
+    ]
+    assert len(found.unreadable) == 1 and "broken.otf" in found.unreadable[0]

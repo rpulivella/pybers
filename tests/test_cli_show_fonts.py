@@ -95,3 +95,15 @@ def testFileNamedFontsIsReachedAsADocument(
     monkeypatch.chdir(tmp_path)
     result = runShowCommand("./fonts")
     assert result.exit_code == 1 and result.stdout == ""
+
+
+def testUnreadableMachineFontPrintsSkippedOnStderr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broken = tmp_path / "broken.otf"
+    broken.write_text("not a font")
+    monkeypatch.setattr("pybers.font.fonts.findMachineFontFiles", lambda: (broken,))
+    result = runShowCommand("fonts", "Helvetica::Bold")
+    assert result.exit_code == 0
+    assert "Face: Helvetica-Bold" in result.stdout
+    assert result.stderr.startswith("Skipped: ") and "broken.otf" in result.stderr
