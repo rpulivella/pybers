@@ -84,6 +84,8 @@ enum EditMenuItem: String, Codable {
     case delete
     case autofillDown
     case undo
+    case bold
+    case italic
 
     var path: [String] {
         switch self {
@@ -93,6 +95,8 @@ enum EditMenuItem: String, Codable {
         case .paste: return ["Edit", "Paste"]
         case .delete: return ["Edit", "Delete"]
         case .autofillDown: return ["Table", "Autofill Cells", "Autofill Down"]
+        case .bold: return ["Format", "Font", "Bold"]
+        case .italic: return ["Format", "Font", "Italic"]
         }
     }
 }
@@ -128,6 +132,7 @@ enum EditAction: String, Codable {
     case tableBandSet
     case tableHeadersSet
     case cellsMerge
+    case fontSet
 }
 
 // `document` counts the request's `documentPaths` from zero; the first is the one saved.
@@ -172,6 +177,8 @@ struct HelperRequest: Codable {
     var steps: [EditStep]?
     // Stored fills to convert as Numbers' scripting reads a cell's background.
     var colors: [StoredColor]?
+    // Where an edit run also exports the document it saved as a PDF.
+    var exportPdfPath: String?
 }
 
 // A color as a golden stores it: its space, `srgb` or `display-p3`, and its components.
@@ -394,14 +401,14 @@ func resolvePath(_ path: String) -> String {
     URL(fileURLWithPath: path).resolvingSymlinksInPath().path
 }
 
-func checkTemporaryPath(_ path: String?, field: String) throws -> String {
+func checkTemporaryPath(_ path: String?, field: String, suffix: String = ".numbers") throws -> String {
     let temporary = resolvePath(NSTemporaryDirectory()) + "/"
-    guard let path, path.hasSuffix(".numbers"), !path.contains("/../"),
+    guard let path, path.hasSuffix(suffix), !path.contains("/../"),
           (resolvePath((path as NSString).deletingLastPathComponent) + "/").hasPrefix(temporary)
     else {
         throw HelperFailure(problem: HelperProblem(
             kind: "request",
-            detail: "\(field) must be a .numbers path inside \(temporary)",
+            detail: "\(field) must be a \(suffix) path inside \(temporary)",
             remedy: "run the helper only through the golden confirmation"))
     }
     return path
@@ -1905,6 +1912,22 @@ func runEditStep(_ step: EditStep, documentId: String, numbers: NSRunningApplica
     case .cellsMerge:
         let (table, range) = try formatRangeReference(step, documentId: documentId)
         _ = try runAppleScript("set t to \(table)\nmerge \(range) of t")
+    case .fontSet:
+        let (table, range) = try formatRangeReference(step, documentId: documentId)
+        guard let font = step.value else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "request", detail: "a fontSet step needs a PostScript name as its value",
+                remedy: "give the font as its PostScript name, such as AvenirNext-Medium"))
+        }
+        let shown = try runAppleScript(
+            "set t to \(table)\nset font name of \(range) of t to \(quoteAppleScript(font))\n"
+                + "get font name of \(range) of t").stringValue ?? ""
+        // A font Numbers did not take would measure the wrong one, so the run stops.
+        guard shown == font else {
+            throw HelperFailure(problem: HelperProblem(
+                kind: "edit", detail: "Numbers set the font to '\(shown)', not '\(font)'",
+                remedy: "check the font is installed, then rerun the recipe"))
+        }
     case .tableBandSet:
         try selectRange(step, documentId: documentId)
         try setTableBand(step.value ?? "", in: window)
@@ -2087,6 +2110,17 @@ func runDocumentEdit(_ request: HelperRequest) -> HelperResult {
         _ = try runAppleScript(
             "save document id \(quoteAppleScript(documentIds[0])) in (POSIX file \(quoteAppleScript(savedCopyPath)))")
         result.savedCopy = FileManager.default.fileExists(atPath: savedCopyPath)
+        if request.exportPdfPath != nil {
+            let pdfPath = try checkTemporaryPath(request.exportPdfPath, field: "exportPdfPath", suffix: ".pdf")
+            _ = try runAppleScript(
+                "export document id \(quoteAppleScript(documentIds[0])) to (POSIX file "
+                    + "\(quoteAppleScript(pdfPath))) as PDF")
+            guard FileManager.default.fileExists(atPath: pdfPath) else {
+                throw HelperFailure(problem: HelperProblem(
+                    kind: "edit", detail: "Numbers exported no PDF to \(pdfPath)",
+                    remedy: "look at Numbers for a dialog, then rerun"))
+            }
+        }
     } catch let failure as HelperFailure {
         result.problems.append(failure.problem)
     } catch let failure as AppleScriptError {

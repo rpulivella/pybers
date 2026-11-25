@@ -246,6 +246,8 @@ class MeasurementRecipe:
     base: str
     documents: list[str]
     steps: list[dict[str, Any]]
+    # Whether Numbers also exports the measurement as a PDF, for the fonts it embeds.
+    pdf: bool = False
 
 
 @dataclass(frozen=True)
@@ -490,7 +492,10 @@ def readMeasurementRecipe(name: str) -> MeasurementRecipe:
                 f"step {position} of {path.name} holds {', '.join(sorted(unknown))}, "
                 "which no step takes"
             )
-    return MeasurementRecipe(recipe["base"], recipe.get("documents", []), steps)
+    return MeasurementRecipe(
+        recipe["base"], recipe.get("documents", []), steps,
+        bool(recipe.get("pdf", False)),
+    )
 
 
 def readTicketKey() -> str:

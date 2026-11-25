@@ -93,11 +93,14 @@ from `<name>.recipe.toml` beside it: a copy of `base` and any `documents`, then 
 acts on by `sheet`, `table` and `range`, which a recipe may specify once at its top for every
 step. A `dataFormatSet`, `customFormatEdit`, `cellFillSet`, `tableBandSet` or
 `tableHeadersSet` step, and a `labelSet` step's wrap, read back what it changed, so a
-control Numbers did not take stops the run.
+control Numbers did not take stops the run, as does a `fontSet` font Numbers did not take.
+`pdf = true` at a recipe's top also exports the saved document as a PDF into
+`workarea/golden-confirm/<ticket>/<name>/`, to read which font each run embeds.
 
 ```
 select           select the range
-menuPress        press menuItem: copy, paste, delete, autofillDown or undo
+menuPress        press menuItem: copy, paste, delete, autofillDown, undo, bold
+                 or italic
 formatSet        set the range's format kind through AppleScript
 valueSet         type value into one cell, as a person would
 labelSet         type the label in value into one cell and wrap the cell, so it reads in full
@@ -115,6 +118,7 @@ tableBandSet     turn the table's Alternating Row Color on or off, as value says
 tableHeadersSet  set header row count, header column count or footer row count,
                  named by setting, to the count in value
 cellsMerge       merge the range, as Table, Merge Cells does
+fontSet          set the range's font to the PostScript name in value, read back
 ```
 
 `dataFormatSet` and `cellFillSet` name a control by the label Numbers shows beside it, such as

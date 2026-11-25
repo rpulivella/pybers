@@ -72,6 +72,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 from rich.markup import escape
@@ -186,12 +187,18 @@ def runMeasure(arguments: argparse.Namespace) -> int:
             shutil.copyfile(source, copy)
             copies.append(str(copy))
         saved = Path(work) / target.name
-        result = requestHelper({
+        exported = Path(work) / f"{arguments.name}.pdf"
+        request: dict[str, Any] = {
             "operation": "documentEdit",
             "documentPaths": copies,
             "savedCopyPath": str(saved),
             "steps": recipe.steps,
-        }, deadlineSeconds=editDeadlineSeconds + editStepSeconds * len(recipe.steps),
+        }
+        if recipe.pdf:
+            request["exportPdfPath"] = str(exported)
+        result = requestHelper(
+            request,
+            deadlineSeconds=editDeadlineSeconds + editStepSeconds * len(recipe.steps),
             logPath=Path(work) / "helper.log")
         problems = readProblems(result)
         if problems or not saved.is_file():
@@ -202,6 +209,13 @@ def runMeasure(arguments: argparse.Namespace) -> int:
             reportProblems(problems)
             return 1
         shutil.copyfile(saved, target)
+        if recipe.pdf:
+            # Derived from the measurement, so it lives with the reports, not beside it.
+            pdfTarget = reportRoot / readTicketKey() / arguments.name / exported.name
+            pdfTarget.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(exported, pdfTarget)
+            shown = pdfTarget.relative_to(repositoryRoot)
+            console.print(f"exported {escape(str(shown))}")
     console.print(f"[green]made[/] {escape(str(target.relative_to(repositoryRoot)))} "
                   f"in Numbers {escape(str(result.get('numbersVersion')))}")
     return 0
