@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """\
-The committed font catalog: every font macOS installs, current with the Mac running it.
+The committed font catalog: every font macOS installs, each named once and on scale.
 
-On a Mac the catalog is read again from the fonts macOS installs, so a macOS release
-that adds or changes a font fails here until `tools/local/typefaces_extract.py` is run.
+`/release-tag` reads the catalog again on the Mac cutting a release, so it matches the
+macOS of the release that ships it rather than of whichever Mac runs the suite.
 
 UPDATES
+2026-11-24  Its currency checked at a release rather than on every run, for PYB-319.
 2026-11-24  Written for PYB-315.
 """
 from __future__ import annotations
@@ -18,23 +19,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/11/24"
 
-import platform
-
-import pytest
-
 from pybers._generated.typefaces import fonts
 from pybers.typeface.fonts import TypefaceSlant
-from tools.local.lib.typefacetable import readSystemRows
-
-onMac = bool(platform.mac_ver()[0])
-
-
-@pytest.mark.skipif(not onMac, reason="the catalog is read from macOS")
-def testCatalogIsCurrentWithThisMac() -> None:
-    assert readSystemRows() == list(fonts), (
-        "The typeface catalog differs from the fonts this Mac installs. Run "
-        "`.venv/bin/python3 -m tools.local.typefaces_extract --write`."
-    )
 
 
 def testCatalogNamesEachFaceOnce() -> None:

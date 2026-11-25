@@ -19,21 +19,28 @@ the tag alone records exactly what shipped.
    - `git log --oneline -3`, confirm the commit being tagged looks right
    - Confirm the `version` field in `pyproject.toml` matches `<version>`
    - Warn if there are uncommitted changes
-4. **Reconcile `CHANGELOG.md`** before any tag. Every ticket marked Done since the last
+4. **Read the typeface catalog again** on this Mac, so the release ships the fonts its
+   macOS installs:
+   ```
+   .venv/bin/python3 -m tools.local.typefaces_extract --write
+   ```
+   If `src/pybers/_generated/typefaces.py` changed, commit it on `develop` before
+   tagging, as `[hotfix] chore: read the typeface catalog from macOS X.Y.Z`.
+5. **Reconcile `CHANGELOG.md`** before any tag. Every ticket marked Done since the last
    final release has its line under `## Unreleased`:
    ```
    .venv/bin/python3 -m tools.workflow.ticket list --status Done
    ```
    Run `/changelog-add` for any ticket missing a line, or confirm none are missing.
-5. **Write the notes from `CHANGELOG.md`**, the source, never editing it to do so. The
+6. **Write the notes from `CHANGELOG.md`**, the source, never editing it to do so. The
    grouping, the Miscellaneous judgment and the beta's "In previous betas:" split are
    in `CONTRIBUTING.md` under Releases. Show the notes and confirm them with the user.
-6. Create the annotated tag. A beta's message is its notes, and a final's is the tag name:
+7. Create the annotated tag. A beta's message is its notes, and a final's is the tag name:
    `git tag -a <tag> -F <notes file>` or `git tag -a <tag> -m "<tag>"`.
-7. **A final release only:** add `## X.Y.Z (build) - YYYY-MM-DD` directly beneath
+8. **A final release only:** add `## X.Y.Z (build) - YYYY-MM-DD` directly beneath
    `## Unreleased`, the one edit a release makes to `CHANGELOG.md`, and publish a
    GitHub release titled `pybers X.Y.Z` holding the notes. PYB-147 automates both.
-8. **Do not push automatically.** Show the push command and ask the user to confirm:
+9. **Do not push automatically.** Show the push command and ask the user to confirm:
    `git push origin <tag>`.
 
 ## Tag format reference
