@@ -812,35 +812,52 @@ selectors are what the earlier finding described only as "the two capital featur
 `(6, 0)` is the counterpart of the `(6, 1)` that appears as a default throughout, so feature
 type 6 is the number-spacing family.
 
-## Typeface variants live in the font NAME, and bold/italic can fake them
+## Bold and italic choose the typeface's own font, never a synthetic one
 
-A third place where Numbers offers a synthetic alternative beside the real thing. Every
-distinct combination in `32-named-styles`:
+`font_name` holds a PostScript name, and `bold` and `italic` are traits Numbers resolves
+against the typeface of that font, drawing the font that carries them. Measured for PYB-268
+on 25 November 2026 in `107-font-bold-italic`, Numbers 15.4, by reading which font each run
+of its PDF export embeds and whether a run is sheared or stroked:
 
 ```
-HelveticaNeue         bold=False  italic=False
-HelveticaNeue         bold=True   italic=False     SYNTHETIC bold on a regular font
-HelveticaNeue-Bold    bold=False  italic=False     the real bold font, flag off
-HelveticaNeue-Bold    bold=True   italic=False     the real bold font AND the flag
-HelveticaNeue-Light   bold=False  italic=False
-HelveticaNeue-Medium  bold=False  italic=False
-SkolarSansLatn-El     bold=(unset) italic=(unset)  extralight
-SkolarSansLatn-ElIt   bold=(unset) italic=True     the italic font AND the flag
-SkolarSansLatn-Rg     bold=False  italic=False
+font_name stored          flags stored     font drawn
+AvenirNext-UltraLight     italic           AvenirNext-UltraLightItalic
+AvenirNext-Medium         italic           AvenirNext-MediumItalic
+AvenirNext-DemiBold       bold, italic     AvenirNext-DemiBoldItalic
+AvenirNext-Medium         bold             AvenirNext-Bold
+Baskerville-SemiBold      bold, italic     Baskerville-SemiBoldItalic
+IowanOldStyle-Roman       bold             IowanOldStyle-Bold
+Papyrus-Condensed         italic           Papyrus-Condensed, upright, unsheared
+AvenirNext-MediumItalic   italic           AvenirNext-MediumItalic
 ```
 
-**Weight and slant are part of `font_name`** (the PostScript name) and `bold` / `italic` are
-independent booleans layered on top, which means:
+- **Italic keeps the weight** and draws the italic of the stored font, Ultra Light to Ultra
+  Light Italic. A character style setting only `italic` is therefore portable across
+  typefaces, which is how Numbers' own `Italic` style works.
+- **Bold jumps to the typeface's Bold**, Medium to Bold rather than Demi Bold, so the flag
+  offers two weights. Any other weight is a change of `font_name`.
+- **A typeface lacking the trait draws its upright font.** No run in the export is sheared,
+  and none is drawn with a stroke, so Numbers fakes neither bold nor italic.
+- **Numbers writes the flags as the font's own traits.** Setting `AvenirNext-DemiBold`
+  stores `bold` beside it, and `AvenirNext-MediumItalic` stores `italic`, so one drawn font
+  has two encodings: an upright name with a flag, or the font's own name with its flag.
 
-- `bold=True` on a regular font is **faux bold**, the same class of defect as the synthetic
-  superscript and scaled small caps recorded above.
-- `bold=True` on a font that is already bold is redundant at best.
-- A style may set neither flag, which is what a chosen variant like extralight looks like.
+`32-named-styles` holds the same pairs a person made by hand, `HelveticaNeue-Bold` with
+`bold` and `SkolarSansLatn-ElIt` with `italic`, which are the second encoding.
 
-**pybers must not treat `bold` as "make this bold".** Choosing a real font is a change of
-`font_name`; setting the flag asks the renderer to synthesize. A caller wanting genuine
-weight needs the typeface's actual font, and the library should be able to tell the two apart
-when reading and prefer the real font when writing.
+### A font that one weight and slant do not choose has a PostScript name of its own
+
+`108-font-optical-width-variable` sets each font through AppleScript, and Numbers stores
+its PostScript name and nothing else: Adobe Jenson Pro's Caption, Subhead and Display at
+weight 400 as `AJensonPro-Capt`, `-Subh` and `-Disp`, `AvenirNextCondensed-DemiBold`, and
+SF Pro's named instances as `SFPro-Medium`, `SFPro-Semibold` and `SFPro-CondensedSemibold`.
+A font weighing 590 or more also stores `bold`, and SF Pro Medium at 510 does not. The
+optical size and the width are therefore chosen by the font's name, and no field records
+either. Numbers 15.4 offers a variable font's named instances and nothing between them. On
+25 November 2026 the Text inspector's font menu listed every SF Pro instance, Ultralight to
+Black at each width, Regular, Expanded, Condensed and Compressed, with their italics, while
+neither it nor the Fonts panel showed a weight slider. A style therefore only ever names an
+instance, by that instance's PostScript name.
 
 ## Lists are nine-level arrays
 

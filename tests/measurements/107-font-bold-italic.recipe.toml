@@ -1,0 +1,250 @@
+# How Numbers makes 107-font-bold-italic: Lorem ipsum in one font per column, then
+# Format > Font > Italic or Bold over the whole cell, beside two italic fonts set directly,
+# so the file shows whether Numbers chooses the typeface's own font or synthesizes one.
+# Headers are removed first, since a header's bold would confound the bold entries. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 107-font-bold-italic`.
+
+base = "00-baseline"
+# Exported as a PDF too, to read which font each run embeds, never its text.
+pdf = true
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "K2"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header row count"
+value = "0"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header column count"
+value = "0"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "footer row count"
+value = "0"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "A1"
+value = "AvenirNext-UltraLight"
+
+[[step]]
+action = "select"
+range = "A1"
+
+[[step]]
+action = "menuPress"
+menuItem = "italic"
+
+[[step]]
+action = "labelSet"
+range = "A2"
+value = "input as Lorem ipsum, font AvenirNext-UltraLight set through AppleScript, Format > Font > Italic"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "B1"
+value = "AvenirNext-Medium"
+
+[[step]]
+action = "select"
+range = "B1"
+
+[[step]]
+action = "menuPress"
+menuItem = "italic"
+
+[[step]]
+action = "labelSet"
+range = "B2"
+value = "input as Lorem ipsum, font AvenirNext-Medium set through AppleScript, Format > Font > Italic"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "C1"
+value = "AvenirNext-DemiBold"
+
+[[step]]
+action = "select"
+range = "C1"
+
+[[step]]
+action = "menuPress"
+menuItem = "italic"
+
+[[step]]
+action = "labelSet"
+range = "C2"
+value = "input as Lorem ipsum, font AvenirNext-DemiBold set through AppleScript, Format > Font > Italic"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "D1"
+value = "AvenirNext-Medium"
+
+[[step]]
+action = "select"
+range = "D1"
+
+[[step]]
+action = "menuPress"
+menuItem = "bold"
+
+[[step]]
+action = "labelSet"
+range = "D2"
+value = "input as Lorem ipsum, font AvenirNext-Medium set through AppleScript, Format > Font > Bold"
+
+[[step]]
+action = "valueSet"
+range = "E1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "E1"
+value = "Baskerville"
+
+[[step]]
+action = "select"
+range = "E1"
+
+[[step]]
+action = "menuPress"
+menuItem = "italic"
+
+[[step]]
+action = "labelSet"
+range = "E2"
+value = "input as Lorem ipsum, font Baskerville set through AppleScript, Format > Font > Italic"
+
+[[step]]
+action = "valueSet"
+range = "F1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "F1"
+value = "Baskerville-SemiBold"
+
+[[step]]
+action = "select"
+range = "F1"
+
+[[step]]
+action = "menuPress"
+menuItem = "italic"
+
+[[step]]
+action = "labelSet"
+range = "F2"
+value = "input as Lorem ipsum, font Baskerville-SemiBold set through AppleScript, Format > Font > Italic"
+
+[[step]]
+action = "valueSet"
+range = "G1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "G1"
+value = "IowanOldStyle-Roman"
+
+[[step]]
+action = "select"
+range = "G1"
+
+[[step]]
+action = "menuPress"
+menuItem = "bold"
+
+[[step]]
+action = "labelSet"
+range = "G2"
+value = "input as Lorem ipsum, font IowanOldStyle-Roman set through AppleScript, Format > Font > Bold"
+
+[[step]]
+action = "valueSet"
+range = "H1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "H1"
+value = "Papyrus-Condensed"
+
+[[step]]
+action = "select"
+range = "H1"
+
+[[step]]
+action = "menuPress"
+menuItem = "italic"
+
+[[step]]
+action = "labelSet"
+range = "H2"
+value = "input as Lorem ipsum, font Papyrus-Condensed set through AppleScript, Format > Font > Italic"
+
+[[step]]
+action = "valueSet"
+range = "I1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "I1"
+value = "AvenirNext-MediumItalic"
+
+[[step]]
+action = "labelSet"
+range = "I2"
+value = "input as Lorem ipsum, font AvenirNext-MediumItalic set through AppleScript"
+
+[[step]]
+action = "valueSet"
+range = "J1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "J1"
+value = "Baskerville-Italic"
+
+[[step]]
+action = "labelSet"
+range = "J2"
+value = "input as Lorem ipsum, font Baskerville-Italic set through AppleScript"
+
+[[step]]
+action = "labelSet"
+range = "K1"
+value = "empty"

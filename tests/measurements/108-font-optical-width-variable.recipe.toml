@@ -1,0 +1,153 @@
+# How Numbers makes 108-font-optical-width-variable: Lorem ipsum in one font per column,
+# fonts that one typeface, weight and slant do not choose alone: Adobe Jenson Pro's optical
+# sizes at one weight, a condensed width, and SF Pro's named instances. Made by
+# `.venv/bin/python3 -m tools.local.golden_confirm measure 108-font-optical-width-variable`.
+
+base = "00-baseline"
+document = 0
+sheet = "Sheet 1"
+table = "Table 1"
+
+[[step]]
+action = "tableExtend"
+range = "I2"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header row count"
+value = "0"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "header column count"
+value = "0"
+
+[[step]]
+action = "tableHeadersSet"
+setting = "footer row count"
+value = "0"
+
+[[step]]
+action = "valueSet"
+range = "A1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "A1"
+value = "AJensonPro-Regular"
+
+[[step]]
+action = "labelSet"
+range = "A2"
+value = "input as Lorem ipsum, font AJensonPro-Regular set through AppleScript: Adobe Jenson Pro Regular, the text optical size"
+
+[[step]]
+action = "valueSet"
+range = "B1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "B1"
+value = "AJensonPro-Capt"
+
+[[step]]
+action = "labelSet"
+range = "B2"
+value = "input as Lorem ipsum, font AJensonPro-Capt set through AppleScript: Adobe Jenson Pro Caption, weight 400 like A"
+
+[[step]]
+action = "valueSet"
+range = "C1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "C1"
+value = "AJensonPro-Subh"
+
+[[step]]
+action = "labelSet"
+range = "C2"
+value = "input as Lorem ipsum, font AJensonPro-Subh set through AppleScript: Adobe Jenson Pro Subhead, weight 400 like A"
+
+[[step]]
+action = "valueSet"
+range = "D1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "D1"
+value = "AJensonPro-Disp"
+
+[[step]]
+action = "labelSet"
+range = "D2"
+value = "input as Lorem ipsum, font AJensonPro-Disp set through AppleScript: Adobe Jenson Pro Display, weight 400 like A"
+
+[[step]]
+action = "valueSet"
+range = "E1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "E1"
+value = "AvenirNextCondensed-DemiBold"
+
+[[step]]
+action = "labelSet"
+range = "E2"
+value = "input as Lorem ipsum, font AvenirNextCondensed-DemiBold set through AppleScript: Avenir Next Condensed Demi Bold, a width as its own typeface"
+
+[[step]]
+action = "valueSet"
+range = "F1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "F1"
+value = "SFPro-Medium"
+
+[[step]]
+action = "labelSet"
+range = "F2"
+value = "input as Lorem ipsum, font SFPro-Medium set through AppleScript: SF Pro Medium, a named instance of a variable font, weight 510"
+
+[[step]]
+action = "valueSet"
+range = "G1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "G1"
+value = "SFPro-Semibold"
+
+[[step]]
+action = "labelSet"
+range = "G2"
+value = "input as Lorem ipsum, font SFPro-Semibold set through AppleScript: SF Pro Semibold, a named instance, weight 590"
+
+[[step]]
+action = "valueSet"
+range = "H1"
+value = "Lorem ipsum"
+
+[[step]]
+action = "fontSet"
+range = "H1"
+value = "SFPro-CondensedSemibold"
+
+[[step]]
+action = "labelSet"
+range = "H2"
+value = "input as Lorem ipsum, font SFPro-CondensedSemibold set through AppleScript: SF Pro Condensed Semibold, a named instance on the width axis"
+
+[[step]]
+action = "labelSet"
+range = "I1"
+value = "empty"

@@ -10,6 +10,8 @@ resolver a document's selector is, every name compared loosely, so `AvenirNext`
 selects Avenir Next.
 
 UPDATES
+2026-11-25  A refused font says Numbers would draw another, as measured, for
+            PYB-268.
 2026-11-24  `openTypefaces` reports its progress, and each font file it cannot read
             is a `PartSkip`, for PYB-319.
 2026-11-24  A typeface is the design and a font one weight and slant of it, and a
@@ -219,8 +221,9 @@ class Typefaces:
     ) -> TypefaceFont | None:
         """Return the font a typeface, weight and slant specify, or a name finds.
 
-        A font the typeface lacks is refused, listing those it has, so no bold or italic
-        is ever faked. A PostScript name pybers does not know finds None.
+        A font the typeface lacks is refused, listing those it has, since Numbers would
+        draw another of its fonts instead. A PostScript name pybers does not know finds
+        None.
         """
         if (typeface is None) == (postScriptName is None):
             given = "neither" if typeface is None else "both"

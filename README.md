@@ -521,7 +521,7 @@ brand = pybers.openTypefaces("BrandSans.otf")
 brand.font("Brand Sans", weight=600, slant=pybers.TypefaceSlant.ITALIC)
 ```
 
-A weight or a slant the typeface lacks is refused, listing the fonts it has, so pybers never asks Numbers to fake a bold or an italic, and several fonts of one weight and slant are refused naming each, to be chosen by PostScript name. A name nobody here knows finds `None` rather than an error, since a style holds only the name, and a server lacking a font can still name a font for a reader who has it.
+A weight or a slant the typeface lacks is refused, listing the fonts it has, since Numbers would silently draw another of its fonts, and several fonts of one weight and slant are refused naming each, to be chosen by PostScript name. A name nobody here knows finds `None` rather than an error, since a style holds only the name, and a server lacking a font can still name a font for a reader who has it.
 
 ### Selectors
 

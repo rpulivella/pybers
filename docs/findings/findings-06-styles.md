@@ -527,63 +527,63 @@ pybers concept rather than presented as a mapping, otherwise a round trip would 
 persistence it cannot deliver.
 
 
-## A `name` does NOT make a style visible: the stylesheet registry does
+## The theme's preset lists decide which named styles a person sees
 
-**The most consequential styles finding, from `42-table-titles-captions`.** A
-`ParagraphStyleArchive` can carry a perfectly good `name` and still never appear in the
-paragraph-styles browser. Being named and being *offerable to the user* are different things,
-and only one of them is what `name` controls.
-
-Every named paragraph style in the document is listed in `TSS.StylesheetArchive.styles`. What
-separates the visible from the hidden is whether it also has an entry in
-**`identifier_to_style_map`**, which keys a style by a stable string:
+Measured for PYB-268 on 25 November 2026 in `105-named-styles-base`, Numbers 15.4, by reading
+the paragraph and character style menus beside the archive. **Each menu is the theme's
+`TSWP.ThemePresetsArchive` list, in its order**: `paragraph_style_presets` for paragraph
+styles and `character_style_presets` for character styles.
 
 ```
-name                     archive    identifier_to_style_map key
-Body                      903884    'text-6-paragraphstyle-Body 1'          theme, IN BROWSER
-Heading                   903880    'text-2-paragraphstyle-Heading 1'       theme, IN BROWSER
-Title                     903878    'text-0-paragraphstyle-Title'           theme, IN BROWSER
-Table Style 1-7           9038xx    'text-13..19-paragraphstyle-Table...'   theme, IN BROWSER
-Special Caption           914532    'text-0-paragraphstyle'                 USER-MADE, in browser
-Object Caption            904523     NONE                                   HIDDEN
-Object Title              904522     NONE                                   HIDDEN
-Table Title 1 (x6)        904094+   'tableName-0-textStyle' ... '-5-'       per-slot, HIDDEN
+paragraph menu    Title, Subtitle, Heading, Heading Red, Body, Caption, Fixture Para, Unused Para
+character menu    None, Unused Char, Fixture Char, Link, Italic, Emphasis, Strikethrough,
+                  Underline, Gray
 ```
 
-`Object Caption` and `Object Title` are real, named, round-trippable styles that the user can
-never see or select. `Table Title 1` exists as **six separate archives**, one per table slot,
-each with its own `tableName-N-textStyle` key, so it is not one shared browser style either.
+A stylesheet key is not what makes a style visible. `Label`, `Label Dark`, `Table Style 1`
+to `7` and `Header & Footer` are keyed `text-<N>-paragraphstyle-<Name>` and hidden, since no
+preset lists them, as are `Default`, `Object Title`, `Object Caption` and the six `Table
+Title 1` archives. A person's new paragraph style is appended to the paragraph list, and a
+new character style is inserted after `None`.
 
-**The rule for pybers.** Creating a *paragraph* or *list* style the user can actually see
-takes two writes, not one:
+**A paragraph style Numbers lists takes three writes**: its archive with its `name`, a key in
+`identifier_to_style_map`, and an entry in `paragraph_style_presets`. **A character style
+takes two**, its archive with its `name` and an entry in `character_style_presets`. Only the
+two system character styles are keyed: `None` as `character-style-null` and `Link` as
+`character-style-hyperlink`.
 
-```
-1. the ParagraphStyleArchive with its `name`         -- makes it a named style
-2. an identifier_to_style_map entry in the stylesheet -- makes it VISIBLE
-```
+### A created document holds no character style until a person adds one
 
-Doing only the first produces exactly the `Object Caption` situation: a style that is real,
-survives a round trip, applies correctly, and is invisible in the browser forever. That is a
-silent failure of the worst kind, everything looks right except the one thing the user asked
-for.
+`106b-created-character-style-added`: a document `pybers.create` made lists no character
+style, its one character preset being an unnamed, empty style. Adding the first one, Numbers
+wrote `None` and `Link` with their keys, beside the new style, and appended the new style to
+`character_style_presets` after the unnamed one. Neither `None` nor `Link` joined the presets.
 
-### The rule does NOT hold for character styles
+### A rename changes the name and nothing else
 
-Measured against the expanded `32-named-styles`, which adds three user-created character
-styles. **Every named character style in the document is absent from
-`identifier_to_style_map` and visible anyway:**
+`105b`, `105c` and `105d` each rename one style: `Body`, a user paragraph style and a user
+character style. Each keeps its archive identifier, its stylesheet key and its place in the
+presets, so `Body Renamed` is still keyed `text-6-paragraphstyle-Body 1`. A key's name suffix
+therefore records the name a style was created with, not its current one.
 
-```
-smallcaps, 'smallcaps +2%', 'tabular numbers'   NO KEY   user-created, visible
-Emphasis, Italic, Underline, Strikethrough, Gray NO KEY  Numbers' own, visible
-Link                                'character-style-hyperlink'   special
-None                                'character-style-null'        special
-```
+### Deleting a style removes it from every list but one
 
-Only the two special system character styles are keyed. The registry governs **paragraph
-and list styles**; for character styles a `name` appears to be sufficient on its own. Do not
-generalize the paragraph rule across style kinds. It was stated too broadly on first
-measurement and `32` corrected it.
+`105e` and `105f` delete a style nothing uses, and Numbers asks nothing. The archive, its key
+and its preset entry are gone, while `StylesheetArchive.styles` still holds its identifier,
+which now resolves to no archive. The keys that remain are not renumbered.
+
+**Deleting a style in use requires a replacement.** `105g` and `105h` delete a used paragraph
+and character style, and Numbers shows "The style you want to delete is used in the document.
+Choose a style to replace it:" with an empty menu, and OK disabled until one is chosen.
+Each cell or run that used the deleted style then names the replacement directly, with no
+variation, so what the deleted style stated is not kept.
+
+### A character style made from selected text captures its font
+
+`Fixture Char` in `105`, made after Format > Font > Italic on Helvetica Neue text, states
+`font_name: HelveticaNeue-Italic` beside `italic`, with an `override_count` of 2. Applied to
+text in another typeface it would change the typeface too. Numbers' own `Italic` states only
+`italic`, which is what keeps it portable.
 
 ### How keys are allocated
 
