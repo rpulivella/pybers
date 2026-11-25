@@ -2,7 +2,7 @@
 """\
 The lines and parts every command prints with, so the same fact always reads alike.
 
-A line is `label: value`, and a count states its noun in the number it agrees with.
+A line is `label: value`, and a count's noun agrees with it in number.
 See `docs/cli-design.md`.
 
 UPDATES

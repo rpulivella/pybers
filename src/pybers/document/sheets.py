@@ -155,7 +155,7 @@ if TYPE_CHECKING:
     from pybers.selection.matching import SelectionMatch
     from pybers.selection.selector import SelectorLike
 
-# Given a cell's own style, the style a write leaves it with.
+# Given a cell's own style, the style a write assigns it.
 type CellStyleCompose = Callable[[CellStyle | None], CellStyle | None]
 
 # Sheets and tables both count from one, matching the rest of the model and matching
@@ -329,8 +329,8 @@ class Sheet:
 class Document:
     """The root of the model, and the single handle: every edit is reached through it.
 
-    Named for `TN.DocumentArchive` rather than "workbook", which the format has no
-    concept of. The private fields carry the archives this was read from, excluded
+    Named for `TN.DocumentArchive` rather than "workbook", a concept absent from the
+    format. The private fields carry the archives this was read from, excluded
     from equality and `repr`, because `save` mutates those rather than rebuilding.
     """
 
@@ -347,7 +347,7 @@ class Document:
     )
     _currencyPattern: str = field(default="", repr=False, compare=False)
     _localeIdentifier: str | None = field(default=None, repr=False, compare=False)
-    # The lines the theme's table preset draws, which a table added here starts from.
+    # The lines the theme's table preset draws, where a table added here starts.
     _tableStyleTheme: TableStyle = field(
         default=blankTableStyle, repr=False, compare=False
     )
@@ -746,7 +746,7 @@ class Document:
         return table
 
     def _ownersLink(self) -> None:
-        """Point every sheet and table at this document, once all of them are in.
+        """Point every sheet and table at this document, once all of them are present.
 
         Linked only then, so a cell can name another table without the caller
         passing the names, and so `Table.document` is never half a document.
@@ -792,7 +792,8 @@ class Document:
         """Write this document back to a `.numbers` package, in place by default.
 
         Repeatable, so there is no `close`, and `onProgress` hears each table and member
-        written. **pybers never evaluates a formula**: Numbers recalculates on open.
+        written. **pybers never evaluates a formula**: a formula reading an edited cell
+        reads stale here until Numbers recalculates it on open.
         """
         # Imported here rather than at module scope, because the writer reaches into
         # `pybers._persistence` and the model layer must stay importable without it.

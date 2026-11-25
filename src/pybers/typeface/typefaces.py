@@ -4,9 +4,10 @@ The typefaces pybers knows, and selecting their fonts with a document's selector
 
 `openTypefaces()` holds the catalog pybers ships and the fonts the machine offers, and
 `openTypefaces(path)` one font file's fonts. A font both know reports the catalog, so
-`[source=catalog]` selects every font a Mac carries. A typefaces selector has two
-positions, typeface and font, read by the one parser and resolver a document's
-selector is, every name compared loosely, so `AvenirNext` selects Avenir Next.
+`[source=catalog]` selects every font a Mac on the catalog's macOS carries. A
+typefaces selector has two positions, typeface and font, read by the one parser and
+resolver a document's selector is, every name compared loosely, so `AvenirNext`
+selects Avenir Next.
 
 UPDATES
 2026-11-24  `openTypefaces` reports its progress, and each font file it cannot read
@@ -137,7 +138,7 @@ def findSlantRefusal(slant: object) -> str | None:
 
 
 def matchNoPseudoClass(name: str, argument: str | None) -> bool:
-    """Refuse a pseudo-class, which the typefaces' scheme admits none of."""
+    """Refuse a pseudo-class, since the typefaces' scheme admits none."""
     raise AssertionError(f"The parser admitted a pseudo-class for a font, {name!r}.")
 
 
@@ -283,7 +284,8 @@ def openTypefaces(
 ) -> Typefaces:
     """Return the fonts pybers knows, or the fonts of the font file at `path`.
 
-    `onProgress` hears each step, and each machine font file read of their total.
+    `onProgress` hears each step, and each machine font file read, counted against
+    its total.
     """
     report = onProgress or dropProgress
     if path is not None:

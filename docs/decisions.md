@@ -16,7 +16,7 @@ history sections making up 40% of it.
 [masaccio](https://github.com/masaccio), an open-source project that reverse-engineered
 Apple's entirely undocumented `.numbers` archive format (the protobuf schemas, the
 compression, the formula AST) from nothing. That is a rare, substantial piece of software
-archaeology, and it is the actual foundation everything here depends on. Real thanks are
+archaeology, and it is the actual foundation of everything here. Real thanks are
 owed for it existing and being open source at all; nothing below should read as a
 complaint about that project.
 
@@ -292,8 +292,8 @@ rows and columns.
 
 **A lock belongs to the reference, never to the address.** `B3`, `$B3`, `B$3` and `$B$3` all
 point at one address and differ only in how they move when a formula is copied, so every
-formula reference carries both locks, each on or off. Keeping the lock out of the address
-is also what lets a table key its cells by address with no normalizing step: two spellings
+formula reference carries both locks, each set or cleared. Keeping the lock out of the address
+is also what enables a table to key its cells by address with no normalizing step: two spellings
 of one position are always one key.
 
 **A reference is qualified only as far as its context needs**, the model of a path or a
@@ -504,10 +504,10 @@ what it does to one node.
 
 ## A document created from nothing, decided 2 November 2026
 
-`pybers.create(locale)` composes a document from the least Numbers both opens and lets a
-person add to, which PYB-261 measured (findings-10-creation.md), rather than from a
+`pybers.create(locale)` composes a document from the least Numbers both opens and enables a
+person to extend, which PYB-261 measured (findings-10-creation.md), rather than from a
 template Numbers made. A template would carry Numbers' bytes into every created document,
-and more than 500 archives a script never asked for. The less a created document holds, the less a
+and more than 500 archives a script never requested. The less a created document holds, the less a
 future Numbers can find wrong with it, but a document Numbers opens and then crashes on
 the first inserted table is damaged, so the floor is set by what a person can add.
 
@@ -623,8 +623,8 @@ stored. A dash carries its array rather than a name, because Numbers 15.4 stores
 menu's dashed line as `[2, 2]` where an earlier save stored `[1, 1]`.
 
 **A border position specifies the part of a range it draws, and is never stored.** Numbers
-keeps four strokes per cell, and its nine Border buttons only choose which edges the next
-stroke lands on. pybers names the nine for what they draw, `all`, `outer`, `outer-top`,
+keeps four strokes per cell, and its nine Border buttons only choose the edges that receive
+the next stroke. pybers names the nine for what they draw, `all`, `outer`, `outer-top`,
 `outer-right`, `outer-bottom`, `outer-left`, `between`, `between-rows` and
 `between-columns`, which sort into their groups and never read two ways on one cell.
 
@@ -635,8 +635,8 @@ depending on the picture rather than on the route, and Numbers draws the stroke 
 wrote, whichever side it reads.
 
 **A border's style follows CSS's table borders: `none` is no border of the cell's own,
-`hidden` draws nothing.** Under `border-collapse`, `none` lets the neighbor's or the
-table's line show, and `hidden` suppresses every line at that edge, which is exactly
+`hidden` draws nothing.** Under `border-collapse`, `none` shows the neighbor's or the
+table's line, and `hidden` suppresses every line at that edge, which is exactly
 Numbers' No Border, an empty stroke that prevails over the gridline and the outline. In
 Python a side holding nothing is `None` and `style=None` removes, as `cellSet` removes a
 control. The CLI's `--border-style none` removes, as `--cell-style none` does, so one word
@@ -741,7 +741,7 @@ constrains it.
 comparison. PYB-304 weighed it against Click, Cyclopts, and argparse with rich_argparse,
 and moved to Click.
 
-**Typer had stopped matching the design it was overridden toward.** Since 0.27.0 (15 July
+**Typer had stopped matching the design pybers overrode it to follow.** Since 0.27.0 (15 July
 2026, its PR #1863) Typer writes a required argument in braces, `{FILE}`, where POSIX and
 man pages write it bare and use braces for a choice. Typer carries a private copy of Click
 as `typer._click` rather than depending on Click, so `PybersGroup` subclassed a copy that
@@ -788,7 +788,7 @@ names its property so.
 
 **pybers ships a catalog and reads the machine.** The catalog holds every font macOS
 installs, read on a Mac before a release, so a document built on a server without those
-fonts still names fonts every Mac carries. The machine's fonts are found as its system
+fonts still names fonts every Mac on that macOS carries. The machine's fonts are found as its system
 offers them, a Mac's through CoreText, and every font is read from its font file by
 fontTools, the same way everywhere. A scan of a Mac's font folders was refused: on
 24 November 2026 it missed 284 fonts a font manager had activated and included 198 that

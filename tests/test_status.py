@@ -63,6 +63,14 @@ def testACountOutsideItsTotalIsRefused(completed: int, total: int) -> None:
         composeProgressCount("reading the tables", completed, total)
 
 
+@pytest.mark.parametrize(("completed", "total"), [(3, None), (None, 5)])
+def testACountWithoutItsTotalIsRefused(
+    completed: int | None, total: int | None
+) -> None:
+    with pytest.raises(ValueError, match="together"):
+        pybers.ProgressStep("reading the tables…", completed, total)
+
+
 @pytest.mark.parametrize("reason", ["Holds a formula", "holds a formula."])
 def testASkippedPartsReasonIsAPhrase(reason: str) -> None:
     with pytest.raises(ValueError, match="status phrase"):

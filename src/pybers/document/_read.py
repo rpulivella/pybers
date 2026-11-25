@@ -39,7 +39,7 @@ UPDATES
 2026-09-03  Formulas, for #41. The key slot and the sticky-bits rule were
             measured against the documents, not read off the schema.
 2026-09-08  Formulas, the engine and the index moved to modules of their own
-            for #45, and a table carries the identity formulas name it by.
+            for #45, and a table carries the identity by which formulas select it.
 2026-09-14  A sheet carries the identifier of the archive it was read from,
             for PYB-63.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
@@ -124,7 +124,8 @@ def open(  # noqa: A001
     """Read a `.numbers` file into a `Document`, writing aware dates in `timeZone`.
 
     Shadows the builtin deliberately. The zone defaults to the one pybers runs in, and
-    `onProgress` hears each member and table read, counted against its total.
+    specifying one makes a script's result the same wherever it runs. `onProgress`
+    hears each member and table read, counted against its total.
     """
     zone = toTimeZone(timeZone)
     source = Path(path)

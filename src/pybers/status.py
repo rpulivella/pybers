@@ -32,6 +32,10 @@ class ProgressStep:
     completed: int | None = None
     total: int | None = None
 
+    def __post_init__(self) -> None:
+        if (self.completed is None) != (self.total is None):
+            raise ValueError("A step carries a count and its total together.")
+
     def __str__(self) -> str:
         if self.total is None:
             return self.message
