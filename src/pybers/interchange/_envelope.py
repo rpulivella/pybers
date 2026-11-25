@@ -10,6 +10,8 @@ tables, against which its formulas' text is read.
 Private. Part of the JSON form's mechanism.
 
 UPDATES
+2026-11-24  Version 12, the typefaces' `skipped`, each font file a `PartSkip`, for
+            PYB-319.
 2026-11-20  Version 9: Automatic's format is `computed`, and a cell carries its
             computed style, for PYB-291.
 2026-11-18  Version 8: a reference escapes each name it writes, for PYB-267.
@@ -47,7 +49,7 @@ from pybers.table._form import TableForm
 from pybers.typeface.typefaces import Typefaces
 
 # Any change to the form's shape is a new version, recorded in `docs/decisions.md`.
-jsonFormVersion: Final[int] = 11
+jsonFormVersion: Final[int] = 12
 
 
 @dataclass(frozen=True, slots=True)

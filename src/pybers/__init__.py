@@ -11,6 +11,8 @@ library-and-CLI/TUI split and first-class named styles from the start. See CLAUD
 the full origin story and design contract.
 
 UPDATES
+2026-11-24  `PartSkip` and `ProgressStep`, the status messages a call reports, for
+            PYB-319.
 2026-11-24  `openTypefaces`, `Typefaces` and the font types, for PYB-315.
 2026-11-17  The stroke family, a cell's borders and a table's lines, for PYB-266.
 2026-11-13  `parseCellStyle` and `CellStyleError`, a cell style read from its text
@@ -196,6 +198,7 @@ lazy from pybers.selection import (
     SelectorError,
     SelectorLike,
 )
+lazy from pybers.status import PartSkip, ProgressStep
 lazy from pybers.style import (
     CellStyle,
     CellStyleError,
@@ -236,7 +239,6 @@ lazy from pybers.table import (
     CellChanges,
     CellKind,
     CellPresentation,
-    CellSkip,
     CellValue,
     CellValueFill,
     MergeRange,
@@ -293,6 +295,8 @@ __all__ = [
     "composeRefusal",
     "nothingRead",
     "nothingWritten",
+    "PartSkip",
+    "ProgressStep",
     "FormulaNode",
     "FormulaError",
     "FormulaSyntaxError",
@@ -369,7 +373,6 @@ __all__ = [
     "CellBorders",
     "CellChange",
     "CellChanges",
-    "CellSkip",
     "CellControl",
     "CellControlBase",
     "CellControlCheckbox",

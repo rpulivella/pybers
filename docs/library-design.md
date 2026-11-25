@@ -24,7 +24,9 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellPresentation` | How a cell shows its value: its format and its control | Frozen |
 | `CellControl` | The control a cell presents its value through, beside its format: one dataclass per control under `CellControlBase`, `CellControlUnknown` included | Frozen |
 | `CellChange` | What a write did to one cell: value and kind before and after, and how far the table grew | Frozen |
-| `CellChanges`, `CellSkip` | What a write did to every cell its selector matched, and each part it skipped, and why | Frozen |
+| `CellChanges` | What a write did to every cell its selector matched, and each part it skipped | Frozen |
+| `PartSkip` | A part a call matched and left as it was: its place as text that reads back, and why | Frozen |
+| `ProgressStep` | A step a long call has started, its message and, when its total is known, the count completed | Frozen |
 | `LocaleChange` | What a region change did to a document: its locale before and after | Frozen |
 | `CellValue` | `Decimal`, `CurrencyAmount`, `str`, `bool`, `datetime`, `timedelta` or `None`, never `float` | Value |
 | `CellFormat` | How a cell shows its value: one dataclass per family, `CellFormatAutomatic` and `CellFormatUnknown` included, belonging to no document | Frozen |
@@ -33,7 +35,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellBorders`, `CellBorder` | A cell's four sides, in CSS order, each the stroke the cell stores and the one its neighbor stores on the same edge, or `None` where neither stores one | Frozen |
 | `TableStyle`, `TableLine`, `TableBand` | A table's lines, each whether it shows and its stroke, whether its outline outlines its title, its banded rows, whether they show and their color, and the `CellStyle` each section's cells inherit | Frozen |
 | `TableStyleChange` | What setting a table's lines did: the lines it drew before and after | Frozen |
-| `Typefaces` | The fonts of the typefaces pybers knows, or one font file's, selected as a document's parts are | Frozen |
+| `Typefaces` | The fonts of the typefaces pybers knows, or one font file's, selected as a document's parts are, and each font file it skipped | Frozen |
 | `TypefaceFont` | One font: its typeface, its name, its PostScript name, its weight, its `TypefaceSlant` and its `TypefaceSource`, the catalog, this machine or a font file | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
@@ -96,12 +98,12 @@ A table's header rows, header columns and footer rows are `table.headers`, set b
 Each command answers to one public call, and the call does the work.
 
 - **A call returns data and prints nothing.** What it returns is a frozen dataclass, or the model itself, which the caller formats however it likes. `pybers.checkDocument` is the pattern.
-- **A long call takes `onProgress`**, a callback that hears each step as it starts, so the caller decides how progress looks, if at all.
+- **Every call whose time grows with something other than what its caller passed takes `onProgress`**, a callback that hears each `ProgressStep`, so the caller decides how progress looks, if at all. A document's size decides how long `pybers.open`, `Document.save` and `checkDocument` take, and the fonts installed decide how long `pybers.openTypefaces` takes, so each takes one. A step whose total the call knows carries its count, and a call given no callback reports nothing.
 - **Nothing waits for input.** A call that cannot proceed raises.
 
 ## Writing a cell
 
-A value's kind follows its Python type, as the table above lists. A currency amount is a `CurrencyAmount`, a `Decimal` amount with the ISO 4217 code of its currency, `CurrencyAmount(Decimal("1250.00"), "EUR")`, which adds, subtracts and compares only with an amount in the same currency. A number written into a currency cell keeps that cell's currency, as typing into one in Numbers does, and `pybers.currencies` lists the 37 currencies Numbers offers. A currency's symbol and where it sits come from the document's own locale, `document.localeIdentifier` such as `en_IT`, through `document.currencySymbolFind("EUR")` and `document.currencyPattern`, never from a table pybers keeps. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone pybers is running in.
+A value's kind follows its Python type, as the table above lists. A currency amount is a `CurrencyAmount`, a `Decimal` amount with the ISO 4217 code of its currency, `CurrencyAmount(Decimal("1250.00"), "EUR")`, which adds, subtracts and compares only with an amount in the same currency. A number written into a currency cell keeps that cell's currency, as typing into one in Numbers does, and `pybers.currencies` lists the 37 currencies Numbers offers. A currency's symbol and where it sits come from the document's own locale, `document.localeIdentifier` such as `en_IT`, through `document.currencySymbolFind("EUR")` and `document.currencyPattern`, never from a table pybers keeps. An `int` is written as that exact number and a `date` as midnight, and a `float` is refused in favor of `Decimal`. A date is read as a naive `datetime`, the wall-clock time Numbers stores, and an aware one written is converted to the document's time zone, which `pybers.open(path, timeZone=...)` sets and which defaults to the zone of the machine running pybers.
 
 - **A cell that changes kind takes the Automatic format** for its new kind, as a value typed into a fresh cell does, and loses any control the old value had.
 - **A value write never fails because of the cell's format.** A value of the cell's kind keeps its format, and keeps its control while the control can show it; a control that cannot, such as a slider given a number outside its range, is dropped with its format.
@@ -126,7 +128,7 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 
 ## Typefaces
 
-A style names a font by its PostScript name, and a script finds that name before it writes the style. `pybers.openTypefaces()` returns the typefaces pybers knows, the catalog it ships and the fonts installed on the machine running it, and `pybers.openTypefaces(path)` a font file's own. `typefaces.select(selector)` returns every `TypefaceFont` a selector matches, as `document.select` does, through the typefaces selector [the command-line design](cli-design.md#typefaces) sets out. `typefaces.font("Avenir Next", weight=600)` returns the one font a typeface, a weight and a slant specify, and refuses one the typeface lacks, listing the fonts it has, so pybers never asks Numbers to fake a bold or an italic. `typefaces.font(postScriptName="BrandSans-Semibold")` returns the font pybers knows by that name, or `None` when neither the catalog nor this machine knows it, since a style holds only the name and needs no font to write it.
+A style names a font by its PostScript name, and a script finds that name before it writes the style. `pybers.openTypefaces()` returns the typefaces pybers knows, the catalog it ships and the fonts installed on the machine running it, and `pybers.openTypefaces(path)` a font file's own. `typefaces.select(selector)` returns every `TypefaceFont` a selector matches, as `document.select` does, through the typefaces selector that [the command-line design](cli-design.md#typefaces) defines. `typefaces.font("Avenir Next", weight=600)` returns the one font a typeface, a weight and a slant specify, and refuses one the typeface lacks, listing the fonts it has, so pybers never asks Numbers to fake a bold or an italic. `typefaces.font(postScriptName="BrandSans-Semibold")` returns the font pybers knows by that name, or `None` when neither the catalog nor this machine knows it, since a style holds only the name and needs no font to write it.
 
 ## Lines
 

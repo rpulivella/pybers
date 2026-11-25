@@ -71,6 +71,9 @@ unreadable: tuple[type[Exception], ...] = (
 )
 
 
+# Why a file read as a font failed, in a refusal and in a skipped part alike.
+unreadableCause: str = "is not a font file pybers can read"
+
 # A library prints nothing, so fontTools' warnings reach only a caller's own handlers.
 logging.getLogger("fontTools").addHandler(logging.NullHandler())
 
@@ -218,11 +221,11 @@ def readFileFonts(path: Path, source: TypefaceSource) -> tuple[TypefaceFont, ...
     except unreadable as exc:
         # The reader's own reason is chained, for `--debug` to show.
         raise TypefaceError(composeRefusal(
-            str(path), "is not a font file pybers can read",
+            str(path), unreadableCause,
             None if path.suffix.lower() in fontSuffixes
             else "Give an .otf, .ttf or .ttc file", nothingRead,
         )) from exc
     return tuple(found.values())
 
 
-__all__ = ["TypefaceError", "readFileFonts"]
+__all__ = ["TypefaceError", "readFileFonts", "unreadableCause"]

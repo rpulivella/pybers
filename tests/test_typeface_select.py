@@ -258,4 +258,6 @@ def testUnreadableMachineFontIsRecordedAndEveryOtherFaceKept(
     assert [each.postScriptName for each in found.select("Brand Sans")] == [
         "BrandSans-Bold",
     ]
-    assert len(found.unreadable) == 1 and "broken.otf" in found.unreadable[0]
+    assert found.skipped == (
+        pybers.PartSkip(str(broken), "is not a font file pybers can read"),
+    )

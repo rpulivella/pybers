@@ -37,8 +37,8 @@ A command parses its arguments, calls the library once, formats what comes back,
 - **Selectors** are positional, quoted in the shell, and parsed by the library, the one syntax `library-design.md` sets out under Addresses. A reference a command prints is that syntax, each name escaped, so it pastes back as a selector. Tab completion offers the sheet and table names of the file being typed.
 - **A shell enables completion** through the environment variable Click reads, once in its startup file: `eval "$(_PYBERS_COMPLETE=zsh_source pybers)"` for zsh, after `autoload -Uz compinit && compinit` loads zsh's completion system, and `bash_source` or `fish_source` for bash or fish.
 - **A command prints every part a selector matches, each as it prints alone.** `show` prints each part, and `set` each cell it wrote, exactly as `show` prints that part, so a part reads the same whatever reached it. A selector's JSON is always an array of those parts' forms, which `parseJsonForm` reads back.
-- **JSON on stdout reads back, and a diagnostic goes to stderr.** A part a write skipped prints `Skipped:` and its reason on stderr, as `Written:` does, so `--output-format json` never mixes a report into the data.
-- **Each command has one default format** that does not change when its output is piped. A terminal only turns color on. `--output-format` chooses another, and `-o FILE` infers it from the extension.
+- **JSON on stdout reads back, and a diagnostic goes to stderr.** A part a call skipped prints `Skipped:` and its reason on stderr, as `Written:` does, so `--output-format json` never mixes a report into the data.
+- **Each command has one default format** that does not change when its output is piped. A terminal only enables color. `--output-format` chooses another, and `-o FILE` infers it from the extension.
 - **Every command offers `--output-format text`, its default, and `--output-format json`**, so an agent or a pipeline never parses a report. `pybers.cli._formats` chooses between them, and every JSON comes from `pybers.formatJsonForm`, the library's one serializer, so a command never builds JSON itself. Its keys are the library's own field names, a number is a JSON number with its exact digits, `None` is `null`, and a value missing for a reason is the name of its sentinel, such as `"UNDETERMINED"`. The rule each value follows is in `decisions.md`, under the JSON form.
 - **`-` is stdin or stdout** for text formats. A `.numbers` document is never written to stdout.
 - **Nothing prompts.** A command that would need an answer refuses instead.
@@ -94,11 +94,12 @@ A command shows a formula as the library returns it, stored and never recalculat
 - **Labels that belong together match** in structure, wording and tense: `Unrecognized cell types` beside `Unrecognized cells`, never one of them a clause.
 - **A value pybers could not determine reads `unknown`**, and an empty one reads `none`.
 - **A value is a phrase, never a sentence, and takes no period**: `Nothing written: previewing only`, `Nothing written: already set`, `Nothing written: already de_DE`.
-- **A part a write skipped prints its reference, then two spaces and its `CellSkip` phrase**: `Skipped: Sheet 1::Table 1::B4  holds a formula`, worded as [the message design](message-design.md) sets out for a skipped part.
+- **A part a call skipped prints its place, then two spaces and its `PartSkip` phrase**, through `formatSkip`: `Skipped: Sheet 1::Table 1::B4  holds a formula`, worded as [the message design](message-design.md) sets out for a skipped part.
+- **A writing command ends with its outcome on stderr**, `Written: budget.numbers` or `Nothing written: already set`, which `composeOutcome` in `pybers.cli._report` builds.
 - **A count names its noun in the number it agrees with**: `1 row`, `10 rows`, through `formatCount` in `pybers.cli._report`, which holds every line more than one command prints.
 - **A flag reads `yes` or `no`.**
 - **Several parts print one after another, a blank line between each**, and each opens with a line specifying it in full, its label at full weight: `Table: Sheet 1::Table 2`, `Cell: Sheet 1::Table 2::B3`. A part's children are indented two spaces beneath it, and a part printed alone starts at column 0.
-- **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is left out. A size reads `5 rows × 3 columns`, in a tree as on a line.
+- **A part's line folds what describes it after its name, two spaces apart**: `Table: Budget::Q1  5 rows × 3 columns  1 header row, 1 footer row  12 cells`. A count of zero or an empty list is omitted. A size reads `5 rows × 3 columns`, in a tree as on a line.
 - **`show` prints a cell's fields in the order and under the names of its JSON form**, each key in words, so `formulaText` reads `Formula text`, folded three spaces apart onto fixed lines: its value, kind and formula, then its presentation, then its cell style, then its borders, then its unrecognized type code. A format prints as its text form, the format shown leading and `(automatic)` after one Automatic chose, `number (automatic)`, so it pastes into `set --cell-format`. A control prints as its text form too, `slider; minimum: 0; maximum: 100; increment: 1`, so it pastes into `set --cell-control`, and `none` removes one. A cell style prints as CSS declarations, `background: #ffd60aff; padding: 6pt`, so it pastes into `set --cell-style`, and `none` removes one. Borders print as CSS, `border: 1pt dashed #000000ff` where all four sides agree and a longhand per side otherwise, `border-top: 1pt dashed #000000ff; border-left: hidden`, leaving out a side that stores none, and a side whose neighbor stores another stroke specifies that cell and its stroke in parentheses. **Wherever CSS has a shorthand for what prints, it is used.** A color prints exactly as stored, so a value pastes back as the same color, which is why one off the 255 grid prints in `color()` rather than hex. `tests/test_cli_show.py` fails for a format or a control that does not read back from its line.
 - **A hierarchy is a tree under its label**, drawn with `TreeCompact` from `pybers.cli._console`: Rich's `Tree` with two-column guides rather than four, the guides in `label` style and the top level at column 0.
 
@@ -160,23 +161,27 @@ Bold rather than bright white, which nearly vanishes on a light terminal.
 
 ## Spinners and progress
 
-- **A spinner is Rich's default, `dots`**, through `statusConsole.status(...)`. Its text is a lowercase gerund ending in `…`: `reading the document…`.
-- **A progress bar is used only when the total is known**, and every one is built the same way:
+- **Every command shows a call's progress on stderr while the call runs**, through `showProgress` in `pybers.cli._console`, which hands the call its `onProgress` and shows each `ProgressStep` it hears.
+- **A step shows a spinner**, Rich's `dots3`, one column wide so it fits the gutter where a section's marker sits, beside the step's message, a lowercase gerund ending in `…`: `unpacking the document…`.
+- **A step of a known total shows a progress bar**, and every one is built the same way:
 
   ```python
   Progress(
-      SpinnerColumn(),
+      SpinnerColumn("dots3", style="value"),
       TextColumn("{task.description}"),
-      BarColumn(bar_width=24),
-      MofNCompleteColumn(),
-      TimeElapsedColumn(),
+      BarColumn(
+          bar_width=24, style="label", complete_style="value",
+          finished_style="value", pulse_style="value",
+      ),
+      TextColumn("{task.completed}/{task.total}", style="value"),
       console=statusConsole,
       transient=True,
   )
   ```
 
-- **Each `onProgress` call** from the library becomes a spinner or progress update.
-- **A transient display disappears when it finishes**, so what remains on screen is the result alone.
+- **A spinner and a bar draw only in the theme's styles**, `value` for what has been done and `label` for what remains, so neither adds a color of its own.
+
+- **A transient display disappears when it finishes**, so what remains on screen is the result alone, and off a terminal nothing is drawn at all.
 
 ## Help
 

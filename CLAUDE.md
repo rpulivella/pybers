@@ -33,6 +33,7 @@ pybers/
   table/          Cell, Table and merges, and both archive halves
   drawable.py     things that float on a sheet   style.py  text.py  geometry.py
   errors.py       PybersError roots every error this library raises
+  status.py       a step a long call reports, and a part a call skipped
   _engine/        the calculation engine     _persistence/  the container and its index
   _generated/     protobuf                   protos/        the extracted schemas
 ```
@@ -167,7 +168,7 @@ called. A name is approved by the maintainer before a ticket relies on it.
 
 - **camelCase** for functions, variables and parameters. Modules stay lowercase, and
   every type is PascalCase: a class, an enum, a protocol or a type alias. No linter
-  checks names, since ruff's naming rules expect snake_case and stay off.
+  checks names, since ruff's naming rules expect snake_case and remain disabled.
 - **Method names are subject first, verb last**: `rowAdd`, `mergeRemove`,
   `cellBordersSet`, each verb one `docs/vocabulary.md` defines. Sorting then groups
   everything acting on a row together. The subject is as specific as the method.
@@ -178,7 +179,7 @@ called. A name is approved by the maintainer before a ticket relies on it.
   atom: `Table`, `TableRow`, `TableRows`, never `RowOfTable`. A scientific or geometric
   value names what it is measured against: `mercatorX` rather than `x`, `cieX1931`
   rather than `cieX`.
-- **Dataclasses, never `TypedDict`.** Frozen where immutability keeps a defect out.
+- **Dataclasses, never `TypedDict`.** Frozen where immutability prevents a defect.
 - Full type hints, modern syntax (`list[str]`, `X | None`), never `typing.List`.
 - `pathlib.Path` exclusively, f-strings exclusively.
 - Never shell out when a Python library can do the work.
@@ -244,7 +245,7 @@ functions over explanation.
   clear. Descriptive names, and no comments narrating arrange, act and assert.
 - Every bug fix earns a regression test that fails for the original defect.
 - Test negative paths: validation, no-op, partial failure, and invariant preservation.
-- Unique temporary directories, cleaned up. Never write into `tests/fixtures/` or
+- Unique temporary directories, each removed afterward. Never write into `tests/fixtures/` or
   `tests/measurements/`.
 - pytest functions and fixtures, not `TestCase` classes.
 

@@ -19,6 +19,7 @@ Numbers opens with its charts, conditional formats and print settings quietly
 gone, rather than as an error.
 
 UPDATES
+2026-11-24  A save reports each table and member it writes, for PYB-319.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-03  A document built in memory is created on save, for PYB-261.
 2026-11-02  A created document saves, for PYB-261.
@@ -70,6 +71,7 @@ from .._persistence import (
 from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import WriteError, composeRefusal, nothingWritten
+from ..status import ProgressListener, composeProgressCount, dropProgress
 from ..table._write import TableSave, openTableSave
 from ..table.cells import Table
 from ._create import composeModelPackage, createSheets
@@ -77,7 +79,9 @@ from ._locale import writeLocale
 from .sheets import Document, Sheet
 
 
-def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave:
+def applyDocumentEdits(
+    document: Document, package: NumbersPackage, onProgress: ProgressListener
+) -> TableSave:
     """Write every changed cell of every table back into the package.
 
     The model is compared against the archives rather than tracked as it is edited.
@@ -91,6 +95,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave
     root = findRoot(index)
     tableInfoTypeId = findArchiveTypeId(tst.TableInfoArchive)
     written: list[tuple[Table, int]] = []
+    total = sum(len(sheet.tables) for sheet in document.sheets)
 
     # Strict, because `createSheets` has made the two lists one list, and a plain
     # `zip` would stop at the shorter side in silence if that ever stopped holding.
@@ -109,6 +114,7 @@ def applyDocumentEdits(document: Document, package: NumbersPackage) -> TableSave
         for table, tableReference in zip(sheet.tables, tableReferences, strict=True):
             tables.tableWrite(table, tableReference)
             written.append((table, tableReference.identifier))
+            onProgress(composeProgressCount("writing the tables", len(written), total))
 
     if writeLocale(document, index):
         for table, identifier in written:
@@ -134,7 +140,9 @@ def resolveSaveTarget(document: Document, path: Path | str | None) -> Path:
     return document._sourcePath
 
 
-def writeAtomically(package: NumbersPackage, target: Path) -> None:
+def writeAtomically(
+    package: NumbersPackage, target: Path, onProgress: ProgressListener
+) -> None:
     """Write a package to a temporary name beside the target, then take its place.
 
     A `.numbers` package is a zip rewritten whole, so writing straight to the
@@ -157,7 +165,7 @@ def writeAtomically(package: NumbersPackage, target: Path) -> None:
     ) as handle:
         temporary = Path(handle.name)
     try:
-        writePackage(package, temporary)
+        writePackage(package, temporary, onProgress)
         temporary.replace(target)
     except Exception:
         temporary.unlink(missing_ok=True)
@@ -173,7 +181,11 @@ def listIdentifiable(document: Document) -> list[Sheet | Table]:
     return items
 
 
-def writeDocument(document: Document, path: Path | str | None = None) -> None:
+def writeDocument(
+    document: Document,
+    path: Path | str | None = None,
+    onProgress: ProgressListener = dropProgress,
+) -> None:
     """Write a document back to a `.numbers` package.
 
     Reached through `Document.save`, which is the caller-facing spelling. This
@@ -195,8 +207,8 @@ def writeDocument(document: Document, path: Path | str | None = None) -> None:
         id(item) for item in listIdentifiable(document) if item._identifier is not None
     }
     try:
-        tables = applyDocumentEdits(document, package)
-        writeAtomically(package, target)
+        tables = applyDocumentEdits(document, package, onProgress)
+        writeAtomically(package, target, onProgress)
     except Exception:
         package.restore(snapshot)
         for item in listIdentifiable(document):

@@ -6,6 +6,7 @@ decimal128. A cell knows the table holding it, so reading or writing its formula
 text, and pointing at it from anywhere, needs nothing passed in.
 
 UPDATES
+2026-11-24  A skipped part is a `PartSkip`, for PYB-319.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-17  `borders`, each side's stroke and its neighbor's, and a copy no
             longer says whether borders go with it, for PYB-266.
@@ -49,7 +50,7 @@ from decimal import Context, Decimal
 from typing import TYPE_CHECKING, NoReturn
 
 from pybers.absence import UNCHANGED, UNDETERMINED
-from pybers.addressing.ranges import CellRange, SelectionMatch
+from pybers.addressing.ranges import CellRange
 from pybers.addressing.reference import CellAddress, CellReference
 from pybers.currency import CurrencyAmount, CurrencyError, findCurrency
 from pybers.errors import WriteError, composeRefusal, nothingWritten
@@ -66,6 +67,7 @@ from pybers.format.formats import (
 from pybers.formula.formatting import formatFormula
 from pybers.formula.nodes import Formula
 from pybers.formula.parse import parseFormula
+from pybers.status import PartSkip
 from pybers.style.cells import CellStyle, findOverrides
 from pybers.table.borders import CellBorders
 from pybers.table.kinds import (
@@ -243,19 +245,11 @@ class CellChange:
 
 
 @dataclass(frozen=True, slots=True)
-class CellSkip:
-    """A part a write matched and did not write as asked, and why, as a short phrase."""
-
-    reference: SelectionMatch
-    reason: str
-
-
-@dataclass(frozen=True, slots=True)
 class CellChanges:
     """What a write did to each cell a selector matched, and each part it skipped."""
 
     changes: tuple[CellChange, ...]
-    skipped: tuple[CellSkip, ...] = ()
+    skipped: tuple[PartSkip, ...] = ()
 
     @property
     def changed(self) -> bool:
@@ -592,7 +586,7 @@ class Cell:
 
 
 __all__ = [
-    "Cell", "CellChange", "CellChanges", "CellCopy", "CellSkip", "CellValue",
+    "Cell", "CellChange", "CellChanges", "CellCopy", "CellValue",
     "decimal128Context",
     "findWrittenValue",
     "refuseValueOverFormula", "toCellValue",

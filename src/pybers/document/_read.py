@@ -28,6 +28,7 @@ to a caller:
   that looks like a perfectly good number.
 
 UPDATES
+2026-11-24  `open` reports each member and each table it reads, for PYB-319.
 2026-11-17  The theme's table style, which a table added starts from, for PYB-266.
 2026-11-02  A package pybers created becomes a document too, for PYB-261.
 2026-10-27  The document's locale identifier is read, for PYB-272.
@@ -38,7 +39,7 @@ UPDATES
 2026-09-03  Formulas, for #41. The key slot and the sticky-bits rule were
             measured against the documents, not read off the schema.
 2026-09-08  Formulas, the engine and the index moved to modules of their own
-            for #45, and a table carries the identity formulas name it by.
+            for #45, and a table carries the identity by which formulas select it.
 2026-09-14  A sheet carries the identifier of the archive it was read from,
             for PYB-63.
 2026-09-22  Type identifiers are asked of the registry by class, for PYB-113.
@@ -56,6 +57,8 @@ __email__ = "pybers@richardulivella.com"
 __status__ = "Development"
 __date__ = "2026/08/31"
 
+import itertools
+from collections.abc import Callable
 from pathlib import Path
 
 from .._engine import readTableIdentities
@@ -66,29 +69,40 @@ from .._persistence import NumbersPackage, readPackage
 from .._persistence.index import ArchiveIndex, findRoot
 from .._persistence.types import findArchiveTypeId
 from ..errors import ReadError
+from ..status import ProgressListener, composeProgressCount, dropProgress
 from ..table._read import readTable
 from ..table._tablestyle import readDocumentTableStyle
 from ..timezone import TimeZoneLike, machineTimeZone, toTimeZone
 from .sheets import Document, Sheet
 
 
-def readSheet(
-    index: ArchiveIndex,
-    identifier: int,
-    source: Path | None,
-    identities: dict[int, str],
-) -> Sheet:
-    """Build one `Sheet`, taking its tables in the sheet's own drawable order.
+def listTableReferences(
+    index: ArchiveIndex, sheetArchive: tn.SheetArchive
+) -> list[tsp.Reference]:
+    """Return a sheet's tables in its own drawable order.
 
     A table is one kind of drawable among several. Shapes, images and text boxes
     share the list and belong to other tickets, so they are skipped by type here
     rather than parsed.
     """
-    sheetArchive = index.resolve(tsp.Reference(identifier=identifier), tn.SheetArchive)
+    tableTypeId = findArchiveTypeId(tst.TableInfoArchive)
+    return [
+        reference for reference in sheetArchive.drawable_infos
+        if index.typeOf(reference) == tableTypeId
+    ]
+
+
+def readSheet(
+    index: ArchiveIndex,
+    sheetArchive: tn.SheetArchive,
+    identifier: int,
+    source: Path | None,
+    identities: dict[int, str],
+    onTableRead: Callable[[], None],
+) -> Sheet:
+    """Build one `Sheet`, taking its tables in the sheet's own drawable order."""
     sheet = Sheet(name=sheetArchive.name, _identifier=identifier)
-    for reference in sheetArchive.drawable_infos:
-        if index.typeOf(reference) != findArchiveTypeId(tst.TableInfoArchive):
-            continue
+    for reference in listTableReferences(index, sheetArchive):
         table = readTable(
             index,
             index.resolve(reference, tst.TableInfoArchive),
@@ -97,26 +111,35 @@ def readSheet(
         )
         table._identifier = reference.identifier
         sheet.tables.append(table)
+        onTableRead()
     return sheet
 
 
 def open(  # noqa: A001
-    path: Path | str, *, timeZone: TimeZoneLike = machineTimeZone
+    path: Path | str,
+    *,
+    timeZone: TimeZoneLike = machineTimeZone,
+    onProgress: ProgressListener | None = None,
 ) -> Document:
     """Read a `.numbers` file into a `Document`, writing aware dates in `timeZone`.
 
-    Shadows the builtin deliberately, so the entry point reads as it should. The
-    zone defaults to the one pybers is running in, and specifying one makes a script's
-    result the same wherever it runs.
+    Shadows the builtin deliberately. The zone defaults to the one pybers runs in, and
+    specifying one makes a script's result the same wherever it runs. `onProgress`
+    hears each member and table read, counted against its total.
     """
     zone = toTimeZone(timeZone)
     source = Path(path)
-    document = readDocument(readPackage(source), source)
+    report = onProgress or dropProgress
+    document = readDocument(readPackage(source, report), source, report)
     document.timeZone = zone
     return document
 
 
-def readDocument(package: NumbersPackage, source: Path | None) -> Document:
+def readDocument(
+    package: NumbersPackage,
+    source: Path | None,
+    onProgress: ProgressListener = dropProgress,
+) -> Document:
     """Build a `Document` from a package read from `source`, or created when None."""
     index = ArchiveIndex(package)
     root = findRoot(index)
@@ -135,10 +158,20 @@ def readDocument(package: NumbersPackage, source: Path | None) -> Document:
         _tableStyleTheme=readDocumentTableStyle(index),
     )
     identities = readTableIdentities(index)
-    for reference in root.sheets:
-        document.sheets.append(
-            readSheet(index, reference.identifier, source, identities)
-        )
+    sheetArchives = [
+        (reference.identifier, index.resolve(reference, tn.SheetArchive))
+        for reference in root.sheets
+    ]
+    total = sum(len(listTableReferences(index, each)) for _, each in sheetArchives)
+    tablesRead = itertools.count(1)
+
+    def reportTableRead() -> None:
+        onProgress(composeProgressCount("reading the tables", next(tablesRead), total))
+
+    for identifier, sheetArchive in sheetArchives:
+        document.sheets.append(readSheet(
+            index, sheetArchive, identifier, source, identities, reportTableRead
+        ))
     document._ownersLink()
     return document
 

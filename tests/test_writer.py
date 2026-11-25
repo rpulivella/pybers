@@ -283,7 +283,9 @@ def test_aFailedSaveLeavesTheExistingFileIntact(
 
     document = pybers.open(working)
 
-    def failWritePackage(package: NumbersPackage, path: Path) -> None:
+    def failWritePackage(
+        package: NumbersPackage, path: Path, onProgress: object
+    ) -> None:
         path.write_bytes(b"half a zip")
         raise OSError("the disk filled up half way through")
 

@@ -6,6 +6,7 @@ Maintained by `/changelog-add`, one verbatim ticket-title bullet per line under 
 
 ## Unreleased
 
+- [PYB-319] Report progress and outcomes as status messages
 - [PYB-318] Name typefaces and their fonts as metal type does
 - [PYB-315] Select a font face by family, weight and slant
 - [PYB-304] Build the command line on Click rather than Typer

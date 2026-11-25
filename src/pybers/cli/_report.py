@@ -2,10 +2,12 @@
 """\
 The lines and parts every command prints with, so the same fact always reads alike.
 
-A line is `label: value`, and a count states its noun in the number it agrees with.
+A line is `label: value`, and a count's noun agrees with it in number.
 See `docs/cli-design.md`.
 
 UPDATES
+2026-11-24  `composeOutcome` and `formatSkip`, the outcome of a write and a part it
+            skipped, for PYB-319.
 2026-11-24  A part's line, a line of fields and the blank line between parts, moved
             from `show`, so every command prints a part alike, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
@@ -26,10 +28,12 @@ __date__ = "2026/10/27"
 
 from collections.abc import Iterable, Sequence
 from enum import StrEnum
+from pathlib import Path
 
 from rich.console import Group, RenderableType
 from rich.text import Text
 
+import pybers
 from pybers.cli._console import TreeCompact
 
 
@@ -145,15 +149,31 @@ def formatRefusal(command: str, reason: str) -> Text:
     return Text.assemble((f"pybers {command}: ", "failure"), reason)
 
 
+def composeOutcome(changed: bool, target: Path | None, unchanged: str) -> Text:
+    """Return whether a write wrote, and where, or the phrase saying why it did not."""
+    if not changed:
+        return formatDetail(f"Nothing written: {unchanged}")
+    if target is None:
+        return formatDetail("Nothing written: previewing only")
+    return formatLine("Written", str(target))
+
+
+def formatSkip(skip: pybers.PartSkip) -> Text:
+    """Return a part a call skipped, `Skipped: Budget::Q3::B4  holds a formula`."""
+    return formatLine("Skipped", f"{skip.place}{segmentGap}{skip.reason}")
+
+
 def formatCount(count: int, noun: str) -> str:
     """Return a count with its noun, `1 row` or `10 rows`."""
     return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
 __all__ = [
-    "BadgeLevel", "childIndent", "fieldGap", "formatBadge", "formatBadgedNode",
+    "BadgeLevel", "childIndent", "composeOutcome", "fieldGap", "formatBadge",
+    "formatBadgedNode",
     "formatCount", "formatCountShown", "formatDetail", "formatFields", "formatHeading",
     "formatLine", "formatListed", "formatParts", "formatRefusal", "formatSegments",
+    "formatSkip",
     "formatTree", "formatTreeNode",
     "formatYesNo", "listChildren", "segmentGap",
 ]

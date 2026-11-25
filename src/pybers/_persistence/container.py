@@ -20,6 +20,7 @@ support, and a reader that carries it survives a file this developer has not
 seen yet. Record what varies; refuse what cannot be verified.
 
 UPDATES
+2026-11-24  Reading and writing a package report each member, for PYB-319.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
 2026-11-02  A member's zip header composed as Numbers writes one, for PYB-261.
 2026-10-07  A directory, an unreadable file and a zip holding no IWA member are
@@ -50,6 +51,7 @@ from ..errors import (
     nothingRead,
     nothingWritten,
 )
+from ..status import ProgressListener, composeProgressCount, dropProgress
 from .iwa import Archive, IWAFile, readIWAFile, writeIWAFile
 
 # Members under this prefix, with this suffix, are the document. Everything else
@@ -214,7 +216,9 @@ def isDocumentMember(name: str) -> bool:
     return name.startswith(indexPrefix) and name.endswith(iwaSuffix)
 
 
-def readPackage(path: Path) -> NumbersPackage:
+def readPackage(
+    path: Path, onProgress: ProgressListener = dropProgress
+) -> NumbersPackage:
     """Read a `.numbers` file into its members.
 
     Members are read in the order the zip lists them, and that order is kept,
@@ -231,7 +235,8 @@ def readPackage(path: Path) -> NumbersPackage:
     package = NumbersPackage()
     try:
         with zipfile.ZipFile(path) as archive:
-            for info in archive.infolist():
+            infos = archive.infolist()
+            for completed, info in enumerate(infos, 1):
                 data = archive.read(info.filename)
                 package.members.append(
                     MemberInfo(
@@ -253,6 +258,9 @@ def readPackage(path: Path) -> NumbersPackage:
                     package.otherMembers.append(
                         StoredMember(name=info.filename, data=data)
                     )
+                onProgress(composeProgressCount(
+                    "unpacking the document", completed, len(infos)
+                ))
     except zipfile.BadZipFile as exc:
         raise ContainerError(composeReadRefusal(
             path, "is not a zip archive, so it is not a Numbers document"
@@ -287,7 +295,9 @@ def toZipInfo(member: MemberInfo) -> zipfile.ZipInfo:
     return info
 
 
-def writePackage(package: NumbersPackage, path: Path) -> None:
+def writePackage(
+    package: NumbersPackage, path: Path, onProgress: ProgressListener = dropProgress
+) -> None:
     """Write a package back to a `.numbers` file.
 
     Members go out in their original order, each with the storage method it was
@@ -300,7 +310,7 @@ def writePackage(package: NumbersPackage, path: Path) -> None:
 
     try:
         with zipfile.ZipFile(path, "w") as archive:
-            for info in package.members:
+            for completed, info in enumerate(package.members, 1):
                 if info.name in iwaByName:
                     data = writeIWAFile(iwaByName[info.name])
                 elif info.name in otherByName:
@@ -311,6 +321,9 @@ def writePackage(package: NumbersPackage, path: Path) -> None:
                         "an archive nor a stored file", nothingWritten,
                     ))
                 archive.writestr(toZipInfo(info), data)
+                onProgress(composeProgressCount(
+                    "saving the document", completed, len(package.members)
+                ))
     except OSError as exc:
         raise ContainerError(composeRefusal(
             str(path), f"cannot be written ({exc.strerror})", notDone=nothingWritten

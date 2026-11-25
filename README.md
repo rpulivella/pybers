@@ -101,7 +101,7 @@ A date is stored as wall-clock time, as Numbers stores it. One given with an off
 - `duration`: Numbers' own units, `1h 30m` or `2d 4h`, or a clock, `1:30`
 - `text`: anything, kept exactly as given
 
-`pybers show FILE` prints a whole document, and `pybers show FILE SELECTOR` prints every part a [selector](#selectors) matches, each in full and one after another. Each part opens with a line specifying it and folding what describes it, its children indented beneath it, and a count of zero is left out. `pybers show` never writes to the document.
+`pybers show FILE` prints a whole document, and `pybers show FILE SELECTOR` prints every part a [selector](#selectors) matches, each in full and one after another. Each part opens with a line specifying it and folding what describes it, its children indented beneath it, and a count of zero is omitted. `pybers show` never writes to the document.
 
 ```console
 $ pybers show shapes.numbers
@@ -160,7 +160,7 @@ Each table's `tableStyle`, its lines, its band and the box each section shows, i
 $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
 [
   {
-    "jsonFormVersion": 9,
+    "jsonFormVersion": 12,
     "sheetName": "Sheet 1",
     "cell": "A11",
     "table": {
@@ -245,7 +245,7 @@ $ pybers show shapes.numbers "Sheet 1::Table 1::A11" --output-format json
 $ pybers show shapes.numbers "*::Table 2" --output-format json
 [
   {
-    "jsonFormVersion": 9,
+    "jsonFormVersion": 12,
     "sheetName": "Sheet 1",
     "table": {
       "name": "Table 2",
@@ -327,7 +327,7 @@ $ pybers show shapes.numbers "*::Table 2" --output-format json
 
 </details>
 
-`pybers show typefaces` prints every font pybers knows: the catalog of fonts macOS installs, which pybers ships so a document built anywhere names fonts every Mac carries, and the fonts this machine offers. `pybers show FONTFILE` prints a font file's own fonts, installed or not. A [selector](#selectors) narrows either, its positions a typeface and a font, every name compared ignoring case, spaces and hyphens, and a quoted value ending in `s` compared exactly. Each typeface prints as a part, its fonts one line each beneath it, so the PostScript name a style needs is found before the style is written:
+`pybers show typefaces` prints every font pybers knows: the catalog of fonts macOS installs, which pybers reads from the macOS of each release and ships, so a document built anywhere names fonts every Mac on that macOS carries, and the fonts this machine offers. `pybers show FONTFILE` prints a font file's own fonts, installed or not. A [selector](#selectors) narrows either, its positions a typeface and a font, every name compared ignoring case, spaces and hyphens, and a quoted value ending in `s` compared exactly. Each typeface prints as a part, its fonts one line each beneath it, so the PostScript name a style needs is found before the style is written:
 
 ```console
 $ pybers show typefaces 'avenirnext::*demi*'
@@ -346,7 +346,7 @@ $ pybers set budget.numbers --locale de_DE
 Locale: de_DE
 ```
 
-The document then shows its numbers, dates and currencies as Germany writes them, `1.234,50 €`, and Numbers recalculates every formula when it opens it, since a result such as `DOLLAR` follows the region. pybers builds each locale field from macOS's own locale data, read into pybers before a release, so it writes a region exactly as Numbers would, on any system pybers runs on.
+The document then shows its numbers, dates and currencies as Germany writes them, `1.234,50 €`, and Numbers recalculates every formula when it opens it, since a result such as `DOLLAR` follows the region. pybers builds each locale field from macOS's own locale data, read into pybers before a release, so it writes a region exactly as Numbers would, on any system that runs pybers.
 
 All three install with the `cli` extra, `pip install -e ".[cli]"`. A selector completes to the sheets and tables of the file typed before it once a shell's startup file holds `eval "$(_PYBERS_COMPLETE=zsh_source pybers)"`, after `autoload -Uz compinit && compinit` in zsh, or the same line with `bash_source` or `fish_source`. Next in the [planned work](#planned), a command will export any document as JSON, for inspecting, diffing and scripting a file without opening Numbers ([PYB-142](https://github.com/rpulivella/pybers/issues/142)), and a terminal interface for browsing a document read-only is planned after it ([PYB-171](https://github.com/rpulivella/pybers/issues/171)).
 

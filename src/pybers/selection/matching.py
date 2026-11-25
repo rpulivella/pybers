@@ -14,6 +14,7 @@ not create two table names differing only in case on one sheet, and enforces not
 about sheet names, so folding them would invent a collision the file does not have.
 
 UPDATES
+2026-11-24  A skipped part is a `PartSkip`, for PYB-319.
 2026-11-24  Placing components, comparing names and meeting conditions moved to
             `resolver`, which the typefaces' resolver shares, for PYB-315.
 2026-11-23  Every message composed by its shape's composer, for PYB-307.
@@ -78,8 +79,8 @@ from pybers.selection.selector import (
     SelectorLike,
     toSelector,
 )
+from pybers.status import PartSkip
 from pybers.table.bounds import findCellsMiss
-from pybers.table.cell import CellSkip
 from pybers.table.cells import Table
 
 type SelectionOwner = Document | Sheet | Table
@@ -409,18 +410,18 @@ def findTable(owner: Document | Sheet, name: str | TableReference | None) -> Tab
 
 def findCellTargets(
     document: Document, selector: SelectorLike
-) -> tuple[list[tuple[Table, CellAddress]], list[CellSkip]]:
+) -> tuple[list[tuple[Table, CellAddress]], list[PartSkip]]:
     """Return each cell a write to every matched cell writes, once, and each skip.
 
     A range is each cell it covers, a merge at its anchor.
     """
     targets: dict[tuple[int, CellAddress], tuple[Table, CellAddress]] = {}
-    skipped: list[CellSkip] = []
+    skipped: list[PartSkip] = []
     for part in selectParts(document, selector):
         table, cells = part.table, part.cells
         if table is None or cells is None:
             kind = "sheet" if table is None else "table"
-            skipped.append(CellSkip(part.reference, f"is a {kind}, not a cell"))
+            skipped.append(PartSkip(str(part.reference), f"is a {kind}, not a cell"))
             continue
         addresses = (
             [cells] if isinstance(cells, CellAddress)

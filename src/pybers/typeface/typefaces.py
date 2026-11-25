@@ -4,11 +4,14 @@ The typefaces pybers knows, and selecting their fonts with a document's selector
 
 `openTypefaces()` holds the catalog pybers ships and the fonts the machine offers, and
 `openTypefaces(path)` one font file's fonts. A font both know reports the catalog, so
-`[source=catalog]` selects every font a Mac carries. A typefaces selector has two
-positions, typeface and font, read by the one parser and resolver a document's
-selector is, every name compared loosely, so `AvenirNext` selects Avenir Next.
+`[source=catalog]` selects every font a Mac on the catalog's macOS carries. A
+typefaces selector has two positions, typeface and font, read by the one parser and
+resolver a document's selector is, every name compared loosely, so `AvenirNext`
+selects Avenir Next.
 
 UPDATES
+2026-11-24  `openTypefaces` reports its progress, and each font file it cannot read
+            is a `PartSkip`, for PYB-319.
 2026-11-24  A typeface is the design and a font one weight and slant of it, and a
             refusal says what is wrong in pybers' words alone, for PYB-318.
 2026-11-24  Written for PYB-315.
@@ -46,7 +49,14 @@ from pybers.selection.scheme import (
     SelectorScheme,
 )
 from pybers.selection.selector import SelectorLike, toSelector
-from pybers.typeface._files import TypefaceError, readFileFonts
+from pybers.status import (
+    PartSkip,
+    ProgressListener,
+    composeProgressCount,
+    composeProgressStep,
+    dropProgress,
+)
+from pybers.typeface._files import TypefaceError, readFileFonts, unreadableCause
 from pybers.typeface._machine import findMachineFontFiles
 from pybers.typeface.fonts import TypefaceFont, TypefaceSlant, TypefaceSource
 
@@ -128,7 +138,7 @@ def findSlantRefusal(slant: object) -> str | None:
 
 
 def matchNoPseudoClass(name: str, argument: str | None) -> bool:
-    """Refuse a pseudo-class, which the typefaces' scheme admits none of."""
+    """Refuse a pseudo-class, since the typefaces' scheme admits none."""
     raise AssertionError(f"The parser admitted a pseudo-class for a font, {name!r}.")
 
 
@@ -149,13 +159,10 @@ def findClosestName(written: str, names: Iterable[str]) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class Typefaces:
-    """The fonts pybers knows, each PostScript name once, and the files it cannot read.
-
-    `unreadable` holds the reason each file gives.
-    """
+    """The fonts pybers knows, each PostScript name once, and each file it skipped."""
 
     fonts: tuple[TypefaceFont, ...]
-    unreadable: tuple[str, ...] = ()
+    skipped: tuple[PartSkip, ...] = ()
 
     def select(self, selector: SelectorLike) -> tuple[TypefaceFont, ...]:
         """Return every font a selector matches, as `document.select` does."""
@@ -272,26 +279,38 @@ def formatFontChoices(fonts: Iterable[TypefaceFont]) -> str:
     ])
 
 
-def openTypefaces(path: Path | str | None = None) -> Typefaces:
-    """Return the fonts pybers knows, or the fonts of the font file at `path`."""
+def openTypefaces(
+    path: Path | str | None = None, *, onProgress: ProgressListener | None = None
+) -> Typefaces:
+    """Return the fonts pybers knows, or the fonts of the font file at `path`.
+
+    `onProgress` hears each step, and each machine font file read, counted against
+    its total.
+    """
+    report = onProgress or dropProgress
     if path is not None:
         file = Path(path)
         if not file.is_file():
             raise TypefaceError(composeRefusal(
                 str(file), "does not exist", None, nothingRead
             ))
+        report(composeProgressStep("reading the font file"))
         return Typefaces(sortFonts(readFileFonts(file, TypefaceSource.FILE)))
+    report(composeProgressStep("reading the catalog"))
     fonts = {font.postScriptName: font for font in readCatalogFonts()}
-    unreadable: list[str] = []
-    for file in findMachineFontFiles():
+    skipped: list[PartSkip] = []
+    report(composeProgressStep("finding the fonts on this machine"))
+    files = findMachineFontFiles()
+    phrase = "reading the fonts on this machine"
+    report(composeProgressCount(phrase, 0, len(files)))
+    for completed, file in enumerate(files, 1):
         try:
-            read = readFileFonts(file, TypefaceSource.MACHINE)
-        except TypefaceError as exc:
-            unreadable.append(str(exc))
-            continue
-        for font in read:
-            fonts.setdefault(font.postScriptName, font)
-    return Typefaces(sortFonts(fonts.values()), tuple(unreadable))
+            for font in readFileFonts(file, TypefaceSource.MACHINE):
+                fonts.setdefault(font.postScriptName, font)
+        except TypefaceError:
+            skipped.append(PartSkip(str(file), unreadableCause))
+        report(composeProgressCount(phrase, completed, len(files)))
+    return Typefaces(sortFonts(fonts.values()), tuple(skipped))
 
 
 __all__ = ["Typefaces", "typefaceScheme", "openTypefaces", "readCatalogFonts"]
