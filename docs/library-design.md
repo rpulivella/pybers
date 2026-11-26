@@ -35,7 +35,7 @@ A document is a tree of mutable owners, and everything a caller holds as a value
 | `CellBorders`, `CellBorder` | A cell's four sides, in CSS order, each the stroke the cell stores and the one its neighbor stores on the same edge, or `None` where neither stores one | Frozen |
 | `TableStyle`, `TableLine`, `TableBand` | A table's lines, each whether it shows and its stroke, whether its outline outlines its title, its banded rows, whether they show and their color, and the `CellStyle` each section's cells inherit | Frozen |
 | `TableStyleChange` | What setting a table's lines did: the lines it drew before and after | Frozen |
-| `Typefaces` | The fonts of the typefaces pybers knows, or one font file's, selected as a document's parts are, and each font file it skipped | Frozen |
+| `Typefaces` | The fonts of the typefaces pybers knows, or a font file's or a folder's, selected as a document's parts are, and each font file it skipped | Frozen |
 | `TypefaceFont` | One font: its typeface, its name, its PostScript name, its weight, its `TypefaceSlant` and its `TypefaceSource`, the catalog, this machine or a font file | Frozen |
 | `Formula` | A formula's tree of nodes, turned into text only on request | Frozen |
 | `CellAddress` | Where a cell is in any table: a row and a column, counted from one, with no table and no `$` | Frozen |
@@ -128,7 +128,7 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 
 ## Typefaces
 
-A style names a font by its PostScript name, and a script finds that name before it writes the style. `pybers.openTypefaces()` returns the typefaces pybers knows, the catalog it ships and the fonts installed on the machine running it, and `pybers.openTypefaces(path)` a font file's own. `typefaces.select(selector)` returns every `TypefaceFont` a selector matches, as `document.select` does, through the typefaces selector that [the command-line design](cli-design.md#typefaces) defines. `typefaces.font("Avenir Next", weight=600)` returns the one font a typeface, a weight and a slant specify, and refuses one the typeface lacks, listing the fonts it has, since Numbers would silently draw another of its fonts, an upright one for a missing italic. `typefaces.font(postScriptName="BrandSans-Semibold")` returns the font pybers knows by that name, or `None` when neither the catalog nor this machine knows it, since a style holds only the name and needs no font to write it.
+A style names a font by its PostScript name, and a script finds that name before it writes the style. `pybers.openTypefaces()` returns the typefaces pybers knows, the catalog it ships and the fonts installed on the machine running it, and `pybers.openTypefaces(path)` the fonts of a font file, or of every font file in a folder. `typefaces.select(selector)` returns every `TypefaceFont` a selector matches, as `document.select` does, through the typefaces selector that [the command-line design](cli-design.md#typefaces) defines. `typefaces.font("Avenir Next", weight=600)` returns the one font a typeface, a weight and a slant specify, and refuses one the typeface lacks, listing the fonts it has, since Numbers would silently draw another of its fonts, an upright one for a missing italic. `typefaces.font(postScriptName="BrandSans-Semibold")` returns the font pybers knows by that name, or `None` when neither the catalog nor this machine knows it, since a style holds only the name and needs no font to write it.
 
 ## Lines
 

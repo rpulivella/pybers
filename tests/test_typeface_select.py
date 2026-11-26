@@ -22,6 +22,7 @@ import pytest
 from fontbuilders import buildFont, saveFont
 
 import pybers
+from conftest import firaSansDirectory
 from pybers import TypefaceFont, Typefaces, TypefaceSlant, TypefaceSource
 from pybers.document.sheets import SelectionError
 from pybers.selection.selector import Selector, SelectorError
@@ -157,6 +158,39 @@ def testFontFileOffersItsOwnFaces(tmp_path: Path) -> None:
 def testMissingFontFileIsRefused(tmp_path: Path) -> None:
     with pytest.raises(pybers.TypefaceError, match="absent.otf does not exist"):
         pybers.openTypefaces(tmp_path / "absent.otf")
+
+
+def testFolderOffersEveryFontFileInIt() -> None:
+    found = pybers.openTypefaces(firaSansDirectory)
+    assert {each.typeface for each in found.fonts} == {"Fira Sans"}
+    assert len(found.fonts) == 11
+    assert found.skipped == ()
+
+
+def testFolderFontIsChosenByWeight() -> None:
+    fira = pybers.openTypefaces(firaSansDirectory)
+    assert fira.font("Fira Sans", weight=350).postScriptName == "FiraSans-Book"
+
+
+def testFolderWeightTwoFontsShareIsRefusedNamingBoth() -> None:
+    fira = pybers.openTypefaces(firaSansDirectory)
+    with pytest.raises(pybers.TypefaceError, match="FiraSans-Hair.*FiraSans-Thin"):
+        fira.font("Fira Sans", weight=100)
+
+
+def testFolderHoldingNoFontFileIsRefused(tmp_path: Path) -> None:
+    (tmp_path / "notes.txt").write_text("not a font")
+    with pytest.raises(pybers.TypefaceError, match="holds no font file"):
+        pybers.openTypefaces(tmp_path)
+
+
+def testFolderSkipsAFileItCannotRead(tmp_path: Path) -> None:
+    saveFont(buildFont("Brand Sans", "Bold", "BrandSans-Bold", 700),
+             tmp_path / "brand.ttf")
+    (tmp_path / "broken.otf").write_bytes(b"not a font")
+    found = pybers.openTypefaces(tmp_path)
+    assert [each.postScriptName for each in found.fonts] == ["BrandSans-Bold"]
+    assert [Path(each.place).name for each in found.skipped] == ["broken.otf"]
 
 
 @pytest.mark.skipif(not platform.mac_ver()[0], reason="the catalog is a Mac's")

@@ -51,6 +51,10 @@ from pybers._persistence.types import archiveTypes, readArchiveTypeId
 
 testsDirectory: Path = Path(__file__).resolve().parent
 
+# Fira Sans, bundled under its SIL Open Font License, so a font chosen by typeface,
+# weight and slant resolves on any machine.
+firaSansDirectory: Path = testsDirectory / "fonts" / "fira-sans"
+
 # Origin and measurement differ in provenance only, so no test cares which holds a stem.
 documentDirectories: tuple[Path, ...] = (
     testsDirectory / "fixtures",

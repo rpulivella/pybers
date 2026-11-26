@@ -10,6 +10,7 @@ resolver a document's selector is, every name compared loosely, so `AvenirNext`
 selects Avenir Next.
 
 UPDATES
+2026-11-26  `openTypefaces` reads a folder of font files, for PYB-268.
 2026-11-25  A refused font says Numbers would draw another, as measured, for
             PYB-268.
 2026-11-24  `openTypefaces` reports its progress, and each font file it cannot read
@@ -30,7 +31,7 @@ __date__ = "2026/11/24"
 
 import difflib
 import functools
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import overload
@@ -60,7 +61,12 @@ from pybers.status import (
 )
 from pybers.typeface._files import TypefaceError, readFileFonts, unreadableCause
 from pybers.typeface._machine import findMachineFontFiles
-from pybers.typeface.fonts import TypefaceFont, TypefaceSlant, TypefaceSource
+from pybers.typeface.fonts import (
+    TypefaceFont,
+    TypefaceSlant,
+    TypefaceSource,
+    fontSuffixes,
+)
 
 # A font's weight when none is given, and the range CSS `font-weight` takes.
 regularWeight: int = 400
@@ -285,30 +291,55 @@ def formatFontChoices(fonts: Iterable[TypefaceFont]) -> str:
 def openTypefaces(
     path: Path | str | None = None, *, onProgress: ProgressListener | None = None
 ) -> Typefaces:
-    """Return the fonts pybers knows, or the fonts of the font file at `path`.
+    """Return the fonts pybers knows, or the fonts at `path`, a font file or a folder.
 
-    `onProgress` hears each step, and each machine font file read, counted against
-    its total.
+    A folder offers every font file directly inside it, as a typeface shipped in
+    file form does. `onProgress` hears each step, and each font file read.
     """
     report = onProgress or dropProgress
-    if path is not None:
-        file = Path(path)
-        if not file.is_file():
-            raise TypefaceError(composeRefusal(
-                str(file), "does not exist", None, nothingRead
-            ))
+    if path is None:
+        report(composeProgressStep("reading the catalog"))
+        fonts = {font.postScriptName: font for font in readCatalogFonts()}
+        report(composeProgressStep("finding the fonts on this machine"))
+        return readFontFiles(
+            fonts, findMachineFontFiles(), TypefaceSource.MACHINE,
+            "reading the fonts on this machine", report,
+        )
+    target = Path(path)
+    if target.is_file():
         report(composeProgressStep("reading the font file"))
-        return Typefaces(sortFonts(readFileFonts(file, TypefaceSource.FILE)))
-    report(composeProgressStep("reading the catalog"))
-    fonts = {font.postScriptName: font for font in readCatalogFonts()}
+        return Typefaces(sortFonts(readFileFonts(target, TypefaceSource.FILE)))
+    if not target.is_dir():
+        raise TypefaceError(composeRefusal(
+            str(target), "does not exist", None, nothingRead
+        ))
+    files = sorted(
+        each for each in target.iterdir()
+        if each.is_file() and each.suffix.lower() in fontSuffixes
+    )
+    if not files:
+        raise TypefaceError(composeRefusal(
+            str(target), "holds no font file, .otf, .ttf, .ttc or .otc", None,
+            nothingRead,
+        ))
+    return readFontFiles(
+        {}, files, TypefaceSource.FILE, "reading the font files", report
+    )
+
+
+def readFontFiles(
+    fonts: dict[str, TypefaceFont], files: Sequence[Path], source: TypefaceSource,
+    phrase: str, report: ProgressListener,
+) -> Typefaces:
+    """Return `fonts` with every font the files offer, each unreadable file skipped.
+
+    A PostScript name already found keeps its first font.
+    """
     skipped: list[PartSkip] = []
-    report(composeProgressStep("finding the fonts on this machine"))
-    files = findMachineFontFiles()
-    phrase = "reading the fonts on this machine"
     report(composeProgressCount(phrase, 0, len(files)))
     for completed, file in enumerate(files, 1):
         try:
-            for font in readFileFonts(file, TypefaceSource.MACHINE):
+            for font in readFileFonts(file, source):
                 fonts.setdefault(font.postScriptName, font)
         except TypefaceError:
             skipped.append(PartSkip(str(file), unreadableCause))

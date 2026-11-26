@@ -327,7 +327,7 @@ $ pybers show shapes.numbers "*::Table 2" --output-format json
 
 </details>
 
-`pybers show typefaces` prints every font pybers knows: the catalog of fonts macOS installs, which pybers reads from the macOS of each release and ships, so a document built anywhere names fonts every Mac on that macOS carries, and the fonts this machine offers. `pybers show FONTFILE` prints a font file's own fonts, installed or not. A [selector](#selectors) narrows either, its positions a typeface and a font, every name compared ignoring case, spaces and hyphens, and a quoted value ending in `s` compared exactly. Each typeface prints as a part, its fonts one line each beneath it, so the PostScript name a style needs is found before the style is written:
+`pybers show typefaces` prints every font pybers knows: the catalog of fonts macOS installs, which pybers reads from the macOS of each release and ships, so a document built anywhere names fonts every Mac on that macOS carries, and the fonts this machine offers. `pybers show FONTFILE` prints a font file's own fonts, installed or not, and a folder of font files prints every font in them. A [selector](#selectors) narrows either, its positions a typeface and a font, every name compared ignoring case, spaces and hyphens, and a quoted value ending in `s` compared exactly. Each typeface prints as a part, its fonts one line each beneath it, so the PostScript name a style needs is found before the style is written:
 
 ```console
 $ pybers show typefaces 'avenirnext::*demi*'
@@ -509,7 +509,7 @@ A `Color` specifies its space and always includes an alpha (opacity). pybers doe
 
 ### Typefaces
 
-A style names its font by a PostScript name, `AvenirNext-DemiBold`, which few people know by heart, so pybers finds it from what a designer specifies, a typeface, a weight and a slant. `pybers.openTypefaces()` holds the typefaces pybers knows, the catalog of fonts macOS installs and the fonts this machine offers, and `pybers.openTypefaces(path)` a font file's own. `typefaces.select` takes the same [selector](#selectors) a document does, and `typefaces.font` returns the one font a typeface, a weight and a slant specify:
+A style names its font by a PostScript name, `AvenirNext-DemiBold`, which few people know by heart, so pybers finds it from what a designer specifies, a typeface, a weight and a slant. `pybers.openTypefaces()` holds the typefaces pybers knows, the catalog of fonts macOS installs and the fonts this machine offers, and `pybers.openTypefaces(path)` a font file's own, or those of every font file in a folder. `typefaces.select` takes the same [selector](#selectors) a document does, and `typefaces.font` returns the one font a typeface, a weight and a slant specify:
 
 ```python
 typefaces = pybers.openTypefaces()

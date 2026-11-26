@@ -22,6 +22,7 @@ from click.testing import CliRunner, Result
 from fontbuilders import buildFont, saveCollection
 
 import pybers
+from conftest import firaSansDirectory
 from pybers.cli._app import app
 
 runner: CliRunner = CliRunner()
@@ -63,6 +64,12 @@ def testFamiliesAreSeparatedByABlankLine(tmp_path: Path) -> None:
     assert [line for line in lines if not line.startswith("  ")] == [
         "Typeface: Brand Sans  1 font", "", "Typeface: Brand Serif  1 font",
     ]
+
+
+def testFolderOfFontFilesShowsEveryFont() -> None:
+    result = runShowCommand(firaSansDirectory, "Fira Sans::*Bold*")
+    assert result.exit_code == 0
+    assert result.stdout.splitlines()[0] == "Typeface: Fira Sans  4 fonts"
 
 
 def testSelectorNarrowsAFontFile(brandPath: Path) -> None:

@@ -10,6 +10,7 @@ JSON is always an array of those forms, which `parseJsonForm` reads back.
 `tests/test_cli_show.py` fails when the form gains a field this command does not print.
 
 UPDATES
+2026-11-26  A folder of font files as FILE shows its fonts, for PYB-268.
 2026-11-24  Progress shows on stderr while a document or the typefaces are read,
             and each font file skipped is composed, for PYB-319.
 2026-11-24  `typefaces` as FILE shows the typefaces pybers knows, for PYB-318.
@@ -253,6 +254,12 @@ def formatFonts(fonts: Sequence[pybers.TypefaceFont]) -> Group:
     return formatParts(families)
 
 
+def isFontPath(path: Path) -> bool:
+    """Return whether FILE is a font file or a folder of them, never a package."""
+    suffix = path.suffix.lower()
+    return suffix in pybers.fontSuffixes or (path.is_dir() and suffix != ".numbers")
+
+
 def showTypefaces(file: str, selector: str | None, outputFormat: OutputFormat) -> None:
     """Print the fonts a selector matches, and each font file skipped on stderr."""
     with showProgress() as onProgress:
@@ -270,7 +277,7 @@ def showTypefaces(file: str, selector: str | None, outputFormat: OutputFormat) -
 @click.argument(
     "file", cls=PybersArgument, type=click.Path(),
     help="The .numbers document, `typefaces` for the typefaces pybers knows, or a font "
-    "file.",
+    "file or a folder of them.",
 )
 @click.argument(
     "selector", cls=PybersArgument, required=False,
@@ -286,7 +293,7 @@ def runShow(
 ) -> None:
     """Show a whole document, or every part SELECTOR matches, or the typefaces."""
     with reportPybersErrors(context):
-        if file == typefacesFile or Path(file).suffix.lower() in pybers.fontSuffixes:
+        if file == typefacesFile or isFontPath(Path(file)):
             showTypefaces(file, selector, outputFormat)
             return
         with showProgress() as onProgress:

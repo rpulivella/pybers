@@ -17,7 +17,7 @@ Workflows are top-level verbs. A noun groups verbs only once one resource needs 
 | ------- | ------------ |
 | `pybers FILE` | Runs `check --names FILE`, so a document always shows something |
 | `check FILE` | Whether pybers can read a document, the tree of its sheets and tables with each unrecognized cell badged, and each font it uses with where pybers knows it, safe to post publicly, `--names` showing each sheet's and table's name and each such cell's address |
-| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading. `show typefaces [SELECTOR]` shows the typefaces pybers knows, and a font file as FILE shows its own |
+| `show FILE [SELECTOR]` | A whole document, or every part a selector matches, for reading. `show typefaces [SELECTOR]` shows the typefaces pybers knows, and a font file or a folder of them as FILE shows its own |
 | `export FILE [SELECTOR]` | JSON, YAML, CSV or a new `.numbers` document, to stdout or `-o`, never changing FILE |
 | `set FILE SELECTOR [VALUE] [--cell-format FORMAT] [--cell-control CONTROL] [--cell-style STYLE] [--cell-style-update STYLE] [--cell-style-remove PROPERTY] [--border POSITION ...] [--table-style STYLE]` | The value, the format, the control, the cell style and the borders of every cell a selector matches, or the lines of every table it matches, each optional. `set FILE --locale LOCALE` changes a document's language and region instead |
 | `import [FILE] DATA` | Data brought into FILE in place, into a changed copy at `-o`, or into a new document when no FILE is given |
@@ -68,7 +68,7 @@ A command parses its arguments, calls the library once, formats what comes back,
 
 A style names a font, and a person finds the font before writing the style, so `show` reads the typefaces pybers knows as it reads a document.
 
-- **`typefaces` as FILE is every font pybers knows**: the catalog pybers ships, read from the fonts macOS installs, and the fonts installed on the machine running it. A font file, `.otf`, `.ttf` or `.ttc`, as FILE is that file's fonts alone, installed or not. A file named `typefaces` is reached as `./typefaces`, as a file named like a command is.
+- **`typefaces` as FILE is every font pybers knows**: the catalog pybers ships, read from the fonts macOS installs, and the fonts installed on the machine running it. A font file, `.otf`, `.ttf` or `.ttc`, as FILE is that file's fonts alone, installed or not, and a folder of them is every font file directly inside it, as a typeface shipped in file form arrives. A file named `typefaces` is reached as `./typefaces`, as a file named like a command is.
 - **A typefaces selector has two positions, typeface and font, joined by `::`**, with the wildcards, negation and grouping every selector has. `Avenir Next` selects a typeface, and `Avenir Next::*Demi*` its fonts whose names hold `Demi`.
 - **A name matches ignoring case, spaces and hyphens**, so `AvenirNext`, `Avenir Next` and `avenir-next` each select Avenir Next, since a typeface's name is spelled many ways and only its letters specify it.
 - **Conditions read what a font is**: `[weight=600]`, `[slant=italic]`, `[source=machine]` and `[postscript=AvenirNext-DemiBold]`. A weight also compares, as a CSS range query does, `[weight>=600]`.
